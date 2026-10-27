@@ -21,7 +21,7 @@ import (
 
 // Remediation is how fast things are being fixed, and what is aging.
 //
-// Counted in issues, not in places. One kernel flaw across sixty modules is
+// Counted in issues, not in occurrences. One kernel flaw across sixty modules is
 // one thing that was fixed, and a mean time to remediate weighted by how far a
 // component fans out through an image is a measurement of the dependency graph
 // rather than of anybody's work.
@@ -128,20 +128,22 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 
 	out := &Remediation{TimeToFix: map[string]time.Duration{}}
 
-	// spans is how long each issue took, averaged per severity band.
-	// Averaged over the issue rather than over its rows, because the places
-	// are what fans out: an issue counts once, in the window its last place
-	// closed by a fix, and only where none of its places is still open. It
-	// took from the first of its places to open to the last of them to close.
+	// spans is how long each issue took, averaged per severity band. Averaged
+	// over the issue rather than over its rows, because the occurrences are
+	// what fans out: an issue counts once, in the window its last occurrence
+	// closed by a fix, and only where none of its occurrences is still open. It
+	// took from the first of its occurrences to open to the last of them to
+	// close.
 	var spans []struct {
 		Rank    int     `bun:"band_rank"`
 		Seconds float64 `bun:"seconds"`
 		Issues  int     `bun:"issues"`
 	}
-	// The issues with a place closed by a fix in the window, whoever may read
-	// it. Every issue counted is among these, so the places of the rest are
-	// never read. A place out of the reader's reach can put an issue here, so
-	// the window's two ends are checked again on what the reader reads.
+	// The issues with an occurrence closed by a fix in the window, whoever may
+	// read it. Every issue counted is among these, so the occurrences of the
+	// rest are never read. An occurrence out of the reader's reach can put an
+	// issue here, so the window's two ends are checked again on what the reader
+	// reads.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	closing := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -158,11 +160,11 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	closing = resolved(closing)
 
 	// One row per issue and product first, because a rating belongs to a
-	// product and every narrowing is a condition on a place. Every place of
-	// those issues, open ones included, so that an issue still open
-	// anywhere the reader looks is not counted as fixed. A place closed for
-	// any other reason is left out: churn carried the issue to a place that
-	// is open, and a record taken back was never a place.
+	// product and every narrowing is a condition on an occurrence. Every
+	// occurrence of those issues, open ones included, so that an issue still
+	// open anywhere the reader looks is not counted as fixed. An occurrence
+	// closed for any other reason is left out: churn carried the issue to an
+	// occurrence that is open, and a record taken back was never an occurrence.
 	closed := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -184,8 +186,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 
 	// Then one row per issue, in the strictest band any product it closed in
 	// gives it, so an issue rated two ways in two products is one fix, in the
-	// same unit as what opened. Counted where no place of it is open in any
-	// product and the last place closed in the window.
+	// same unit as what opened. Counted where no occurrence of it is open in any
+	// product and the last occurrence closed in the window.
 	perIssue := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, closed).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
@@ -201,7 +203,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	}
 
 	// The averaging happens over the grouped issues, in a statement of its
-	// own, because averaging inside the grouping would average the places.
+	// own, because averaging inside the grouping would average the occurrences.
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_issue"`, perIssue).
 		ColumnExpr(`"per_issue"."band_rank" AS "band_rank"`).
@@ -253,11 +255,11 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 // whether anybody has answered it.
 //
 // One pass over the open findings rather than three per bucket. Each issue is
-// reduced to a flag per bucket saying it has a place there, a flag per bucket
-// saying one of those places is unanswered, and the rating it carries there;
-// the issues are then counted by which flags and ratings they hold, which is
-// a handful of rows however many issues there are. An issue with places in
-// two buckets counts in both.
+// reduced to a flag per bucket saying it has an occurrence there, a flag per
+// bucket saying one of those occurrences is unanswered, and the rating it
+// carries there; the issues are then counted by which flags and ratings they
+// hold, which is a handful of rows however many issues there are. An issue with
+// occurrences in two buckets counts in both.
 //
 // The boundaries are moments computed here and bound, rather than date
 // arithmetic in the statement, because a database that does its own date
@@ -265,24 +267,24 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 func (s *Store) aging(ctx context.Context, subject access.Subject, products []int64, all bool,
 	scope Scope, now time.Time) ([]Bucket, error) {
 
-	// Answered is the same test the deadline list makes: a claim waiting for
+	// Answered is the same test the deadline list makes: a decision waiting for
 	// a second person is not standing, so it answers nothing and the finding
 	// is still undecided. Matched on the live key rather than on both
 	// versions, because for a figure about a backlog "somebody has said
 	// something here" is the question, not "which build of it".
 	//
-	// Built once from the decision side and joined on the finding, so the
-	// question is asked of the decisions once rather than of every open
-	// place in turn. The decision is outermost through CROSS JOIN ... WHERE,
-	// for the reason the state filter gives: SQLite left to choose starts
-	// from every open finding.
+	// Built once from the decision occurrence side and joined on the finding,
+	// so the question is asked of the decision occurrences once rather than of
+	// every open occurrence in turn. The decision occurrence is outermost
+	// through CROSS JOIN ... WHERE, for the reason the state filter gives:
+	// SQLite left to choose starts from every open finding.
 	standing, held := InForce()
 	answeredKinds, answeredArgs := kind.Statistics.Where(`"f2"."kind"`)
 	answered := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(DecisionIssue).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f2"`).
-		Where(DecisionAtPlace("f2")).
+		Where(DecisionOccurrenceOf("f2")).
 		Join(`JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"`).
 		Join(`JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"`).
 		ColumnExpr(`"f2"."id" AS "finding_id"`).
@@ -294,10 +296,10 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		GroupExpr(`"f2"."id"`)
 
 	// One row per issue and product, with the flags. Every narrowing is a
-	// condition on a place, so each applies here, before the places are
-	// reduced.
+	// condition on an occurrence, so each applies here, before the occurrences
+	// are reduced.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
-	places := s.db.NewSelect().
+	occurrences := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
@@ -310,19 +312,19 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		GroupExpr(`"f"."vulnerability_id", "st"."product_id"`)
 	for i, bucket := range agingBuckets {
 		in, args := bucket.holds(now)
-		places = places.
+		occurrences = occurrences.
 			ColumnExpr(`MAX(CASE WHEN `+in+` THEN 1 ELSE 0 END) AS "open_`+bucketName(i)+`"`, args...).
 			ColumnExpr(`MAX(CASE WHEN `+in+` AND "answered"."finding_id" IS NULL THEN 1 ELSE 0 END)`+
 				` AS "undecided_`+bucketName(i)+`"`, args...)
 	}
-	places = scope.Narrow(onlyReadable(places, subject, products, all))
+	occurrences = scope.Narrow(onlyReadable(occurrences, subject, products, all))
 
 	// One row per issue. The rating is joined to the reduced rows, each
 	// product's own where it has stated one, and an issue's rating in a
 	// bucket is the strictest across the products it is open in there:
 	// the highest rank, with a word that ranks nothing below every band.
 	issues := s.db.NewSelect().
-		TableExpr(`(?) AS "grouped"`, places).
+		TableExpr(`(?) AS "grouped"`, occurrences).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
 		Join(rating.For(rating.OnGrouped)).
 		GroupExpr(`"grouped"."vulnerability_id"`)

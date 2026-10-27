@@ -12,37 +12,37 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-func TestAGroupedClaimReadsItsPlacesInTheTransactionItWritesIn(t *testing.T) {
+func TestAGroupedDecisionReadsItsOccurrencesInTheTransactionItWritesIn(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		first := triage.Proposal{
-			Place: f.at(), Outcome: triage.NotApplicable, Justification: triage.CodeNotInExecutePath,
+			Occurrence: f.at(), Outcome: triage.NotApplicable, Justification: triage.CodeNotInExecutePath,
 			Reasoning: "The parser is never reached: we only call the encoder.", By: f.proposer,
 		}
 		also := f.at()
-		also.PlaceIdentity = "another-place-of-libfoo"
+		also.OccurrenceIdentity = "another-place-of-libfoo"
 		asked := 0
 		decided, err := f.store.ProposeGrouped(ctx, f.triager, first,
-			func(_ context.Context, db bun.IDB) ([]triage.Place, error) {
+			func(_ context.Context, db bun.IDB) ([]triage.Occurrence, error) {
 				asked++
 				if _, ok := db.(bun.Tx); !ok {
-					t.Errorf("the places were read through %T, outside the transaction that writes", db)
+					t.Errorf("the occurrences were read through %T, outside the transaction that writes", db)
 				}
-				return []triage.Place{also}, nil
+				return []triage.Occurrence{also}, nil
 			})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if asked == 0 {
-			t.Fatal("the places were never asked for")
+			t.Fatal("the occurrences were never asked for")
 		}
-		var rows []triage.Decision
-		if err := f.db.DB.NewSelect().Model(&rows).Where(`"claim_id" = ?`, decided.ClaimID).
-			Order("place_identity").Scan(ctx); err != nil {
+		var rows []triage.DecisionOccurrence
+		if err := f.db.DB.NewSelect().Model(&rows).Where(`"decision_id" = ?`, decided.DecisionID).
+			Order("occurrence_identity").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if len(rows) != 2 || rows[0].PlaceIdentity != also.PlaceIdentity || rows[1].PlaceIdentity != first.Place.PlaceIdentity {
-			t.Errorf("the claim wrote %+v; want the first place and the one asked for", rows)
+		if len(rows) != 2 || rows[0].OccurrenceIdentity != also.OccurrenceIdentity || rows[1].OccurrenceIdentity != first.Occurrence.OccurrenceIdentity {
+			t.Errorf("the decision wrote %+v; want the first occurrence and the one asked for", rows)
 		}
 	})
 }

@@ -34,28 +34,28 @@ type Disposed struct {
 	Version       string
 	// Purl is the component's package identifier, which tells two components
 	// of one name and one version apart.
-	Purl  string
-	Place string
+	Purl       string
+	Occurrence string
 	// Consumer is what pulls the component in, empty where the build holds it
-	// directly. The place identity is derived from content and is a hash, so
+	// directly. The occurrence identity is derived from content and is a hash, so
 	// it correlates two rows and tells nobody where anything is; this is the
 	// name an auditor reads.
 	Consumer string
 	// State is where this stands, in the four words the state filter uses.
 	// "undecided" is the row an auditor is looking for and the one every other
 	// report leaves out.
-	State ClaimStanding
-	// Outcome and Justification are what was claimed, where anything was.
+	State DecisionStanding
+	// Outcome and Justification are what was proposed, where anything was.
 	Outcome       string
 	Justification string
-	// ProposedBy and ProposedAt are who claimed it and when; ApprovedBy and
+	// ProposedBy and ProposedAt are who proposed it and when; ApprovedBy and
 	// ApprovedAt are who agreed. Two different people is the whole of the
 	// separation-of-duties control, so both are carried rather than a count.
 	ProposedBy string
 	ProposedAt *time.Time
 	ApprovedBy string
 	ApprovedAt *time.Time
-	// AgreementCarried says the agreement was given for an earlier claim and
+	// AgreementCarried says the agreement was given for an earlier decision and
 	// carried onto this one, which is what a re-affirmation stands on. The
 	// person named read those words rather than these, and a register that
 	// did not say so reported them as having agreed to reasoning they have
@@ -80,7 +80,7 @@ type Disposed struct {
 	// UnaffectedBy is the CVE record lines that closed this as unaffected, as
 	// JSON. Empty on every other row.
 	UnaffectedBy string
-	// Stated is the supplier's statement answering this place: on a row
+	// Stated is the supplier's statement answering this occurrence: on a row
 	// closed as disclaimed, the one that closed it, and on an open row, one
 	// answering it on the routes through the supplier's product. Nil where
 	// none does.
@@ -88,7 +88,7 @@ type Disposed struct {
 }
 
 // SupplierSaid is a supplier's statement as the register states it beside the
-// place it answers.
+// occurrence it answers.
 type SupplierSaid struct {
 	Publisher     string
 	Product       string
@@ -255,33 +255,33 @@ func (s *Store) RegisterEach(ctx context.Context, subject access.Subject, target
 // Named rather than declared inside the reader, because two readers return it
 // now: the screen's page, and the walk the export makes.
 type registerRow struct {
-	Vulnerability string     `bun:"vulnerability"`
-	Severity      string     `bun:"severity"`
-	Component     string     `bun:"component"`
-	Version       string     `bun:"version"`
-	Purl          string     `bun:"purl"`
-	Place         string     `bun:"place_identity"`
-	Consumer      string     `bun:"consumer"`
-	Outcome       string     `bun:"outcome"`
-	Justification string     `bun:"justification"`
-	DecisionState string     `bun:"decision_state"`
-	ProposedBy    string     `bun:"proposed_by"`
-	ProposedAt    *time.Time `bun:"proposed_at"`
-	ApprovedBy    string     `bun:"approved_by"`
-	ApprovedAt    *time.Time `bun:"approved_at"`
-	Carried       bool       `bun:"agreement_carried"`
-	OpenedAt      time.Time  `bun:"opened_at"`
-	ClosedAt      *time.Time `bun:"closed_at"`
-	DueAt         *time.Time `bun:"due_at"`
-	ClosedBecause string     `bun:"closed_because"`
-	ClosedNote    string     `bun:"closed_note"`
-	UnaffectedBy  string     `bun:"unaffected_by"`
-	StatedBy      *int64     `bun:"stated_by"`
-	StatedWho     string     `bun:"stated_who"`
-	StatedIn      string     `bun:"stated_in"`
-	StatedWhy     string     `bun:"stated_why"`
-	StatedWords   string     `bun:"stated_words"`
-	StatedFile    string     `bun:"stated_file"`
+	Vulnerability           string     `bun:"vulnerability"`
+	Severity                string     `bun:"severity"`
+	Component               string     `bun:"component"`
+	Version                 string     `bun:"version"`
+	Purl                    string     `bun:"purl"`
+	Occurrence              string     `bun:"occurrence_identity"`
+	Consumer                string     `bun:"consumer"`
+	Outcome                 string     `bun:"outcome"`
+	Justification           string     `bun:"justification"`
+	DecisionOccurrenceState string     `bun:"decision_state"`
+	ProposedBy              string     `bun:"proposed_by"`
+	ProposedAt              *time.Time `bun:"proposed_at"`
+	ApprovedBy              string     `bun:"approved_by"`
+	ApprovedAt              *time.Time `bun:"approved_at"`
+	Carried                 bool       `bun:"agreement_carried"`
+	OpenedAt                time.Time  `bun:"opened_at"`
+	ClosedAt                *time.Time `bun:"closed_at"`
+	DueAt                   *time.Time `bun:"due_at"`
+	ClosedBecause           string     `bun:"closed_because"`
+	ClosedNote              string     `bun:"closed_note"`
+	UnaffectedBy            string     `bun:"unaffected_by"`
+	StatedBy                *int64     `bun:"stated_by"`
+	StatedWho               string     `bun:"stated_who"`
+	StatedIn                string     `bun:"stated_in"`
+	StatedWhy               string     `bun:"stated_why"`
+	StatedWords             string     `bun:"stated_words"`
+	StatedFile              string     `bun:"stated_file"`
 }
 
 // Registering narrows the register.
@@ -294,8 +294,8 @@ type registerRow struct {
 type Registering struct {
 	// States keeps rows standing in any of these, by the four words the row
 	// itself carries.
-	States []ClaimStanding
-	// Outcomes keeps rows whose standing judgment is one of these.
+	States []DecisionStanding
+	// Outcomes keeps rows whose standing decision is one of these.
 	Outcomes []string
 	// Component and Issue keep one of each, by name.
 	Component string
@@ -311,9 +311,9 @@ type Registering struct {
 
 // narrow applies it to the register's statement.
 //
-// Over the decision's own columns rather than over the word the row carries:
-// the word is worked out as the row is read, and the two are the same rule
-// spelled for a reader and for the engine.
+// Over the decision occurrence's own columns rather than over the word the row
+// carries: the word is worked out as the row is read, and the two are the same
+// rule spelled for a reader and for the engine.
 func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if len(r.States) > 0 {
 		var said []string
@@ -331,8 +331,9 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("(" + strings.Join(said, " OR ") + ")")
 	}
 	if len(r.Outcomes) > 0 {
-		// Asked of a judgment that is on the record, so a superseded claim's
-		// outcome does not answer for a place nothing stands at.
+		// Asked of a decision occurrence on the record, so a superseded
+		// decision's outcome does not answer for an occurrence nothing stands
+		// at.
 		q = q.Where("("+onTheRecord+`COALESCE("cl"."outcome", '') ELSE '' END) IN (?)`,
 			bun.List(r.Outcomes))
 	}
@@ -359,7 +360,7 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // registerState is the predicate behind one of the four words a register row
 // carries, spelled beside the column they are read from so the filter and the
 // word cannot come to mean different things.
-func registerState(word ClaimStanding) (string, bool) {
+func registerState(word DecisionStanding) (string, bool) {
 	live := `"de"."live_key" IS NOT NULL`
 	lapsed := `"de"."state" = 'lapsed'`
 	switch word {
@@ -392,76 +393,78 @@ func (s *Store) registerJoins(productID int64,
 		// The component's consumer. Left, because a build holds some
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		// The one decision on the record at the place, or none, filed under
+		// The one decision on the record at the occurrence, or none, filed under
 		// any issue read as the finding's.
-		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+		Join(`LEFT JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
 			AND `+onTheRecordHere, productID).
-		Join(`LEFT JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`)
+		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`)
 }
 
-// onTheRecordHere picks, among every decision row ever written at a place,
+// onTheRecordHere picks, among every decision row ever written at an occurrence,
 // the one the register reports: the live decision that covers the finding's
 // versions, or where none does, the latest lapsed one. A withdrawn row is on
 // no record, and a live decision keyed on other versions answers for another
-// build's finding at the same place.
+// build's finding at the same occurrence.
 //
-// Rows are never deleted, so a place carries its whole history, and matched by
-// place alone a place withdrawn and claimed again reads twice. The versions
-// are the findings list's own test, so the register and the list agree about
-// every place. The claim's outcome is read by a scalar rather than through the
-// join, because the claim joined is the one this condition selects.
+// Rows are never deleted, so an occurrence carries its whole history, and
+// matched by occurrence alone an occurrence withdrawn and proposed again reads
+// twice. The versions are the findings list's own test, so the register and the
+// list agree about every occurrence. The decision's outcome is read by a scalar
+// rather than through the join, because the decision joined is the one this
+// condition selects.
 //
-// Two live decisions can cover one finding: a claim keyed on its versions and
-// a correction, which covers the place at any version. The one reported is
+// Two live decisions can cover one finding: a decision keyed on its versions and
+// a correction, which covers the occurrence at any version. The one reported is
 // the one the finding's own screen names: the correction in force, and
 // otherwise the oldest.
 var onTheRecordHere = `(("de"."live_key" IS NOT NULL AND ` + keyMatchesOn("de", outcomeOf("de")) + `
-	AND NOT EXISTS (SELECT 1 FROM "decision" AS "d3"
+	AND NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "d3"
 		JOIN "vulnerability" AS "d3v" ON "d3v"."id" = "d3"."vulnerability_id"
 		WHERE "d3"."product_id" = "de"."product_id"
 		  AND "d3v"."issue_id" = "dv"."issue_id"
-		  AND "d3"."place_identity" = "de"."place_identity"
+		  AND "d3"."occurrence_identity" = "de"."occurrence_identity"
 		  AND "d3"."live_key" IS NOT NULL
 		  AND ` + keyMatchesOn("d3", outcomeOf("d3")) + `
 		  AND (` + rankOf("d3") + ` < ` + rankOf("de") + `
 		    OR (` + rankOf("d3") + ` = ` + rankOf("de") + ` AND "d3"."id" < "de"."id"))))
-	OR ("de"."state" = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision" AS "d2"
+	OR ("de"."state" = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "d2"
 		JOIN "vulnerability" AS "d2v" ON "d2v"."id" = "d2"."vulnerability_id"
 		WHERE "d2"."product_id" = "de"."product_id"
 		  AND "d2v"."issue_id" = "dv"."issue_id"
-		  AND "d2"."place_identity" = "de"."place_identity"
+		  AND "d2"."occurrence_identity" = "de"."occurrence_identity"
 		  AND (("d2"."live_key" IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
 		    OR ("d2"."state" = 'lapsed' AND "d2"."id" > "de"."id")))))`
 
-// outcomeOf is the outcome of a decision's claim, as a scalar.
-func outcomeOf(decision string) string {
-	return `(SELECT "clr"."outcome" FROM "claim" AS "clr" WHERE "clr"."id" = "` + decision + `"."claim_id")`
+// outcomeOf is the outcome of a decision occurrence's decision, as a scalar.
+func outcomeOf(occurrence string) string {
+	return `(SELECT "clr"."outcome" FROM "decision" AS "clr" WHERE "clr"."id" = "` + occurrence + `"."decision_id")`
 }
 
-// rankOf orders the live decisions at one place the way the finding's screen
+// rankOf orders the live decisions at one occurrence the way the finding's screen
 // does: a correction in force before anything else.
-func rankOf(decision string) string {
-	return `(CASE WHEN ` + outcomeOf(decision) + ` = '` + OutcomeMismatched + `'
-		AND ("` + decision + `"."state" = 'approved'
-		  OR ("` + decision + `"."needs_approval" = FALSE AND "` + decision + `"."sent_back_at" IS NULL))
+func rankOf(occurrence string) string {
+	return `(CASE WHEN ` + outcomeOf(occurrence) + ` = '` + OutcomeMismatched + `'
+		AND ("` + occurrence + `"."state" = 'approved'
+		  OR ("` + occurrence + `"."needs_approval" = FALSE AND "` + occurrence + `"."sent_back_at" IS NULL))
 		THEN 0 ELSE 1 END)`
 }
 
 // registerQuery is the register, unbounded. What a caller adds is how much of
 // it they want.
 //
-// The standing decision at each place, and the agreement it holds. Left joins
-// throughout, because a place nobody has decided about is the row this exists
-// to show — an inner join answers the question the audit list already answers.
+// The standing decision at each occurrence, and the agreement it holds. Left
+// joins throughout, because an occurrence nobody has decided about is the row
+// this exists to show — an inner join answers the question the audit list
+// already answers.
 func (s *Store) registerQuery(productID int64,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery) *bun.SelectQuery {
 
 	return s.registerJoins(productID, narrow).
 		// A lapsed decision is on the record: who proposed and who approved
 		// it is what a compliance reader comes here for, and the findings list
-		// says "lapsed" about the same place.
+		// says "lapsed" about the same occurrence.
 		Join(`LEFT JOIN "person" AS "pp" ON "pp"."id" = "de"."proposed_by"`).
-		// The supplier's statement answering the place, where one does.
+		// The supplier's statement answering the occurrence, where one does.
 		Join(`LEFT JOIN "vex_statement" AS "sr" ON "sr"."id" = "f"."stated_by"`).
 		Join(WordsJoin("sr")).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
@@ -469,11 +472,11 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"c"."version" AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
-		// A decision counts where it is live or where it lapsed. Lapsed is
-		// what happened to it and is part of the record; a superseded one is
-		// not, and reporting it would say a place is decided when it is not.
+		// A decision counts where it is live or where it lapsed. Lapsed is what
+		// happened to it and is part of the record; a superseded one is not,
+		// and reporting it would say an occurrence is decided when it is not.
 		ColumnExpr(onTheRecord + `COALESCE("cl"."outcome", '') ELSE '' END AS "outcome"`).
 		ColumnExpr(onTheRecord + `COALESCE("cl"."justification", '') ELSE '' END AS "justification"`).
 		ColumnExpr(onTheRecord + `"de"."state" ELSE '' END AS "decision_state"`).
@@ -485,19 +488,19 @@ func (s *Store) registerQuery(productID int64,
 		// finding it belongs to on a page whose total counts findings, so the
 		// page holds fewer findings than it says and every later offset skips
 		// some of the register.
-		ColumnExpr(onTheRecord + `COALESCE((SELECT "p2"."identity" FROM "claim_approval" AS "da2"
+		ColumnExpr(onTheRecord + `COALESCE((SELECT "p2"."identity" FROM "decision_approval" AS "da2"
 			JOIN "person" AS "p2" ON "p2"."id" = "da2"."approved_by"
-			WHERE "da2"."claim_id" = "de"."claim_id" AND "da2"."withdrawn_at" IS NULL
+			WHERE "da2"."decision_id" = "de"."decision_id" AND "da2"."withdrawn_at" IS NULL
 			ORDER BY "da2"."approved_at", "da2"."id" LIMIT 1), '') ELSE '' END AS "approved_by"`).
-		ColumnExpr(onTheRecord + `(SELECT MIN("da3"."approved_at") FROM "claim_approval" AS "da3"
-			WHERE "da3"."claim_id" = "de"."claim_id" AND "da3"."withdrawn_at" IS NULL)
+		ColumnExpr(onTheRecord + `(SELECT MIN("da3"."approved_at") FROM "decision_approval" AS "da3"
+			WHERE "da3"."decision_id" = "de"."decision_id" AND "da3"."withdrawn_at" IS NULL)
 			ELSE NULL END AS "approved_at"`).
 		// And whether that agreement was carried rather than given. The same
 		// row the identity above comes from, ordered the same way, so the two
 		// cannot describe different approvals.
 		ColumnExpr(onTheRecord + `COALESCE((SELECT CASE WHEN "da4"."carried_from" IS NULL THEN 0 ELSE 1 END
-			FROM "claim_approval" AS "da4"
-			WHERE "da4"."claim_id" = "de"."claim_id" AND "da4"."withdrawn_at" IS NULL
+			FROM "decision_approval" AS "da4"
+			WHERE "da4"."decision_id" = "de"."decision_id" AND "da4"."withdrawn_at" IS NULL
 			ORDER BY "da4"."approved_at", "da4"."id" LIMIT 1), 0) ELSE 0 END AS "agreement_carried"`).
 		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
 		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
@@ -515,19 +518,19 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`COALESCE("sr"."justification", '') AS "stated_why"`).
 		ColumnExpr(WordsColumn + ` AS "stated_words"`).
 		ColumnExpr(`COALESCE("sr"."document", '') AS "stated_file"`).
-		OrderExpr(`"v"."identifier", "c"."name", "f"."place_identity"`)
+		OrderExpr(`"v"."identifier", "c"."name", "f"."occurrence_identity"`)
 }
 
-// onTheRecord opens the case expression each of the decision's own columns is
-// wrapped in: a decision is part of this record where it is live or where it
-// lapsed, and a superseded one is not.
+// onTheRecord opens the case expression each of the decision occurrence's own
+// columns is wrapped in: a decision is part of this record where it is live or
+// where it lapsed, and a superseded one is not.
 const onTheRecord = `CASE WHEN "de"."live_key" IS NOT NULL OR "de"."state" = 'lapsed' THEN `
 
 // disposedFrom is one row as the register states it.
 func disposedFrom(row registerRow) Disposed {
 	one := Disposed{
 		Vulnerability: row.Vulnerability, Severity: row.Severity,
-		Component: row.Component, Version: row.Version, Purl: row.Purl, Place: row.Place,
+		Component: row.Component, Version: row.Version, Purl: row.Purl, Occurrence: row.Occurrence,
 		Consumer: row.Consumer,
 		Outcome:  row.Outcome, Justification: row.Justification,
 		ProposedBy: row.ProposedBy, ProposedAt: row.ProposedAt,
@@ -544,10 +547,10 @@ func disposedFrom(row registerRow) Disposed {
 		}
 	}
 	// The same four words the state filter uses, at the grain of one
-	// place: a place has one standing decision or none, so there is no
+	// occurrence: an occurrence has one standing decision or none, so there is no
 	// aggregate to take here and no way for this to disagree with the
 	// list.
-	one.State = placeStanding(row.DecisionState)
+	one.State = occurrenceStanding(row.DecisionOccurrenceState)
 	// A deadline met, which is answerable only for something that closed: an
 	// open row has not missed its deadline, it has not reached the end of the
 	// question.
@@ -566,11 +569,12 @@ func disposedFrom(row registerRow) Disposed {
 	return one
 }
 
-// placeStanding is the standing of one place, from the state of the decision
-// standing there, or none. A place has one standing decision or none, so there
-// is no aggregate to take and no way for this to disagree with the list.
-func placeStanding(decision string) ClaimStanding {
-	switch decision {
+// occurrenceStanding is the standing of one occurrence, from the state of the
+// decision standing there, or none. An occurrence has one standing decision or
+// none, so there is no aggregate to take and no way for this to disagree with
+// the list.
+func occurrenceStanding(occurrence string) DecisionStanding {
+	switch occurrence {
 	case "":
 		return StandingUndecided
 	case "approved":

@@ -111,7 +111,7 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 // equal, and the published reference carries whichever was registered first.
 //
 // Named fields rather than every repeated name: plenty of names mean different
-// things in different bodies — "places" is what a claim wrote in one and what
+// things in different bodies — "occurrences" is what a decision covers in one and what
 // is still open in another. Each named field has to be carried by at least two
 // bodies, so a rename leaves this failing rather than checking nothing.
 var factsDescribedOnce = []string{"consumer", "sees_nothing"}
@@ -150,7 +150,7 @@ func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
 //
 // A description is read by somebody working through a parameter list, and a
 // claim pressed at them there is noise in the one place a reader is most in a
-// hurry. It is a gate rather than a judgment because a span survives a rewrite
+// hurry. It is a gate rather than a person's call because a span survives a rewrite
 // of the sentence around it: bold is added one field at a time, and one field
 // at a time is exactly what nobody reviews.
 //

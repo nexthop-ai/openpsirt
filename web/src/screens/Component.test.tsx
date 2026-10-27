@@ -59,7 +59,7 @@ describe("scheduling an upgrade of a component", () => {
       build("202411", "broadcom", "3.5", ["3.9"]),
     ]);
     const sent = accept(() => ({
-      data: { claim_id: 9, decisions: 2, issues: 2, waiting: false, held: false },
+      data: { decision_id: 9, occurrences: 2, issues: 2, waiting: false, held: false },
     }));
     mount.render(
       screen(
@@ -89,7 +89,7 @@ describe("scheduling an upgrade of a component", () => {
         builds: [{ stream: "master", variant: "broadcom" }],
       },
     });
-    expect(mount.host().textContent).toContain("Recorded against 2 places across 2 issues.");
+    expect(mount.host().textContent).toContain("Recorded against 2 occurrences across 2 issues.");
   });
 
   it("opens on the other version's own build when that version is picked", async () => {
@@ -109,7 +109,7 @@ describe("scheduling an upgrade of a component", () => {
     expect(location()).toContain("stream=202411");
   });
 
-  it("offers a judgment rather than an empty form when nothing fixes it", async () => {
+  it("offers a decision rather than an empty form when nothing fixes it", async () => {
     serving([build("master", "broadcom", "3.7", [])]);
     mount.render(screen(<Component />, "/products/sonic/components/libnl", PATTERN));
     await settle();

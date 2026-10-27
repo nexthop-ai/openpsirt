@@ -136,7 +136,7 @@ The decisions easiest to violate by accident and costliest to unpick.
 | No engine-specific SQL in the core. Four engines are supported; engine-specific code lives in the database package and the job queue's locking only, listed in `DESIGN-database.md` and nowhere else | REQ-71 |
 | Never trust identifiers a scan file supplies to be stable between builds or consistent between producers. Identity is derived from content | REQ-08 |
 | Visibility is enforced in the data-access layer, never per handler, and every query carries a subject: counts, aggregates, search and exports as well as rows | REQ-42 and REQ-43 |
-| A finding is a component at a specific place. Never deduplicate up to the package; grouping is presentation | REQ-17 |
+| A finding is a component at a specific occurrence. Never deduplicate up to the package; grouping is presentation | REQ-17 |
 | Identity is structural; expiry is version-based. Mixed, an unrelated top-level bump invalidates a leaf decision. The one other expiry is risk lapsing when its issue is rated worse, which concerns the issue, never identity | REQ-25 |
 | A test pinning what a query does runs on every engine; SQLite catches no portability trap. A test pinning routing, which role reaches which endpoint, or a response's shape runs on SQLite and PostgreSQL, because nothing it pins varies by engine. The test's SQL decides which | REQ-71 |
 | Every transaction is retryable as a whole, through the one helper. A cluster certifies at `COMMIT`, so a write whose statements all succeeded can still roll back | REQ-71 |
@@ -156,16 +156,16 @@ The decisions easiest to violate by accident and costliest to unpick.
 ## Measurement before optimization
 
 - Work out an answer when asked. No cache, precomputed total, refresh job or denormalized copy until a measured real deployment shows a real problem. A stale answer brings invalidation, drift and a wrong number nothing reports; copying a hosted product's hourly snapshots adopts its constraints.
-- A fact about a moment that cannot be worked out later is stored, for correctness: what a place held before a version moved, how many builds an approval reached.
+- A fact about a moment that cannot be worked out later is stored, for correctness: what an occurrence held before a version moved, how many builds an approval reached.
 - A value stored for speed has to earn its place, and is rewritten when its inputs move. A finding's urgency earns it: stored so a list sorts without joining four signals per row, and rewritten when they move (REQ-32).
 - A value that can still be worked out is never frozen by storing it: correctness keeps a stored value, and speed has to earn it.
 
-## Bulk judgment caps
+## Bulk decision caps
 
 - A cap follows reversibility: what nothing re-checks is capped.
-- Every bulk judgment has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, so one answering many findings stays a size a reviewer can follow, and an unbounded write is a denial of service somebody triggers by accident.
+- Every bulk decision has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, so one answering many findings stays a size a reviewer can follow, and an unbounded write is a denial of service somebody triggers by accident.
 - A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. Its transaction size was measured and needs no chunking (`DESIGN-triage.md`).
-- A cap bounds what is written, never what was asked for, because one named issue expands into many places (REQ-27).
+- A cap bounds what is written, never what was asked for, because one named issue expands into many occurrences (REQ-27).
 
 ## Source file size
 

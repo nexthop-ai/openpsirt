@@ -11,7 +11,7 @@ import { UpstreamSaid } from "../ui/UpstreamSaid";
 // What upstreams say about open findings here that depends on their own build.
 //
 // Never applied by itself. Opening one lands on the finding, where the
-// statement starts a claim that goes through approval as any other; declining
+// statement starts a decision that goes through approval as any other; declining
 // one takes it off this list. Drawn only where something is offered.
 export function UpstreamOffers({ product }: { product?: string }) {
   const offers = useOffers(product ?? "");

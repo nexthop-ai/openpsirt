@@ -176,7 +176,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 type matchDetail struct {
 	Type string `json:"type"`
 	// Found is what the match was made against. The version range is the
-	// evidence for the judgment recording how the scanner matched asks
+	// evidence for the decision recording how the scanner matched asks
 	// somebody to make: for a distribution's package reached by identifier
 	// it is an upstream range, which is precisely what cannot see a
 	// backported fix.

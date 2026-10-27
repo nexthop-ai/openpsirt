@@ -36,7 +36,7 @@ func TestAnIssueWhosePlacesCouldNotBeReadIsNotAnIssueThatIsNotHere(t *testing.T)
 		map[int64][]access.Role{product.ID: {access.PublicRead}}, 101)
 	_, _, err = attach.NewStore(handle.DB, files).Issue(ctx, who, "mine", "CVE-2026-0001")
 	if err == nil {
-		t.Fatal("an issue whose places could not be read was resolved")
+		t.Fatal("an issue whose occurrences could not be read was resolved")
 	}
 	if errors.Is(err, attach.ErrNoSuchIssue) {
 		t.Errorf("a read that failed was answered as no such issue: %v", err)

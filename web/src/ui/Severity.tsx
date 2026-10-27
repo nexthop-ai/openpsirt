@@ -39,7 +39,7 @@ export function Severity({ word }: { word?: string }) {
 }
 
 // A feed's word that the issue is exploited somewhere in the world, said
-// outright rather than left to a color. A fact rather than a judgment, and it
+// outright rather than left to a color. A fact rather than a decision, and it
 // is what decides the order. The quieter of the two exploitation badges: it
 // arrives on its own on many rows and says nothing about this product.
 export function Exploited({ when }: { when?: boolean }) {

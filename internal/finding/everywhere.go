@@ -37,13 +37,14 @@ type Sighting struct {
 	Variant     string
 	Component   string
 	Version     string
-	// Places is how many times that component sits in that build carrying
-	// this issue — one issue in one component can sit at sixty places.
-	Places int
+	// Occurrences is how many times that component sits in that build
+	// carrying this issue — one issue in one component can sit at sixty
+	// occurrences.
+	Occurrences int
 	// State is how far it has been decided, by the same definition the
-	// findings list uses: a group is agreed when every place is, waiting when
-	// any is, undecided when none has a claim.
-	State       ClaimStanding
+	// findings list uses: a group is agreed when every occurrence is, waiting
+	// when any is, undecided when none has a decision.
+	State       DecisionStanding
 	Undisclosed bool
 	// Recorded is a flaw recorded here in our own product rather than an
 	// issue a scanner reported.
@@ -55,10 +56,10 @@ type Sighting struct {
 // Everywhere is every build that carries one issue, across every product the
 // subject may see.
 //
-// One row per build and component, not per place: the same component at
+// One row per build and component, not per occurrence: the same component at
 // the same version in two builds is two rows because they are two things
-// somebody ships, and sixty places of it in one build is one row with a count,
-// because it is one piece of work.
+// somebody ships, and sixty occurrences of it in one build is one row with a
+// count, because it is one piece of work.
 //
 // Capped, with the total said. A kernel flaw across a dozen products and forty
 // builds is a real answer and an unbounded one is a page nobody can read. The
@@ -116,7 +117,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		Variant     string     `bun:"variant"`
 		Component   string     `bun:"component"`
 		Version     string     `bun:"version"`
-		Places      int        `bun:"places"`
+		Occurrences int        `bun:"places"`
 		Waiting     int        `bun:"waiting_here"`
 		Approved    int        `bun:"approved_here"`
 		Lapsed      int        `bun:"lapsed_here"`
@@ -136,17 +137,17 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
-		// The version a fix arrived in, where any place knows one. Folded to
-		// the empty string first, a minimum answered "" whenever any place
-		// stated no version — which reads as no fix known, about a group where
-		// one is.
+		// The version a fix arrived in, where any occurrence knows one. Folded
+		// to the empty string first, a minimum answered "" whenever any
+		// occurrence stated no version — which reads as no fix known, about a
+		// group where one is.
 		ColumnExpr(`COALESCE(MIN(NULLIF("f"."fixed_in", '')), '') AS "fixed_in"`)
-	// The decision state of each place, the same counts the findings list
+	// The decision state of each occurrence, the same counts the findings list
 	// carries and by the same conditions, so the two agree about what
-	// "agreed" means. Nothing here asks whether a claim is with its author,
+	// "agreed" means. Nothing here asks whether a decision is with its author,
 	// so that column is not read and not computed.
 	err = decisionCounts(sightings, `"st"."product_id"`, nil,
-		claimWaiting, claimApproved, claimLapsed).
+		decisionWaiting, decisionApproved, decisionLapsed).
 		// Grouped on the component itself, not on its name. The total beside
 		// this list counts one sighting per component, and a build that ships
 		// two versions of a name — which is ordinary — folded them into one
@@ -168,8 +169,8 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			Product: row.Product, ProductName: row.ProductName,
 			Stream: row.Stream, Variant: row.Variant,
 			Component: row.Component, Version: row.Version,
-			Places:      row.Places,
-			State:       stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
+			Occurrences: row.Occurrences,
+			State:       stateWord(row.Occurrences, row.Waiting, row.Approved, row.Lapsed),
 			Undisclosed: row.Private > 0,
 			Recorded:    row.Recorded > 0,
 			DueAt:       row.DueAt,

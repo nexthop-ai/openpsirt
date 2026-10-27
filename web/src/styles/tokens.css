@@ -64,7 +64,7 @@
   --sev-low: #4a6a8c;
   /* Not a rating. A scanner's own "unknown", a producer's invented word and
      no rating at all are one state, and it is gray because it is the absence
-     of a judgment rather than a mild one — drawn in the low band's color it
+     of a decision rather than a mild one — drawn in the low band's color it
      would say somebody had looked and decided it was small. */
   --sev-unrated: #8a8f98;
   --ok: #1f7a4d;

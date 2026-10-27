@@ -12,7 +12,7 @@ import { DAY_MS, on } from "../ui/when";
 import { own } from "../ui/own";
 import { Peek, Sits } from "./FindingsViews";
 import { SORTS, identityOf, type Row } from "./list";
-import { claimAt, componentAt, findingAt, productFindingsAt } from "../app/routes";
+import { decisionAt, componentAt, findingAt, productFindingsAt } from "../app/routes";
 import { said, type Recorded } from "../ui/Decide";
 import { bandOf } from "../ui/severities";
 
@@ -46,7 +46,7 @@ export function DecidedNotice({ decided, onDismiss }: { decided: Decided; onDism
           ? `the ${said(decided.recorded.outcome)} takes effect once a second person approves it.`
           : "in force now."}{" "}
         {decided.recorded.needsApproval && (
-          <Link to={claimAt(decided.recorded.claimId)} className="linkish">
+          <Link to={decisionAt(decided.recorded.decisionId)} className="linkish">
             Open the decision →
           </Link>
         )}
@@ -109,9 +109,9 @@ function upstreamSays(state: string | undefined, fixedIn: string | undefined) {
     case "none":
       return { text: "none yet", kind: "note" as const };
     case "mixed":
-      // The row is an issue at a component across builds, and its places do
+      // The row is an issue at a component across builds, and its occurrences do
       // not agree about what upstream did. Saying one of their answers would
-      // be a claim about the world nobody made.
+      // be a statement about the world nobody made.
       return { text: "differs by build", kind: "note" as const };
     default:
       return { text: "—", kind: "faint" as const };
@@ -156,7 +156,7 @@ export function FindingsTable({
   // one source package.
   siblings: Map<string, number>;
   // The list's own address as a row carries it, so a finding can walk back to
-  // it, and the prepared claim a row may arrive with.
+  // it, and the prepared decision a row may arrive with.
   carrying: string;
   prepared: { name: string } | null | undefined;
   set: (key: string, value: string) => void;
@@ -186,7 +186,7 @@ export function FindingsTable({
   const listed = !!decided && rows.some((row) => identityOf(row) === decided.key);
   const nextListed = !!decided?.next && rows.some((row) => identityOf(row) === decided.next);
   const answer = decided && (
-    <tr className="places">
+    <tr className="occurrences">
       <td colSpan={columns}>
         <DecidedNotice decided={decided} onDismiss={onDismiss} />
       </td>
@@ -446,7 +446,7 @@ export function FindingsTable({
                                 package is two rows here and one piece of work
                                 everywhere else: it is decided once, upgraded
                                 once, and routed by one rule. Said on the row
-                                rather than folded away, because the places are
+                                rather than folded away, because the occurrences are
                                 real and a reader counting them should get the
                                 same number the list does — what they were not
                                 told is that four of the rows are one bump. */}
@@ -520,11 +520,11 @@ export function FindingsTable({
                     {/* Counted in the units somebody acts in. Deciding on
                               this row decides about every package and every
                               consumer under it, so those are the numbers shown —
-                              a place count is a figure a reader cannot reconcile
+                              an occurrence count is a figure a reader cannot reconcile
                               with anything else on the screen. */}
                     <td className="num">
                       <span
-                        title={`${row.places} ${row.places === 1 ? "finding" : "findings"} underneath`}
+                        title={`${row.occurrences} ${row.occurrences === 1 ? "finding" : "findings"} underneath`}
                       >
                         {row.packages > 1 && (
                           <>
@@ -546,7 +546,7 @@ export function FindingsTable({
                     </td>
                   </tr>
                   {peeking === key && (
-                    <tr className="places">
+                    <tr className="occurrences">
                       <td colSpan={columns}>
                         <Peek
                           at={buildOf(row)}

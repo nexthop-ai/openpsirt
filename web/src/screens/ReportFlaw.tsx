@@ -57,7 +57,7 @@ export function ReportFlaw() {
   const queries = useQueryClient();
 
   // A vulnerability report this flaw is the record of, where the form was
-  // opened from one. It fixes the product, fills the summary from the claim,
+  // opened from one. It fixes the product, fills the summary from the decision,
   // and takes who reported it from the report rather than asking again.
   const [params] = useSearchParams();
   const fromReport = params.get("from") ?? "";
@@ -72,8 +72,8 @@ export function ReportFlaw() {
   // of the two, and the ones that do not exist are simply not offered.
   const [streams, setStreams] = useState<string[]>(scope.stream ? [scope.stream] : []);
   const [variants, setVariants] = useState<string[]>(scope.variant ? [scope.variant] : []);
-  // Seeded from the claim where it is already cached, which is the ordinary
-  // arrival from the report's own page. The reseed below covers a claim that
+  // Seeded from the decision where it is already cached, which is the ordinary
+  // arrival from the report's own page. The reseed below covers a decision that
   // arrives after the form is drawn.
   const [summary, setSummary] = useState(report.data?.summary ?? "");
   const [severity, setSeverity] = useState("");
@@ -89,7 +89,7 @@ export function ReportFlaw() {
   // on a right that is not known until the session is.
   const [chose, setChose] = useState<boolean | null>(null);
   const [vector, setVector] = useState("");
-  // Who told us, or who found it here. All optional: a claim arriving
+  // Who told us, or who found it here. All optional: a decision arriving
   // anonymously has no reporter, and a form demanding one asks them to invent
   // an answer.
   const [reportedBy, setReportedBy] = useState("");
@@ -114,7 +114,7 @@ export function ReportFlaw() {
   // which of their files did not attach.
   const [onward, setOnward] = useState("");
   const [weaknesses, setWeaknesses] = useState<string[]>([]);
-  // The claim's words as a starting point, once they arrive and only while the
+  // The decision's words as a starting point, once they arrive and only while the
   // summary is still empty.
   useReseed(report.data?.reference ?? "", () => {
     if (report.data?.summary && summary === "") setSummary(report.data.summary);
@@ -250,7 +250,7 @@ export function ReportFlaw() {
     },
   });
 
-  // Filed for judging: the claim, where it came from, and what arrived with it.
+  // Filed for judging: the decision, where it came from, and what arrived with it.
   // The files go against the report, which is what exists once this is done.
   const recordReport = useRecordReport(product);
   const filing = useMutation({
@@ -295,7 +295,7 @@ export function ReportFlaw() {
   const choices = choicesAt(record.error, "component");
   // A summary and a build. Not a severity: a flaw may be recorded before
   // anybody has worked out how bad it is, and making somebody pick a word to
-  // get the record written is how a guess ends up stored as a judgment.
+  // get the record written is how a guess ends up stored as a decision.
   // Nothing more once something is saved. A file that did not attach keeps
   // the form up to say so, and a second press would file a second report or
   // record a second flaw.
@@ -621,7 +621,7 @@ export function ReportFlaw() {
               onChange={(event) => setSeverity(event.target.value)}
             >
               {/* No default. A severity nobody chose, sitting in the field as
-                  though somebody had, is a judgment this screen would be making
+                  though somebody had, is a decision this screen would be making
                   on their behalf. */}
               <option value="">Not rated</option>
               {SEVERITIES.map((word) => (
@@ -733,7 +733,7 @@ export function ReportFlaw() {
                   : whole
                     ? `Against ${streams.length * variants.length} ${
                         streams.length * variants.length === 1 ? "build" : "builds"
-                      }: one issue, a finding per place. A build without the component is refused.`
+                      }: one issue, a finding per occurrence. A build without the component is refused.`
                     : "Pick at least one branch or tag and one variant."}
           </span>
         </div>

@@ -29,7 +29,7 @@ const Lease = "publish.documents"
 
 // betweenPasses is how often the published documents are worked out again.
 //
-// What moves them is a claim agreed to, a scan landing or a product turned
+// What moves them is a decision agreed to, a scan landing or a product turned
 // on, and a reader learns of it from the next pass. Five minutes is the rescan
 // schedule's own pace, and a pass that finds nothing moved writes nothing.
 const betweenPasses = 5 * time.Minute

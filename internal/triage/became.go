@@ -30,9 +30,9 @@ import (
 // proposed" that counts only the pending ones is exactly the disagreement
 // between a count and a list that the queue was fixed to avoid.
 
-// WhatHappened is what became of a claim, in one word.
+// WhatHappened is what became of a decision, in one word.
 //
-// Read from the rows every time rather than stored. A claim has no state of
+// Read from the rows every time rather than stored. A decision has no state of
 // its own — its rows do — and a word kept beside it would be a second place
 // for the truth, updated by every path that approves, withdraws, sends back or
 // lapses one, and wrong from the first path that forgets.
@@ -48,54 +48,54 @@ const (
 	AgreedTo WhatHappened = "approved"
 	// TakenBack is the proposer having withdrawn it themselves.
 	TakenBack WhatHappened = "withdrawn"
-	// MovedUnder is the code having changed, so the claim stopped applying.
+	// MovedUnder is the code having changed, so the decision stopped applying.
 	MovedUnder WhatHappened = "lapsed"
-	// AgreementUndone is an agreement taken back, leaving the claim waiting
+	// AgreementUndone is an agreement taken back, leaving the decision waiting
 	// again. Distinguished from StillWaiting because somebody had agreed: it
 	// is the one outcome a proposer is entitled to find surprising.
 	AgreementUndone WhatHappened = "undone"
-	// SeveralWays is a claim whose rows did not all end the same way — an
+	// SeveralWays is a decision whose rows did not all end the same way — an
 	// approver agreeing to most of a bulk set and setting some aside, or half
 	// of it lapsing as one build moved. Said rather than picked between,
-	// because choosing one of them would report the claim as something it only
+	// because choosing one of them would report the decision as something it only
 	// partly is.
 	SeveralWays WhatHappened = "mixed"
 )
 
-// WhatHappenedAll is every word for what became of a claim.
+// WhatHappenedAll is every word for what became of a decision.
 func WhatHappenedAll() []WhatHappened {
 	return []WhatHappened{
 		StillWaiting, SentBackFor, AgreedTo, TakenBack, MovedUnder, AgreementUndone, SeveralWays,
 	}
 }
 
-// Became is one claim somebody proposed and what happened to it.
+// Became is one decision somebody proposed and what happened to it.
 type Became struct {
-	Claim Claim
-	// Decision is a representative row — the earliest — and Reasoning is what
+	Decision Decision
+	// DecisionOccurrence is a representative row — the earliest — and Reasoning is what
 	// it currently rests on.
-	Decision  Decision
-	Reasoning string
-	Happened  WhatHappened
+	DecisionOccurrence DecisionOccurrence
+	Reasoning          string
+	Happened           WhatHappened
 	// When is the moment it became that, and By is who did it where a
-	// person did. Both are absent for a claim still waiting: nothing has
+	// person did. Both are absent for a decision still waiting: nothing has
 	// happened to it, which is the whole of what it has to report.
 	When *time.Time
 	By   int64
-	// Rows, Issues and Places are how big the claim is, in the three units a
+	// Rows, Issues and Occurrences are how big the decision is, in the three units a
 	// queue card already uses.
-	Rows, Issues, Places int
+	Rows, Issues, Occurrences int
 	// Outliers is what in a bulk set does not look like the rest — the same
 	// signals an approver is shown, for the same reason.
 	//
-	// Whoever wrote a bulk claim faces the choice an approver faces: hold part
+	// Whoever wrote a bulk decision faces the choice an approver faces: hold part
 	// of it back, or argue all of it as one. Showing the signals to one of them
 	// and not the other left the person best placed to say "not those four"
 	// with no way to see which four.
 	Outliers *Outliers
 }
 
-// Became returns what became of the claims this person proposed, newest first.
+// Became returns what became of the decisions this person proposed, newest first.
 //
 // Everything they proposed, whatever happened to it — which is the point.
 // Narrowed to what they may still read: losing the reading of a product does
@@ -106,76 +106,76 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, 0, access.Denied("read what judgments became")
+		return nil, 0, access.Denied("read what decisions became")
 	}
 	limit = database.AList.Of(limit)
 
-	// One row per claim, ordered by its newest decision, so a page is a page
-	// of claims and the count counts claims.
+	// One row per decision, ordered by its newest row, so a page is a page
+	// of decisions and the count counts decisions.
 	mine := func() *bun.SelectQuery {
-		q := s.db.NewSelect().Model((*Decision)(nil)).
-			ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		q := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
+			ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 			ColumnExpr(`MAX("de"."id") AS "newest"`).
 			Where(`"de"."proposed_by" = ?`, subject.ID).
-			GroupExpr(`"de"."claim_id"`)
+			GroupExpr(`"de"."decision_id"`)
 		return readableBy(q, subject, "de")
 	}
 
-	page, err := s.pageClaims(ctx, subject, mine, limit, offset, "what you proposed")
+	page, err := s.pageDecisions(ctx, subject, mine, limit, offset, "what you proposed")
 	if err != nil {
 		return nil, 0, err
 	}
 	if len(page.Order) == 0 {
 		return nil, page.Total, nil
 	}
-	total, ids, byID, rows := page.Total, page.Order, page.Claims, page.Rows
+	total, ids, byID, rows := page.Total, page.Order, page.Decisions, page.Rows
 
 	var agreements []Approval
 	if err := s.db.NewSelect().Model(&agreements).
-		Where(`"claim_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"decision_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("read what was agreed to: %w", err)
 	}
 	agreed := map[int64][]Approval{}
 	for _, one := range agreements {
-		agreed[one.ClaimID] = append(agreed[one.ClaimID], one)
+		agreed[one.DecisionID] = append(agreed[one.DecisionID], one)
 	}
 
 	gathered := map[int64]*Became{}
 	for _, row := range rows {
-		entry, seen := gathered[row.ClaimID]
+		entry, seen := gathered[row.DecisionID]
 		if !seen {
-			entry = &Became{Claim: byID[row.ClaimID], Decision: row}
-			gathered[row.ClaimID] = entry
+			entry = &Became{Decision: byID[row.DecisionID], DecisionOccurrence: row}
+			gathered[row.DecisionID] = entry
 		}
 		entry.Rows++
 	}
 	issues := map[int64]map[int64]bool{}
-	places := map[int64]map[string]bool{}
+	occurrences := map[int64]map[string]bool{}
 	for _, row := range rows {
-		if issues[row.ClaimID] == nil {
-			issues[row.ClaimID] = map[int64]bool{}
-			places[row.ClaimID] = map[string]bool{}
+		if issues[row.DecisionID] == nil {
+			issues[row.DecisionID] = map[int64]bool{}
+			occurrences[row.DecisionID] = map[string]bool{}
 		}
-		issues[row.ClaimID][row.VulnerabilityID] = true
-		places[row.ClaimID][row.PlaceIdentity] = true
+		issues[row.DecisionID][row.VulnerabilityID] = true
+		occurrences[row.DecisionID][row.OccurrenceIdentity] = true
 	}
 	for id, entry := range gathered {
 		entry.Issues = len(issues[id])
-		entry.Places = len(places[id])
+		entry.Occurrences = len(occurrences[id])
 	}
 
-	byClaim := map[int64][]Decision{}
+	byDecision := map[int64][]DecisionOccurrence{}
 	for _, row := range rows {
-		byClaim[row.ClaimID] = append(byClaim[row.ClaimID], row)
+		byDecision[row.DecisionID] = append(byDecision[row.DecisionID], row)
 	}
 	for id, entry := range gathered {
-		entry.Happened, entry.When, entry.By = became(byClaim[id], agreed)
+		entry.Happened, entry.When, entry.By = became(byDecision[id], agreed)
 	}
 
-	representatives := make([]Decision, 0, len(ids))
+	representatives := make([]DecisionOccurrence, 0, len(ids))
 	for _, id := range ids {
 		if entry, ok := gathered[id]; ok {
-			representatives = append(representatives, entry.Decision)
+			representatives = append(representatives, entry.DecisionOccurrence)
 		}
 	}
 	reasoning, err := s.currentReasoning(ctx, representatives)
@@ -183,16 +183,16 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 		return nil, 0, err
 	}
 
-	// The same signals an approver is shown, for a claim its author may still
-	// hold part of back. Only a bulk claim has outliers, and only one that is
+	// The same signals an approver is shown, for a decision its author may still
+	// hold part of back. Only a bulk decision has outliers, and only one that is
 	// still being argued has anything to do about them.
-	var bulk []Claim
+	var bulk []Decision
 	for _, id := range ids {
 		entry, ok := gathered[id]
 		if !ok {
 			continue
 		}
-		many, err := s.overMany(ctx, entry.Claim)
+		many, err := s.overMany(ctx, entry.Decision)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -201,7 +201,7 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 		}
 		if entry.Happened == StillWaiting || entry.Happened == SentBackFor ||
 			entry.Happened == AgreementUndone || entry.Happened == SeveralWays {
-			bulk = append(bulk, entry.Claim)
+			bulk = append(bulk, entry.Decision)
 		}
 	}
 	outliers, err := s.outliersFor(ctx, subject, bulk)
@@ -215,21 +215,21 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 		if !ok {
 			continue
 		}
-		entry.Reasoning = reasoning[entry.Decision.ID]
-		entry.Outliers = outliers[entry.Claim.ID]
+		entry.Reasoning = reasoning[entry.DecisionOccurrence.ID]
+		entry.Outliers = outliers[entry.Decision.ID]
 		out = append(out, *entry)
 	}
 	return out, total, nil
 }
 
-// became reads one word out of a claim's rows and the agreements against them.
+// became reads one word out of a decision's rows and the agreements against them.
 //
 // The order is what makes it right. Rows that ended differently are said to
 // have ended differently rather than reported as whichever came first; and a
 // row that is proposed is three different things depending on how it got
 // there — never agreed to, sent back for more, or agreed to and undone — which
 // is exactly the distinction the queue could not draw.
-func became(rows []Decision, agreed map[int64][]Approval) (WhatHappened, *time.Time, int64) {
+func became(rows []DecisionOccurrence, agreed map[int64][]Approval) (WhatHappened, *time.Time, int64) {
 	var (
 		waiting, sentBack, approved, withdrawn, lapsed, undone int
 		when                                                   *time.Time
@@ -247,7 +247,7 @@ func became(rows []Decision, agreed map[int64][]Approval) (WhatHappened, *time.T
 		switch row.State {
 		case Approved:
 			approved++
-			for _, one := range agreed[row.ClaimID] {
+			for _, one := range agreed[row.DecisionID] {
 				if one.WithdrawnAt == nil {
 					stamp := one.ApprovedAt
 					at(&stamp, one.ApprovedBy)
@@ -265,9 +265,9 @@ func became(rows []Decision, agreed map[int64][]Approval) (WhatHappened, *time.T
 			case row.SentBackAt != nil:
 				sentBack++
 				at(row.SentBackAt, 0)
-			case tookBackAgreement(agreed[row.ClaimID], row.ProposedBy):
+			case tookBackAgreement(agreed[row.DecisionID], row.ProposedBy):
 				undone++
-				for _, one := range agreed[row.ClaimID] {
+				for _, one := range agreed[row.DecisionID] {
 					at(one.WithdrawnAt, orZero(one.WithdrawnBy))
 				}
 			default:
@@ -306,9 +306,9 @@ func became(rows []Decision, agreed map[int64][]Approval) (WhatHappened, *time.T
 // agreement was taken back — which is what tells "undone" from "never
 // answered", since the row reads as proposed either way.
 //
-// A proposer revising their own claim withdraws every agreement standing on
+// A proposer revising their own decision withdraws every agreement standing on
 // the old words, so the withdrawal alone does not mean anybody undid anything:
-// stating the claim again is the proposer's own act and reads as waiting, not
+// stating the decision again is the proposer's own act and reads as waiting, not
 // as an agreement taken back.
 func tookBackAgreement(against []Approval, proposedBy int64) bool {
 	for _, one := range against {

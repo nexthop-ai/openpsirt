@@ -5,7 +5,7 @@
 // that draws it.
 //
 // The review exists to confirm one thing: builds holding this issue at another
-// version, where a tick is a claim about code nobody has looked at. Builds
+// version, where a tick is a decision about code nobody has looked at. Builds
 // already matching are named there rather than asked about — a decision
 // reaches those by lookup — and the confirmation that follows names them too.
 // So where no build holds another version, both steps are a summary somebody

@@ -134,7 +134,7 @@ func ApplyRunOn(t *testing.T, r *Reach, db *database.DB, seriesName string, buil
 }
 
 // SeededLead is a lead on the seeded build, with the product linking GitHub
-// and keeping its source, and the place it is addressed by.
+// and keeping its source, and the occurrence it is addressed by.
 func SeededLead(t *testing.T, r *Reach) string {
 	t.Helper()
 	ctx := t.Context()
@@ -161,16 +161,16 @@ func SeededLead(t *testing.T, r *Reach) string {
 		t.Fatal(err)
 	}
 	ApplyRun(t, r, time.Now().UTC().Add(-2*time.Hour), LeadRun(true))
-	var place string
-	if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."place_identity"`).
-		Where(`"f"."kind" = ?`, kind.Analysis).Scan(ctx, &place); err != nil {
+	var occurrence string
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
+		Where(`"f"."kind" = ?`, kind.Analysis).Scan(ctx, &occurrence); err != nil {
 		t.Fatal(err)
 	}
-	return place
+	return occurrence
 }
 
 // HandedOffLead is the seeded lead confirmed and handed off as a flaw against
-// the seeded build, kept or moved into its case, with its place and the flaw's
+// the seeded build, kept or moved into its case, with its occurrence and the flaw's
 // identifier.
 func HandedOffLead(t *testing.T, r *Reach, move bool) (string, string) {
 	t.Helper()
@@ -182,8 +182,8 @@ func HandedOffLead(t *testing.T, r *Reach, move bool) (string, string) {
 // they triage internal work.
 func HandedOffLeadHeldBy(t *testing.T, r *Reach, move bool, holder string) (string, string) {
 	t.Helper()
-	place := SeededLead(t, r)
-	at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+	occurrence := SeededLead(t, r)
+	at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 	if holder != "" {
 		if w := AsPerson(t, r, holder, "PUT", at+"/assignment", `{"person":"`+holder+`"}`); w.Code != 204 {
 			t.Fatalf("%s did not take the lead: %d %s", holder, w.Code, w.Body.String())
@@ -205,7 +205,7 @@ func HandedOffLeadHeldBy(t *testing.T, r *Reach, move bool, holder string) (stri
 	if err := json.Unmarshal(w.Body.Bytes(), &done); err != nil {
 		t.Fatal(err)
 	}
-	return place, done.Identifier
+	return occurrence, done.Identifier
 }
 
 // FixedBody is the body of a statement that the lead at an address was

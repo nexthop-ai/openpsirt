@@ -84,8 +84,8 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 		// An agreed decision is stated in the build's VEX document, and the
 		// same row as an analysis result is not, though it is public, which
 		// no lead is.
-		claim, _ := r.Claimed(t, "triager", shown, "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", shown, "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 		stated := func() bool {
 			for _, statement := range r.VexStatements(t) {
 				if statement[0] == shown {

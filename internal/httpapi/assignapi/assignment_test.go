@@ -354,7 +354,7 @@ func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) 
 	// Two sites, because the same comparison is made twice: assigning one
 	// finding, and planning an upgrade across a component.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
@@ -375,7 +375,7 @@ func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) 
 			`{"person":"reader"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("somebody without the right gave work away, answering %d", got.Code)
 		}
-		_ = place
+		_ = occurrence
 	})
 }
 

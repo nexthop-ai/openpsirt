@@ -80,7 +80,7 @@ func assignOne(t *testing.T, w *fixture.World, holder int64) {
 		row := &finding.Finding{
 			TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
 			Visibility: access.Public, ComponentID: component.ID,
-			PlaceIdentity: "place-1", Urgency: 1,
+			OccurrenceIdentity: "place-1", Urgency: 1,
 			OpenedAt: time.Now().UTC(), AssignedTo: &holder,
 		}
 		if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -154,7 +154,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 			row := &finding.Finding{
 				TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
 				Visibility: access.Public, ComponentID: component.ID,
-				PlaceIdentity: "place-" + identifier, Urgency: 1,
+				OccurrenceIdentity: "place-" + identifier, Urgency: 1,
 				OpenedAt: time.Now().UTC(), AssignedTo: &held,
 			}
 			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {

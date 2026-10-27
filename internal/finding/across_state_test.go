@@ -25,7 +25,7 @@ import (
 )
 
 // acrossProducts is two products shipping the same components, carrying the
-// same issues at the same place identities, with decisions in each that the
+// same issues at the same occurrence identities, with decisions in each that the
 // other must not read as its own, and one finding in the second product that
 // only a private reader sees.
 type acrossProducts struct {
@@ -58,32 +58,33 @@ func (f *fixture) acrossProducts(t *testing.T) acrossProducts {
 	}
 
 	somebody := f.somebodyElse(t)
-	underSwss := finding.PlaceIdentity(libnl.Name, swss.Name)
-	underTeamd := finding.PlaceIdentity(libnl.Name, teamd.Name)
-	decide := func(product int64, outcome, issue, place, componentVersion, consumerVersion, state, key string) {
+	underSwss := finding.OccurrenceIdentity(libnl.Name, swss.Name)
+	underTeamd := finding.OccurrenceIdentity(libnl.Name, teamd.Name)
+	decide := func(product int64, outcome, issue, occurrence, componentVersion, consumerVersion, state, key string) {
 		t.Helper()
 		f.decision(t, decisionRow{
-			By: somebody, Claim: claimSaying(t, f.db, somebody, outcome),
-			Product: product, Issue: f.issueID(t, issue), Place: place, State: state,
+			By: somebody, Decision: decisionSaying(t, f.db, somebody, outcome),
+			Product: product, Issue: f.issueID(t, issue), Occurrence: occurrence, State: state,
 			Component: &componentVersion, Consumer: &consumerVersion, Key: key,
 		})
 	}
-	// The first product agreed one place of CVE-2026-1 and promised an upgrade
-	// over both places of CVE-2026-3. The second has a proposal waiting at the
-	// very place the first agreed, which must not make the first's row waiting.
+	// The first product agreed one occurrence of CVE-2026-1 and promised an
+	// upgrade over both occurrences of CVE-2026-3. The second has a proposal
+	// waiting at the very occurrence the first agreed, which must not make the
+	// first's row waiting.
 	decide(f.productID, "not-applicable", "CVE-2026-1", underSwss, libnl.Version, swss.Version, "approved", "a1")
 	decide(f.productID, "upgrade-needed", "CVE-2026-3", underSwss, libnl.Version, swss.Version, "approved", "a3s")
 	decide(f.productID, "upgrade-needed", "CVE-2026-3", underTeamd, libnl.Version, teamd.Version, "approved", "a3t")
 	decide(other, "not-applicable", "CVE-2026-1", underSwss, libnl.Version, swss.Version, "proposed", "b1")
-	// And dismissed CVE-2026-2 at its one place, which the second product
+	// And dismissed CVE-2026-2 at its one occurrence, which the second product
 	// did not.
-	decide(f.productID, "not-applicable", "CVE-2026-2", finding.PlaceIdentity(swss.Name, ""),
+	decide(f.productID, "not-applicable", "CVE-2026-2", finding.OccurrenceIdentity(swss.Name, ""),
 		swss.Version, "", "approved", "a2")
 	return acrossProducts{first: f.productID, second: other, firstName: "sonic", secondName: "hedgehog"}
 }
 
 // rowsOf is a list as comparable text: the product, the issue, the component,
-// how far it has been decided and how many places it covers.
+// how far it has been decided and how many occurrences it covers.
 func rowsOf(product string, groups []finding.Group) []string {
 	out := make([]string, 0, len(groups))
 	for _, g := range groups {
@@ -91,17 +92,17 @@ func rowsOf(product string, groups []finding.Group) []string {
 		if in == "" {
 			in = g.Product
 		}
-		out = append(out, fmt.Sprintf("%s %s %s %s %d", in, g.Vulnerability, g.Component, g.State, g.Places))
+		out = append(out, fmt.Sprintf("%s %s %s %s %d", in, g.Vulnerability, g.Component, g.State, g.Occurrences))
 	}
 	sort.Strings(out)
 	return out
 }
 
 // The list across products answers what each product's own list answers, for
-// every filter that reads the decisions: the same rows, the same states and
-// the same total, under the same visibility. The query spanning products
-// correlates each decision with its own product rather than binding one, and
-// the two spellings have to agree.
+// every filter that reads the decision occurrences: the same rows, the same
+// states and the same total, under the same visibility. The query spanning
+// products correlates each decision occurrence with its own product rather than
+// binding one, and the two spellings have to agree.
 func TestTheListAcrossProductsAnswersWhatEachProductsListDoes(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -118,15 +119,15 @@ func TestTheListAcrossProductsAnswersWhatEachProductsListDoes(t *testing.T) {
 		}
 		filters := map[string]finding.Filter{
 			"nothing":   {},
-			"undecided": {States: []finding.ClaimStanding{finding.StandingUndecided}},
-			"waiting":   {States: []finding.ClaimStanding{finding.StandingWaiting}},
-			"agreed":    {States: []finding.ClaimStanding{finding.StandingAgreed}},
+			"undecided": {States: []finding.DecisionStanding{finding.StandingUndecided}},
+			"waiting":   {States: []finding.DecisionStanding{finding.StandingWaiting}},
+			"agreed":    {States: []finding.DecisionStanding{finding.StandingAgreed}},
 			"planned":   {Planned: finding.PlannedOnly},
 			"unplanned": {Planned: finding.NotPlanned},
 			"dismissed": {Outcomes: []string{"not-applicable"}},
 			"the list's defaults": {
 				Workable: finding.Working([]string{finding.OnBranch}, []string{finding.InSupport}),
-				States:   []finding.ClaimStanding{finding.StandingUndecided},
+				States:   []finding.DecisionStanding{finding.StandingUndecided},
 				Assigned: []string{"nobody"},
 				Planned:  finding.NotPlanned,
 			},
@@ -187,11 +188,12 @@ func (s *statements) AfterQuery(_ context.Context, event *bun.QueryEvent) {
 	s.sent = append(s.sent, event.Query)
 }
 
-// The state filter across products reaches each open finding from a decision,
-// through an index on the finding, as it does inside one product. Reached
-// the other way, SQLite starts from every open finding and reads every
-// decision of its product once per row, which is minutes on a real deployment
-// and invisible on a fixture this size — so the plan is what is asserted.
+// The state filter across products reaches each open finding from a decision
+// occurrence, through an index on the finding, as it does inside one product.
+// Reached the other way, SQLite starts from every open finding and reads every
+// decision occurrence of its product once per row, which is minutes on a real
+// deployment and invisible on a fixture this size — so the plan is what is
+// asserted.
 //
 // SQLite alone: the order asserted is the one SQLite takes without statistics,
 // and the other engines choose theirs from statistics this fixture is too
@@ -218,7 +220,7 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 		seen := &statements{}
 		f.hook(seen)
 		if _, _, err := f.store.Anywhere(ctx, who, 50, 0, finding.Filter{
-			States: []finding.ClaimStanding{finding.StandingUndecided},
+			States: []finding.DecisionStanding{finding.StandingUndecided},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -227,10 +229,10 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 		seen.mu.Unlock()
 
 		checked := 0
-		fromDecision := regexp.MustCompile(`^SEARCH de USING `)
-		toFinding := regexp.MustCompile(`^SEARCH (f|f2) USING (COVERING )?INDEX finding_(place|vulnerability)_idx`)
+		fromOccurrence := regexp.MustCompile(`^SEARCH de USING `)
+		toFinding := regexp.MustCompile(`^SEARCH (f|f2) USING (COVERING )?INDEX finding_(occurrence|vulnerability)_idx`)
 		for _, statement := range sent {
-			if !strings.Contains(statement, `"decision" AS "de"`) || !strings.Contains(statement, `AS "f2"`) {
+			if !strings.Contains(statement, `"decision_occurrence" AS "de"`) || !strings.Contains(statement, `AS "f2"`) {
 				continue
 			}
 			checked++
@@ -244,14 +246,14 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 				t.Fatalf("explain a statement: %v", err)
 			}
 			var lines []string
-			decisions, reached := false, false
+			occurrences, reached := false, false
 			for _, step := range plan {
 				lines = append(lines, step.Detail)
-				decisions = decisions || fromDecision.MatchString(step.Detail)
-				reached = reached || (decisions && toFinding.MatchString(step.Detail))
+				occurrences = occurrences || fromOccurrence.MatchString(step.Detail)
+				reached = reached || (occurrences && toFinding.MatchString(step.Detail))
 			}
 			if !reached {
-				t.Errorf("the state filter does not reach the findings from the decisions:\n  %s",
+				t.Errorf("the state filter does not reach the findings from the decision occurrences:\n  %s",
 					strings.Join(lines, "\n  "))
 			}
 		}

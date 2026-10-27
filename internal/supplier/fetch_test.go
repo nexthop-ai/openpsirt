@@ -429,7 +429,7 @@ func TestWhatAPublisherSaysIsFixedDecidesNothingHere(t *testing.T) {
 	// (REQ-31). A pass on a timer makes that easier to violate by accident than
 	// an upload does, because nobody is watching each document arrive — so this
 	// asks the one question that would show it: a publisher announcing a fix
-	// must not close, suppress or re-state the finding at that place.
+	// must not close, suppress or re-state the finding at that occurrence.
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
 		open := f.reported(t, "CVE-2026-1111", "libnl-3-200", "3.7.0")

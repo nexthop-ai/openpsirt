@@ -288,7 +288,7 @@ func (l *listing) threats() []advisory.Threat {
 }
 
 // remediations is what a holder of an affected product can do: that no fix is
-// planned, or none is available yet, and what to do instead where the claim
+// planned, or none is available yet, and what to do instead where the decision
 // named it.
 func (l *listing) remediations() []advisory.Remediation {
 	type said struct{ category, details string }
@@ -304,7 +304,7 @@ func (l *listing) remediations() []advisory.Remediation {
 		case vex.NoFixPlanned:
 			by[said{"no_fix_planned", fact.Action}] = append(by[said{"no_fix_planned", fact.Action}], id)
 		default:
-			// A claim that will not be fixed, naming what to do instead.
+			// A decision that it will not be fixed, naming what to do instead.
 			planned := said{"no_fix_planned", vex.NoFixPlanned}
 			by[planned] = append(by[planned], id)
 			by[said{"mitigation", fact.Action}] = append(by[said{"mitigation", fact.Action}], id)

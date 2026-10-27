@@ -35,7 +35,7 @@ func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
 			moves("CVE-2026-1", "3.9.0"),
 			moves("CVE-2026-2", "3.9.0"),
 			moves("CVE-2026-3", "3.8.0"),
-			// Nothing to move to: it needs a judgment rather than a bump, and
+			// Nothing to move to: it needs a decision rather than a bump, and
 			// contributes no upgrade at all.
 			{Issue: finding.Named{Identifier: "CVE-2026-4", Severity: "high"}, Component: libnl},
 		}); err != nil {
@@ -221,10 +221,11 @@ func TestTheBinariesOfOneSourcePackageAreOneEntryWhicheverNameIsAsked(t *testing
 			if len(got.Packages) != 3 {
 				t.Errorf("asked as %q: %d binaries, want all three", asked, len(got.Packages))
 			}
-			// libcurl4t64 sits under two consumers and the gnutls build under one.
-			if got.Issues != 1 || got.Places != 3 {
-				t.Errorf("asked as %q: %d issues at %d places, want one at three",
-					asked, got.Issues, got.Places)
+			// libcurl4t64 sits under two consumers and the gnutls build under
+			// one.
+			if got.Issues != 1 || got.Occurrences != 3 {
+				t.Errorf("asked as %q: %d issues at %d occurrences, want one at three",
+					asked, got.Issues, got.Occurrences)
 			}
 			if len(got.Upgrades) != 1 || got.Upgrades[0].FixedHere != 1 {
 				t.Errorf("asked as %q: upgrades %+v, want one version fixing one issue",
@@ -271,9 +272,9 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 		if clean.SourceVersion != swss.Version {
 			t.Errorf("it ships %q, want %q", clean.SourceVersion, swss.Version)
 		}
-		if clean.Issues != 0 || clean.Places != 0 {
-			t.Errorf("%d issues at %d places against something nothing was reported on",
-				clean.Issues, clean.Places)
+		if clean.Issues != 0 || clean.Occurrences != 0 {
+			t.Errorf("%d issues at %d occurrences against something nothing was reported on",
+				clean.Issues, clean.Occurrences)
 		}
 		// A deadline is the earliest among what is open, so it is absent
 		// rather than zero where nothing is.
@@ -473,9 +474,10 @@ func ranked(id string, component graph.Described, severity string, score float64
 	return one
 }
 
-// spread opens three issues at one place and two issues at two places, so
-// that "most issues" and "most places" are different answers and an ordering
-// that ignores what was asked shows up as the same list twice.
+// spread opens three issues at one occurrence and two issues at two
+// occurrences, so that "most issues" and "most occurrences" are different
+// answers and an ordering that ignores what was asked shows up as the same list
+// twice.
 func spread(t *testing.T, f *fixture) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
@@ -511,10 +513,10 @@ func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
 		if got := leader(finding.Filter{}); got != swss.Name {
 			t.Errorf("unasked, the view leads with %q rather than the package holding the most issues", got)
 		}
-		// Its reach. Three issues at one place against two issues at
-		// two places: a view that ignores the key answers the same as above.
-		if got := leader(finding.Filter{SortBy: finding.ByPlaces}); got != libnl.Name {
-			t.Errorf("sort=places leads with %q rather than the package sitting in the most places", got)
+		// Its reach. Three issues at one occurrence against two issues at two
+		// occurrences: a view that ignores the key answers the same as above.
+		if got := leader(finding.Filter{SortBy: finding.ByOccurrences}); got != libnl.Name {
+			t.Errorf("sort=occurrences leads with %q rather than the package sitting at the most occurrences", got)
 		}
 		// The worst of what is open against it.
 		if got := leader(finding.Filter{SortBy: finding.BySeverity}); got != libnl.Name {
@@ -522,7 +524,7 @@ func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
 		}
 		// And the other way round, which was accepted and discarded: the
 		// caller asking for the least of something was answered with the most.
-		if got := leader(finding.Filter{SortBy: finding.ByPlaces, Ascending: true}); got != swss.Name {
+		if got := leader(finding.Filter{SortBy: finding.ByOccurrences, Ascending: true}); got != swss.Name {
 			t.Errorf("asc=true leads with %q, which is what descending answers", got)
 		}
 	})
@@ -609,41 +611,41 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 	// nothing reaches is a rule nobody has tested. So every scheme runs this,
 	// because what each one refuses is its own.
 	for _, ecosystem := range []struct {
-		name     string
-		purl     string
-		at       string
-		places   []string
-		furthest string
+		name        string
+		purl        string
+		at          string
+		occurrences []string
+		furthest    string
 	}{
 		{
-			name:   "rpm",
-			purl:   "pkg:rpm/fedora/openssl@3.2.1-1.fc39",
-			at:     "3.2.1-1.fc39",
-			places: []string{"3.2.1-2.fc39", "3.2.1-3.fc39"}, furthest: "3.2.1-3.fc39",
+			name:        "rpm",
+			purl:        "pkg:rpm/fedora/openssl@3.2.1-1.fc39",
+			at:          "3.2.1-1.fc39",
+			occurrences: []string{"3.2.1-2.fc39", "3.2.1-3.fc39"}, furthest: "3.2.1-3.fc39",
 		},
 		{
-			name:   "apk",
-			purl:   "pkg:apk/alpine/openssl@3.3.2-r0",
-			at:     "3.3.2-r0",
-			places: []string{"3.3.2-r1", "3.3.2-r2"}, furthest: "3.3.2-r2",
+			name:        "apk",
+			purl:        "pkg:apk/alpine/openssl@3.3.2-r0",
+			at:          "3.3.2-r0",
+			occurrences: []string{"3.3.2-r1", "3.3.2-r2"}, furthest: "3.3.2-r2",
 		},
 		{
-			name:   "deb",
-			purl:   "pkg:deb/debian/openssl@3.0.11-1",
-			at:     "3.0.11-1",
-			places: []string{"3.0.11-2", "3.0.14-1"}, furthest: "3.0.14-1",
+			name:        "deb",
+			purl:        "pkg:deb/debian/openssl@3.0.11-1",
+			at:          "3.0.11-1",
+			occurrences: []string{"3.0.11-2", "3.0.14-1"}, furthest: "3.0.14-1",
 		},
 		{
-			name:   "pypi",
-			purl:   "pkg:pypi/cryptography@41.0.0",
-			at:     "41.0.0",
-			places: []string{"41.0.1", "41.0.2"}, furthest: "41.0.2",
+			name:        "pypi",
+			purl:        "pkg:pypi/cryptography@41.0.0",
+			at:          "41.0.0",
+			occurrences: []string{"41.0.1", "41.0.2"}, furthest: "41.0.2",
 		},
 		{
-			name:   "maven",
-			purl:   "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
-			at:     "2.14.1",
-			places: []string{"2.16.0", "2.17.1"}, furthest: "2.17.1",
+			name:        "maven",
+			purl:        "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+			at:          "2.14.1",
+			occurrences: []string{"2.16.0", "2.17.1"}, furthest: "2.17.1",
 		},
 	} {
 		for _, one := range []struct {
@@ -653,10 +655,10 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 		}{
 			// Ranked: every version places, so the newest leads and reaching it
 			// reaches what the earlier one fixed.
-			{"versions that all place", ecosystem.places, true},
+			{"versions that all place", ecosystem.occurrences, true},
 			// And unranked: one entry nobody can place is not a list ordered
 			// except for that entry, it is a list that is not ordered.
-			{"one entry nobody can place", []string{ecosystem.places[0], "unfixed"}, false},
+			{"one entry nobody can place", []string{ecosystem.occurrences[0], "unfixed"}, false},
 		} {
 			t.Run(ecosystem.name+"/"+one.what, func(t *testing.T) {
 				each(t, func(t *testing.T, f *fixture) {
@@ -705,8 +707,9 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 					if !one.ordered {
 						return
 					}
-					// Ranked means the furthest along leads, and that it reaches
-					// what the earlier release fixed as well as its own.
+					// Ranked means the furthest along leads, and that it
+					// reaches what the earlier release fixed as well as its
+					// own.
 					if up[0].To != ecosystem.furthest {
 						t.Errorf("the list leads with %q, want the furthest along", up[0].To)
 					}

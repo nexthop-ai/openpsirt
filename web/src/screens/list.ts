@@ -45,7 +45,7 @@ export type SortWord = NonNullable<
 export const SORTS = {
   Severity: "severity",
   EPSS: "epss",
-  Covers: "places",
+  Covers: "occurrences",
   Due: "deadline",
   // eslint-disable-next-line no-restricted-syntax -- Keyed on this interface's own column headers.
 } satisfies Record<string, SortWord>;
@@ -62,7 +62,7 @@ export const ORDERS = {
   urgency: "Urgency",
   severity: "Severity",
   epss: "EPSS",
-  places: "Covers",
+  occurrences: "Covers",
   deadline: "Due",
   age: "Age",
 } satisfies Record<SortWord, string>;
@@ -267,7 +267,7 @@ const WORDS: { [K in ClosedParameter]: Record<Word<K>, true> } = {
   origin: { scanner: true, manual: true },
   planned: { planned: true, unplanned: true, either: true },
   across_variants: { only: true, every: true },
-  sort: { urgency: true, age: true, deadline: true, places: true, epss: true, severity: true },
+  sort: { urgency: true, age: true, deadline: true, occurrences: true, epss: true, severity: true },
   decision_state: { proposed: true, approved: true, withdrawn: true, lapsed: true },
 };
 
@@ -391,10 +391,10 @@ export function listQuery(params: URLSearchParams) {
   // address carries is somebody else's text like any other, so a value that is
   // not a run number is a parameter to leave off rather than one to send wrong.
   const openedBy = num(params.get("opened_by_run"), 1, Number.MAX_SAFE_INTEGER);
-  // The claim whose places the list is narrowed to, as the claim page links to.
+  // The decision whose occurrences the list is narrowed to, as the decision page links to.
   // The states narrow its rows and are sent only with it.
-  const claim = num(params.get("claim"), 1, Number.MAX_SAFE_INTEGER);
-  const claimStates = pick("decision_state", params.getAll("claim_state"));
+  const decision = num(params.get("decision"), 1, Number.MAX_SAFE_INTEGER);
+  const decisionStates = pick("decision_state", params.getAll("decision_state"));
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   const openedAfter = day(params.get("opened_after"));
   const openedBefore = day(params.get("opened_before"));
@@ -412,10 +412,10 @@ export function listQuery(params: URLSearchParams) {
     ...(openedAfter ? { opened_after: openedAfter } : {}),
     ...(openedBefore ? { opened_before: openedBefore } : {}),
     ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
-    ...(claim !== undefined ? { decision: claim } : {}),
-    ...(claim !== undefined && claimStates.length > 0
+    ...(decision !== undefined ? { decision } : {}),
+    ...(decision !== undefined && decisionStates.length > 0
       ? {
-          decision_state: [...new Set(claimStates)],
+          decision_state: [...new Set(decisionStates)],
         }
       : {}),
     ...(proposedAfter ? { proposed_after: proposedAfter } : {}),

@@ -101,7 +101,7 @@ type PersonBody struct {
 	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
 	// DeactivatedAt is when they stopped being somebody who may sign in.
 	// Absent is the ordinary state, and it is never a deletion: they are
-	// still named by every judgment they proposed.
+	// still named by every decision they proposed.
 	//
 	// On the list as well as on the person, because "who still has access"
 	// is a question about the list — and a list that answers it only one row

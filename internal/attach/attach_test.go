@@ -28,7 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// fixture is one migrated database with a product, an issue, and a place the
+// fixture is one migrated database with a product, an issue, and an occurrence the
 // issue sits at — which is the least that makes an attachment reachable, since
 // what may read one is what may read the issue.
 type fixture struct {
@@ -79,10 +79,10 @@ func (f *fixture) hook(hook bun.QueryHook) {
 	f.store = attach.NewStore(f.db.DB, f.files)
 }
 
-// anIssue records a vulnerability and one place it sits at, at a visibility.
+// anIssue records a vulnerability and one occurrence it sits at, at a visibility.
 //
 // The visibility is on the finding rather than on the issue, which is where it
-// lives: what an attachment inherits is worked out from the places, not stored
+// lives: what an attachment inherits is worked out from the occurrences, not stored
 // anywhere of its own.
 func (f *fixture) anIssue(t *testing.T, name string, visibility access.Visibility) int64 {
 	t.Helper()
@@ -103,7 +103,7 @@ func (f *fixture) anIssue(t *testing.T, name string, visibility access.Visibilit
 	row := &finding.Finding{
 		TargetID: f.target, Kind: finding.Vulnerable, VulnerabilityID: issue.ID,
 		Visibility: visibility, ComponentID: component.ID,
-		PlaceIdentity: "place-" + name, Urgency: 1, OpenedAt: time.Now().UTC(),
+		OccurrenceIdentity: "place-" + name, Urgency: 1, OpenedAt: time.Now().UTC(),
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatalf("record a finding: %v", err)

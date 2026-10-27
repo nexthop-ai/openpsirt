@@ -30,19 +30,19 @@ func toldOfKind(t *testing.T, r *httpapitest.Reach, who string, kind notify.Kind
 	return n
 }
 
-func TestRowsOfALeadClaimSetAsideAreToldToAProposerWhoReadsOnlyInternalWork(t *testing.T) {
+func TestRowsOfALeadDecisionSetAsideAreToldToAProposerWhoReadsOnlyInternalWork(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, kin := besideTheLeak(t, r, 4)
-		decided := decideLead(t, r, place,
+		occurrence, kin := besideTheLeak(t, r, 4)
+		decided := decideLead(t, r, occurrence,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the length is checked by the caller"}`)
 		var aside int64
-		if err := r.DB.DB.NewSelect().Table("decision").Column("id").
-			Where(`"place_identity" = ?`, kin[0]).Where(`"claim_id" = ?`, decided.ClaimID).
+		if err := r.DB.DB.NewSelect().Table("decision_occurrence").Column("id").
+			Where(`"occurrence_identity" = ?`, kin[0]).Where(`"decision_id" = ?`, decided.DecisionID).
 			Scan(t.Context(), &aside); err != nil {
 			t.Fatal(err)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID),
 			fmt.Sprintf(`{"except":[%d],"because":"the overflow is not the leak"}`, aside)); got.Code != http.StatusOK {
 			t.Fatalf("approving with a row set aside answered %d: %s", got.Code, got.Body)
 		}
@@ -52,12 +52,12 @@ func TestRowsOfALeadClaimSetAsideAreToldToAProposerWhoReadsOnlyInternalWork(t *t
 	})
 }
 
-func TestAMentionOnALeadClaimReachesSomebodyWhoReadsOnlyInternalWork(t *testing.T) {
+func TestAMentionOnALeadDecisionReachesSomebodyWhoReadsOnlyInternalWork(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		decided := decideLead(t, r, httpapitest.SeededLead(t, r),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/comments", decided.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/comments", decided.DecisionID),
 			`{"body":"@internal-reader, could you look at the check above?"}`); got.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body)
 		}
@@ -72,7 +72,7 @@ func TestAnApprovalBatchUndoneIsToldToALeadProposerWhoReadsOnlyInternalWork(t *t
 		decided := decideLead(t, r, httpapitest.SeededLead(t, r),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving under a batch answered %d: %s", got.Code, got.Body)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodDelete,

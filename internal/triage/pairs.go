@@ -16,51 +16,51 @@ type Pair struct {
 	// First and Second are the two people, the lower identifier first, so a
 	// pair reads the same whichever of them proposed.
 	First, Second int64
-	// Claims is how many claims ran between them, in either direction.
-	Claims int
+	// Decisions is how many decisions ran between them, in either direction.
+	Decisions int
 }
 
 // Agreements is one product's standing agreements over a period, and the pairs
 // they ran between.
 type Agreements struct {
 	ProductID int64
-	// Claims is every claim in the product proposed in the period that
+	// Decisions is every decision in the product proposed in the period that
 	// somebody other than its proposer agreed to and has not taken back.
-	Claims int
-	Pairs  []Pair
+	Decisions int
+	Pairs     []Pair
 }
 
-// AgreedSince is every product's agreements on claims proposed since a moment,
+// AgreedSince is every product's agreements on decisions proposed since a moment,
 // by the pairs of people they ran between.
 //
 // A pair is two people rather than a proposer and an approver. The pattern is
 // two people each agreeing to what the other proposes, so counting the
 // directions apart halves the share of the pair it exists to find.
 //
-// Counted in claims rather than in rows. A claim over sixty places is one
+// Counted in decisions rather than in rows. A decision over sixty occurrences is one
 // thing proposed and one thing agreed to, and a pair's share of the rows would
-// be decided by whose claims happened to be broad.
+// be decided by whose decisions happened to be broad.
 //
 // Unnarrowed, for the reason the count of what stands with nobody agreeing is:
 // what it feeds is a condition told to administrators, which carries the fact
-// and a link and never the claims.
+// and a link and never the decisions.
 func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements, error) {
 	var rows []struct {
 		ProductID  int64 `bun:"product_id"`
 		ProposedBy int64 `bun:"proposed_by"`
 		ApprovedBy int64 `bun:"approved_by"`
-		Claims     int   `bun:"claims"`
+		Decisions  int   `bun:"claims"`
 	}
 	// Grouped by the two people as they stand, and folded into pairs below.
 	// Ordering the two within the statement needs the lesser and greater of
 	// two values, which the four engines spell differently.
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`"ap"."approved_by" AS "approved_by"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
 		Where(`"de"."proposed_at" >= ?`, since).
@@ -71,13 +71,13 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 	}
 	var totals []struct {
 		ProductID int64 `bun:"product_id"`
-		Claims    int   `bun:"claims"`
+		Decisions int   `bun:"claims"`
 	}
 	err = s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
 		Where(`"de"."proposed_at" >= ?`, since).
@@ -94,21 +94,21 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 		if second < first {
 			first, second = second, first
 		}
-		folded[key{row.ProductID, first, second}] += row.Claims
+		folded[key{row.ProductID, first, second}] += row.Decisions
 	}
 	at := map[int64]int{}
 	out := make([]Agreements, 0, len(totals))
 	for _, total := range totals {
 		at[total.ProductID] = len(out)
-		out = append(out, Agreements{ProductID: total.ProductID, Claims: total.Claims})
+		out = append(out, Agreements{ProductID: total.ProductID, Decisions: total.Decisions})
 	}
-	for k, claims := range folded {
+	for k, decisions := range folded {
 		i, ok := at[k.product]
 		if !ok {
 			continue
 		}
 		out[i].Pairs = append(out[i].Pairs, Pair{
-			ProductID: k.product, First: k.first, Second: k.second, Claims: claims,
+			ProductID: k.product, First: k.first, Second: k.second, Decisions: decisions,
 		})
 	}
 	return out, nil

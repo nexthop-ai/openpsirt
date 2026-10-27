@@ -11,10 +11,10 @@ import {
   useLead,
   type Evidence,
   type LeadOutcome,
-  type LeadPlace,
+  type LeadOccurrence,
   type LeadReason,
 } from "../api/leads";
-import { claimAt, leadAt, leadsAt, type Build } from "../app/routes";
+import { decisionAt, leadAt, leadsAt, type Build } from "../app/routes";
 import { ChoiceCards } from "../ui/ChoiceCards";
 import { Editor } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
@@ -72,7 +72,7 @@ export function Lead() {
 
       <div className="card">
         <h3>Result</h3>
-        <Place place={at} />
+        <Location location={at} />
         {evidence.open && (
           <LeadAssignee build={build} place={place} evidence={evidence} assigns={assigns} />
         )}
@@ -105,7 +105,7 @@ export function Lead() {
           <ol>
             {(evidence.steps ?? []).map((step, i) => (
               <li key={i} style={{ marginLeft: (step.depth ?? 0) * 12 }}>
-                <Place place={step} />
+                <Location location={step} />
               </li>
             ))}
           </ol>
@@ -118,7 +118,7 @@ export function Lead() {
           <ul>
             {(evidence.related ?? []).map((related, i) => (
               <li key={i}>
-                <Place place={related} />
+                <Location location={related} />
               </li>
             ))}
           </ul>
@@ -137,16 +137,18 @@ export function Lead() {
       {evidence.state !== "handed-off" && (
         <div className="card">
           <h3>Decision</h3>
-          {evidence.decision ? (
+          {evidence.decision_occurrence ? (
             <p>
-              {labeled(evidence.decision.outcome)}
-              {evidence.decision.reason && ` · ${reasonSaid(evidence.decision.reason)}`}
-              {evidence.decision.needs_approval && evidence.decision.state === "proposed" && (
-                <span className="state waiting"> Waiting for approval</span>
-              )}{" "}
-              {evidence.decision.claim_id !== undefined && (
-                <Link to={claimAt(evidence.decision.claim_id)}>
-                  Claim {evidence.decision.claim_id}
+              {labeled(evidence.decision_occurrence.outcome)}
+              {evidence.decision_occurrence.reason &&
+                ` · ${reasonSaid(evidence.decision_occurrence.reason)}`}
+              {evidence.decision_occurrence.needs_approval &&
+                evidence.decision_occurrence.state === "proposed" && (
+                  <span className="state waiting"> Waiting for approval</span>
+                )}{" "}
+              {evidence.decision_occurrence.decision_id !== undefined && (
+                <Link to={decisionAt(evidence.decision_occurrence.decision_id)}>
+                  Decision {evidence.decision_occurrence.decision_id}
                 </Link>
               )}
             </p>
@@ -189,10 +191,10 @@ function Commit({ sha }: { sha: string }) {
   );
 }
 
-// One place the analyzer named: where, what it said there, and the code.
-function Place({ place }: { place: LeadPlace }) {
-  const href = linkable(place.link);
-  const where = located(place.path, place.start_line);
+// One location the analyzer named: where, what it said there, and the code.
+function Location({ location }: { location: LeadOccurrence }) {
+  const href = linkable(location.link);
+  const where = located(location.path, location.start_line);
   return (
     <div>
       <div>
@@ -202,23 +204,23 @@ function Place({ place }: { place: LeadPlace }) {
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            title={place.revision}
+            title={location.revision}
           >
             {where}
           </a>
         ) : (
-          <span className="mono" title={place.unlinked}>
+          <span className="mono" title={location.unlinked}>
             {where}
           </span>
         )}
-        {place.function && <span className="hint"> in {place.function}</span>}
-        {place.approximate && (
+        {location.function && <span className="hint"> in {location.function}</span>}
+        {location.approximate && (
           <span className="hint" title="The line is where the code was, not where it is.">
             {" "}
             · approximate
           </span>
         )}
-        {place.patched && (
+        {location.patched && (
           <span
             className="hint"
             title="The build patched this file, so the repository is not what was built."
@@ -228,13 +230,13 @@ function Place({ place }: { place: LeadPlace }) {
           </span>
         )}
       </div>
-      {place.message && <div>{place.message}</div>}
-      {place.snippet && (
+      {location.message && <div>{location.message}</div>}
+      {location.snippet && (
         <pre
           className="mono"
-          title={place.snippet_line ? `From line ${place.snippet_line}` : undefined}
+          title={location.snippet_line ? `From line ${location.snippet_line}` : undefined}
         >
-          {place.snippet}
+          {location.snippet}
         </pre>
       )}
     </div>
@@ -251,8 +253,8 @@ function Kin({ build, evidence }: { build: Build; evidence: Evidence }) {
   const list = (rows: typeof kin) => (
     <ul>
       {rows.map((each) => (
-        <li key={each.place}>
-          <Link className="mono" to={leadAt(build, each.place)}>
+        <li key={each.occurrence}>
+          <Link className="mono" to={leadAt(build, each.occurrence)}>
             {each.rule}
           </Link>{" "}
           <span className="mono hint">{located(each.path, each.line)}</span>

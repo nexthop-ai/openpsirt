@@ -39,7 +39,7 @@ type Release struct {
 	// Identifier is what this build's own inventory called the thing it is
 	// about, and empty where that document named no component of its own.
 	Identifier string
-	// Grounds is the decision every open place of the issue in this release
+	// Grounds is the decision every open occurrence of the issue in this release
 	// stands under, where approved, live decisions with one outcome cover them
 	// all, and nil otherwise.
 	Grounds *Grounds
@@ -51,16 +51,16 @@ type Release struct {
 // Grounds is the decision a release stands under, as the document and the
 // advisory screen read it.
 type Grounds struct {
-	// Decision is the earliest decision among those covering the release.
-	Decision int64
-	Outcome  string
+	// DecisionOccurrence is the earliest decision occurrence among those covering the release.
+	DecisionOccurrence int64
+	Outcome            string
 	// Reason is the decision's justification, in the vocabulary the CSAF
 	// flag labels are.
 	Reason string
 	// Mitigation is what stops the flaw, where the decision named it. The
 	// decision's reasoning is never read.
 	Mitigation string
-	// MadeOn is the builds the decision's claim was made on: the one on
+	// MadeOn is the builds the decision was made on: the one on
 	// screen when it was proposed and every one the person chose beside it,
 	// in name order. Empty where nothing was recorded, which says nothing
 	// about where it was made.
@@ -93,7 +93,7 @@ func (r Release) MadeElsewhere() bool {
 }
 
 // NoFixPlanned says the release is stated affected because approved decisions
-// that it will not be fixed cover every open place of the issue there.
+// that it will not be fixed cover every open occurrence of the issue there.
 func (r Release) NoFixPlanned() bool {
 	return r.Holds && r.Grounds != nil && r.Grounds.Outcome == finding.OutcomeWontFix
 }
@@ -146,7 +146,7 @@ func (r Release) Status() string {
 //
 // Only a closure that counts as the issue going away is read as a fix. A
 // superseded closure is the version moving with the flaw still in it, so the
-// row that superseded it speaks for the place. A release whose closures are
+// row that superseded it speaks for the occurrence. A release whose closures are
 // none of them a fix, with nothing open, is stated as known affected: nothing
 // on it says the flaw left.
 //
@@ -224,7 +224,7 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 			Holds:      row.Open > 0 || row.Settled == 0,
 			Identifier: row.Root, Overridden: overridden[at],
 		}
-		// Coverage is asked of open places, so a release holding the flaw
+		// Coverage is asked of open occurrences, so a release holding the flaw
 		// only through a superseded closure has none.
 		if row.Open > 0 {
 			release.Grounds = standing[at]
@@ -244,7 +244,7 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 }
 
 // standingIn is the decision each build of the product stands under for this
-// issue, keyed by its stream and variant, where one covers every open place.
+// issue, keyed by its stream and variant, where one covers every open occurrence.
 func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 	visible []access.Visibility) (map[[2]int64]*Grounds, error) {
 
@@ -288,7 +288,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 	}
 	for _, row := range rows {
 		out[[2]int64{row.StreamID, row.VariantID}] = &Grounds{
-			Decision: row.DecidedBy, Outcome: row.Outcome,
+			DecisionOccurrence: row.DecidedBy, Outcome: row.Outcome,
 			Reason:     said[row.DecidedBy].Justification,
 			Mitigation: said[row.DecidedBy].Mitigation,
 			MadeOn:     made[row.DecidedBy],
@@ -297,24 +297,24 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 	return out, nil
 }
 
-// madeOn is the builds each decision's claim was made on, in name order.
+// madeOn is the builds each decision occurrence's decision was made on, in name order.
 //
-// A decision is keyed without a build and reaches every build whose versions
-// match, so what it was made on is read from the record its claim keeps, and a
-// claim keeping none has nothing to say here.
-func madeOn(ctx context.Context, db bun.IDB, decisions []int64) (map[int64][]Built, error) {
+// A decision occurrence is keyed without a build and reaches every build whose versions
+// match, so what it was made on is read from the record its decision keeps, and a
+// decision keeping none has nothing to say here.
+func madeOn(ctx context.Context, db bun.IDB, occurrences []int64) (map[int64][]Built, error) {
 	out := map[int64][]Built{}
-	if len(decisions) == 0 {
+	if len(occurrences) == 0 {
 		return out, nil
 	}
 	var rows []struct {
 		ID int64 `bun:"id"`
 		Built
 	}
-	where, args := database.InAnyOf(`"de"."id"`, decisions)
+	where, args := database.InAnyOf(`"de"."id"`, occurrences)
 	err := db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_build" AS "cb" ON "cb"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_build" AS "cb" ON "cb"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "t" ON "t"."id" = "cb"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).

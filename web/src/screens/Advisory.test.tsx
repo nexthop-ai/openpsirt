@@ -102,7 +102,7 @@ describe("one advisory", () => {
         variant: "broadcom",
         status: "known_not_affected",
         decided: "known_not_affected",
-        covered: { decision: 4, outcome: "not-affected", made_on: [] },
+        covered: { decision_occurrence: 4, outcome: "not-affected", made_on: [] },
       },
     ]);
     const put = answer("PUT", () => ({ data: {} }));

@@ -16,7 +16,7 @@ import (
 
 func TestPlanningAnUpgradeAnswersEverythingOpenOnTheComponent(t *testing.T) {
 	// Coverage is the component, not a version pair. Moving to a version is a
-	// claim that it answers what is open on the package — including findings
+	// decision that it answers what is open on the package — including findings
 	// recorded as fixed in an earlier release of the same line — and the next
 	// scan says which of that was true. Deciding it from the versions would
 	// need an ordering per ecosystem this does not have.
@@ -33,15 +33,15 @@ func TestPlanningAnUpgradeAnswersEverythingOpenOnTheComponent(t *testing.T) {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
 		}
 		var done struct {
-			Decisions int  `json:"decisions"`
-			Issues    int  `json:"issues"`
-			Targets   int  `json:"targets"`
-			Waiting   bool `json:"waiting"`
+			Occurrences int  `json:"occurrences"`
+			Issues      int  `json:"issues"`
+			Targets     int  `json:"targets"`
+			Waiting     bool `json:"waiting"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
 		}
-		if done.Decisions == 0 || done.Issues == 0 {
+		if done.Occurrences == 0 || done.Issues == 0 {
 			t.Fatalf("it recorded nothing: %+v", done)
 		}
 		// A date a year out is past the deadline of anything with one, so a
@@ -100,7 +100,7 @@ func TestPlanningAnUpgradeNeedsTheTriageRight(t *testing.T) {
 
 // Moving the date is moving the thing the gate is about. A promise first made
 // inside the deadline the work already had was recorded as needing nobody,
-// and nothing recomputed that when the date changed — so the same claim could
+// and nothing recomputed that when the date changed — so the same decision could
 // be pushed years out, stay in force, go on suppressing everything it covered,
 // and never appear in the review queue.
 func TestMovingAPromisePastTheDeadlineGatesItAgain(t *testing.T) {
@@ -117,8 +117,8 @@ func TestMovingAPromisePastTheDeadlineGatesItAgain(t *testing.T) {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
 		}
 		var done struct {
-			ClaimID int64 `json:"claim_id"`
-			Waiting bool  `json:"waiting"`
+			DecisionID int64 `json:"decision_id"`
+			Waiting    bool  `json:"waiting"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
@@ -130,7 +130,7 @@ func TestMovingAPromisePastTheDeadlineGatesItAgain(t *testing.T) {
 		// The same promise, a year out.
 		later := time.Now().UTC().Add(365 * 24 * time.Hour).Format(time.DateOnly)
 		moved := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.DecisionID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Slipping to next year."}`, later))
 		if moved.Code != http.StatusNoContent {
 			t.Fatalf("moving the promise answered %d: %s", moved.Code, moved.Body.String())
@@ -142,7 +142,7 @@ func TestMovingAPromisePastTheDeadlineGatesItAgain(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "reviewer", "/v1/review-queue", &queue)
 		if queue.Total != 1 {
-			t.Errorf("a promise moved a year out left %d claims waiting", queue.Total)
+			t.Errorf("a promise moved a year out left %d decisions waiting", queue.Total)
 		}
 	})
 }
@@ -163,14 +163,14 @@ func TestAPromiseCannotBeMovedOntoADateAlreadyPast(t *testing.T) {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
 		}
 		var done struct {
-			ClaimID int64 `json:"claim_id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
 		}
 		gone := time.Now().UTC().Add(-24 * time.Hour).Format(time.DateOnly)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.DecisionID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Backdated."}`, gone)),
 			http.StatusUnprocessableEntity)
 	})
@@ -178,7 +178,7 @@ func TestAPromiseCannotBeMovedOntoADateAlreadyPast(t *testing.T) {
 
 // Every path that stores typed text runs the markdown policy before storing
 // it. Re-promising reached the write through the inner revision, which did
-// not, so raw HTML and remote images went into the claim's history.
+// not, so raw HTML and remote images went into the decision's history.
 func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
@@ -193,30 +193,30 @@ func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
 		}
 		var done struct {
-			ClaimID int64 `json:"claim_id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
 		}
 		later := time.Now().UTC().Add(48 * time.Hour).Format(time.DateOnly)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.DecisionID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,`+
 				`"reasoning":"Slipping <script>alert(1)</script>"}`, later)),
 			http.StatusUnprocessableEntity)
 
 		// And the text never reached storage. The status alone would pass with
 		// the policy running after the write instead of before it, which is
-		// what this route did: the re-promise reached the claim through the
+		// what this route did: the re-promise reached the decision through the
 		// inner revision, and that one did not check.
-		var claim struct {
+		var decision struct {
 			Argument struct {
 				Reasoning string `json:"reasoning"`
 			} `json:"argument"`
 		}
-		httpapitest.Read(t, r, "private-triage", fmt.Sprintf("/v1/decisions/%d", done.ClaimID), &claim)
-		if strings.Contains(claim.Argument.Reasoning, "<script>") {
-			t.Errorf("the refused reasoning was stored anyway: %q", claim.Argument.Reasoning)
+		httpapitest.Read(t, r, "private-triage", fmt.Sprintf("/v1/decisions/%d", done.DecisionID), &decision)
+		if strings.Contains(decision.Argument.Reasoning, "<script>") {
+			t.Errorf("the refused reasoning was stored anyway: %q", decision.Argument.Reasoning)
 		}
 	})
 }
@@ -237,8 +237,8 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
 		}
 		var done struct {
-			ClaimID int64 `json:"claim_id"`
-			Waiting bool  `json:"waiting"`
+			DecisionID int64 `json:"decision_id"`
+			Waiting    bool  `json:"waiting"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
@@ -246,11 +246,11 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 		if !done.Waiting {
 			t.Fatal("a promise a year out was not gated, so nobody agrees and this tests nothing")
 		}
-		r.Agreed(t, done.ClaimID)
+		r.Agreed(t, done.DecisionID)
 
 		later := time.Now().UTC().Add(400 * 24 * time.Hour).Format(time.DateOnly)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.DecisionID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The release slipped a month."}`,
 				later)); got.Code >= 300 {
 			t.Fatalf("moving the promise answered %d: %s", got.Code, got.Body.String())
@@ -262,9 +262,9 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 
 		// The same version and date with new words withdraws the agreement
 		// too, and says the reasoning changed rather than the promise.
-		r.Agreed(t, done.ClaimID)
+		r.Agreed(t, done.DecisionID)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.DecisionID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The same promise, said better."}`,
 				later)); got.Code >= 300 {
 			t.Fatalf("restating the promise answered %d: %s", got.Code, got.Body.String())
@@ -276,10 +276,10 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 	})
 }
 
-// A promise stores a decision at every place it reports, and only there: one
-// for each issue at each place on the component, each a live claim of the
+// A promise stores a row at every occurrence it reports, and only there: one
+// for each issue at each occurrence on the component, each a live row of the
 // promise.
-func TestAPromiseStoresADecisionAtEveryPlaceItReports(t *testing.T) {
+func TestAPromiseStoresADecisionAtEveryOccurrenceItReports(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		r.ScannedTwoIssues(t)
@@ -294,39 +294,39 @@ func TestAPromiseStoresADecisionAtEveryPlaceItReports(t *testing.T) {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
 		}
 		var done struct {
-			ClaimID   int64 `json:"claim_id"`
-			Decisions int   `json:"decisions"`
+			DecisionID  int64 `json:"decision_id"`
+			Occurrences int   `json:"occurrences"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
 		}
 
-		var places int
+		var occurrences int
 		if err := r.DB.DB.NewSelect().
-			TableExpr(`(SELECT DISTINCT "f"."vulnerability_id", "f"."place_identity"
+			TableExpr(`(SELECT DISTINCT "f"."vulnerability_id", "f"."occurrence_identity"
 				FROM "finding" AS "f" JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
 				WHERE "c"."name" = ? AND "f"."closed_at" IS NULL) AS "open_places"`, "linux-image").
-			ColumnExpr("COUNT(*)").Scan(ctx, &places); err != nil {
+			ColumnExpr("COUNT(*)").Scan(ctx, &occurrences); err != nil {
 			t.Fatal(err)
 		}
 		var stored []struct {
 			State   string  `bun:"state"`
 			LiveKey *string `bun:"live_key"`
 		}
-		if err := r.DB.DB.NewSelect().Table("decision").Column("state", "live_key").
-			Where(`"claim_id" = ?`, done.ClaimID).Scan(ctx, &stored); err != nil {
+		if err := r.DB.DB.NewSelect().Table("decision_occurrence").Column("state", "live_key").
+			Where(`"decision_id" = ?`, done.DecisionID).Scan(ctx, &stored); err != nil {
 			t.Fatal(err)
 		}
-		if places < 2 {
-			t.Fatalf("the build has %d places open on the component, so this checked nothing", places)
+		if occurrences < 2 {
+			t.Fatalf("the build has %d occurrences open on the component, so this checked nothing", occurrences)
 		}
-		if done.Decisions != places || len(stored) != places {
-			t.Fatalf("the promise reported %d decisions and stored %d, over %d places",
-				done.Decisions, len(stored), places)
+		if done.Occurrences != occurrences || len(stored) != occurrences {
+			t.Fatalf("the promise reported %d rows and stored %d, over %d occurrences",
+				done.Occurrences, len(stored), occurrences)
 		}
 		for _, row := range stored {
 			if row.State != "proposed" || row.LiveKey == nil {
-				t.Errorf("a stored decision is %s with live key %v, want a live proposal",
+				t.Errorf("a stored row is %s with live key %v, want a live proposal",
 					row.State, row.LiveKey)
 			}
 		}

@@ -59,7 +59,9 @@ const SAMPLES: Record<string, () => string[]> = {
     routes.dependenciesAt(build),
     routes.dependenciesAt(build, { at: odd, path: odd }),
   ],
-  decideAt: () => [routes.decideAt(build, odd, { version: odd, ecosystem: odd, namespace: odd })],
+  bulkDecisionAt: () => [
+    routes.bulkDecisionAt(build, odd, { version: odd, ecosystem: odd, namespace: odd }),
+  ],
   uploadsAt: () => [routes.uploadsAt(build), routes.uploadsAt(build, "sarif")],
   inventoryChangesAt: () => [routes.inventoryChangesAt(build, 7)],
   runAt: () => [routes.runAt(build, 7)],
@@ -72,8 +74,8 @@ const SAMPLES: Record<string, () => string[]> = {
     routes.sameScreenAt(build, "findings/CVE-1/components/a%2Fb"),
   ],
   sameProductScreenAt: () => [routes.sameProductScreenAt(odd, "/inbox")],
-  claimAt: () => [routes.claimAt(7)],
   decisionAt: () => [routes.decisionAt(7)],
+  decisionOccurrenceAt: () => [routes.decisionOccurrenceAt(7)],
   issueAt: () => [routes.issueAt(odd)],
   personAt: () => [routes.personAt(odd)],
   advisoryAt: () => [routes.advisoryAt(odd)],
@@ -191,11 +193,11 @@ describe("where a row opens", () => {
     expect(asked.has("version")).toBe(false);
   });
 
-  // A rule prepares a claim and a person proposes it, so what travels to the
+  // A rule prepares a decision and a person proposes it, so what travels to the
   // finding is which filter was picked. The name rather than the words: the
   // filter decides what it says, and a copy in the address would go stale the
   // moment somebody saved over the name.
-  it("names the saved filter a prepared claim comes from", () => {
+  it("names the saved filter a prepared decision comes from", () => {
     const at = findingAt(
       { product: "sonic", stream: "main", variant: "broadcom" },
       { vulnerability: "CVE-2024-1", component: "zlib", version: "" },

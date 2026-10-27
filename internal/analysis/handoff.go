@@ -27,7 +27,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// ErrHandedOff refuses a judgment about a lead handed off as a flaw, and a
+// ErrHandedOff refuses a decision about a lead handed off as a flaw, and a
 // second hand-off of it.
 var ErrHandedOff = triage.ErrLeadHandedOff
 
@@ -95,13 +95,13 @@ type Suggestion struct {
 	Unanalyzed []BuildName
 }
 
-// Note is one piece of writing on a claim about a lead: a revision of its
+// Note is one piece of writing on a decision about a lead: a revision of its
 // reasoning or a comment.
 type Note struct {
-	ClaimID   int64
-	Comment   bool
-	Body      string
-	WrittenAt time.Time
+	DecisionID int64
+	Comment    bool
+	Body       string
+	WrittenAt  time.Time
 }
 
 // Authored is what one person wrote about a lead, oldest first.
@@ -119,7 +119,7 @@ type Said struct {
 // Disclosure is what moving a lead into its flaw's case discloses with the
 // flaw (REQ-40).
 type Disclosure struct {
-	// Authors is everybody who wrote reasoning or a comment on a claim about
+	// Authors is everybody who wrote reasoning or a comment on a decision about
 	// the lead or the leads linked with it, with what each wrote.
 	Authors []Authored
 	// Paths is every path the lead names, and Said every message the
@@ -147,13 +147,13 @@ type Offer struct {
 	// third-party code, so the flaw is reported to the upstream it came from.
 	ThirdParty bool
 	// Together is how many other leads the hand-off links to the flaw with
-	// this one: the leads its confirming claim covers, which a move moves
+	// this one: the leads its confirming decision covers, which a move moves
 	// with it.
 	Together  int
 	Discloses Disclosure
 }
 
-// lead is what a hand-off reads about the lead at a place.
+// lead is what a hand-off reads about the lead at an occurrence.
 type lead struct {
 	ID          int64  `bun:"id"`
 	TargetID    int64  `bun:"target_id"`
@@ -191,10 +191,10 @@ func MayHandOff(subject access.Subject, productID int64) error {
 	return nil
 }
 
-// newestLead is the newest finding of the lead at a place in a product that
+// newestLead is the newest finding of the lead at an occurrence in a product that
 // the subject reads in full, with what a hand-off needs of it.
 func newestLead(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
-	placeIdentity string) (*lead, error) {
+	occurrenceIdentity string) (*lead, error) {
 
 	reach := finding.LeadReach(subject, productID)
 	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
@@ -208,7 +208,7 @@ func newestLead(ctx context.Context, db bun.IDB, subject access.Subject, product
 		ColumnExpr(`"f"."id", "f"."target_id", "f"."component_id", "ar"."path"`).
 		ColumnExpr(`"vu"."identifier" AS "rule", "si"."last_run_id", "si"."series_id"`).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(reach.Full, reach.FullArgs...).
 		Where(kinds, kindArgs...).
 		OrderExpr(`"f"."id" DESC`).Limit(1).
@@ -217,58 +217,58 @@ func newestLead(ctx context.Context, db bun.IDB, subject access.Subject, product
 	case errors.Is(err, sql.ErrNoRows):
 		return nil, finding.ErrNoOpenFinding
 	case err != nil:
-		return nil, fmt.Errorf("read the lead at that place: %w", err)
+		return nil, fmt.Errorf("read the lead at that occurrence: %w", err)
 	}
 	return &out, nil
 }
 
-// confirmedAt reports whether a claim confirming the lead at a place stands.
+// confirmedAt reports whether a decision confirming the lead at an occurrence stands.
 func confirmedAt(ctx context.Context, db bun.IDB, productID, findingID int64) (bool, error) {
 	var outcome *string
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		ColumnExpr(standingOutcome+` AS "outcome"`, productID).
 		Where(`"f"."id" = ?`, findingID).
 		Scan(ctx, &outcome); err != nil {
-		return false, fmt.Errorf("read the claim standing at the lead: %w", err)
+		return false, fmt.Errorf("read the decision standing at the lead: %w", err)
 	}
 	return outcome != nil && *outcome == string(Confirmed), nil
 }
 
-// stampedClaim is a claim and the stamp it was read with.
-type stampedClaim struct {
+// stampedDecision is a decision and the stamp it was read with.
+type stampedDecision struct {
 	ID    int64 `bun:"id"`
 	Stamp int   `bun:"stamp"`
 }
 
-// claimsAt is every claim with a live row at the place of a lead finding, in
-// a product, with the stamp each holds: zero for a claim nobody has stamped.
-func claimsAt(ctx context.Context, db bun.IDB, productID, findingID int64) ([]stampedClaim, error) {
-	var out []stampedClaim
+// decisionsAt is every decision with a live row at the occurrence of a lead finding, in
+// a product, with the stamp each holds: zero for a decision nobody has stamped.
+func decisionsAt(ctx context.Context, db bun.IDB, productID, findingID int64) ([]stampedDecision, error) {
+	var out []stampedDecision
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "decision" AS "dc" ON `+finding.DecisionFiledAt("dc", "f")).
-		Join(`JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"`).
-		Join(`LEFT JOIN "claim_stamp" AS "cst" ON "cst"."claim_id" = "sc"."id"`).
+		Join(`JOIN "decision_occurrence" AS "dc" ON `+finding.DecisionOccurrenceFiledAt("dc", "f")).
+		Join(`JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"`).
+		Join(`LEFT JOIN "decision_stamp" AS "cst" ON "cst"."decision_id" = "sc"."id"`).
 		ColumnExpr(`DISTINCT "sc"."id", COALESCE("cst"."stamp", 0) AS "stamp"`).
 		Where(`"f"."id" = ?`, findingID).
 		Where(`"dc"."product_id" = ?`, productID).
 		Where(`"dc"."live_key" IS NOT NULL`).
 		OrderExpr(`"sc"."id" ASC`).
 		Scan(ctx, &out); err != nil {
-		return nil, fmt.Errorf("read the claims standing at the lead: %w", err)
+		return nil, fmt.Errorf("read the decisions standing at the lead: %w", err)
 	}
 	return out, nil
 }
 
-// Propose is what handing off the lead at a place in a product is offered:
+// Propose is what handing off the lead at an occurrence in a product is offered:
 // the components, ranked, the builds it was seen in, and what moving it into
 // its case would disclose.
 func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
-	placeIdentity string) (*Offer, error) {
+	occurrenceIdentity string) (*Offer, error) {
 
 	if err := MayHandOff(subject, productID); err != nil {
 		return nil, err
 	}
-	l, err := newestLead(ctx, db, subject, productID, placeIdentity)
+	l, err := newestLead(ctx, db, subject, productID, occurrenceIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 	}
 	declared := declaredThirdParty(run, l.Path)
 	out := &Offer{Rule: l.Rule, Prefix: prefixOf(l.Path, modules, declared), ThirdParty: declared != ""}
-	if out.Seen, err = seenIn(ctx, db, productID, placeIdentity); err != nil {
+	if out.Seen, err = seenIn(ctx, db, productID, occurrenceIdentity); err != nil {
 		return nil, err
 	}
 
@@ -336,7 +336,7 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 			return nil, err
 		}
 	}
-	together, err := togetherAt(ctx, db, productID, placeIdentity)
+	together, err := togetherAt(ctx, db, productID, occurrenceIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -347,50 +347,50 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 	return out, nil
 }
 
-// togetherAt is the places of the leads handed off with the lead at a place,
-// that place first. A lead handed off goes with every lead handed off as its
-// flaw; one not handed off yet, with every lead the claim confirming it
+// togetherAt is the occurrences of the leads handed off with the lead at an occurrence,
+// that occurrence first. A lead handed off goes with every lead handed off as its
+// flaw; one not handed off yet, with every lead the decision confirming it
 // covers that nobody handed off.
-func togetherAt(ctx context.Context, db bun.IDB, productID int64, placeIdentity string) ([]string, error) {
-	handed, err := finding.HandoffAt(ctx, db, productID, placeIdentity)
+func togetherAt(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity string) ([]string, error) {
+	handed, err := finding.HandoffAt(ctx, db, productID, occurrenceIdentity)
 	if err != nil {
 		return nil, err
 	}
 	var others []string
 	if handed != nil {
 		if err := db.NewSelect().Model((*finding.Handoff)(nil)).
-			Column("lh.place_identity").
+			Column("lh.occurrence_identity").
 			Where(`"lh"."product_id" = ?`, productID).
 			Where(`"lh"."vulnerability_id" = ?`, handed.VulnerabilityID).
-			Where(`"lh"."place_identity" <> ?`, placeIdentity).
+			Where(`"lh"."occurrence_identity" <> ?`, occurrenceIdentity).
 			OrderExpr(`"lh"."id" ASC`).
 			Scan(ctx, &others); err != nil {
 			return nil, fmt.Errorf("read the leads handed off as the flaw: %w", err)
 		}
-		return append([]string{placeIdentity}, others...), nil
+		return append([]string{occurrenceIdentity}, others...), nil
 	}
-	if err := db.NewSelect().TableExpr(`"decision" AS "dc"`).
+	if err := db.NewSelect().TableExpr(`"decision_occurrence" AS "dc"`).
 		Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"`).
-		Join(`JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"`).
-		Join(`JOIN "decision" AS "od" ON "od"."claim_id" = "dc"."claim_id" AND "od"."product_id" = "dc"."product_id"`).
+		Join(`JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"`).
+		Join(`JOIN "decision_occurrence" AS "od" ON "od"."decision_id" = "dc"."decision_id" AND "od"."product_id" = "dc"."product_id"`).
 		Join(`JOIN "vulnerability" AS "ov" ON "ov"."id" = "od"."vulnerability_id"`).
-		ColumnExpr(`DISTINCT "od"."place_identity"`).
+		ColumnExpr(`DISTINCT "od"."occurrence_identity"`).
 		Where(`"dc"."product_id" = ?`, productID).
-		Where(`"dc"."place_identity" = ?`, placeIdentity).
+		Where(`"dc"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(`"rv"."kind" = ?`, string(kind.Rule)).
 		Where(`"sc"."outcome" = ?`, string(Confirmed)).
 		Where(`"dc"."live_key" IS NOT NULL`).
 		Where(`("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL))`).
 		Where(`"ov"."kind" = ?`, string(kind.Rule)).
 		Where(`"od"."live_key" IS NOT NULL`).
-		Where(`"od"."place_identity" <> ?`, placeIdentity).
+		Where(`"od"."occurrence_identity" <> ?`, occurrenceIdentity).
 		Where(`NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-			WHERE "lh"."product_id" = "od"."product_id" AND "lh"."place_identity" = "od"."place_identity")`).
-		OrderExpr(`"od"."place_identity" ASC`).
+			WHERE "lh"."product_id" = "od"."product_id" AND "lh"."occurrence_identity" = "od"."occurrence_identity")`).
+		OrderExpr(`"od"."occurrence_identity" ASC`).
 		Scan(ctx, &others); err != nil {
 		return nil, fmt.Errorf("read the leads confirmed with the lead: %w", err)
 	}
-	return append([]string{placeIdentity}, others...), nil
+	return append([]string{occurrenceIdentity}, others...), nil
 }
 
 // handedWith is every hand-off of the flaw a hand-off links, in one product,
@@ -525,9 +525,9 @@ func resembling(ctx context.Context, db bun.IDB, targetID int64, dir string) ([]
 	return out, nil
 }
 
-// seenIn is every build of a product holding a finding of the lead at a
-// place, open or closed.
-func seenIn(ctx context.Context, db bun.IDB, productID int64, placeIdentity string) ([]BuildName, error) {
+// seenIn is every build of a product holding a finding of the lead at an
+// occurrence, open or closed.
+func seenIn(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity string) ([]BuildName, error) {
 	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
 	var out []BuildName
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
@@ -536,7 +536,7 @@ func seenIn(ctx context.Context, db bun.IDB, productID int64, placeIdentity stri
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		ColumnExpr(`DISTINCT "t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(kinds, kindArgs...).
 		OrderExpr(`"s"."name" ASC, "va"."name" ASC`).
 		Scan(ctx, &out); err != nil {
@@ -588,11 +588,11 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 	return out, nil
 }
 
-// disclosing is what disclosing the leads at these places in a product with
-// their flaw discloses. The writing on claims is read at the visibilities the
+// disclosing is what disclosing the leads at these occurrences in a product with
+// their flaw discloses. The writing on decisions is read at the visibilities the
 // subject reads in the product.
 func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
-	places []string) (Disclosure, error) {
+	occurrences []string) (Disclosure, error) {
 
 	var out Disclosure
 	visible := []access.Visibility{}
@@ -600,27 +600,27 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 		visible = access.Visible(subject, productID)
 	}
 	if len(visible) > 0 {
-		claims := `SELECT "dc"."claim_id" FROM "decision" AS "dc"
+		decisions := `SELECT "dc"."decision_id" FROM "decision_occurrence" AS "dc"
 			JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"
-			WHERE "dc"."product_id" = ? AND "dc"."place_identity" IN (?) AND "rv"."kind" = ?
+			WHERE "dc"."product_id" = ? AND "dc"."occurrence_identity" IN (?) AND "rv"."kind" = ?
 			  AND "dc"."visibility" IN (?)`
-		claimArgs := []any{productID, bun.List(places), string(kind.Rule), bun.List(visible)}
+		decisionArgs := []any{productID, bun.List(occurrences), string(kind.Rule), bun.List(visible)}
 		var notes []struct {
-			PersonID  int64     `bun:"person_id"`
-			ClaimID   int64     `bun:"claim_id"`
-			Comment   int       `bun:"comment"`
-			Body      string    `bun:"body"`
-			WrittenAt time.Time `bun:"written_at"`
+			PersonID   int64     `bun:"person_id"`
+			DecisionID int64     `bun:"decision_id"`
+			Comment    int       `bun:"comment"`
+			Body       string    `bun:"body"`
+			WrittenAt  time.Time `bun:"written_at"`
 		}
 		if err := db.NewSelect().
-			TableExpr(`(SELECT "cr"."written_by" AS "person_id", "cr"."claim_id", 0 AS "comment", "cr"."body",
-					"cr"."written_at" FROM "claim_revision" AS "cr"
-				WHERE "cr"."claim_id" IN (`+claims+`)
-				UNION ALL SELECT "cm"."written_by" AS "person_id", "cm"."claim_id", 1 AS "comment", "cm"."body",
-					"cm"."written_at" FROM "claim_comment" AS "cm"
-				WHERE "cm"."claim_id" IN (`+claims+`)) AS "w"`, append(claimArgs, claimArgs...)...).
-			ColumnExpr(`"w"."person_id", "w"."claim_id", "w"."comment", "w"."body", "w"."written_at"`).
-			OrderExpr(`"w"."person_id" ASC, "w"."written_at" ASC, "w"."claim_id" ASC, "w"."comment" ASC`).
+			TableExpr(`(SELECT "cr"."written_by" AS "person_id", "cr"."decision_id", 0 AS "comment", "cr"."body",
+					"cr"."written_at" FROM "decision_revision" AS "cr"
+				WHERE "cr"."decision_id" IN (`+decisions+`)
+				UNION ALL SELECT "cm"."written_by" AS "person_id", "cm"."decision_id", 1 AS "comment", "cm"."body",
+					"cm"."written_at" FROM "decision_comment" AS "cm"
+				WHERE "cm"."decision_id" IN (`+decisions+`)) AS "w"`, append(decisionArgs, decisionArgs...)...).
+			ColumnExpr(`"w"."person_id", "w"."decision_id", "w"."comment", "w"."body", "w"."written_at"`).
+			OrderExpr(`"w"."person_id" ASC, "w"."written_at" ASC, "w"."decision_id" ASC, "w"."comment" ASC`).
 			Scan(ctx, &notes); err != nil {
 			return out, fmt.Errorf("read what was written about the lead: %w", err)
 		}
@@ -629,7 +629,7 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 				out.Authors = append(out.Authors, Authored{PersonID: n.PersonID})
 			}
 			last := &out.Authors[len(out.Authors)-1]
-			last.Notes = append(last.Notes, Note{ClaimID: n.ClaimID, Comment: n.Comment == 1, Body: n.Body,
+			last.Notes = append(last.Notes, Note{DecisionID: n.DecisionID, Comment: n.Comment == 1, Body: n.Body,
 				WrittenAt: n.WrittenAt})
 		}
 	}
@@ -653,7 +653,7 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 			ColumnExpr(`COALESCE("`+alias+`"."path", '') AS "path", "`+alias+`"."`+message+`" AS "message_text"`).
 			ColumnExpr(`CASE WHEN "`+alias+`"."snippet" IS NULL THEN NULL ELSE TRUE END AS "snippet"`).
 			Where(`"s"."product_id" = ?`, productID).
-			Where(`"f"."place_identity" IN (?)`, bun.List(places)).
+			Where(`"f"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 			Where(kinds, kindArgs...)
 	}
 	for _, q := range []*bun.SelectQuery{from("analysis_result", "ar", "message_text"),
@@ -696,8 +696,8 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 // Handing is a hand-off of one lead: the flaw to record and whether the lead
 // moves into its case.
 type Handing struct {
-	ProductID     int64
-	PlaceIdentity string
+	ProductID          int64
+	OccurrenceIdentity string
 	// Flaw is the flaw as the recorded-flaw path takes it, with the builds
 	// a person confirmed and the component they chose.
 	Flaw finding.Entering
@@ -705,16 +705,16 @@ type Handing struct {
 }
 
 // Recorded is a flaw recorded from a lead: the identifier it was filed under,
-// the component carrying it, and how many builds and places it opened at.
+// the component carrying it, and how many builds and occurrences it opened at.
 type Recorded struct {
-	Identifier string
-	Component  string
-	Builds     int
-	Places     int
+	Identifier  string
+	Component   string
+	Builds      int
+	Occurrences int
 }
 
 // HandOff records a confirmed lead as a flaw here, through the path every
-// recorded flaw takes, and links it and every lead its confirming claim
+// recorded flaw takes, and links it and every lead its confirming decision
 // covers to the flaw in the same transaction. The component chosen is learned
 // for the lead's prefix, and the leads move into the case where the person
 // asked.
@@ -729,22 +729,22 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 	in.Flaw.Then = func(ctx context.Context, tx bun.IDB, vulnerabilityID int64, now time.Time) error {
 		// Read again here: whether the lead still stands confirmed and
 		// unhanded is a fact a retry asks again.
-		l, err := newestLead(ctx, tx, subject, in.ProductID, in.PlaceIdentity)
+		l, err := newestLead(ctx, tx, subject, in.ProductID, in.OccurrenceIdentity)
 		if err != nil {
 			return err
 		}
-		// The claims standing at the lead, with the stamps they hold, read
+		// The decisions standing at the lead, with the stamps they hold, read
 		// before whether one confirms it. Restamped once it does, so a
 		// revision or withdrawal of the confirmation committing beside this
 		// matches nothing, or makes this match nothing, and is asked again.
-		standing, err := claimsAt(ctx, tx, in.ProductID, l.ID)
+		standing, err := decisionsAt(ctx, tx, in.ProductID, l.ID)
 		if err != nil {
 			return err
 		}
-		if err := finding.LeadEnded(ctx, tx, in.ProductID, in.PlaceIdentity, now); err != nil {
+		if err := finding.LeadEnded(ctx, tx, in.ProductID, in.OccurrenceIdentity, now); err != nil {
 			return err
 		}
-		if handed, err := finding.HandoffAt(ctx, tx, in.ProductID, in.PlaceIdentity); err != nil {
+		if handed, err := finding.HandoffAt(ctx, tx, in.ProductID, in.OccurrenceIdentity); err != nil {
 			return err
 		} else if handed != nil {
 			return ErrHandedOff
@@ -762,21 +762,21 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 		// What the hand-off is offered, read in the transaction recording
 		// it: the flaw keeps the component ranked first and the builds
 		// proposed beside the lead it was recorded from.
-		offer, err := Propose(ctx, tx, subject, in.ProductID, in.PlaceIdentity)
+		offer, err := Propose(ctx, tx, subject, in.ProductID, in.OccurrenceIdentity)
 		if err != nil {
 			return err
 		}
-		// Every lead the confirming claim covers is the one flaw, and is
-		// linked to it: a lead of the group left behind holds a claim
+		// Every lead the confirming decision covers is the one flaw, and is
+		// linked to it: a lead of the group left behind holds a decision
 		// nothing may change and no flaw.
-		together, err := togetherAt(ctx, tx, in.ProductID, in.PlaceIdentity)
+		together, err := togetherAt(ctx, tx, in.ProductID, in.OccurrenceIdentity)
 		if err != nil {
 			return err
 		}
 		rows := make([]*finding.Handoff, 0, len(together))
-		for _, place := range together {
+		for _, occurrence := range together {
 			row := &finding.Handoff{
-				ProductID: in.ProductID, PlaceIdentity: place, VulnerabilityID: vulnerabilityID,
+				ProductID: in.ProductID, OccurrenceIdentity: occurrence, VulnerabilityID: vulnerabilityID,
 				Visibility: access.Internal, HandedBy: subject.ID, HandedAt: now,
 			}
 			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -796,7 +796,7 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 			strings.TrimSpace(in.Flaw.Ecosystem), strings.TrimSpace(in.Flaw.Namespace), subject.ID, now); err != nil {
 			return err
 		}
-		if err := recordOrigin(ctx, tx, in.ProductID, in.PlaceIdentity, vulnerabilityID, offer, in.Flaw,
+		if err := recordOrigin(ctx, tx, in.ProductID, in.OccurrenceIdentity, vulnerabilityID, offer, in.Flaw,
 			subject.ID, now); err != nil {
 			return err
 		}
@@ -822,12 +822,12 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 	for _, row := range rows {
 		builds[row.TargetID] = true
 	}
-	return &Recorded{Identifier: identifier, Component: component, Builds: len(builds), Places: len(rows)}, nil
+	return &Recorded{Identifier: identifier, Component: component, Builds: len(builds), Occurrences: len(rows)}, nil
 }
 
-// Answerable refuses a claim about a lead the subject no longer reads in
+// Answerable refuses a decision about a lead the subject no longer reads in
 // full, or one handed off as a flaw, which is judged instead. Asked inside the
-// transaction writing the claim.
+// transaction writing the decision.
 func Answerable(ctx context.Context, tx bun.IDB, subject access.Subject, productID int64, lead *finding.Finding) error {
 	reach := finding.LeadReach(subject, productID)
 	read, err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
@@ -840,14 +840,14 @@ func Answerable(ctx context.Context, tx bun.IDB, subject access.Subject, product
 	if !read {
 		return finding.ErrNoOpenFinding
 	}
-	handed, err := finding.HandoffAt(ctx, tx, productID, lead.PlaceIdentity)
+	handed, err := finding.HandoffAt(ctx, tx, productID, lead.OccurrenceIdentity)
 	if err != nil {
 		return err
 	}
 	if handed != nil {
 		return ErrHandedOff
 	}
-	return finding.LeadEnded(ctx, tx, productID, lead.PlaceIdentity, time.Now().UTC())
+	return finding.LeadEnded(ctx, tx, productID, lead.OccurrenceIdentity, time.Now().UTC())
 }
 
 // learn records the component a path prefix was confirmed as, replacing what
@@ -888,14 +888,14 @@ func learn(ctx context.Context, tx bun.IDB, productID int64, prefix, component, 
 
 // Move moves a kept lead into its flaw's case while the flaw is undisclosed,
 // and every lead handed off as the flaw with it.
-func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity string,
+func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, occurrenceIdentity string,
 	now time.Time) error {
 
 	if err := MayHandOff(subject, productID); err != nil {
 		return err
 	}
 	return database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
-		h, err := handedFor(ctx, tx, subject, productID, placeIdentity)
+		h, err := handedFor(ctx, tx, subject, productID, occurrenceIdentity)
 		if err != nil {
 			return err
 		}
@@ -925,12 +925,12 @@ func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int
 // Unmove takes a moved lead back out of its flaw's case while the flaw is
 // undisclosed, and every lead handed off as the flaw with it: the flaw's
 // readers who read it only through the case read it no longer.
-func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity string) error {
+func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, occurrenceIdentity string) error {
 	if err := MayHandOff(subject, productID); err != nil {
 		return err
 	}
 	return database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
-		h, err := handedFor(ctx, tx, subject, productID, placeIdentity)
+		h, err := handedFor(ctx, tx, subject, productID, occurrenceIdentity)
 		if err != nil {
 			return err
 		}
@@ -957,7 +957,7 @@ func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID i
 }
 
 // moveOut takes a moved lead back out of its flaw's case, and the undo is
-// recorded as the access change it is. The lead and the claims about it stay
+// recorded as the access change it is. The lead and the decisions about it stay
 // internal throughout, so only the flaw's readers lose it.
 func moveOut(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.Handoff) error {
 	if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.Handoff)(nil)).
@@ -968,7 +968,7 @@ func moveOut(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding
 }
 
 // moveIn moves a handed-off lead into its flaw's case, and the move is
-// recorded as the access change it is. The lead and the claims about it stay
+// recorded as the access change it is. The lead and the decisions about it stay
 // internal, so everybody who read it keeps it, and the flaw's readers read it
 // as well (finding.LeadReading).
 func moveIn(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.Handoff, now time.Time) error {
@@ -1000,12 +1000,12 @@ func updateAsRead(ctx context.Context, q *bun.UpdateQuery, h *finding.Handoff) e
 // handedFor is the hand-off of a lead the subject reads in full, for a move or
 // an undo.
 func handedFor(ctx context.Context, tx bun.IDB, subject access.Subject, productID int64,
-	placeIdentity string) (*finding.Handoff, error) {
+	occurrenceIdentity string) (*finding.Handoff, error) {
 
-	if _, err := newestLead(ctx, tx, subject, productID, placeIdentity); err != nil {
+	if _, err := newestLead(ctx, tx, subject, productID, occurrenceIdentity); err != nil {
 		return nil, err
 	}
-	h, err := finding.HandoffAt(ctx, tx, productID, placeIdentity)
+	h, err := finding.HandoffAt(ctx, tx, productID, occurrenceIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -1044,8 +1044,8 @@ func LeadName(ctx context.Context, db bun.IDB, h *finding.Handoff) (string, erro
 			JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"
 			JOIN "target" AS "t" ON "t"."id" = "f"."target_id"
 			JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"
-			WHERE "s"."product_id" = "p"."id" AND "f"."place_identity" = ? AND `+kinds+`) AS "rule"`,
-			append([]any{h.PlaceIdentity}, kindArgs...)...).
+			WHERE "s"."product_id" = "p"."id" AND "f"."occurrence_identity" = ? AND `+kinds+`) AS "rule"`,
+			append([]any{h.OccurrenceIdentity}, kindArgs...)...).
 		Where(`"p"."id" = ?`, h.ProductID).
 		Scan(ctx, &names); err != nil {
 		return "", fmt.Errorf("read what to call the lead: %w", err)

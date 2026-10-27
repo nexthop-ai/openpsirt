@@ -76,7 +76,7 @@ type Account struct {
 	LastSeenAt       *time.Time `bun:"last_seen_at"`
 	// DeactivatedAt is when they stopped being somebody who may sign in.
 	// Null is the ordinary state. Never a deletion: the record names them
-	// as the proposer of judgments and the approver of others.
+	// as the proposer of decisions and the approver of others.
 	DeactivatedAt *time.Time `bun:"deactivated_at"`
 }
 

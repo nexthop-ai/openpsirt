@@ -668,10 +668,10 @@ type Neighbor struct {
 	// only that says every container is clean while the packages inside them
 	// hold thousands. What makes a branch worth opening is what is in it.
 	//
-	// Issues rather than finding rows. A finding is one issue at one place,
-	// and the issues open against a component are the same at every place it
-	// sits — so a node drawn beneath one parent is looking at one place, and
-	// the count is the issues there, not the rows across every place.
+	// Issues rather than finding rows. A finding is one issue at one occurrence,
+	// and the issues open against a component are the same at every occurrence
+	// — so a node drawn beneath one parent is looking at one occurrence, and
+	// the count is the issues there, not the rows across every occurrence.
 	Findings int `bun:"findings"`
 	Beneath  int `bun:"beneath,scanonly"`
 	// BeneathBy is that same number by how the issues were rated. A node
@@ -922,7 +922,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 	}
 	// The neighbors first, so what is counted against each is counted for
 	// them alone. Counted for the whole build and joined, the step above the
-	// bench kernel groups the build's 325,389 open places for 45 parents
+	// bench kernel groups the build's 325,389 open occurrences for 45 parents
 	// carrying none: 32 ms, against 3 ms for the two statements.
 	var ids []int64
 	if err := edges().ColumnExpr(`DISTINCT "fn"."component_id"`).Scan(ctx, &ids); err != nil {
@@ -991,9 +991,9 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 // pass, and 17.1 s for a search for "li" on a switch image of 297,881 open
 // findings, where the pass takes 0.24 s.
 //
-// The pass groups the places to one row per issue on a component before
-// counting them. A distinct count over the places sorts all of them: over the
-// bench kernel's build, 325,389 open places, the pass takes 103 ms counted
+// The pass groups the occurrences to one row per issue on a component before
+// counting them. A distinct count over the occurrences sorts all of them: over the
+// bench kernel's build, 325,389 open occurrences, the pass takes 103 ms counted
 // distinct and 42 ms grouped first.
 //
 // Where the components the query reaches are known, the pass is over theirs
@@ -1255,7 +1255,7 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	}
 	limit = database.AList.Of(limit)
 
-	// The components matched, each once however many places it sits at. The
+	// The components matched, each once however many occurrences it sits at. The
 	// name is matched on its folded form, which is lowercased and trimmed
 	// when stored, so no engine is asked to compare loosely; and the term is
 	// escaped as well as folded, so a term of "%" searches for a percent sign.
@@ -1296,10 +1296,10 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 // DeclaredScopes is what a producer said about each edge arriving at one
 // component in one build, by the component that pulls it in.
 //
-// Keyed on the puller rather than on the edge row, because that is what a place
+// Keyed on the puller rather than on the edge row, because that is what an occurrence
 // names: a finding sits at a component under a consumer, and the product itself
 // is a consumer of nothing, which is the zero key here for the same reason a
-// place under the build carries no consumer.
+// occurrence under the build carries no consumer.
 //
 // A word is present only where the producer stated one, and most inventories
 // state none at all.
@@ -1343,7 +1343,7 @@ func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
 		}
 		at := [2]int64{row.ChildComponentID, puller}
 		// The first word for a pair, in the order above. A component reached
-		// from one consumer by two edges is one place, and two words for it is
+		// from one consumer by two edges is one occurrence, and two words for it is
 		// the producer having said two things about the same dependency.
 		if _, already := scopes[at]; !already {
 			scopes[at] = row.Kind

@@ -17,11 +17,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// Described is what a decision is about, as the findings list would show it:
+// Described is what a decision occurrence is about, as the findings list would show it:
 // the build to link to, the issue, the component and where it sits.
 //
-// Read from the open findings the decision's row matches rather than from
-// anything the decision itself states, because a decision names a place and
+// Read from the open findings the row matches rather than from
+// anything the decision itself states, because a decision names an occurrence and
 // versions and nothing else — the build, the component and what the issue is
 // are the finding's to say.
 type Described struct {
@@ -41,80 +41,80 @@ type Described struct {
 	// Owner and Parent are the two ends of the way down, as the findings list
 	// gives them; Unplaced says the inventory placed the component nowhere.
 	Owner, Parent string
-	// Places is how many places the issue sits at in that component in that
-	// build, and Decided how many of those this decision's claim covers.
-	Places, Decided int
+	// Occurrences is how many occurrences the issue sits at in that component in that
+	// build, and Decided how many of those this row's decision covers.
+	Occurrences, Decided int
 }
 
-// describedRow is one open finding a decision's row matches.
+// describedRow is one open finding a decision occurrence matches.
 type describedRow struct {
-	DecisionID  int64  `bun:"decision_id"`
-	ClaimID     int64  `bun:"claim_id"`
-	Exact       int    `bun:"exact"`
-	TargetID    int64  `bun:"target_id"`
-	ProductID   int64  `bun:"product_id"`
-	Product     string `bun:"product"`
-	ProductName string `bun:"product_name"`
-	Stream      string `bun:"stream"`
-	StreamName  string `bun:"stream_name"`
-	Variant     string `bun:"variant"`
-	VariantName string `bun:"variant_name"`
-	ComponentID int64  `bun:"component_id"`
-	Component   string `bun:"component"`
-	Version     string `bun:"version"`
-	Purl        string `bun:"purl"`
-	ConsumerID  *int64 `bun:"consumer_id"`
-	Consumer    string `bun:"consumer"`
-	FixState    string `bun:"fix_state"`
-	FixedIn     string `bun:"fixed_in"`
-	Issue       int64  `bun:"vulnerability_id"`
+	DecisionOccurrenceID int64  `bun:"decision_occurrence_id"`
+	DecisionID           int64  `bun:"decision_id"`
+	Exact                int    `bun:"exact"`
+	TargetID             int64  `bun:"target_id"`
+	ProductID            int64  `bun:"product_id"`
+	Product              string `bun:"product"`
+	ProductName          string `bun:"product_name"`
+	Stream               string `bun:"stream"`
+	StreamName           string `bun:"stream_name"`
+	Variant              string `bun:"variant"`
+	VariantName          string `bun:"variant_name"`
+	ComponentID          int64  `bun:"component_id"`
+	Component            string `bun:"component"`
+	Version              string `bun:"version"`
+	Purl                 string `bun:"purl"`
+	ConsumerID           *int64 `bun:"consumer_id"`
+	Consumer             string `bun:"consumer"`
+	FixState             string `bun:"fix_state"`
+	FixedIn              string `bun:"fixed_in"`
+	Issue                int64  `bun:"vulnerability_id"`
 }
 
-// Describe reads what each of these decisions is about, in a handful of
-// statements for the whole set rather than one per decision.
+// Describe reads what each of these decision occurrences is about, in a handful of
+// statements for the whole set rather than one per row.
 //
-// A decision's row matches open findings by place and, while it is live, by
-// the versions it was written against. A lapsed decision's versions no longer
-// match anything, so the match falls back to the place alone: the card can
-// still say which component and build the judgment was about, which is what
+// A decision occurrence matches open findings by occurrence and, while it is live, by
+// the versions it was written against. A lapsed row's versions no longer
+// match anything, so the match falls back to the occurrence alone: the card can
+// still say which component and build the decision was about, which is what
 // somebody re-making it needs. Where a row matches several builds, the first
 // by name is the one described.
 //
 // Narrowed to what the subject may read, like every count that is served
 // back: a decision somebody may read can sit beside findings they may not.
-func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions []Decision) (map[int64]Described, error) {
+func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrences []DecisionOccurrence) (map[int64]Described, error) {
 	out := map[int64]Described{}
-	if len(decisions) == 0 {
+	if len(occurrences) == 0 {
 		return out, nil
 	}
-	ids := make([]int64, 0, len(decisions))
-	claims := make([]int64, 0, len(decisions))
-	for _, decision := range decisions {
-		ids = append(ids, decision.ID)
-		claims = append(claims, decision.ClaimID)
+	ids := make([]int64, 0, len(occurrences))
+	decisions := make([]int64, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		ids = append(ids, occurrence.ID)
+		decisions = append(decisions, occurrence.DecisionID)
 	}
 	var rows []describedRow
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		// The decision is on the outside of this join by construction, and
+		TableExpr(`"decision_occurrence" AS "de"`).
+		// The decision occurrence is on the outside of this join by construction, and
 		// the spelling is the instruction. CROSS JOIN ... WHERE is an inner
 		// join on every engine; on SQLite it also fixes the order, statistics
 		// or not — and left
 		// to itself the planner started from finding, taking "open" as an
 		// equality that matches ten rows when it matches every open row in
-		// the deployment, and probed the decisions once per row: 0.46 s to
+		// the deployment, and probed the decision occurrences once per row: 0.46 s to
 		// describe a page of thirty-two, against 0.1 ms the other way round.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtPlace("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "product" AS "pr" ON "pr"."id" = "st"."product_id"`).
-		ColumnExpr(`"de"."id" AS "decision_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr("CASE WHEN "+finding.VersionsMatch+` THEN 1 ELSE 0 END AS "exact"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
@@ -136,18 +136,18 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		OrderExpr(`"de"."id", exact DESC, "st"."name", "va"."name", "c"."name"`).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what these decisions are about: %w", err)
+		return nil, fmt.Errorf("read what these decision occurrences are about: %w", err)
 	}
 	if len(rows) == 0 {
 		return out, nil
 	}
 
-	// The first row per decision is the one described: an exact match
+	// The first row per decision occurrence is the one described: an exact match
 	// first, then the first build by name.
 	chosen := map[int64]describedRow{}
 	for _, row := range rows {
-		if _, seen := chosen[row.DecisionID]; !seen {
-			chosen[row.DecisionID] = row
+		if _, seen := chosen[row.DecisionOccurrenceID]; !seen {
+			chosen[row.DecisionOccurrenceID] = row
 		}
 	}
 
@@ -178,7 +178,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		}
 		byIssue[issue.ID] = issue
 	}
-	// Each decision's own product's rating of its issue. A rating belongs to a
+	// Each row's own product's rating of its issue. A rating belongs to a
 	// product, and these rows span them — a queue of decisions is not one
 	// product's — so the word a card shows is the one the product the
 	// decision was made in holds.
@@ -191,8 +191,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		return nil, err
 	}
 
-	// The places the issue sits at in that component in that build, and
-	// how many of those the decision's claim covers. One grouped statement
+	// The occurrences the issue sits at in that component in that build, and
+	// how many of those the row's decision covers. One grouped statement
 	// each over the builds and components in hand; the triples that were not
 	// asked about fall out in Go.
 	targets, components := distinctOf(chosen)
@@ -200,7 +200,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		TargetID    int64 `bun:"target_id"`
 		Issue       int64 `bun:"vulnerability_id"`
 		ComponentID int64 `bun:"component_id"`
-		Places      int   `bun:"places"`
+		Occurrences int   `bun:"places"`
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -223,41 +223,41 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	type triple struct {
 		target, issue, component int64
 	}
-	places := map[triple]int{}
+	occurrencesAt := map[triple]int{}
 	for _, count := range counts {
-		places[triple{count.TargetID, count.Issue, count.ComponentID}] = count.Places
+		occurrencesAt[triple{count.TargetID, count.Issue, count.ComponentID}] = count.Occurrences
 	}
 
-	// Covered is what the claim's live rows actually match — the place and
-	// both versions, as a finding asks it — rather than every place the
-	// claim ever named. The place-only fallback above is for naming what a
-	// lapsed judgment was about; counted that way, a claim whose rows had
-	// lapsed, or which was keyed at another build's version, reported places
+	// Covered is what the decision's live rows actually match — the occurrence and
+	// both versions, as a finding asks it — rather than every occurrence the
+	// decision ever named. The occurrence-only fallback above is for naming what a
+	// lapsed decision was about; counted that way, a decision whose rows had
+	// lapsed, or which was keyed at another build's version, reported occurrences
 	// it does not cover.
 	var covered []struct {
-		ClaimID     int64 `bun:"claim_id"`
+		DecisionID  int64 `bun:"decision_id"`
 		TargetID    int64 `bun:"target_id"`
 		Issue       int64 `bun:"vulnerability_id"`
 		ComponentID int64 `bun:"component_id"`
 		Decided     int   `bun:"decided"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		// The decision on the outside, as above.
-		Join(finding.DecisionIssue).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		// The decision occurrence on the outside, as above.
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtPlace("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."place_identity") AS "decided"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
+		ColumnExpr(`COUNT(DISTINCT "f"."occurrence_identity") AS "decided"`).
+		Where(`"de"."decision_id" IN (?)`, bun.List(decisions)).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
@@ -266,16 +266,16 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		GroupExpr(`"de"."claim_id", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
+		GroupExpr(`"de"."decision_id", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &covered); err != nil {
-		return nil, fmt.Errorf("count what these claims cover: %w", err)
+		return nil, fmt.Errorf("count what these decisions cover: %w", err)
 	}
 	type claimed struct {
-		claim, target, issue, component int64
+		decision, target, issue, component int64
 	}
 	decided := map[claimed]int{}
 	for _, count := range covered {
-		decided[claimed{count.ClaimID, count.TargetID, count.Issue, count.ComponentID}] = count.Decided
+		decided[claimed{count.DecisionID, count.TargetID, count.Issue, count.ComponentID}] = count.Decided
 	}
 
 	// The two ends of the way down, one walk per build rather than per row.
@@ -291,7 +291,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	// way out of a handler, never part of a transaction.
 	pool, err := s.pool()
 	if err != nil {
-		return nil, fmt.Errorf("describing decisions reads the graph through the pool: %w", err)
+		return nil, fmt.Errorf("describing decision occurrences reads the graph through the pool: %w", err)
 	}
 	chains := map[int64]map[int64][]graph.Step{}
 	for target, components := range byTarget {
@@ -312,8 +312,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 			FixState: row.FixState, FixedIn: row.FixedIn,
 			Issue: byIssue[row.Issue].RatedIn(
 				rated[finding.RatedKey{ProductID: row.ProductID, VulnerabilityID: row.Issue}]),
-			Places:  places[triple{row.TargetID, row.Issue, row.ComponentID}],
-			Decided: decided[claimed{row.ClaimID, row.TargetID, row.Issue, row.ComponentID}],
+			Occurrences: occurrencesAt[triple{row.TargetID, row.Issue, row.ComponentID}],
+			Decided:     decided[claimed{row.DecisionID, row.TargetID, row.Issue, row.ComponentID}],
 		}
 		at := row.ComponentID
 		if row.ConsumerID != nil {
@@ -323,7 +323,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		// A route up that could not be walked is not the same as nothing
 		// pulling this in. The finding records its consumer either way, so
 		// the card names it rather than showing an approver a blank where the
-		// path they are meant to judge the claim by should be.
+		// path they are meant to judge the decision by should be.
 		if one.Owner == "" && one.Parent == "" && row.Consumer != "" {
 			one.Parent = row.Consumer
 		}

@@ -19,9 +19,9 @@ func TestAProposalThatNeedsNobodyIsListedInForceRatherThanWaiting(t *testing.T) 
 	// The findings list reads it as agreed, the way the finding screen reads
 	// it, and the waiting filter does not return it.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
+			"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"affected","reasoning":"We ship the vulnerable parser."}`); got.Code != http.StatusCreated {
 			t.Fatalf("recording affected answered %d: %s", got.Code, got.Body.String())
@@ -42,16 +42,16 @@ func TestAMissedFixDateFileSaysWhichDateWasMissed(t *testing.T) {
 	// The card on screen reads "Patch by" the date. A file of the same list
 	// that dropped the date could not say which promise did not hold.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
+			"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"patch-needed","committed_to":"`+httpapitest.AheadOfUs+`",`+
 				`"reasoning":"Taking the upstream commit as a distro patch."}`); got.Code != http.StatusCreated {
 			t.Fatalf("recording a backport answered %d: %s", got.Code, got.Body.String())
 		}
 		missed := time.Now().UTC().AddDate(0, 0, -3).Truncate(24 * time.Hour)
-		if _, err := r.DB.DB.NewUpdate().Table("claim").
+		if _, err := r.DB.DB.NewUpdate().Table("decision").
 			Set(`"committed_to" = ?`, missed).
 			Where(`"outcome" = ?`, "patch-needed").Exec(t.Context()); err != nil {
 			t.Fatal(err)

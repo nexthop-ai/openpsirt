@@ -10,10 +10,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-func TestAFindingsHolderIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
-	// Who is dealing with a finding is one name where its places agree. A
-	// place the reader may not read is not one of the places they are shown,
-	// and a holder read off it names who is working undisclosed work.
+func TestAFindingsHolderIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
+	// Who is dealing with a finding is one name where its occurrences agree. An
+	// occurrence the reader may not read is not one of the occurrences they are
+	// shown, and a holder read off it names who is working undisclosed work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -33,7 +33,7 @@ func TestAFindingsHolderIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
 		}
 		open := f.open(t)
 		if len(open) != 2 {
-			t.Fatalf("the issue sits at %d places, want two", len(open))
+			t.Fatalf("the issue sits at %d occurrences, want two", len(open))
 		}
 		for i, holder := range []string{"someone", "somebody-else"} {
 			q := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
@@ -52,14 +52,14 @@ func TestAFindingsHolderIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
 			t.Fatal(err)
 		}
 		if evidence.AssignedTo != "someone" {
-			t.Errorf("a reader of the disclosed place reads its holder as %q", evidence.AssignedTo)
+			t.Errorf("a reader of the disclosed occurrence reads its holder as %q", evidence.AssignedTo)
 		}
 	})
 }
 
-func TestAFindingsRoutingRuleIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
-	// The rule that placed a finding is one name where its places agree. A
-	// rule read off a place the reader may not read names how undisclosed
+func TestAFindingsRoutingRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
+	// The rule that placed a finding is one name where its occurrences agree. A
+	// rule read off an occurrence the reader may not read names how undisclosed
 	// work is routed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -70,7 +70,7 @@ func TestAFindingsRoutingRuleIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
 		}
 		open := f.open(t)
 		if len(open) != 2 {
-			t.Fatalf("the issue sits at %d places, want two", len(open))
+			t.Fatalf("the issue sits at %d occurrences, want two", len(open))
 		}
 		planner := f.planner(t, access.PublicTriage, access.Assigner)
 		where := f.team(t, "platform")
@@ -95,7 +95,7 @@ func TestAFindingsRoutingRuleIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
 			t.Fatal(err)
 		}
 		if evidence.RoutedBy != "in the open" {
-			t.Errorf("a reader of the disclosed place reads its rule as %q", evidence.RoutedBy)
+			t.Errorf("a reader of the disclosed occurrence reads its rule as %q", evidence.RoutedBy)
 		}
 	})
 }

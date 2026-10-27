@@ -21,15 +21,15 @@ import (
 )
 
 // leadAt is the seeded lead's address on the seeded build.
-func leadAt(place string) string {
-	return "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+func leadAt(occurrence string) string {
+	return "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 }
 
 // evidenceAs is the seeded lead's evidence as one person reads it.
-func evidenceAs(t *testing.T, r *httpapitest.Reach, who, place string) findingsapi.LeadEvidenceBody {
+func evidenceAs(t *testing.T, r *httpapitest.Reach, who, occurrence string) findingsapi.LeadEvidenceBody {
 	t.Helper()
 	var body findingsapi.LeadEvidenceBody
-	httpapitest.Read(t, r, who, leadAt(place), &body)
+	httpapitest.Read(t, r, who, leadAt(occurrence), &body)
 	return body
 }
 
@@ -72,16 +72,16 @@ func agreeToDisclose(t *testing.T, r *httpapitest.Reach, movement int64) error {
 
 func TestAConfirmedLeadIsHandedOffAsAFlawOnce(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
-		got := evidenceAs(t, r, "lead-handler", place)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
+		got := evidenceAs(t, r, "lead-handler", occurrence)
 		if got.State != "handed-off" || got.Handoff == nil || got.Handoff.Flaw != flaw || got.Handoff.Moved {
 			t.Fatalf("the lead reads %s with %+v; want handed off, kept, as %s", got.State, got.Handoff, flaw)
 		}
-		again := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
+		again := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"again"}`)
 		httpapitest.RefusedWith(t, again, http.StatusConflict)
 		// The flaw is judged now, not the lead.
-		decided := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+		decided := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"still real"}`)
 		httpapitest.RefusedWith(t, decided, http.StatusConflict)
 	})
@@ -89,17 +89,17 @@ func TestAConfirmedLeadIsHandedOffAsAFlawOnce(t *testing.T) {
 
 func TestOnlyAConfirmedLeadIsHandedOffBySomebodyWorkingBothHalves(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		body := `{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost,
-			leadAt(place)+"/flaw", body), http.StatusConflict)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+			leadAt(occurrence)+"/flaw", body), http.StatusConflict)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
 		// Internal triage alone does not record a private flaw.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			leadAt(place)+"/flaw", body), http.StatusForbidden)
+			leadAt(occurrence)+"/flaw", body), http.StatusForbidden)
 	})
 }
 
@@ -120,45 +120,45 @@ func handedOffItems(t *testing.T, r *httpapitest.Reach, who string) []string {
 	return said
 }
 
-// claimAt is the claim made at a lead's place.
-func claimAt(t *testing.T, r *httpapitest.Reach, place string) string {
+// decisionAt is the decision made at a lead's occurrence.
+func decisionAt(t *testing.T, r *httpapitest.Reach, occurrence string) string {
 	t.Helper()
-	var claim int64
-	if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
-		Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+	var decision int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."decision_id"`).
+		Where(`"de"."occurrence_identity" = ?`, occurrence).Limit(1).Scan(t.Context(), &decision); err != nil {
 		t.Fatal(err)
 	}
-	return fmt.Sprintf("/v1/decisions/%d", claim)
+	return fmt.Sprintf("/v1/decisions/%d", decision)
 }
 
 func TestAnIncludedLeadStaysWholeToEverybodyWhoReadIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, true)
-		got := evidenceAs(t, r, "internal-reader", place)
-		if got.At.Message != "p is leaked" || got.At.Snippet == "" || got.Decision == nil || got.Handoff != nil {
-			t.Errorf("an internal reader read %+v; want the whole lead and its claim, and nothing of the flaw", got)
+		occurrence, _ := httpapitest.HandedOffLead(t, r, true)
+		got := evidenceAs(t, r, "internal-reader", occurrence)
+		if got.At.Message != "p is leaked" || got.At.Snippet == "" || got.DecisionOccurrence == nil || got.Handoff != nil {
+			t.Errorf("an internal reader read %+v; want the whole lead and its decision, and nothing of the flaw", got)
 		}
 		if said := handedOffItems(t, r, "internal-reader"); len(said) != 1 || said[0] != "p is leaked" {
 			t.Errorf("an internal reader listed %q; want the included lead, whole", said)
 		}
-		if claim := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, claimAt(t, r, place), ""); claim.Code != http.StatusOK {
-			t.Errorf("an internal reader reading the claim at the included lead answered %d: %s", claim.Code, claim.Body)
+		if decision := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, decisionAt(t, r, occurrence), ""); decision.Code != http.StatusOK {
+			t.Errorf("an internal reader reading the decision at the included lead answered %d: %s", decision.Code, decision.Body)
 		}
 	})
 }
 
 func TestTheFlawsReadersReadALeadOnlyOnceItIsIncluded(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodGet, leadAt(place), ""),
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 		if said := handedOffItems(t, r, "private"); len(said) != 0 {
 			t.Errorf("a reader of undisclosed work listed %q before the lead was included; want nothing", said)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("including the lead answered %d: %s", got.Code, got.Body)
 		}
-		full := evidenceAs(t, r, "private", place)
+		full := evidenceAs(t, r, "private", occurrence)
 		if full.At.Message != "p is leaked" || full.Handoff == nil || !full.Handoff.Moved || full.Handoff.Flaw != flaw {
 			t.Errorf("a reader of undisclosed work read %+v; want the whole lead and its flaw", full)
 		}
@@ -174,20 +174,20 @@ func TestTheFlawsReadersReadALeadOnlyOnceItIsIncluded(t *testing.T) {
 
 func TestAKeptLeadNamesItsFlawOnlyToThePeopleOnTheCase(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
-		internal := evidenceAs(t, r, "internal-reader", place)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
+		internal := evidenceAs(t, r, "internal-reader", occurrence)
 		if internal.At.Message != "p is leaked" || internal.Handoff != nil {
 			t.Errorf("an internal reader read %+v; want the whole lead and nothing of the case", internal)
 		}
 		// A kept lead is internal, which reading undisclosed work does not
 		// reach.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(place), ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-			leadAt(place)+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
 		}
-		granted := evidenceAs(t, r, "embargo-reader", place)
+		granted := evidenceAs(t, r, "embargo-reader", occurrence)
 		if granted.At.Message != "p is leaked" || granted.Handoff == nil || granted.Handoff.Flaw != flaw {
 			t.Errorf("somebody granted the lead read %+v; want the lead and its flaw", granted)
 		}
@@ -200,34 +200,34 @@ func TestAKeptLeadNamesItsFlawOnlyToThePeopleOnTheCase(t *testing.T) {
 			t.Errorf("somebody granted one lead listed %d; want none, as the grant is not a list", len(listed.Items))
 		}
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete,
-			leadAt(place)+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("withdrawing the grant answered %d: %s", got.Code, got.Body)
 		}
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(place), ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 	})
 }
 
 func TestAMovedLeadIsDisclosedWithItsFlawWithoutItsSnippets(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, leadAt(place), ""),
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, true)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 		disclosed(t, r, flaw)
-		public := evidenceAs(t, r, "reader", place)
+		public := evidenceAs(t, r, "reader", occurrence)
 		if public.At.Message != "p is leaked" || public.At.Snippet != "" {
 			t.Errorf("a reader of disclosed work read %q with snippet %q; want the lead without its source",
 				public.At.Message, public.At.Snippet)
 		}
 		// Disclosure is one way.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete,
-			leadAt(place)+"/flaw/disclosure", ""), http.StatusConflict)
+			leadAt(occurrence)+"/flaw/disclosure", ""), http.StatusConflict)
 	})
 }
 
 func TestASnippetIsDisclosedWhereItsPathSaysSo(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, true)
 		located, err := catalog.NewStore(r.DB.DB).Locate(t.Context(), "mine", "master", "broadcom")
 		if err != nil {
 			t.Fatal(err)
@@ -240,7 +240,7 @@ func TestASnippetIsDisclosedWhereItsPathSaysSo(t *testing.T) {
 			t.Fatal(err)
 		}
 		disclosed(t, r, flaw)
-		if got := evidenceAs(t, r, "reader", place); got.At.Snippet != "return;" {
+		if got := evidenceAs(t, r, "reader", occurrence); got.At.Snippet != "return;" {
 			t.Errorf("a reader of disclosed work read snippet %q; want the source the path discloses", got.At.Snippet)
 		}
 	})
@@ -248,21 +248,21 @@ func TestASnippetIsDisclosedWhereItsPathSaysSo(t *testing.T) {
 
 func TestAnUndoneMoveTakesBackOnlyTheFlawsReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, true)
-		if got := evidenceAs(t, r, "embargo-reader", place); got.At.Message != "p is leaked" {
+		occurrence, _ := httpapitest.HandedOffLead(t, r, true)
+		if got := evidenceAs(t, r, "embargo-reader", occurrence); got.At.Message != "p is leaked" {
 			t.Fatalf("a reader of undisclosed work read %+v while the lead was included; want the whole lead", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("undoing the move answered %d: %s", got.Code, got.Body)
 		}
-		if got := evidenceAs(t, r, "internal-reader", place); got.At.Message != "p is leaked" {
+		if got := evidenceAs(t, r, "internal-reader", occurrence); got.At.Message != "p is leaked" {
 			t.Errorf("an internal reader read %+v; want the whole lead still", got)
 		}
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(place), ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete,
-			leadAt(place)+"/flaw/disclosure", ""), http.StatusConflict)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/flaw/disclosure", ""), http.StatusConflict)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("moving it again answered %d: %s", got.Code, got.Body)
 		}
 	})
@@ -270,17 +270,17 @@ func TestAnUndoneMoveTakesBackOnlyTheFlawsReaders(t *testing.T) {
 
 func TestALaterSightingOfAnIncludedLeadOpensReadableByBothAudiences(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, true)
+		occurrence, _ := httpapitest.HandedOffLead(t, r, true)
 		now := time.Now().UTC()
 		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/fixed",
-			httpapitest.FixedBody(t, r, leadAt(place), "the early return frees p")); got.Code != http.StatusOK {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/fixed",
+			httpapitest.FixedBody(t, r, leadAt(occurrence), "the early return frees p")); got.Code != http.StatusOK {
 			t.Fatalf("closing the lead answered %d: %s", got.Code, got.Body)
 		}
 		httpapitest.ApplyRun(t, r, now.Add(-30*time.Minute), httpapitest.LeadRun(true))
 		var held []string
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
-			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."place_identity" = ?`, place).
+			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."occurrence_identity" = ?`, occurrence).
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
@@ -288,7 +288,7 @@ func TestALaterSightingOfAnIncludedLeadOpensReadableByBothAudiences(t *testing.T
 			t.Errorf("the lead's findings are %v; want the reopened one internal beside the closed one", held)
 		}
 		for _, who := range []string{"internal-reader", "private"} {
-			if got := evidenceAs(t, r, who, place); !got.Open || got.At.Message != "p is leaked" {
+			if got := evidenceAs(t, r, who, occurrence); !got.Open || got.At.Message != "p is leaked" {
 				t.Errorf("%s read the reopened lead as %+v; want it open and whole", who, got)
 			}
 		}
@@ -297,13 +297,13 @@ func TestALaterSightingOfAnIncludedLeadOpensReadableByBothAudiences(t *testing.T
 
 func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+		occurrence := httpapitest.SeededLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
 		var offer findingsapi.HandoffOfferBody
-		httpapitest.Read(t, r, "lead-handler", leadAt(place)+"/flaw", &offer)
+		httpapitest.Read(t, r, "lead-handler", leadAt(occurrence)+"/flaw", &offer)
 		last := offer.Suggestions[len(offer.Suggestions)-1]
 		if offer.Prefix != "src" || len(offer.Seen) != 1 || last.From != "build" || last.Component != "" {
 			t.Fatalf("offered %+v; want the build last, for the prefix src", offer)
@@ -316,7 +316,7 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		if said := offer.Discloses.Said; !slices.Contains(said, findingsapi.AnalyzerSaidBody{Path: "src/a.c", Message: "p is leaked"}) {
 			t.Errorf("a move discloses the messages %+v; want the analyzer's message at src/a.c", said)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -324,8 +324,8 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),
 			httpapitest.OtherToolRun("cppcheck", "overflow", "120", "src/c.c", 4))
 		var other string
-		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."place_identity"`).
-			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."place_identity" <> ?`, place).
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
+			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."occurrence_identity" <> ?`, occurrence).
 			Scan(t.Context(), &other); err != nil {
 			t.Fatal(err)
 		}
@@ -354,11 +354,11 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 
 func TestADisclosedLeadSeenAgainKeepsItsSourceStripped(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, true)
 		disclosed(t, r, flaw)
 		// The next run describes the lead again, with its snippet.
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRun(true))
-		if got := evidenceAs(t, r, "reader", place); got.At.Message != "p is leaked" || got.At.Snippet != "" {
+		if got := evidenceAs(t, r, "reader", occurrence); got.At.Message != "p is leaked" || got.At.Snippet != "" {
 			t.Errorf("a reader of disclosed work read %q with snippet %q after the next run; want the lead without its source",
 				got.At.Message, got.At.Snippet)
 		}
@@ -367,13 +367,13 @@ func TestADisclosedLeadSeenAgainKeepsItsSourceStripped(t *testing.T) {
 
 func TestSomebodyGrantedOnlyALeadReadsItAndIsToldSo(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-			leadAt(place)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
 		}
 		// The outsider holds nothing on the product.
-		got := evidenceAs(t, r, "outsider", place)
+		got := evidenceAs(t, r, "outsider", occurrence)
 		if got.At.Message != "p is leaked" || got.Handoff == nil || got.Handoff.Flaw != flaw {
 			t.Errorf("somebody granted only the lead read %+v; want the lead and its flaw", got)
 		}
@@ -381,7 +381,7 @@ func TestSomebodyGrantedOnlyALeadReadsItAndIsToldSo(t *testing.T) {
 			t.Errorf("somebody granted only the lead was told %q; want the one line granting it", told)
 		}
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete,
-			leadAt(place)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("withdrawing the grant answered %d: %s", got.Code, got.Body)
 		}
 	})
@@ -389,35 +389,35 @@ func TestSomebodyGrantedOnlyALeadReadsItAndIsToldSo(t *testing.T) {
 
 func TestAKeptLeadStaysWhereItIsOnceItsFlawIsDisclosed(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-			leadAt(place)+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
 		}
 		disclosed(t, r, flaw)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-			leadAt(place)+"/flaw/disclosure", ""), http.StatusConflict)
-		if got := evidenceAs(t, r, "internal-reader", place); got.At.Message != "p is leaked" {
+			leadAt(occurrence)+"/flaw/disclosure", ""), http.StatusConflict)
+		if got := evidenceAs(t, r, "internal-reader", occurrence); got.At.Message != "p is leaked" {
 			t.Errorf("an internal reader read %+v; want the kept lead, internal still", got)
 		}
-		if got := evidenceAs(t, r, "lead-handler", place); got.Handoff == nil || !got.Handoff.Disclosed || got.Handoff.Moved {
+		if got := evidenceAs(t, r, "lead-handler", occurrence); got.Handoff == nil || !got.Handoff.Disclosed || got.Handoff.Moved {
 			t.Errorf("the hand-off reads %+v; want it kept, and its flaw disclosed", got.Handoff)
 		}
 		// The grant ends with the disclosure.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(place), ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 	})
 }
 
-func TestAHandedOffLeadsClaimIsNeitherRevisedNorWithdrawn(t *testing.T) {
+func TestAHandedOffLeadsDecisionIsNeitherRevisedNorWithdrawn(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, false)
-		var claim int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
-			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+		occurrence, _ := httpapitest.HandedOffLead(t, r, false)
+		var decision int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."decision_id"`).
+			Where(`"de"."occurrence_identity" = ?`, occurrence).Limit(1).Scan(t.Context(), &decision); err != nil {
 			t.Fatal(err)
 		}
-		at := fmt.Sprintf("/v1/decisions/%d", claim)
+		at := fmt.Sprintf("/v1/decisions/%d", decision)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at+"/reasoning",
 			`{"reasoning":"p leaks, and more besides"}`), http.StatusConflict)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, at, ""),
@@ -427,7 +427,7 @@ func TestAHandedOffLeadsClaimIsNeitherRevisedNorWithdrawn(t *testing.T) {
 
 func TestADisclosureLandingWhileARunAppliesStripsWhatTheRunWrote(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, true)
 		movement := askToDisclose(t, r, flaw)
 		// The disclosure is agreed to after the run has described the lead
 		// again and read its hand-off, and before the run commits.
@@ -443,7 +443,7 @@ func TestADisclosureLandingWhileARunAppliesStripsWhatTheRunWrote(t *testing.T) {
 		if err := rival(); err != nil {
 			t.Fatal(err)
 		}
-		got := evidenceAs(t, r, "reader", place)
+		got := evidenceAs(t, r, "reader", occurrence)
 		if got.At.Message != "p is leaked" || got.At.Snippet != "" || len(got.Steps) != 1 || got.Steps[0].Snippet != "" {
 			t.Errorf("a reader of disclosed work read %q with snippet %q and steps %+v; want the lead without the source the run wrote",
 				got.At.Message, got.At.Snippet, got.Steps)
@@ -453,23 +453,23 @@ func TestADisclosureLandingWhileARunAppliesStripsWhatTheRunWrote(t *testing.T) {
 
 func TestAnUndoneBatchLeavesTheConfirmationAHandOffRestsOn(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+		occurrence := httpapitest.SeededLead(t, r)
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
 		var decided struct {
-			ClaimID int64 `json:"claim_id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing to the confirmation answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -484,8 +484,8 @@ func TestAnUndoneBatchLeavesTheConfirmationAHandOffRestsOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		var state string
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."state"`).
-			Where(`"de"."claim_id" = ?`, decided.ClaimID).Scan(t.Context(), &state); err != nil {
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."state"`).
+			Where(`"de"."decision_id" = ?`, decided.DecisionID).Scan(t.Context(), &state); err != nil {
 			t.Fatal(err)
 		}
 		if undone.Undone != 0 || state != "approved" {
@@ -497,17 +497,17 @@ func TestAnUndoneBatchLeavesTheConfirmationAHandOffRestsOn(t *testing.T) {
 
 func TestAMoveLandingWhileARunAppliesReachesTheSightingTheRunOpened(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, false)
+		occurrence, _ := httpapitest.HandedOffLead(t, r, false)
 		now := time.Now().UTC()
 		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/fixed",
-			httpapitest.FixedBody(t, r, leadAt(place), "the early return frees p")); got.Code != http.StatusOK {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/fixed",
+			httpapitest.FixedBody(t, r, leadAt(occurrence), "the early return frees p")); got.Code != http.StatusOK {
 			t.Fatalf("closing the lead answered %d: %s", got.Code, got.Body)
 		}
 		// The lead is moved after the run has read its hand-off, and before
 		// the run opens the sighting at it.
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "finding", 3*time.Second, func() error {
-			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("the move answered %d: %s", got.Code, got.Body)
 			}
 			return nil
@@ -520,14 +520,14 @@ func TestAMoveLandingWhileARunAppliesReachesTheSightingTheRunOpened(t *testing.T
 		}
 		var held []string
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
-			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."place_identity" = ?`, place).
+			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."occurrence_identity" = ?`, occurrence).
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
 		if len(held) != 2 || held[0] != "internal" || held[1] != "internal" {
 			t.Errorf("the lead's findings are %v; want the one the run opened internal with the other", held)
 		}
-		if got := evidenceAs(t, r, "private", place); !got.Open || got.Handoff == nil || !got.Handoff.Moved {
+		if got := evidenceAs(t, r, "private", occurrence); !got.Open || got.Handoff == nil || !got.Handoff.Moved {
 			t.Errorf("a reader of undisclosed work read %+v; want the sighting the run opened, in the case", got)
 		}
 	})
@@ -554,7 +554,7 @@ func toldOf(t *testing.T, r *httpapitest.Reach, who, kind string) []string {
 
 func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersWithoutTheFlawAndNotToTheirAuthor(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		if got := toldOf(t, r, "internal-triager", "lead-handed-off"); len(got) != 1 ||
 			!strings.Contains(got[0], "handed off as a flaw") || strings.Contains(got[0], flaw) {
 			t.Errorf("the internal triager was told %q; want the hand-off without its flaw", got)
@@ -564,7 +564,7 @@ func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersWithoutTheFlawAndNo
 				t.Errorf("%s was told %q; want nothing", who, got)
 			}
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("the move answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "internal-triager", "lead-moved"); len(got) != 1 ||
@@ -574,25 +574,26 @@ func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersWithoutTheFlawAndNo
 	})
 }
 
-// claimReads is what one person reads of the claim at a lead's place, by the
-// status each read of it answers, and whether their list of decisions holds it.
-func claimReads(t *testing.T, r *httpapitest.Reach, who, claim, decision string) (string, bool) {
+// decisionReads is what one person reads of the decision at a lead's
+// occurrence, by the status each read of it answers, and whether their list of
+// decision occurrences holds it.
+func decisionReads(t *testing.T, r *httpapitest.Reach, who, decision, occurrence string) (string, bool) {
 	t.Helper()
 	var codes []string
-	for _, path := range []string{claim, claim + "/comments", claim + "/revisions", claim + "/approvals", decision} {
+	for _, path := range []string{decision, decision + "/comments", decision + "/revisions", decision + "/approvals", occurrence} {
 		codes = append(codes, fmt.Sprint(httpapitest.AsPerson(t, r, who, http.MethodGet, path, "").Code))
 	}
 	var listed struct {
 		Items []struct {
-			Decision struct {
-				ClaimID int64 `json:"claim_id"`
-			} `json:"decision"`
+			DecisionOccurrence struct {
+				DecisionID int64 `json:"decision_id"`
+			} `json:"decision_occurrence"`
 		} `json:"items"`
 	}
 	httpapitest.Read(t, r, who, "/v1/decision-occurrences?limit=200", &listed)
 	listedIt := false
 	for _, item := range listed.Items {
-		if fmt.Sprintf("/v1/decisions/%d", item.Decision.ClaimID) == claim {
+		if fmt.Sprintf("/v1/decisions/%d", item.DecisionOccurrence.DecisionID) == decision {
 			listedIt = true
 		}
 	}
@@ -601,26 +602,26 @@ func claimReads(t *testing.T, r *httpapitest.Reach, who, claim, decision string)
 		t.Fatalf("%s exporting the audit answered %d: %s", who, exported.Code, exported.Body)
 	}
 	if strings.Contains(exported.Body.String(), "clang-tidy/leak") != listedIt {
-		t.Errorf("%s exported %q, where their list held the claim: %v", who, exported.Body, listedIt)
+		t.Errorf("%s exported %q, where their list held the decision: %v", who, exported.Body, listedIt)
 	}
 	return strings.Join(codes, " "), listedIt
 }
 
-func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testing.T) {
+func TestTheDecisionsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
 			"/v1/products/mine/issues/"+flaw+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("bringing somebody onto the flaw's case answered %d: %s", got.Code, got.Body)
 		}
-		claim := claimAt(t, r, place)
-		var decision int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."id"`).
-			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &decision); err != nil {
+		decision := decisionAt(t, r, occurrence)
+		var row int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."id"`).
+			Where(`"de"."occurrence_identity" = ?`, occurrence).Limit(1).Scan(t.Context(), &row); err != nil {
 			t.Fatal(err)
 		}
-		decisionAt := fmt.Sprintf("/v1/decision-occurrences/%d", decision)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, claim+"/comments",
+		occurrenceAt := fmt.Sprintf("/v1/decision-occurrences/%d", row)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, decision+"/comments",
 			`{"body":"the early return is the only path"}`); got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body)
 		}
@@ -630,53 +631,53 @@ func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testin
 			for who, want := range map[string]string{
 				"internal-reader": whole, "private": flawsReaders, "outsider": flawsReaders,
 			} {
-				got, listed := claimReads(t, r, who, claim, decisionAt)
+				got, listed := decisionReads(t, r, who, decision, occurrenceAt)
 				if got != want || listed != (want == whole) {
-					t.Errorf("%s %s read the claim as %s, listed %v; want %s", who, when, got, listed, want)
+					t.Errorf("%s %s read the decision as %s, listed %v; want %s", who, when, got, listed, want)
 				}
 			}
 		}
 		expect("while the lead was kept", none)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("including the lead answered %d: %s", got.Code, got.Body)
 		}
 		expect("while the lead was included", whole)
 		for _, who := range []string{"internal-reader", "private", "outsider"} {
-			if got := evidenceAs(t, r, who, place); got.Decision == nil {
-				t.Errorf("%s read the included lead without its claim", who)
+			if got := evidenceAs(t, r, who, occurrence); got.DecisionOccurrence == nil {
+				t.Errorf("%s read the included lead without its decision", who)
 			}
 		}
-		// Reading the claims is not arguing them.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodPost, claim+"/comments",
+		// Reading the decisions is not arguing them.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodPost, decision+"/comments",
 			`{"body":"me too"}`), http.StatusNotFound)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("undoing the move answered %d: %s", got.Code, got.Body)
 		}
 		expect("once the move was undone", none)
 	})
 }
 
-// dismissedLead is the seeded lead dismissed by one claim, and the claim.
+// dismissedLead is the seeded lead dismissed by one decision, and the decision.
 func dismissedLead(t *testing.T, r *httpapitest.Reach) (string, string) {
 	t.Helper()
-	place := httpapitest.SeededLead(t, r)
-	if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+	occurrence := httpapitest.SeededLead(t, r)
+	if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrence)+"/decision",
 		`{"outcome":"dismissed","reason":"false_positive","reasoning":"freed by the caller"}`); got.Code != http.StatusCreated {
 		t.Fatalf("dismissing answered %d: %s", got.Code, got.Body)
 	}
-	return place, claimAt(t, r, place)
+	return occurrence, decisionAt(t, r, occurrence)
 }
 
 func TestAWithdrawnDismissalOfALeadIsToldToTheInternalTriagersAndAnApprovalIsNot(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		_, claim := dismissedLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, claim+"/approval", `{}`); got.Code != http.StatusOK {
+		_, decision := dismissedLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, decision+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "lead-handler", "lead-reopened"); len(got) != 0 {
 			t.Errorf("an internal triager was told %q of an approval; want nothing", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, claim, ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, decision, ""); got.Code != http.StatusNoContent {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "lead-handler", "lead-reopened"); len(got) != 1 || !strings.Contains(got[0], "back in the queue") {
@@ -693,8 +694,8 @@ func TestAWithdrawnDismissalOfALeadIsToldToTheInternalTriagersAndAnApprovalIsNot
 
 func TestAWithdrawnDismissalNobodyAgreedToTellsNobody(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		_, claim := dismissedLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, claim, ""); got.Code != http.StatusNoContent {
+		_, decision := dismissedLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, decision, ""); got.Code != http.StatusNoContent {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "lead-handler", "lead-reopened"); len(got) != 0 {

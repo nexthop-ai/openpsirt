@@ -15,13 +15,13 @@ import (
 //
 // Counting is reading, so these carry a subject like every other read, and the
 // count has to agree with the list somebody opens next: issues at components,
-// not places. Both are asserted here because they are the two ways this has
+// not occurrences. Both are asserted here because they are the two ways this has
 // gone wrong before.
 func TestCountingWhatIsOpenAgreesWithTheListAndCarriesVisibility(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// libnl sits under two consumers, so it is one issue at one component
-		// in two places — which is exactly where counting rows and counting
+		// at two occurrences — which is exactly where counting rows and counting
 		// what somebody decides about diverge.
 		f.shipped(t, twoConsumers())
 		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", swss))
@@ -38,7 +38,7 @@ func TestCountingWhatIsOpenAgreesWithTheListAndCarriesVisibility(t *testing.T) {
 		}
 		if got := byProduct[f.productID]; got != listed {
 			t.Errorf("the catalog counts %d and the list shows %d; one of them is "+
-				"counting places", got, listed)
+				"counting occurrences", got, listed)
 		}
 
 		// Somebody who holds nothing here counts nothing here — a count is a

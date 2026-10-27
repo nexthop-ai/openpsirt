@@ -226,7 +226,7 @@ function Field({
   // setting's key.
   //
   // A password manager classifies a field by every word it can reach through
-  // it, and the key is one of those: the claim window's key rendered into `id`
+  // it, and the key is one of those: the decision window's key rendered into `id`
   // is a sign-in field to LastPass however many ignore attributes sit beside
   // it. `name` is pinned to a constant for the same reason. Generated rather
   // than sanitized, so no key reaches a classifier — sanitizing only moves the

@@ -97,7 +97,7 @@ func TestABranchIsComparedAgainstWhatWasLastShippedFromIt(t *testing.T) {
 				ready.Shipped.Stream)
 		}
 		// Two criticals now against one shipped, counted as issues at
-		// components rather than as places — libnl sits under two consumers,
+		// components rather than as occurrences — libnl sits under two consumers,
 		// so counting rows would say four and two.
 		if ready.Now.ByBand["critical"] != 2 {
 			t.Errorf("the branch reads as %d criticals, want 2 (%v)",

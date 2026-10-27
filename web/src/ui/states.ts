@@ -4,7 +4,7 @@
 import type { Body } from "../api/client";
 import { own } from "./own";
 
-// A place's decision state, in the words every screen says it in.
+// An occurrence's decision state, in the words every screen says it in.
 //
 // One vocabulary, because a register, a comparison, the findings list and a
 // document all state the same four words about the same fact. The server says
@@ -35,13 +35,13 @@ export type Stands = Body<"DisposedBody">["state"];
 // The four, in the order a reader works down: what nobody has answered first.
 export const STATES = Object.keys(STATE_SAID) as readonly Stands[];
 
-// The class for the one case none of the four covers: some places answered and
+// The class for the one case none of the four covers: some occurrences answered and
 // the rest never decided. The server leaves the word empty there. Drawn as
 // waiting, because it is neither decided nor untouched.
 const PARTLY_CLASS = "waiting";
 
 // said is what a state is called, or a plain description of the one case none
-// of the four covers: some places agreed and the rest never decided.
+// of the four covers: some occurrences agreed and the rest never decided.
 export function said(state: string | undefined): string {
   if (!state) return "part decided";
   return own(STATE_SAID, state) ?? state;

@@ -51,7 +51,7 @@ const REGISTER = "/v1/products/{product}/branches-and-tags/{stream}/variants/{va
 describe("the disposition register", () => {
   const row = {
     vulnerability: "CVE-2026-1",
-    place: "p1",
+    occurrence: "p1",
     severity: "high",
     component: "zlib",
     version: "1.2",

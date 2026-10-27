@@ -20,89 +20,89 @@ import (
 // The threshold a second person's agreement turns on.
 //
 // The deployment's separation-of-duties gate (REQ-24): what counts as a
-// deferral standing on its own, how long a place has been put off across every
-// claim that put it off, and the one function every write path asks before it
+// deferral standing on its own, how long an occurrence has been put off across every
+// decision that put it off, and the one function every write path asks before it
 // records anything. It sat in the file that renders the review queue, which is
 // the screen the gate produces work for rather than the rule itself.
 
 // DeferredSoFar is the total time a finding has been put off, across every
-// deferral ever recorded about the same place.
+// deferral ever recorded about the same occurrence.
 //
 // Cumulative rather than per deferral, because otherwise deferring repeatedly
 // for just under the threshold never needs agreement — and four consecutive
 // twenty-nine day deferrals are a year nobody approved.
-func (s *Store) DeferredSoFar(ctx context.Context, decision Decision) (time.Duration, error) {
-	decision.ID = -1
-	totals, err := s.deferredSoFar(ctx, []Decision{decision})
+func (s *Store) DeferredSoFar(ctx context.Context, occurrence DecisionOccurrence) (time.Duration, error) {
+	occurrence.ID = -1
+	totals, err := s.deferredSoFar(ctx, []DecisionOccurrence{occurrence})
 	if err != nil {
 		return 0, err
 	}
-	return totals[decision.ID], nil
+	return totals[occurrence.ID], nil
 }
 
-// DeferredAt is the same total for several places of one issue in one
-// product, keyed by place, in one statement for all of them. A form deciding
-// about those places says whether a deferral would stand on its own, and that
+// DeferredAt is the same total for several occurrences of one issue in one
+// product, keyed by occurrence, in one statement for all of them. A form deciding
+// about those occurrences says whether a deferral would stand on its own, and that
 // is the total it is measured against.
 //
 // Counted over the deferrals the subject may read. A deferral sits at the
-// place it defers, so somebody deciding about a place reads every deferral
+// occurrence it defers, so somebody deciding about an occurrence reads every deferral
 // made there, and the total is the one the gate measures.
 func (s *Store) DeferredAt(ctx context.Context, subject access.Subject, productID,
-	vulnerabilityID int64, places []string) (map[string]time.Duration, error) {
-	decisions := make([]Decision, 0, len(places))
-	for i, place := range places {
-		decisions = append(decisions, Decision{
+	vulnerabilityID int64, occurrences []string) (map[string]time.Duration, error) {
+	rows := make([]DecisionOccurrence, 0, len(occurrences))
+	for i, occurrence := range occurrences {
+		rows = append(rows, DecisionOccurrence{
 			ID: int64(-1 - i), ProductID: productID, VulnerabilityID: vulnerabilityID,
-			PlaceIdentity: place,
+			OccurrenceIdentity: occurrence,
 		})
 	}
-	totals, err := s.deferredSoFarAs(ctx, decisions, func(q *bun.SelectQuery) *bun.SelectQuery {
+	totals, err := s.deferredSoFarAs(ctx, rows, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return readableBy(q, subject, "de")
 	})
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]time.Duration, len(places))
-	for _, decision := range decisions {
-		out[decision.PlaceIdentity] = totals[decision.ID]
+	out := make(map[string]time.Duration, len(occurrences))
+	for _, occurrence := range rows {
+		out[occurrence.OccurrenceIdentity] = totals[occurrence.ID]
 	}
 	return out, nil
 }
 
 // deferredSoFar reads, in one statement for all of them, how long each of
-// these decisions' places has been put off for in total, keyed by the
-// decision asked about.
+// these rows' occurrences has been put off for in total, keyed by the
+// row asked about.
 //
 // One statement for the page rather than one per row: the deferrals in the
-// products on the page are read together and matched to each decision's
-// place here. The set is small — a deferral is a decision of ours, in these
+// products on the page are read together and matched to each row's
+// occurrence here. The set is small — a deferral is a decision of ours, in these
 // products, and most decisions are not deferrals — where a lookup per row
 // was a statement per queue entry.
-func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[int64]time.Duration, error) {
-	return s.deferredSoFarAs(ctx, decisions, func(q *bun.SelectQuery) *bun.SelectQuery { return q })
+func (s *Store) deferredSoFar(ctx context.Context, occurrences []DecisionOccurrence) (map[int64]time.Duration, error) {
+	return s.deferredSoFarAs(ctx, occurrences, func(q *bun.SelectQuery) *bun.SelectQuery { return q })
 }
 
 // deferredSoFarAs is deferredSoFar over the deferrals a narrowing admits.
-func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
+func (s *Store) deferredSoFarAs(ctx context.Context, occurrences []DecisionOccurrence,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery) (map[int64]time.Duration, error) {
-	return s.deferredWith(ctx, decisions, narrow, nil)
+	return s.deferredWith(ctx, occurrences, narrow, nil)
 }
 
 // deferredWith is deferredSoFarAs with a stretch being asked for added to
-// each decision's place, keyed by the decision. A stretch overlapping one
+// each row's occurrence, keyed by the row. A stretch overlapping one
 // already held is counted once with it, as two recorded ones are.
-func (s *Store) deferredWith(ctx context.Context, decisions []Decision,
+func (s *Store) deferredWith(ctx context.Context, occurrences []DecisionOccurrence,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery, asking map[int64]span) (map[int64]time.Duration, error) {
-	totals := make(map[int64]time.Duration, len(decisions))
-	if len(decisions) == 0 {
+	totals := make(map[int64]time.Duration, len(occurrences))
+	if len(occurrences) == 0 {
 		return totals, nil
 	}
 	products := map[int64]bool{}
 	issues := map[int64]bool{}
-	for _, decision := range decisions {
-		products[decision.ProductID] = true
-		issues[decision.VulnerabilityID] = true
+	for _, occurrence := range occurrences {
+		products[occurrence.ProductID] = true
+		issues[occurrence.VulnerabilityID] = true
 	}
 	productIDs := make([]int64, 0, len(products))
 	for id := range products {
@@ -114,7 +114,7 @@ func (s *Store) deferredWith(ctx context.Context, decisions []Decision,
 	}
 
 	// Every deferral of the issue, including those filed under an issue that
-	// merged into it: a place put off under either name was put off.
+	// merged into it: an occurrence put off under either name was put off.
 	issueOf, err := finding.IssuesOf(ctx, s.db, issueIDs)
 	if err != nil {
 		return nil, err
@@ -123,22 +123,22 @@ func (s *Store) deferredWith(ctx context.Context, decisions []Decision,
 	for _, issue := range issueOf {
 		asked = append(asked, issue)
 	}
-	var deferrals []Decision
-	if err := narrow(s.db.NewSelect().Model(&deferrals).Relation("Claim")).
+	var deferrals []DecisionOccurrence
+	if err := narrow(s.db.NewSelect().Model(&deferrals).Relation("Decision")).
 		Where(`"de"."product_id" IN (?)`, bun.List(productIDs)).
-		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(asked)).
-		Where(`"claim"."outcome" = ?`, Deferred).
+		Where(finding.FiledUnderAny(filed.DecisionOccurrenceIssue), bun.List(asked)).
+		Where(`"decision"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones included, for the span they were in force.
 		// Excluded outright, the threshold was defeated by taking a deferral
 		// back and making another: each one alone stayed under the line, the
-		// running total reset to zero every time, and a place stayed hidden
+		// running total reset to zero every time, and an occurrence stayed hidden
 		// indefinitely with no second person ever seeing it. A withdrawal
 		// shortens the time something was put off; it does not erase it.
-		Where(`"claim"."deferred_until" IS NOT NULL`).Scan(ctx); err != nil {
+		Where(`"decision"."deferred_until" IS NOT NULL`).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how long these have been put off: %w", err)
 	}
 
-	type place struct {
+	type occurrenceAt struct {
 		product, issue int64
 		at             string
 	}
@@ -150,7 +150,7 @@ func (s *Store) deferredWith(ctx context.Context, decisions []Decision,
 	if err != nil {
 		return nil, err
 	}
-	held := spans[place]{}
+	held := spans[occurrenceAt]{}
 	for _, deferral := range deferrals {
 		deferral.VulnerabilityID = deferredAs[deferral.VulnerabilityID]
 		// Measured from when it was asked for, so a deferral that has not yet
@@ -158,17 +158,17 @@ func (s *Store) deferredWith(ctx context.Context, decisions []Decision,
 		// part already spent. The question is how long this has been put off
 		// for, not how long it has been put off so far.
 		if one, ok := heldDeferral(deferral); ok {
-			key := place{deferral.ProductID, deferral.VulnerabilityID, deferral.PlaceIdentity}
+			key := occurrenceAt{deferral.ProductID, deferral.VulnerabilityID, deferral.OccurrenceIdentity}
 			held[key] = append(held[key], one)
 		}
 	}
-	for _, decision := range decisions {
-		key := place{decision.ProductID, issueOf[decision.VulnerabilityID], decision.PlaceIdentity}
-		if more, ok := asking[decision.ID]; ok {
-			totals[decision.ID] = spans[place]{key: append(slices.Clone(held[key]), more)}.total(key)
+	for _, occurrence := range occurrences {
+		key := occurrenceAt{occurrence.ProductID, issueOf[occurrence.VulnerabilityID], occurrence.OccurrenceIdentity}
+		if more, ok := asking[occurrence.ID]; ok {
+			totals[occurrence.ID] = spans[occurrenceAt]{key: append(slices.Clone(held[key]), more)}.total(key)
 			continue
 		}
-		totals[decision.ID] = held.total(key)
+		totals[occurrence.ID] = held.total(key)
 	}
 	return totals, nil
 }
@@ -200,14 +200,14 @@ func commitmentGated(committedTo, binding *time.Time) bool {
 	return committedTo.After(*binding)
 }
 
-// heldSpan is when one deferral row put its place off.
+// heldSpan is when one deferral row put its occurrence off.
 //
 // From when it was asked for to the date it returns on, cut short where the
 // row ended before that date: taken back, or lapsed when the versions it was
 // keyed on moved. An ending shortens the time something was hidden and does
 // not erase it: counted as zero, the cumulative threshold was defeated by
 // withdrawing and deferring again, one sub-threshold span at a time, forever.
-// Counted whole, a row that stopped applying would still be putting its place
+// Counted whole, a row that stopped applying would still be putting its occurrence
 // off.
 //
 // Not held where it ended before it took effect.
@@ -221,25 +221,25 @@ func heldSpan(proposedAt, until time.Time, state State, endedAt *time.Time) (spa
 	return span{from: proposedAt, to: until}, true
 }
 
-// heldDeferral is heldSpan for a decision read with its claim.
-func heldDeferral(deferral Decision) (span, bool) {
-	if deferral.Claim == nil || deferral.Claim.DeferredUntil == nil {
+// heldDeferral is heldSpan for a row read with its decision.
+func heldDeferral(deferral DecisionOccurrence) (span, bool) {
+	if deferral.Decision == nil || deferral.Decision.DeferredUntil == nil {
 		return span{}, false
 	}
-	return heldSpan(deferral.ProposedAt, *deferral.Claim.DeferredUntil, deferral.State,
+	return heldSpan(deferral.ProposedAt, *deferral.Decision.DeferredUntil, deferral.State,
 		deferral.EndedAt)
 }
 
-// span is one stretch a place was put off for.
+// span is one stretch an occurrence was put off for.
 type span struct{ from, to time.Time }
 
-// spans are the stretches deferrals held each place for.
+// spans are the stretches deferrals held each occurrence for.
 type spans[K comparable] map[K][]span
 
-// total is how long the place was put off for, with overlapping stretches
-// counted once. One claim keyed at two versions writes two rows over one
+// total is how long the occurrence was put off for, with overlapping stretches
+// counted once. One decision keyed at two versions writes two rows over one
 // stretch, and a deferral re-affirmed after it lapsed carries its date into
-// the new claim: either way the place was put off once.
+// the new decision: either way the occurrence was put off once.
 func (all spans[K]) total(key K) time.Duration {
 	held := slices.Clone(all[key])
 	slices.SortFunc(held, func(a, b span) int { return a.from.Compare(b.from) })
@@ -262,13 +262,13 @@ func (all spans[K]) total(key K) time.Duration {
 	return sum
 }
 
-// deferralThreshold is how much cumulative postponement a place may carry
+// deferralThreshold is how much cumulative postponement an occurrence may carry
 // before a further deferral needs a second person.
 //
 // Read here rather than handed in, and read inside whatever transaction the
 // caller opened. It is an input to the control: read outside, a retry — or a
 // first attempt that merely waited — decided against a policy that has since
-// changed, and recorded a claim as needing nobody under one that says it does.
+// changed, and recorded a decision as needing nobody under one that says it does.
 func (s *Store) deferralThreshold(ctx context.Context) (time.Duration, error) {
 	return DeferralThreshold(ctx, s.db)
 }
@@ -295,32 +295,32 @@ const DefaultDeferralThreshold = 30 * 24 * time.Hour
 // the time it is written, and a retry re-reads everything else and would keep
 // this one stale. REQ-71: nothing a transaction depends on is read outside it.
 //
-// One binding over the whole set rather than one per place: an act covering a
+// One binding over the whole set rather than one per occurrence: an act covering a
 // critical and a medium is gated by the critical, however many mediums are in
 // it.
 func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Proposal) error {
 	var targets []int64
-	places := make([]finding.At, 0, len(proposals))
+	occurrences := make([]finding.At, 0, len(proposals))
 	var productID int64
 	for _, p := range proposals {
 		if len(p.BindingAcross) == 0 {
 			continue
 		}
 		if len(targets) == 0 {
-			targets, productID = p.BindingAcross, p.Place.ProductID
+			targets, productID = p.BindingAcross, p.Occurrence.ProductID
 		}
-		places = append(places, finding.At{
-			VulnerabilityID: p.Place.VulnerabilityID,
-			PlaceIdentity:   p.Place.PlaceIdentity,
+		occurrences = append(occurrences, finding.At{
+			VulnerabilityID:    p.Occurrence.VulnerabilityID,
+			OccurrenceIdentity: p.Occurrence.OccurrenceIdentity,
 		})
 	}
-	if len(places) == 0 {
+	if len(occurrences) == 0 {
 		return nil
 	}
 	// The store here is only a receiver: what the read runs on is this
 	// transaction, which DeadlineAt takes as its own argument for exactly this
 	// reason.
-	binding, err := (&finding.Store{}).DeadlineAt(ctx, s.db, subject, productID, targets, places)
+	binding, err := (&finding.Store{}).DeadlineAt(ctx, s.db, subject, productID, targets, occurrences)
 	if err != nil {
 		return err
 	}
@@ -335,11 +335,11 @@ func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Pr
 // gate works out whether each of these proposals needs a second person, and
 // records the answer on them.
 //
-// A claim's wait is not something its author states. As a field on the
+// A decision's wait is not something its author states. As a field on the
 // proposal, worked out by the caller before the transaction opens and taken on
 // trust, it has the same shape the binding deadline does and the same
 // consequence: a policy changing between the answer and the
-// write, or a deferral landing on the same place in between, stored a claim
+// write, or a deferral landing on the same occurrence in between, stored a decision
 // as needing nobody under a rule that says it does. Nothing reported it.
 func (s *Store) gate(ctx context.Context, subject access.Subject, proposals []Proposal) error {
 	threshold, err := s.deferralThreshold(ctx)
@@ -385,7 +385,7 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 	}
 
 	// The stretch asked for, from this store's own clock, like every other
-	// time decision here. A date already past asks for no time at all, so a
+	// time recorded here. A date already past asks for no time at all, so a
 	// back-dated deferral adds nothing and subtracts nothing.
 	asking := map[int64]span{}
 	if p.DeferredUntil != nil {
@@ -395,12 +395,12 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 		}
 	}
 
-	// Merged with the postponements already asked for about this same place,
+	// Merged with the postponements already asked for about this same occurrence,
 	// so a stretch this deferral shares with one still in force is counted
 	// once.
-	total, err := s.deferredWith(ctx, []Decision{{
-		ID: -1, ProductID: p.Place.ProductID, VulnerabilityID: p.Place.VulnerabilityID,
-		PlaceIdentity: p.Place.PlaceIdentity,
+	total, err := s.deferredWith(ctx, []DecisionOccurrence{{
+		ID: -1, ProductID: p.Occurrence.ProductID, VulnerabilityID: p.Occurrence.VulnerabilityID,
+		OccurrenceIdentity: p.Occurrence.OccurrenceIdentity,
 	}}, func(q *bun.SelectQuery) *bun.SelectQuery { return q }, asking)
 	if err != nil {
 		return false, err

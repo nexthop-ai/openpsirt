@@ -102,8 +102,8 @@ describe("a parameter the route table lists", () => {
 
 describe("the route check", () => {
   it("matches one segment per parameter, and none empty", () => {
-    expect(unrouted(routes, "/claims/7")).toBe("");
-    expect(unrouted(routes, "/claims/")).not.toBe("");
-    expect(unrouted(routes, "/claims/7/8")).not.toBe("");
+    expect(unrouted(routes, "/decisions/7")).toBe("");
+    expect(unrouted(routes, "/decisions/")).not.toBe("");
+    expect(unrouted(routes, "/decisions/7/8")).not.toBe("");
   });
 });

@@ -312,7 +312,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Summary: "Generate a CSAF document for an advisory",
 		Description: "Returns a CSAF 2.0 document for this advisory: what it covers, and " +
 			"which releases hold each issue, which no longer do, and which are known not " +
-			"affected because approved decisions cover every open place of the issue there.\n\n" +
+			"affected because approved decisions cover every open occurrence of the issue there.\n\n" +
 			"A release known not affected carries the decision's reason as a flag and its " +
 			"mitigation as the impact. The document is a security advisory whatever it states. " +
 			"A release marked affected on the advisory is stated as known affected.\n\n" +

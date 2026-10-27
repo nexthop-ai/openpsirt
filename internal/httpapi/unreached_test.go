@@ -341,18 +341,18 @@ func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &affects); err != nil {
 			t.Fatal(err)
 		}
-		// Nothing added, and the dropped build's places closed. The counts are
+		// Nothing added, and the dropped build's occurrences closed. The counts are
 		// what a caller acts on, and both came back from a handler nothing
 		// had ever run.
 		if affects.Added != 0 {
 			t.Errorf("narrowing added %d builds, want none", affects.Added)
 		}
 		if affects.Closed == 0 {
-			t.Errorf("narrowing closed %d, want the dropped build's places", affects.Closed)
+			t.Errorf("narrowing closed %d, want the dropped build's occurrences", affects.Closed)
 		}
 
 		// Taking a build out with no reason is refused: closing a finding as
-		// never-affected is a judgment, and one with no reason is not.
+		// never-affected is a decision, and one with no reason is not.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
 			`{"builds":[{"stream":"master","variant":"mellanox"}]}`),
 			http.StatusUnprocessableEntity)

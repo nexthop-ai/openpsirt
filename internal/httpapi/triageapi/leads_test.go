@@ -29,14 +29,14 @@ func TestADismissedLeadStatesAReasonAndWaitsForASecondPerson(t *testing.T) {
 		if got.Code != http.StatusCreated {
 			t.Fatalf("the dismissal answered %d: %s", got.Code, got.Body)
 		}
-		var decided core.DecisionBody
+		var decided core.DecisionOccurrenceBody
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
 		if !decided.NeedsApproval || decided.Reason != "false_positive" || decided.Justification != "" {
 			t.Fatalf("recorded %+v; want a reason, waiting for a second person", decided)
 		}
-		approval := fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID)
+		approval := fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID)
 		// Agreeing to internal material takes reading it as well as the
 		// right to agree.
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost, approval, `{}`); got.Code != http.StatusNotFound {
@@ -48,7 +48,7 @@ func TestADismissedLeadStatesAReasonAndWaitsForASecondPerson(t *testing.T) {
 	})
 }
 
-func TestAClaimAboutALeadIsAgreedToOnlyByAnApprover(t *testing.T) {
+func TestADecisionAboutALeadIsAgreedToOnlyByAnApprover(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		at := fmt.Sprintf(leadDecisionAt, httpapitest.SeededLead(t, r))
 		got := httpapitest.AsPerson(t, r, "internal-lead", http.MethodPost, at,
@@ -56,20 +56,20 @@ func TestAClaimAboutALeadIsAgreedToOnlyByAnApprover(t *testing.T) {
 		if got.Code != http.StatusCreated {
 			t.Fatalf("the dismissal answered %d: %s", got.Code, got.Body)
 		}
-		var decided core.DecisionBody
+		var decided core.DecisionOccurrenceBody
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
-		// The claim says it is internal, which is what a screen offering
+		// The decision says it is internal, which is what a screen offering
 		// Agree asks the reader's reach at.
-		var claim struct {
+		var decision struct {
 			Internal bool `json:"internal"`
 		}
-		httpapitest.Read(t, r, "internal-reviewer", fmt.Sprintf("/v1/decisions/%d", decided.ClaimID), &claim)
-		if !claim.Internal {
-			t.Error("a claim about a lead does not say it is internal")
+		httpapitest.Read(t, r, "internal-reviewer", fmt.Sprintf("/v1/decisions/%d", decided.DecisionID), &decision)
+		if !decision.Internal {
+			t.Error("a decision about a lead does not say it is internal")
 		}
-		approval := fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID)
+		approval := fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID)
 		// Triaging internal material is not the right to agree to it.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, approval, `{}`),
 			http.StatusNotFound)
@@ -87,7 +87,7 @@ func TestAConfirmedLeadWaitsForNobody(t *testing.T) {
 		if got.Code != http.StatusCreated {
 			t.Fatalf("the confirmation answered %d: %s", got.Code, got.Body)
 		}
-		var decided core.DecisionBody
+		var decided core.DecisionOccurrenceBody
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
@@ -120,8 +120,8 @@ func TestAVulnerabilityOutcomeIsRefusedOnALead(t *testing.T) {
 
 func TestALeadOutcomeIsRefusedOnAVulnerability(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
-		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999/occurrences/" + place + "/decision"
+		occurrence := r.Scanned(t)
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999/occurrences/" + occurrence + "/decision"
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"confirmed","reasoning":"real"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a lead outcome on a vulnerability answered %d: %s", got.Code, got.Body)
@@ -130,33 +130,33 @@ func TestALeadOutcomeIsRefusedOnAVulnerability(t *testing.T) {
 }
 
 // leadState is where the seeded lead stands, as its evidence says.
-func leadState(t *testing.T, r *httpapitest.Reach, place string) string {
+func leadState(t *testing.T, r *httpapitest.Reach, occurrence string) string {
 	t.Helper()
 	var got struct {
 		State string `json:"state"`
 	}
-	httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &got)
+	httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence, &got)
 	return got.State
 }
 
-func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
+func TestALeadStandsWhereTheDecisionAgreedToPutsIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got := leadState(t, r, place); got != "open" {
+		occurrence := httpapitest.SeededLead(t, r)
+		if got := leadState(t, r, occurrence); got != "open" {
 			t.Fatalf("a lead in the series' first run is %q; want open", got)
 		}
-		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, occurrence),
 			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
-		var decided core.DecisionBody
+		var decided core.DecisionOccurrenceBody
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
-		if got := leadState(t, r, place); got != "open" {
+		if got := leadState(t, r, occurrence); got != "open" {
 			t.Errorf("a lead whose dismissal waits for a second person is %q; want it open", got)
 		}
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
-		if got := leadState(t, r, place); got != "dismissed" {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`)
+		if got := leadState(t, r, occurrence); got != "dismissed" {
 			t.Errorf("a lead whose dismissal was agreed to is %q; want dismissed", got)
 		}
 	})
@@ -164,8 +164,8 @@ func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
 
 func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+		occurrence := httpapitest.SeededLead(t, r)
+		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 		at := lead + "/fixed"
 		body := httpapitest.FixedBody(t, r, lead, "the bounds check landed")
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, body),
@@ -173,7 +173,7 @@ func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRun(false))
 		body = httpapitest.FixedBody(t, r, lead, "the bounds check landed")
-		if got := leadState(t, r, place); got != "not-reproduced" {
+		if got := leadState(t, r, occurrence); got != "not-reproduced" {
 			t.Fatalf("a lead the newest run did not see is %q; want not-reproduced", got)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reader", http.MethodPost, at, body),
@@ -181,16 +181,16 @@ func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, body); got.Code != http.StatusOK {
 			t.Fatalf("closing a lead nobody sees answered %d: %s", got.Code, got.Body)
 		}
-		if got := leadState(t, r, place); got != "fixed" {
+		if got := leadState(t, r, occurrence); got != "fixed" {
 			t.Errorf("a lead closed as fixed is %q; want fixed", got)
 		}
 		if got := leadsOf(t, r, "internal-reader", "?state=fixed"); len(got.Items) != 1 ||
-			got.Items[0].Place != place || got.States["fixed"] != 1 {
+			got.Items[0].Occurrence != occurrence || got.States["fixed"] != 1 {
 			t.Errorf("the fixed leads are %+v; want the one closed, listed and counted", got)
 		}
 
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-30*time.Minute), httpapitest.LeadRun(true))
-		if got := leadState(t, r, place); got == "fixed" {
+		if got := leadState(t, r, occurrence); got == "fixed" {
 			t.Error("a fixed lead seen again is still fixed")
 		}
 		if got := leadsOf(t, r, "internal-reader", "?state=fixed"); len(got.Items) != 0 || got.States["fixed"] != 0 {
@@ -211,8 +211,8 @@ func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 
 func TestAFixedLeadNamesARunOfItsBuildThatDidNotSeeIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+		occurrence := httpapitest.SeededLead(t, r)
+		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 		var saw int64
 		if err := r.DB.DB.NewSelect().TableExpr(`"series_run" AS "sr"`).ColumnExpr(`MIN("sr"."id")`).
 			Scan(t.Context(), &saw); err != nil {
@@ -246,33 +246,33 @@ func TestAFixedLeadNamesARunOfItsBuildThatDidNotSeeIt(t *testing.T) {
 
 func TestADismissalLapsesWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+		occurrence := httpapitest.SeededLead(t, r)
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, occurrence),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"freed by the caller"}`)
-		var decided core.DecisionBody
+		var decided core.DecisionOccurrenceBody
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`)
 
 		// The same line again pairs on the whole key, and the dismissal stands.
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRunAt(12))
-		if got := leadState(t, r, place); got != "dismissed" {
+		if got := leadState(t, r, occurrence); got != "dismissed" {
 			t.Fatalf("a dismissed lead seen again on its whole key is %q; want dismissed", got)
 		}
 		// Two lines down pairs it on its nearest line.
 		httpapitest.ApplyRun(t, r, time.Now().UTC(), httpapitest.LeadRunAt(14))
-		if got := leadState(t, r, place); got == "dismissed" {
+		if got := leadState(t, r, occurrence); got == "dismissed" {
 			t.Fatalf("a dismissed lead paired only on its nearest line is still dismissed")
 		}
 		// Re-affirmed by its author, it stands again on the agreement it had.
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/reaffirmation", decided.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", decided.DecisionID),
 			`{"reasoning":"still freed by the caller after the move"}`); got.Code != http.StatusCreated {
 			t.Fatalf("re-affirming answered %d: %s", got.Code, got.Body)
 		}
-		if got := leadState(t, r, place); got != "dismissed" {
+		if got := leadState(t, r, occurrence); got != "dismissed" {
 			t.Errorf("a re-affirmed dismissal leaves the lead %q; want dismissed", got)
 		}
 	})
@@ -280,12 +280,12 @@ func TestADismissalLapsesWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 
 func TestAConfirmationStandsWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		occurrence := httpapitest.SeededLead(t, r)
+		decideLead(t, r, occurrence, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRunAt(12))
 		// Two lines down pairs it on its nearest line.
 		httpapitest.ApplyRun(t, r, time.Now().UTC(), httpapitest.LeadRunAt(14))
-		if got := leadState(t, r, place); got != "confirmed" {
+		if got := leadState(t, r, occurrence); got != "confirmed" {
 			t.Errorf("a confirmed lead paired only on its nearest line is %q; want it confirmed still", got)
 		}
 	})
@@ -294,11 +294,11 @@ func TestAConfirmationStandsWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 // leadsListed is a product's list of leads as somebody reads it.
 type leadsListed struct {
 	Items []struct {
-		Place  string `json:"place"`
-		Rule   string `json:"rule"`
-		Path   string `json:"path"`
-		State  string `json:"state"`
-		Builds int    `json:"builds"`
+		Occurrence string `json:"occurrence"`
+		Rule       string `json:"rule"`
+		Path       string `json:"path"`
+		State      string `json:"state"`
+		Builds     int    `json:"builds"`
 	} `json:"items"`
 	Total   int            `json:"total"`
 	States  map[string]int `json:"states"`
@@ -316,9 +316,9 @@ func leadsOf(t *testing.T, r *httpapitest.Reach, who, query string) leadsListed 
 
 func TestTheQueueHoldsALeadFromTheSeriesFirstRun(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		got := leadsOf(t, r, "internal-reader", "")
-		if len(got.Items) != 1 || got.Total != 1 || got.Items[0].Place != place || got.Items[0].State != "open" ||
+		if len(got.Items) != 1 || got.Total != 1 || got.Items[0].Occurrence != occurrence || got.Items[0].State != "open" ||
 			got.Items[0].Path != "src/a.c" || got.Items[0].Builds != 1 || got.States["open"] != 1 {
 			t.Fatalf("the queue is %+v; want the seeded lead listed and counted open", got)
 		}
@@ -329,10 +329,10 @@ func TestTheQueueHoldsALeadFromTheSeriesFirstRun(t *testing.T) {
 	})
 }
 
-func TestAClaimWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
+func TestADecisionWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+		occurrence := httpapitest.SeededLead(t, r)
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, occurrence),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("the dismissal answered %d: %s", got.Code, got.Body)
@@ -347,46 +347,46 @@ func TestAClaimWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
 	})
 }
 
-func TestALeadsEvidenceNamesItsRuleAndTheClaimStandingAtIt(t *testing.T) {
+func TestALeadsEvidenceNamesItsRuleAndTheDecisionStandingAtIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		type evidence struct {
-			Rule     string             `json:"rule"`
-			Decision *core.DecisionBody `json:"decision"`
+			Rule               string                       `json:"rule"`
+			DecisionOccurrence *core.DecisionOccurrenceBody `json:"decision_occurrence"`
 		}
 		var before evidence
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &before)
-		if before.Rule != "clang-tidy/leak" || before.Decision != nil {
-			t.Fatalf("the evidence before any claim is %+v; want the rule and no claim", before)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence, &before)
+		if before.Rule != "clang-tidy/leak" || before.DecisionOccurrence != nil {
+			t.Fatalf("the evidence before any decision is %+v; want the rule and no decision", before)
 		}
-		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, occurrence),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
-		var decided core.DecisionBody
+		var decided core.DecisionOccurrenceBody
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
 		var after evidence
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &after)
-		if after.Decision == nil || after.Decision.ClaimID != decided.ClaimID || !after.Decision.NeedsApproval {
-			t.Errorf("the evidence names the claim %+v; want claim %d, waiting", after.Decision, decided.ClaimID)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence, &after)
+		if after.DecisionOccurrence == nil || after.DecisionOccurrence.DecisionID != decided.DecisionID || !after.DecisionOccurrence.NeedsApproval {
+			t.Errorf("the evidence names the decision %+v; want decision %d, waiting", after.DecisionOccurrence, decided.DecisionID)
 		}
-		// A claim withdrawn stands nowhere.
-		httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, fmt.Sprintf("/v1/decisions/%d", decided.ClaimID), ``)
+		// A decision withdrawn stands nowhere.
+		httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, fmt.Sprintf("/v1/decisions/%d", decided.DecisionID), ``)
 		var withdrawn evidence
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &withdrawn)
-		if withdrawn.Decision != nil {
-			t.Errorf("the evidence names a withdrawn claim %+v", withdrawn.Decision)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence, &withdrawn)
+		if withdrawn.DecisionOccurrence != nil {
+			t.Errorf("the evidence names a withdrawn decision %+v", withdrawn.DecisionOccurrence)
 		}
 	})
 }
 
 func TestTheRecordStatesALeadsReasonAsAReason(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		decided := decideLead(t, r, place,
+		occurrence := httpapitest.SeededLead(t, r)
+		decided := decideLead(t, r, occurrence,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`)
 		var record struct {
 			Items []struct {
 				Outcome       string `json:"outcome"`
@@ -406,7 +406,7 @@ func TestTheRecordStatesALeadsReasonAsAReason(t *testing.T) {
 
 func TestALeadSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKeptAsItStands(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		ended := func(on *time.Time) {
 			t.Helper()
 			if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, on).
@@ -426,12 +426,12 @@ func TestALeadSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKeptAsItSta
 		var evidence struct {
 			Ended bool `json:"past_end_of_life"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &evidence)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence, &evidence)
 		if !evidence.Ended {
 			t.Error("the lead's evidence does not say its releases are past their end of life")
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks"}`), http.StatusConflict)
 
 		ended(nil)
@@ -443,33 +443,33 @@ func TestALeadSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKeptAsItSta
 
 func TestWithdrawingAnAgreedDismissalOfALeadReopensIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+		occurrence := httpapitest.SeededLead(t, r)
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, occurrence),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("the dismissal answered %d: %s", got.Code, got.Body)
 		}
-		var decided core.DecisionBody
+		var decided core.DecisionOccurrenceBody
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
-		claim := fmt.Sprintf("/v1/decisions/%d", decided.ClaimID)
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, claim+"/approval", `{}`); got.Code != http.StatusOK {
+		decision := fmt.Sprintf("/v1/decisions/%d", decided.DecisionID)
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, decision+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
-		if got := leadState(t, r, place); got != "dismissed" {
+		if got := leadState(t, r, occurrence); got != "dismissed" {
 			t.Fatalf("a lead whose dismissal was agreed to is %q; want dismissed", got)
 		}
 		if queued := leadsOf(t, r, "internal-reader", ""); len(queued.Items) != 0 {
 			t.Fatalf("the queue holds %+v beside an agreed dismissal; want nothing", queued.Items)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, claim, ``); got.Code != http.StatusNoContent {
-			t.Fatalf("withdrawing the claim answered %d: %s", got.Code, got.Body)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, decision, ``); got.Code != http.StatusNoContent {
+			t.Fatalf("withdrawing the decision answered %d: %s", got.Code, got.Body)
 		}
-		if got := leadState(t, r, place); got != "open" {
+		if got := leadState(t, r, occurrence); got != "open" {
 			t.Errorf("a lead whose dismissal was withdrawn is %q; want open", got)
 		}
-		if queued := leadsOf(t, r, "internal-reader", ""); len(queued.Items) != 1 || queued.Items[0].Place != place {
+		if queued := leadsOf(t, r, "internal-reader", ""); len(queued.Items) != 1 || queued.Items[0].Occurrence != occurrence {
 			t.Errorf("the queue holds %+v after the dismissal was withdrawn; want the lead back", queued.Items)
 		}
 	})
@@ -480,8 +480,8 @@ func TestWithdrawingAnAgreedDismissalOfALeadReopensIt(t *testing.T) {
 // would otherwise be accepted is refused.
 func TestAFixedLeadNamesOnlyAnAppliedComparableRunOfItsSeriesOnItsBuild(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+		occurrence := httpapitest.SeededLead(t, r)
+		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 		now := time.Now().UTC()
 		httpapitest.ApplyRun(t, r, now.Add(-2*time.Hour), httpapitest.LeadRun(false))
 		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))

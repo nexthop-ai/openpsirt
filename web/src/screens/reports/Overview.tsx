@@ -29,7 +29,7 @@ import {
 } from "./Window";
 import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
-import { decisionAt } from "../../app/routes";
+import { decisionOccurrenceAt } from "../../app/routes";
 
 // The window the figures cover. Thirty days is the window the remediation
 // metrics names and the one people quote; the others are here because a month
@@ -70,7 +70,7 @@ export function openFor(
 }
 
 // The state of the work, rather than the work itself: how fast things are
-// fixed, what is aging, how long a judgment waits for a second person, what
+// fixed, what is aging, how long a decision waits for a second person, what
 // keeps being put off, and what has been argued away.
 //
 // It is figures rather than a list, so it prints rather than exporting.
@@ -104,15 +104,15 @@ export function Overview() {
   // The findings argued away, which is what an auditor asks for first.
   //
   // All three dismissals, read together because what they have in common
-  // is that nothing was changed: "not applicable" claims the code is not
+  // is that nothing was changed: "not applicable" decisions the code is not
   // reachable, "will not fix" that it is not worth fixing, and "already fixed
   // here" that a packager backported it. Asking only the first is how a
   // program that dismisses everything as "will not fix" reads as a program
   // that has argued nothing away.
   //
   // Read from the record rather than from the decisions list, because the
-  // record is the one that takes an outcome repeated and names the place each
-  // judgment sits at.
+  // record is the one that takes an outcome repeated and names the occurrence each
+  // decision sits at.
   const { known, dismissing } = useOutcomes();
   const argued = useQuery({
     // Asked once the server has said which outcomes dismiss: asked before, the
@@ -130,7 +130,7 @@ export function Overview() {
               state: ["approved" as const],
               // The window this report states, so the sheet does not carry a
               // header saying ninety days over a list that ignores it. Dated
-              // by when the judgment was argued, which is what the record
+              // by when the decision was argued, which is what the record
               // dates by.
               ...(began ? { from: began } : {}),
               ...(period.to ? { to: endExclusive(period.to) } : {}),
@@ -285,7 +285,7 @@ export function Overview() {
               </table>
             </Wide>
             <p className="hint">
-              &ldquo;Nobody has said&rdquo; includes claims still waiting for approval.
+              &ldquo;Nobody has said&rdquo; includes decisions still waiting for approval.
             </p>
           </>
         )}
@@ -371,12 +371,12 @@ export function Overview() {
             </Wide>
             <p className="hint">
               Measured over {(measures.data?.sampled ?? 0).toLocaleString()}{" "}
-              {(measures.data?.sampled ?? 0) === 1 ? "claim" : "claims"}
+              {(measures.data?.sampled ?? 0) === 1 ? "decision" : "decisions"}
               {measures.data?.capped
                 ? " — the most recent part of the window rather than all of it"
                 : ""}
               . {(measures.data?.sent_back ?? 0).toLocaleString()}{" "}
-              {(measures.data?.sent_back ?? 0) === 1 ? "claim was" : "claims were"} sent back.
+              {(measures.data?.sent_back ?? 0) === 1 ? "decision was" : "decisions were"} sent back.
             </p>
 
             <h4 style={{ marginTop: 14 }}>Throughput by person</h4>
@@ -445,7 +445,7 @@ export function Overview() {
               </thead>
               <tbody>
                 {(repeated.data?.items ?? []).map((row) => (
-                  <tr key={`${row.product} ${row.vulnerability} ${row.place}`}>
+                  <tr key={`${row.product} ${row.vulnerability} ${row.occurrence}`}>
                     <td>
                       <Severity word={row.severity} />{" "}
                       <span className="id">{row.vulnerability}</span>
@@ -481,8 +481,8 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Dismissals</h3>
         <p className="hint">
-          Approved in this window, newest first. {byProduct(at.product)}, one row per place.{" "}
-          <Link to="/record">The record</Link> groups them by claim.
+          Approved in this window, newest first. {byProduct(at.product)}, one row per occurrence.{" "}
+          <Link to="/record">The record</Link> groups them by decision.
         </p>
         {argued.isPending ? (
           <Loading />
@@ -500,10 +500,10 @@ export function Overview() {
                 <tr>
                   <th>Issue</th>
                   {/* Which of the three, because they are read together and
-                      are not the same claim. */}
+                      are not the same decision. */}
                   <th>Dismissed as</th>
                   <th>Component</th>
-                  {/* Which place. Without it a claim covering forty of them
+                  {/* Which occurrence. Without it a decision covering forty of them
                       draws forty rows that differ in nothing a reader can
                       see, which reads as the same dismissal recorded forty
                       times. */}
@@ -514,9 +514,13 @@ export function Overview() {
               </thead>
               <tbody>
                 {(argued.data?.items ?? []).map((row) => (
-                  <tr key={row.id} className="row opens" onClick={opener(decisionAt(row.id))}>
+                  <tr
+                    key={row.id}
+                    className="row opens"
+                    onClick={opener(decisionOccurrenceAt(row.id))}
+                  >
                     <td>
-                      <Link to={decisionAt(row.id)} className="id">
+                      <Link to={decisionOccurrenceAt(row.id)} className="id">
                         {row.issue}
                       </Link>
                     </td>

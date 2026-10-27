@@ -24,11 +24,11 @@ import (
 // team is a product with people who may approve in it, and the administrator
 // the condition is told to.
 type team struct {
-	db      *database.DB
-	product int64
-	admin   *access.Account
-	people  map[string]*access.Account
-	claims  int
+	db        *database.DB
+	product   int64
+	admin     *access.Account
+	people    map[string]*access.Account
+	decisions int
 }
 
 func aTeam(t *testing.T, w *fixture.World, names ...string) *team {
@@ -56,7 +56,7 @@ func aTeam(t *testing.T, w *fixture.World, names ...string) *team {
 	return tm
 }
 
-// agreed writes claims one person proposed and another agreed to, straight to
+// agreed writes decisions one person proposed and another agreed to, straight to
 // the tables, proposed a number of days ago.
 func (tm *team) agreed(t *testing.T, proposer, approver string, n, daysAgo int) {
 	t.Helper()
@@ -64,31 +64,31 @@ func (tm *team) agreed(t *testing.T, proposer, approver string, n, daysAgo int) 
 	at := time.Now().UTC().Add(-time.Duration(daysAgo) * 24 * time.Hour).Truncate(time.Microsecond)
 	by, with := tm.people[proposer].ID, tm.people[approver].ID
 	for range n {
-		tm.claims++
+		tm.decisions++
 		reason := string(triage.CodeNotPresent)
-		claim := &triage.Claim{
-			Kind: triage.FindingClaim, ProposedBy: by, ProposedAt: at,
-			Outcome: triage.NotApplicable, Justification: &reason,
-		}
-		if _, err := tm.db.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		revision := &triage.Revision{ClaimID: claim.ID, Ordinal: 1, Body: "Not shipped.",
-			WrittenBy: by, WrittenAt: at}
-		if _, err := tm.db.DB.NewInsert().Model(revision).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
 		decision := &triage.Decision{
-			ClaimID: claim.ID, ProductID: tm.product,
-			VulnerabilityID: tm.issue(t),
-			PlaceIdentity:   fmt.Sprintf("place-%d", tm.claims), Visibility: access.Public,
-			NeedsApproval: true, State: triage.Approved,
-			ProposedBy: by, ProposedAt: at,
+			Kind: triage.FindingDecision, ProposedBy: by, ProposedAt: at,
+			Outcome: triage.NotApplicable, Justification: &reason,
 		}
 		if _, err := tm.db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		approval := &triage.Approval{ClaimID: claim.ID, RevisionID: revision.ID,
+		revision := &triage.Revision{DecisionID: decision.ID, Ordinal: 1, Body: "Not shipped.",
+			WrittenBy: by, WrittenAt: at}
+		if _, err := tm.db.DB.NewInsert().Model(revision).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		occurrence := &triage.DecisionOccurrence{
+			DecisionID: decision.ID, ProductID: tm.product,
+			VulnerabilityID:    tm.issue(t),
+			OccurrenceIdentity: fmt.Sprintf("place-%d", tm.decisions), Visibility: access.Public,
+			NeedsApproval: true, State: triage.Approved,
+			ProposedBy: by, ProposedAt: at,
+		}
+		if _, err := tm.db.DB.NewInsert().Model(occurrence).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		approval := &triage.Approval{DecisionID: decision.ID, RevisionID: revision.ID,
 			ApprovedBy: with, ApprovedAt: at}
 		if _, err := tm.db.DB.NewInsert().Model(approval).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -145,7 +145,7 @@ func TestOnePairAgreeingToMostOfAProductsWorkIsRaised(t *testing.T) {
 
 		body := tm.heard(t, tm.admin)
 		if body == "" {
-			t.Fatal("one pair agreed to nine of ten claims among three approvers and nobody was told")
+			t.Fatal("one pair agreed to nine of ten decisions among three approvers and nobody was told")
 		}
 		for _, want := range []string{"ana@example.com", "ben@example.com", "90%"} {
 			if !strings.Contains(body, want) {
@@ -235,7 +235,7 @@ func TestAPairIsCountedOverTheReportsPeriod(t *testing.T) {
 		tm.agreed(t, "cat", "ana", 5, 3)
 		tm.agreed(t, "ben", "cat", 5, 3)
 		if body := tm.heard(t, tm.admin); body != "" {
-			t.Errorf("claims proposed four months ago raised %q", body)
+			t.Errorf("decisions proposed four months ago raised %q", body)
 		}
 	})
 }
@@ -248,22 +248,22 @@ func TestOldAgreementsDoNotDiluteAPairsShareNow(t *testing.T) {
 		tm.agreed(t, "ana", "ben", 9, 3)
 		tm.agreed(t, "cat", "ana", 1, 3)
 		if body := tm.heard(t, tm.admin); body == "" {
-			t.Error("one pair agreed to nine of this quarter's ten claims and older work hid it")
+			t.Error("one pair agreed to nine of this quarter's ten decisions and older work hid it")
 		}
 	})
 }
 
-func TestAPairIsNotRaisedOverTooFewClaims(t *testing.T) {
+func TestAPairIsNotRaisedOverTooFewDecisions(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		tm := aTeam(t, w, "ana", "ben", "cat")
-		// Every claim, and a handful of them.
+		// Every decision, and a handful of them.
 		tm.agreed(t, "ana", "ben", 9, 3)
 		if body := tm.heard(t, tm.admin); body != "" {
-			t.Errorf("nine claims in a quarter raised %q", body)
+			t.Errorf("nine decisions in a quarter raised %q", body)
 		}
 		tm.agreed(t, "ben", "ana", 1, 3)
 		if body := tm.heard(t, tm.admin); body == "" {
-			t.Error("one pair agreed to all of ten claims and nobody was told")
+			t.Error("one pair agreed to all of ten decisions and nobody was told")
 		}
 	})
 }

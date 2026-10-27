@@ -204,7 +204,7 @@ func TestAnUnscoredFindingExportsWithNoScoreRatherThanAZero(t *testing.T) {
 
 // The three lists that could be read on a screen and not taken away.
 //
-// The record of judgments is what an auditor is given, the review queue is
+// The record of decisions is what an auditor is given, the review queue is
 // what a manager reports a backlog from, and the by-component view is what a
 // release meeting argues over — all three were copied out by hand.
 //
@@ -263,7 +263,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 			t.Errorf("the by-component export does not state the line: %v", states(open))
 		}
 
-		// The record of judgments. Nothing has been judged in this fixture, so
+		// The record of decisions. Nothing has been decided in this fixture, so
 		// what it must produce is a header and no rows — an empty answer is an
 		// answer, and a file that failed to open is not.
 		record := httpapitest.RowsUnder(lines(t, "private-triage", "/v1/audit.csv"))
@@ -271,30 +271,30 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 			t.Fatalf("the record's export has no header: %v", record)
 		}
 		if len(record) != 1 {
-			t.Errorf("nothing has been judged and the record exported %d rows", len(record)-1)
+			t.Errorf("nothing has been decided and the record exported %d rows", len(record)-1)
 		}
 
 		// The review queue, likewise: nothing waits, and the columns still
 		// come out so a spreadsheet opens.
 		queue := httpapitest.RowsUnder(lines(t, "private-triage", "/v1/review-queue.csv"))
-		if len(queue) == 0 || queue[0][0] != "claim" {
+		if len(queue) == 0 || queue[0][0] != "decision" {
 			t.Fatalf("the review queue's export has no header: %v", queue)
 		}
 
 		// An agreement taken back is in the record and is not somebody who
 		// agrees now, and the column an auditor reads must not mix the two.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		// The queue is what is waiting on *you*, so the file is too: an
-		// approver sees the claim and its proposer does not, and `mine`
+		// approver sees the decision and its proposer does not, and `mine`
 		// reverses that. A file that answered the same for both would be a
 		// backlog report about somebody else's work.
 		waiting := httpapitest.RowsUnder(lines(t, "reviewer", "/v1/review-queue.csv"))
 		if len(waiting) != 2 {
-			t.Fatalf("an approver's queue exported %d rows, wanted the claim", len(waiting)-1)
+			t.Fatalf("an approver's queue exported %d rows, wanted the decision", len(waiting)-1)
 		}
 		theirs := httpapitest.RowsUnder(lines(t, "triager", "/v1/review-queue.csv"))
 		if len(theirs) != 1 {
-			t.Errorf("the proposer's own claim is in their queue export: %v", theirs)
+			t.Errorf("the proposer's own decision is in their queue export: %v", theirs)
 		}
 		own := httpapitest.RowsUnder(lines(t, "triager", "/v1/review-queue.csv?mine=true"))
 		if len(own) != 2 {
@@ -302,7 +302,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 		}
 
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", claim),
+			fmt.Sprintf("/v1/decisions/%d/approval", decision),
 			`{"batch":"a-batch"}`); got.Code >= 300 {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
@@ -699,7 +699,7 @@ func TestCoverageStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T
 
 func TestAFileWithNothingToStateStatesNothing(t *testing.T) {
 	// The record has no severity line. An empty "triaged_at_or_above" is a key
-	// about findings on a file about judgments — worse than silence, because
+	// about findings on a file about decisions — worse than silence, because
 	// somebody reads it.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, "/v1/audit.json", "")

@@ -4,13 +4,13 @@
 // Package triage holds what people decide about findings, and the rules for
 // when a decision stops applying.
 //
-// The shape everything here rests on: a decision is a claim about a
+// The shape everything here rests on: a decision is about a
 // combination of code, not about a release. It is keyed structurally — which
 // issue, in which component, under which consumer — and it stops applying when
 // the code it was about changes. Those two are kept apart deliberately:
 // identity is structural and expiry is version-based, and letting either reach
 // into the other is how an unrelated bump at the top of a build invalidates a
-// judgment made about a leaf.
+// decision made about a leaf.
 package triage
 
 import (
@@ -38,9 +38,9 @@ const (
 	// Mismatched means the scanner matched this against something it is not.
 	// The finding is wrong rather than answered.
 	//
-	// A claim about identity, where every other outcome is a judgment about
+	// A decision about identity, where every other outcome is a decision about
 	// risk. That is what makes it the one outcome the versions do not expire:
-	// a decision is stored under the versions it was a claim about and stops
+	// a decision is stored under the versions it was made about and stops
 	// applying when they move, which is right for how dangerous something is
 	// and wrong for whether the thing is there at all. A version bump does
 	// not make a wrong match right, so without this the same wrong match
@@ -98,19 +98,19 @@ func Outcomes() []Outcome {
 	return append(VulnerabilityOutcomes(), LeadOutcomes()...)
 }
 
-// VulnerabilityOutcomes are the outcomes a claim about a finding of the
+// VulnerabilityOutcomes are the outcomes a decision about a finding of the
 // vulnerability and entered kinds records.
 func VulnerabilityOutcomes() []Outcome {
 	return []Outcome{Affected, NotApplicable, Mismatched, Deferred, WontFix,
 		AlreadyFixed, UpgradeNeeded, PatchNeeded}
 }
 
-// LeadOutcomes are the outcomes a claim about a lead records. A lead is an
+// LeadOutcomes are the outcomes a decision about a lead records. A lead is an
 // analyzer's guess, so what is asked of it is whether it is real, and none of
 // the vulnerability outcomes, which are about how a known issue applies, fits.
 func LeadOutcomes() []Outcome { return []Outcome{Dismissed, NotSecurity, Confirmed} }
 
-// OutcomesFor are the outcomes a claim about a finding of this kind records.
+// OutcomesFor are the outcomes a decision about a finding of this kind records.
 func OutcomesFor(k kind.Kind) []Outcome {
 	if k == kind.Analysis {
 		return LeadOutcomes()
@@ -160,7 +160,7 @@ func OutcomesThatHideRisk() []Outcome {
 	return kept
 }
 
-// OutcomesDismissing are the outcomes that claim no further work is needed:
+// OutcomesDismissing are the outcomes that say no further work is needed:
 // it does not apply, the match is wrong, it will not be fixed, the fix is
 // already here.
 //
@@ -175,7 +175,7 @@ func OutcomesThatHideRisk() []Outcome {
 // control held.
 //
 // The vulnerability outcomes alone: the reports counting dismissals read the
-// vulnerability kinds. Approval quality reads lead claims too, and asks what
+// vulnerability kinds. Approval quality reads lead decisions too, and asks what
 // always needs a second person rather than this.
 func OutcomesDismissing() []Outcome {
 	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
@@ -187,11 +187,11 @@ func OutcomesDismissing() []Outcome {
 	return kept
 }
 
-// Dismisses reports whether this outcome claims no further work is needed
+// Dismisses reports whether this outcome says no further work is needed
 // about a vulnerability: it hides risk and carries no date that something
 // later checks. A lead's outcomes dismiss nothing the dismissal counts read,
 // because those read the vulnerability kinds alone. Approval quality reads
-// lead claims and files a lead's dismissal standing alone with these.
+// lead decisions and files a lead's dismissal standing alone with these.
 func (o Outcome) Dismisses() bool { return !o.AboutALead() && o.HidesRisk() && !o.Dated() }
 
 // Valid reports whether o is one we recognize.
@@ -238,32 +238,32 @@ func (o Outcome) Commits() bool { return o == UpgradeNeeded || o == PatchNeeded 
 // an outcome makes a statement about the future at all.
 func (o Outcome) Dated() bool { return o.Commits() || o == Deferred }
 
-// StandsAtAnyVersion reports whether a claim with this outcome keeps applying
+// StandsAtAnyVersion reports whether a decision with this outcome keeps applying
 // when the code under it moves.
 //
 // One outcome does. Identity is structural and expiry is version-based, and
-// neither reaches into the other: a claim that the match itself is wrong is
+// neither reaches into the other: a decision that the match itself is wrong is
 // about the first, so the second has nothing to say about it. Every other
-// outcome is a judgment made under the versions it was made against, and a
-// judgment about risk that outlived them would be the bump at the top of a
+// outcome is a decision made under the versions it was made against, and a
+// decision about risk that outlived them would be the bump at the top of a
 // build failing to re-open a question somebody has to answer again.
 //
-// Every outcome about a lead does too. A lead's place is the lead, carried by
-// matching rather than by versions, and what weakens a judgment about one is a
+// Every outcome about a lead does too. A lead's occurrence is the lead, carried by
+// matching rather than by versions, and what weakens a decision about one is a
 // pairing that is only probable (`DESIGN-analysis.md` § Lead triage).
 func (o Outcome) StandsAtAnyVersion() bool {
 	return slices.Contains(finding.AnyVersionOutcomes(), string(o))
 }
 
-// AboutALead reports whether this is an outcome a claim about a lead records.
+// AboutALead reports whether this is an outcome a decision about a lead records.
 func (o Outcome) AboutALead() bool { return slices.Contains(LeadOutcomes(), o) }
 
 // NeedsJustification reports whether this outcome says which recognized reason
-// applies, which is a claim two of them make.
+// applies, which is a decision two of them make.
 //
-// Both are claims that something is not the problem here, and which reason
-// applies is the whole of what each says. The rest are claims about priority
-// or about work, and a reason on one of those states something the claim does
+// Both are decisions that something is not the problem here, and which reason
+// applies is the whole of what each says. The rest are decisions about priority
+// or about work, and a reason on one of those states something the decision does
 // not make.
 //
 // A dismissed lead states its reason too, from the vocabulary LeadReasons
@@ -297,14 +297,14 @@ const (
 	MitigationsExist Justification = "inline_mitigations_already_exist"
 )
 
-// AboutIdentity reports whether this reason claims something is not there,
+// AboutIdentity reports whether this reason says something is not there,
 // rather than that what is there cannot be reached or is already stopped.
 //
 // The distinction a correction turns on. A correction does not lapse when the
 // code moves, so the reason behind one has to be a reason no version bump can
 // answer. That something is absent is such a reason; that it is unreachable or
-// already mitigated is a claim about surroundings and configuration, which a
-// bump changes all the time — recorded as a correction it would put a judgment
+// already mitigated is a decision about surroundings and configuration, which a
+// bump changes all the time — recorded as a correction it would put a decision
 // about risk beyond the rule that re-examines it.
 func (j Justification) AboutIdentity() bool {
 	return j == ComponentNotPresent || j == CodeNotPresent
@@ -331,7 +331,7 @@ func JustificationsCorrecting() []Justification {
 }
 
 // LeadReason is why a lead is dismissed. The words start from the ones code
-// scanning services offer, and a claim stores one where a vulnerability claim
+// scanning services offer, and a decision stores one where a vulnerability decision
 // stores its justification.
 type LeadReason string
 
@@ -369,28 +369,28 @@ func (j Justification) Valid() bool {
 	return false
 }
 
-// State is where a decision has got to.
+// State is where a decision occurrence has got to.
 //
-// Append-only in spirit: a decision moves forward and what it was before stays
+// Append-only in spirit: a row moves forward and what it was before stays
 // readable, so the record reads as proposed, approved, withdrawn rather than
 // as whatever it happens to be now.
 type State string
 
 const (
-	// Proposed means somebody has claimed it and nobody has agreed yet.
+	// Proposed means somebody has proposed it and nobody has agreed yet.
 	Proposed State = "proposed"
 	// Approved means a second person agreed, against one specific revision of
 	// the reasoning.
 	Approved State = "approved"
 	// Withdrawn means it no longer applies because somebody took it back.
 	Withdrawn State = "withdrawn"
-	// LapsedState means the code it was a claim about changed. Named for what
+	// LapsedState means the code it was a decision about changed. Named for what
 	// it is rather than for the word alone, because "lapsed" reads as a verb
 	// everywhere else in this package.
 	LapsedState State = "lapsed"
 )
 
-// States is every state a decision row can reach, in the order a row moves
+// States is every state a decision occurrence can reach, in the order a row moves
 // through them.
 func States() []State { return []State{Proposed, Approved, Withdrawn, LapsedState} }
 

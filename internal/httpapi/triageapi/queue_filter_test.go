@@ -23,7 +23,7 @@ func TestTheReviewQueueTakesItsFiltersFromTheAddress(t *testing.T) {
 			`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"wont-fix",`+
 				`"selected_by":"the drivers","reasoning":"Not built for this image."}`); got.Code !=
 			http.StatusCreated {
-			t.Fatalf("the claim answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("the decision answered %d: %s", got.Code, got.Body.String())
 		}
 
 		for _, each := range []struct {

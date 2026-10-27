@@ -195,7 +195,7 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 					Stream  string `json:"stream"`
 					Variant string `json:"variant"`
 				} `json:"builds"`
-				Places int `json:"places"`
+				Occurrences int `json:"occurrences"`
 			} `json:"items"`
 		}
 		var whole listing
@@ -208,8 +208,8 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 		if len(row.Builds) != 2 || row.Builds[0].Stream != "master" || row.Builds[1].Stream != "v1.0" {
 			t.Errorf("the row names the builds %+v, want master and v1.0", row.Builds)
 		}
-		if row.Places != 2 {
-			t.Errorf("the row counts %d findings, want one in each build", row.Places)
+		if row.Occurrences != 2 {
+			t.Errorf("the row counts %d findings, want one in each build", row.Occurrences)
 		}
 		if len(row.Components) == 0 {
 			t.Error("the row names no component")
@@ -224,9 +224,9 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 		if b := narrowed.Items[0].Builds; len(b) != 1 || b[0].Stream != "v1.0" {
 			t.Errorf("narrowed to v1.0 the row names %+v", b)
 		}
-		if narrowed.Items[0].Places != 1 {
+		if narrowed.Items[0].Occurrences != 1 {
 			t.Errorf("narrowed to one build the row counts %d findings, want 1",
-				narrowed.Items[0].Places)
+				narrowed.Items[0].Occurrences)
 		}
 	})
 }
@@ -642,7 +642,7 @@ func TestAVectorSettlesTheSeverityRatherThanBeingAskedTwice(t *testing.T) {
 
 func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 	// authorizing before resolving a name applied to issues. Every route
-	// shaped "this issue, at this place" resolved the name first and
+	// shaped "this issue, at this occurrence" resolved the name first and
 	// checked what it reached second, so a name somebody holds and a name
 	// nobody holds came back differently — and on two of them the check
 	// that came second was not a refusal at all: a fix target answered an

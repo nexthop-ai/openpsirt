@@ -41,7 +41,7 @@ func TestAnUndisclosedRecordsWordsReachNoReaderOfDisclosedWorkAlone(t *testing.T
 		// The record, undisclosed, beside the scanned finding.
 		recorded := open[0]
 		recorded.ID, recorded.Kind, recorded.Visibility = 0, finding.Entered, access.Private
-		recorded.PlaceIdentity = finding.PlaceIdentity("libnl", "recorded-by-hand")
+		recorded.OccurrenceIdentity = finding.OccurrenceIdentity("libnl", "recorded-by-hand")
 		if _, err := f.db.DB.NewInsert().Model(&recorded).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +142,7 @@ func TestAnUndisclosedRecordsScoreReachesNoReaderOfDisclosedWorkAlone(t *testing
 		}
 		recorded := open[0]
 		recorded.ID, recorded.Kind, recorded.Visibility = 0, finding.Entered, access.Private
-		recorded.PlaceIdentity = finding.PlaceIdentity("libnl", "recorded-by-hand")
+		recorded.OccurrenceIdentity = finding.OccurrenceIdentity("libnl", "recorded-by-hand")
 		if _, err := f.db.DB.NewInsert().Model(&recorded).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

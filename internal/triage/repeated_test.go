@@ -16,58 +16,58 @@ import (
 
 // putOffUntilTakenBack records a deferral that was withdrawn on a date, which
 // is what decides how much of what it asked for it actually held.
-func (f *fixture) putOffUntilTakenBack(t *testing.T, place string, from, until,
+func (f *fixture) putOffUntilTakenBack(t *testing.T, occurrence string, from, until,
 	takenBack time.Time) {
 
 	t.Helper()
-	f.putOffEnding(t, place, from, until, triage.Withdrawn, &takenBack)
+	f.putOffEnding(t, occurrence, from, until, triage.Withdrawn, &takenBack)
 }
 
-// putOff records one deferral at a place, from a moment until a moment.
+// putOff records one deferral at an occurrence, from a moment until a moment.
 //
 // Written directly rather than proposed through the store: what is under test
-// is the report, and reaching three deferrals at one place through the normal
+// is the report, and reaching three deferrals at one occurrence through the normal
 // path means three approvals and two supersessions, none of which this is
 // about.
-func (f *fixture) putOff(t *testing.T, place string, from, until time.Time, state triage.State) {
+func (f *fixture) putOff(t *testing.T, occurrence string, from, until time.Time, state triage.State) {
 	t.Helper()
-	f.putOffEnding(t, place, from, until, state, nil)
+	f.putOffEnding(t, occurrence, from, until, state, nil)
 }
 
 // putOffIn is putOff against a product other than the fixture's own.
-func (f *fixture) putOffIn(t *testing.T, product int64, place string, from, until time.Time,
+func (f *fixture) putOffIn(t *testing.T, product int64, occurrence string, from, until time.Time,
 	state triage.State) {
 
 	t.Helper()
-	f.putOffAt(t, product, place, from, until, state, nil)
+	f.putOffAt(t, product, occurrence, from, until, state, nil)
 }
 
-func (f *fixture) putOffEnding(t *testing.T, place string, from, until time.Time,
+func (f *fixture) putOffEnding(t *testing.T, occurrence string, from, until time.Time,
 	state triage.State, endedAt *time.Time) {
 
 	t.Helper()
-	f.putOffAt(t, f.product, place, from, until, state, endedAt)
+	f.putOffAt(t, f.product, occurrence, from, until, state, endedAt)
 }
 
-func (f *fixture) putOffAt(t *testing.T, product int64, place string, from, until time.Time,
+func (f *fixture) putOffAt(t *testing.T, product int64, occurrence string, from, until time.Time,
 	state triage.State, endedAt *time.Time) {
 	t.Helper()
-	// Every decision belongs to a claim, even one covering a single place, so
+	// Every row belongs to a decision, even one covering a single occurrence, so
 	// the report reads the same rows a real deferral produces.
-	// The words are the claim's; the landing place is the row's.
-	claim := &triage.Claim{
-		Kind: triage.FindingClaim, ProposedBy: f.proposer, ProposedAt: from,
+	// The words are the decision's; the landing place is the row's.
+	decision := &triage.Decision{
+		Kind: triage.FindingDecision, ProposedBy: f.proposer, ProposedAt: from,
 		Outcome: triage.Deferred, DeferredUntil: &until,
 	}
-	if _, err := f.db.DB.NewInsert().Model(claim).Exec(t.Context()); err != nil {
-		t.Fatalf("record a claim: %v", err)
+	if _, err := f.db.DB.NewInsert().Model(decision).Exec(t.Context()); err != nil {
+		t.Fatalf("record a decision: %v", err)
 	}
 	// The key carries the product, as a real one does: two products may hold
-	// the same place and both may be decided about.
-	live := fmt.Sprintf("%d|%s|%s", product, place, until.Format(time.RFC3339Nano))
-	row := &triage.Decision{
-		ClaimID: claim.ID, ProductID: product, VulnerabilityID: f.issue,
-		PlaceIdentity: place, Visibility: access.Public,
+	// the same occurrence and both may be decided about.
+	live := fmt.Sprintf("%d|%s|%s", product, occurrence, until.Format(time.RFC3339Nano))
+	row := &triage.DecisionOccurrence{
+		DecisionID: decision.ID, ProductID: product, VulnerabilityID: f.issue,
+		OccurrenceIdentity: occurrence, Visibility: access.Public,
 		State: state, ProposedBy: f.proposer, ProposedAt: from, EndedAt: endedAt,
 	}
 	if state.Live() {
@@ -85,7 +85,7 @@ func TestWhatKeepsBeingPutOffIsListedWithHowOftenAndHowLong(t *testing.T) {
 	// to.
 	each(t, func(t *testing.T, f *fixture) {
 		now := time.Now().UTC()
-		// One place put off twice, another once.
+		// One occurrence put off twice, another once.
 		f.putOff(t, "place-a", now.Add(-60*24*time.Hour), now.Add(-30*24*time.Hour), triage.Approved)
 		f.putOff(t, "place-a", now.Add(-30*24*time.Hour), now.Add(30*24*time.Hour), triage.Approved)
 		f.putOff(t, "place-b", now.Add(-10*24*time.Hour), now.Add(20*24*time.Hour), triage.Approved)
@@ -95,7 +95,7 @@ func TestWhatKeepsBeingPutOffIsListedWithHowOftenAndHowLong(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
-			t.Fatalf("listed %d places, want the one put off more than once: %+v", len(rows), rows)
+			t.Fatalf("listed %d occurrences, want the one put off more than once: %+v", len(rows), rows)
 		}
 		got := rows[0]
 		if got.Times != 2 {
@@ -109,8 +109,8 @@ func TestWhatKeepsBeingPutOffIsListedWithHowOftenAndHowLong(t *testing.T) {
 		if !got.Standing {
 			t.Error("a deferral running until next month does not read as standing")
 		}
-		if got.PlaceIdentity != "place-a" {
-			t.Errorf("it names the place %q", got.PlaceIdentity)
+		if got.OccurrenceIdentity != "place-a" {
+			t.Errorf("it names the occurrence %q", got.OccurrenceIdentity)
 		}
 	})
 }
@@ -146,7 +146,7 @@ func TestTimeTakenBackCountsForAsLongAsItHeld(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
-			t.Fatalf("listed %d places, want the one put off twice: %+v", len(rows), rows)
+			t.Fatalf("listed %d occurrences, want the one put off twice: %+v", len(rows), rows)
 		}
 		if rows[0].Times != 2 {
 			t.Errorf("it says %d deferrals, want the two that held", rows[0].Times)
@@ -201,7 +201,7 @@ func TestSomebodyWhoHoldsNothingIsToldOfNoDeferrals(t *testing.T) {
 //
 // The grouping was on the display name, which carries no uniqueness rule —
 // only the product's own name does, and that is not the one anybody reads. So
-// one ordinary judgment in each of two products merged into a single row
+// one ordinary decision in each of two products merged into a single row
 // reading as a repeated-deferral pattern, with a total summed across both.
 func TestTwoProductsDisplayedAlikeAreNotOnePattern(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
@@ -238,22 +238,22 @@ func TestTwoProductsDisplayedAlikeAreNotOnePattern(t *testing.T) {
 	})
 }
 
-// putOffAtTwoVersions records one deferral claim with two rows at one place,
-// which is what one claim keyed at two upstream versions writes.
-func (f *fixture) putOffAtTwoVersions(t *testing.T, place string, from, until time.Time) {
+// putOffAtTwoVersions records one deferral decision with two rows at one occurrence,
+// which is what one decision keyed at two upstream versions writes.
+func (f *fixture) putOffAtTwoVersions(t *testing.T, occurrence string, from, until time.Time) {
 	t.Helper()
-	claim := &triage.Claim{
-		Kind: triage.FindingClaim, ProposedBy: f.proposer, ProposedAt: from,
+	decision := &triage.Decision{
+		Kind: triage.FindingDecision, ProposedBy: f.proposer, ProposedAt: from,
 		Outcome: triage.Deferred, DeferredUntil: &until,
 	}
-	if _, err := f.db.DB.NewInsert().Model(claim).Exec(t.Context()); err != nil {
-		t.Fatalf("record a claim: %v", err)
+	if _, err := f.db.DB.NewInsert().Model(decision).Exec(t.Context()); err != nil {
+		t.Fatalf("record a decision: %v", err)
 	}
 	for _, version := range []string{"1.2.3", "1.2.4"} {
-		live := fmt.Sprintf("%d|%s|%s", f.product, place, version)
-		row := &triage.Decision{
-			ClaimID: claim.ID, ProductID: f.product, VulnerabilityID: f.issue,
-			PlaceIdentity: place, Visibility: access.Public, LiveKey: &live,
+		live := fmt.Sprintf("%d|%s|%s", f.product, occurrence, version)
+		row := &triage.DecisionOccurrence{
+			DecisionID: decision.ID, ProductID: f.product, VulnerabilityID: f.issue,
+			OccurrenceIdentity: occurrence, Visibility: access.Public, LiveKey: &live,
 			State: triage.Approved, ProposedBy: f.proposer, ProposedAt: from,
 		}
 		if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
@@ -264,8 +264,8 @@ func (f *fixture) putOffAtTwoVersions(t *testing.T, place string, from, until ti
 
 func TestALapsedDeferralCountsForAsLongAsItHeldAndOverlapsCountOnce(t *testing.T) {
 	// A lapse ends a deferral's effect the way a withdrawal does, so it counts
-	// for as long as it held. Re-affirmed, the new claim carries the old
-	// date: the place was hidden from the first day to the date once, less
+	// for as long as it held. Re-affirmed, the new decision carries the old
+	// date: the occurrence was hidden from the first day to the date once, less
 	// the day between, and never twice.
 	each(t, func(t *testing.T, f *fixture) {
 		// Midnight, because a deferral returns on a day and the servers keep
@@ -281,10 +281,10 @@ func TestALapsedDeferralCountsForAsLongAsItHeldAndOverlapsCountOnce(t *testing.T
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
-			t.Fatalf("listed %d places, want the one: %+v", len(rows), rows)
+			t.Fatalf("listed %d occurrences, want the one: %+v", len(rows), rows)
 		}
 		if rows[0].Times != 2 {
-			t.Errorf("it says %d deferrals, want the two claims", rows[0].Times)
+			t.Errorf("it says %d deferrals, want the two decisions", rows[0].Times)
 		}
 		if rows[0].TotalDays < 23.9 || rows[0].TotalDays > 24.1 {
 			t.Errorf("it says %.1f days, want 24: five before the lapse and nineteen after",
@@ -302,9 +302,9 @@ func TestALapsedDeferralCountsForAsLongAsItHeldAndOverlapsCountOnce(t *testing.T
 	})
 }
 
-func TestOneClaimAtTwoVersionsIsOneDeferral(t *testing.T) {
-	// One claim keyed at two versions writes two rows over one stretch. It
-	// put the place off once.
+func TestOneDecisionAtTwoVersionsIsOneDeferral(t *testing.T) {
+	// One decision keyed at two versions writes two rows over one stretch. It
+	// put the occurrence off once.
 	each(t, func(t *testing.T, f *fixture) {
 		now := time.Now().UTC().Truncate(24 * time.Hour)
 		f.putOff(t, "place-b", now.Add(-40*24*time.Hour), now.Add(-30*24*time.Hour), triage.Approved)
@@ -315,10 +315,10 @@ func TestOneClaimAtTwoVersionsIsOneDeferral(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
-			t.Fatalf("listed %d places, want the one: %+v", len(rows), rows)
+			t.Fatalf("listed %d occurrences, want the one: %+v", len(rows), rows)
 		}
 		if rows[0].Times != 2 {
-			t.Errorf("it says %d deferrals, want the two claims", rows[0].Times)
+			t.Errorf("it says %d deferrals, want the two decisions", rows[0].Times)
 		}
 		if rows[0].TotalDays < 29.9 || rows[0].TotalDays > 30.1 {
 			t.Errorf("it says %.1f days, want 30", rows[0].TotalDays)

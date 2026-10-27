@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { mounted } from "../test/mount";
 import { Moved, built } from "./moved";
-import { ROUTES, inventoryChangesAt, personAt } from "./routes";
+import { ROUTES, bulkDecisionAt, decisionAt, inventoryChangesAt, personAt } from "./routes";
 
 const mount = mounted();
 
@@ -47,5 +47,23 @@ describe("a former address", () => {
         (at) => inventoryChangesAt(built(at), Number(at.scan)),
       ),
     ).toBe("/products/sonic/streams/main/variants/broadcom/uploads/7/changes");
+  });
+
+  it("forwards a claim to the decision it is now", () => {
+    expect(
+      landing("/claims/12#approve", ROUTES.formerDecision, (at) => decisionAt(Number(at.id))),
+    ).toBe("/decisions/12#approve");
+  });
+
+  it("forwards deciding about a component to the bulk decision, with what it narrowed by", () => {
+    expect(
+      landing(
+        "/products/sonic/streams/main/variants/broadcom/components/libfoo/decide?version=1.2",
+        ROUTES.formerBulkDecision,
+        (at) => bulkDecisionAt(built(at), at.component ?? ""),
+      ),
+    ).toBe(
+      "/products/sonic/streams/main/variants/broadcom/components/libfoo/bulk-decision?version=1.2",
+    );
   });
 });

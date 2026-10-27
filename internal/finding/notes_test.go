@@ -295,7 +295,7 @@ func TestABulletCarriesWhatDecidesWhenTheUpgradeIsTaken(t *testing.T) {
 				Vulnerability: "CVE-2026-2", Component: "linux-image", Severity: "low",
 				Because: finding.Upgraded, FromVersion: "6.12.41-1", MovedTo: "6.12.85-1",
 				// An address a reader's machine would act on, from a feed.
-				// The same rule an address stored beside a claim goes
+				// The same rule an address stored beside a decision goes
 				// through, and this one leaves the building.
 				Advisory: "ms-msdt:calc",
 			},

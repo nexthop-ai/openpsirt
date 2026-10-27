@@ -17,8 +17,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// place is one finding's position: the component, and what pulled it in.
-type place struct {
+// occurrence is one finding's position: the component, and what pulled it in.
+type occurrence struct {
 	componentID int64
 	consumerID  int64 // zero where the thing above is the product itself
 }
@@ -26,25 +26,25 @@ type place struct {
 // key identifies a finding within a variant.
 type key struct {
 	vulnerabilityID int64
-	place           place
+	occurrence      occurrence
 }
 
 // at identifies a finding by where it sits rather than by what sits there.
 //
-// The place identity is built from names alone, so it survives a version
+// The occurrence identity is built from names alone, so it survives a version
 // change where the component identity does not. Comparing the two is what
 // distinguishes a version moving under a finding from the finding going away.
 type at struct {
-	vulnerabilityID int64
-	placeIdentity   string
+	vulnerabilityID    int64
+	occurrenceIdentity string
 }
 
 // Apply records what a run found, writing only the difference.
 //
-// A scanner reports a package at a version. Fanning that out across the places
-// the package occupies is done here, from the graph the inventory described —
-// it is the step where one line in a report becomes the number of decisions
-// somebody actually has to make.
+// A scanner reports a package at a version. Fanning that out across the
+// occurrences the package occupies is done here, from the graph the inventory
+// described — it is the step where one line in a report becomes the number of
+// decisions somebody actually has to make.
 //
 // Re-running against a database that moved slightly must write only what
 // changed, for the same reason the graph does: a nightly re-scan that found
@@ -130,7 +130,7 @@ type applyRun struct {
 	ratings         map[int64]Rating
 	shipped         bool
 	present         inventory
-	places          consumers
+	occurrences     consumers
 	claims          []Claim
 	placed          *placer
 	suppliers       *disclaiming
@@ -176,9 +176,9 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	// rating arrives on the published word's deadline while the ones beside it
 	// sit on the product's.
 	//
-	// Read at this moment rather than copied onto the finding, so a place that
-	// newly pulls a library in tomorrow picks the product's rating up without
-	// anything having to remember to go and fetch it.
+	// Read at this moment rather than copied onto the finding, so an occurrence
+	// that newly pulls a library in tomorrow picks the product's rating up
+	// without anything having to remember to go and fetch it.
 	if run.ratings, err = ratingsInForce(ctx, tx, productID, vulnerabilities); err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	if run.present, err = openComponents(ctx, tx, targetID); err != nil {
 		return nil, err
 	}
-	if run.places, err = openPlaces(ctx, tx, targetID); err != nil {
+	if run.occurrences, err = openOccurrences(ctx, tx, targetID); err != nil {
 		return nil, err
 	}
 	// The build's own claims about what it ships. Applied here rather than
@@ -218,7 +218,7 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	}
 	// Where each product a claim or a statement names sits in this build,
 	// worked out once per product.
-	if run.placed, err = placing(ctx, tx, targetID, run.present, run.places); err != nil {
+	if run.placed, err = placing(ctx, tx, targetID, run.present, run.occurrences); err != nil {
 		return nil, err
 	}
 	if run.suppliers, err = disclaimers(ctx, tx, productID, issues, issueIDs, run.placed); err != nil {
@@ -229,7 +229,7 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	// nothing was found in has still done its job, while one covering nothing
 	// the build ships has not.
 	run.claimsReaching, run.claimsReachingNothing = claimsReaching(run.claims, run.present,
-		run.places, run.placed)
+		run.occurrences, run.placed)
 	// The claims that fix what they cover, as against those that argue it
 	// does not apply. The first close a finding and the second mark it.
 	run.byName = indexClaims(run.claims)
@@ -323,7 +323,7 @@ type wantedSet struct {
 	unplaced int
 }
 
-// wanted places each reported issue at every place its component sits.
+// wanted places each reported issue at every occurrence its component sits.
 func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 	w := wantedSet{
 		findings: map[key]Finding{}, patched: map[key]bool{}, cleared: map[key]string{},
@@ -332,10 +332,10 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 	for _, r := range reported {
 		component, held := run.present.byIdentity[r.Component.Identity()]
 		if !held {
-			// Reported against something this variant does not contain. It
-			// has no place, so it cannot become a finding at one, and silently
-			// dropping it would hide a report that does not match the
-			// inventory it was produced from.
+			// Reported against something this variant does not contain. It has
+			// no occurrence, so it cannot become a finding at one, and silently
+			// dropping it would hide a report that does not match the inventory
+			// it was produced from.
 			w.unplaced++
 			continue
 		}
@@ -345,10 +345,10 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 		}
 		naming := run.byName.naming(run.claims, r.Issue)
 
-		for _, consumerID := range run.places.of(component.ID) {
-			k := key{vulnerabilityID, place{componentID: component.ID, consumerID: consumerID}}
-			// Asked per place: a claim about a component inside one of the
-			// build's products reaches only the places beneath it.
+		for _, consumerID := range run.occurrences.of(component.ID) {
+			k := key{vulnerabilityID, occurrence{componentID: component.ID, consumerID: consumerID}}
+			// Asked per occurrence: a claim about a component inside one of the
+			// build's products reaches only the occurrences beneath it.
 			covering, claimedBy := coveringClaim(naming, component, consumerID, run.placed)
 			// Set on every report rather than only when true, because a later
 			// report at the same key replaces the finding below and the claim
@@ -381,12 +381,12 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 				// knowledge by the time it reaches us: the advisory it matched
 				// is published. What is not disclosed is a finding somebody
 				// entered here.
-				Visibility:      access.Public,
-				VulnerabilityID: vulnerabilityID,
-				ComponentID:     component.ID,
-				ConsumerID:      optional(consumerID),
-				PlaceIdentity:   PlaceIdentity(component.Name, run.present.nameOf(consumerID)),
-				FixState:        r.FixState, FixedIn: r.FixedIn, FixedAt: r.FixedAt,
+				Visibility:         access.Public,
+				VulnerabilityID:    vulnerabilityID,
+				ComponentID:        component.ID,
+				ConsumerID:         optional(consumerID),
+				OccurrenceIdentity: OccurrenceIdentity(component.Name, run.present.nameOf(consumerID)),
+				FixState:           r.FixState, FixedIn: r.FixedIn, FixedAt: r.FixedAt,
 				Matched: r.Matched, MatchedFrom: r.MatchedFrom,
 				MatchedIn: r.MatchedIn, MatchedRange: r.MatchedRange,
 				SuppressedBy: covering,
@@ -414,7 +414,7 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 			// upstream, and this product having been attacked says nothing
 			// about that — what it says is that the finding is not one to put
 			// below the line.
-			// A place a supplier answers on some routes is not work, so it
+			// An occurrence a supplier answers on some routes is not work, so it
 			// carries no deadline: every count of what is late then agrees
 			// about it without each having to ask.
 			if run.onTheClock && answeredBy == nil &&
@@ -435,7 +435,7 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 }
 
 // heldOpen reads what is already open that a scan governs, by component and
-// by place name.
+// by occurrence identity.
 //
 // A run is the authority on what it found, and everything it no longer
 // reports is closed — so without narrowing to what a scan opened, the first
@@ -446,10 +446,10 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 // Only the columns the difference reads. A large image holds hundreds of
 // thousands of open rows, and every one of them is read here.
 //
-// The second index is by place *name* rather than by component. A version
-// change makes a different component and therefore a different key, so the
-// two indexes disagree exactly where a version moved — which is the case worth
-// telling apart from every other kind of closure.
+// The second index is by occurrence *identity* rather than by component. A
+// version change makes a different component and therefore a different key, so
+// the two indexes disagree exactly where a version moved — which is the case
+// worth telling apart from every other kind of closure.
 func heldOpen(ctx context.Context, tx bun.IDB, targetID int64) (map[key]heldFinding,
 	map[at]heldFinding, error) {
 
@@ -464,8 +464,8 @@ func heldOpen(ctx context.Context, tx bun.IDB, targetID int64) (map[key]heldFind
 	held := make(map[key]heldFinding, len(open))
 	heldAt := make(map[at]heldFinding, len(open))
 	for _, f := range open {
-		held[key{f.VulnerabilityID, place{f.ComponentID, value(f.ConsumerID)}}] = f
-		heldAt[at{f.VulnerabilityID, f.PlaceIdentity}] = f
+		held[key{f.VulnerabilityID, occurrence{f.ComponentID, value(f.ConsumerID)}}] = f
+		heldAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = f
 	}
 	return held, heldAt, nil
 }
@@ -502,7 +502,7 @@ type applyPlan struct {
 // departure is an open finding closing because it is no longer reported.
 type departure struct {
 	f heldFinding
-	// superseded says the same issue is still wanted at the same place: the
+	// superseded says the same issue is still wanted at the same occurrence: the
 	// row is being superseded by one against a new version rather than
 	// resolved.
 	superseded bool
@@ -548,11 +548,11 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		}
 		already, open := held[k]
 		if !open {
-			// The same issue at the same place a moment ago, on a different
+			// The same issue at the same occurrence a moment ago, on a different
 			// component, means the version moved and the issue came with it.
 			// Recorded on the way in, because this is the only point where
 			// both versions are in hand.
-			if was, moved := heldAt[at{f.VulnerabilityID, f.PlaceIdentity}]; moved &&
+			if was, moved := heldAt[at{f.VulnerabilityID, f.OccurrenceIdentity}]; moved &&
 				was.ComponentID != f.ComponentID {
 				plan.movedFrom[len(plan.opening)] = was.ComponentID
 			}
@@ -597,15 +597,15 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		plan.updated++
 	}
 
-	// With the same issue still wanted at the same place, a row closing is
+	// With the same issue still wanted at the same occurrence, a row closing is
 	// being superseded by one against a new version rather than resolved.
 	wantedAt := map[at]bool{}
-	// And where what is wanted at that place is patched, the row closes as
+	// And where what is wanted at that occurrence is patched, the row closes as
 	// patched: the version moved and the issue did not come with it.
 	patchedAt := map[at]int64{}
-	// And where a supplier's statement answers what is wanted at that place on
-	// every route, the row closes as disclaimed: the version moved and the
-	// supplier says the new one is not affected.
+	// And where a supplier's statement answers what is wanted at that
+	// occurrence on every route, the row closes as disclaimed: the version
+	// moved and the supplier says the new one is not affected.
 	disclaimedAt := map[at]int64{}
 	for k, f := range want.findings {
 		// A release the record states is unaffected is not one the issue came
@@ -615,19 +615,19 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			continue
 		}
 		if statement, answered := want.disclaimed[k]; answered {
-			disclaimedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = statement
+			disclaimedAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = statement
 			continue
 		}
-		wantedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = true
+		wantedAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = true
 		if want.patched[k] {
-			patchedAt[at{f.VulnerabilityID, f.PlaceIdentity}] = *f.SuppressedBy
+			patchedAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = *f.SuppressedBy
 		}
 	}
 	for k, f := range held {
 		if _, still := want.findings[k]; still {
 			continue
 		}
-		where := at{f.VulnerabilityID, f.PlaceIdentity}
+		where := at{f.VulnerabilityID, f.OccurrenceIdentity}
 		if claimID, ok := patchedAt[where]; ok {
 			plan.patching[claimID] = append(plan.patching[claimID], f.ID)
 			continue
@@ -675,10 +675,11 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	for i, componentID := range plan.movedFrom {
 		opening[i].ArrivedFrom = upstreamOf(before[componentID])
 	}
-	// What closed before at each place something opens or arrives closed: the
-	// latest row per component and consumer, which says whether that closure
-	// is already recorded there, and the latest per place name, which says
-	// what version the place held when a patch closed it.
+	// What closed before at each occurrence something opens or arrives closed:
+	// the latest row per component and consumer, which says whether that
+	// closure is already recorded there, and the latest per occurrence
+	// identity, which says what version the occurrence held when a patch closed
+	// it.
 	var reading []int64
 	for _, f := range opening {
 		reading = append(reading, f.VulnerabilityID)
@@ -692,12 +693,12 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	if err != nil {
 		return wrote, err
 	}
-	// A place whose patch was dropped as its version moved. The patched row is
-	// closed, so the open index never sees it, and the version the place held
-	// is what the new finding arrived from.
+	// An occurrence whose patch was dropped as its version moved. The patched
+	// row is closed, so the open index never sees it, and the version the
+	// occurrence held is what the new finding arrived from.
 	patchedBefore := map[int]int64{}
 	for i, f := range opening {
-		if was, ok := latestAt[at{f.VulnerabilityID, f.PlaceIdentity}]; ok &&
+		if was, ok := latestAt[at{f.VulnerabilityID, f.OccurrenceIdentity}]; ok &&
 			f.ArrivedFrom == "" && was.ClosedBecause == Patched && was.ComponentID != f.ComponentID {
 			patchedBefore[i] = was.ComponentID
 		}
@@ -725,7 +726,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	// A finding first seen already patched is recorded, closed, so the patch
 	// is accounted for: in a release comparison against a build that lacked
 	// it, and in the document saying this build is fixed. Recorded once. Where
-	// the latest row at that place already says patched, a re-scan writes
+	// the latest row at that occurrence already says patched, a re-scan writes
 	// nothing but the claim it now stands on.
 	recorded, err := recordArrived(ctx, tx, plan.arrivedPatched, want.findings, latest, arrivedAs[int64]{
 		reason: Patched,
@@ -815,7 +816,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 		key := closure{reason, movedTo}
 		byReason[key] = append(byReason[key], d.f.ID)
 	}
-	// A supplier's answer on some routes goes with the place, wherever a row
+	// A supplier's answer on some routes goes with the occurrence, wherever a row
 	// closes for anything but a supplier's statement.
 	for key, ids := range byReason {
 		n, err := closeIDs(ctx, tx, ids, run.startedAt, run.runID, key.Reason,
@@ -890,7 +891,7 @@ type arrivedAs[By comparable] struct {
 // recordArrived records, closed, each finding first seen closed for one
 // reason, and answers how many it recorded.
 //
-// Recorded once. Where the latest row at that place already closed for the
+// Recorded once. Where the latest row at that occurrence already closed for the
 // reason, nothing is recorded, and the row is pointed at what closes it now
 // where that moved. Never open, so never due.
 func recordArrived[By comparable](ctx context.Context, tx bun.IDB, keys []key,
@@ -964,7 +965,7 @@ func closeIDs(ctx context.Context, tx bun.IDB, ids []int64, startedAt time.Time,
 }
 
 // latestClosed reads the most recent closed row of these issues, at each
-// component and consumer and at each place name.
+// component and consumer and at each occurrence identity.
 func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 	vulnerabilities []int64) (map[key]Finding, map[at]Finding, error) {
 
@@ -982,7 +983,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 	}
 	err := database.IDsInBatches(ctx, issues, func(ctx context.Context, batch []int64) error {
 		// The latest row of each grouping, by identifier, rather than every
-		// closed row ever recorded: a place whose version moves gathers a
+		// closed row ever recorded: an occurrence whose version moves gathers a
 		// closed row at every move.
 		latest := func(grouping string) *bun.SelectQuery {
 			kinds, kindArgs := kind.Closure.Where(`"lf"."kind"`)
@@ -999,7 +1000,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		kinds, kindArgs := kind.Closure.Where(`"kind"`)
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
-				"place_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
+				"occurrence_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
 			// The range again outside the two arms: a membership test under OR
 			// is never a semi-join on PostgreSQL or MySQL, so without it the
 			// read walks every finding in the deployment.
@@ -1010,22 +1011,22 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.
 					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."component_id", "lf"."consumer_id"`)).
-					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."place_identity"`))
+					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."occurrence_identity"`))
 			}).
-			// Ascending, so the last row read at a place is its latest.
+			// Ascending, so the last row read at an occurrence is its latest.
 			OrderExpr(`"id" ASC`).
 			Scan(ctx)
 		if err != nil {
 			return err
 		}
 		for _, row := range rows {
-			byKey[key{row.VulnerabilityID, place{row.ComponentID, value(row.ConsumerID)}}] = row
-			byAt[at{row.VulnerabilityID, row.PlaceIdentity}] = row
+			byKey[key{row.VulnerabilityID, occurrence{row.ComponentID, value(row.ConsumerID)}}] = row
+			byAt[at{row.VulnerabilityID, row.OccurrenceIdentity}] = row
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("read what these places last closed as: %w", err)
+		return nil, nil, fmt.Errorf("read what these occurrences last closed as: %w", err)
 	}
 	return byKey, byAt, nil
 }

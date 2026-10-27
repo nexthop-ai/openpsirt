@@ -9,11 +9,11 @@ import { here, ruleIn, SCOPE, type Kept } from "./Saved";
 // The saved filter a list is narrowed by.
 //
 // The answer decides two things: which name the dropdown shows as open, and —
-// where that one prepares a claim — which findings open with a decision form
+// where that one prepares a decision — which findings open with a decision form
 // filled in. It is read off the address rather than remembered from the act of
 // picking, because a rule that outlived the narrowing it was picked for would
 // fill a form on a finding it never drew, with somebody's name about to go on
-// the claim.
+// the decision.
 
 const kept: Kept[] = [
   { name: "overdue kernel", query: "component=linux&state=undecided" },

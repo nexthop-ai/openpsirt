@@ -49,12 +49,12 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 			t.Errorf("nothing pulls libnl-3-200 in, which cannot be true: %+v", around)
 		}
 
-		// The issues at a component, which is what a bulk claim narrows.
+		// The issues at a component, which is what a bulk decision narrows.
 		var issues struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`
 				Severity      string `json:"severity"`
-				Places        int    `json:"places"`
+				Occurrences   int    `json:"occurrences"`
 				FixedIn       string `json:"fixed_in"`
 			} `json:"items"`
 			Total int `json:"total"`
@@ -68,11 +68,11 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 		// it is, how much of the build it sits in, and whether there is
 		// anywhere to go.
 		if issues.Items[0].Severity == "" || issues.Items[0].FixedIn == "" ||
-			issues.Items[0].Places == 0 {
+			issues.Items[0].Occurrences == 0 {
 			t.Errorf("the list to choose from says nothing to choose on: %+v", issues.Items[0])
 		}
 
-		// One claim across a named set.
+		// One decision across a named set.
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/components/libnl-3-200/bulk-decision",
@@ -90,28 +90,28 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
 			t.Fatal(err)
 		}
-		// One per *place*, not one per name. A decision is keyed on a place,
-		// so a claim built from one of them would silence one consumer and
+		// One per *occurrence*, not one per name. A decision is keyed on an
+		// occurrence, so one built from one of them would silence one consumer and
 		// leave the rest open while reporting that it had covered them.
-		var places int
+		var occurrences int
 		for _, each := range issues.Items {
-			places += each.Places
+			occurrences += each.Occurrences
 		}
-		if recorded.Recorded != places {
-			t.Errorf("recorded %d decisions for %d places, want one each",
-				recorded.Recorded, places)
+		if recorded.Recorded != occurrences {
+			t.Errorf("recorded %d rows for %d occurrences, want one each",
+				recorded.Recorded, occurrences)
 		}
 
 		// And how the set was narrowed is on the record, because "how were
-		// these chosen" is the question asked of a bulk judgment later.
+		// these chosen" is the question asked of a bulk decision later.
 		var made struct {
-			Decision struct {
+			DecisionOccurrence struct {
 				SelectedBy string `json:"selected_by"`
-			} `json:"decision"`
+			} `json:"decision_occurrence"`
 		}
 		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", recorded.IDs[0]), &made)
-		if made.Decision.SelectedBy == "" {
-			t.Error("a claim recorded as one of many does not say how the set was narrowed")
+		if made.DecisionOccurrence.SelectedBy == "" {
+			t.Error("a decision recorded as one of many does not say how the set was narrowed")
 		}
 
 		// A deferral with nowhere to say until when is refused rather than
@@ -223,7 +223,7 @@ func TestASettingThatWouldReadAsUnsetIsRefused(t *testing.T) {
 
 		// The one setting that is a count rather than a duration is checked as
 		// a count. A duration there would be stored and then ignored.
-		cap := "/v1/settings/triage.together-cap"
+		cap := "/v1/settings/triage.bulk-decision-cap"
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, cap,
 			`{"value":"48h"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a duration was accepted as a count: %d %s", got.Code, got.Body.String())

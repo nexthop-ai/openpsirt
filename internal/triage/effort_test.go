@@ -12,8 +12,8 @@ import (
 )
 
 func TestWhereTheWorkWentNamesOnlyComponentsItsReaderMayRead(t *testing.T) {
-	// A place is a pair of names with no product in it. The component a
-	// judgment is counted under is read off the findings in its own product
+	// An occurrence is a pair of names with no product in it. The component a
+	// decision is counted under is read off the findings in its own product
 	// that the reader may read, never off the same pair in another product
 	// or a finding undisclosed to them.
 	each(t, func(t *testing.T, f *fixture) {
@@ -24,7 +24,7 @@ func TestWhereTheWorkWentNamesOnlyComponentsItsReaderMayRead(t *testing.T) {
 			"place-a", access.Private)
 		f.finds(t, f.build(t, f.secondProduct(t), "theirs"), f.component(t, "libtheirs", "2.0.0"),
 			"place-a", access.Public)
-		f.proposes(t, f.triager, f.placeIn(f.product, "place-a", access.Public))
+		f.proposes(t, f.triager, f.occurrenceIn(f.product, "place-a", access.Public))
 
 		spent, _, err := f.store.Effort(ctx, f.reviewer, triage.Measuring{},
 			time.Time{}, time.Now().UTC().Add(time.Hour), 50, 0)
@@ -36,7 +36,7 @@ func TestWhereTheWorkWentNamesOnlyComponentsItsReaderMayRead(t *testing.T) {
 			named[row.Component] = true
 		}
 		if !named["libfoo"] {
-			t.Errorf("the component the judgment is about is not named: %v", named)
+			t.Errorf("the component the decision is about is not named: %v", named)
 		}
 		for _, hidden := range []string{"libhidden", "libtheirs"} {
 			if named[hidden] {

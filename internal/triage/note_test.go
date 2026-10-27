@@ -15,10 +15,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-func TestANoteIsWrittenWithoutRecordingAJudgment(t *testing.T) {
-	// The whole of what a note is for. A comment hangs off a claim and the box
-	// for one appears only where a claim already exists, so the first person
-	// to say anything had to record a judgment in order to say it.
+func TestANoteIsWrittenWithoutRecordingADecision(t *testing.T) {
+	// The whole of what a note is for. A comment hangs off a decision and the box
+	// for one appears only where a decision already exists, so the first person
+	// to say anything had to record a decision in order to say it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.sits(t, access.Public)
@@ -33,7 +33,7 @@ func TestANoteIsWrittenWithoutRecordingAJudgment(t *testing.T) {
 		}
 		// And nothing was decided by writing it.
 		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
-			t.Error("writing a note recorded a judgment")
+			t.Error("writing a note recorded a decision")
 		}
 	})
 }
@@ -120,11 +120,11 @@ func TestReadingAnIssueHereDoesNotCarryWritingANoteHere(t *testing.T) {
 	})
 }
 
-func TestAnUndisclosedPlaceMakesTheWholeThreadUndisclosed(t *testing.T) {
-	// One undisclosed place among several makes the issue undisclosed for
+func TestAnUndisclosedOccurrenceMakesTheWholeThreadUndisclosed(t *testing.T) {
+	// One undisclosed occurrence among several makes the issue undisclosed for
 	// anybody deciding what may be said, which is the rule the finding screen
 	// already holds to. A note is one thread for the issue, so it cannot be
-	// public for some of its places and private for others — and the safe
+	// public for some of its occurrences and private for others — and the safe
 	// direction is the stricter one.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -135,7 +135,7 @@ func TestAnUndisclosedPlaceMakesTheWholeThreadUndisclosed(t *testing.T) {
 		// The fixture's triager holds public triage only.
 		if _, err := f.store.NoteOn(ctx, f.triager, f.product, f.issue,
 			"Something about the embargoed half."); !errors.Is(err, access.ErrDenied) {
-			t.Errorf("public triage wrote a note on an issue with an undisclosed place: %v", err)
+			t.Errorf("public triage wrote a note on an issue with an undisclosed occurrence: %v", err)
 		}
 		keeper := f.granted(t, "keeper", f.product, access.PrivateTriage)
 		if _, err := f.store.NoteOn(ctx, keeper, f.product, f.issue,
@@ -144,7 +144,7 @@ func TestAnUndisclosedPlaceMakesTheWholeThreadUndisclosed(t *testing.T) {
 		}
 		if _, err := f.store.Notes(ctx, f.onlooker, f.product, f.issue); !errors.Is(err, triage.ErrNoSuchNote) {
 			t.Errorf("a public reader was shown the thread on an issue with an undisclosed "+
-				"place: %v", err)
+				"occurrence: %v", err)
 		}
 	})
 }
@@ -209,7 +209,7 @@ func TestWhatANoteSaidBeforeIsKept(t *testing.T) {
 	})
 }
 
-// sits opens the fixture's issue at one place in one build of its product, so
+// sits opens the fixture's issue at one occurrence in one build of its product, so
 // that there is something for a note to be about.
 func (f *fixture) sits(t *testing.T, visibility access.Visibility) {
 	t.Helper()
@@ -301,7 +301,7 @@ func TestSomebodyBroughtOntoACaseReachesItsNotes(t *testing.T) {
 	})
 }
 
-// anotherIssue interns a second issue and opens it at a place in the fixture's
+// anotherIssue interns a second issue and opens it at an occurrence in the fixture's
 // product, so a case grant has something it does not cover to be refused on.
 func (f *fixture) anotherIssue(t *testing.T, identifier string) int64 {
 	t.Helper()
@@ -317,8 +317,8 @@ func (f *fixture) anotherIssue(t *testing.T, identifier string) int64 {
 	row := &finding.Finding{
 		TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: id,
 		Visibility: access.Public, ComponentID: f.component(t, "libbaz", "1.0"),
-		PlaceIdentity: "place-of-libbaz",
-		OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
+		OccurrenceIdentity: "place-of-libbaz",
+		OpenedAt:           time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatal(err)

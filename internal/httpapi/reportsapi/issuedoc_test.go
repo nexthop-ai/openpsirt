@@ -13,45 +13,45 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/reportsapi"
 )
 
-func TestTheIssueDocumentCountsOnlyTheJudgmentsInForceAsStanding(t *testing.T) {
-	// A withdrawn judgment is on the record and stands nowhere, so the
+func TestTheIssueDocumentCountsOnlyTheDecisionsInForceAsStanding(t *testing.T) {
+	// A withdrawn decision is on the record and stands nowhere, so the
 	// sentence over a page of the record counts it as recorded and not as
 	// standing. Lowering the page size changes it for the whole package, so
 	// this test runs alone.
-	defer reportsapi.JudgmentsShown(1)()
+	defer reportsapi.DecisionsShown(1)()
 	httpapitest.ReachOn(t, httpapitest.CastSeed.Alone, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
-		taken, _ := r.DecidedAt(t, place)
-		if _, err := r.DB.DB.NewUpdate().Table("decision").
+		occurrence := r.Scanned(t)
+		taken, _ := r.DecidedAt(t, occurrence)
+		if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"state" = ?`, "withdrawn").Set(`"live_key" = NULL`).
 			Set(`"ended_at" = ?`, time.Now().UTC()).
 			Where(`"id" = ?`, taken).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		_, claim := r.DecidedAt(t, place)
-		r.Agreed(t, claim)
+		_, decision := r.DecidedAt(t, occurrence)
+		r.Agreed(t, decision)
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
 			"/v1/issues/CVE-2026-9999/document", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("the document answered %d: %s", got.Code, got.Body.String())
 		}
-		want := "1 judgment stands, of 2 judgments recorded. The most recent is below."
+		want := "A decision stands at 1 occurrence, of 2 decided occurrences recorded. The most recent is below."
 		if !strings.Contains(got.Body.String(), want) {
 			t.Errorf("the document does not say %q:\n%s", want, got.Body.String())
 		}
 	})
 }
 
-// Each place in the issue document says where the judgment there stands: one
-// that lapsed when the code moved no longer stands, and one nobody judged
-// says nobody has.
-func TestTheIssueDocumentSaysWhereEachPlacesJudgmentStands(t *testing.T) {
+// Each occurrence in the issue document says where the decision there
+// stands: one that lapsed when the code moved no longer stands, and one nobody
+// decided says nobody has.
+func TestTheIssueDocumentSaysWhereEachOccurrencesDecisionStands(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		r.AgreedThenLapsed(t)
 		for issue, want := range map[string]string{
-			"CVE-2026-CURL1": "— the judgment here no longer stands",
+			"CVE-2026-CURL1": "— the decision here no longer stands",
 			"CVE-2026-CURL2": "— nobody has said",
 		} {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,

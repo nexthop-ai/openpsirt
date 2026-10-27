@@ -12,14 +12,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// A commitment a claim argued for is moved only by that claim. A second claim
-// promising a different version for the same package in the same build is
-// refused, naming the claim that stands, and the standing commitment is left
-// as it was; the claim that made it may still revise it.
+// A commitment a decision argued for is moved only by that decision. A second
+// decision promising a different version for the same package in the same build
+// is refused, naming the decision that stands, and the standing commitment is
+// left as it was; the decision that made it may still revise it.
 //
-// Verified by deleting the second-claim refusal in movedTo: the second claim
-// then rewrites the version and takes over the commitment.
-func TestASecondClaimDoesNotMoveACommitmentAnotherClaimMade(t *testing.T) {
+// Verified by deleting the second-decision refusal in movedTo: the second
+// decision then rewrites the version and takes over the commitment.
+func TestASecondDecisionDoesNotMoveACommitmentAnotherDecisionMade(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -28,9 +28,9 @@ func TestASecondClaimDoesNotMoveACommitmentAnotherClaimMade(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.planner(t, access.PublicTriage)
-		commit := func(to string, claim int64) error {
+		commit := func(to string, decision int64) error {
 			_, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
-				to, nil, &claim, []int64{f.target}, nil)
+				to, nil, &decision, []int64{f.target}, nil)
 			return err
 		}
 		standing := func() finding.Upgrade {
@@ -48,28 +48,28 @@ func TestASecondClaimDoesNotMoveACommitmentAnotherClaimMade(t *testing.T) {
 		}
 
 		err = commit("3.10.0", second)
-		if err == nil || !strings.Contains(err.Error(), "under claim 101") {
-			t.Errorf("a second claim moving the commitment got %v, want the standing claim named", err)
+		if err == nil || !strings.Contains(err.Error(), "under decision 101") {
+			t.Errorf("a second decision moving the commitment got %v, want the standing decision named", err)
 		}
-		if row := standing(); row.ToVersion != "3.9.0" || row.ClaimID == nil || *row.ClaimID != first {
-			t.Errorf("after the refusal the commitment is to %s under claim %v, want 3.9.0 under %d",
-				row.ToVersion, row.ClaimID, first)
+		if row := standing(); row.ToVersion != "3.9.0" || row.DecisionID == nil || *row.DecisionID != first {
+			t.Errorf("after the refusal the commitment is to %s under decision %v, want 3.9.0 under %d",
+				row.ToVersion, row.DecisionID, first)
 		}
 
 		if err := commit("3.10.0", first); err != nil {
-			t.Fatalf("the claim that made the commitment revising it: %v", err)
+			t.Fatalf("the decision that made the commitment revising it: %v", err)
 		}
 		if row := standing(); row.ToVersion != "3.10.0" {
-			t.Errorf("a revision by the claim that made it left the version at %s", row.ToVersion)
+			t.Errorf("a revision by the decision that made it left the version at %s", row.ToVersion)
 		}
 	})
 }
 
-// A second claim promising a bump of the same package for another build
-// leaves the first claim's commitment where it is: only the claim that made
-// a commitment withdraws it. The same promise stated again by a second claim
+// A second decision promising a bump of the same package for another build
+// leaves the first decision's commitment where it is: only the decision that made
+// a commitment withdraws it. The same promise stated again by a second decision
 // is refused.
-func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
+func TestASecondDecisionKeepsTheCommitmentsAnotherDecisionMade(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -79,9 +79,9 @@ func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
 		}
 		other := f.anotherBranch(t, "release-2")
 		who := f.planner(t, access.PublicTriage)
-		commit := func(to string, claim int64, builds ...int64) error {
+		commit := func(to string, decision int64, builds ...int64) error {
 			_, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
-				to, nil, &claim, builds, nil)
+				to, nil, &decision, builds, nil)
 			return err
 		}
 		owner := func(target int64) *int64 {
@@ -93,7 +93,7 @@ func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
 			if len(rows) == 0 {
 				return nil
 			}
-			return rows[0].ClaimID
+			return rows[0].DecisionID
 		}
 
 		const first, second = int64(101), int64(202)
@@ -101,31 +101,31 @@ func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
 			t.Fatalf("the first commitment: %v", err)
 		}
 		if err := commit("3.9.0", second, other); err != nil {
-			t.Fatalf("the second claim's commitment: %v", err)
+			t.Fatalf("the second decision's commitment: %v", err)
 		}
 		if got := owner(f.target); got == nil || *got != first {
-			t.Errorf("the first claim's commitment is now held by %v, want claim %d", got, first)
+			t.Errorf("the first decision's commitment is now held by %v, want decision %d", got, first)
 		}
 		if got := owner(other); got == nil || *got != second {
-			t.Errorf("the second build's commitment is held by %v, want claim %d", got, second)
+			t.Errorf("the second build's commitment is held by %v, want decision %d", got, second)
 		}
 
-		// The same promise stated again by a second claim is refused: its
-		// decisions would rest on a date only the first claim moves.
+		// The same promise stated again by a second decision is refused: its
+		// occurrences would rest on a date only the first decision moves.
 		if err := commit("3.9.0", second, f.target, other); err == nil {
-			t.Error("a second claim restated a commitment another claim made, and was accepted")
+			t.Error("a second decision restated a commitment another decision made, and was accepted")
 		}
 		if got := owner(f.target); got == nil || *got != first {
-			t.Errorf("restating the promise moved the commitment to %v, want claim %d", got, first)
+			t.Errorf("restating the promise moved the commitment to %v, want decision %d", got, first)
 		}
 
-		// The claim that made a commitment still withdraws it by narrowing.
+		// The decision that made a commitment still withdraws it by narrowing.
 		third := f.anotherBranch(t, "release-3")
 		if err := commit("3.9.0", second, third); err != nil {
 			t.Fatal(err)
 		}
 		if got := owner(other); got != nil {
-			t.Errorf("the second claim narrowed its builds and its commitment is held by %v", got)
+			t.Errorf("the second decision narrowed its builds and its commitment is held by %v", got)
 		}
 	})
 }

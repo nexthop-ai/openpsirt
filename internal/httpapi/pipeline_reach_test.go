@@ -29,7 +29,7 @@ import (
 // The build holds an analyzer run and the lead it opened, so the receipts a
 // key reads back carry a run. A receipt counts results and names none: the
 // key reads how many the run opened, and never the file, the message, the
-// rule's finding or the place a lead is addressed by. Verified by naming the
+// rule's finding or the occurrence a lead is addressed by. Verified by naming the
 // lead's file in the receipt's failure field, which fails on the file.
 func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	// What a sender may read, and what each answers here: the build's

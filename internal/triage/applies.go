@@ -17,11 +17,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// Applying returns the decision standing against a place, if one is.
+// Applying returns the decision standing against an occurrence, if one is.
 //
-// Expiry happens here and is not a mechanism. A decision was stored under the
-// versions it was a claim about; a place asks under the versions it has now.
-// With a version moved the two keys stop matching and the decision simply does
+// Expiry happens here and is not a mechanism. A decision's row was stored under the
+// versions it was made about; an occurrence asks under the versions it has now.
+// With a version moved the two keys stop matching and the row simply does
 // not come back — nothing sweeps, nothing expires on a timer, and there is no
 // second rule that could disagree with the first.
 //
@@ -36,22 +36,22 @@ import (
 // patch is our own change to our own build, and it would be a poor trade to
 // re-ask every question every night in order to catch the few that a patch
 // made stale. What compensates is that a decision's age is shown wherever it
-// appears, so an old judgment looks like one.
+// appears, so an old decision looks like one.
 // It takes no subject, unlike everything else read here, because the question
 // is not a person's: it is whether this finding is suppressed, asked while
 // recording what a scan found and while listing findings for anybody at all.
-// The answer does not vary by who is asking. Every path that reaches a place
+// The answer does not vary by who is asking. Every path that reaches an occurrence
 // resolved it through a lookup that carried a subject, so nothing gets here
 // without the finding itself having been authorized.
-func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
-	decision := new(Decision)
+func (s *Store) Applying(ctx context.Context, at Occurrence) (*DecisionOccurrence, error) {
+	occurrence := new(DecisionOccurrence)
 	standing, held := finding.InForce()
 	// With its argument: what suppresses a finding is the outcome, and a
 	// deferral stops standing on a date that is held there too.
-	query := s.db.NewSelect().Model(decision).Relation("Claim").
+	query := s.db.NewSelect().Model(occurrence).Relation("Decision").
 		Where(`"de"."product_id" = ?`, at.ProductID).
-		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
-		Where(`"de"."place_identity" = ?`, at.PlaceIdentity).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), at.VulnerabilityID).
+		Where(`"de"."occurrence_identity" = ?`, at.OccurrenceIdentity).
 		// Approved, or proposed and never needing agreement, and not one
 		// that was sent back — asked of the one spelling rather than written
 		// out here. A copy of it here is a copy the next rule can miss, and
@@ -60,25 +60,25 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 		// and the count of what stands on one signature.
 		Where(standing, held...)
 
-	// The versions, except where the claim is that the match itself is wrong:
-	// that one covers the place at whatever it now holds, because the
+	// The versions, except where the decision is that the match itself is wrong:
+	// that one covers the occurrence at whatever it now holds, because the
 	// versions are not what it is about. Grouped, so the two halves are one
 	// condition rather than two that a later clause could come between.
 	query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.WhereOr(`"claim"."outcome" = ?`, Mismatched).
+		return q.WhereOr(`"decision"."outcome" = ?`, Mismatched).
 			WhereGroup(" OR ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				q = matchVersion(q, `"de"."component_upstream_version"`, at.ComponentUpstream)
 				return matchVersion(q, `"de"."consumer_upstream_version"`, at.ConsumerUpstream)
 			})
 	})
 
-	// An agreed claim outranks a waiting one, and a claim that the match is
-	// wrong outranks both: a judgment about risk at a place the match does not
-	// describe is a judgment about something that is not there. Ordering by
-	// identifier alone let a newer unapproved claim shadow an approved one,
+	// An agreed decision outranks a waiting one, and a decision that the match is
+	// wrong outranks both: a decision about risk at an occurrence the match does not
+	// describe is a decision about something that is not there. Ordering by
+	// identifier alone let a newer unapproved decision shadow an approved one,
 	// which is a way for one person to overturn a decision two people made.
 	if err := query.OrderExpr(
-		`CASE WHEN "claim"."outcome" = ? THEN 0 ELSE 1 END, `+
+		`CASE WHEN "decision"."outcome" = ? THEN 0 ELSE 1 END, `+
 			`CASE WHEN "de"."state" = ? THEN 0 ELSE 1 END, "de"."id" DESC`, Mismatched, Approved).
 		Limit(1).Scan(ctx); err != nil {
 		// No decision standing is an answer. Anything else is a fault, and
@@ -94,34 +94,34 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	// A deferral says "not now, ask again on this date". Once the date has
 	// passed it stops standing, and the finding is back in the queue — flagged
 	// as something that was deferred rather than as something new, which the
-	// kept decision is what says.
-	if decision.Claim.Outcome == Deferred && decision.Claim.DeferredUntil != nil {
-		if !s.now().Before(*decision.Claim.DeferredUntil) {
+	// kept row is what says.
+	if occurrence.Decision.Outcome == Deferred && occurrence.Decision.DeferredUntil != nil {
+		if !s.now().Before(*occurrence.Decision.DeferredUntil) {
 			return nil, nil
 		}
 	}
-	return decision, nil
+	return occurrence, nil
 }
 
-// PreviouslyAt returns decisions once made about a place, whatever versions
+// PreviouslyAt returns the rows once made about an occurrence, whatever versions
 // they were made against.
 //
 // The structural half of the key on its own. When a version moves and a
-// decision stops applying, somebody has to make the judgment again — and
+// decision stops applying, somebody has to make the decision again — and
 // making them start from a blank page, having thrown away the reasoning that
 // was written the last time, is how a tool teaches people to stop writing
 // reasoning at all.
 //
-// So what comes back is history rather than an answer: the claim that used to
+// So what comes back is history rather than an answer: the decision that used to
 // stand, and the versions it was about. Whether it still holds is the
 // question being put, not something this decides.
-func (s *Store) PreviouslyAt(ctx context.Context, subject access.Subject, at Place) ([]Decision, error) {
-	var previous []Decision
+func (s *Store) PreviouslyAt(ctx context.Context, subject access.Subject, at Occurrence) ([]DecisionOccurrence, error) {
+	var previous []DecisionOccurrence
 	// With the argument each row applied, which is what is offered back.
-	if err := readableBy(s.db.NewSelect().Model(&previous).Relation("Claim"), subject, "de").
+	if err := readableBy(s.db.NewSelect().Model(&previous).Relation("Decision"), subject, "de").
 		Where(`"de"."product_id" = ?`, at.ProductID).
-		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
-		Where(`"de"."place_identity" = ?`, at.PlaceIdentity).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), at.VulnerabilityID).
+		Where(`"de"."occurrence_identity" = ?`, at.OccurrenceIdentity).
 		Order("de.id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided here before: %w", err)
 	}
@@ -144,32 +144,32 @@ func matchVersion(query *bun.SelectQuery, column, stated string) *bun.SelectQuer
 	return query.Where(column+" = ?", trimmed)
 }
 
-// Revisions returns the reasoning behind a claim, oldest first.
+// Revisions returns the reasoning behind a decision, oldest first.
 //
 // All of it. An approval names one revision, so reading only the current one
 // leaves somebody unable to see what was actually agreed to.
-func (s *Store) Revisions(ctx context.Context, subject access.Subject, claimID int64) ([]Revision, error) {
-	if _, _, err := s.readableClaimRows(ctx, subject, claimID); err != nil {
+func (s *Store) Revisions(ctx context.Context, subject access.Subject, decisionID int64) ([]Revision, error) {
+	if _, _, err := s.readableDecisionRows(ctx, subject, decisionID); err != nil {
 		return nil, err
 	}
 	var revisions []Revision
 	if err := s.db.NewSelect().Model(&revisions).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, decisionID).
 		Order("ordinal ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the reasoning: %w", err)
 	}
 	return revisions, nil
 }
 
-// Approvals returns who agreed to a claim and to which words, including
+// Approvals returns who agreed to a decision and to which words, including
 // agreements later taken back.
-func (s *Store) Approvals(ctx context.Context, subject access.Subject, claimID int64) ([]Approval, error) {
-	if _, _, err := s.readableClaimRows(ctx, subject, claimID); err != nil {
+func (s *Store) Approvals(ctx context.Context, subject access.Subject, decisionID int64) ([]Approval, error) {
+	if _, _, err := s.readableDecisionRows(ctx, subject, decisionID); err != nil {
 		return nil, err
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, decisionID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who agreed: %w", err)
 	}
@@ -180,46 +180,46 @@ func (s *Store) Approvals(ctx context.Context, subject access.Subject, claimID i
 //
 // Shown wherever a decision appears. It is the compensating control for expiry
 // being inert against a producer that patches rather than bumps: an eight-year
-// -old judgment should look like one rather than reading the same as
+// -old decision should look like one rather than reading the same as
 // yesterday's.
-func (s *Store) Age(decision *Decision) time.Duration {
-	return s.now().Sub(decision.ProposedAt)
+func (s *Store) Age(occurrence *DecisionOccurrence) time.Duration {
+	return s.now().Sub(occurrence.ProposedAt)
 }
 
-// Read returns one decision with the reasoning it currently rests on.
+// Read returns one decision occurrence with the reasoning it currently rests on.
 //
 // Everything a decision endpoint accepts has a matching way to read the
 // result. A tool that lets somebody argue, agree and annotate, and then offers
 // no way to see what any of it produced, sends every reader to the review
 // queue — which by definition no longer holds what was agreed to.
-func (s *Store) Read(ctx context.Context, subject access.Subject, decisionID int64) (*Decision, string, error) {
-	decision, err := s.reaching(ctx, subject, decisionID, readable, onCases)
+func (s *Store) Read(ctx context.Context, subject access.Subject, occurrenceID int64) (*DecisionOccurrence, string, error) {
+	occurrence, err := s.reaching(ctx, subject, occurrenceID, readable, onCases)
 	if err != nil {
 		return nil, "", err
 	}
-	reasoning, err := s.currentReasoning(ctx, []Decision{*decision})
+	reasoning, err := s.currentReasoning(ctx, []DecisionOccurrence{*occurrence})
 	if err != nil {
 		return nil, "", err
 	}
-	if err := s.withholdPartReasoning(ctx, subject, []Decision{*decision}, reasoning); err != nil {
+	if err := s.withholdPartReasoning(ctx, subject, []DecisionOccurrence{*occurrence}, reasoning); err != nil {
 		return nil, "", err
 	}
-	return decision, reasoning[decision.ID], nil
+	return occurrence, reasoning[occurrence.ID], nil
 }
 
-// ReadClaim reads a claim and the rows it covers, for somebody who may read
+// ReadDecision reads a decision and the rows it covers, for somebody who may read
 // every one of them.
 //
-// A claim is one argument, so it is refused whole or answered whole: shown
+// A decision is one argument, so it is refused whole or answered whole: shown
 // half, a reader would be told about words whose other half is about a finding
 // they may not see.
-func (s *Store) ReadClaim(ctx context.Context, subject access.Subject,
-	claimID int64) (*Claim, []Decision, error) {
+func (s *Store) ReadDecision(ctx context.Context, subject access.Subject,
+	decisionID int64) (*Decision, []DecisionOccurrence, error) {
 
-	return s.readableClaimRows(ctx, subject, claimID)
+	return s.readableDecisionRows(ctx, subject, decisionID)
 }
 
-// Filter narrows a list of decisions to what somebody is looking for.
+// Filter narrows a list of decision occurrences to what somebody is looking for.
 //
 // An empty field is not a filter. Nobody asking about deferrals wants to be
 // told which states exist first.
@@ -248,7 +248,7 @@ type Filter struct {
 	// that asks this asked both and added them, and said eleven over a list of
 	// ten.
 	Stopped bool
-	// Alone limits to judgments no second person has a standing agreement
+	// Alone limits to decisions no second person has a standing agreement
 	// on.
 	//
 	// The exception report an auditor asks for, and the one expected to come
@@ -265,13 +265,13 @@ type Filter struct {
 	// why asking it tests the two-person rule rather than reading an
 	// assertion somebody made about it.
 	Alone bool
-	// InForce limits to judgments that apply now: agreed to, or standing
-	// without needing agreement, and still holding the place they were made
+	// InForce limits to decisions that apply now: agreed to, or standing
+	// without needing agreement, and still holding the occurrence they were made
 	// about.
 	//
-	// The state filter beside it asks something else. A judgment is approved
+	// The state filter beside it asks something else. A decision is approved
 	// and still lapses when the code moves out from under it, so a list of
-	// approved judgments is a list of what was once agreed rather than of
+	// approved decisions is a list of what was once agreed rather than of
 	// what stands — which is the question asked of the corrections in force,
 	// where the whole point is that nothing expires them.
 	InForce bool
@@ -279,34 +279,34 @@ type Filter struct {
 	// identity. Approver matches an agreement that still stands.
 	Proposer string
 	Approver string
-	// Issue and Component name what the judgment was about.
+	// Issue and Component name what the decision was about.
 	Issue     string
 	Component string
-	// TargetID keeps judgments about places one build holds.
+	// TargetID keeps decisions about occurrences one build holds.
 	//
 	// A decision names no build, deliberately — it is keyed on the
-	// product, the issue and the place, so that it carries across the
+	// product, the issue and the occurrence, so that it carries across the
 	// releases that share the code. What a release sign-off asks is the other
-	// question: which of these judgments is about something this build
-	// actually ships. Reached through the findings at the place, the way the
+	// question: which of these decisions is about something this build
+	// actually ships. Reached through the findings at the occurrence, the way the
 	// component filter beside it is.
 	TargetID int64
 }
 
-// List returns decisions matching a filter, newest first, with how many there
+// List returns decision occurrences matching a filter, newest first, with how many there
 // are behind the page.
 //
 // Newest first because the question this answers is almost always about recent
-// judgment: what have we dismissed, what did we defer, what is coming back.
+// decision: what have we dismissed, what did we defer, what is coming back.
 // Oldest-first would put the page nobody wants at the front of every request.
 func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
-	limit, offset int) ([]Decision, map[int64]string, int, error) {
+	limit, offset int) ([]DecisionOccurrence, map[int64]string, int, error) {
 
-	// The outcome and the date are the claim's, so what narrows on them asks
-	// the claim. An EXISTS rather than a join, so that counting the page and
+	// The outcome and the date are the decision's, so what narrows on them asks
+	// the decision. An EXISTS rather than a join, so that counting the page and
 	// reading it narrow identically without one of them multiplying rows.
 	saying := func(q *bun.SelectQuery, clause string, values ...any) *bun.SelectQuery {
-		return q.Where(`EXISTS (SELECT 1 FROM "claim" AS "fc" WHERE "fc"."id" = "de"."claim_id" AND `+
+		return q.Where(`EXISTS (SELECT 1 FROM "decision" AS "fc" WHERE "fc"."id" = "de"."decision_id" AND `+
 			clause+`)`, values...)
 	}
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -324,29 +324,29 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 			q = saying(q, `"fc"."deferred_until" IS NOT NULL AND "fc"."deferred_until" <= ?`, s.now())
 		}
 		if f.Stopped {
-			// The claims whose date has passed, as a set the rows are tested
-			// against, rather than a lookup of each row's claim. Asked per row
-			// beside the OR, PostgreSQL probes the claim once for every
-			// decision in the product: 170 ms to count 133,000 decisions,
+			// The decisions whose date has passed, as a set the rows are tested
+			// against, rather than a lookup of each row's decision. Asked per row
+			// beside the OR, PostgreSQL probes the decision once for every
+			// row in the product: 170 ms to count 133,000 rows,
 			// against 22 ms with the set built once.
-			q = q.Where(`("de"."state" = ? OR "de"."claim_id" IN (SELECT "fc"."id" FROM "claim" AS "fc" `+
+			q = q.Where(`("de"."state" = ? OR "de"."decision_id" IN (SELECT "fc"."id" FROM "decision" AS "fc" `+
 				`WHERE "fc"."deferred_until" IS NOT NULL AND "fc"."deferred_until" <= ?))`,
 				LapsedState, s.now())
 		}
-		// The judgment's subject, through the one spelling the record's
+		// The decision's subject, through the one spelling the record's
 		// own page uses. Stated in the filter and applied by only one of the
 		// two readers, a caller that set any of the three got the whole
 		// unnarrowed list back with no complaint.
-		return aboutTheSamePlaces(q, subject, f)
+		return aboutTheSameOccurrences(q, subject, f)
 	}
 
-	total, err := narrow(s.db.NewSelect().Model((*Decision)(nil))).Count(ctx)
+	total, err := narrow(s.db.NewSelect().Model((*DecisionOccurrence)(nil))).Count(ctx)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("count what was decided: %w", err)
 	}
 
-	var decisions []Decision
-	if err := narrow(s.db.NewSelect().Model(&decisions)).Relation("Claim").
+	var occurrences []DecisionOccurrence
+	if err := narrow(s.db.NewSelect().Model(&occurrences)).Relation("Decision").
 		Order("de.id DESC").Limit(int64(limit)).Offset(int64(offset)).Scan(ctx); err != nil {
 		return nil, nil, 0, fmt.Errorf("read what was decided: %w", err)
 	}
@@ -354,12 +354,12 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 	// The reasoning comes with the row, for the same reason the review queue
 	// carries it: a list where seeing why means opening each entry is a list
 	// nobody reads before acting on.
-	reasoning, err := s.currentReasoning(ctx, decisions)
+	reasoning, err := s.currentReasoning(ctx, occurrences)
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	if err := s.withholdPartReasoning(ctx, subject, decisions, reasoning); err != nil {
+	if err := s.withholdPartReasoning(ctx, subject, occurrences, reasoning); err != nil {
 		return nil, nil, 0, err
 	}
-	return decisions, reasoning, int(total), nil
+	return occurrences, reasoning, int(total), nil
 }

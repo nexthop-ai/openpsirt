@@ -79,14 +79,14 @@ func TestASavedFilterIsPersonalAndReplacesItsOwnName(t *testing.T) {
 	})
 }
 
-// A rule prepares a claim; a person proposes it.
+// A rule prepares a decision; a person proposes it.
 //
-// The wider form — a rule proposing its own pending claim — was refused
+// The wider form — a rule proposing its own pending decision — was refused
 // because it leaves the approver as the only human judgment on it. What is
 // kept here is a prefill, and what has to hold is that it is a prefill: it
 // carries the words somebody will put their name to, and it never proposes
 // anything by itself.
-func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
+func TestASavedFilterCanPrepareADecisionAndNeverProposesOne(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 
@@ -130,7 +130,7 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 			"prepares":{"outcome":"not-applicable",
 			"justification":"vulnerable_code_not_present",
 			"reasoning":"The driver is not built for this image."}}`); code != http.StatusNoContent {
-			t.Fatalf("keeping a filter that prepares a claim answered %d: %s", code, said)
+			t.Fatalf("keeping a filter that prepares a decision answered %d: %s", code, said)
 		}
 		kept := mine(t)
 		if len(kept) != 1 || kept[0].Prepares == nil {
@@ -141,7 +141,7 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 			t.Errorf("it prepares %+v", kept[0].Prepares)
 		}
 
-		// It proposes nothing by itself. Keeping it left no claim behind:
+		// It proposes nothing by itself. Keeping it left no decision behind:
 		// a person submits it, which is the whole of why the narrow form was
 		// chosen over a rule that files its own.
 		var queue struct {
@@ -149,7 +149,7 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "reviewer", "/v1/review-queue", &queue)
 		if queue.Total != 0 {
-			t.Errorf("saving a filter that prepares a claim proposed %d of them", queue.Total)
+			t.Errorf("saving a filter that prepares a decision proposed %d of them", queue.Total)
 		}
 
 		// Saving over the name without a prefill takes the prefill off. The

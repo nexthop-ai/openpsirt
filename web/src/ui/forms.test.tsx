@@ -30,7 +30,7 @@ const out = (days: number) => {
 describe("what the decision form says about a second person", () => {
   const classes = classesOf(PUBLISHED);
 
-  it("counts what the place was already put off for", () => {
+  it("counts what the occurrence was already put off for", () => {
     expect(forecast("deferred", classes, 30, out(10))).toContain("stands on its own");
     expect(forecast("deferred", classes, 30, out(10), 25)).toContain(
       "a second person has to agree",
@@ -69,12 +69,12 @@ describe("what the decision form says about a second person", () => {
     expect(forecast("affected", classes, 30, "")).toBe("No approval needed. Goes to remediation.");
   });
 
-  it("says nothing before the server has said what each outcome claims", () => {
+  it("says nothing before the server has said what each outcome says", () => {
     expect(forecast("not-applicable", classesOf(undefined), 30, "")).toBe("");
   });
 });
 
-describe("revising a claim's reasoning", () => {
+describe("revising a decision's reasoning", () => {
   beforeEach(() => {
     window.localStorage.clear();
     belongTo("oidc:ana");
@@ -110,11 +110,15 @@ describe("words pasted into a filter", () => {
 });
 
 describe("the consumers a decision covers", () => {
-  const at = (place: string, consumer: string) => ({ place, component: "linux", consumer });
+  const at = (occurrence: string, consumer: string) => ({
+    occurrence,
+    component: "linux",
+    consumer,
+  });
 
-  it("counts consumers rather than places", () => {
-    const places = [at("a", "kmod"), at("b", "kmod"), at("c", "initrd")] as Sitting[];
-    expect(consumersOf(places)).toBe(2);
+  it("counts consumers rather than occurrences", () => {
+    const occurrences = [at("a", "kmod"), at("b", "kmod"), at("c", "initrd")] as Sitting[];
+    expect(consumersOf(occurrences)).toBe(2);
   });
 });
 
@@ -200,7 +204,7 @@ describe("carrying decisions from another line", () => {
       }
       return {
         data: {
-          moved: [{ decision_id: 5, vulnerability: "CVE-2026-1" }],
+          moved: [{ decision_occurrence: 5, vulnerability: "CVE-2026-1" }],
           postponed: [],
           applying: 0,
           absent: 0,

@@ -18,7 +18,7 @@ import (
 )
 
 // Superseded tells a product's triagers that a merge of two issues met two
-// judgments in the product that disagreed, and kept one of them.
+// decisions in the product that disagreed, and kept one of them.
 //
 // Returned as a function for the reason Lapses is: the scanner records what a
 // report said, and how anybody hears about it is wired in by the deployment.
@@ -28,29 +28,29 @@ func Superseded(db *bun.DB, logger *slog.Logger) func(context.Context, []finding
 			return
 		}
 		if err := tellSuperseded(ctx, db, gone); err != nil && logger != nil {
-			logger.Error("could not say that a merge superseded a judgment", "error", err)
+			logger.Error("could not say that a merge superseded a decision", "error", err)
 		}
 	}
 }
 
-// supersededAbout is what a telling names about one displaced judgment.
+// supersededAbout is what a telling names about one displaced decision.
 type supersededAbout struct {
 	Product  string `bun:"product"`
 	IssueID  int64  `bun:"issue_id"`
 	Absorbed string `bun:"absorbed"`
 	Kept     string `bun:"kept"`
 	// Private is whether the telling is withheld and held to private triage:
-	// whether a decision is at any visibility but public, or for a judgment
+	// whether a decision occurrence is at any visibility but public, or for a decision
 	// about the whole issue in a product, whether no finding of it there is
 	// disclosed.
 	Private bool `bun:"private"`
 }
 
-// supersededSaid is how a telling words each kind of judgment.
+// supersededSaid is how a telling words each kind of decision.
 var supersededSaid = map[finding.DisplacedKind]string{
-	finding.DisplacedDecision: "two decisions in %s disagreed about one place",
-	finding.DisplacedRating:   "two ratings of it in %s disagreed",
-	finding.DisplacedAttack:   "two records of %s being attacked through it gave different dates",
+	finding.DisplacedDecisionOccurrence: "two decisions in %s disagreed about one occurrence",
+	finding.DisplacedRating:             "two ratings of it in %s disagreed",
+	finding.DisplacedAttack:             "two records of %s being attacked through it gave different dates",
 }
 
 func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) error {
@@ -62,7 +62,7 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 	for _, one := range gone {
 		said, known := supersededSaid[one.Kind]
 		if !known {
-			failed = errors.Join(failed, fmt.Errorf("a merge displaced a judgment of unknown kind %q", one.Kind))
+			failed = errors.Join(failed, fmt.Errorf("a merge displaced a decision of unknown kind %q", one.Kind))
 			continue
 		}
 		q := db.NewSelect().
@@ -75,11 +75,11 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			ColumnExpr(`"va"."identifier" AS "absorbed"`).
 			ColumnExpr(`"vk"."identifier" AS "kept"`).
 			Where(`"p"."id" = ?`, one.ProductID)
-		if one.Kind == finding.DisplacedDecision {
+		if one.Kind == finding.DisplacedDecisionOccurrence {
 			// Withheld where either decision is: the one that stands is what
 			// the link opens, and the one that lapsed is what the message
 			// is about.
-			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de" `+
+			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "decision_occurrence" AS "de" `+
 				`WHERE "de"."id" IN (?, ?) AND "de"."visibility" <> ?) THEN 1 ELSE 0 END AS "private"`,
 				one.RecordID, one.StandingID, string(access.Public))
 		} else {
@@ -96,8 +96,8 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			failed = errors.Join(failed, fmt.Errorf("read what a merge superseded: %w", err))
 			continue
 		}
-		link := weblink.Decision(one.StandingID)
-		if one.Kind != finding.DisplacedDecision {
+		link := weblink.DecisionOccurrence(one.StandingID)
+		if one.Kind != finding.DisplacedDecisionOccurrence {
 			link = weblink.Issue(about.Kept)
 		}
 		body := fmt.Sprintf("%s merged into %s, and "+said+". The one with more standing "+

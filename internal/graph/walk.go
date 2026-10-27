@@ -92,11 +92,11 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // from the screen beside it thereafter, which is a screen quoting yesterday's
 // answer with nothing saying so.
 //
-// Distinct issues, not finding rows. A finding is one issue at one place, and
-// a library at thirty-six places with two issues is seventy-two rows — which
+// Distinct issues, not finding rows. A finding is one issue at one occurrence, and
+// a library at thirty-six occurrences with two issues is seventy-two rows — which
 // is what a parent reads if it counts findings, where somebody who drilled
-// down one path is looking at one place and expects two. The issues open
-// against a component are the same at every place it sits, so counting them
+// down one path is looking at one occurrence and expects two. The issues open
+// against a component are the same at every occurrence it sits at, so counting them
 // once per component answers per path without a walk per path. And counted
 // over distinct components, not summed along edges: a library reached by
 // twenty containers is one thing inside each of them.
@@ -174,7 +174,7 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 		return nil, fmt.Errorf("walk beneath each component: %w", err)
 	}
 
-	// The places are grouped to one row per issue on a component before the
+	// The occurrences are grouped to one row per issue on a component before the
 	// rating is joined, and only on the components the walk reaches.
 	var open []struct {
 		ComponentID     int64  `bun:"component_id"`
@@ -406,7 +406,7 @@ func (r region) above(starts []int64) []int64 {
 // root, the root itself left out.
 //
 // What places a supplier's statement on a finding: a statement about what sits
-// inside a product is evidence where the product is above the place, and
+// inside a product is evidence where the product is above the occurrence, and
 // nowhere else. Read through the same walk the chains are, to the same bound.
 func (s *Store) Above(ctx context.Context, subject access.Subject, targetID,
 	componentID int64) ([]Component, error) {

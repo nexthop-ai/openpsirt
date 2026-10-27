@@ -373,7 +373,7 @@ func ruleIn(ctx context.Context, tx bun.IDB, productID, ruleID int64) (*leadRule
 }
 
 // coverage is the open leads each of the rules names in the product that the
-// subject may read, counted by place, whether or not the rule is approved.
+// subject may read, counted by occurrence, whether or not the rule is approved.
 func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
 	ids []int64) (map[int64]int, error) {
 
@@ -392,7 +392,7 @@ func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		Join(`JOIN "target" AS "t" ON "t"."stream_id" = "s"."id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."target_id" = "t"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		ColumnExpr(`"lr"."id", COUNT(DISTINCT "f"."place_identity") AS "leads"`).
+		ColumnExpr(`"lr"."id", COUNT(DISTINCT "f"."occurrence_identity") AS "leads"`).
 		Where(`"lr"."product_id" = ?`, productID).
 		Where(`"lr"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).

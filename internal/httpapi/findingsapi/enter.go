@@ -38,8 +38,8 @@ type EmbargoedBody struct {
 	// Passed says the date has arrived. It is a date to answer rather than a
 	// trigger, so this is a row somebody has to act on rather than a record of
 	// something that happened.
-	Passed bool `json:"passed" doc:"Whether the date has already arrived"`
-	Places int  `json:"places" doc:"The number of findings this covers, across every build listed"`
+	Passed      bool `json:"passed" doc:"Whether the date has already arrived"`
+	Occurrences int  `json:"occurrences" doc:"The number of findings this covers, across every build listed"`
 }
 
 // EmbargoedBuildBody is one build an embargoed issue sits in.
@@ -59,11 +59,11 @@ type EnteredBody struct {
 	Visibility core.Visibility `json:"visibility" doc:"Whether it has been disclosed"`
 	DueAt      string          `json:"due_at,omitempty" doc:"The date it has to be answered by"`
 	Builds     int             `json:"builds" doc:"The number of builds it was recorded against"`
-	// Places is how many findings that made. A component can sit in more than
-	// one place in a build, and a finding is a component at a place, so a
-	// flaw recorded against one build can open several — which is what a
-	// scanned finding of the same flaw at the same component would open.
-	Places int `json:"places" doc:"The number of findings that opened. One per place the component sits in, in each build"`
+	// Occurrences is how many findings that made. A component can have more
+	// than one occurrence in a build, and a finding is a component at an
+	// occurrence, so a flaw recorded against one build can open several —
+	// which is what a scanned finding of the same flaw at the same component would open.
+	Occurrences int `json:"occurrences" doc:"The number of findings that opened. One per occurrence of the component in each build"`
 }
 
 // FlawFields is what a recorded flaw says of itself, wherever one is recorded.
@@ -120,7 +120,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			Builds []struct {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
 				Variant string `json:"variant" minLength:"1" doc:"The way that line is built"`
-			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take"`
+			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take"`
 			FlawFields
 			Component string `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Version   string `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
@@ -186,7 +186,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			Status int
 			Body   EnteredBody
 		}{Status: http.StatusCreated}
-		// Builds and places are different numbers: one flaw at a component
+		// Builds and occurrences are different numbers: one flaw at a component
 		// that two things pull in is two findings in one build.
 		builds := map[int64]bool{}
 		for _, row := range rows {
@@ -195,7 +195,7 @@ func registerEntry(api huma.API, in core.Deps) {
 		out.Body = EnteredBody{
 			Identifier: identifier, Component: component,
 			Visibility: core.Visibility(rows[0].Visibility),
-			Builds:     len(builds), Places: len(rows),
+			Builds:     len(builds), Occurrences: len(rows),
 		}
 		// Every row got the same one, because they are the same flaw.
 		if rows[0].DueAt != nil {
@@ -226,7 +226,7 @@ func refusedFlaw(in core.Deps, err error) error {
 		return huma.Error404NotFound(finding.ErrNothingScanned.Error())
 	case errors.Is(err, finding.ErrNoBuild), errors.Is(err, finding.ErrSeveralProducts):
 		return core.Asked(in.Logger, err)
-	case errors.Is(err, finding.ErrTooManyPlaces):
+	case errors.Is(err, finding.ErrTooManyOccurrences):
 		// The caller's to narrow, and the sentence says by how much.
 		return core.Asked(in.Logger, err)
 	case errors.Is(err, finding.ErrToldTwice):
@@ -394,7 +394,7 @@ func registerDisclosure(api huma.API, in core.Deps) {
 				Product: row.Product, ProductName: row.ProductName,
 				Components: components, Builds: builds, Severity: row.Severity,
 				DiscloseAt: core.Stamp(row.DiscloseAt), Passed: row.Passed(now),
-				Places: row.Places,
+				Occurrences: row.Occurrences,
 			})
 		}
 		return out, nil
@@ -724,7 +724,7 @@ func registerMovements(api huma.API, in core.Deps) {
 	})
 }
 
-// toldDisclosed tells whoever holds a place of an issue that it is public
+// toldDisclosed tells whoever holds an occurrence of an issue that it is public
 // now, apart from the person who made it so.
 //
 // After the write rather than inside it. A notice that could not be written
@@ -921,7 +921,7 @@ func registerAffects(api huma.API, in core.Deps) {
 				return nil, core.SeveralComponents(several, "version, and ecosystem where two share one")
 			case errors.Is(err, finding.ErrNotOursToSay),
 				errors.Is(err, finding.ErrNoReason),
-				errors.Is(err, finding.ErrTooManyPlaces),
+				errors.Is(err, finding.ErrTooManyOccurrences),
 				errors.Is(err, finding.ErrNoBuild),
 				errors.Is(err, finding.ErrSeveralProducts):
 				return nil, core.Asked(in.Logger, err)

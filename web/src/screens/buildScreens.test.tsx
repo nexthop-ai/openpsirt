@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Decision } from "./Decision";
+import { DecisionOccurrence } from "./DecisionOccurrence";
 import { InventoryChanges } from "./InventoryChanges";
 import { Run } from "./Run";
 import { Upgrades } from "./Upgrades";
@@ -17,19 +17,23 @@ const text = () => mount.host().textContent ?? "";
 const BUILD = "/products/sonic/streams/master/variants/arm";
 const BUILT = "/products/:product/streams/:stream/variants/:variant";
 
-describe("a decision's address", () => {
-  it("forwards to the claim the decision belongs to", async () => {
-    serve(() => ({ data: { decision: { claim_id: 41 } } }));
-    mount.render(screen(<Decision />, "/decisions/9", "/decisions/:id"));
+describe("an occurrence row's address", () => {
+  it("forwards to the decision the row belongs to", async () => {
+    serve(() => ({ data: { decision_occurrence: { decision_id: 41 } } }));
+    mount.render(
+      screen(<DecisionOccurrence />, "/decision-occurrences/9", "/decision-occurrences/:id"),
+    );
     await settle();
-    expect(location()).toBe("/claims/41");
+    expect(location()).toBe("/decisions/41");
   });
 
-  it("says a decision naming no claim does, rather than forwarding nowhere", async () => {
-    serve(() => ({ data: { decision: {} } }));
-    mount.render(screen(<Decision />, "/decisions/9", "/decisions/:id"));
+  it("says an address naming no decision does, rather than forwarding nowhere", async () => {
+    serve(() => ({ data: { decision_occurrence: {} } }));
+    mount.render(
+      screen(<DecisionOccurrence />, "/decision-occurrences/9", "/decision-occurrences/:id"),
+    );
     await settle();
-    expect(text()).toContain("That decision names no claim.");
+    expect(text()).toContain("That address names no decision.");
   });
 });
 
@@ -77,7 +81,14 @@ describe("the upgrades a build is waiting on", () => {
       data: {
         items: [
           { fold: "a", upstream: "zlib", to: "1.3", state: "landed", issues: 2 },
-          { fold: "b", upstream: "openssl", to: "3.0.9", state: "planned", issues: 1, claim_id: 5 },
+          {
+            fold: "b",
+            upstream: "openssl",
+            to: "3.0.9",
+            state: "planned",
+            issues: 1,
+            decision_id: 5,
+          },
           { fold: "c", upstream: "curl", to: "8.6", state: "lapsed", issues: 4, held_by: "bo" },
         ],
       },

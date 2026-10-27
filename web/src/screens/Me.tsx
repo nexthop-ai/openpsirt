@@ -79,7 +79,7 @@ export function Me() {
                         {where.may_hide && chip("Argues about private findings")}
                         {where.triages_internal && chip("Argues about internal findings")}
                         {where.may_assign && chip("Hands work to others")}
-                        {where.may_agree && chip("Agrees to somebody else's claim")}
+                        {where.may_agree && chip("Agrees to somebody else's decision")}
                       </span>
                     </td>
                   </tr>

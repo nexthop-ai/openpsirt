@@ -36,7 +36,7 @@ const row = (product: string) => ({
   severity: "high",
   disclose_at: "2027-01-01T00:00:00Z",
   passed: false,
-  places: 2,
+  occurrences: 2,
 });
 
 describe("the disclosing screen", () => {

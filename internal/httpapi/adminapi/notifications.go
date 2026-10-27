@@ -184,7 +184,7 @@ func registerChatChoices(api huma.API, in core.Deps) {
 		Description: "Turns direct messages on or off, and says whether what a chat channel " +
 			"carries is sent to you directly as well.\n\n" +
 			"Direct messages are on until turned off. They carry what is your own — work " +
-			"assigned to you, a note naming you, a claim sent back — and what is about a " +
+			"assigned to you, a note naming you, a decision sent back — and what is about a " +
 			"product or a team where no channel carries it. `shared` sends you what the " +
 			"channels carry as well, for somebody who does not sit in them; it is off until " +
 			"asked for, and asking for it without `direct` is refused.\n\n" +

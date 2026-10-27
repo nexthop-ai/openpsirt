@@ -87,11 +87,11 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "rule_family_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
 		)` + t.suffix,
 
-		// A confirmed lead recorded as a flaw, by its place in a product.
+		// A confirmed lead recorded as a flaw, by its occurrence in a product.
 		`CREATE TABLE "lead_handoff" (
 			"id"               ` + t.id + `,
 			"product_id"       ` + t.ref + ` NOT NULL,
-			"place_identity"   ` + t.hash + ` NOT NULL,
+			"occurrence_identity" ` + t.hash + ` NOT NULL,
 			-- The flaw it was recorded as.
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
 			-- The visibility the lead's findings hold: internal while its
@@ -112,7 +112,7 @@ func leadV0110(t *columnTypes) []string {
 			-- read the hand-off before the run and writes it after finds the
 			-- value changed, and reads again.
 			"last_run_id"      ` + t.refNull + `,
-			CONSTRAINT "lead_handoff_place_unique" UNIQUE ("product_id", "place_identity"),
+			CONSTRAINT "lead_handoff_occurrence_unique" UNIQUE ("product_id", "occurrence_identity"),
 			CONSTRAINT "lead_handoff_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "lead_handoff_flaw_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "lead_handoff_by_fk" FOREIGN KEY ("handed_by") REFERENCES "person"("id"),
@@ -128,7 +128,7 @@ func leadV0110(t *columnTypes) []string {
 			"product_id"          ` + t.ref + ` NOT NULL,
 			"vulnerability_id"    ` + t.ref + ` NOT NULL,
 			-- The place of the lead the hand-off was made at.
-			"place_identity"      ` + t.hash + ` NOT NULL,
+			"occurrence_identity" ` + t.hash + ` NOT NULL,
 			-- The component the offer ranked first, which the person may
 			-- have turned down. Null where it was the build itself.
 			"suggested_component" ` + t.free + ` NULL,
@@ -147,7 +147,7 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "flaw_lead_by_fk" FOREIGN KEY ("handed_by") REFERENCES "person"("id"),
 			CONSTRAINT "flaw_lead_undone_by_fk" FOREIGN KEY ("undone_by") REFERENCES "person"("id")
 		)` + t.suffix,
-		`CREATE INDEX "flaw_lead_place_idx" ON "flaw_lead" ("product_id", "place_identity")`,
+		`CREATE INDEX "flaw_lead_occurrence_idx" ON "flaw_lead" ("product_id", "occurrence_identity")`,
 
 		// One build of the set a hand-off proposed the flaw against.
 		`CREATE TABLE "flaw_lead_build" (
@@ -189,7 +189,7 @@ func leadV0110(t *columnTypes) []string {
 		`CREATE TABLE "lead_collaborator" (
 			"id"             ` + t.id + `,
 			"product_id"     ` + t.ref + ` NOT NULL,
-			"place_identity" ` + t.hash + ` NOT NULL,
+			"occurrence_identity" ` + t.hash + ` NOT NULL,
 			"person_id"      ` + t.ref + ` NOT NULL,
 			"added_by"       ` + t.ref + ` NOT NULL,
 			"added_at"       ` + t.timestamp + ` NOT NULL,
@@ -198,7 +198,7 @@ func leadV0110(t *columnTypes) []string {
 			-- The person again while the grant stands, null once it is
 			-- withdrawn: one live grant per person per lead.
 			"live_person_id" ` + t.refNull + `,
-			CONSTRAINT "lead_collaborator_live_unique" UNIQUE ("product_id", "place_identity", "live_person_id"),
+			CONSTRAINT "lead_collaborator_live_unique" UNIQUE ("product_id", "occurrence_identity", "live_person_id"),
 			CONSTRAINT "lead_collaborator_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "lead_collaborator_person_fk" FOREIGN KEY ("person_id") REFERENCES "person"("id"),
 			CONSTRAINT "lead_collaborator_added_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id"),

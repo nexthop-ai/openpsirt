@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// AgreedBody is one person agreeing to one judgment, and when.
+// AgreedBody is one person agreeing to one decision, and when.
 type AgreedBody struct {
 	By string `json:"by" doc:"Their sign-in identity"`
 	At string `json:"at" doc:"The moment they agreed"`
@@ -23,22 +23,22 @@ type AgreedBody struct {
 	// agreement out: an agreement somebody made and then took back is what an
 	// audit is looking for.
 	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"The moment the agreement was taken back, by the approver or by somebody editing the words it was given for"`
-	// Carried says this agreement was given for an earlier claim and carried
+	// Carried says this agreement was given for an earlier decision and carried
 	// onto this one, which is what a re-affirmation stands on. The person
 	// named read those words rather than these.
-	Carried bool `json:"carried,omitempty" doc:"Whether this agreement was carried forward from an earlier claim rather than given for this one"`
+	Carried bool `json:"carried,omitempty" doc:"Whether this agreement was carried forward from an earlier decision rather than given for this one"`
 }
 
-// JudgedBody is one judgment as an auditor reads it.
-type JudgedBody struct {
-	ID      int64  `json:"id"`
-	ClaimID int64  `json:"claim_id" doc:"The claim this decision belongs to. Every decision one act wrote shares it"`
-	Issue   string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
-	Product string `json:"product" doc:"The product, by the name that addresses it"`
+// AuditedBody is one decision at one occurrence, as an auditor reads it.
+type AuditedBody struct {
+	ID         int64  `json:"id"`
+	DecisionID int64  `json:"decision_id" doc:"The decision this occurrence belongs to. Every occurrence one act covered shares it"`
+	Issue      string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
+	Product    string `json:"product" doc:"The product, by the name that addresses it"`
 
 	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	// Component is the judgment's subject. Named from a finding at the place,
-	// in any state — a judgment about something since fixed or removed is
+	// Component is the decision's subject. Named from a finding at the
+	// occurrence, in any state — a decision about something since fixed or removed is
 	// exactly what an audit asks for, so it is named rather than left
 	// blank.
 	Component string `json:"component"`
@@ -47,15 +47,15 @@ type JudgedBody struct {
 
 	Outcome       core.Outcome        `json:"outcome"`
 	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a judgment about a lead, which states no justification"`
+	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a decision about a lead, which states no justification"`
 	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
-	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the claim holds for, where the claim stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides"`
+	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the decision holds for, where the decision stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides"`
 	DeferredUntil string              `json:"deferred_until,omitempty"`
-	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record"`
-	Reasoning     string              `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers"`
+	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the decision says the fix arrived in, where it says one has. What somebody auditing an already-fixed decision checks against the packager's own record"`
+	Reasoning     string              `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the occurrences the decision covers"`
 
-	State    core.ClaimState `json:"state"`
-	Standing bool            `json:"standing" doc:"Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it"`
+	State    core.DecisionState `json:"state"`
+	Standing bool               `json:"standing" doc:"Whether it applies now. A decision can be approved and no longer standing — the code moved out from under it"`
 
 	ProposedBy string       `json:"proposed_by"`
 	ProposedAt string       `json:"proposed_at"`
@@ -68,7 +68,7 @@ type JudgedBody struct {
 	TwoPeople bool `json:"two_people" doc:"Whether somebody other than the proposer has a standing agreement on it"`
 }
 
-// StatesBody is how many decisions are in each state.
+// StatesBody is how many occurrences are in each state.
 type StatesBody struct {
 	Proposed  int `json:"proposed"`
 	Approved  int `json:"approved"`
@@ -76,35 +76,35 @@ type StatesBody struct {
 	Lapsed    int `json:"lapsed"`
 }
 
-// JudgedClaimBody is one claim as the record lists it. Every count is of the
-// decisions the filters matched and the caller may read.
-type JudgedClaimBody struct {
-	Claim int64 `json:"claim" doc:"The claim's identifier"`
+// AuditedDecisionBody is one decision as the record lists it. Every count is
+// of the occurrences the filters matched and the caller may read.
+type AuditedDecisionBody struct {
+	Decision int64 `json:"decision" doc:"The decision's identifier"`
 
-	Issue       string `json:"issue" doc:"The vulnerability the earliest matching decision is about, under the name it is filed here"`
-	Issues      int    `json:"issues" doc:"How many vulnerabilities the matching decisions are about"`
-	Product     string `json:"product" doc:"The product of the earliest matching decision, by the name that addresses it"`
+	Issue       string `json:"issue" doc:"The vulnerability the earliest matching occurrence is about, under the name it is filed here"`
+	Issues      int    `json:"issues" doc:"How many vulnerabilities the matching occurrences are about"`
+	Product     string `json:"product" doc:"The product of the earliest matching occurrence, by the name that addresses it"`
 	ProductName string `json:"product_name,omitempty" doc:"That product's display name, or its name where it has none"`
-	Products    int    `json:"products" doc:"How many products the matching decisions are in"`
-	Component   string `json:"component" doc:"The component the earliest matching decision is about"`
+	Products    int    `json:"products" doc:"How many products the matching occurrences are in"`
+	Component   string `json:"component" doc:"The component the earliest matching occurrence is about"`
 	Version     string `json:"version,omitempty"`
 	Consumer    string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
-	Components  int    `json:"components" doc:"How many component names sit at the matching places, counted through the findings you may read"`
-	Decisions   int    `json:"decisions" doc:"How many decisions match"`
-	Places      int    `json:"places" doc:"How many places the matching decisions are at"`
+	Components  int    `json:"components" doc:"How many component names sit at the matching occurrences, counted through the findings you may read"`
+	Rows        int    `json:"rows" doc:"How many of its occurrences match, counted once for each issue"`
+	Occurrences int    `json:"occurrences" doc:"How many distinct occurrences match"`
 
 	Outcome       core.Outcome        `json:"outcome"`
 	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a claim about a lead, which states no justification"`
+	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a decision about a lead, which states no justification"`
 	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply"`
-	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the claim holds for, where the claim stated it. Absent where the reason decides"`
+	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the decision holds for, where the decision stated it. Absent where the reason decides"`
 	DeferredUntil string              `json:"deferred_until,omitempty"`
-	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in"`
-	Reasoning     string              `json:"reasoning" doc:"The words the claim currently rests on. Editing them withdraws every agreement"`
+	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the decision says the fix arrived in"`
+	Reasoning     string              `json:"reasoning" doc:"The words the decision currently rests on. Editing them withdraws every agreement"`
 
-	State    core.ClaimStates `json:"state" doc:"The state the matching decisions share, or mixed where they differ"`
-	States   StatesBody       `json:"states" doc:"How many matching decisions are in each state"`
-	Standing int              `json:"standing" doc:"How many matching decisions apply now"`
+	State    core.DecisionStates `json:"state" doc:"The state the matching occurrences share, or mixed where they differ"`
+	States   StatesBody          `json:"states" doc:"How many matching occurrences are in each state"`
+	Standing int                 `json:"standing" doc:"How many matching occurrences the decision applies at now"`
 
 	ProposedBy string       `json:"proposed_by"`
 	ProposedAt string       `json:"proposed_at"`
@@ -122,22 +122,22 @@ type Auditing struct {
 	// Repeatable, because "dismissed or deferred" and "waiting or sent back"
 	// are the questions somebody reading the record has, and one value cannot
 	// ask either. Repeat the parameter; any of what is named matches.
-	Product   []string          `query:"product,explode" maxItems:"200" maxLength:"191" doc:"Limit to these products, by name. Repeatable; any of them matches"`
-	Outcome   []core.Outcome    `query:"outcome,explode" uniqueItems:"true" doc:"Limit to these kinds of judgment. Repeatable; any of them matches"`
-	State     []core.ClaimState `query:"state,explode" uniqueItems:"true" doc:"Limit to these states. Repeatable; any of them matches"`
-	From      string            `query:"from" doc:"Only judgments proposed on or after this date, as YYYY-MM-DD"`
-	To        string            `query:"to" doc:"Only judgments proposed before this date, as YYYY-MM-DD"`
-	Alone     bool              `query:"alone" doc:"Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing"`
-	InForce   bool              `query:"in_force" doc:"Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to"`
-	Proposer  string            `query:"proposed_by" doc:"Only judgments this person proposed, by sign-in identity"`
-	Approver  string            `query:"approved_by" doc:"Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match"`
-	Issue     string            `query:"issue" doc:"Only judgments about this vulnerability, under the name it is filed here"`
-	Component string            `query:"component" doc:"Only judgments about this component, by name"`
+	Product   []string             `query:"product,explode" maxItems:"200" maxLength:"191" doc:"Limit to these products, by name. Repeatable; any of them matches"`
+	Outcome   []core.Outcome       `query:"outcome,explode" uniqueItems:"true" doc:"Limit to these kinds of decision. Repeatable; any of them matches"`
+	State     []core.DecisionState `query:"state,explode" uniqueItems:"true" doc:"Limit to these states. Repeatable; any of them matches"`
+	From      string               `query:"from" doc:"Only decisions proposed on or after this date, as YYYY-MM-DD"`
+	To        string               `query:"to" doc:"Only decisions proposed before this date, as YYYY-MM-DD"`
+	Alone     bool                 `query:"alone" doc:"Only decisions no second person has a standing agreement on. Asked of a dismissal this should answer nothing"`
+	InForce   bool                 `query:"in_force" doc:"Only decisions that apply now: agreed to, or standing without needing agreement, and still holding the occurrence they were made about. A decision can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to"`
+	Proposer  string               `query:"proposed_by" doc:"Only decisions this person proposed, by sign-in identity"`
+	Approver  string               `query:"approved_by" doc:"Only decisions this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match"`
+	Issue     string               `query:"issue" doc:"Only decisions about this vulnerability, under the name it is filed here"`
+	Component string               `query:"component" doc:"Only decisions about this component, by name"`
 	// A build, for the question a release sign-off asks. A decision names no
-	// build — it is keyed on the product, the issue and the place, so that it
-	// carries across releases sharing the code — so this asks which judgments
-	// are about something one build actually ships.
-	Stream  string `query:"stream" doc:"Only judgments about places this branch or tag holds. Needs exactly one product and a variant"`
+	// build — it is keyed on the product, the issue and the occurrence, so
+	// that it carries across releases sharing the code — so this asks which
+	// decisions are about something one build actually ships.
+	Stream  string `query:"stream" doc:"Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant"`
 	Variant string `query:"variant" doc:"The build of that stream. Needs exactly one product and a stream"`
 }
 
@@ -220,20 +220,20 @@ func (a Auditing) narrow(ctx context.Context, in core.Deps,
 }
 
 func registerAudit(api huma.API, in core.Deps) {
-	registerAuditClaims(api, in)
+	registerAuditDecisions(api, in)
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-audit", Method: http.MethodGet, Path: "/v1/audit",
 		Summary: "List decisions with who made them and who agreed",
-		Description: "Every judgment recorded in a period, newest first, with what it was " +
+		Description: "Every decision recorded in a period, once for each occurrence it covers, newest first, with what it was " +
 			"about, the reasoning it rests on, who proposed it and when, and who agreed and " +
 			"when — including agreements later taken back.\n\n" +
-			"The period is the date a judgment was proposed, not approved: a judgment " +
+			"The period is the date a decision was proposed, not approved: a decision " +
 			"belongs to when it was argued, and dating it by its agreement would move it out " +
 			"of that period whenever an approval came late, which is the ordinary case.\n\n" +
 			"Narrowed by what you may see, like every other list here. Nothing about this view " +
 			"is exempt from the visibility rules — a report showing more than the screens it " +
 			"summarizes would be a way around them.\n\n" +
-			"`alone=true` returns judgments no second person has a standing agreement on. " +
+			"`alone=true` returns decisions no second person has a standing agreement on. " +
 			"That population is large and legitimate on its own — an outcome that hides " +
 			"nothing needs no second person, and a short deferral stands alone — so ask it " +
 			"with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, " +
@@ -247,7 +247,7 @@ func registerAudit(api huma.API, in core.Deps) {
 		Auditing
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset int `query:"offset" minimum:"0"`
-	}) (*core.CountedListOutput[JudgedBody], error) {
+	}) (*core.CountedListOutput[AuditedBody], error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -261,92 +261,93 @@ func registerAudit(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the record could not be read", err)
 		}
-		out := &core.CountedListOutput[JudgedBody]{}
-		out.Body.Items = make([]JudgedBody, 0, len(rows))
+		out := &core.CountedListOutput[AuditedBody]{}
+		out.Body.Items = make([]AuditedBody, 0, len(rows))
 		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, judgedBody(row))
+			out.Body.Items = append(out.Body.Items, auditedBody(row))
 		}
 		out.Body.Total = total
 		return out, nil
 	})
 }
 
-// judgedBody is one judgment as an auditor reads it.
-func judgedBody(row triage.Judged) JudgedBody {
-	body := JudgedBody{
-		ID: row.ID, ClaimID: row.ClaimID, Issue: row.Issue, Product: row.Product,
+// auditedBody is one decision at one occurrence, as an auditor reads it.
+func auditedBody(row triage.AuditedOccurrence) AuditedBody {
+	body := AuditedBody{
+		ID: row.ID, DecisionID: row.DecisionID, Issue: row.Issue, Product: row.Product,
 		ProductName: row.ProductName,
 		Component:   row.Component, Version: row.Version, Consumer: row.Consumer,
-		Outcome: core.Outcome(row.Claim.Outcome), Reasoning: row.Reasoning,
-		State: core.ClaimState(row.State), Standing: row.Standing(),
+		Outcome: core.Outcome(row.Decision.Outcome), Reasoning: row.Reasoning,
+		State: core.DecisionState(row.State), Standing: row.Standing(),
 		ProposedBy: row.ProposedByName, ProposedAt: core.Stamp(row.ProposedAt),
 		TwoPeople: row.BySomebodyElse(),
 		Approvals: agreedBodies(row.Approvals),
 	}
-	body.Justification, body.Reason, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(row.Claim)
-	body.Scope = statedScope(row.Claim)
+	body.Justification, body.Reason, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(row.Decision)
+	body.Scope = statedScope(row.Decision)
 	if row.EndedAt != nil {
 		body.EndedAt = core.Stamp(*row.EndedAt)
 	}
 	return body
 }
 
-// argued is what a claim says beyond its outcome, as the record writes it. A
-// claim about a lead holds its reason where a vulnerability's claim holds its
-// justification, and the two are drawn from different vocabularies.
-func argued(claim *triage.Claim) (justification core.Justification, reason core.LeadReason,
+// argued is what a decision says beyond its outcome, as the record writes it.
+// A decision about a lead holds its reason where a vulnerability's decision
+// holds its justification, and the two are drawn from different vocabularies.
+func argued(decision *triage.Decision) (justification core.Justification, reason core.LeadReason,
 	mitigation, deferred, fixed string) {
-	if claim == nil {
+	if decision == nil {
 		return "", "", "", "", ""
 	}
-	if claim.Justification != nil {
-		if claim.Outcome.AboutALead() {
-			reason = core.LeadReason(*claim.Justification)
+	if decision.Justification != nil {
+		if decision.Outcome.AboutALead() {
+			reason = core.LeadReason(*decision.Justification)
 		} else {
-			justification = core.Justification(*claim.Justification)
+			justification = core.Justification(*decision.Justification)
 		}
 	}
-	if claim.Mitigation != nil {
-		mitigation = *claim.Mitigation
+	if decision.Mitigation != nil {
+		mitigation = *decision.Mitigation
 	}
-	if claim.DeferredUntil != nil {
-		deferred = claim.DeferredUntil.UTC().Format(time.DateOnly)
+	if decision.DeferredUntil != nil {
+		deferred = decision.DeferredUntil.UTC().Format(time.DateOnly)
 	}
-	if claim.FixedVersion != nil {
-		fixed = *claim.FixedVersion
+	if decision.FixedVersion != nil {
+		fixed = *decision.FixedVersion
 	}
 	return justification, reason, mitigation, deferred, fixed
 }
 
-// statedScope is whom a claim says its published statement holds for, where it
-// says. A claim that widened a public statement is one an auditor looks for.
-func statedScope(claim *triage.Claim) core.StatementScope {
-	if claim == nil || claim.Scope == nil {
+// statedScope is whom a decision says its published statement holds for,
+// where it says. A decision that widened a public statement is one an auditor
+// looks for.
+func statedScope(decision *triage.Decision) core.StatementScope {
+	if decision == nil || decision.Scope == nil {
 		return ""
 	}
-	return core.StatementScope(*claim.Scope)
+	return core.StatementScope(*decision.Scope)
 }
 
-func registerAuditClaims(api huma.API, in core.Deps) {
+func registerAuditDecisions(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-audit-claims", Method: http.MethodGet, Path: "/v1/audit/decisions",
+		OperationID: "list-audit-decisions", Method: http.MethodGet, Path: "/v1/audit/decisions",
 		Summary: "List the audit log by decision",
-		Description: "The record one claim at a time, newest first: every claim with a decision " +
-			"the filters match, once, however many places it covers.\n\n" +
-			"Takes every filter the per-decision record takes, with the same meaning. A claim is " +
-			"listed where any of its decisions match, and every count on it is of the decisions " +
-			"that match and that you may read. Asked for `state=lapsed`, a claim with one " +
-			"lapsed decision of forty reads as one decision, lapsed. `total` counts claims.\n\n" +
-			"What the claim is about is named from its earliest matching decision, beside how " +
-			"many issues, products, components and places the matching decisions reach.\n\n" +
-			"Each decision on its own is `GET /v1/audit`, and the file is one row per decision " +
-			"with the claim it belongs to.",
+		Description: "The record one decision at a time, newest first: every decision with an " +
+			"occurrence the filters match, once, however many occurrences it covers.\n\n" +
+			"Takes every filter the per-occurrence record takes, with the same meaning. A decision is " +
+			"listed where any of its occurrences match, and every count on it is of the occurrences " +
+			"that match and that you may read. Asked for `state=lapsed`, a decision that lapsed " +
+			"at one occurrence of forty reads as one occurrence, lapsed. `total` counts decisions.\n\n" +
+			"What the decision is about is named from its earliest matching occurrence, beside how " +
+			"many issues, products, components and occurrences the matches reach.\n\n" +
+			"Each occurrence on its own is `GET /v1/audit`, and the file is one row per occurrence " +
+			"with the decision it belongs to.",
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Auditing
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
-	}) (*core.CountedListOutput[JudgedClaimBody], error) {
+	}) (*core.CountedListOutput[AuditedDecisionBody], error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -355,29 +356,29 @@ func registerAuditClaims(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		rows, total, err := store.AuditClaims(ctx, subject, filter, since, until, input.Limit, input.Offset)
+		rows, total, err := store.AuditDecisions(ctx, subject, filter, since, until, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the record could not be read", err)
 		}
-		out := &core.CountedListOutput[JudgedClaimBody]{}
-		out.Body.Items = make([]JudgedClaimBody, 0, len(rows))
+		out := &core.CountedListOutput[AuditedDecisionBody]{}
+		out.Body.Items = make([]AuditedDecisionBody, 0, len(rows))
 		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, judgedClaimBody(row))
+			out.Body.Items = append(out.Body.Items, auditedDecisionBody(row))
 		}
 		out.Body.Total = total
 		return out, nil
 	})
 }
 
-// judgedClaimBody is one claim as the record lists it.
-func judgedClaimBody(row triage.JudgedClaim) JudgedClaimBody {
-	body := JudgedClaimBody{
-		Claim: row.Claim.ID, Issue: row.Issue, Issues: row.Issues,
+// auditedDecisionBody is one decision as the record lists it.
+func auditedDecisionBody(row triage.AuditedDecision) AuditedDecisionBody {
+	body := AuditedDecisionBody{
+		Decision: row.Decision.ID, Issue: row.Issue, Issues: row.Issues,
 		Product: row.Product, ProductName: row.ProductName, Products: row.Products,
 		Component: row.Component, Version: row.Version, Consumer: row.Consumer,
-		Components: row.Components, Decisions: row.Decisions, Places: row.Places,
-		Outcome: core.Outcome(row.Claim.Outcome), Reasoning: row.Reasoning,
-		State: core.ClaimStates(row.State()),
+		Components: row.Components, Rows: row.Rows, Occurrences: row.Occurrences,
+		Outcome: core.Outcome(row.Decision.Outcome), Reasoning: row.Reasoning,
+		State: core.DecisionStates(row.State()),
 		States: StatesBody{
 			Proposed: row.States[triage.Proposed], Approved: row.States[triage.Approved],
 			Withdrawn: row.States[triage.Withdrawn], Lapsed: row.States[triage.LapsedState],
@@ -387,12 +388,12 @@ func judgedClaimBody(row triage.JudgedClaim) JudgedClaimBody {
 		TwoPeople: row.BySomebodyElse(),
 		Approvals: agreedBodies(row.Approvals),
 	}
-	body.Justification, body.Reason, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(&row.Claim)
-	body.Scope = statedScope(&row.Claim)
+	body.Justification, body.Reason, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(&row.Decision)
+	body.Scope = statedScope(&row.Decision)
 	return body
 }
 
-// agreedBodies is every agreement on a claim, taken back or not.
+// agreedBodies is every agreement on a decision, taken back or not.
 func agreedBodies(approvals []triage.Agreed) []AgreedBody {
 	out := make([]AgreedBody, 0, len(approvals))
 	for _, agreed := range approvals {

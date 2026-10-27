@@ -36,7 +36,7 @@ type flawLead struct {
 	ID                 int64      `bun:"id,pk,autoincrement"`
 	ProductID          int64      `bun:"product_id,notnull"`
 	VulnerabilityID    int64      `bun:"vulnerability_id,notnull"`
-	PlaceIdentity      string     `bun:"place_identity,notnull"`
+	OccurrenceIdentity string     `bun:"occurrence_identity,notnull"`
 	SuggestedComponent string     `bun:"suggested_component,nullzero"`
 	SuggestedEcosystem string     `bun:"suggested_ecosystem,nullzero"`
 	SuggestedNamespace string     `bun:"suggested_namespace,nullzero"`
@@ -62,11 +62,11 @@ type flawLeadBuild struct {
 // component the offer ranked first and the builds it proposed: every build
 // the lead was seen in, and the builds holding the chosen component that the
 // lead's series never analyzed.
-func recordOrigin(ctx context.Context, tx bun.IDB, productID int64, placeIdentity string,
+func recordOrigin(ctx context.Context, tx bun.IDB, productID int64, occurrenceIdentity string,
 	vulnerabilityID int64, offer *Offer, chosen finding.Entering, by int64, now time.Time) error {
 
 	row := &flawLead{
-		ProductID: productID, VulnerabilityID: vulnerabilityID, PlaceIdentity: placeIdentity,
+		ProductID: productID, VulnerabilityID: vulnerabilityID, OccurrenceIdentity: occurrenceIdentity,
 		SuggestedFrom: FromBuild, HandedBy: by, HandedAt: now,
 	}
 	if len(offer.Suggestions) > 0 {
@@ -118,13 +118,13 @@ func sameOrUnstated(offered, chosen string) bool {
 	return chosen == "" || chosen == offered
 }
 
-// UndoHandOff undoes the hand-off of the lead at a place in a product while
+// UndoHandOff undoes the hand-off of the lead at an occurrence in a product while
 // its flaw is undisclosed, with every lead handed off as the flaw: each is
 // confirmed again and internal, its collaborators' grants end, and the flaw is
 // taken back out of every build it was recorded against, closed as invalid
 // for the reason given. The flaw keeps the record of the lead it was recorded
 // from, marked undone.
-func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity,
+func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, occurrenceIdentity,
 	because string, now time.Time) error {
 
 	if err := MayHandOff(subject, productID); err != nil {
@@ -139,7 +139,7 @@ func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, produc
 	}
 	return database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
 		at := now.UTC().Truncate(time.Microsecond)
-		h, err := handedFor(ctx, tx, subject, productID, placeIdentity)
+		h, err := handedFor(ctx, tx, subject, productID, occurrenceIdentity)
 		if err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, produc
 			if err := one.Unlink(ctx, tx); err != nil {
 				return err
 			}
-			if err := endLeadGrants(ctx, tx, subject, productID, one.PlaceIdentity, name, at); err != nil {
+			if err := endLeadGrants(ctx, tx, subject, productID, one.OccurrenceIdentity, name, at); err != nil {
 				return err
 			}
 			if err := recordAccess(ctx, tx, subject, name, &was, &became); err != nil {
@@ -183,15 +183,15 @@ func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, produc
 	})
 }
 
-// endLeadGrants withdraws every standing grant of the lead at a place, each
+// endLeadGrants withdraws every standing grant of the lead at an occurrence, each
 // recorded in the administration trail as a withdrawal is. A grant reaches a
 // lead its flaw is not disclosed for, and a lead no longer handed off has no
 // case to be brought into.
 func endLeadGrants(ctx context.Context, tx bun.IDB, subject access.Subject, productID int64,
-	placeIdentity, name string, now time.Time) error {
+	occurrenceIdentity, name string, now time.Time) error {
 
 	rights := access.NewStore(tx)
-	rows, err := rights.LeadRows(ctx, productID, placeIdentity)
+	rows, err := rights.LeadRows(ctx, productID, occurrenceIdentity)
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func endLeadGrants(ctx context.Context, tx bun.IDB, subject access.Subject, prod
 	}
 	records := trail.NewStore(tx)
 	for _, row := range rows {
-		if err := rights.RemoveFromLead(ctx, productID, placeIdentity, row.PersonID, subject.ID); err != nil {
+		if err := rights.RemoveFromLead(ctx, productID, occurrenceIdentity, row.PersonID, subject.ID); err != nil {
 			return err
 		}
 		if err := records.Record(ctx, subject, trail.Case, name+" · "+identity[row.PersonID],
@@ -272,14 +272,14 @@ func takeFlawBack(ctx context.Context, tx bun.IDB, subject access.Subject, produ
 
 // FlawOrigin is the lead a flaw was recorded from, as its reader reads it.
 type FlawOrigin struct {
-	// Place is the lead's place identity, and Build the build its newest
+	// Occurrence is the lead's occurrence identity, and Build the build its newest
 	// finding the reader reads is on.
-	Place string
-	Build BuildName
-	Rule  string
-	Path  string
-	Line  int
-	State State
+	Occurrence string
+	Build      BuildName
+	Rule       string
+	Path       string
+	Line       int
+	State      State
 	// Suggested is the component the hand-off's offer ranked first, empty
 	// for the build itself, and From where the offer took it from.
 	Suggested Suggestion
@@ -353,7 +353,7 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		ColumnExpr(`"vu"."identifier" AS "rule", "ar"."path", "ar"."start_line"`).
 		ColumnExpr(state+` AS "state"`, stateArgs...).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, row.PlaceIdentity).
+		Where(`"f"."occurrence_identity" = ?`, row.OccurrenceIdentity).
 		Where(reach.Full, reach.FullArgs...).
 		Where(kinds, kindArgs...).
 		OrderExpr(`CASE WHEN "f"."closed_at" IS NULL THEN 0 ELSE 1 END ASC, "f"."id" DESC`).
@@ -365,7 +365,7 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		return nil, fmt.Errorf("read the lead the flaw was recorded from: %w", err)
 	}
 	out := &FlawOrigin{
-		Place: row.PlaceIdentity, Rule: lead.Rule, Path: lead.Path, Line: atLeast(lead.Line), State: lead.State,
+		Occurrence: row.OccurrenceIdentity, Rule: lead.Rule, Path: lead.Path, Line: atLeast(lead.Line), State: lead.State,
 		Build: BuildName{TargetID: lead.TargetID, Stream: lead.Stream, Variant: lead.Variant},
 		Suggested: Suggestion{Component: row.SuggestedComponent, Ecosystem: row.SuggestedEcosystem,
 			Namespace: row.SuggestedNamespace, From: row.SuggestedFrom},
@@ -382,17 +382,17 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		Scan(ctx, &out.Proposed); err != nil {
 		return nil, fmt.Errorf("read the builds the flaw was proposed against: %w", err)
 	}
-	if out.FixedIn, err = notReproducedFor(ctx, db, reach, productID, vulnerabilityID, row.PlaceIdentity); err != nil {
+	if out.FixedIn, err = notReproducedFor(ctx, db, reach, productID, vulnerabilityID, row.OccurrenceIdentity); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
 // notReproducedFor is each build a flaw is open on in a product where the
-// newest finding of the lead at a place that the reach admits is not
+// newest finding of the lead at an occurrence that the reach admits is not
 // reproduced, or closed as fixed, with the run that first did not see it.
 func notReproducedFor(ctx context.Context, db bun.IDB, reach finding.LeadReading, productID,
-	vulnerabilityID int64, placeIdentity string) ([]Unseen, error) {
+	vulnerabilityID int64, occurrenceIdentity string) ([]Unseen, error) {
 
 	leads, leadArgs := kind.Leads.Where(`"f"."kind"`)
 	entered, enteredArgs := kind.In(`"ef"."kind"`, []kind.Kind{kind.Entered})
@@ -409,7 +409,7 @@ func notReproducedFor(ctx context.Context, db bun.IDB, reach finding.LeadReading
 		ColumnExpr(`"t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
 		ColumnExpr(`"si"."absent_run_id", "si"."fixed_run_id"`).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(leads, leadArgs...).
 		Where(reach.Full, reach.FullArgs...).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "ef" WHERE "ef"."target_id" = "f"."target_id"

@@ -252,7 +252,7 @@ func DisclosureTriageRights() []access.Role {
 	return []access.Role{access.PublicTriage, access.PrivateTriage}
 }
 
-// ApproveRights is the roles that may agree to a claim: the capability, or a
+// ApproveRights is the roles that may agree to a decision: the capability, or a
 // triager on somebody else's work. That the two are different people is
 // checked separately and has no override.
 func ApproveRights() []access.Role {

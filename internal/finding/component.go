@@ -17,20 +17,20 @@ import (
 
 // Everything open at one component.
 //
-// Not the findings list narrowed to one name: this answers per place rather
+// Not the findings list narrowed to one name: this answers per occurrence rather
 // than per group, because somebody standing on a component in the dependency
 // tree is looking at where it sits.
 
 // AtComponent lists the open issues against one component of a build, with
-// every place each one occupies.
+// every occurrence each one has.
 //
-// Every place, because a decision is keyed on one — so a claim built from a
-// single arbitrary place would silence one consumer and leave the others open
-// while reporting that it had covered them.
+// Every occurrence, because a decision is recorded per occurrence — so a
+// decision built from a single arbitrary occurrence would silence one consumer
+// and leave the others open while reporting that it had covered them.
 //
-// The set somebody narrows before claiming something about all of it. What
+// The set somebody narrows before deciding something about all of it. What
 // narrows it is theirs — a text match on what a report says is how a candidate
-// is found, never why a claim is true.
+// is found, never why a decision is true.
 // It answers with how many findings the whole narrowed set covers as well as
 // the page, because it has already counted them: the caller asked for both and
 // was running the whole narrowing twice for the second — on a set the store's
@@ -52,8 +52,8 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 
 	// Every package of the fold, not the one binary that was named. The
 	// by-issue list folds the same way, so the single vim row somebody picks
-	// from is four packages at sixty-one places — and keyed on one of them,
-	// this asked for a quarter of what the screen showed and the judgment
+	// from is four packages at sixty-one occurrences — and keyed on one of them,
+	// this asked for a quarter of what the screen showed and the decision
 	// covered a quarter of what the person meant, four times over.
 	fold, err := InTheFold(ctx, s.db, componentID)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// the grouping stays on finding's covering index.
 			// Escaped, and the escape character stated. Spliced raw, a term
 			// holding a percent or an underscore selected far more issues
-			// than the box said — and this is the set a bulk judgment is
+			// than the box said — and this is the set a bulk decision is
 			// then recorded against, so one justification landed on issues
 			// nobody saw. A backslash matched differently on each engine
 			// besides.
@@ -92,7 +92,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	// total rides on the page, as the findings list's does.
 	var heads []struct {
 		VulnerabilityID int64 `bun:"vulnerability_id"`
-		Places          int   `bun:"places"`
+		Occurrences     int   `bun:"places"`
 		Total           int   `bun:"total"`
 	}
 	// The number of findings the whole narrowed set holds, which is what a bulk
@@ -120,7 +120,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	} else {
 		// Grouped and counted, not COUNT DISTINCT: with no GROUP BY, Count()
 		// emits its own count(*) and the expression never reaches the
-		// statement, so the total counted places while the list counts
+		// statement, so the total counted occurrences while the list counts
 		// issues.
 		counted, err := s.db.NewSelect().
 			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
@@ -169,10 +169,10 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// Read off the finding, where a standing record of this product
 			// being attacked is already written for ranking.
 			ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited_here" THEN 1 ELSE 0 END) AS "exploited_here"`).
-			// The earliest deadline among this issue's places here, which is
-			// the one that makes it late. Read with the rest of what a row
-			// shows rather than off the places: the places are read for what
-			// a decision is keyed on, and that read carries no clock.
+			// The earliest deadline among this issue's occurrences here, which
+			// is the one that makes it late. Read with the rest of what a row
+			// shows rather than off the occurrences: the occurrences are read
+			// for what a decision is keyed on, and that read carries no clock.
 			ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."target_id" = ?`, targetID).
@@ -197,11 +197,11 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		}
 	}
 
-	// Every place, fetched for the page of issues rather than one arbitrary
-	// place per issue. A decision is keyed on a place, so a claim built from
-	// MIN(place_identity) covers one consumer and leaves the rest open while
-	// reporting that it covered them.
-	everywhere, err := s.placesOf(ctx, targetID, fold, issues, visible)
+	// Every occurrence, fetched for the page of issues rather than one
+	// arbitrary occurrence per issue. A decision is recorded per occurrence, so
+	// one built from MIN(occurrence_identity) covers one consumer and leaves
+	// the rest open while reporting that it covered them.
+	everywhere, err := s.occurrencesOf(ctx, targetID, fold, issues, visible)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -209,25 +209,25 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	at := make([]Deciding, 0, len(heads))
 	for _, head := range heads {
 		row := about[head.VulnerabilityID]
-		for _, place := range everywhere[head.VulnerabilityID] {
-			place.ProductID = productID
-			place.VulnerabilityID = head.VulnerabilityID
-			place.SeverityCenti = row.Severity
-			place.FixedIn = row.FixedIn
-			place.Summary = firstLineOf(row.Description)
-			place.Exploited = row.Exploited == 1
-			place.ExploitedHere = row.ExploitedHere == 1
-			place.LikelihoodPPM = row.LikelihoodPPM
-			place.DueAt = row.DueAt
-			place.Places = head.Places
-			at = append(at, place)
+		for _, occurrence := range everywhere[head.VulnerabilityID] {
+			occurrence.ProductID = productID
+			occurrence.VulnerabilityID = head.VulnerabilityID
+			occurrence.SeverityCenti = row.Severity
+			occurrence.FixedIn = row.FixedIn
+			occurrence.Summary = firstLineOf(row.Description)
+			occurrence.Exploited = row.Exploited == 1
+			occurrence.ExploitedHere = row.ExploitedHere == 1
+			occurrence.LikelihoodPPM = row.LikelihoodPPM
+			occurrence.DueAt = row.DueAt
+			occurrence.Occurrences = head.Occurrences
+			at = append(at, occurrence)
 		}
 	}
 	return at, total, int(reaching), nil
 }
 
-// placesOf reads every place a set of issues occupies at one component.
-func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issues []int64,
+// occurrencesOf reads every occurrence a set of issues has at one component.
+func (s *Store) occurrencesOf(ctx context.Context, targetID int64, fold []int64, issues []int64,
 	visible []access.Visibility) (map[int64][]Deciding, error) {
 
 	everywhere := map[int64][]Deciding{}
@@ -235,11 +235,11 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 		return everywhere, nil
 	}
 	var rows []struct {
-		VulnerabilityID   int64  `bun:"vulnerability_id"`
-		PlaceIdentity     string `bun:"place_identity"`
-		Visibility        string `bun:"visibility"`
-		ComponentUpstream string `bun:"component_upstream"`
-		ConsumerUpstream  string `bun:"consumer_upstream"`
+		VulnerabilityID    int64  `bun:"vulnerability_id"`
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+		Visibility         string `bun:"visibility"`
+		ComponentUpstream  string `bun:"component_upstream"`
+		ConsumerUpstream   string `bun:"consumer_upstream"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := s.db.NewSelect().
@@ -247,7 +247,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
@@ -257,16 +257,16 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility", "c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version"`).
+		GroupExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility", "c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where these sit: %w", err)
 	}
 	for _, row := range rows {
 		everywhere[row.VulnerabilityID] = append(everywhere[row.VulnerabilityID], Deciding{
-			PlaceIdentity:     row.PlaceIdentity,
-			Visibility:        access.AsVisibility(row.Visibility),
-			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
+			OccurrenceIdentity: row.OccurrenceIdentity,
+			Visibility:         access.AsVisibility(row.Visibility),
+			ComponentUpstream:  row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
 		})
 	}
 	return everywhere, nil
@@ -339,10 +339,10 @@ type ComponentGroup struct {
 	// Issues is how many distinct vulnerabilities are open against it, which
 	// is how many rows it contributes to the findings list.
 	Issues int
-	// Places is how many times those sit somewhere in the build. The two
+	// Occurrences is how many times those sit somewhere in the build. The two
 	// differ by orders of magnitude on shared code and the gap is the point:
 	// one kernel issue reaching four hundred modules is one decision.
-	Places int
+	Occurrences int
 	// Upgrades are the versions upstream has released that would close
 	// some of what is open here, each with how many issues it would close.
 	//
@@ -365,27 +365,27 @@ type ComponentGroup struct {
 // it: the text the candidate list was narrowed by, how many issues that
 // narrowing reaches now, and how many the caller went on to name.
 //
-// `selected_by` is prose and nothing can check it. A claim reading
+// `selected_by` is prose and nothing can check it. A decision reading
 // "drivers this image does not build" over a set actually chosen by ticking
 // everything is indistinguishable in the record from an honest one, and the
 // decision that asks for how a set was chosen asks for something an approver
 // can act on. Two numbers make it checkable without turning prose into a
-// filter: equal, the claim is exactly what that narrowing returns; far apart,
+// filter: equal, the decision is exactly what that narrowing returns; far apart,
 // the sentence does not describe the set.
 type Narrowing struct {
 	// Contains is the text the list was narrowed by, empty where it was not.
 	Contains string
 	// Matched is how many distinct issues that narrowing reaches at this fold
-	// in this build, read in the transaction that writes the claim.
+	// in this build, read in the transaction that writes the decision.
 	Matched int
-	// Named is how many the caller went on to claim about.
+	// Named is how many the caller went on to decide about.
 	Named int
 }
 
 // NarrowedWithin re-runs a bulk selection's narrowing inside the transaction
-// that is about to write the claim.
+// that is about to write the decision.
 //
-// Re-run rather than taken from the caller, for the reason the places are: a
+// Re-run rather than taken from the caller, for the reason the occurrences are: a
 // count sent along with the request is the caller's word twice over. Read with
 // the same visibility rule the candidate list used, so the two numbers compare
 // against each other rather than against different populations.
@@ -410,7 +410,7 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 	if contains != "" {
 		// The same escaped match the candidate list makes. Spliced raw, a term
 		// holding a percent selects far more than the box said — and this is
-		// the number an approver checks the claim against.
+		// the number an approver checks the decision against.
 		q = q.Where(`"f"."vulnerability_id" IN (?)`, describedAs(q, subject, contains))
 	}
 	matched, err := tx.NewSelect().TableExpr(`(?) AS "grouped"`, q).Count(ctx)

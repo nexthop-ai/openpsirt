@@ -30,18 +30,18 @@ func TestARatingSaysWhetherItIsYourOwn(t *testing.T) {
 		if made.Code != http.StatusCreated {
 			t.Fatalf("recording a rating answered %d: %s", made.Code, made.Body.String())
 		}
-		var claim struct {
+		var decision struct {
 			ID            int64 `json:"id"`
 			NeedsApproval bool  `json:"needs_approval"`
 			Mine          bool  `json:"mine"`
 		}
-		if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+		if err := json.Unmarshal(made.Body.Bytes(), &decision); err != nil {
 			t.Fatal(err)
 		}
-		if !claim.NeedsApproval {
+		if !decision.NeedsApproval {
 			t.Fatal("a milder rating needed nobody, so this tests nothing")
 		}
-		if !claim.Mine {
+		if !decision.Mine {
 			t.Error("the rating you just made does not read as yours")
 		}
 
@@ -61,7 +61,7 @@ func TestARatingSaysWhetherItIsYourOwn(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, row := range page.Items {
-				if row.ID == claim.ID {
+				if row.ID == decision.ID {
 					return row.Mine
 				}
 			}
@@ -144,10 +144,10 @@ func TestAnAssessmentSomebodyMayNotReachAnswersAsOneNobodyMade(t *testing.T) {
 		if made.Code != http.StatusCreated {
 			t.Fatalf("recording a rating answered %d: %s", made.Code, made.Body.String())
 		}
-		var claim struct {
+		var decision struct {
 			ID int64 `json:"id"`
 		}
-		if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+		if err := json.Unmarshal(made.Body.Bytes(), &decision); err != nil {
 			t.Fatal(err)
 		}
 		// Triaging another product, so the route admits them and the rating's
@@ -168,7 +168,7 @@ func TestAnAssessmentSomebodyMayNotReachAnswersAsOneNobodyMade(t *testing.T) {
 			{http.MethodDelete, "/v1/assessments/%d", "/v1/assessments/999999"},
 		} {
 			there := httpapitest.AsPerson(t, r, "outsider", c.method,
-				fmt.Sprintf(c.path, claim.ID), "")
+				fmt.Sprintf(c.path, decision.ID), "")
 			nobody := httpapitest.AsPerson(t, r, "outsider", c.method, c.never, "")
 			httpapitest.RefusedWith(t, there, http.StatusNotFound)
 			if there.Body.String() != nobody.Body.String() {

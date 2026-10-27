@@ -9,12 +9,19 @@ import {
   Standing,
   stateOf,
   type Previous,
-} from "./FindingClaim";
+} from "./FindingDecision";
 import { Assess } from "./FindingAssess";
 import { Disclose } from "./FindingDisclose";
 import { ExploitedHere } from "./FindingExploited";
 import { Notes } from "./FindingNotes";
-import { Duplicates, MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
+import {
+  Duplicates,
+  MatchMethod,
+  LookItUp,
+  Occurrences,
+  References,
+  Reporter,
+} from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { FlawLeadCard, fixedFromLead, useFlawLead } from "./FlawLead";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -36,15 +43,21 @@ import { Because } from "../ui/Outcome";
 import { useFindingNeighbors } from "./findingNeighbors";
 import { useDecisionPrefill } from "./findingPrefill";
 import { FindingWhich } from "./FindingWhich";
-import { buildFindingsAt, claimAt, componentAt, issueAt, productFindingsAt } from "../app/routes";
+import {
+  buildFindingsAt,
+  decisionAt,
+  componentAt,
+  issueAt,
+  productFindingsAt,
+} from "../app/routes";
 import { useReseed } from "../ui/reseed";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
 // sits, the evidence — and the working screen for deciding it, before and
-// after. When a claim stands it is shown in its state, with one activity
+// after. When a decision stands it is shown in its state, with one activity
 // timeline, the revision history, the comments, and the decisions made at this
-// place before, whose reasoning is offered back.
+// occurrence before, whose reasoning is offered back.
 
 // The score's publisher and its rank, as a reader
 // can use it.
@@ -73,9 +86,9 @@ function neighborly(step: { row: { vulnerability?: string; component?: string } 
 
 type Similar = Body<"SimilarBody">;
 
-// The places of the finding asked which decision stood there
+// The occurrences of the finding asked which decision stood there
 // before. The finding carries the earlier decisions themselves; what it does
-// not carry is which place each was at, and reaffirming one needs the place.
+// not carry is which occurrence each was at, and reaffirming one needs the occurrence.
 const SAMPLE = 8;
 
 // The reason a finding carries no deadline, in words a reader can act on.
@@ -136,7 +149,10 @@ export function Finding() {
   const [reclassifying, setReclassifying] = useState(false);
   // The rating just recorded, confirmed on the line the form opened from.
   const [rated, setRated] = useState<{ severity: string; waiting: boolean } | null>(null);
-  const [extending, setExtending] = useState<{ claimId: number; decisionId: number } | null>(null);
+  const [extending, setExtending] = useState<{
+    decisionId: number;
+    decisionOccurrenceId: number;
+  } | null>(null);
   // The rest of what belongs to one finding, put back on walking to the next:
   // the confirmation of what was recorded, the decision being extended, and
   // the rating form and what it recorded.
@@ -178,19 +194,22 @@ export function Finding() {
   // button that answers 403.
   const here = mayOf(who.data, product);
   const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
-  const places = useMemo(() => it?.places ?? [], [it]);
+  const occurrences = useMemo(() => it?.occurrences ?? [], [it]);
   // The lead a recorded flaw came from, read once for its card and the fix it
   // offers on this build.
   const flawLead = useFlawLead(product, vulnerability, !!it?.recorded);
-  // A place is the component and what pulls it in; two chains reaching the
-  // same pair are one place, and the head counts what a decision covers.
-  const distinct = new Set(places.map((place) => place.place)).size;
-  // The claims standing here, one representative decision each, read for the
-  // reasoning and the approvals the claim row does not carry.
-  const standingIds = useMemo(() => (it?.standing ?? []).map((c) => c.decision_id), [it]);
+  // An occurrence is the component and what pulls it in; two chains reaching the
+  // same pair are one occurrence, and the head counts what a decision covers.
+  const distinct = new Set(occurrences.map((occurrence) => occurrence.occurrence)).size;
+  // The decisions standing here, one representative row each, read for the
+  // reasoning and the approvals the decision row does not carry.
+  const standingIds = useMemo(
+    () => (it?.standing ?? []).map((c) => c.decision_occurrence_id),
+    [it],
+  );
   const standing = useQueries({
     queries: standingIds.slice(0, SAMPLE).map((id) => ({
-      queryKey: ["decision", id],
+      queryKey: ["decision-occurrence", id],
       queryFn: async () =>
         unwrap(await api.GET("/v1/decision-occurrences/{id}", { params: { path: { id } } })),
     })),
@@ -201,7 +220,8 @@ export function Finding() {
   // pressed the button, so where they were looking no longer holds anything.
   // Smooth, so the page moving is something they watch rather than a jump.
   const landed =
-    !!recorded && standing.some((q) => q.data?.decision?.claim_id === recorded.claimId);
+    !!recorded &&
+    standing.some((q) => q.data?.decision_occurrence?.decision_id === recorded.decisionId);
   useEffect(() => {
     if (!recorded) return;
     const frame = requestAnimationFrame(() =>
@@ -209,16 +229,18 @@ export function Finding() {
     );
     return () => cancelAnimationFrame(frame);
   }, [recorded, landed]);
-  // The place each earlier decision was at, for reaffirming it. Asked of
-  // distinct places: `places` holds chain rows, and eight chains to one place
-  // would otherwise fill the sample and leave a second place never asked.
-  const openPlaces = [
-    ...new Map(places.filter((p) => p.decision == null).map((p) => [p.place, p])).values(),
+  // The occurrence each earlier decision was at, for reaffirming it. Asked of
+  // distinct occurrences: `occurrences` holds chain rows, and eight chains to one occurrence
+  // would otherwise fill the sample and leave a second occurrence never asked.
+  const openOccurrences = [
+    ...new Map(
+      occurrences.filter((p) => p.decision_occurrence == null).map((p) => [p.occurrence, p]),
+    ).values(),
   ].slice(0, SAMPLE);
   const history = useQueries({
-    queries: ((it?.previous ?? []).some((p) => p.ended === "lapsed") ? openPlaces : []).map(
-      (place) => ({
-        queryKey: ["decided", at, place.place],
+    queries: ((it?.previous ?? []).some((p) => p.ended === "lapsed") ? openOccurrences : []).map(
+      (occurrence) => ({
+        queryKey: ["decided", at, occurrence.occurrence],
         queryFn: async () =>
           unwrap(
             await api.GET(
@@ -230,7 +252,7 @@ export function Finding() {
                     stream,
                     variant,
                     issue: vulnerability,
-                    occurrence: place.place ?? "",
+                    occurrence: occurrence.occurrence ?? "",
                   },
                 },
               },
@@ -263,28 +285,29 @@ export function Finding() {
     kind: it.score_kind,
   };
 
-  // Each claim kept with the summary it came from, paired before anything is
+  // Each decision kept with the summary it came from, paired before anything is
   // dropped. Filtering first and indexing the summary list afterwards paired
-  // a claim with another claim's summary the moment one of the parallel reads
+  // a decision with another decision's summary the moment one of the parallel reads
   // was slow or failed — and the summary is where the identifier the reasoning
-  // editor writes to comes from, so a revision landed on the wrong claim.
+  // editor writes to comes from, so a revision landed on the wrong decision.
   const pairs = standingIds.slice(0, SAMPLE).flatMap((_, i) => {
-    const claim = standing[i]?.data;
-    return claim ? [{ claim, summary: it.standing?.[i] }] : [];
+    const decision = standing[i]?.data;
+    return decision ? [{ decision, summary: it.standing?.[i] }] : [];
   });
-  const claims = pairs.map((pair) => pair.claim);
-  // A decision read that failed is said, because a claim missing from the
-  // cards reads as a place nobody decided.
+  const decisions = pairs.map((pair) => pair.decision);
+  // A decision read that failed is said, because a decision missing from the
+  // cards reads as an occurrence nobody decided.
   const unread = [...standing, ...history].find((q) => q.isError);
-  const placeOf = new Map<number, string>();
+  const occurrenceOf = new Map<number, string>();
   history.forEach((q, i) => {
     for (const d of q.data?.previously ?? []) {
-      if (d.decision?.id && !placeOf.has(d.decision.id))
-        placeOf.set(d.decision.id, openPlaces[i]?.place ?? "");
+      if (d.decision_occurrence?.id && !occurrenceOf.has(d.decision_occurrence.id))
+        occurrenceOf.set(d.decision_occurrence.id, openOccurrences[i]?.occurrence ?? "");
     }
   });
   const previous: Previous[] = (it.previous ?? []).map((p) => ({
-    id: p.decision_id,
+    id: p.decision_occurrence_id,
+    decisionId: p.decision_id,
     outcome: p.outcome,
     justification: p.justification ?? "",
     deferredUntil: p.deferred_until ?? "",
@@ -295,30 +318,32 @@ export function Finding() {
     about: p.about ?? "",
     approvedBy: p.approved_by_name || p.approved_by || "",
     reasoning: p.reasoning,
-    place: placeOf.get(p.decision_id) ?? "",
+    occurrence: occurrenceOf.get(p.decision_occurrence_id) ?? "",
   }));
   const similar: Similar[] = it.similar ?? [];
-  // Another product's decision about this same issue at this same place.
+  // Another product's decision about this same issue at this same occurrence.
   // Evidence and a prefill, never an outcome: what is shipped around a
-  // component differs between products, which is the whole reason a place is a
+  // component differs between products, which is the whole reason an occurrence is a
   // component at a position rather than a component.
   const elsewhere = it.elsewhere ?? [];
   // Anything here still to answer. One named predicate rather than
   // the same test written at four sites: the fifth was written in a different
-  // unit — a count of distinct places against a count of chain rows — and
+  // unit — a count of distinct occurrences against a count of chain rows — and
   // could never be false, which read as a second safety check and was none.
-  const undecided = places.some((place) => place.decision == null);
+  const undecided = occurrences.some((occurrence) => occurrence.decision_occurrence == null);
   // What publishers have said, from VEX documents and supplier advisories: a
   // third layer beside what the build claims and what we decided. Shown,
   // offered as a prefill, never applied.
   const publishers = it.said ?? [];
-  // What the build itself says about these places, in its own words.
+  // What the build itself says about these occurrences, in its own words.
   const claimed = it.claimed ?? [];
 
-  // Counted as places, the way the decision counts them, not as chain rows.
-  const decided = new Set(places.filter((p) => p.decision != null).map((p) => p.place)).size;
+  // Counted as occurrences, the way the decision counts them, not as chain rows.
+  const decided = new Set(
+    occurrences.filter((p) => p.decision_occurrence != null).map((p) => p.occurrence),
+  ).size;
   const state = stateOf(
-    claims,
+    decisions,
     decided,
     distinct,
     (it.standing ?? []).map((each) => each.state ?? ""),
@@ -382,7 +407,8 @@ export function Finding() {
           <span className={`state ${state.cls}`}>{state.label}</span>
         </h2>
         <p>
-          {product} · {stream} · {variant} · {distinct} {distinct === 1 ? "place" : "places"} ·{" "}
+          {product} · {stream} · {variant} · {distinct}{" "}
+          {distinct === 1 ? "occurrence" : "occurrences"} ·{" "}
           <b style={{ color: "var(--ink)" }}>
             {decided} of {distinct} decided
           </b>
@@ -546,7 +572,7 @@ export function Finding() {
                 nowhere to go. */}
             {/* The newest generation the issue is rated under, and the
                 others beside it: a version 3 and a version 4 rating are two
-                judgments. */}
+                decisions. */}
             <div className="score">
               <span className="n">{newest.score ? newest.score.toFixed(1) : "—"}</span>
               <span className="l">CVSS{newest.version ? ` ${newest.version}` : ""}</span>
@@ -693,7 +719,7 @@ export function Finding() {
             ) : it.fix_state === "wont-fix" ? (
               <>Upstream has declined to fix this.</>
             ) : it.fix_state === "mixed" ? (
-              <>The places this sits at do not agree about what upstream did.</>
+              <>The occurrences this sits at do not agree about what upstream did.</>
             ) : (
               <>No fix has been published.</>
             )}
@@ -771,8 +797,8 @@ export function Finding() {
           <div className="alert info" style={{ marginBottom: 14 }} ref={confirmation}>
             <strong>Submitted</strong>
             <span>
-              Recorded against {recorded.recorded} {recorded.recorded === 1 ? "place" : "places"}{" "}
-              here
+              Recorded against {recorded.recorded}{" "}
+              {recorded.recorded === 1 ? "occurrence" : "occurrences"} here
               {recorded.applied.length > 0 && <>, and in {recorded.applied.join(", ")}</>};{" "}
               {recorded.matching} matching {recorded.matching === 1 ? "build is" : "builds are"}{" "}
               reached by lookup.{" "}
@@ -791,28 +817,28 @@ export function Finding() {
                 </>
               )}
               {recorded.needsApproval && (
-                <Link to={claimAt(recorded.claimId)} className="linkish">
+                <Link to={decisionAt(recorded.decisionId)} className="linkish">
                   Open the decision →
                 </Link>
               )}
             </span>
           </div>
         )}
-        {pairs.map(({ claim, summary }) => (
+        {pairs.map(({ decision, summary }) => (
           <Standing
-            key={claim.decision?.id}
-            claim={claim}
+            key={decision.decision_occurrence?.id}
+            decision={decision}
             summary={summary}
-            places={places}
-            mine={mine(claim.proposed_by ?? "")}
+            occurrences={occurrences}
+            mine={mine(decision.proposed_by ?? "")}
             mayApprove={!!(it.undisclosed ? here?.agrees_private : here?.agrees_public)}
             onRevised={() => void finding.refetch()}
             about={{ product, vulnerability }}
             undisclosed={!!it.undisclosed}
           >
-            {claim.decision?.claim_id && (
+            {decision.decision_occurrence?.decision_id && (
               <Comments
-                claimId={claim.decision.claim_id}
+                decisionId={decision.decision_occurrence.decision_id}
                 mine={mine}
                 about={{ product, vulnerability }}
                 undisclosed={!!it.undisclosed}
@@ -823,17 +849,17 @@ export function Finding() {
         ))}
 
         {/* Above the VEX statements: a write-up is what somebody deciding
-            reads first, and a third party's claim is read against it. The
+            reads first, and a third party's decision is read against it. The
             whole block of links belongs below the action, which is a different
-            question from the advisory the judgment rests on. */}
+            question from the advisory the decision rests on. */}
         <div className="evidence">
           <References advisory={it.advisory} refs={it.references ?? []} />
           <LookItUp links={it.links ?? []} />
         </div>
 
-        {/* The build's own words: why a place is marked or closed, and the
+        {/* The build's own words: why an occurrence is marked or closed, and the
             workaround where it says the flaw applies. Shown whatever has
-            been decided, because the marking stays on the place. Its text
+            been decided, because the marking stays on the occurrence. Its text
             is a third party's, shown and never rendered. */}
         {claimed.length > 0 && (
           <div className="card">
@@ -944,7 +970,7 @@ export function Finding() {
                               // The version goes into the record too: an
                               // approver reads this months later, and "says
                               // fixed" with nothing saying fixed in what is
-                              // the same sentence about a different claim.
+                              // the same sentence about a different decision.
                               reasoning:
                                 `${one.publisher} says ${(one.status ?? "").replace("_", " ")}` +
                                 (one.about ? ` of ${one.about}` : "") +
@@ -972,7 +998,7 @@ export function Finding() {
                   Same component, same justification. Still needs a second person.
                 </p>
                 {similar.map((s) => (
-                  <div key={s.decision_id} className="prior">
+                  <div key={s.decision_occurrence_id} className="prior">
                     <header>
                       <span className="id">#{s.decision_id}</span>{" "}
                       <Because code={s.justification} />
@@ -990,7 +1016,10 @@ export function Finding() {
                         type="button"
                         className="btn ghost"
                         onClick={() => {
-                          setExtending({ claimId: s.claim_id, decisionId: s.decision_id });
+                          setExtending({
+                            decisionId: s.decision_id,
+                            decisionOccurrenceId: s.decision_occurrence_id,
+                          });
                           startFrom({
                             outcome: "not-applicable",
                             justification: s.justification,
@@ -1009,14 +1038,14 @@ export function Finding() {
               <div className="card">
                 <h3>Decided elsewhere</h3>
                 {/* Never an outcome and never a default. Another team's
-                    judgment about their product is not a judgment about this
+                    decision about their product is not a decision about this
                     one — what is shipped around the component differs — so
                     this offers words to start from and decides nothing. */}
                 <p className="reading" style={{ marginBottom: 8 }}>
-                  Same issue, same place, another product. Their judgment, for reference.
+                  Same issue, same occurrence, another product. Their decision, for reference.
                 </p>
                 {elsewhere.map((e) => (
-                  <div key={`${e.product} ${e.decision_id}`} className="prior">
+                  <div key={`${e.product} ${e.decision_occurrence_id}`} className="prior">
                     <header>
                       <span className="id">{e.product}</span>{" "}
                       {e.justification && <Because code={e.justification} />}
@@ -1077,7 +1106,7 @@ export function Finding() {
               <div className="alert info">
                 <strong>Filled in from “{rule}”</strong>
                 <span>
-                  Nothing is proposed until you submit. It goes out as <b>your</b> claim.
+                  Nothing is proposed until you submit. It goes out as <b>your</b> decision.
                 </span>
                 <button
                   type="button"
@@ -1093,7 +1122,7 @@ export function Finding() {
               <div ref={form}>
                 <Decide
                   at={located}
-                  places={places}
+                  occurrences={occurrences}
                   undisclosed={!!it.undisclosed}
                   assigning={
                     <Assignee
@@ -1127,8 +1156,8 @@ export function Finding() {
       <div className="deciding">
         {/* Keyed on the issue in this product, so it is here whether or not
             anybody has decided anything, and apart from the comments on a
-            decision, which sit on the decision's card. The two stay apart: a claim is
-            keyed on a place and a note on an issue, so they cannot become one
+            decision, which sit on the decision's card. The two stay apart: a decision is
+            keyed on an occurrence and a note on an issue, so they cannot become one
             record, and merging them would put text an approval never saw into
             the record an approval points at. */}
         <Notes
@@ -1138,18 +1167,18 @@ export function Finding() {
           undisclosed={!!it.undisclosed}
         />
 
-        {/* Keyed on the claim, not on the row: the reasoning and the
-            agreement belong to the action that made the judgment. The
+        {/* Keyed on the decision, not on the row: the reasoning and the
+            agreement belong to the action that made the decision. The
             conversation about it is on the decision's own card. */}
-        {pairs[0]?.claim.decision?.claim_id && (
+        {pairs[0]?.decision.decision_occurrence?.decision_id && (
           <>
             <Activity
-              claimId={pairs[0].claim.decision.claim_id}
-              claim={pairs[0].claim}
-              places={pairs[0].summary?.places}
+              decisionId={pairs[0].decision.decision_occurrence.decision_id}
+              decision={pairs[0].decision}
+              occurrences={pairs[0].summary?.occurrences}
               previous={previous}
             />
-            <Revisions claimId={pairs[0].claim.decision.claim_id} />
+            <Revisions decisionId={pairs[0].decision.decision_occurrence.decision_id} />
           </>
         )}
         <Attachments about={{ product, vulnerability }} admin={!!who.data?.admin} />
@@ -1180,7 +1209,11 @@ export function Finding() {
             the issue is and what upstream did before they want the walk down
             to it. */}
         <div className="card">
-          <Places places={places} build={{ product, stream, variant }} version={it.version} />
+          <Occurrences
+            occurrences={occurrences}
+            build={{ product, stream, variant }}
+            version={it.version}
+          />
         </div>
 
         {/* Who has been let into this one case. Only where it is
@@ -1230,7 +1263,7 @@ export function Finding() {
             onReuse={(reasoning, outcome, justification) => {
               startFrom({ reasoning, outcome, justification });
               // The form, by identity. A CSS selector matched the first card
-              // inside the acting column, which is the standing claim's
+              // inside the acting column, which is the standing decision's
               // wherever one stands — so the act filled the form in correctly
               // and scrolled somewhere above it, and on a long finding the
               // form the person is now meant to submit was off screen.

@@ -39,8 +39,8 @@ type Embargoed struct {
 	// it is a date to answer, not a trigger.
 	DiscloseAt time.Time `bun:"disclose_at"`
 	AssignedTo *int64    `bun:"assigned_to"`
-	// Places is how many findings this covers, across every build named.
-	Places int `bun:"places"`
+	// Occurrences is how many findings this covers, across every build named.
+	Occurrences int `bun:"places"`
 	// Components are the components carrying it, by name.
 	Components []string `bun:"-"`
 	// Builds are the builds carrying it.
@@ -153,7 +153,7 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p") + ` AS "product_name"`).
 		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
-		// Whoever is dealing with it, and nobody where the places disagree.
+		// Whoever is dealing with it, and nobody where the occurrences disagree.
 		// A minimum named one of them: a partly assigned embargo read as one
 		// person's, which is a list of what is coming that names the wrong
 		// person to ask. The same reconciliation the deadline list does, in
@@ -167,7 +167,7 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		OrderExpr(`"disclose_at", "v"."identifier", "p"."name"`)
 
 	// Counted over the grouping rather than the rows: a row here is an issue
-	// in a product however many places it sits at, and counting the places
+	// in a product however many occurrences it has, and counting the occurrences
 	// would say a number the list cannot show.
 	total, err := s.db.NewSelect().
 		TableExpr(`(?) AS "approaching"`, query).Count(ctx)

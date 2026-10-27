@@ -105,7 +105,7 @@ export function labeled(outcome?: string): string {
 //
 // A word this does not know is shown as it arrived, the way the two renderers
 // above do it. In the tables that draw it the outcome is the whole of the
-// cell, so an empty one reads as a judgment nobody made.
+// cell, so an empty one reads as a decision nobody made.
 export function Outcome({ outcome }: { outcome?: string }) {
   if (!outcome) return null;
   const it = of(outcome);
@@ -121,7 +121,7 @@ export function Outcome({ outcome }: { outcome?: string }) {
 //
 // The vocabulary was adopted so that export would be nearly free, and CSAF is
 // the adapter that matters — so whichever of these somebody picks is what
-// ships to a customer, machine-readable, as our claim about their exposure.
+// ships to a customer, machine-readable, as our statement about their exposure.
 // Offered as bare tokens, that choice is made at the end of a long day off a
 // list of five snake_case strings, which is an accuracy problem rather than a
 // cosmetic one.
@@ -163,7 +163,7 @@ export const JUSTIFICATIONS = [
 // A form that narrows the list and keeps the old value sends a reason the
 // endpoint refuses, and a select whose value matches no option draws blank —
 // so nobody sees what is about to be sent. Dropped rather than replaced: which
-// reason applies is a claim a reader takes literally, and a form that picks
+// reason applies is a statement a reader takes literally, and a form that picks
 // one when the last became unavailable has answered for somebody.
 export function reasonsFor(outcome?: string) {
   return outcome === "mismatched" ? JUSTIFICATIONS_CORRECTING : JUSTIFICATIONS;
@@ -178,7 +178,7 @@ export function reasonOffered(outcome: string | undefined, chosen: string): stri
 // Derived rather than written out again. The other three describe how code is
 // reached or what already stops it, and a version bump changes both — a
 // correction carries past every bump, so one of those recorded as a correction
-// would put a judgment about risk beyond the rule that re-examines it. The
+// would put a decision about risk beyond the rule that re-examines it. The
 // endpoint refuses them; offering them here would be a refusal somebody meets
 // after writing the reasoning.
 export const JUSTIFICATIONS_CORRECTING = JUSTIFICATIONS.filter(

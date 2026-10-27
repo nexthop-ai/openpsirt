@@ -13,22 +13,22 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because, Outcome } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
-import { claimAt, findingOf, reviewQueueAt } from "../app/routes";
+import { decisionAt, findingOf, reviewQueueAt } from "../app/routes";
 
 type Row = Body<"ToReaffirmBody">;
 
-// What one act re-made: how many claims, and how many of those wait for a
+// What one act re-made: how many decisions, and how many of those wait for a
 // second person.
-type Reaffirmed = { claims: number; waiting: number };
+type Reaffirmed = { decisions: number; waiting: number };
 
 // What to say about it once the rows it came from have left the list.
 export function reaffirmedNotice(made: Reaffirmed): string {
-  const claims = `Reaffirmed ${made.claims.toLocaleString()} ${made.claims === 1 ? "claim" : "claims"}`;
-  if (made.waiting === 0) return `${claims}.`;
-  return `${claims}; ${made.waiting.toLocaleString()} ${made.waiting === 1 ? "waits" : "wait"} for a second person.`;
+  const decisions = `Reaffirmed ${made.decisions.toLocaleString()} ${made.decisions === 1 ? "decision" : "decisions"}`;
+  if (made.waiting === 0) return `${decisions}.`;
+  return `${decisions}; ${made.waiting.toLocaleString()} ${made.waiting === 1 ? "waits" : "wait"} for a second person.`;
 }
 
-// Why a claim lapsed, in the words a reader acts on. Both can hold.
+// Why a decision lapsed, in the words a reader acts on. Both can hold.
 export function whyLapsed(row: Pick<Row, "code_moved" | "rated_worse" | "was" | "now">): string[] {
   const why: string[] = [];
   if (row.code_moved) why.push("Code moved");
@@ -38,12 +38,12 @@ export function whyLapsed(row: Pick<Row, "code_moved" | "rated_worse" | "was" | 
   return why;
 }
 
-// The claims of yours that lapsed and that nothing has replaced: work handed
+// The decisions of yours that lapsed and that nothing has replaced: work handed
 // back, which the lapse alert links here. Each is re-made whole with its own
 // outcome and justification; the reason typed here is the one they share.
 //
-// The selection is held by claim across pages, because re-affirming acts on
-// claims and the server takes them by identifier.
+// The selection is held by decision across pages, because re-affirming acts on
+// decisions and the server takes them by identifier.
 export function ToReaffirm({
   rows,
   query,
@@ -57,20 +57,23 @@ export function ToReaffirm({
   const [open, setOpen] = useState(false);
   const [reasoning, setReasoning] = useState("");
   const [made, setMade] = useState<Reaffirmed | null>(null);
-  // The re-made claims that wait for a second person, each followed on its
+  // The re-made decisions that wait for a second person, each followed on its
   // own page.
   const [waitingOn, setWaitingOn] = useState<number[]>([]);
   const again = useMutation({
     mutationFn: async () =>
       unwrap(
         await api.POST("/v1/reaffirmations", {
-          body: { claims: [...picked], reasoning: reasoning.trim() },
+          body: { decisions: [...picked], reasoning: reasoning.trim() },
         }),
       ),
     onSuccess: (answer) => {
-      const claims = answer?.claims ?? [];
-      setMade({ claims: claims.length, waiting: claims.filter((one) => one.waiting).length });
-      setWaitingOn(claims.filter((one) => one.waiting).map((one) => one.claim_id));
+      const decisions = answer?.decisions ?? [];
+      setMade({
+        decisions: decisions.length,
+        waiting: decisions.filter((one) => one.waiting).length,
+      });
+      setWaitingOn(decisions.filter((one) => one.waiting).map((one) => one.decision_id));
       setPicked(new Set());
       setReasoning("");
       setOpen(false);
@@ -80,10 +83,10 @@ export function ToReaffirm({
 
   if (query.isPending) return <Loading />;
   if (query.isError) {
-    return <Failed error={query.error} what="The claims to reaffirm could not be read." />;
+    return <Failed error={query.error} what="The decisions to reaffirm could not be read." />;
   }
 
-  const shown = rows.map((row) => row.claim.id);
+  const shown = rows.map((row) => row.decision.id);
   const allShown = shown.length > 0 && shown.every((id) => picked.has(id));
   function pick(ids: number[], on: boolean) {
     const next = new Set(picked);
@@ -106,8 +109,8 @@ export function ToReaffirm({
           ) : (
             waitingOn.map((id) => (
               <span key={id}>
-                <Link to={claimAt(id)} className="linkish">
-                  Open claim {id} →
+                <Link to={decisionAt(id)} className="linkish">
+                  Open decision {id} →
                 </Link>{" "}
               </span>
             ))
@@ -117,7 +120,7 @@ export function ToReaffirm({
       {rows.length === 0 ? (
         <Empty
           title="Nothing of yours has lapsed."
-          detail="A claim lands here when the code moves under it or its issue is rated worse."
+          detail="A decision lands here when the code moves under it or its issue is rated worse."
         />
       ) : (
         <>
@@ -171,13 +174,13 @@ export function ToReaffirm({
                   <th style={{ width: 30 }}>
                     <input
                       type="checkbox"
-                      aria-label="Select every claim on this page"
+                      aria-label="Select every decision on this page"
                       checked={allShown}
                       onChange={(event) => pick(shown, event.target.checked)}
                     />
                   </th>
                   <th>Why</th>
-                  <th>Claim</th>
+                  <th>Decision</th>
                   <th>Issue</th>
                   <th>Component</th>
                   <th>Where</th>
@@ -187,13 +190,13 @@ export function ToReaffirm({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.claim.id} className="row">
+                  <tr key={row.decision.id} className="row">
                     <td>
                       <input
                         type="checkbox"
                         aria-label="Select"
-                        checked={picked.has(row.claim.id)}
-                        onChange={(event) => pick([row.claim.id], event.target.checked)}
+                        checked={picked.has(row.decision.id)}
+                        onChange={(event) => pick([row.decision.id], event.target.checked)}
                       />
                     </td>
                     <td>
@@ -204,12 +207,12 @@ export function ToReaffirm({
                       ))}
                     </td>
                     <td>
-                      <Outcome outcome={row.decision.outcome} />{" "}
-                      <Because code={row.decision.justification} />
+                      <Outcome outcome={row.decision_occurrence.outcome} />{" "}
+                      <Because code={row.decision_occurrence.justification} />
                     </td>
                     <td>
-                      <Link to={claimAt(row.claim.id)} className="id">
-                        {row.place.vulnerability}
+                      <Link to={decisionAt(row.decision.id)} className="id">
+                        {row.occurrence.vulnerability}
                       </Link>
                       {row.issues > 1 && <span className="hint"> and {row.issues - 1} more</span>}
                     </td>
@@ -220,9 +223,11 @@ export function ToReaffirm({
                         "—"
                       )}
                     </td>
-                    <td className="hint">{row.place.product_name || row.place.product}</td>
+                    <td className="hint">
+                      {row.occurrence.product_name || row.occurrence.product}
+                    </td>
                     <td className="num">
-                      {row.places} {row.places === 1 ? "place" : "places"}
+                      {row.occurrences} {row.occurrences === 1 ? "occurrence" : "occurrences"}
                     </td>
                     <td className="hint">{at(row.lapsed_at) || "—"}</td>
                   </tr>

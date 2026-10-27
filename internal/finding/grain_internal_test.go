@@ -70,8 +70,8 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 			*v = []string{"agreed"}
 		case *[]FixState:
 			*v = []FixState{FixedUpstream}
-		case *[]ClaimStanding:
-			*v = []ClaimStanding{StandingAgreed}
+		case *[]DecisionStanding:
+			*v = []DecisionStanding{StandingAgreed}
 		case *PlannedFilter:
 			*v = PlannedOnly
 		case **time.Time:

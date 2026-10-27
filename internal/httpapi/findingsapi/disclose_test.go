@@ -111,7 +111,7 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 }
 
 // The person whose act makes an issue public is not told it is public, even
-// where they hold a place of it. Verified by deleting the skip in
+// where they hold an occurrence of it. Verified by deleting the skip in
 // toldDisclosed: the agreer is told of their own act.
 func TestWhoeverDisclosesAnIssueIsNotToldOfIt(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {

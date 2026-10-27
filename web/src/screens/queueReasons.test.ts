@@ -16,28 +16,28 @@ describe("the list the review queue opens on", () => {
   });
 });
 
-describe("what a dated claim promised", () => {
-  const claim = { upgradeTo: "", committedTo: "2026-09-01", deferredUntil: "2026-10-01" };
+describe("what a dated decision promised", () => {
+  const decision = { upgradeTo: "", committedTo: "2026-09-01", deferredUntil: "2026-10-01" };
 
   it("names the version and the date of an upgrade", () => {
-    expect(promised({ ...claim, outcome: "upgrade-needed", upgradeTo: "3.0.15" })).toBe(
+    expect(promised({ ...decision, outcome: "upgrade-needed", upgradeTo: "3.0.15" })).toBe(
       "Upgrade to 3.0.15 by 2026-09-01",
     );
   });
 
   it("names the date of an upgrade that names no version", () => {
-    expect(promised({ ...claim, outcome: "upgrade-needed" })).toBe("Upgrade by 2026-09-01");
+    expect(promised({ ...decision, outcome: "upgrade-needed" })).toBe("Upgrade by 2026-09-01");
   });
 
   it("names the date of a patch", () => {
-    expect(promised({ ...claim, outcome: "patch-needed" })).toBe("Patch by 2026-09-01");
+    expect(promised({ ...decision, outcome: "patch-needed" })).toBe("Patch by 2026-09-01");
   });
 
   it("names the date a deferral returns", () => {
-    expect(promised({ ...claim, outcome: "deferred" })).toBe("Deferred until 2026-10-01");
+    expect(promised({ ...decision, outcome: "deferred" })).toBe("Deferred until 2026-10-01");
   });
 
   it("says nothing for an outcome with no date", () => {
-    expect(promised({ ...claim, outcome: "wont-fix" })).toBe("");
+    expect(promised({ ...decision, outcome: "wont-fix" })).toBe("");
   });
 });

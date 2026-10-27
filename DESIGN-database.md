@@ -309,7 +309,7 @@ only what follows it. A fresh install applies it and every migration after it.
 | Each table is made by one declaration | The declarations sit beside the migration, grouped by area, with the reasoning for each table's shape. The migration names every table in an order where each follows every table it points at |
 | v0.7.0's record of its schema holds it | On each of the four engines the baseline builds exactly the columns, constraints and indexes v0.7.0 built, and the schema test fails on any line either side lacks |
 | Every statement a declaration holds is one the baseline makes | A test reads each declaration and fails on a table or index the baseline makes from somewhere else, so no declaration reads as schema and is not |
-| A release's declaration may be derived from a baseline declaration | v0.8.0's declarations of the finding, decision and notification tables are the baseline's with indexes beside them, and most of v0.9.0's are the baseline's or v0.8.0's with columns beside them. The baseline's schema test holds what they start from |
+| A release's declaration may be derived from a baseline declaration | v0.8.0's declarations of the finding, decision occurrence and notification tables are the baseline's with indexes beside them, and most of v0.9.0's are the baseline's or v0.8.0's with columns beside them. The baseline's schema test holds what they start from |
 | A baseline declaration a tagged migration reads keeps its name and its statements | Migration 42 reads the finding table's declaration by the name v0.7.0 gave it. The baseline's declaration answers to that name, and builds the same statements, byte for byte, that v0.7.0's declaration built |
 | A database below the baseline is refused | A version from 1 to 40 is one a release before v0.7.0 built. Startup and `openpsirt migrate up` refuse it before anything runs, naming its version and the releases that upgrade it, and `openpsirt migrate status` reports it as before the baseline with the same releases. v0.8.0 upgrades a version from 39, its own baseline, on. A version below 39 takes v0.6.0 first, because v0.8.0 refuses it as this tree does. Without the refusal the baseline would run against the old tables: PostgreSQL and SQLite fail on the first name already taken, and MySQL and MariaDB step over every table that exists (§ Migrations that stop half way) and record the baseline over the old schema |
 
@@ -393,7 +393,7 @@ row moves. § Indexes says what each index serves.
 | Table | Gains | Every engine |
 |---|---|---|
 | `finding` | What is open in a build indexed with its deadline, and the grouping index carrying when a finding opened, why it closed and who holds it | Each index dropped and made again by the release's statement, where the table stands. SQLite included: an index is made there like anywhere else, and a rebuild would copy every row to change none |
-| `decision` | An index on the state and the claim | Made where the table stands |
+| `decision`, v0.11.0's `decision_occurrence` | An index on the state and the decision | Made where the table stands |
 | `notification` | An index on the kind, whether a row is open, and the person | Made where the table stands |
 | `finding`, on PostgreSQL alone | Vacuumed after a fiftieth of it changes and analyzed after a hundredth | A storage setting on the table |
 
@@ -427,14 +427,14 @@ which reads as no attempt in flight.
 | Each image's components are grouped by name | The identifier with no version, reduced the way identity reduces it |
 | A name some build held at two versions at once is left as it is, in every build | Two of its nodes in one build with intervals that overlap. v0.9.0 keeps such images apart by version too. A build holding that name once moves to the name on its next upload, once, as a version moving would |
 | One component is kept per name | The one already identified by the name where there is one, and otherwise the earliest. It takes the name's identity, no version, the identifier with no version, and the fold key that follows; a supplier, license or platform enumeration it lacks is taken from the others |
-| Live decisions are keyed on the merged image | A live decision at a place an image's finding sits at, keyed on that image's upstream version as the component or as what pulls it in, is keyed on the merged image's instead, which is none. Its live key is worked out again where it was keyed on the versions. An ended decision stays as it was recorded. Read a product at a time, its places a batch at a time: no index on the decisions leads with the place |
-| Two live decisions that became one claim keep one | The approved over the proposed, then the one proposed last, then the later row: the order a settled decision is read in. The other lapses, with the moment of the upgrade |
+| Live decision occurrences are keyed on the merged image | The live decision at an occurrence an image's finding sits at, keyed on that image's upstream version as the component or as what pulls it in, is keyed on the merged image's instead, which is none. Its live key is worked out again where it was keyed on the versions. An ended one stays as it was recorded. Read a product at a time, its occurrences a batch at a time: no index on the decision occurrences leads with the occurrence |
+| Two live rows that come to share one live key keep one | The approved over the proposed, then the one proposed last, then the later row: the order a settled decision is read in. The other lapses, with the moment of the upgrade |
 | Upgrade commitments move to the merged image's fold | A build already committed on it keeps that commitment, and drops the one on the old fold |
 | Nodes are pointed at the kept component, and joined | A build's nodes whose intervals meet, one closing at the scan the next opened, are one node across both: the first is kept, its interval reaches the last one's end, and its identifier is the last one's with no version. A gap stays two nodes |
 | Each old node is a version the build stated | One image version row per node, on the node kept: the old component's version and the node's identifier, across the old node's interval |
 | Edges are pointed at the kept nodes, and joined | After every image is merged, an edge whose pair and scope match one that closed at the scan it opened is joined into that one |
 | Findings and tags are pointed at the kept component | Both the component a finding is against and what pulls it in. A tag the merged image carried twice for one issue in one product keeps the first added |
-| The findings are read and moved once for every image | Read for the places decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
+| The findings are read and moved once for every image | Read for the occurrences decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
 | The other components are removed | Nothing points at them any more |
 | Each destination's name is folded | The name becomes its lower-case key and the spelling typed is kept beside it (`DESIGN-notifications.md` § Outbound HTTP). Two names one kind held that fold to one key stay two. One still in use keeps the key before a retired one, then the one already spelled as the key, then the earliest. The other takes the key followed by its own number, and that numbered key is also the name it is listed under, so retiring it by the name shown reaches it. On MySQL and MariaDB in a transaction of its own between the image version table and the merge, which asks whether the column is there before adding it, so a start after one stopped part way folds rather than failing on the column |
 | A delivery gains when its latest attempt began | A column that takes a null, added where the table stands on every engine, after the destinations are folded. On MySQL and MariaDB in a transaction of its own between the fold and the merge, which asks whether the column is there first, so a start after one stopped part way steps over it |
@@ -451,7 +451,7 @@ as v0.9.0 stores the same image.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decisions beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one tag on it, one commitment on its fold, the decision proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the decision about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
+| A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decision occurrences beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one tag on it, one commitment on its fold, the occurrence proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the occurrence about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
 | The same on PostgreSQL, a trigger on every table refusing a removal while a column pointing at the table leads no index, and an index made by hand on one such column | Migrations 42, 43 and 44 remove nothing the trigger refuses, components and nodes are removed under it, the index made by hand is still there, and none of the merge's own remains |
 | The same on MySQL and MariaDB, the merge stopped at its last step | No version is recorded, no image version written and every stamp is still its own component. The next start steps over the table and leaves what an upgrade that did not stop leaves |
 | The nodes of that build, one component carrying a source package | Upgraded, that component's node holds its source package and version, and every other node holds none |
@@ -460,7 +460,7 @@ as v0.9.0 stores the same image.
 
 Measured on PostgreSQL 16 with ten nightly builds of 34 images restamped every
 night over 600 packages, 1,632,000 findings and 204,000 edges beneath them, and
-122,400 live decisions keyed on the last stamp: the upgrade takes 2 min 41 s, and
+122,400 live decision occurrences keyed on the last stamp: the upgrade takes 2 min 41 s, and
 leaves 34 image components, 340 image versions and 20,400 edges. `make measure`
 re-runs it. The time is mostly rewriting the findings, which grow with images
 times stamps, so a deployment with a month of nightly history takes three times
@@ -516,7 +516,7 @@ Migration 44. No row moves. § Indexes says what each index serves,
 |---|---|---|
 | `finding` | An index on the run that opened a finding, and one on the run that closed it | Made where the table stands by the release's statement. An index the database already holds under the name is replaced, because on MySQL and MariaDB a stopped upgrade leaves the indexes it made and the next start runs the migration from the top |
 | `product` | Whether its security documents are published, false for every product | Added where the table stands, with a default of false, and stepped over where a stopped upgrade added it already |
-| `claim` | Whom a statement published from it holds for, empty for every claim | Added where the table stands, and stepped over where it is already there |
+| `claim`, v0.11.0's `decision` | Whom a statement published from it holds for, empty for every decision | Added where the table stands, and stepped over where it is already there |
 | `published_document` | A new table: one row per published document, holding the revision a reader is handed | Made by the release's statement, and stepped over where it is already there |
 | `upstream` | A new table: the upstream a product trusts, the key it confirmed, and how reading it went | Made by the release's statement, and stepped over where it is already there |
 | `upstream_document` | A new table: one row per document an upstream lists, at the revision last recorded | Made by the release's statement, and stepped over where it is already there |
@@ -535,6 +535,67 @@ is 21 to 29 MB beside a 306 MB table.
 Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
 says what a report's case holds.
 
+It renames the triage records first, so the rest of it and the release's
+declarations are written against the new names.
+
+| v0.10.0 table | v0.11.0 table |
+|---|---|
+| `decision`, the row at one occurrence | `decision_occurrence` |
+| `decision_superseded` | `decision_occurrence_superseded` |
+| `claim` | `decision` |
+| `claim_revision`, `claim_approval`, `claim_comment`, `claim_comment_revision`, `claim_build` | `decision_revision`, `decision_approval`, `decision_comment`, `decision_comment_revision`, `decision_build` |
+
+| Column | v0.11.0 name |
+|---|---|
+| `claim_id`, on every table above and on `upgrade` | `decision_id` |
+| `decision_id`, on `decision_occurrence_superseded` | `decision_occurrence_id` |
+| `place_identity`, on `decision_occurrence` and `finding` | `occurrence_identity` |
+
+Every index and constraint named after a renamed table or column is renamed
+with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`, and
+`finding_place_idx` is `finding_occurrence_idx`. The tables v0.11.0 creates are
+declared under the new names, `decision_stamp` among them.
+
+| Rule | Why |
+|---|---|
+| A rename changes the catalog alone | No row is read or written and no index is built on the three servers, so its time does not grow with the rows |
+| A name moves only once its holder has moved | `decision` becomes `decision_occurrence` before `claim` becomes `decision`. PostgreSQL holds an index name once per schema, and MySQL and MariaDB a foreign key's |
+| Each rename waits 3 seconds at most for its table, logs what holds it, and tries again until it runs or the upgrade is stopped | Otherwise PostgreSQL and MySQL wait without bound behind a session reading the table, and every request queues behind the rename with nothing saying why |
+| What holds a table is read from the engine | PostgreSQL's granted locks on it; on MySQL and MariaDB its granted metadata locks where the server records them, and otherwise every other session on the database. MariaDB records none by default |
+| PostgreSQL renames inside the upgrade's one transaction | A failure leaves every name as it was. A rename that waited out its bound is undone to a savepoint and tried again, because a failed statement otherwise ends the transaction |
+| MySQL and MariaDB step over a rename already made, and log it | Each commits as it runs, so a start that stopped part way left some made. A table is stepped over where its new name is there, and anything else where its old name is gone |
+| MySQL and MariaDB rename a foreign key by declaring it again | Neither has a statement for it. It is dropped and declared under its new name in one statement, in place, with foreign keys unchecked so no row is read. The index the key had serves the new one, and is renamed with it where it bore the key's name |
+| SQLite builds a renamed index again | It has no statement renaming one, and SQLite is a development database |
+| SQLite keeps the constraint names v0.10.0 wrote | A constraint's name is part of a SQLite table's text, which only a rebuild rewrites, and SQLite reports none of them |
+| PostgreSQL names each renamed table's sequence after it | The sequence keeps its table's old name otherwise |
+
+The stored values the renames reach then take the new words, in a step of
+its own after the renames.
+
+| Stored value | v0.10.0 | v0.11.0 |
+|---|---|---|
+| A bulk decision's `kind` on `decision` | `together` | `bulk` |
+| `kind` on `notification` and `outbound` | `claim-waiting`, `claim-lapsed` | `decision-waiting`, `decision-lapsed` |
+| A notification's `link` to a decision's row at one occurrence | `/decisions/{id}` | `/decision-occurrences/{id}` |
+| A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
+| The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
+
+| Rule | Why |
+|---|---|
+| Each step writes only rows still holding a v0.10.0 value | A second start changes what the first did not reach, and nothing twice. On MySQL and MariaDB the renames committed the upgrade's transaction, so each statement here commits as it runs |
+| PostgreSQL and SQLite rewrite inside the upgrade's one transaction | A failure leaves every value as it was |
+| A kept filter is rewritten in Go, one part of its query string at a time | A word matched in SQL also matches inside a value. Every other part stays byte for byte, because the list recognizes a kept filter as open by comparing addresses |
+| Only a link at the v0.10.0 address of a decision's row is rewritten | v0.11.0 gives that address to the decision, so the link would open another record. A link to `/claims/{id}` is forwarded by the interface |
+| The setting's row moves only where none is under the new name | A row under the new name outranks the former one |
+| The setting is read under its former name while the new one is unset, and each start logs a warning naming both | A v0.10.0 binary still running after the upgrade writes the former name |
+| Changing the setting replaces the former row and removes it in the same transaction, and the trail records the former value as what was replaced | The former name is refused at the API, so this is the one way to clear it and end the warning |
+| A waiting condition's identity keeps the words v0.10.0 hashed | An open condition is matched by that hash, and a new one would notify everybody again |
+| The trail of administrative changes keeps the former setting name | It records a change under the name the setting had |
+| A decision's record of how its set was chosen is kept as written | It records what somebody asked for |
+
+The rewrite's time grows with the notifications of the two kinds, and is not
+measured.
+
 | Table | Change | Every engine |
 |---|---|---|
 | `flaw_report` | Gains a title, who holds it and since when. Loses the acknowledged moment and who acknowledged | Each acknowledgement is first written as a message sent, dated the day it was recorded, by whoever recorded it, with no text. A report already holding a sent message is stepped over, so a start after one that stopped part way writes none twice. The index serving the unanswered list is dropped, then the foreign key naming who acknowledged on the server engines, then the columns. The holder's foreign key is added where the table does not hold it, whatever the columns say, since a stopped upgrade can leave the columns changed and the key not added |
@@ -547,6 +608,11 @@ says what a report's case holds.
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.10.0 database holding an acknowledged report | Upgraded, with the acknowledgement read back as the first message sent, on its day and by the person who recorded it |
+| A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
+| The same, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
+| A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
+| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a kept filter naming the renamed words and the bulk action limit | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
+| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
 
 ### Release records
 
@@ -598,7 +664,7 @@ in the gate.
 
 | Stage | What it does |
 |---|---|
-| The release's database | The release's image is built from its tag, and its own demo targets run unedited against an empty database of the rehearsal's own: products, inventories, the scans, a VEX document, judgments and an approval, an assignment, and a recorded flaw |
+| The release's database | The release's image is built from its tag, and its own demo targets run unedited against an empty database of the rehearsal's own: products, inventories, the scans, a VEX document, decisions and an approval, an assignment, and a recorded flaw |
 | What it held | Its status report's open findings per build, and every table's row count with it stopped. A build whose line carries no count is not settled, and the wait ends in a refusal naming it |
 | The upgrade | This tree's image applies the migrations on their own. The version reached is this tree's last migration |
 | The rows | Each table's count: a table both sides hold keeps its count, and a table only the upgrade holds starts empty. From a release before v0.9.0, the components, nodes and edges may hold fewer, by no more than the release held for container images, and the image versions start filled, with no more rows than the release held image nodes, because its upgrade merges the first three and fills the fourth from them. From a release before v0.9.0 the reasoning and recorded ratings reconcile exactly too, as the next table says |
@@ -606,7 +672,7 @@ in the gate.
 
 | Table, from a release before v0.9.0 | What the counts reconcile against |
 |---|---|
-| `statement_text` | Starts with one row per distinct reasoning, word for word, across the claims and supplier statements the release held |
+| `statement_text` | Starts with one row per distinct reasoning, word for word, across the build claims and supplier statements the release held |
 | `recorded_rating` | Starts with one row per issue and product the release held a recorded flaw for, on an issue rated by a word or by a score naming no publisher. An issue that absorbed another in a merge may add one, as what the merge brought together says |
 | `issue_rating` | Gains exactly the recorded words whose issue and product held no word in force, and keeps every word that was |
 | `vulnerability_rating` | Loses exactly the unsourced ratings of issues now holding a recorded rating. No other issue's unsourced ratings move, none is gained, and no rating naming a publisher moves |
@@ -1019,7 +1085,7 @@ defect.
 | Read inside the write | What it decides |
 |---|---|
 | The limits on an act answering many issues | Whether the act is refused. A limit a caller left unset is the deployment's setting |
-| How many findings one judgment may write | Whether a judgment across many places, or an extension of an agreed one, is refused |
+| How many findings one decision may write | Whether a decision across many occurrences, or an extension of an agreed one, is refused |
 | The longest a personal token may last | The ceiling the new token is held to |
 | Whether the writer may write a note about an issue | Whether the note is written |
 | Where each added build holds a recorded flaw's component | Which rows the flaw opens. A build that stopped shipping it is refused |
@@ -1131,13 +1197,13 @@ critical, and from what" is the question being asked of it.
 | Write | What it matches on beside the key |
 |---|---|
 | Agreeing to or withdrawing a rating | The state the claim was read in |
-| Holding rows of a claim back, and setting them aside | Still waiting, and still the claim they were read from |
+| Holding occurrences of a decision back, and setting them aside | Still waiting, and still the decision they were read from |
 | Filling in what a tag was cut from | An empty parent; a lost race reads back what won and refuses a different branch |
 | Changing a setting | The value read |
 | Bringing a retired product, release or variant back | Still retired. A match of none is another declaration that got there first, and this one records no return to use |
 | Collecting an upload nothing refers to | Still unattached, and not redacted since the page was read |
 | Moving a handed-off lead, taking it back out, or disclosing its flaw | The visibility read, the flaw undisclosed, and the last analysis run to describe the lead, which a run writes before it writes anything about the lead |
-| Handing off a lead, and revising, withdrawing, approving, setting aside, sending back or undoing the approval of a claim | The claim's stamp as read, set to a new value. The stamp is read before the hand-off is asked about, and a hand-off reads the stamp of the claim standing at the lead before it asks whether that claim confirms it. A hand-off and a withdrawal of its confirmation each read the other's absence, and only one of the two matches. The stamp is a row of its own beside the claim, because a row no foreign key points at is locked by nothing but its writers: InnoDB locks the parent of every child row it checks, so a stamp on the claim row waits on any transaction that inserted a row naming the claim. A claim with no stamp row holds zero, and its first stamp inserts the row; a duplicate key there is the same lost race. A claim writer sets the stamp as its transaction ends, after every other statement, so the stamp row is locked for the least time and two writers lock their claims' stamps in one order. Reaffirming writes no stamp: it acts on a lapsed claim, and a claim confirming a lead does not lapse |
+| Handing off a lead, and revising, withdrawing, approving, setting aside, sending back or undoing the approval of a decision | The decision's stamp as read, set to a new value. The stamp is read before the hand-off is asked about, and a hand-off reads the stamp of the decision standing at the lead before it asks whether that decision confirms it. A hand-off and a withdrawal of its confirmation each read the other's absence, and only one of the two matches. The stamp is a row of its own beside the decision, because a row no foreign key points at is locked by nothing but its writers: InnoDB locks the parent of every child row it checks, so a stamp on the decision row waits on any transaction that inserted a row naming the decision. A decision with no stamp row holds zero, and its first stamp inserts the row; a duplicate key there is the same lost race. A decision writer sets the stamp as its transaction ends, after every other statement, so the stamp row is locked for the least time and two writers lock their decisions' stamps in one order. Reaffirming writes no stamp: it acts on a lapsed decision, and a decision confirming a lead does not lapse |
 
 An insert that can lose a race on a unique key hands the race back rather than
 reporting the duplicate: recording a person, authorizing a name to sign in with,
@@ -1199,7 +1265,7 @@ The query builder writes every value into the statement text, so no two
 statements share a text and a cache of statements never answers from itself.
 Each mode the PostgreSQL driver offers, measured on PostgreSQL 16 with one
 processor over a 1 ms, 100 Mbit link, on the bench planning an upgrade over a
-kernel at 291,500 places:
+kernel at 291,500 occurrences:
 
 | Mode | Results | Kept per connection after the plan | The plan | Trend | Findings list | Home, all at once |
 |---|---|---|---|---|---|---|
@@ -1228,7 +1294,7 @@ style naming the month first.
 | On PostgreSQL, such a batch is one array a column | The server parses a list of rows a value at a time and an array whole, and unpacks the arrays into rows |
 | A row type with a column that names its own default keeps the list of rows | A column with a default, or one storing a zero value as null, is left to its default one row at a time, which an array cannot say |
 
-Writing the 291,500 decisions of one upgrade plan, measured on PostgreSQL 16
+Writing the 291,500 decision occurrences of one upgrade plan, measured on PostgreSQL 16
 with one processor over a 1 ms, 100 Mbit link:
 
 | Statements | A row |
@@ -1271,7 +1337,7 @@ them. The test harness adds `synchronous(OFF)`.
 | Rule | Reason |
 |---|---|
 | Every table is analyzed at start, on every engine | A server refreshes a table's estimates in the background once about a tenth of its rows have changed, so a database loaded before that ran, restored from elsewhere, or held by a server whose background work has stalled arrives with estimates that describe nothing |
-| An upgrade is followed by a start that analyzes | On MySQL and MariaDB an upgrade analyzes each table it rebuilds and leaves the rest as they were. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, beside an accurate 2,202 decisions. The planner started from the issues and products as a cross product, and a page of the decision audit ran for more than four hours. Analyzed, the same statement takes 5 ms |
+| An upgrade is followed by a start that analyzes | On MySQL and MariaDB an upgrade analyzes each table it rebuilds and leaves the rest as they were. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, beside an accurate 2,202 decision occurrences. The planner started from the issues and products as a cross product, and a page of the decision audit ran for more than four hours. Analyzed, the same statement takes 5 ms |
 | A server is not asked again after a scan | Its own background refresh follows a scan's writes. SQLite has none, so it is asked after every scan (§ SQLite settings) |
 | A failed refresh is logged and the start goes on | Stale estimates make a statement slow, never wrong |
 | The refresh has a quarter of the startup deadline | One running long leaves the rest of the start its time |
@@ -1313,14 +1379,14 @@ spelled four different ways.
 | Either index partial | No: it holds only the rows a condition admits |
 | A column that is an expression | Read as a column no other index's column equals |
 
-The indexes on the finding, decision and notification tables that serve the hottest reads:
+The indexes on the finding, decision occurrence and notification tables that serve the hottest reads:
 
 | Index | Columns | Serves |
 |---|---|---|
 | What is open in a build | Build, closed, deadline | The deadline report for one build, as a range at the end of the prefix: 256 ms a page through the deployment-wide deadline index, 205 ms through this one, for a build of 183,788 open findings |
 | Deadlines running out | Closed, the build's claim, deadline | The deadline report across the deployment, which names no build: 248 ms through it, 343 to 392 ms without it |
 | Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason, holder | The findings list and its total, and the backlog trend, each from the index alone. Over 375,843 findings, with the last two columns and without them: the trend grouped in the database reads 578 pages and 16,500, and takes 88 ms and 172 ms; the index is 4.6 MB and 4.2 MB |
-| Decisions waiting, by claim | State, claim | The review queue's page and its count, with 33,150 decisions waiting among 133,549. With the index and without it: the page 22 ms and 81 ms, the count 22 ms and 40 ms |
+| Occurrences waiting, by decision | State, decision | The review queue's page and its count, with 33,150 occurrences waiting among 133,549. With the index and without it: the page 22 ms and 81 ms, the count 22 ms and 40 ms |
 | What a run changed | Build, the run that opened a finding, issue, component, visibility, the run that closed it; and the same with the two runs swapped | The opened and closed counts on a page of receipts, from the index alone. A run's own screen also reads each finding's rating and exploitation, which the index does not hold, so it reads the table. The build leads. Led by the run, MySQL and MariaDB read a page whose runs opened most of the build through the component index and the table: 1.04 s and 599 ms for the count, against 231 ms and 237 ms in this order. MySQL a year in is the one case the other order wins, 134 ms against 467 ms. `DESIGN-ingest.md` § Receipt cost has the page on all four engines |
 | Who is being told | Kind, cleared, person | The notify sweep's read of who holds an open condition of each kind, once per kind. Kind and an open row are the prefix on all four engines, the null included, and MySQL and MariaDB group the people from the index without sorting them. With 152,859 open conditions over 204 people, without the index and with it: PostgreSQL 46 ms and 0.33 ms a read, averaged over every kind; the kind holding every row 106 ms and 15 ms on MySQL, 22 ms and 17 ms on MariaDB, 36 ms and 12 ms on SQLite; all 28 kinds once 2.9 s and 18 ms on MySQL. `DESIGN-notifications.md` § Delivery has the sweep |
 
@@ -1378,7 +1444,7 @@ into a failure of the whole scan that carried it — which is indistinguishable
 from a product that stopped having problems.
 
 The exception is text carrying a unique index, which needs a width. There the
-value is refused with a sentence rather than shortened: a decision keyed on a
+value is refused with a sentence rather than shortened: a decision's row keyed on a
 truncated version would be compared against the finding's full one, match
 nothing, and say so nowhere.
 

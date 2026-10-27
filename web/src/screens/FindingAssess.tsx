@@ -8,7 +8,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { RECORDABLE } from "../ui/severities";
-import { RATINGS } from "./FindingClaim";
+import { RATINGS } from "./FindingDecision";
 
 // The rating the form opens on: the standing one, then the published one, and
 // only where the form offers it. A published "negligible" or "none" is a word
@@ -31,8 +31,8 @@ export function milderThan(rating: string, published?: string): boolean {
 // Rating the issue itself, as against what was published.
 //
 // The finding screen is four readings of the record, split by the question
-// each answers. This is the one form among them: a claim about the issue
-// rather than about the place it was made from, so it holds in every build of
+// each answers. This is the one form among them: a decision about the issue
+// rather than about the occurrence it was made from, so it holds in every build of
 // this product — and rating it milder waits for a second person.
 //
 // The form only. What it is about is the severity line it opens from, which

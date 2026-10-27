@@ -67,7 +67,7 @@ func registerRulings(api huma.API, in core.Deps) {
 			"product. A duplicate of an issue that is not open here is refused: reject the " +
 			"report instead.\n\n" +
 			"A duplicate of a flaw recorded here, covering a report from outside, gives the " +
-			"flaw's undisclosed places in this product a disclosure date, or brings theirs " +
+			"flaw's undisclosed occurrences in this product a disclosure date, or brings theirs " +
 			"earlier: when the earliest such report arrived, plus `disclosure.after`. Bringing " +
 			"a date earlier past the movement threshold waits for a second person, as a " +
 			"shortening does. " +
@@ -76,7 +76,7 @@ func registerRulings(api huma.API, in core.Deps) {
 			"date first.\n\n" +
 			"Every report named has to be in this product, not accepted as an issue, and " +
 			"under no ruling, or nothing is " +
-			"written. The number of reports is bounded by `triage.together-cap`.",
+			"written. The number of reports is bounded by `triage.bulk-decision-cap`.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -308,13 +308,13 @@ func registerRulings(api huma.API, in core.Deps) {
 		Description: "The disclosure date ruling these reports a duplicate of this issue would " +
 			"give it here, without ruling anything.\n\n" +
 			"The date is when the earliest report from outside arrived, or was recorded where " +
-			"it does not say, plus `disclosure.after`. It is set on the undisclosed open places " +
+			"it does not say, plus `disclosure.after`. It is set on the undisclosed open occurrences " +
 			"of a flaw recorded here that have no date or a later one. A first date takes " +
 			"effect at once; bringing an existing date earlier is a shortening, and past the " +
 			"movement threshold waits for a second person, which `needs_approval` says. " +
 			"`disclose_at` is absent " +
 			"where the ruling would set nothing: every report was found here, the issue is not " +
-			"a flaw recorded here, or its places already end that day or earlier.\n\n" +
+			"a flaw recorded here, or its occurrences already end that day or earlier.\n\n" +
 			"An issue that is not here and one you may not be told of answer alike.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {

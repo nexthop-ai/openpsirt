@@ -53,7 +53,7 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 			}
 		}
 
-		// The reports read dismissals from the record, which holds claims
+		// The reports read dismissals from the record, which holds decisions
 		// about leads, and count vulnerabilities alone.
 		for _, got := range who.Outcomes {
 			if got.Dismisses && triage.Outcome(got.Outcome).AboutALead() {

@@ -21,14 +21,14 @@ import (
 // bundled is the fix-bundle list.
 type bundled struct {
 	Items []struct {
-		Upstream   string   `json:"upstream"`
-		From       string   `json:"from"`
-		To         string   `json:"to"`
-		Components []string `json:"components"`
-		Issues     int      `json:"issues"`
-		Places     int      `json:"places"`
-		Severity   string   `json:"severity"`
-		Exploited  bool     `json:"exploited"`
+		Upstream    string   `json:"upstream"`
+		From        string   `json:"from"`
+		To          string   `json:"to"`
+		Components  []string `json:"components"`
+		Issues      int      `json:"issues"`
+		Occurrences int      `json:"occurrences"`
+		Severity    string   `json:"severity"`
+		Exploited   bool     `json:"exploited"`
 	} `json:"items"`
 	Total int `json:"total"`
 }
@@ -58,9 +58,9 @@ func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 		// Two issues across two packages is two distinct vulnerabilities and
 		// four findings: the row says both, because they answer different
 		// questions.
-		if one.Issues != 2 || one.Places != 4 {
-			t.Errorf("the bundle closes %d issues at %d places, want 2 and 4",
-				one.Issues, one.Places)
+		if one.Issues != 2 || one.Occurrences != 4 {
+			t.Errorf("the bundle closes %d issues at %d occurrences, want 2 and 4",
+				one.Issues, one.Occurrences)
 		}
 		// Worth doing for its worst member.
 		if one.Severity != "critical" || !one.Exploited {
@@ -100,7 +100,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		r.ScannedSiblings(t)
 
 		const at = "/v1/products/mine/components/libcurl4t64/upgrade"
-		// A judgment with no reasoning is refused like every other. The body
+		// A decision with no reasoning is refused like every other. The body
 		// carries everything else a bump needs, so the refusal is the
 		// reasoning's alone.
 		unreasoned := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
@@ -113,7 +113,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 
 		// One act, one transaction. A release past end-of-life cannot be a fix
 		// target, and that refusal comes from the half that writes the intent
-		// — after the judgments have been written. Nothing may survive it: a
+		// — after the decisions have been written. Nothing may survive it: a
 		// bump half declared is a release plan that says a bump is declared
 		// for a release it is not.
 		gone := time.Now().UTC().AddDate(0, 0, -1).Format(time.DateOnly)
@@ -168,24 +168,24 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			t.Fatalf("declaring a bump answered %d: %s", got.Code, got.Body.String())
 		}
 		var done struct {
-			ClaimID    int64 `json:"claim_id"`
-			Decisions  int   `json:"decisions"`
-			Targets    int   `json:"targets"`
-			Issues     int   `json:"issues"`
-			Components int   `json:"components"`
+			DecisionID  int64 `json:"decision_id"`
+			Occurrences int   `json:"occurrences"`
+			Targets     int   `json:"targets"`
+			Issues      int   `json:"issues"`
+			Components  int   `json:"components"`
 		}
 		if err := json.Unmarshal(got.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
 		}
 		// Everything open across both binaries of the source package, not
-		// only what named this version — five places, three issues, both
-		// packages, under one claim.
-		if done.Decisions != 5 || done.Issues != 3 || done.Components != 2 {
-			t.Errorf("one upgrade wrote %+v, want five places across three issues"+
+		// only what named this version — five occurrences, three issues, both
+		// packages, under one decision.
+		if done.Occurrences != 5 || done.Issues != 3 || done.Components != 2 {
+			t.Errorf("one upgrade wrote %+v, want five occurrences across three issues"+
 				" and both packages of the source", done)
 		}
-		if done.ClaimID == 0 {
-			t.Error("an upgrade recorded no claim")
+		if done.DecisionID == 0 {
+			t.Error("an upgrade recorded no decision")
 		}
 		// One commitment per build and fold, which is the grain the work is
 		// done in and what the pending-upgrades screen reads. It was one per
@@ -196,7 +196,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 				done.Targets)
 		}
 
-		// Everything it reached now carries a claim, and the one nothing has
+		// Everything it reached now carries a decision, and the one nothing has
 		// fixed does not. "Agreed" rather than "waiting": a promise inside
 		// the deadline needs nobody to agree to it, so it is in force, which
 		// is the state an ordinary affected decision lands in too.
@@ -205,7 +205,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings?state=agreed", &decided)
 		if decided.Total != 3 {
-			t.Errorf("%d rows carry a claim after the upgrade, want the three it covered",
+			t.Errorf("%d rows carry a decision after the upgrade, want the three it covered",
 				decided.Total)
 		}
 
@@ -253,12 +253,12 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 		const plan = "/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades"
 		var waiting struct {
 			Items []struct {
-				Upstream   string   `json:"upstream"`
-				To         string   `json:"to"`
-				Components []string `json:"components"`
-				Issues     int      `json:"issues"`
-				Places     int      `json:"places"`
-				State      string   `json:"state"`
+				Upstream    string   `json:"upstream"`
+				To          string   `json:"to"`
+				Components  []string `json:"components"`
+				Issues      int      `json:"issues"`
+				Occurrences int      `json:"occurrences"`
+				State       string   `json:"state"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager", plan, &waiting)
@@ -266,11 +266,11 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 			t.Fatalf("the release is waiting on %d bumps: %+v", len(waiting.Items), waiting.Items)
 		}
 		one := waiting.Items[0]
-		// Three issues across two sibling packages, at five places, none
+		// Three issues across two sibling packages, at five occurrences, none
 		// landed — an upgrade covers everything open on the fold, not only
 		// what named this version as its fix.
-		if one.Upstream != "curl" || one.Issues != 3 || one.Places != 5 {
-			t.Errorf("the plan says %+v, want the three issues it covers at five places", one)
+		if one.Upstream != "curl" || one.Issues != 3 || one.Occurrences != 5 {
+			t.Errorf("the plan says %+v, want the three issues it covers at five occurrences", one)
 		}
 		if len(one.Components) != 2 {
 			t.Errorf("the bump moves %v here, want both packages", one.Components)
@@ -287,9 +287,9 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 		}
 		var after struct {
 			Items []struct {
-				Issues int    `json:"issues"`
-				Places int    `json:"places"`
-				State  string `json:"state"`
+				Issues      int    `json:"issues"`
+				Occurrences int    `json:"occurrences"`
+				State       string `json:"state"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager", plan, &after)
@@ -300,13 +300,14 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 	})
 }
 
-func TestAnUpgradeIsOneDecisionPerPlaceHoweverManyBuildsShipIt(t *testing.T) {
-	// A decision is keyed on the product, the issue, the place and the two
+func TestAnUpgradeIsOneDecisionPerOccurrenceHoweverManyBuildsShipIt(t *testing.T) {
+	// A decision is keyed on the product, the issue, the occurrence and the two
 	// upstream versions — no build appears in that key, deliberately, so the
-	// same claim is recognized across variants. A component shipped at the
+	// same decision is recognized across variants. A component shipped at the
 	// same version by two builds is therefore one thing to decide about and
 	// two findings, and proposing per finding wrote the same key twice: the
-	// second collided with the index that keeps one claim standing per place
+	// second collided with the index that keeps one decision standing per
+	// occurrence
 	// and took the whole act down with it, so every product with more than
 	// one build refused every bundle it was asked to declare.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -329,18 +330,18 @@ func TestAnUpgradeIsOneDecisionPerPlaceHoweverManyBuildsShipIt(t *testing.T) {
 				got.Code, got.Body.String())
 		}
 		var out struct {
-			Decisions int `json:"decisions"`
-			Issues    int `json:"issues"`
+			Occurrences int `json:"occurrences"`
+			Issues      int `json:"issues"`
 		}
 		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
 			t.Fatal(err)
 		}
-		// Five places at two sibling packages of one source, and five
-		// decisions however many builds ship them: a decision is keyed on the
-		// place, and no build appears in that key.
-		if out.Decisions != 5 {
-			t.Errorf("an upgrade over two builds wrote %d decisions, want the five "+
-				"places it covers", out.Decisions)
+		// Five occurrences at two sibling packages of one source, and five
+		// rows however many builds ship them: a decision is keyed on the
+		// occurrence, and no build appears in that key.
+		if out.Occurrences != 5 {
+			t.Errorf("an upgrade over two builds wrote %d rows, want the five "+
+				"occurrences it covers", out.Occurrences)
 		}
 
 		var after struct {
@@ -531,10 +532,10 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 		var made struct {
-			ClaimID int64 `json:"claim_id"`
-			Waiting bool  `json:"waiting"`
+			DecisionID int64 `json:"decision_id"`
+			Waiting    bool  `json:"waiting"`
 		}
-		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil || made.ClaimID == 0 {
+		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil || made.DecisionID == 0 {
 			t.Fatalf("declaring answered %s (%v)", got.Body.String(), err)
 		}
 		// A failure rather than a skip. Waiting is derived from the
@@ -547,7 +548,7 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 			t.Fatal("a bump this size no longer needs a second person, so the " +
 				"agreement this test takes back was never given")
 		}
-		r.Agreed(t, made.ClaimID)
+		r.Agreed(t, made.DecisionID)
 
 		const plan = "/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades"
 		var waiting struct {
@@ -563,7 +564,7 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 
 		// Moved, with a reason, which is what a second person reads.
 		if moved := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/promise", made.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", made.DecisionID),
 			`{"to":"8.6.0-1","by":"2030-02-01","reasoning":"8.5.0 was pulled; taking 8.6.0."}`,
 		); moved.Code != http.StatusNoContent {
 			t.Fatalf("re-promising answered %d: %s", moved.Code, moved.Body.String())
@@ -587,7 +588,7 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 	})
 }
 
-func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
+func TestAPromiseCarriesNoBoundAndADecisionKeepsItsOwn(t *testing.T) {
 	// One bound governed two actions with opposite risk profiles. A bulk
 	// dismissal is bounded because nothing re-checks it: one sentence
 	// answering a thousand findings has to stay a size a reviewer can follow.
@@ -596,19 +597,19 @@ func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
 	// record false, because the bump closes what it closes.
 	//
 	// In a real image one kernel bump reached 4,485 findings across 44,016
-	// places. Held to the shipped two thousand, the highest-value action in
+	// occurrences. Held to the shipped two thousand, the highest-value action in
 	// the data was refused by a factor of twenty-two, and the only escape was
 	// raising a setting that guards the dismissal path.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
-		// One, so anything covering more than a single place is past it. The
-		// fold here is five places.
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+		// One, so anything covering more than a single occurrence is past it.
+		// The fold here is five occurrences.
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.bulk-decision-cap",
 			`{"value":"1"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
 		}
 
-		// The judgment, refused, which is what keeps this test honest: the cap
+		// The decision, refused, which is what keeps this test honest: the cap
 		// is in force and reaching this path.
 		judged := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
@@ -616,7 +617,7 @@ func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 				`"reasoning":"The transfer path is never reached."}`)
 		if judged.Code != http.StatusUnprocessableEntity {
-			t.Fatalf("a bulk judgment past the cap answered %d: %s",
+			t.Fatalf("a bulk decision past the cap answered %d: %s",
 				judged.Code, judged.Body.String())
 		}
 
@@ -631,26 +632,26 @@ func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
 				promised.Code, promised.Body.String())
 		}
 		var done struct {
-			Decisions int `json:"decisions"`
-			Issues    int `json:"issues"`
+			Occurrences int `json:"occurrences"`
+			Issues      int `json:"issues"`
 		}
 		if err := json.Unmarshal(promised.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)
 		}
 		// Everything the fold covers, not one row of it. A promise narrowed to
-		// the cap would record a bump answering one place when it answers
+		// the cap would record a bump answering one occurrence when it answers
 		// five.
-		if done.Decisions <= 1 || done.Issues != 3 {
-			t.Errorf("the promise recorded %+v, want every place of the three issues", done)
+		if done.Occurrences <= 1 || done.Issues != 3 {
+			t.Errorf("the promise recorded %+v, want every occurrence of the three issues", done)
 		}
 	})
 }
 
-func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
+func TestABulkDecisionCoversTheFoldTheListShowed(t *testing.T) {
 	// The by-issue list folds to the source package: curl, libcurl4t64 and
 	// libcurl3t64 are one row. Keyed on the binary that was named, the bulk
-	// screen offered a quarter of what that row stood for and the judgment
-	// covered a quarter of what the person meant — four claims and four
+	// screen offered a quarter of what that row stood for and the decision
+	// covered a quarter of what the person meant — four decisions and four
 	// approvals to answer what reads as one thing.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
@@ -659,7 +660,7 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 		var candidates struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`
-				Places        int    `json:"places"`
+				Occurrences   int    `json:"occurrences"`
 			} `json:"items"`
 			Findings int `json:"findings"`
 		}
@@ -672,12 +673,12 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 				len(candidates.Items), candidates.Findings, candidates.Items)
 		}
 		for _, item := range candidates.Items {
-			if item.Vulnerability == "CVE-2026-CURL1" && item.Places != 2 {
-				t.Errorf("an issue at both packages of the fold says %d places", item.Places)
+			if item.Vulnerability == "CVE-2026-CURL1" && item.Occurrences != 2 {
+				t.Errorf("an issue at both packages of the fold says %d occurrences", item.Occurrences)
 			}
 		}
 
-		// And the judgment written from it covers the fold, in one claim.
+		// And the decision written from it covers the fold, in one act.
 		decided := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/components/libcurl4t64/bulk-decision",
@@ -686,7 +687,7 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 				`"selected_by":"the whole fold",`+
 				`"reasoning":"The transfer path is never reached from this image."}`)
 		if decided.Code != http.StatusCreated {
-			t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
+			t.Fatalf("the bulk decision answered %d: %s", decided.Code, decided.Body.String())
 		}
 		var written struct {
 			Recorded int     `json:"recorded"`
@@ -699,16 +700,16 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 		// Keyed on the named binary it answered one and reported that it had
 		// covered what the list showed.
 		if written.Recorded != 2 || len(written.IDs) != 2 {
-			t.Errorf("one judgment wrote %d decisions, want the two places of the fold",
+			t.Errorf("one decision wrote %d rows, want the two occurrences of the fold",
 				written.Recorded)
 		}
 	})
 }
 
-func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
-	// The server resolves the places itself, correctly and for exactly this
-	// reason, and took the claimant's word for how the issue list was chosen.
-	// A claim reading "drivers this image does not build" over a set picked by
+func TestABulkDecisionRecordsANarrowingAnApproverCanCheck(t *testing.T) {
+	// The server resolves the occurrences itself, correctly and for exactly this
+	// reason, and took the proposer's word for how the issue list was chosen.
+	// A decision reading "drivers this image does not build" over a set picked by
 	// ticking everything is indistinguishable in the record from an honest
 	// one, and what is asked for is how the set was chosen — which an approver
 	// has to be able to act on.
@@ -725,60 +726,60 @@ func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
 				`"selected_by":"only the ones in the transfer path",`+
 				`"reasoning":"The transfer path is never reached from this image."}`)
 		if everything.Code != http.StatusCreated {
-			t.Fatalf("deciding together answered %d: %s",
+			t.Fatalf("the bulk decision answered %d: %s",
 				everything.Code, everything.Body.String())
 		}
 		var made struct {
-			ClaimID int64 `json:"claim_id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(everything.Body.Bytes(), &made); err != nil {
 			t.Fatal(err)
 		}
 
 		var detail struct {
-			Claim struct {
+			Decision struct {
 				SelectedBy string `json:"selected_by"`
 				Selection  *struct {
 					Contains string `json:"contains"`
 					Matched  int    `json:"matched"`
 					Named    int    `json:"named"`
 				} `json:"selection"`
-			} `json:"claim"`
+			} `json:"decision"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ClaimID), &detail)
-		claim := detail.Claim
-		if claim.Selection == nil {
-			t.Fatal("a bulk claim records no narrowing an approver could re-run")
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.DecisionID), &detail)
+		decision := detail.Decision
+		if decision.Selection == nil {
+			t.Fatal("a bulk decision records no narrowing an approver could re-run")
 		}
 		// Three issues are open at the fold and none was narrowed away, so the
 		// sentence claiming a subset is visible as one: named two of the three
 		// with no narrowing at all.
-		if claim.Selection.Contains != "" {
-			t.Errorf("the claim says it narrowed by %q", claim.Selection.Contains)
+		if decision.Selection.Contains != "" {
+			t.Errorf("the decision says it narrowed by %q", decision.Selection.Contains)
 		}
-		if claim.Selection.Matched != 3 || claim.Selection.Named != 2 {
+		if decision.Selection.Matched != 3 || decision.Selection.Named != 2 {
 			t.Errorf("the narrowing reached %d and named %d, want 3 and 2",
-				claim.Selection.Matched, claim.Selection.Named)
+				decision.Selection.Matched, decision.Selection.Named)
 		}
 		// And the prose is kept, because it is what the person meant to say.
-		if claim.SelectedBy != "only the ones in the transfer path" {
-			t.Errorf("the claimant's own words are %q", claim.SelectedBy)
+		if decision.SelectedBy != "only the ones in the transfer path" {
+			t.Errorf("the proposer's own words are %q", decision.SelectedBy)
 		}
 	})
 }
 
-func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
+func TestANarrowedDecisionRecordsWhatThatNarrowingReaches(t *testing.T) {
 	// The empty-term path proves the record exists; this one proves the term
 	// is re-run. Without it the escaped match that produces the number an
-	// approver checks the claim against could be deleted and every test would
-	// still pass, while the screen sends it on every narrowed claim.
+	// approver checks the decision against could be deleted and every test would
+	// still pass, while the screen sends it on every narrowed decision.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		r.ScannedSiblings(t)
 		// One of the three issues says something the others do not. A percent
 		// sign in the text as well, because the escape is what stops a term
 		// holding one from selecting far more than the box said — and this is
-		// the set a bulk judgment is then recorded against.
+		// the set a bulk decision is then recorded against.
 		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
 			Set(`"description" = ?`, "A 100% reachable fault in the transfer driver.").
 			Where(`"identifier" = ?`, "CVE-2026-CURL1").Exec(ctx); err != nil {
@@ -793,36 +794,36 @@ func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
 				`"selected_by":"the transfer driver","contains":"driver",`+
 				`"reasoning":"The transfer path is never reached from this image."}`)
 		if decided.Code != http.StatusCreated {
-			t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
+			t.Fatalf("the bulk decision answered %d: %s", decided.Code, decided.Body.String())
 		}
 		var made struct {
-			ClaimID int64 `json:"claim_id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
 			t.Fatal(err)
 		}
 		var detail struct {
-			Claim struct {
+			Decision struct {
 				Selection *struct {
 					Contains string `json:"contains"`
 					Matched  int    `json:"matched"`
 					Named    int    `json:"named"`
 				} `json:"selection"`
-			} `json:"claim"`
+			} `json:"decision"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ClaimID), &detail)
-		if detail.Claim.Selection == nil {
-			t.Fatal("a narrowed claim records no narrowing")
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.DecisionID), &detail)
+		if detail.Decision.Selection == nil {
+			t.Fatal("a narrowed decision records no narrowing")
 		}
-		one := detail.Claim.Selection
-		// One of the three matches that word, and one was claimed about: the
+		one := detail.Decision.Selection
+		// One of the three matches that word, and one was decided about: the
 		// sentence describes the set, which is what the two numbers say.
 		if one.Contains != "driver" || one.Matched != 1 || one.Named != 1 {
 			t.Errorf("the narrowing reads %+v, want driver reaching 1 and naming 1", one)
 		}
 
 		// And a term holding a percent matches the text that holds one rather
-		// than everything. Spliced raw it is a wildcard, and the claim would
+		// than everything. Spliced raw it is a wildcard, and the decision would
 		// record three where the person saw one.
 		escaped := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"vulnerabilities":["CVE-2026-CURL2"],"outcome":"not-applicable",`+
@@ -830,16 +831,16 @@ func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
 				`"selected_by":"the ones mentioning a percentage","contains":"100%",`+
 				`"reasoning":"The transfer path is never reached from this image."}`)
 		if escaped.Code != http.StatusCreated {
-			t.Fatalf("deciding together answered %d: %s", escaped.Code, escaped.Body.String())
+			t.Fatalf("the bulk decision answered %d: %s", escaped.Code, escaped.Body.String())
 		}
 		if err := json.Unmarshal(escaped.Body.Bytes(), &made); err != nil {
 			t.Fatal(err)
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ClaimID), &detail)
-		if detail.Claim.Selection == nil {
-			t.Fatal("a narrowed claim records no narrowing")
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.DecisionID), &detail)
+		if detail.Decision.Selection == nil {
+			t.Fatal("a narrowed decision records no narrowing")
 		}
-		if got := detail.Claim.Selection.Matched; got != 1 {
+		if got := detail.Decision.Selection.Matched; got != 1 {
 			t.Errorf("a term holding a percent reached %d issues, want the one whose "+
 				"text holds it", got)
 		}
@@ -907,8 +908,8 @@ func TestThePendingUpgradesFileSaysWhatTheListSays(t *testing.T) {
 		}
 		body := httpapitest.RowsUnder(lines)
 		want := []string{
-			"upstream", "from", "to", "components", "issues", "places",
-			"declared_at", "by", "held_by", "held_by_name", "state", "claim",
+			"upstream", "from", "to", "components", "issues", "occurrences",
+			"declared_at", "by", "held_by", "held_by_name", "state", "decision",
 		}
 		if !slices.Equal(body[0], want) {
 			t.Fatalf("the file's columns are %v, want %v", body[0], want)
@@ -919,7 +920,7 @@ func TestThePendingUpgradesFileSaysWhatTheListSays(t *testing.T) {
 
 		// The list's field for each column, written as the file writes it:
 		// a number as digits, a list joined by spaces, an absent field empty.
-		field := map[string]string{"claim": "claim_id"}
+		field := map[string]string{"decision": "decision_id"}
 		item := list.Items[0]
 		for at, column := range want {
 			key := column
@@ -946,8 +947,8 @@ func TestThePendingUpgradesFileSaysWhatTheListSays(t *testing.T) {
 				t.Errorf("the file's %s is %q and the list's %s is %q", column, body[1][at], key, said)
 			}
 		}
-		if item["claim_id"] == nil || item["upstream"] != "curl" || item["by"] == nil {
-			t.Errorf("the declared upgrade reads as %v, want curl, its date and the claim that argued for it", item)
+		if item["decision_id"] == nil || item["upstream"] != "curl" || item["by"] == nil {
+			t.Errorf("the declared upgrade reads as %v, want curl, its date and the decision that argued for it", item)
 		}
 	})
 }

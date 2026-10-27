@@ -41,7 +41,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 //
 // A deferral is the one outcome that needs a date, and what is kept is the
 // length rather than the date: the date is worked out from it whenever
-// somebody submits the claim, so a rule saved in March means "put this off for
+// somebody submits the decision, so a rule saved in March means "put this off for
 // a quarter" rather than "until 3 March".
 func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
@@ -88,13 +88,13 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 	})
 }
 
-// The claim a saved filter prepares, at the store.
+// The decision a saved filter prepares, at the store.
 //
 // The endpoint's own schema refuses a prefill with no reasoning before the
 // store sees it, which is where a caller meets the rule. It is checked here as
 // well because the store is what anything else in this process calls, and a
 // rule that lives only in a request schema is one the next caller walks past.
-func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
+func TestAPreparedDecisionHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
@@ -157,13 +157,13 @@ func TestAPreparedClaimHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 	})
 }
 
-// The submission rules, asked where the claim is prepared.
+// The submission rules, asked where the decision is prepared.
 //
 // A saved filter prefills a decision, so a combination the decision store
 // refuses is a refusal that lands when somebody presses the button rather than
 // when they saved the thing that fills it in. The store is what anything else
 // in this process calls, so the rule is asked here rather than in a schema.
-func TestAFilterMayNotPrepareAClaimTheDecisionStoreWouldRefuse(t *testing.T) {
+func TestAFilterMayNotPrepareADecisionTheDecisionStoreWouldRefuse(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {

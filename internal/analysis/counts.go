@@ -20,7 +20,7 @@ type SeriesCount struct {
 	// Series is the series' name, as its producer first sent it.
 	Series string
 	// ByState counts the series' leads in each state, every state named and
-	// zero where none stands there. Waiting is the open ones whose claim waits
+	// zero where none stands there. Waiting is the open ones whose decision waits
 	// for a second person, and Ruled the dismissed ones a standing rule
 	// covers. A lead on two builds in two states counts in both, as the queue
 	// counts it.
@@ -72,7 +72,7 @@ func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, pro
 	if err := db.NewSelect().
 		TableExpr(`(?) AS "l"`, leadFindings(db, subject, Scope{ProductID: productID}, visible)).
 		ColumnExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).
-		ColumnExpr(`COUNT(DISTINCT "l"."place_identity") AS "leads"`).
+		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity") AS "leads"`).
 		GroupExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).
 		Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("count the leads of product %d by series: %w", productID, err)

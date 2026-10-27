@@ -121,7 +121,7 @@ func TestQualifiersDoNotStopAClaimMatching(t *testing.T) {
 }
 
 func TestAClaimWithoutAVersionCoversEveryVersion(t *testing.T) {
-	// One claim, however many places its component sits: the fan-out is done
+	// One claim, however many occurrences its component has: the fan-out is done
 	// where findings are.
 	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
 	 "products": [{"@id": "pkg:deb/sonic/frr"}]}`))

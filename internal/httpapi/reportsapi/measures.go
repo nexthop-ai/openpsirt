@@ -27,9 +27,9 @@ type SpreadBody struct {
 // WorkedBody is one person's throughput.
 type WorkedBody struct {
 	Person    string `json:"person"`
-	Proposed  int    `json:"proposed" doc:"Claims they made in the window"`
-	Approved  int    `json:"approved" doc:"Claims they agreed to, dated by the agreement: an approver's week is the week they approved in"`
-	Withdrawn int    `json:"withdrawn" doc:"Claims of theirs they took back"`
+	Proposed  int    `json:"proposed" doc:"Decisions they made in the window"`
+	Approved  int    `json:"approved" doc:"Decisions they agreed to, dated by the agreement: an approver's week is the week they approved in"`
+	Withdrawn int    `json:"withdrawn" doc:"Decisions of theirs they took back"`
 }
 
 // MeasuresBody is the state of triage, against what is open.
@@ -39,7 +39,7 @@ type MeasuresBody struct {
 	ToDecide []SpreadBody `json:"time_to_decide" doc:"The wait before anybody proposed anything, per severity"`
 	ToAgree  []SpreadBody `json:"time_to_agree" doc:"The wait for a second person, per severity"`
 	Worked   []WorkedBody `json:"throughput" doc:"Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members"`
-	SentBack int          `json:"sent_back" doc:"Claims an approver asked more of in the window. Counted for the deployment rather than per person: the record holds that a claim was sent back and not by whom"`
+	SentBack int          `json:"sent_back" doc:"Decisions an approver asked more of in the window. Counted for the deployment rather than per person: the record holds that a decision was sent back and not by whom"`
 	Sampled  int          `json:"sampled" doc:"The number of observations behind the two spans"`
 	Capped   bool         `json:"capped,omitempty" doc:"The ceiling was reached, so the spans describe the most recent part of the window rather than all of it"`
 }
@@ -57,7 +57,7 @@ func registerMeasures(api huma.API, in core.Deps) {
 		Summary: "Show how long triage is taking and who is doing it",
 		Description: "Four figures about how this deployment is working, as against what it " +
 			"holds: how long a finding sits before anybody proposes anything, how long a " +
-			"claim waits for a second person, what each person got through, and how much " +
+			"decision waits for a second person, what each person got through, and how much " +
 			"came back.\n\n" +
 			"The two waits come back three ways each — the middle, what nine in ten came " +
 			"in under, and the longest — so a caller reads three numbers per wait rather " +
@@ -68,11 +68,11 @@ func registerMeasures(api huma.API, in core.Deps) {
 			"an auditor is reporting on; `days` is the rolling window, and the two are ways " +
 			"of saying the same thing so only one may be sent.\n\n" +
 			"Bounded, and it says so. The two waits are worked out from at most the most " +
-			"recent few thousand claims in the window; `sampled` says how many and `capped` " +
+			"recent few thousand decisions in the window; `sampled` says how many and `capped` " +
 			"says whether the ceiling was reached. A figure quoted from part of a window " +
 			"without saying so is the one thing a number like this must not be.\n\n" +
 			"Send-backs are counted for the deployment rather than per person: the record " +
-			"holds that a claim was sent back and not by whom, and the reason travels as a " +
+			"holds that a decision was sent back and not by whom, and the reason travels as a " +
 			"comment.\n\n" +
 			"Narrowed to what you may read, like every count here — so two people asking get " +
 			"different answers rather than one of them getting an error.\n\n" +
@@ -80,8 +80,8 @@ func registerMeasures(api huma.API, in core.Deps) {
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.Period
-		Product string `query:"product" doc:"Limit to judgments made in one product, by name"`
-		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows"`
+		Product string `query:"product" doc:"Limit to decisions made in one product, by name"`
+		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows"`
 	}) (*struct{ Body MeasuresBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {

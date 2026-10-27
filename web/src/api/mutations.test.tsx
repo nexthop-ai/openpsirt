@@ -4,15 +4,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useComment, useEditComment, useEditNote, useRevise, useWithdraw } from "./mutations";
 import { acted } from "../test/acted";
-import { EVERY_CLAIM_KEY } from "../test/claimKeys";
+import { EVERY_DECISION_KEY } from "../test/decisionKeys";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("an edit to a claim, once it lands", () => {
-  it("revising the reasoning sends it to the claim named and moves every claim read", async () => {
+describe("an edit to a decision, once it lands", () => {
+  it("revising the reasoning sends it to the decision named and moves every decision read", async () => {
     const { sent, invalidated } = await acted(mount.render, mount.host, "PUT", useRevise, {
       id: 102,
       reasoning: "Not reachable from the socket.",
@@ -23,15 +23,15 @@ describe("an edit to a claim, once it lands", () => {
         { params: { path: { id: 102 } }, body: { reasoning: "Not reachable from the socket." } },
       ],
     ]);
-    expect(invalidated).toEqual(EVERY_CLAIM_KEY);
+    expect(invalidated).toEqual(EVERY_DECISION_KEY);
   });
 
-  it("withdrawing a claim moves every claim read", async () => {
+  it("withdrawing a decision moves every decision read", async () => {
     const { sent, invalidated } = await acted(mount.render, mount.host, "DELETE", useWithdraw, {
       id: 102,
     });
     expect(sent).toEqual([["/v1/decisions/{id}", { params: { path: { id: 102 } } }]]);
-    expect(invalidated).toEqual(EVERY_CLAIM_KEY);
+    expect(invalidated).toEqual(EVERY_DECISION_KEY);
   });
 });
 

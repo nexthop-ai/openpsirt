@@ -101,7 +101,7 @@ Every field a person types passes the submission policy, whether or not
 anything renders it: an assessment's reasoning, the reason an embargo is
 extended, the note on a closure by hand, the note on a build declared
 unaffected, and the summary recorded with an issuance. So does an address
-stored on its own — where work on a claim is happening, the address beside a
+stored on its own — where work on a decision is happening, the address beside a
 fix target — and the summary of a recorded flaw. A field that skips the policy
 loses all three of its parts at once: the scheme check, the refusal of raw
 markup, and the length bound.

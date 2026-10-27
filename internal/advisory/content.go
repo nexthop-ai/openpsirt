@@ -172,7 +172,7 @@ func (s *Store) referencesTo(ctx context.Context,
 	for _, one := range held {
 		// An address a scanner or a feed supplied, going into a document
 		// somebody else's tooling will follow. The same rule an address
-		// stored beside a claim goes through, for the stronger case: this one
+		// stored beside a decision goes through, for the stronger case: this one
 		// leaves the deployment.
 		if one.URL == "" || seen[one.URL] || markdown.Addressable(one.URL) != nil {
 			continue

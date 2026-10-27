@@ -65,16 +65,16 @@ func TestLeadCountsBySeriesAreReadOnlyUnderInternalRead(t *testing.T) {
 // count is the total the lead list answers asked for that series and state.
 func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		httpapitest.ApplyRunIn(t, r, "semgrep/default", time.Now().UTC().Add(-time.Hour),
 			httpapitest.OtherToolRun("semgrep", "sqli", "89", "src/c.c", 3, 7))
 
 		// The seeded lead is dismissed with a second person's agreement, and
 		// the other series' two stay open.
-		decided := decideLead(t, r, place,
+		decided := decideLead(t, r, occurrence,
 			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
 		if other := leadsOf(t, r, "internal-reader", "?series=SEMGREP/default"); len(other.Items) != 2 {
@@ -145,11 +145,11 @@ func leadFile(t *testing.T, r *httpapitest.Reach, who, query string) (int, [][]s
 // flaw's readers, and no row carries source text.
 func TestTheLeadFileHoldsWhatTheListHolds(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, true)
+		occurrence, _ := httpapitest.HandedOffLead(t, r, true)
 		const message, snippet = "p is leaked", "return;"
 
 		_, rows, body := leadFile(t, r, "internal-reader", "?state=handed-off")
-		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != message || rows[0][13] != place {
+		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != message || rows[0][13] != occurrence {
 			t.Fatalf("an internal reader's file holds %q; want the included lead whole", rows)
 		}
 		if strings.Contains(body, snippet) {
@@ -187,17 +187,17 @@ func TestTheLeadFileHoldsWhatTheListHolds(t *testing.T) {
 // The file with no state named is the queue, and says so above its rows.
 func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		_, rows, body := leadFile(t, r, "internal-reader", "")
 		if !strings.Contains(body, "the queue") {
 			t.Errorf("the file with no state does not say it is the queue:\n%s", body)
 		}
-		if len(rows) != 1 || rows[0][13] != place || rows[0][5] != "open" || rows[0][2] != "12" {
+		if len(rows) != 1 || rows[0][13] != occurrence || rows[0][5] != "open" || rows[0][2] != "12" {
 			t.Errorf("the queue's file holds %q; want the seeded lead, open at line 12", rows)
 		}
 		// Whoever holds a lead is a column of the file, as the list names them.
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut,
-			"/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place+"/assignment",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence+"/assignment",
 			`{"person":"internal-triager"}`); got.Code >= 300 {
 			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
 		}
@@ -217,20 +217,20 @@ const exceptionReport = "/v1/audit/decisions?alone=true&outcome=not-applicable&o
 // nobody else, the count included.
 func TestTheExceptionReportListsALeadDismissalNobodyAgreedToOnlyToInternalReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		decided := decideLead(t, r, place,
+		occurrence := httpapitest.SeededLead(t, r)
+		decided := decideLead(t, r, occurrence,
 			`{"outcome":"not-security","reasoning":"a crash in a tool that exits"}`)
 		type record struct {
 			Items []struct {
-				Claim   int64  `json:"claim"`
-				Outcome string `json:"outcome"`
+				Decision int64  `json:"decision"`
+				Outcome  string `json:"outcome"`
 			} `json:"items"`
 			Total int `json:"total"`
 		}
 		var got record
 		httpapitest.Read(t, r, "internal-reader", exceptionReport, &got)
-		if got.Total != 1 || len(got.Items) != 1 || got.Items[0].Claim != decided.ClaimID {
-			t.Fatalf("an internal reader's exception report is %+v; want the lead's claim alone", got)
+		if got.Total != 1 || len(got.Items) != 1 || got.Items[0].Decision != decided.DecisionID {
+			t.Fatalf("an internal reader's exception report is %+v; want the lead's decision alone", got)
 		}
 		for _, who := range []string{"private", "reader", "embargo-reader"} {
 			var other record
@@ -241,7 +241,7 @@ func TestTheExceptionReportListsALeadDismissalNobodyAgreedToOnlyToInternalReader
 		}
 		// Agreed to by a second person, it leaves.
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
 		httpapitest.Read(t, r, "internal-reader", exceptionReport, &got)
@@ -261,18 +261,18 @@ func TestALeadDismissalStandingWithNobodyAgreeingIsCountedWhateverItsFlagSays(t 
 				decided := decideLead(t, r, httpapitest.SeededLead(t, r), outcome)
 				// Standing, and cleared of the gate's flag, which is the write
 				// path got around.
-				if _, err := r.DB.DB.NewUpdate().Table("decision").
+				if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 					Set(`"state" = ?`, triage.Approved).Set(`"needs_approval" = ?`, false).
-					Where(`"claim_id" = ?`, decided.ClaimID).Exec(t.Context()); err != nil {
+					Where(`"decision_id" = ?`, decided.DecisionID).Exec(t.Context()); err != nil {
 					t.Fatal(err)
 				}
-				claims, rows, err := triage.NewStore(r.DB.DB).HiddenWithNobodyAgreeing(t.Context())
+				decisions, rows, err := triage.NewStore(r.DB.DB).HiddenWithNobodyAgreeing(t.Context())
 				if err != nil {
 					t.Fatal(err)
 				}
-				if claims != 1 || rows != 1 {
-					t.Errorf("%s standing alone with no flag counts %d claims over %d rows; want one of each",
-						name, claims, rows)
+				if decisions != 1 || rows != 1 {
+					t.Errorf("%s standing alone with no flag counts %d decisions over %d rows; want one of each",
+						name, decisions, rows)
 				}
 			})
 		})

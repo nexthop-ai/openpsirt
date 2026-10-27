@@ -59,7 +59,7 @@ export function Catalog() {
         </ul>
       </section>
 
-      {/* Only what is reachable nowhere else. The record of judgments, the
+      {/* Only what is reachable nowhere else. The record of decisions, the
           review queue, the by-component view, the comparison and the register
           are all files offered on the screen that produces them, and those
           copies are the better ones because they carry that screen's filters. */}

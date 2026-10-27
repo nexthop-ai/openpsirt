@@ -5,11 +5,11 @@
 
 // A year of nightly scans against this, measured rather than assumed.
 //
-// `REQUIREMENTS.md` §4 records the gap: scan files are deleted once read and the
-// interval storage was shaped so that a rebuild changing nothing writes
-// nothing, which is asserted by a test — but nobody had checked the shape
-// after a year of real nightly scans, and "the design says it should be fine"
-// is a sentence with a word doing too much work in it.
+// `REQUIREMENTS.md` §4 records the gap: scan files are deleted once read and
+// the interval storage was shaped so that a rebuild changing nothing writes
+// nothing, which is asserted by a test — but nobody had checked the shape after
+// a year of real nightly scans, and "the design says it should be fine" is a
+// sentence with a word doing too much work in it.
 //
 // This is behind a build tag because it is a measurement and not a gate: it
 // takes minutes, it asserts almost nothing, and its output is numbers to write
@@ -44,7 +44,7 @@ const (
 	// components is how many packages a build ships. The real image has 6,845.
 	components = 700
 	// consumers is how many containers each package sits in on average. A real
-	// image reached 241,021 places from 7,035 components, so about 34.
+	// image reached 241,021 occurrences from 7,035 components, so about 34.
 	//
 	// That reach was measured against the previous fixture and has not been
 	// re-measured against the current one, which describes 190 fewer
@@ -135,7 +135,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		// The first night is every finding opening at once, which is what an
 		// installation's first scan actually is.
 		first, took, issued := night(func(int) string { return "1.0" }, 0)
-		t.Logf("scale: %d components x %d consumers = %d places, %d issues",
+		t.Logf("scale: %d components x %d consumers = %d occurrences, %d issues",
 			components, consumers, components*consumers, issues)
 		t.Logf("night 1 (everything opens): opened %d in %s, %d statements (%s each)",
 			first.Opened, took, issued, per(took, issued))

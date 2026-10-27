@@ -218,7 +218,7 @@ type Agreement struct {
 
 // Approve records a second person agreeing to what the advisory says.
 //
-// Against one edition, not against the advisory, for the reason the claim
+// Against one edition, not against the advisory, for the reason the decision
 // approval it is modelled on names: an agreement that floats free of the words
 // would still be standing after somebody rewrote them.
 //

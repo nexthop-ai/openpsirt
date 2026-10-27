@@ -20,9 +20,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
-func TestAnIssuanceRetriedAfterAClaimWasWithdrawnRecordsTheDocumentAsItNowStands(t *testing.T) {
+func TestAnIssuanceRetriedAfterADecisionWasWithdrawnRecordsTheDocumentAsItNowStands(t *testing.T) {
 	// The document is generated inside the transaction that records it, on
-	// every attempt. A claim withdrawn between a refused commit and its retry
+	// every attempt. A decision withdrawn between a refused commit and its retry
 	// is gone from what is recorded: a document generated once, before, would
 	// record a statement nobody stands behind any more.
 	ctx := t.Context()
@@ -77,15 +77,15 @@ func TestAnIssuanceRetriedAfterAClaimWasWithdrawnRecordsTheDocumentAsItNowStands
 		len(open) != 1 {
 		t.Fatalf("the scan opened %d findings: %v", len(open), err)
 	}
-	at, err := findings.PlaceFor(ctx, proposer, w.Target.ID, issue, open[0].PlaceIdentity)
+	at, err := findings.OccurrenceFor(ctx, proposer, w.Target.ID, issue, open[0].OccurrenceIdentity)
 	if err != nil {
 		t.Fatal(err)
 	}
 	decisions := triage.NewStore(db)
-	decision, err := decisions.Propose(ctx, proposer, triage.Proposal{
-		Place: triage.Place{
+	occurrence, err := decisions.Propose(ctx, proposer, triage.Proposal{
+		Occurrence: triage.Occurrence{
 			ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-			PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
+			OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
 			ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 			OnTag: at.OnTag,
 		},
@@ -96,7 +96,7 @@ func TestAnIssuanceRetriedAfterAClaimWasWithdrawnRecordsTheDocumentAsItNowStands
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := decisions.ApproveClaim(ctx, approver, decision.ClaimID, "", nil, ""); err != nil {
+	if _, err := decisions.ApproveDecision(ctx, approver, occurrence.DecisionID, "", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,11 +111,11 @@ func TestAnIssuanceRetriedAfterAClaimWasWithdrawnRecordsTheDocumentAsItNowStands
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(before), "not_affected") {
-		t.Fatalf("the agreed claim is not in the document before the race: %s", before)
+		t.Fatalf("the agreed decision is not in the document before the race: %s", before)
 	}
 
 	between = func() {
-		if _, err := decisions.Withdraw(ctx, proposer, decision.ClaimID); err != nil {
+		if _, err := decisions.Withdraw(ctx, proposer, occurrence.DecisionID); err != nil {
 			t.Errorf("withdrawing between the attempts: %v", err)
 		}
 	}
@@ -128,7 +128,7 @@ func TestAnIssuanceRetriedAfterAClaimWasWithdrawnRecordsTheDocumentAsItNowStands
 		t.Fatal("no commit was refused, so nothing ran between the attempts")
 	}
 	if strings.Contains(recorded.Document, "not_affected") {
-		t.Errorf("the recorded document states a claim withdrawn before it was recorded: %s",
+		t.Errorf("the recorded document states a decision withdrawn before it was recorded: %s",
 			recorded.Document)
 	}
 }

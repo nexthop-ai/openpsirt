@@ -72,7 +72,7 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 				TargetID: target.ID, Kind: finding.Vulnerable,
 				VulnerabilityID: named[each.identifier],
 				Visibility:      each.visibility, ComponentID: component.ID,
-				PlaceIdentity: "place-" + each.component, Urgency: int64(i + 1),
+				OccurrenceIdentity: "place-" + each.component, Urgency: int64(i + 1),
 				OpenedAt: time.Now().UTC(), AssignedTo: &holder.PartyID,
 			}
 			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -172,7 +172,7 @@ func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(
 			row := &finding.Finding{
 				TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: named[each.identifier],
 				Visibility: each.visibility, ComponentID: component.ID,
-				PlaceIdentity: "place-" + each.component, Urgency: int64(i + 1),
+				OccurrenceIdentity: "place-" + each.component, Urgency: int64(i + 1),
 				OpenedAt: time.Now().UTC(),
 			}
 			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -251,7 +251,7 @@ func TestADigestLeavesOutEverythingItsReaderWasToldAbout(t *testing.T) {
 			row := &finding.Finding{
 				TargetID: target.ID, Kind: finding.Vulnerable,
 				VulnerabilityID: named[identifier], Visibility: access.Public,
-				ComponentID: component.ID, PlaceIdentity: "place-" + identifier,
+				ComponentID: component.ID, OccurrenceIdentity: "place-" + identifier,
 				Urgency: int64(i + 1), OpenedAt: time.Now().UTC(), AssignedTo: &holder.PartyID,
 			}
 			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {

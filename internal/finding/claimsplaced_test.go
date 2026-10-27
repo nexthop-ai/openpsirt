@@ -66,7 +66,7 @@ func (f *fixture) vendorSays(t *testing.T, product string, status sbom.Status, d
 	f.publishes(t, []finding.Statement{finding.StatementOf(claim, target)}, digest)
 }
 
-func TestAClaimAboutAComponentInsideAProductReachesOnlyThePlacesBeneathIt(t *testing.T) {
+func TestAClaimAboutAComponentInsideAProductReachesOnlyTheOccurrencesBeneathIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, beside(acmeY))
 		f.argues(t, insideOf(sbom.NotAffected, acmeY, "never called"))
@@ -96,7 +96,7 @@ func TestAClaimAboutAComponentInsideAProductReachesItHoweverDeep(t *testing.T) {
 	})
 }
 
-func TestAClaimAboutAComponentInsideAProductLeavesAPlaceReachedOutsideIt(t *testing.T) {
+func TestAClaimAboutAComponentInsideAProductLeavesAnOccurrenceReachedOutsideIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, shared())
 		f.argues(t, insideOf(sbom.NotAffected, acmeY, "never called"))
@@ -124,7 +124,7 @@ func TestAClaimAboutAnotherReleaseOfTheProductReachesNothing(t *testing.T) {
 	})
 }
 
-func TestAClaimAboutTheBuildsRootReachesEveryPlace(t *testing.T) {
+func TestAClaimAboutTheBuildsRootReachesEveryOccurrence(t *testing.T) {
 	sonic := graph.Described{Purl: rootPurl, Name: "sonic"}
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, beside(acmeY))
@@ -195,7 +195,7 @@ func TestAFixUploadedOnItsOwnAboutTheBuildsRootClosesAsPatched(t *testing.T) {
 		f.vendorSays(t, rootPurl, sbom.AlreadyFixed, "sha256:vendor-1")
 		applied, _ := f.reported(t, found(inside, zlib))
 		if applied.Patched != 2 || applied.Opened != 0 {
-			t.Errorf("patched %d and opened %d, want both places recorded patched",
+			t.Errorf("patched %d and opened %d, want both occurrences recorded patched",
 				applied.Patched, applied.Opened)
 		}
 	})
@@ -259,7 +259,7 @@ func TestTheListFindsWhatTheBuildSaysAndNothingElse(t *testing.T) {
 		f.argues(t, insideOf(sbom.Affected, acmeY, "turn compression off"))
 		f.reported(t, found(inside, zlib))
 		who := f.holding(t, access.PublicTriage)
-		places := func(filter finding.Filter) int {
+		occurrences := func(filter finding.Filter) int {
 			t.Helper()
 			groups, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, filter)
 			if err != nil {
@@ -267,18 +267,18 @@ func TestTheListFindsWhatTheBuildSaysAndNothingElse(t *testing.T) {
 			}
 			total := 0
 			for _, g := range groups {
-				total += g.Places
+				total += g.Occurrences
 			}
 			return total
 		}
-		if got := places(finding.Filter{}); got != 2 {
-			t.Fatalf("the list holds %d places, want the two zlib places", got)
+		if got := occurrences(finding.Filter{}); got != 2 {
+			t.Fatalf("the list holds %d occurrences, want the two zlib occurrences", got)
 		}
-		if got := places(finding.Filter{BuildSays: []string{"affected"}}); got != 1 {
-			t.Errorf("what the build says is affected is %d places, want the one inside Y", got)
+		if got := occurrences(finding.Filter{BuildSays: []string{"affected"}}); got != 1 {
+			t.Errorf("what the build says is affected is %d occurrences, want the one inside Y", got)
 		}
-		if got := places(finding.Filter{BuildSays: []string{"not_affected"}}); got != 0 {
-			t.Errorf("what the build says is not affected is %d places, want none", got)
+		if got := occurrences(finding.Filter{BuildSays: []string{"not_affected"}}); got != 0 {
+			t.Errorf("what the build says is not affected is %d occurrences, want none", got)
 		}
 	})
 }
@@ -438,7 +438,7 @@ func TestAStatementAboutAGenericProductIsPlacedByItsIdentifier(t *testing.T) {
 	})
 }
 
-func TestAClaimAboutAGenericRootReachesEveryPlace(t *testing.T) {
+func TestAClaimAboutAGenericRootReachesEveryOccurrence(t *testing.T) {
 	// A root is stored by its name alone, which a generic identifier is
 	// matched against. It is the build, and never a product inside it.
 	generic := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}

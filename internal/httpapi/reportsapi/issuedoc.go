@@ -21,20 +21,20 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// howManyJudgments is how many judgments the document carries.
+// howManyDecisions is how many decided occurrences the document carries.
 //
 // A page rather than everything: an issue at a widely vendored component can
 // carry hundreds, and what this document is for is being read.
-var howManyJudgments = 200
+var howManyDecisions = 200
 
 // registerIssueDocument renders everything known about one issue.
 //
 // The question a customer inquiry arrives as: the issue, the products of ours
-// carrying it, the decision about each, and the argument behind each judgment
+// carrying it, the decision about each, and the argument behind each decision
 // — in one document, so that two people answering the same inquiry answer it
 // the same way.
 //
-// An internal document. It carries the reasoning behind each judgment,
+// An internal document. It carries the reasoning behind each decision,
 // which is this deployment's argument rather than its word to a customer — the
 // documents that go out are the advisory and the VEX, and both are assembled
 // elsewhere and deliberately say less. The lead line says so, because a
@@ -96,7 +96,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		}
 		return unaffected(name), nil
 	}
-	rows, total, _, err := finding.NewStore(in.DB.DB).Everywhere(ctx, subject, id, howManyJudgments)
+	rows, total, _, err := finding.NewStore(in.DB.DB).Everywhere(ctx, subject, id, howManyDecisions)
 	if err != nil {
 		return "", core.WentWrong(in.Logger, "where this issue sits could not be read", err)
 	}
@@ -149,7 +149,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		fmt.Fprintf(&out, "- Also known as %s\n", strings.Join(aliases, ", "))
 	}
 	// The places it is written up, each address through the rule an address
-	// stored beside a claim goes through: this is a document somebody
+	// stored beside a decision goes through: this is a document somebody
 	// forwards.
 	//
 	// Read on its own, because the issue itself and the places it is written
@@ -162,15 +162,15 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		fmt.Fprintf(&out, "- <%s>\n", at)
 	}
 
-	// Its places, which are what the inquiry actually asks for.
-	fmt.Fprintf(&out, "\n## Its places\n\n%s\n\n", howManyCarry(total, len(rows)))
+	// Its occurrences, which are what the inquiry actually asks for.
+	fmt.Fprintf(&out, "\n## Its occurrences\n\n%s\n\n", howManyCarry(total, len(rows)))
 	for _, row := range rows {
 		fmt.Fprintf(&out, "- %s %s (%s) — %s %s",
 			markdown.Literal(row.Product), markdown.Literal(row.Stream),
 			markdown.Literal(row.Variant), markdown.Literal(row.Component),
 			markdown.Literal(row.Version))
-		if row.Places > 1 {
-			fmt.Fprintf(&out, ", at %d places", row.Places)
+		if row.Occurrences > 1 {
+			fmt.Fprintf(&out, ", at %d occurrences", row.Occurrences)
 		}
 		fmt.Fprintf(&out, " — %s", stateSaid(row.State))
 		if row.DueAt != nil {
@@ -182,44 +182,44 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		out.WriteString("\n")
 	}
 
-	// And what was decided, with the argument each judgment rests on.
-	judged, decided, err := triage.NewStore(in.DB.DB).Audit(ctx, subject,
+	// And what was decided, with the argument each decision rests on.
+	audited, decided, err := triage.NewStore(in.DB.DB).Audit(ctx, subject,
 		triage.Filter{Issue: known.Identifier}, time.Time{}, time.Time{},
-		howManyJudgments, 0)
+		howManyDecisions, 0)
 	if err != nil {
 		return "", core.WentWrong(in.Logger, "what was decided could not be read", err)
 	}
 	out.WriteString("\n## The decisions\n\n")
-	if len(judged) == 0 {
-		out.WriteString("Nothing. Every place of it is open and undecided.\n")
+	if len(audited) == 0 {
+		out.WriteString("Nothing. Every occurrence of it is open and undecided.\n")
 		return out.String(), nil
 	}
-	// Said where it is a page of a longer record, the way the places above
-	// say it. An issue at a widely vendored component carries hundreds of
-	// judgments, and stopping at two hundred silently reads as the whole of
-	// it.
-	if len(judged) < decided {
-		// What stands is the judgments in force. The record below carries the
+	// Said where it is a page of a longer record, the way the occurrences
+	// above say it. An issue at a widely vendored component carries hundreds
+	// of decided occurrences, and stopping at two hundred silently reads as the
+	// whole of it.
+	if len(audited) < decided {
+		// What stands is the decisions in force. The record below carries the
 		// withdrawn and lapsed ones as well.
 		standing, err := triage.NewStore(in.DB.DB).AuditCount(ctx, subject,
 			triage.Filter{Issue: known.Identifier, InForce: true}, time.Time{}, time.Time{})
 		if err != nil {
 			return "", core.WentWrong(in.Logger, "what was decided could not be counted", err)
 		}
-		below := fmt.Sprintf("The %d most recent are below.", len(judged))
-		if len(judged) == 1 {
+		below := fmt.Sprintf("The %d most recent are below.", len(audited))
+		if len(audited) == 1 {
 			below = "The most recent is below."
 		}
 		fmt.Fprintf(&out, "%s, of %s recorded. %s\n\n",
-			judgmentsStand(standing), judgments(decided), below)
+			decisionsStand(standing), decisions(decided), below)
 	}
 	// Newest first, which is how the record reads: what stands now is what
 	// somebody is looking for, and the history is under it.
-	sort.SliceStable(judged, func(i, j int) bool {
-		return judged[i].ProposedAt.After(judged[j].ProposedAt)
+	sort.SliceStable(audited, func(i, j int) bool {
+		return audited[i].ProposedAt.After(audited[j].ProposedAt)
 	})
-	for _, one := range judged {
-		body := judgedBody(one)
+	for _, one := range audited {
+		body := auditedBody(one)
 		fmt.Fprintf(&out, "- %s in %s — %s", body.Outcome, markdown.Literal(body.Product), body.State)
 		if body.Standing {
 			out.WriteString(", standing")
@@ -238,7 +238,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		}
 		out.WriteString("\n")
 		if body.Reasoning != "" {
-			// Indented under the judgment it belongs to, and left exactly as
+			// Indented under the decision it belongs to, and left exactly as
 			// it was typed: it went through the text policy when it was
 			// written, and rewriting it here would be a second policy.
 			for _, line := range strings.Split(strings.TrimSpace(body.Reasoning), "\n") {
@@ -275,14 +275,14 @@ func howManyCarry(total, shown int) string {
 // stateSaid is how far a build has decided it, in words rather than in the
 // vocabulary the database stores. A group that is none of the standings is
 // part decided.
-func stateSaid(state finding.ClaimStanding) string {
+func stateSaid(state finding.DecisionStanding) string {
 	switch state {
 	case finding.StandingAgreed:
 		return "agreed"
 	case finding.StandingWaiting:
 		return "waiting for a second person"
 	case finding.StandingLapsed:
-		return "the judgment here no longer stands"
+		return "the decision here no longer stands"
 	case finding.StandingUndecided:
 		return "nobody has said"
 	}
@@ -315,21 +315,22 @@ func urlsOf(references []finding.Reference) []string {
 	return out
 }
 
-// judgments says a count of judgments in its singular and plural forms.
-func judgments(n int) string {
+// decisions says a count of decided occurrences in its singular and plural
+// forms.
+func decisions(n int) string {
 	if n == 1 {
-		return "1 judgment"
+		return "1 decided occurrence"
 	}
-	return fmt.Sprintf("%d judgments", n)
+	return fmt.Sprintf("%d decided occurrences", n)
 }
 
-// judgmentsStand says how many judgments are in force.
-func judgmentsStand(n int) string {
+// decisionsStand says at how many occurrences a decision is in force.
+func decisionsStand(n int) string {
 	switch n {
 	case 0:
-		return "No judgment stands"
+		return "No decision stands at any occurrence"
 	case 1:
-		return "1 judgment stands"
+		return "A decision stands at 1 occurrence"
 	}
-	return fmt.Sprintf("%d judgments stand", n)
+	return fmt.Sprintf("Decisions stand at %d occurrences", n)
 }

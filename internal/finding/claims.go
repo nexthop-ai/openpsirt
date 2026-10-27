@@ -4,7 +4,7 @@
 package finding
 
 // The build's claims as applying a scan reads them: which ones name an issue,
-// which one covers a place, and how many reach anything the build ships.
+// which one covers an occurrence, and how many reach anything the build ships.
 
 import (
 	"sort"
@@ -26,7 +26,7 @@ import (
 //
 // A claim naming a product of the build reaches only what sits beneath it, so
 // one naming a release of the product the build does not ship reaches nothing.
-func claimsReaching(claims []Claim, present inventory, places consumers,
+func claimsReaching(claims []Claim, present inventory, occurrences consumers,
 	p *placer) (reaching, reachingNothing int) {
 
 	for _, claim := range claims {
@@ -35,7 +35,7 @@ func claimsReaching(claims []Claim, present inventory, places consumers,
 			if !claim.covers(describedOf(component)) {
 				continue
 			}
-			for _, consumerID := range places.of(component.ID) {
+			for _, consumerID := range occurrences.of(component.ID) {
 				if p.reaches(claim.within(), component, consumerID) {
 					found = true
 					break
@@ -64,7 +64,7 @@ func describedOf(c graph.Component) graph.Described {
 }
 
 // coveringClaim finds the build's argument that covers a reported issue at
-// one place, if it made one: the claim that suppresses it, and the claim the
+// one occurrence, if it made one: the claim that suppresses it, and the claim the
 // finding names whatever it says.
 //
 // A claim that arrived attached to the component is preferred over one that
@@ -91,7 +91,7 @@ func coveringClaim(claims []Claim, component graph.Component, consumerID int64,
 		}
 	}
 	// A document uploaded on its own and the one sent with the inventory both
-	// speak for the build. Where both cover a place, the one said more
+	// speak for the build. Where both cover an occurrence, the one said more
 	// recently is the build's word: a revision uploaded on its own replaces
 	// what came with the inventory, and a later upload replaces the revision.
 	stale := ""
@@ -135,7 +135,7 @@ func coveringClaim(claims []Claim, component graph.Component, consumerID int64,
 type claimsByName map[string][]int
 
 // indexClaims puts each claim under the name it argues about, once per apply
-// rather than once per place a reported issue occupies.
+// rather than once per occurrence a reported issue occupies.
 func indexClaims(claims []Claim) claimsByName {
 	index := claimsByName{}
 	for i, claim := range claims {

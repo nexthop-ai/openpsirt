@@ -19,7 +19,7 @@ const HELD = {
   product: "sonic",
   stream: "master",
   variant: "broadcom",
-  places: 1,
+  occurrences: 1,
   builds: 1,
 };
 
@@ -36,7 +36,7 @@ async function drawn(row: Record<string, unknown>) {
 
 describe("a lead in the work somebody holds", () => {
   it("opens the lead's page and says it is a lead", async () => {
-    const to = await drawn({ ...HELD, place: "abc" });
+    const to = await drawn({ ...HELD, occurrence: "abc" });
     expect(to).toBe("/products/sonic/streams/master/variants/broadcom/leads/abc");
     expect(mount.host().textContent).toContain("lead");
   });

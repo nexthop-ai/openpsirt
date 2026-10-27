@@ -135,7 +135,7 @@ export const buildFindingsAt = (build: Build, query?: Query) => at("buildFinding
 // added to the list needs nothing here and cannot collide with a name the
 // finding screen already uses.
 //
-// Opened through a saved filter that prepares a claim, the filter's name
+// Opened through a saved filter that prepares a decision, the filter's name
 // travels too, and the finding fills its decision form from what that filter
 // prepares. The name rather than the words: the filter is the one place
 // deciding what it says, and a copy in an address is a second one that goes
@@ -190,9 +190,9 @@ export function findingOf(row: {
 
 // The screens of one build.
 export const dependenciesAt = (build: Build, query?: Query) => at("dependencies", build, query);
-export const decideAt = (build: Build, component: string, which: Which = {}) =>
+export const bulkDecisionAt = (build: Build, component: string, which: Which = {}) =>
   at(
-    "decide",
+    "bulkDecision",
     { ...build, component },
     {
       version: which.version || undefined,
@@ -223,8 +223,8 @@ export function sameScreenAt(build: Build, rest: string): string {
 export const sameProductScreenAt = (product: string, rest: string) => productAt(product) + rest;
 
 // One thing, by what names it.
-export const claimAt = (id: number) => at("claim", { id });
 export const decisionAt = (id: number) => at("decision", { id });
+export const decisionOccurrenceAt = (id: number) => at("decisionOccurrence", { id });
 export const issueAt = (vulnerability: string) => at("issue", { vulnerability });
 export const personAt = (identity: string) => at("person", { identity });
 export const advisoryAt = (advisory: string | number) => at("advisory", { advisory });
@@ -232,7 +232,7 @@ export const reportAt = (report: string) => at("report", { report });
 export const settingsAt = (section: string) => at("settingsSection", { section });
 
 // The review queue, for one product, on one of its lists, or opened on the
-// claims somebody made themselves or has to re-affirm.
+// decisions somebody made themselves or has to re-affirm.
 export const reviewQueueAt = (
   which: {
     product?: string;
@@ -261,7 +261,7 @@ export const reportFlawAt = (product: string, from?: string, source?: "outside")
 export const exploitedAt = (product?: string) =>
   at("exploited", {}, { product: product || undefined });
 
-// The record of judgments, asked a question.
+// The record of decisions, asked a question.
 export const recordAt = (query?: Query) => at("record", {}, query);
 
 // An address built here, with its query replaced, for a list moved to another

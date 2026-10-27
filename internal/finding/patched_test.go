@@ -275,7 +275,7 @@ func TestAFindingRecordedClosedOnArrivalIsNeitherOpenedNorFixed(t *testing.T) {
 }
 
 func TestTwoReportsOfOneIssueAgreeOnWhetherItIsPatched(t *testing.T) {
-	// One issue reported under two names reaches the same place twice. The
+	// One issue reported under two names reaches the same occurrence twice. The
 	// claim names only one of them, so the second report is not covered, and
 	// what decides the finding is the report that stands.
 	each(t, func(t *testing.T, f *fixture) {
@@ -361,7 +361,7 @@ func TestABumpOntoAPatchedVersionClosesAsPatched(t *testing.T) {
 }
 
 func TestAPatchReturningAfterTheComponentLeftIsRecordedAgain(t *testing.T) {
-	// What is already recorded is the latest row at a place, never any row.
+	// What is already recorded is the latest row at an occurrence, never any row.
 	// Patched, then dropped, then removed, then back with the patch: the
 	// latest row says removed, so the patch is recorded again.
 	each(t, func(t *testing.T, f *fixture) {

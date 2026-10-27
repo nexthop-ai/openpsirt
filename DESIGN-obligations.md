@@ -38,7 +38,7 @@ Satisfies REQ-32 and REQ-77.
 | | What it is | Where it comes from |
 |---|---|---|
 | A vulnerability is exploited somewhere in the world | A property of the **issue** | A feed, through the scanner |
-| A vulnerability applies to our product | A **triage outcome** | A person, through a claim |
+| A vulnerability applies to our product | A **triage outcome** | A person, through a decision |
 | Our product is being exploited through it | An **incident** | A customer, a researcher, an investigation. No feed reports this |
 
 | Rule | Reason |
@@ -57,16 +57,16 @@ asks, which is why they are stored rather than worked out again.
 | | |
 |---|---|
 | That this product was exploited through an issue, here | Person-recorded, append-only, on any finding regardless of kind. An inherited flaw used against our product is the case, and it needs no flaw of our own |
-| An attack through no issue anybody has published | Recorded as a flaw found here, carried by the build itself, and the record kept against that flaw. A compromised build or update channel is the case: the flaw sits at the build's root, one place across every variant (`DESIGN-findings.md` § Recorded flaws), so the record needs no kind of its own |
+| An attack through no issue anybody has published | Recorded as a flaw found here, carried by the build itself, and the record kept against that flaw. A compromised build or update channel is the case: the flaw sits at the build's root, one occurrence across every variant (`DESIGN-findings.md` § Recorded flaws), so the record needs no kind of its own |
 | The moment it became known | What a window counts from, directly or through the notices given after it. Stated rather than taken from the clock, because somebody learns of an attack before they reach a screen |
 | The grounds | What is being asserted and how it is known. Nothing re-checks the record, so this is the whole of what a later reader has |
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out. § Notices outside |
 | The releases that carry the fix | Person-stated, each a tag of the product, added as each is cut and withdrawn where named in error. § Fix releases |
 | Clearing the exploitation record | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `DESIGN-findings.md` § Merged issues holds the rule |
 
-The record is against an issue and one product, the shape an assessment has. A
-place would be wrong twice over: the attack is a fact about the product rather
-than about a dependency path, and keyed to a place it would lapse the next time
+The record is against an issue and one product, the shape an assessment has. An
+occurrence would be wrong twice over: the attack is a fact about the product rather
+than about a dependency path, and keyed to an occurrence it would lapse the next time
 somebody rebuilt.
 
 One record stands per issue and product, held by the database rather than by a
@@ -81,15 +81,15 @@ turn, so nothing is counted before the narrowing: § The shelf.
 Recording one and clearing one both ask for triage on that product, and both
 land in the administrative trail. That is the layer the record belongs to — it
 decides what the triage record may say, which is what a setting, a grant or an
-alias does and not what a judgment about a finding does.
+alias does and not what a decision about a finding does.
 
 ## The record and the triage record
 
-A judgment gives way to a fact, and never the other way round. A person who
-watched this product be attacked is not the one to give way to a claim that it
+A decision gives way to a fact, and never the other way round. A person who
+watched this product be attacked is not the one to give way to a decision that it
 was never affected.
 
-`DESIGN-triage.md` § Claims against a recorded attack holds the rules that
+`DESIGN-triage.md` § Decisions against a recorded attack holds the rules that
 asymmetry produces.
 
 ## Order
@@ -224,15 +224,15 @@ hears and when each clears.
 
 ## Bulk acts
 
-No act over many issues reaches a standing record. `DESIGN-triage.md` § Claims
+No act over many issues reaches a standing record. `DESIGN-triage.md` § Decisions
 against a recorded attack holds the rules.
 
 | | |
 |---|---|
-| No bulk dismissal and no bulk deferral | `DESIGN-triage.md` § Claims against a recorded attack |
+| No bulk dismissal and no bulk deferral | `DESIGN-triage.md` § Decisions against a recorded attack |
 | No vanishing under a triage floor | The record puts its findings in a band above everything a feed can say, and the line admits either exploitation signal. `DESIGN-findings.md` § Urgency |
 | No bulk clearing | A record is cleared one at a time, with a reason and a name |
-| The list a bulk judgment is picked from marks an attacked issue | A selection reaching one is refused whole, so the list says which issue that is before anything is sent |
+| The list a bulk decision is picked from marks an attacked issue | A selection reaching one is refused whole, so the list says which issue that is before anything is sent |
 
 ## Limits
 

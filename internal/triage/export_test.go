@@ -18,8 +18,8 @@ func NearestRank(sorted []time.Duration, part float64) time.Duration {
 }
 
 // Counted is Bounds.counted, for the test of which limit holds when.
-func (b Bounds) Counted(issues, places int, review bool) error {
-	return b.counted(issues, places, review)
+func (b Bounds) Counted(issues, occurrences int, review bool) error {
+	return b.counted(issues, occurrences, review)
 }
 
 // ProposersOfAll is proposersOfAll read a given number of rows at a time, for

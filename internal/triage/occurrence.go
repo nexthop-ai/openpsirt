@@ -1,0 +1,1154 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package triage
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
+)
+
+// DecisionOccurrence is one decision at one occurrence: one combination of code.
+type DecisionOccurrence struct {
+	bun.BaseModel `bun:"table:decision_occurrence,alias:de"`
+
+	ID int64 `bun:"id,pk,autoincrement"`
+	// DecisionID is the action this row was written by, which is what the
+	// queue lists and what an approver agrees to.
+	DecisionID int64 `bun:"decision_id,notnull"`
+	// FromStatement is the VEX statement this was started from, where one
+	// was. A citation and never an application: what a publisher said is
+	// not our decision, and what this records is that somebody read it
+	// before making theirs — which is what lets anything notice that the
+	// ground moved under an approved dismissal.
+	FromStatement      *int64            `bun:"from_statement_id"`
+	ProductID          int64             `bun:"product_id,notnull"`
+	VulnerabilityID    int64             `bun:"vulnerability_id,notnull"`
+	OccurrenceIdentity string            `bun:"occurrence_identity,notnull"`
+	Visibility         access.Visibility `bun:"visibility,notnull"`
+	// The versions the decision was made against. Absent where nothing states
+	// one, and absent for the consumer where the thing above is the product
+	// itself — whose version changes every build and is excluded from expiry.
+	ComponentUpstreamVersion *string `bun:"component_upstream_version"`
+	ConsumerUpstreamVersion  *string `bun:"consumer_upstream_version"`
+	// SeverityCenti is what the decision says is on the decision: the outcome,
+	// the justification, the mitigation, the dates, the version an upgrade
+	// moves to. One act is one argument, and a copy per occurrence is a copy
+	// that can be revised on its own.
+	//
+	// SeverityCenti is how bad this was judged to be when the decision was made,
+	// in hundredths. Kept with the row rather than read from the issue
+	// later, because what a re-affirmation asks is whether severity has risen
+	// *since* — and an issue's severity is rewritten in place as reports
+	// revise it, so reading it now would compare a number against itself.
+	SeverityCenti *int `bun:"severity_centi"`
+	// NeedsApproval says a second person has to agree before this takes
+	// effect. A short deferral does not, so it is a property of the decision
+	// rather than of its outcome alone — and it has to be recorded, or a decision
+	// that is waiting and one that is in force are indistinguishable.
+	NeedsApproval bool  `bun:"needs_approval,notnull"`
+	State         State `bun:"state,notnull"`
+	// SentBackAt marks that an approver asked for more before they would
+	// agree, and is cleared when the author revises. Deliberately not a state:
+	// the decision is still proposed and still suppresses nothing, and what
+	// changed is whose turn it is.
+	SentBackAt *time.Time `bun:"sent_back_at"`
+	// SelectedBy is how the set this was part of was narrowed, for a decision
+	// recorded as one of many in a single action. Null for a decision made on
+	// its own — and never the decision itself: "these matched a word" is how a
+	// candidate was found, not a reason anybody would accept.
+	SelectedBy *string   `bun:"selected_by"`
+	ProposedBy int64     `bun:"proposed_by,notnull"`
+	ProposedAt time.Time `bun:"proposed_at,notnull"`
+	// EndedAt is when this stopped applying — withdrawn, or lapsed because
+	// the code moved. Null while it is live.
+	EndedAt *time.Time `bun:"ended_at"`
+	// LiveKey is what this row decides about, while its decision is still
+	// live. Null once it is withdrawn or has lapsed, which is what lets a
+	// fresh decision be made at an occurrence a dead one used to cover.
+	LiveKey *string `bun:"live_key"`
+	// Decision is the argument this row applies — the outcome, the justification,
+	// the dates, the version an upgrade moves to.
+	//
+	// Loaded by a query that asks for it and nil in one that did not, which is
+	// deliberate: plenty of readers want only where a decision lands and when
+	// it stops applying, and a zero-valued argument standing in for one nobody
+	// fetched would read as an outcome nobody chose.
+	Decision *Decision `bun:"rel:belongs-to,join:decision_id=id"`
+}
+
+// Revision is one statement of the reasoning behind a decision.
+//
+// Hung off the decision rather than off its rows, because one act is one
+// argument. A copy per occurrence is a copy that can be revised on its own, which
+// left forty-three rows saying the old thing under a decision that read as agreed.
+type Revision struct {
+	bun.BaseModel `bun:"table:decision_revision,alias:dr"`
+
+	ID         int64     `bun:"id,pk,autoincrement"`
+	DecisionID int64     `bun:"decision_id,notnull"`
+	Ordinal    int64     `bun:"ordinal,notnull"`
+	Body       string    `bun:"body,notnull"`
+	WrittenBy  int64     `bun:"written_by,notnull"`
+	WrittenAt  time.Time `bun:"written_at,notnull"`
+}
+
+// Approval is a second person agreeing to one revision of a decision's reasoning.
+type Approval struct {
+	bun.BaseModel `bun:"table:decision_approval,alias:da"`
+
+	ID          int64      `bun:"id,pk,autoincrement"`
+	DecisionID  int64      `bun:"decision_id,notnull"`
+	RevisionID  int64      `bun:"revision_id,notnull"`
+	ApprovedBy  int64      `bun:"approved_by,notnull"`
+	ApprovedAt  time.Time  `bun:"approved_at,notnull"`
+	WithdrawnAt *time.Time `bun:"withdrawn_at"`
+	// WithdrawnBy is who took the agreement back, which is not who gave it.
+	//
+	// A proposer revising their own decision withdraws every agreement standing
+	// on the old words. With only the approver recorded, the queue reported
+	// that back to the proposer as somebody else having undone their
+	// agreement.
+	WithdrawnBy *int64  `bun:"withdrawn_by"`
+	Batch       *string `bun:"batch"`
+	// Covered is how many findings this decision covered when it was agreed to.
+	//
+	// Kept rather than worked out later. A decision reaches by matching, so a
+	// build appearing afterwards is covered without anybody acting — asking
+	// what it covers *now* answers a different question from what somebody
+	// consented to, and only one of those two can be recovered after the fact.
+	Covered *int `bun:"covered"`
+	// CarriedFrom names the agreement this one was carried forward from,
+	// where it was carried rather than given.
+	//
+	// A re-affirmation states fresh reasoning and stands on the agreement its
+	// predecessor had. Recorded as an ordinary approval it reads as the
+	// earlier approver agreeing, today, to words they have never seen — which
+	// is what an approval naming one revision of the reasoning exists to make
+	// impossible. What they agreed to is the earlier words, and this is the
+	// field that says so.
+	CarriedFrom *int64 `bun:"carried_from"`
+}
+
+// Occurrence is what a decision is about, as a finding presents it.
+//
+// Assembled from the finding and the components it points at rather than from
+// anything a person typed, so that whether a decision applies is a question
+// about the code and not about how somebody described it.
+type Occurrence struct {
+	ProductID          int64
+	VulnerabilityID    int64
+	OccurrenceIdentity string
+	// Visibility is the finding's, carried here so that what somebody may
+	// decide about is answered where the query is rather than by whichever
+	// handler happened to build this. A finding nobody has disclosed is one
+	// only a private triager may argue about.
+	Visibility access.Visibility
+	// OnTag says this sits in a release that was built once and cannot change.
+	// Read from the finding rather than supplied, for the same reason the
+	// visibility is: what may be said about an occurrence is a fact about the occurrence.
+	OnTag bool
+	// Kind is the finding's kind, which decides the outcomes a decision about it
+	// may record. Unset is the vulnerability kind.
+	Kind kind.Kind
+	// ComponentUpstream and ConsumerUpstream are the versions expiry compares.
+	// They are the *upstream* versions: a shipped package carries a version of
+	// its own that moves whenever it is rebuilt, and rebuilding is not a
+	// reason to ask somebody the same question again.
+	ComponentUpstream string
+	ConsumerUpstream  string
+}
+
+// ErrSamePerson is returned when somebody tries to agree to a decision they proposed
+// any row of or wrote any of the reasoning of.
+var ErrSamePerson = refusal.New("somebody who proposed any of a decision or wrote any of its reasoning may not agree to it")
+
+// ErrNothingToApprove is returned when there is no current reasoning to
+// approve, which means the decision is not in a state anybody can agree to.
+var ErrNothingToApprove = refusal.New("that decision has no reasoning to approve")
+
+// Store reads and writes decisions and their occurrences.
+type Store struct {
+	db  bun.IDB
+	now func() time.Time
+	// restamps is the stamp each decision written in this transaction was read
+	// at, restamped as the transaction ends. Nil outside one.
+	restamps map[int64]int
+}
+
+// NewStore returns a store over db.
+func NewStore(db bun.IDB) *Store {
+	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// ErrAlreadyInTransaction is returned when a write entry point is called on a
+// store that is already inside a transaction.
+//
+// One sentence rather than thirteen copies of it: written out at every entry
+// point, the assertion refuses in its own words and the copies drift — two of
+// them say something else.
+var ErrAlreadyInTransaction = errors.New("this store is already inside a transaction")
+
+// pool is the handle a write opens its transaction on.
+func (s *Store) pool() (*bun.DB, error) {
+	db, ok := database.Handle(s.db)
+	if !ok {
+		return nil, ErrAlreadyInTransaction
+	}
+	return db, nil
+}
+
+// writing runs do inside one transaction, with this store rebuilt over it.
+//
+// Named for the act rather than for the mechanism, so a reader can still see
+// which entry points open a transaction: each of them is a call to this, and
+// the ones that do not are the reads.
+//
+// The transaction is handed over beside the store because several of these
+// also write through the finding store, whose methods take the handle rather
+// than this one.
+func (s *Store) writing(ctx context.Context,
+	do func(ctx context.Context, within *Store, tx bun.Tx) error) error {
+
+	db, err := s.pool()
+	if err != nil {
+		return err
+	}
+	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+		within := &Store{db: tx, now: s.now, restamps: map[int64]int{}}
+		if err := do(ctx, within, tx); err != nil {
+			return err
+		}
+		return within.restampAll(ctx)
+	})
+}
+
+// Proposal is somebody deciding something about a finding.
+type Proposal struct {
+	Occurrence    Occurrence
+	Outcome       Outcome
+	Justification Justification
+	// Mitigation names the thing that stops it — the rule, the setting,
+	// the service that is not exposed. Required where the justification is
+	// that mitigations already exist, because that decision rests on
+	// configuration rather than on code, and configuration can be removed
+	// with no version moving and nothing asking again.
+	Mitigation string
+	// Scope is whom a statement published from this decision holds for, where
+	// the proposer states it. Empty lets the outcome and the reason decide.
+	Scope         Scope
+	DeferredUntil *time.Time
+	// FixedVersion is the package version whoever packages this states the
+	// fix arrived in. Required where the decision is that the fix is already
+	// here, because that decision is a fact somebody can check against the
+	// packager's own record rather than an opinion — and a decision of that
+	// kind with nothing to check is the one to be most careful of.
+	FixedVersion string
+	// CommittedTo is when the work promised here will be done, for the two
+	// outcomes that promise something. Not a deferral's date: that says
+	// when somebody will look again, and this says when the thing will
+	// have happened — after which the scans say whether it did.
+	CommittedTo *time.Time
+	// UpgradeTo is the version an upgrade moves to, where that is the action.
+	// It is the payload of the decision rather than a second record beside it,
+	// so what a person decided and what the release is waiting on cannot come
+	// to disagree.
+	UpgradeTo string
+	// Binding is the earliest deadline among the findings this act covers.
+	//
+	// The gate the commitment is measured against. Inside it, promising to act
+	// by a date is ordinary triage — the work is already allowed to stay open
+	// that long. Past it, the promise is a deferral of the worst thing the act
+	// covers, and a second person agrees. Computed over the whole set by the
+	// caller, because one act covering a critical and a medium is gated by the
+	// critical however many mediums are in it.
+	Binding *time.Time
+	// BindingAcross is the builds the act covers, for a caller that cannot
+	// resolve the binding itself inside the transaction.
+	//
+	// The deadline it is gated against is a stored value that a re-rating or
+	// an arriving scan moves, so reading it before the transaction opens gates
+	// the promise against a deadline that may be gone by the time it is
+	// written — and a retry of the closure re-reads everything else and would
+	// keep this one stale value. Handed over as what it is resolved *from*,
+	// and resolved in `gate`, where the threshold is already read.
+	//
+	// The upgrade paths resolve theirs in their own transaction and pass
+	// Binding instead.
+	BindingAcross []int64
+	Reasoning     string
+	By            int64
+	// SeverityCenti is how bad this is judged to be right now, in hundredths.
+	// Recorded with the decision so that a later re-affirmation can ask whether
+	// it has risen since.
+	SeverityCenti int
+	// SelectedBy is how the set was narrowed, where this is one of many
+	// recorded together. Recorded with the decision so that "how were these
+	// chosen" has an answer later.
+	SelectedBy string
+	// FromStatement is the VEX statement this was started from, where one
+	// was. Recorded so that a revision to it can be noticed; it is never
+	// what the decision rests on, which is the reasoning somebody typed.
+	FromStatement *int64
+	// MadeOn is the builds the decision is made on: the one on screen and every
+	// one the person chose beside it. A build the decision reaches by lookup is
+	// not one of them. Empty where no build is in hand.
+	MadeOn []int64
+	// MadeAs is a decision whose recorded builds this one keeps, for a decision
+	// re-made as the same decision: re-affirmed after its code moved, or the
+	// rows an approver set aside.
+	MadeAs int64
+	// NeedsApproval says a second person must agree before this takes effect.
+	//
+	// Worked out by the store, inside the transaction that writes. Not
+	// something whoever is proposing states: it turns on the deployment's
+	// threshold and on what this occurrence has already been put off for, and read
+	// before the transaction opens it describes a world that a retry — or a
+	// policy somebody changed in between — has left behind. The acts that are
+	// gated by construction rather than by arithmetic set it themselves and
+	// say why.
+	NeedsApproval bool
+}
+
+// Propose records a decision and the reasoning behind it.
+//
+// The two are written together. A decision with no reasoning is not something a
+// second person can agree to, and leaving the reasoning to a later write is
+// how a decision ends up in the queue with nothing in it to review.
+func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal) (*DecisionOccurrence, error) {
+	// Normalized before it is checked, not only before it is stored. Checking
+	// the stated value and storing the careful one would let an occurrence that
+	// states nothing pass the check for disclosed findings and then be
+	// recorded as undisclosed — authorized as one thing and kept as another.
+	if !mayDecideOn(subject, p.Occurrence.ProductID, p.Occurrence.VulnerabilityID, visibilityOf(p.Occurrence)) {
+		return nil, ErrNotTheirs
+	}
+	if err := p.valid(s.now()); err != nil {
+		return nil, err
+	}
+	if p.By != subject.ID {
+		// A decision is somebody's, and recording it under another name would
+		// make the second-person rule meaningless: anybody could propose as
+		// somebody else and then agree with themselves.
+		return nil, refusal.Errorf("a decision is recorded as made by whoever made it")
+	}
+
+	var recorded *DecisionOccurrence
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		// Worked out here rather than taken from the caller, and re-worked on
+		// every attempt: what it turns on is the policy and what this occurrence
+		// has already been put off for, both of which a retry re-reads.
+		gated := []Proposal{p}
+		if err := within.gate(ctx, subject, gated); err != nil {
+			return err
+		}
+		decision, err := within.newDecision(ctx, FindingDecision, p.By, nil, "", gated[0])
+		if err != nil {
+			return err
+		}
+		recorded, err = within.propose(ctx, decision, gated[0])
+		return err
+	})
+	if err != nil {
+		return recorded, s.alreadyDecided(ctx, err, []Occurrence{p.Occurrence})
+	}
+	return recorded, nil
+}
+
+// ProposeMany records the same decision at several occurrences as one action.
+//
+// One decision about a finding covers every occurrence it sits at unless somebody
+// narrows it, and a finding on shared code reaches many: on a real image a
+// kernel issue averages eighty-six. Written one at a time that is eighty-six
+// transactions, each with its own commit, and on SQLite, which has one
+// writer, that is every other write waiting while somebody presses a button.
+//
+// Atomic for a better reason than speed. One action writes one record per
+// occurrence; half of them written and the rest abandoned is not that, and it
+// leaves a finding that is neither answered nor open with nothing saying which
+// occurrences were which. The same holds across builds, where one decision covers an
+// occurrence in each of several.
+func (s *Store) ProposeMany(ctx context.Context, subject access.Subject,
+	proposals []Proposal) ([]*DecisionOccurrence, error) {
+
+	if len(proposals) == 0 {
+		return nil, nil
+	}
+	if err := oneArgument(proposals); err != nil {
+		return nil, err
+	}
+
+	var recorded []*DecisionOccurrence
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		recorded = recorded[:0]
+		if err := within.allowed(ctx, subject, proposals); err != nil {
+			return err
+		}
+		// Asked per occurrence rather than once for the set: the threshold reads
+		// the decision, and two occurrences of one finding can differ in what they
+		// carry. Re-worked on every attempt, against the policy and the
+		// postponement in force when the write lands rather than when the
+		// request arrived.
+		if err := within.gate(ctx, subject, proposals); err != nil {
+			return err
+		}
+		// One action, one decision, however many occurrences it covers. The
+		// decision is what the queue lists, what an approver agrees to, and what
+		// the argument is held on; the rows underneath stay one per occurrence and
+		// carry only where the decision lands.
+		decision, err := within.newDecision(ctx, FindingDecision, subject.ID, nil, "", proposals[0])
+		if err != nil {
+			return err
+		}
+		recorded, err = within.proposeAll(ctx, decision, proposals)
+		return err
+	})
+	if err != nil {
+		return nil, s.alreadyDecided(ctx, err, occurrencesOf(proposals))
+	}
+	return recorded, nil
+}
+
+// ProposeGrouped records one decision at an occurrence and at every occurrence more names,
+// as one action. more is asked inside the transaction the decision is written
+// in, on every attempt, so the occurrences it names are the ones the write lands
+// on: an occurrence answered, closed or covered between a read and the write is not
+// decided. Each occurrence more names takes the first proposal's argument.
+//
+// The first proposal's row is returned.
+func (s *Store) ProposeGrouped(ctx context.Context, subject access.Subject, first Proposal,
+	more func(context.Context, bun.IDB) ([]Occurrence, error)) (*DecisionOccurrence, error) {
+
+	proposals := []Proposal{first}
+	var recorded []*DecisionOccurrence
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		occurrences, err := more(ctx, tx)
+		if err != nil {
+			return err
+		}
+		proposals = proposals[:1]
+		for _, occurrence := range occurrences {
+			also := first
+			also.Occurrence = occurrence
+			proposals = append(proposals, also)
+		}
+		if err := within.allowed(ctx, subject, proposals); err != nil {
+			return err
+		}
+		if err := within.gate(ctx, subject, proposals); err != nil {
+			return err
+		}
+		decision, err := within.newDecision(ctx, FindingDecision, subject.ID, nil, "", proposals[0])
+		if err != nil {
+			return err
+		}
+		recorded, err = within.proposeAll(ctx, decision, proposals)
+		return err
+	})
+	if err != nil {
+		return nil, s.alreadyDecided(ctx, err, occurrencesOf(proposals))
+	}
+	return recorded[0], nil
+}
+
+func (s *Store) propose(ctx context.Context, decision *Decision, p Proposal) (*DecisionOccurrence, error) {
+	written, err := s.proposeAll(ctx, decision, []Proposal{p})
+	if err != nil {
+		return nil, err
+	}
+	return written[0], nil
+}
+
+// proposeAll writes one row per occurrence, in batches rather than one at a time.
+//
+// One decision covers every occurrence it sits at, and on shared code that is many:
+// 507 occurrences for the worst case on the demo. A round trip each is 1.4 s on
+// MySQL where the batched form is one statement per five hundred rows — the
+// same shape the scan apply already uses, and for the same reason.
+func (s *Store) proposeAll(ctx context.Context, decision *Decision, proposals []Proposal) ([]*DecisionOccurrence, error) {
+	return s.write(ctx, decision, proposals, database.InBatches[DecisionOccurrence])
+}
+
+// proposeUnkeyed writes what proposeAll writes and reads no identifier back,
+// for a writer that needs only how many rows it wrote. A promise to upgrade
+// writes a row at every occurrence it covers, and no bound applies to how many.
+func (s *Store) proposeUnkeyed(ctx context.Context, decision *Decision, proposals []Proposal) (int, error) {
+	written, err := s.write(ctx, decision, proposals, database.InBatchesUnkeyed[DecisionOccurrence])
+	return len(written), err
+}
+
+// write is proposeAll with the insert named: whether the identifiers the
+// database assigned are read back is the one thing that differs between the
+// two.
+func (s *Store) write(ctx context.Context, decision *Decision, proposals []Proposal,
+	insert func(context.Context, bun.IDB, []DecisionOccurrence) error) ([]*DecisionOccurrence, error) {
+	// Here rather than at each entry point, because every path that writes a
+	// decision occurrence reaches this one — a decision made at a finding, a bulk act, a
+	// re-affirmation, an extension carried to another issue, and an occurrence
+	// carried across builds. Checked at the entry points instead, the four
+	// that were not checked would be four ways round the rule.
+	//
+	// Inside the caller's transaction, which every one of them has open: a
+	// retry re-runs the closure, and a record kept in between is one this
+	// decision contradicts.
+	// Filed under the issue each occurrence is read as. An occurrence carried from a
+	// row filed under an issue that has since merged into another names
+	// the issue it was filed under, and a new decision is about the issue
+	// that stands — keyed under it, where every live row about it is.
+	filed := make([]int64, 0, len(proposals))
+	for _, p := range proposals {
+		filed = append(filed, p.Occurrence.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return nil, err
+	}
+	for i := range proposals {
+		if issue, known := issueOf[proposals[i].Occurrence.VulnerabilityID]; known {
+			proposals[i].Occurrence.VulnerabilityID = issue
+		}
+	}
+	if err := s.refuseIfExploitedHere(ctx, decision, proposals); err != nil {
+		return nil, err
+	}
+	now := s.now().Truncate(time.Microsecond)
+	rows := make([]DecisionOccurrence, 0, len(proposals))
+	for _, p := range proposals {
+		rows = append(rows, s.row(decision, p, now))
+	}
+	if err := s.disclosedSince(ctx, rows); err != nil {
+		return nil, err
+	}
+	if err := insert(ctx, s.db, rows); err != nil {
+		if database.IsDuplicate(err) {
+			// The unique index over the live key refused it, which is the only
+			// thing that could: two proposals arriving together both walk
+			// through any check made before the write. Naming the decision that
+			// is already there happens outside this transaction — a failed
+			// write leaves nothing else in it able to read.
+			return nil, ErrAlreadyDecided
+		}
+		return nil, fmt.Errorf("record %d decision occurrences: %w", len(rows), err)
+	}
+	written := make([]*DecisionOccurrence, 0, len(rows))
+	for i := range rows {
+		written = append(written, &rows[i])
+	}
+	return written, nil
+}
+
+// row is one decision occurrence as it will be stored: where the decision lands, and
+// nothing about what it says.
+func (s *Store) row(decision *Decision, p Proposal, now time.Time) DecisionOccurrence {
+	key := liveKeyFor(p.Occurrence, decision.Outcome.StandsAtAnyVersion())
+	liveKey := &key
+	occurrence := DecisionOccurrence{
+		DecisionID: decision.ID,
+		// Carried on the row that was just written, because what a caller
+		// renders is the decision, and the argument is the decision's.
+		Decision:  decision,
+		ProductID: p.Occurrence.ProductID, VulnerabilityID: p.Occurrence.VulnerabilityID,
+		OccurrenceIdentity:       p.Occurrence.OccurrenceIdentity,
+		Visibility:               visibilityOf(p.Occurrence),
+		ComponentUpstreamVersion: text(p.Occurrence.ComponentUpstream),
+		ConsumerUpstreamVersion:  text(p.Occurrence.ConsumerUpstream),
+		State:                    Proposed,
+		NeedsApproval:            p.NeedsApproval,
+		FromStatement:            p.FromStatement,
+		LiveKey:                  liveKey,
+		ProposedBy:               p.By, ProposedAt: now,
+	}
+	if p.SeverityCenti > 0 {
+		audited := p.SeverityCenti
+		occurrence.SeverityCenti = &audited
+	}
+	if p.SelectedBy != "" {
+		how := p.SelectedBy
+		occurrence.SelectedBy = &how
+	}
+	return occurrence
+}
+
+// oneArgument refuses a set of proposals that do not all say the same thing.
+//
+// One action is one argument. The caller assembles a proposal per occurrence because
+// what varies per occurrence — the versions it was made against, whether a second
+// person has to agree, how bad it was judged to be — has to come from the row
+// rather than from whoever pressed the button. What the decision *says* does not
+// vary, and nothing produces a set where it does: in the measured deployment
+// every payload field is constant across every row of every decision.
+//
+// Refused rather than quietly taking the first, because a set that disagrees is
+// two decisions somebody meant to record as one, and recording it as one loses
+// whichever half was not the first.
+func oneArgument(proposals []Proposal) error {
+	first := proposals[0]
+	for _, p := range proposals[1:] {
+		switch {
+		case p.Outcome != first.Outcome:
+			return refusal.Errorf("one action records one outcome: %q and %q were both given",
+				first.Outcome, p.Outcome)
+		case p.Justification != first.Justification:
+			return refusal.New("one action records one justification")
+		case strings.TrimSpace(p.Mitigation) != strings.TrimSpace(first.Mitigation):
+			return refusal.New("one action records one mitigation")
+		case p.Scope != first.Scope:
+			return refusal.New("one action records one statement of whom it holds for")
+		case version(p.FixedVersion) != version(first.FixedVersion):
+			return refusal.New("one action records one fixed version")
+		case version(p.UpgradeTo) != version(first.UpgradeTo):
+			return refusal.New("one action records one version to upgrade to")
+		case !sameDay(p.DeferredUntil, first.DeferredUntil):
+			return refusal.New("one action records one date to look again")
+		case !sameDay(p.CommittedTo, first.CommittedTo):
+			return refusal.New("one action records one date to act by")
+		case strings.TrimSpace(p.Reasoning) != strings.TrimSpace(first.Reasoning):
+			return refusal.New("one action records one piece of reasoning")
+		}
+	}
+	return nil
+}
+
+// sameDay compares two dates either of which may be absent.
+func sameDay(a, b *time.Time) bool {
+	switch {
+	case a == nil && b == nil:
+		return true
+	case a == nil || b == nil:
+		return false
+	default:
+		return a.Equal(*b)
+	}
+}
+
+// Reasons checks an outcome against the reason and the mitigation stated
+// beside it.
+//
+// One function rather than the rule restated wherever a decision is put together.
+// A saved filter prefills a decision, and a combination it accepted that the
+// decision store refuses is a refusal that lands when somebody presses the
+// button rather than when they saved the thing that fills it in.
+//
+// The mitigation is separate from the reason because only one reason asks for
+// it, and a caller that carries no free text at all passes the empty string —
+// which refuses that one reason, correctly: there is nowhere for it to say
+// what stops it.
+//
+// Two outcomes may carry one and they ask for it differently. A decision that
+// mitigations already exist *is* the mitigation, so it is required there. A
+// decision that something will not be fixed is a standing property of a shipped
+// feature — a protocol that cannot change without breaking what it is
+// compatible with — and there is often a real thing a holder can do about it.
+// Optional there, because plenty of unfixable things have no workaround, and
+// saying so falsely is worse than saying nothing.
+func Reasons(outcome Outcome, justification Justification, mitigation string) error {
+	// The decision that something does not affect us *is* which of the
+	// recognized reasons applies, so it is not optional there — and it is
+	// meaningless on the others, which are decisions about priority rather than
+	// about applicability.
+	switch {
+	case outcome == Dismissed:
+		// A lead's reasons are their own: the vulnerability ones describe
+		// how a known issue applies, and a lead is a guess somebody judged.
+		if !slices.Contains(LeadReasons(), LeadReason(justification)) {
+			return refusal.Errorf("%q is not a reason a lead is dismissed for: %v", justification, LeadReasons())
+		}
+		if strings.TrimSpace(mitigation) != "" {
+			return refusal.New("a dismissed lead says what stops it in its reasoning")
+		}
+		return nil
+	case outcome.NeedsJustification():
+		if !justification.Valid() {
+			return refusal.Errorf("%q is not a recognized reason for something not applying", justification)
+		}
+		// A correction keeps applying however far the code moves, so the
+		// reason behind one has to be a reason no version bump can answer.
+		// That something is absent is such a reason; that it is unreachable
+		// or already stopped is a decision about surroundings and configuration,
+		// which a bump changes all the time — accepted here it would put a
+		// decision about risk beyond the rule that re-examines it.
+		if outcome.StandsAtAnyVersion() && !justification.AboutIdentity() {
+			return refusal.Errorf(
+				"%q says how the code is reached or what stops it, which a version bump "+
+					"changes. A decision that the match is wrong states that something is not "+
+					"there: %v", justification, JustificationsCorrecting())
+		}
+		// Named, because the tool cannot notice this one going away.
+		// Every other reason is a decision about code and lapses when the
+		// code moves; this one is a decision about configuration, which
+		// can be removed with nothing moving at all.
+		if justification == MitigationsExist && strings.TrimSpace(mitigation) == "" {
+			return refusal.New(
+				"say what stops it — a decision that mitigations already exist is about " +
+					"configuration rather than code, so nothing here will notice it being " +
+					"removed and the next person needs to know what to go and check")
+		}
+	default:
+		if justification != "" {
+			return refusal.Errorf("%q states why something does not apply, which %q does not claim",
+				justification, outcome)
+		}
+	}
+	if justification != MitigationsExist && outcome != WontFix &&
+		strings.TrimSpace(mitigation) != "" {
+		return refusal.Errorf("naming what stops it belongs to %q and to %q, and no other reason",
+			MitigationsExist, WontFix)
+	}
+	return nil
+}
+
+// valid reports whether a proposal says enough to be recorded.
+//
+// It takes the moment rather than reading a clock, because a store's clock is
+// injectable and a rule about dates that read a different clock from the rest
+// of the package would be a rule no test could pin.
+func (p Proposal) valid(now time.Time) error {
+	if !p.Outcome.Valid() {
+		return refusal.Errorf("%q is not an outcome", p.Outcome)
+	}
+	// A lead is asked whether it is real, and a vulnerability how it
+	// applies. Each kind's outcomes answer its own question and no other.
+	if !slices.Contains(OutcomesFor(p.Occurrence.Kind), p.Outcome) {
+		if p.Occurrence.Kind == kind.Analysis {
+			return refusal.Errorf("%q is not something a lead is judged to be: %v", p.Outcome, LeadOutcomes())
+		}
+		return refusal.Errorf("%q is a decision about a lead", p.Outcome)
+	}
+	// A tag cannot be fixed. It was built once and is what somebody
+	// received, so an outcome that names a date is a statement about a thing
+	// that will not move: a deferral says somebody will look again when
+	// nothing will have changed, and a promise to act says work will land in a
+	// release that is closed.
+	//
+	// The three refused are exactly the three that store a date, so this is
+	// one question rather than a list to keep in step. It is not Commits: a
+	// deferral's date is a review date rather than a commitment, and it is as
+	// meaningless here as the other two.
+	//
+	// A tag still takes what is true of it — affected, not
+	// applicable, will not fix, already fixed here — which is the whole point
+	// of triaging one.
+	if p.Occurrence.OnTag && p.Outcome.Dated() {
+		return refusal.Errorf(
+			"%q names a date, and this release was built once: it cannot change, so nothing "+
+				"can be promised about it. Say what is true of it instead", p.Outcome)
+	}
+	if strings.TrimSpace(p.Reasoning) == "" {
+		return refusal.New("a decision needs reasoning, because somebody else has to agree with it")
+	}
+	// The same policy every other typed field goes through, run before the
+	// text is stored rather than when it is read back. Stored text is then
+	// known to have passed what was in force when it arrived.
+	if err := markdown.Check(p.Reasoning); err != nil {
+		return err
+	}
+	if p.By == 0 {
+		return refusal.New("a decision needs somebody to have made it")
+	}
+	if err := keyable(p.Occurrence); err != nil {
+		return err
+	}
+	if err := Reasons(p.Outcome, p.Justification, p.Mitigation); err != nil {
+		return err
+	}
+	if err := scoped(p.Outcome, p.Scope); err != nil {
+		return err
+	}
+	if p.Outcome == Deferred && p.DeferredUntil == nil {
+		return refusal.New("a deferral needs a date it returns on, or it is a decision never to look again")
+	}
+	if p.Outcome != Deferred && p.DeferredUntil != nil {
+		return refusal.Errorf("%q does not return on a date", p.Outcome)
+	}
+	// The version the fix arrived in is what makes this decision checkable
+	// against whoever packages it. Without it the decision is "trust me",
+	// which is the one thing this outcome must not be able to say.
+	//
+	// It is recorded and never compared against what ships. Deciding
+	// whether one version is at or past another needs an ordering per
+	// ecosystem — Debian epochs, RPM release segments, and the ecosystems
+	// that follow neither — which is a different project entirely.
+	if p.Outcome == AlreadyFixed && strings.TrimSpace(p.FixedVersion) == "" {
+		return refusal.New("a decision that the fix is already here needs the version it arrived in, so somebody can check it")
+	}
+	if p.Outcome != AlreadyFixed && strings.TrimSpace(p.FixedVersion) != "" {
+		return refusal.Errorf("%q does not claim a fix has arrived", p.Outcome)
+	}
+	// The two outcomes that promise work need the date the work lands .
+	// Without it there is nothing to gate against and nothing to lapse —
+	// the decision would be "we will deal with this", which is what leaving a
+	// finding undecided already says.
+	if p.Outcome.Commits() && p.CommittedTo == nil {
+		return refusal.Errorf("%q promises work and needs the date it will be done, "+
+			"or it says nothing a finding left alone does not", p.Outcome)
+	}
+	if !p.Outcome.Commits() && p.CommittedTo != nil {
+		return refusal.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
+	}
+	// A date already past is not a date. Nothing here checked, and the two
+	// dates fail in opposite directions: a deferral until last year takes the
+	// occurrence's live key so nobody else may decide there, suppresses nothing,
+	// and lands in the review queue already run out — a work item the tool
+	// made for itself. A promise to act by last year is worse, because the
+	// gate asks whether the date is past the deadline the work has and a date
+	// in the past never is, so the promise stands on one signature.
+	if p.DeferredUntil != nil && !p.DeferredUntil.After(now) {
+		return refusal.Errorf(
+			"a deferral returns on a date still to come: %s has passed",
+			p.DeferredUntil.UTC().Format(time.DateOnly))
+	}
+	if p.CommittedTo != nil && !p.CommittedTo.After(now) {
+		return refusal.Errorf(
+			"promised work lands on a date still to come: %s has passed",
+			p.CommittedTo.UTC().Format(time.DateOnly))
+	}
+	// A backport moves no version, which is the whole difference between the
+	// two: naming one here would record an upgrade under the outcome
+	// that exists for the case where there is not going to be one.
+	if p.Outcome != UpgradeNeeded && strings.TrimSpace(p.UpgradeTo) != "" {
+		return refusal.Errorf("%q moves no version", p.Outcome)
+	}
+	if p.Outcome == UpgradeNeeded && strings.TrimSpace(p.UpgradeTo) == "" {
+		return refusal.New("an upgrade needs the version it moves to")
+	}
+	return nil
+}
+
+// version is how a version string is read, everywhere it is read.
+//
+// Surrounding space is not part of a version. It has to be taken off in one
+// place because the two halves disagreed otherwise: storing treated a
+// whitespace-only version as absent, and matching treated it as a version
+// that happened to be spaces — so a row was written against nothing and
+// looked for something, and could never apply to the occurrence it was made about.
+func version(s string) string { return strings.TrimSpace(s) }
+
+// versionLimit is how long an upstream version a row may be keyed on.
+//
+// The two version columns are part of the index every lookup of "does a
+// decision apply to this finding" takes, and an index of that width has to
+// stay inside what the narrowest supported server allows for one — which is
+// where 191 comes from and why these are not the free-text columns the
+// components they copy have.
+//
+// Measured against the reference producer's real output before settling for
+// it: 6,845 components, longest version 49 characters, longest name 120,
+// longest package identifier 140, and nothing at all over 191. The headroom is
+// about fourfold on the field that matters.
+const versionLimit = database.NameWidth
+
+// keyable refuses an occurrence whose versions will not fit the key a row is
+// matched on.
+//
+// Refused here rather than left to the write, which would answer with a
+// driver's message about a column nobody reading it has heard of. Refused
+// rather than truncated, which is the important half: a row keyed on a
+// shortened version would be compared against the finding's full one and match
+// nothing, so the decision would stand on the record, cover nothing, and say so
+// nowhere.
+func keyable(at Occurrence) error {
+	for what, held := range map[string]string{
+		"component": at.ComponentUpstream,
+		"consumer":  at.ConsumerUpstream,
+	} {
+		// Counted in characters, which is what the columns hold.
+		if n := utf8.RuneCountInString(version(held)); n > versionLimit {
+			return refusal.Errorf(
+				"the %s's upstream version is %d characters and a decision is keyed on at most "+
+					"%d, so this cannot be matched to a finding later — a version that long is "+
+					"usually a producer putting something else in the field",
+				what, n, versionLimit)
+		}
+	}
+	return nil
+}
+
+// text keeps an absent version absent rather than storing it as an empty one.
+//
+// The difference matters: a version nobody stated and a version that is the
+// empty string would otherwise compare equal, and expiry is exactly a
+// comparison of versions.
+func text(s string) *string {
+	trimmed := version(s)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+// liveKeyFor is what a row decides about: the occurrence, and both upstream
+// versions it was made against — or the occurrence alone, where the decision stands at
+// any version.
+//
+// Hashed rather than stored as its parts, because it exists to be compared for
+// equality under a unique index and nothing ever reads it back. The versions
+// are normalized the same way they are everywhere else, so a decision written with
+// spaces around a version collides with one written without — which is the
+// whole point of a uniqueness rule.
+//
+// The two shapes cannot collide. A key over three fields and a key over five
+// are different strings before they are hashed, so a correction and a decision
+// about an occurrence that states no version at all stay apart.
+//
+// Spelled in the finding package, which re-keys the live rows of an issue
+// merged into another under the issue they are read as.
+func liveKeyFor(at Occurrence, anyVersion bool) string {
+	return finding.LiveKey(at.ProductID, at.VulnerabilityID, at.OccurrenceIdentity,
+		at.ComponentUpstream, at.ConsumerUpstream, anyVersion)
+}
+
+// liveKeysFor is every key a live decision covering this occurrence could be held
+// under: the one keyed on its versions, and the one keyed on the occurrence alone.
+//
+// Both, wherever the question is whether anything stands here. Asked with the
+// versioned key alone, a correction covering the occurrence answers as absent, and
+// the answer to "may somebody decide something here" would be yes at an occurrence
+// already answered.
+func liveKeysFor(at Occurrence) []string {
+	return []string{liveKeyFor(at, false), liveKeyFor(at, true)}
+}
+
+// ErrAlreadyDecided is returned when a live decision already covers this exact
+// combination of code.
+//
+// The answer is to revise that decision rather than to make a second one beside
+// it: two decisions about one finding are a disagreement, and a disagreement
+// belongs in one place where both sides are readable.
+var ErrAlreadyDecided = refusal.New("a decision already stands here")
+
+// occurrencesOf is the occurrences a set of proposals is about, for a refusal that has
+// to name one of them.
+func occurrencesOf(proposals []Proposal) []Occurrence {
+	occurrences := make([]Occurrence, 0, len(proposals))
+	for _, p := range proposals {
+		occurrences = append(occurrences, p.Occurrence)
+	}
+	return occurrences
+}
+
+// alreadyDecided turns the constraint's refusal into a sentence naming which
+// decision to go and read.
+//
+// Read after the transaction has unwound, which is why it is not part of the
+// write: inside it the row that collided is the row this attempt could not
+// see. Where the decision has since gone — withdrawn between the collision and
+// the read — the original refusal stands, because a message naming a decision
+// that is no longer there is worse than one naming none.
+//
+// Written four times, in three files, the wording drifts by a word at each:
+// the same refusal reads "here" from one path and "at one of these occurrences"
+// from another for the same act on one occurrence.
+func (s *Store) alreadyDecided(ctx context.Context, err error, occurrences []Occurrence) error {
+	if !errors.Is(err, ErrAlreadyDecided) {
+		return err
+	}
+	where := "here"
+	if len(occurrences) > 1 {
+		where = "at one of these occurrences"
+	}
+	for _, occurrence := range occurrences {
+		standing, found := s.liveAt(ctx, liveKeysFor(occurrence)...)
+		if !found {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: decision occurrence %d is already %s %s — revise that one rather than recording a "+
+				"second decision about the same code",
+			ErrAlreadyDecided, standing.ID, standing.State, where)
+	}
+	return err
+}
+
+// ErrNothingOpen says a selection named nothing that is actually open where it
+// was claimed to be.
+//
+// Its own error because it is not a refusal and not a fault in what was
+// written: whatever was selected has since been fixed, closed or renamed, and
+// what the caller should do about it is look again.
+var ErrNothingOpen = refusal.New("nothing named here is open")
+
+// orEmpty reads a stored version back as the string an occurrence states. The
+// inverse of text, which is why neither is named for what it does to a value.
+func orEmpty(stored *string) string {
+	if stored == nil {
+		return ""
+	}
+	return *stored
+}
+
+// visibilityOf reads an occurrence's visibility, treating anything unset as not
+// disclosed.
+//
+// Unset has to read as private, or an occurrence assembled by something that forgot
+// to state it would make a private finding argueable by anybody who can triage
+// the public ones. Internal stays internal: read as private, it would be
+// argued by the private team and refused to the people who work it.
+func visibilityOf(at Occurrence) access.Visibility {
+	return access.AsVisibility(string(at.Visibility))
+}
+
+// disclosedSince turns public every row whose issue was disclosed in its
+// product after the caller read the occurrence.
+//
+// The visibility a proposal carries is read before this transaction opens,
+// and disclosing an issue changes it. A row written private on an issue that
+// is public by then stays private for good, because disclosing reads the
+// findings to decide whether anything is left to disclose. Asked here, inside
+// the transaction, an issue with no undisclosed finding left in the product
+// is disclosed.
+func (s *Store) disclosedSince(ctx context.Context, rows []DecisionOccurrence) error {
+	products := map[int64]bool{}
+	issues := map[int64]bool{}
+	for _, row := range rows {
+		if row.Visibility == access.Private {
+			products[row.ProductID] = true
+			issues[row.VulnerabilityID] = true
+		}
+	}
+	if len(issues) == 0 {
+		return nil
+	}
+	var held []struct {
+		ProductID       int64 `bun:"product_id"`
+		VulnerabilityID int64 `bun:"vulnerability_id"`
+		Private         int   `bun:"private"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
+		Where(`"st"."product_id" IN (?)`, bun.List(keysOf(products))).
+		Where(`"f"."vulnerability_id" IN (?)`, bun.List(keysOf(issues))).
+		Apply(ofKinds(kind.Triage, "f")).
+		GroupExpr(`"st"."product_id", "f"."vulnerability_id"`).
+		Scan(ctx, &held)
+	if err != nil {
+		return fmt.Errorf("read whether the issue is still undisclosed: %w", err)
+	}
+	disclosed := map[[2]int64]bool{}
+	for _, one := range held {
+		if one.Private == 0 {
+			disclosed[[2]int64{one.ProductID, one.VulnerabilityID}] = true
+		}
+	}
+	for i := range rows {
+		if disclosed[[2]int64{rows[i].ProductID, rows[i].VulnerabilityID}] {
+			rows[i].Visibility = access.Public
+		}
+	}
+	return nil
+}
+
+// Undecided keeps the occurrences nothing currently stands at.
+//
+// For a decision reaching another build: the occurrences its matching versions
+// already cover by lookup are not to be decided again — that would be
+// a second decision beside a standing one — and the rest are what is left to
+// decide. Asked as one statement over the keys.
+func (s *Store) Undecided(ctx context.Context, occurrences []Occurrence) ([]Occurrence, error) {
+	if len(occurrences) == 0 {
+		return nil, nil
+	}
+	keys := make([]string, 0, len(occurrences)*2)
+	for _, at := range occurrences {
+		keys = append(keys, liveKeysFor(at)...)
+	}
+	var standing []string
+	if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
+		ColumnExpr(`"de"."live_key"`).
+		Where(`"de"."live_key" IN (?)`, bun.List(keys)).
+		Scan(ctx, &standing); err != nil {
+		return nil, fmt.Errorf("read what already stands: %w", err)
+	}
+	covered := make(map[string]bool, len(standing))
+	for _, key := range standing {
+		covered[key] = true
+	}
+	left := make([]Occurrence, 0, len(occurrences))
+	for _, at := range occurrences {
+		held := false
+		for _, key := range liveKeysFor(at) {
+			held = held || covered[key]
+		}
+		if !held {
+			left = append(left, at)
+		}
+	}
+	return left, nil
+}
+
+// liveAt reads a decision currently standing over an occurrence, under any of the keys
+// one could be held under. Used to explain a refusal rather than to prevent
+// one.
+func (s *Store) liveAt(ctx context.Context, keys ...string) (*DecisionOccurrence, bool) {
+	standing := new(DecisionOccurrence)
+	if err := s.db.NewSelect().Model(standing).
+		Where(`"live_key" IN (?)`, bun.List(keys)).
+		// Deterministic, because two decisions can stand at one occurrence and the
+		// message names one of them.
+		Order("id").Limit(1).Scan(ctx); err != nil {
+		return nil, false
+	}
+	return standing, true
+}
+
+// reaching finds a decision occurrence a subject may act on, under a given rule.
+//
+// The rule differs by act: arguing about a finding needs the triage role,
+// while agreeing to somebody else's decision is the approver capability alongside
+// being able to read it. Reading what was decided follows whichever act
+// produced it — anybody who could have taken part can see what came of it.
+func (s *Store) reaching(ctx context.Context, subject access.Subject, occurrenceID int64,
+	allowed func(access.Subject, int64, access.Visibility) bool, cases bool) (*DecisionOccurrence, error) {
+
+	occurrence := new(DecisionOccurrence)
+	// With its argument: everything that reads a decision occurrence back reads what it
+	// said, and the row on its own carries only where it landed.
+	if err := s.db.NewSelect().Model(occurrence).Relation("Decision").
+		Where(`"de"."id" = ?`, occurrenceID).Scan(ctx); err != nil {
+		// A row somebody may not reach and one that does not exist get
+		// the same answer, so that guessing identifiers says nothing. A read
+		// that failed is neither, and says so.
+		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read decision occurrence %d", occurrenceID))
+	}
+	if !allowed(subject, occurrence.ProductID, occurrence.Visibility) {
+		// The case grant is the pair of a product and an issue, so it
+		// can only be asked once the row is in hand — and it is asked
+		// for reading alone. Arguing and agreeing keep the rule they
+		// were given: a collaborator may argue about the issue they
+		// were brought in on and may not agree to anybody's decision
+		// about it.
+		if !cases {
+			return nil, ErrNotTheirs
+		}
+		if !readableOn(subject, occurrence.ProductID, occurrence.VulnerabilityID, occurrence.Visibility) {
+			// A lead included in its flaw's case is read by the flaw's
+			// readers, which only the row's occurrence says.
+			included, err := s.readsIncluded(ctx, subject, []int64{occurrence.ID})
+			if err != nil {
+				return nil, err
+			}
+			if !included[occurrence.ID] {
+				return nil, ErrNotTheirs
+			}
+		}
+	}
+	return occurrence, nil
+}

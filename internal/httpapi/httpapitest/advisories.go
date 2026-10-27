@@ -145,21 +145,21 @@ func (r *Reach) Suppliers(t *testing.T, path string) []supplierRow {
 	return body.Items
 }
 
-// ScannedAtTwoPlaces is one issue in one component pulled in by two things, so
-// the component sits at two places in the build.
+// ScannedAtTwoOccurrences is one issue in one component pulled in by two things, so
+// the component sits at two occurrences in the build.
 //
 // The ordinary case — a library is pulled in by several things — and the one a
-// fixture with a single place cannot represent: it cannot tell a rule about a
-// place from a rule about a component, which is exactly the distinction a
-// document with no place granularity turns on.
-func (r *Reach) ScannedAtTwoPlaces(t *testing.T) {
+// fixture with a single occurrence cannot represent: it cannot tell a rule about an
+// occurrence from a rule about a component, which is exactly the distinction a
+// document with no occurrence granularity turns on.
+func (r *Reach) ScannedAtTwoOccurrences(t *testing.T) {
 	t.Helper()
 	r.scannedUnder(t,
 		graph.Described{Purl: "pkg:deb/debian/libswsscommon@1.0.0", Name: "libswsscommon", Version: "1.0.0"},
 		graph.Described{Purl: "pkg:deb/debian/libteam5@1.31", Name: "libteam5", Version: "1.31"})
 }
 
-// ScannedInTwoImages is ScannedAtTwoPlaces with two container images pulling
+// ScannedInTwoImages is ScannedAtTwoOccurrences with two container images pulling
 // the library in, each stamped with a build: the shape of a SONiC image. It
 // also reports CVE-2026-9998 in docker-swss itself.
 func (r *Reach) ScannedInTwoImages(t *testing.T) {
@@ -174,7 +174,7 @@ func (r *Reach) ScannedInTwoImages(t *testing.T) {
 // scannedUnder is one issue in libnl, pulled in by the two components given.
 func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
 	t.Helper()
-	// One report, two places: the places come from the graph, and the library
+	// One report, two occurrences: the occurrences come from the graph, and the library
 	// hangs off both consumers.
 	reported := []finding.Reported{{
 		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
@@ -188,7 +188,7 @@ func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
 			Component: first.AsImage(), FixState: finding.NoFix,
 		})
 	}
-	r.Scan(t, "two-places", graph.Snapshot{
+	r.Scan(t, "two-occurrences", graph.Snapshot{
 		Root:       SeededRoot,
 		Components: []graph.Described{first, second, SeededLib},
 		Dependencies: []graph.Dependency{
@@ -200,7 +200,7 @@ func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
 
 // ScannedBeneathAProduct is one issue in one library that curl pulls in
 // directly and through libssh, that an app pulls in, and that the build holds
-// directly: four places, two of them beneath curl.
+// directly: four occurrences, two of them beneath curl.
 //
 // The build names its root by the package identifier given, where one is.
 func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {

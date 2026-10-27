@@ -22,7 +22,7 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 - [Duplicate descriptions](#duplicate-descriptions)
 - [History as intervals](#history-as-intervals)
 - [Inventory delta](#inventory-delta)
-- [Place identity](#place-identity)
+- [Occurrence identity](#occurrence-identity)
 - [Path traversal](#path-traversal)
 - [Limits](#limits)
 
@@ -37,9 +37,9 @@ before anything may target them.
 | Stream | A branch or a tag of that product |
 | Variant | One of the ways the product is built |
 | Build | One stream built as one variant, and the pair a scan is filed against |
-| Place | A component and what directly pulled it in |
-| Finding | One component at one place in one build. Twelve places is twelve findings (REQ-17) |
-| Group | One issue at one component across every place it sits at. The row the findings list returns, and the thing somebody decides about |
+| Occurrence | A component and what directly pulled it in |
+| Finding | One component at one occurrence in one build. Twelve occurrences is twelve findings (REQ-17) |
+| Group | One issue at one component across every occurrence it sits at. The row the findings list returns, and the thing somebody decides about |
 | Report | A claim somebody sent us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`DESIGN-findings.md` § Reports) |
 
 Each word names one thing, and the unit a scan is filed against is called a
@@ -52,13 +52,13 @@ other.
 |---|---|
 | Build | The word in prose, in responses and on screens. The table is called `target`, and the name stops there |
 | Release | Not a level of the hierarchy. It is the act of shipping and the version a fix arrives in |
-| Place | Spelled `places` everywhere, never "locations" |
+| Occurrence | Spelled `occurrences` everywhere, never "locations" |
 
 | Verb | Means | Not |
 |---|---|---|
-| Approve | A second person agrees to a claim | Agree, as a state |
-| Decided | A group whose every place is answered by a standing decision | Agreed. The wire value is `agreed`, and that is the only place the word appears for this |
-| Withdraw | Taking back something recorded: a claim, an approval, a role | Revoke, retract, remove, cancel. Retiring a team or a rule is the exception, being not a taking-back |
+| Approve | A second person agrees to a decision | Agree, as a state |
+| Decided | A group whose every occurrence is answered by a standing decision | Agreed. The wire value is `agreed`, and that is the only place the word appears for this |
+| Withdraw | Taking back something recorded: a decision, an approval, a role | Revoke, retract, remove, cancel. Retiring a team or a rule is the exception, being not a taking-back |
 | Hand back | Returning work to nobody | Release, which would make that word mean a third thing |
 
 ## Streams
@@ -407,7 +407,7 @@ name is not enough.
 | A name matching several is refused with the choices, each carrying all four parts | A choice missing one leads back to the same refusal |
 | A name matching none is not found, and is looked up only once the request is authorized | A refusal that differs between a held name and a missing one, for a build the caller may not read, says what the build holds |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
-| Findings rows, tree nodes, the rows of the tree of one's own work, the steps of a way down, component packages, and the unassigned, late, disposed, blocking and claim lists carry the ecosystem and namespace | A screen can send back only what it was given |
+| Findings rows, tree nodes, the rows of the tree of one's own work, the steps of a way down, component packages, and the unassigned, late, disposed, blocking and decision lists carry the ecosystem and namespace | A screen can send back only what it was given |
 | The finding and its reach, decision, assignment and tags, a component's neighbors, trend, open issues and decision about them, and a list narrowed beneath one, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
 
 ## Upstream name and version
@@ -450,13 +450,13 @@ none, one source at two versions in one build with one of them already fixed.
 
 | Rule | |
 |---|---|
-| **It groups; it does not identify** | Identity stays derived from the component's own content (REQ-08), a finding stays keyed on its place (REQ-17), and a decision stays keyed on that place and expires on its own version (REQ-25). When a producer starts stating a source package for something it did not, the grouping moves and no record does |
+| **It groups; it does not identify** | Identity stays derived from the component's own content (REQ-08), a finding stays keyed on its occurrence (REQ-17), and the decision at that occurrence stays keyed on it and expires on its own version (REQ-25). When a producer starts stating a source package for something it did not, the grouping moves and no record does |
 | **Written on the way in, read as a column** | The grouping was an expression six queries each spelled for themselves, which is a key that comes apart. A column also groups on an index rather than on a function of four columns |
-| **Hashed rather than spelled out** | A readable composite would have to be bounded to carry an index, and two keys agreeing to that bound would merge two source packages into one row — which, under one judgment covering the whole fold, writes decisions across both |
+| **Hashed rather than spelled out** | A readable composite would have to be bounded to carry an index, and two keys agreeing to that bound would merge two source packages into one row — which, under one decision covering the whole fold, writes rows across both |
 | **A component stating no source package is its own** | Coverage is producer-supplied and thin: 564 of 786 Debian packages, 10 of 18 Alpine, 2 of 188 PyPI, and none of 1,684 Go modules or 3,880 generic components. Leaving those out of every grouping would leave the majority ungrouped |
 | **Folded for capitals, like every other matched name** | The four engines do not fold alike outside ASCII, so it is folded here rather than asked of one of them |
-| **Cut to a number of characters, not a number of bytes** | Every indexed name column here is declared in characters — PostgreSQL, MySQL and MariaDB all count a `VARCHAR`'s length that way — and the fold key hashes four cut names. Cut at the same number of *bytes*, a name in a script taking three bytes a character was cut to a third of the width the column holds, so two components whose names differ only past that third folded together and one judgment covered both. The cut could also land inside a character, which hashes mangled parts and stores invalid UTF-8 |
-| **It does not reach the two records that name what shipped** | The disposition register is one row per issue and place, and a VEX or CSAF statement is one per issue and component — the binary a customer's scanner matched on, not the source it was cut from. Folding either would publish a claim about a package nobody received |
+| **Cut to a number of characters, not a number of bytes** | Every indexed name column here is declared in characters — PostgreSQL, MySQL and MariaDB all count a `VARCHAR`'s length that way — and the fold key hashes four cut names. Cut at the same number of *bytes*, a name in a script taking three bytes a character was cut to a third of the width the column holds, so two components whose names differ only past that third folded together and one decision covered both. The cut could also land inside a character, which hashes mangled parts and stores invalid UTF-8 |
+| **It does not reach the two records that name what shipped** | The disposition register is one row per issue and occurrence, and a VEX or CSAF statement is one per issue and component — the binary a customer's scanner matched on, not the source it was cut from. Folding either would publish a claim about a package nobody received |
 
 Folding at ingest is a different proposal, and the measurement refuses it. 82
 of the 117 groups hold binaries pulled in by different parents,
@@ -627,14 +627,14 @@ scan, counted the way the change is counted and excluding the root. Forty names
 moving is a rebuild on an inventory of two thousand and a different build on an
 inventory of sixty.
 
-## Place identity
+## Occurrence identity
 
-The unit of triage is a component at a place: the pair of this component and the
+The unit of triage is a component at an occurrence: the pair of this component and the
 thing that directly depends on it. Names only, no versions, hashed. Where the
 thing above is the root, the component's name stands alone, because the root's
 name differs per variant.
 
-A finding of the analysis kind has a place of its own, minted from its series
+A finding of the analysis kind has an occurrence of its own, minted from its series
 and the result's match key and carried by matching (`DESIGN-analysis.md`
 § Matching). It sits at a component as every finding does.
 
@@ -643,7 +643,7 @@ switch image:
 
 | | Chain of names | Component and its consumer |
 |---|---:|---:|
-| Places in one image | 134,509 | 27,366 — the edge count |
+| Occurrences in one image | 134,509 | 27,366 — the edge count |
 | Worst single component | 49,170 | 63 |
 
 The worst case is one shared library: ten sub-packages built from its source,
@@ -657,7 +657,7 @@ something runs in is one step further up, and the whole route is walkable.
 
 ## Path traversal
 
-Under the definition above a place *is* an edge, so no row per route is stored.
+Under the definition above an occurrence *is* an edge, so no row per route is stored.
 The questions asked of the graph are answered by walking it.
 
 | Question, on the worst component in a real image | PostgreSQL | MySQL |
@@ -692,13 +692,13 @@ root, against 0.018 s.
 | Limit | Detail |
 |---|---|
 | An image with no package identifier in a database v0.8.0 built is not recognized by the upgrade | v0.8.0 kept nothing saying the format called it a container. Its next upload stores it by name, once, as a version moving would (`DESIGN-database.md` § The v0.9.0 upgrade) |
-| An image's version is shown on the component screen alone | The tree, the findings list, a place's chain and the comparisons show an image with no version, which is what it is stored as |
-| Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a claim is keyed on the versions in hand and asked again when they move |
+| An image's version is shown on the component screen alone | The tree, the findings list, an occurrence's chain and the comparisons show an image with no version, which is what it is stored as |
+| Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a decision is keyed on the versions in hand and asked again when they move |
 | A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |
 | Two artifacts distinguished only by a package qualifier are one component | A component is tracked for which vulnerabilities apply to it, and a qualifier does not change that |
 | A component's row, and its fold, are what the first report of it stated | A source package or a distribution a later report states reaches that product's scanner, the build's claims and a closing finding's explanation from the node, and not the fold, a decision's expiry, a routing rule or a search by name, which read the row. A package first described without its source package folds on its own name in every product |
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
-| A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
-| A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named. A decision is related to a finding by one spelling of the product, the issue and the place, with a form for each way a statement reads the two rows: the finding under any alias code gives it, the product left to a statement that holds it through the finding's build, the issue asked through the merge where the statement has not joined the issue a decision is filed under, and a derived table carrying a decision's issue and place. Every query correlating a decision to a finding composes one of them. A test fails a comparison of a decision's issue or place with a finding's written out in either order and under any alias, and lists by name the few place comparisons between two rows that are not a decision and a finding. Each query adds its own condition on liveness, versions and state beside the correlation |
+| A group's state is read from what its occurrences say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn decision in no bucket at all: in none of the four states, and in the total |
+| An occurrence identity carries no build and no product | That is what lets a decision travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named. A decision occurrence is related to a finding by one spelling of the product, the issue and the occurrence, with a form for each way a statement reads the two rows: the finding under any alias code gives it, the product left to a statement that holds it through the finding's build, the issue asked through the merge where the statement has not joined the issue a decision is filed under, and a derived table carrying a decision occurrence's issue and occurrence. Every query correlating a decision occurrence to a finding composes one of them. A test fails a comparison of a decision occurrence's issue or occurrence with a finding's written out in either order and under any alias, and lists by name the few occurrence comparisons between two rows that are not a decision occurrence and a finding. Each query adds its own condition on liveness, versions and state beside the correlation |
 | An issue taken off an advisory and put back keeps one row, with the interval it was last on | The pair is unique, so the row is revived rather than a second written, and when it was first on is not kept. An issuance from before it was taken off is then read as not naming it, so a rename that document should refuse is allowed |
-| Where an issue sits, and the disclosure queue, link to a finding by name and version alone | The first groups one issue's places by component name, so one row can stand for two components of that name. Where a build holds that name at that version as two, the link lands on the choice between them |
+| Where an issue sits, and the disclosure queue, link to a finding by name and version alone | The first groups one issue's occurrences by component name, so one row can stand for two components of that name. Where a build holds that name at that version as two, the link lands on the choice between them |

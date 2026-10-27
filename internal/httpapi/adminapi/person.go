@@ -40,7 +40,7 @@ type AboutPersonBody struct {
 	Audits bool `json:"audits,omitempty" doc:"Whether they may read this deployment's own records. It grants no product's findings or decisions"`
 	// DeactivatedAt is when they stopped being somebody who may sign in.
 	// Absent is the ordinary state. Never a deletion: they are still named
-	// by every judgment they proposed and every one they agreed to.
+	// by every decision they proposed and every one they agreed to.
 	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"The date they left. Absent means they are active"`
 	// Holds is the grants in force now.
 	Holds []HeldBody `json:"holds,omitempty"`
@@ -70,11 +70,11 @@ type HeldChangeBody struct {
 
 // PersonRecordBody is how much of the triage record rests on one person.
 type PersonRecordBody struct {
-	Proposed int `json:"proposed" doc:"Claims they argued"`
-	Approved int `json:"approved" doc:"Claims they agreed to that still stand"`
+	Proposed int `json:"proposed" doc:"Decisions they argued"`
+	Approved int `json:"approved" doc:"Decisions they agreed to that still stand"`
 	// Withdrawn is counted apart, because an agreement taken back is not
 	// somebody who agrees.
-	Withdrawn      int    `json:"withdrawn" doc:"Claims they agreed to and later took back"`
+	Withdrawn      int    `json:"withdrawn" doc:"Decisions they agreed to and later took back"`
 	LastProposedAt string `json:"last_proposed_at,omitempty" doc:"Absent where they never have"`
 	LastApprovedAt string `json:"last_approved_at,omitempty" doc:"Absent where they never have"`
 }
@@ -227,7 +227,7 @@ func registerDeactivation(api huma.API, a core.Administering) {
 			"onward, their sessions are ended, and what they were dealing with is handed " +
 			"back so it is not held by somebody who is gone. So is work in the queue of a " +
 			"team they were on that no remaining member reads.\n\n" +
-			"Nobody is deleted. The record names them as the proposer of judgments and the " +
+			"Nobody is deleted. The record names them as the proposer of decisions and the " +
 			"approver of others, and their roles are left where they are: what somebody " +
 			"held is part of why the record reads as it does, and bringing them back should " +
 			"not mean reconstructing it. What stops them is the date.\n\n" +

@@ -20,7 +20,7 @@ import (
 
 // LeadRowBody is one lead in a product's list of them.
 type LeadRowBody struct {
-	Place      string    `json:"place" doc:"The lead's place identity, which addresses it on every build it is on"`
+	Occurrence string    `json:"occurrence" doc:"The lead's occurrence identity, which addresses it on every build it is on"`
 	Rule       string    `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
 	Path       string    `json:"path" doc:"The file, from the top of the checkout"`
 	Line       int       `json:"line,omitempty" doc:"The line the result starts at"`
@@ -43,7 +43,7 @@ type LeadsOutput struct {
 		// Counted rather than only listed, so that a list leaving leads
 		// out says how much it left (REQ-30).
 		States  map[string]int `json:"states" doc:"The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build"`
-		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
+		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a decision about them waits for a second person"`
 		Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
 		Ended   int            `json:"past_end_of_life" doc:"Open leads left out of the queue because every release they are open in is past its end of life. Zero for a list by state"`
 	}
@@ -101,7 +101,7 @@ func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]Le
 	out := make([]LeadRowBody, 0, len(rows))
 	for _, r := range rows {
 		row := LeadRowBody{
-			Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message,
+			Occurrence: r.Occurrence, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message,
 			ThirdParty: r.ThirdParty,
 			Stream:     r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
 			Opened: r.Opened.UTC().Format(time.DateOnly),
@@ -122,7 +122,7 @@ func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]Le
 func leadColumns() []string {
 	return []string{
 		"rule", "path", "line", "function", "message", "state", "stream", "variant",
-		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "place", "third_party",
+		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "occurrence", "third_party",
 	}
 }
 
@@ -136,7 +136,7 @@ func leadCells(row LeadRowBody) []string {
 	return []string{
 		row.Rule, row.Path, line, row.Function, row.Message,
 		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened,
-		row.AssignedTo, row.AssignedName, strconv.FormatBool(row.AssignedTeam), row.Place,
+		row.AssignedTo, row.AssignedName, strconv.FormatBool(row.AssignedTeam), row.Occurrence,
 		strconv.FormatBool(row.ThirdParty),
 	}
 }
@@ -150,11 +150,11 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			"on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer " +
 			"reports the same flaw on the build, then the tool's own security severity for the rule, " +
 			"then its precision, then newest first.\n\n" +
-			"With no `state` it is the queue: open code findings with no claim waiting for a second " +
+			"With no `state` it is the queue: open code findings with no decision waiting for a second " +
 			"person. `state` lists the code findings in one state instead. `fixed` lists the code findings " +
 			"closed on a build and not opened anew there.\n\n" +
 			"`states` counts every code finding in the scope by state and `waiting` the open ones " +
-			"left out for a waiting claim, and `ruled` the dismissed ones a suppression rule covers, " +
+			"left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, " +
 			"so what the list leaves out is counted. The queue also leaves out a code finding open only in " +
 			"releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in " +
 			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +

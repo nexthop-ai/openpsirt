@@ -268,7 +268,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		{StatementRevised, s.statementsRevised, "what a publisher changed"},
 		// Work that has stopped moving: different waits with different
 		// audiences.
-		{ClaimWaiting, s.waitingClaims, "what is waiting on a second person"},
+		{DecisionWaiting, s.waitingDecisions, "what is waiting on a second person"},
 		{SentBackWaiting, s.sentBackWaiting, "what was sent back and left"},
 		{DeferralEnding, s.deferralsEnding, "which deferrals are running out"},
 		{QueueUntaken, s.queuesUntaken, "what is sitting in a queue"},
@@ -550,7 +550,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	}
 	// The open findings each person holds, counted as pieces of work rather
 	// than as rows: one issue in one component is one thing to deal with
-	// however many places it sits at, and "6 items" meaning 288 findings is a
+	// however many occurrences it sits at, and "6 items" meaning 288 findings is a
 	// number that makes somebody's absence look like a catastrophe.
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	pieces := w.db.NewSelect().

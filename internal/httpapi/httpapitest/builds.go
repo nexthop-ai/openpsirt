@@ -86,7 +86,7 @@ func (r *Reach) AlsoHolds(t *testing.T, product, stream, variant, identifier str
 }
 
 // ScannedAlso is a second build of the same product, holding the same issue at
-// the same place, with the library at the given version.
+// the same occurrence, with the library at the given version.
 func (r *Reach) ScannedAlso(t *testing.T, variant, version string) {
 	t.Helper()
 	if _, err := catalog.NewStore(r.DB.DB).DeclareVariant(t.Context(),
@@ -208,7 +208,7 @@ func (r *Reach) ScannedTag(t *testing.T, tag, version string) {
 }
 
 // AlsoScannedInto puts the same component and issue behind a second product,
-// so that a place identity — which carries no product, deliberately — is the
+// so that an occurrence identity — which carries no product, deliberately — is the
 // same key in both.
 func (r *Reach) AlsoScannedInto(t *testing.T, product, stream, variant string) {
 	t.Helper()
@@ -249,9 +249,9 @@ func (r *Reach) ScannedSiblings(t *testing.T) {
 }
 
 // SiblingsAlsoIn puts the same two packages, at the same versions, in a second
-// variant of the same branch. A decision is keyed on the place and the two
+// variant of the same branch. A decision's row is keyed on the occurrence and the two
 // upstream versions and on no build at all, so this is the fixture in which
-// one decision covers two findings — and the one in which proposing per
+// one row covers two findings — and the one in which proposing per
 // finding writes the same key twice.
 func (r *Reach) SiblingsAlsoIn(t *testing.T, variant string) {
 	t.Helper()
@@ -274,7 +274,7 @@ func (r *Reach) productID(t *testing.T) int64 {
 // ScannedTwoSources puts two packages of two different source packages in the
 // build, both carrying one issue.
 //
-// The fixture for anything about two answers to one issue: one judgment covers
+// The fixture for anything about two answers to one issue: one decision covers
 // a whole fold, so two different answers within one fold is not a state
 // anything can reach.
 func (r *Reach) ScannedTwoSources(t *testing.T) {

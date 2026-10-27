@@ -94,7 +94,7 @@ export const GROUPS: Group[] = [
         slug: "effort-by-component",
         name: "Effort by component",
         answers:
-          "What the judgments in a period were about, most argued first, and what came of them.",
+          "What the decisions in a period were about, most argued first, and what came of them.",
       },
     ],
   },
@@ -122,7 +122,7 @@ export const GROUPS: Group[] = [
         // publishes them: a lead's dismissal is one, beside the dismissals of
         // a vulnerability. Asked of a list typed here, an outcome the server
         // adds would go uncounted while the record said none stood alone.
-        // Before the server has said, there is nothing to ask. A claim about
+        // Before the server has said, there is nothing to ask. A decision about
         // a lead is internal, and the record lists it only to somebody who
         // reads internal material in its product.
         to: (at, gated) =>
@@ -138,7 +138,7 @@ export const GROUPS: Group[] = [
       },
       {
         // The record again, asked the other question it was built to answer.
-        // Every other judgment lapses when the code moves; these do not, so
+        // Every other decision lapses when the code moves; these do not, so
         // nothing brings them back round to anybody and the only way to read
         // them is to ask for them.
         name: "Standing corrections",

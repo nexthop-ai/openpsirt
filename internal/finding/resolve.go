@@ -30,9 +30,9 @@ var ErrNothingOpenThere = refusal.New("nothing is open there")
 
 // Resolved is what a closure did.
 type Resolved struct {
-	// Closed is how many places of the issue in this build were closed. An
-	// issue sits at many places and a fix reaches all of them, so this is the
-	// number of rows written rather than the number of things somebody
+	// Closed is how many occurrences of the issue in this build were closed. An
+	// issue sits at many occurrences and a fix reaches all of them, so this is
+	// the number of rows written rather than the number of things somebody
 	// decided about.
 	Closed int
 	At     time.Time

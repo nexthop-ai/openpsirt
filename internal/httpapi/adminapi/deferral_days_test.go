@@ -49,7 +49,7 @@ func TestTheSessionPublishesTheLimitsInForce(t *testing.T) {
 		httpapitest.Read(t, r, "triager", "/v1/session/me", &me)
 		shipped := limits{
 			DeferralDays: int(triage.DefaultDeferralThreshold.Hours() / 24),
-			BulkCap:      triage.DefaultTogetherCap,
+			BulkCap:      triage.DefaultBulkDecisionCap,
 		}
 		if me != shipped {
 			t.Errorf("with nothing set the session publishes %+v, want %+v", me, shipped)
@@ -57,7 +57,7 @@ func TestTheSessionPublishesTheLimitsInForce(t *testing.T) {
 
 		for name, value := range map[string]string{
 			setting.DeferralThreshold: "240h",
-			setting.TogetherCap:       "7",
+			setting.BulkDecisionCap:   "7",
 		} {
 			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/"+name,
 				`{"value":"`+value+`"}`); got.Code >= 300 {

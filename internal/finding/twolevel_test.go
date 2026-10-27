@@ -44,7 +44,7 @@ func (f *fixture) curlFold(t *testing.T) (lib, tool graph.Described) {
 }
 
 // A condition over a group is asked of every package in its fold. The list
-// groups the places by issue and component first and by fold second, and a
+// groups the occurrences by issue and component first and by fold second, and a
 // state is a condition over the second: a fold with one package decided and
 // one not is neither undecided nor agreed, rather than one row of each.
 func TestAGroupsStateIsAskedOfEveryPackageInItsFold(t *testing.T) {
@@ -54,9 +54,9 @@ func TestAGroupsStateIsAskedOfEveryPackageInItsFold(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		somebody := f.somebodyElse(t)
 		issue := f.issue(t, "CVE-2026-CURL")
-		f.decided(t, somebody, issue, finding.PlaceIdentity(lib.Name, ""), "approved", lib.Version, "lib")
+		f.decided(t, somebody, issue, finding.OccurrenceIdentity(lib.Name, ""), "approved", lib.Version, "lib")
 
-		count := func(states ...finding.ClaimStanding) int {
+		count := func(states ...finding.DecisionStanding) int {
 			t.Helper()
 			groups, total, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: states})
 			if err != nil {
@@ -66,8 +66,8 @@ func TestAGroupsStateIsAskedOfEveryPackageInItsFold(t *testing.T) {
 				t.Fatalf("%v: a page of %d rows says there are %d", states, len(groups), total)
 			}
 			for _, group := range groups {
-				if group.Places != 2 {
-					t.Errorf("%v: the fold's row counts %d places, want both packages'", states, group.Places)
+				if group.Occurrences != 2 {
+					t.Errorf("%v: the fold's row counts %d occurrences, want both packages'", states, group.Occurrences)
 				}
 			}
 			return total
@@ -82,7 +82,7 @@ func TestAGroupsStateIsAskedOfEveryPackageInItsFold(t *testing.T) {
 			t.Errorf("a fold with one package decided reads as agreed in %d rows", n)
 		}
 
-		f.decided(t, somebody, issue, finding.PlaceIdentity(tool.Name, ""), "approved", tool.Version, "tool")
+		f.decided(t, somebody, issue, finding.OccurrenceIdentity(tool.Name, ""), "approved", tool.Version, "tool")
 		if n := count(finding.StandingAgreed); n != 1 {
 			t.Errorf("a fold with every package decided reads as agreed in %d rows, want one", n)
 		}
@@ -92,10 +92,10 @@ func TestAGroupsStateIsAskedOfEveryPackageInItsFold(t *testing.T) {
 	})
 }
 
-// The fold is counted once by every count of the list, and its places are
-// both packages' places, whichever statement does the counting: the page, the
-// count behind an empty page, the list across products, the hidden count, and
-// the two other views with and without a page.
+// The fold is counted once by every count of the list, and its occurrences are
+// both packages' occurrences, whichever statement does the counting: the page,
+// the count behind an empty page, the list across products, the hidden count,
+// and the two other views with and without a page.
 func TestAFoldIsOneRowInEveryCountOfTheList(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -106,14 +106,14 @@ func TestAFoldIsOneRowInEveryCountOfTheList(t *testing.T) {
 			"no filter": {},
 			"has a fix": {HasFix: true},
 			"by age":    {SortBy: finding.ByAge},
-			"undecided": {States: []finding.ClaimStanding{finding.StandingUndecided}},
+			"undecided": {States: []finding.DecisionStanding{finding.StandingUndecided}},
 		} {
 			groups, total, err := f.store.Groups(ctx, who, f.scope, 50, 0, filter)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if total != 1 || len(groups) != 1 || groups[0].Places != 2 || groups[0].Packages != 2 {
-				t.Fatalf("%s: the page is %+v (total %d), want one row of two packages' places",
+			if total != 1 || len(groups) != 1 || groups[0].Occurrences != 2 || groups[0].Packages != 2 {
+				t.Fatalf("%s: the page is %+v (total %d), want one row of two packages' occurrences",
 					name, groups, total)
 			}
 			if _, past, err := f.store.Groups(ctx, who, f.scope, 50, 50, filter); err != nil || past != 1 {
@@ -123,7 +123,7 @@ func TestAFoldIsOneRowInEveryCountOfTheList(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if all != 1 || len(across) != 1 || across[0].Places != 2 {
+			if all != 1 || len(across) != 1 || across[0].Occurrences != 2 {
 				t.Errorf("%s: across products the fold is %+v (total %d)", name, across, all)
 			}
 			if _, past, err := f.store.Anywhere(ctx, who, 50, 50, filter); err != nil || past != 1 {
@@ -147,9 +147,9 @@ func TestAFoldIsOneRowInEveryCountOfTheList(t *testing.T) {
 			t.Errorf("by component the fold is %d rows (total %d), want one per package", len(components), byComponent)
 		}
 		for _, component := range components {
-			if component.Issues != 1 || component.Places != 1 {
-				t.Errorf("%s carries %d issues at %d places, want one at one",
-					component.Component, component.Issues, component.Places)
+			if component.Issues != 1 || component.Occurrences != 1 {
+				t.Errorf("%s carries %d issues at %d occurrences, want one at one",
+					component.Component, component.Issues, component.Occurrences)
 			}
 		}
 		alone, err := f.store.CountComponentGroups(ctx, who, f.scope, finding.Filter{})
@@ -161,7 +161,7 @@ func TestAFoldIsOneRowInEveryCountOfTheList(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if byBump != 1 || len(bundles) != 1 || bundles[0].Places != 2 || bundles[0].Issues != 1 ||
+		if byBump != 1 || len(bundles) != 1 || bundles[0].Occurrences != 2 || bundles[0].Issues != 1 ||
 			len(bundles[0].Components) != 2 {
 			t.Errorf("by upgrade the fold is %+v (total %d), want one bump of both packages", bundles, byBump)
 		}
@@ -176,7 +176,7 @@ func TestABundleNamesEachPackageAndBuildOnceInNameOrder(t *testing.T) {
 	// A fold of two packages, each with two issues the same version fixes,
 	// shipped in two builds, beside a bundle of another fold. Each bundle
 	// names its own packages and builds, once each, in the order a reader
-	// scans them, however many places and issues sit under a name.
+	// scans them, however many occurrences and issues sit under a name.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib := graph.Described{

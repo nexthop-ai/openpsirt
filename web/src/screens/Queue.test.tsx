@@ -39,7 +39,7 @@ describe("the review queue", () => {
     ]);
   });
 
-  it("exports what became of your claims on the Mine tab", async () => {
+  it("exports what became of your decisions on the Mine tab", async () => {
     serve(() => ({ data: { items: [], total: 0 } }));
     mount.render(screen(<Queue />, "/review-queue?mine=1&severity=high"));
     await settle();
@@ -57,27 +57,27 @@ describe("the review queue", () => {
   });
 });
 
-// A claim waiting in the queue, as the server lists one.
+// A decision waiting in the queue, as the server lists one.
 function waiting(id: number) {
   return {
     age_days: 3,
     builds: ["master · broadcom"],
-    claim: { id, kind: "finding", proposed_at: "2026-09-01T00:00:00Z", proposed_by: "bo" },
-    decision: { id: id * 10, outcome: "not-applicable", reasoning: "not built" },
-    decisions: 1,
+    decision: { id, kind: "finding", proposed_at: "2026-09-01T00:00:00Z", proposed_by: "bo" },
+    decision_occurrence: { id: id * 10, outcome: "not-applicable", reasoning: "not built" },
+    rows: 1,
     issues: 1,
-    places: 1,
-    place: { place: `p${id}`, product: "sonic", vulnerability: `CVE-2026-${id}` },
+    occurrences: 1,
+    occurrence: { occurrence: `p${id}`, product: "sonic", vulnerability: `CVE-2026-${id}` },
     proposed_by: "bo",
     reasoning: "not built",
   };
 }
 
 describe("approving a selection", () => {
-  // Verified by dropping the batch name from the request each claim is
+  // Verified by dropping the batch name from the request each decision is
   // approved with, by counting landed approvals as refused, and by clearing the
   // whole selection after the loop: each fails one assertion below.
-  it("approves every claim under the batch name, and keeps only the refused one ticked", async () => {
+  it("approves every decision under the batch name, and keeps only the refused one ticked", async () => {
     serve((path) => {
       if (path === "/v1/review-queue")
         return { data: { items: [waiting(1), waiting(2)], total: 2 } };
@@ -95,7 +95,7 @@ describe("approving a selection", () => {
     const host = mount.host();
 
     const all = host.querySelector<HTMLInputElement>(
-      'input[aria-label="Select every claim shown"]',
+      'input[aria-label="Select every decision shown"]',
     );
     expect(all, "no select-all control").not.toBeNull();
     act(() => all?.click());
@@ -125,7 +125,9 @@ describe("approving a selection", () => {
       ["/v1/decisions/{id}/approval", 1, { batch: "tuesday" }],
       ["/v1/decisions/{id}/approval", 2, { batch: "tuesday" }],
     ]);
-    expect(host.textContent).toContain("One claim could not be agreed to and is still selected.");
+    expect(host.textContent).toContain(
+      "One decision could not be agreed to and is still selected.",
+    );
     expect(host.textContent).toContain("1 selected");
     expect(host.textContent).toContain("Agreed to under “tuesday”");
   });
@@ -158,7 +160,7 @@ describe("the review queue by reason", () => {
   it("names a missed promise and offers changing it or deciding again, never approving", async () => {
     const promise = {
       ...waiting(7),
-      decision: {
+      decision_occurrence: {
         id: 70,
         outcome: "upgrade-needed",
         upgrade_to: "3.0.15",
@@ -199,7 +201,7 @@ describe("the selection an approval loop leaves", () => {
     expect([...stillPicked(now, new Set(["a", "b"]), ["b"]).keys()]).toEqual(["b", "late"]);
   });
 
-  it("does not put back a refused claim that was unticked while it ran", () => {
+  it("does not put back a refused decision that was unticked while it ran", () => {
     const now = new Map([["a", 1]]);
     expect([...stillPicked(now, new Set(["a", "b"]), ["b"]).keys()]).toEqual([]);
   });
@@ -225,9 +227,12 @@ describe("a product's page", () => {
 });
 
 describe("what an approver agrees to", () => {
-  it("shows whom the published statement holds for where the claim states it", async () => {
+  it("shows whom the published statement holds for where the decision states it", async () => {
     const stated = waiting(7);
-    stated.decision = { ...stated.decision, scope: "portable" } as typeof stated.decision;
+    stated.decision_occurrence = {
+      ...stated.decision_occurrence,
+      scope: "portable",
+    } as typeof stated.decision_occurrence;
     serve((path) =>
       path === "/v1/review-queue"
         ? { data: { items: [stated, waiting(8)], total: 2 } }
@@ -235,7 +240,7 @@ describe("what an approver agrees to", () => {
     );
     mount.render(screen(<Queue />, "/review-queue"));
     await settle();
-    const cards = Array.from(mount.host().querySelectorAll(".claimed"));
+    const cards = Array.from(mount.host().querySelectorAll(".decided"));
     expect(cards.map((card) => card.textContent ?? "")).toEqual([
       expect.stringContaining("for anyone shipping this version"),
       expect.not.stringContaining("for"),

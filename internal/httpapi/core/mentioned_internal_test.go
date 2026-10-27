@@ -59,7 +59,7 @@ func TestMentionsAreAllNotToldWhenTheReadersCannotBeRead(t *testing.T) {
 		dropped, err := Mentioned(t.Context(), Deps{DB: dbtest.Closed(t)},
 			access.Everything("a test asking who may be told"),
 			MentionTarget{ProductID: 1, VulnerabilityID: 1, Visibility: access.Public},
-			"@alice and @bob, look", "/claims/1")
+			"@alice and @bob, look", "/decisions/1")
 		if err == nil {
 			t.Error("a failed read of who may be told was reported as none failing")
 		}

@@ -33,7 +33,7 @@ deployment.
 | `public-triage` | Argue about disclosed findings: decide, revise, withdraw, comment. Take work nobody owns, and hand back your own |
 | `private-triage` | The same for findings nobody has announced yet, including recording one and moving its disclosure date. Disclosed findings take `public-triage` |
 | `internal-triage` | The same for internal findings. Disclosed and undisclosed findings take their own triage roles |
-| `approver` | Agree to somebody else's claim, at a visibility its holder reads. A triager may also approve, and the proposer may never approve their own |
+| `approver` | Agree to somebody else's decision, at a visibility its holder reads. A triager may also approve, and the proposer may never approve their own |
 | `assigner` | Give work to somebody else, or take what they are holding |
 | administrator | The deployment: people, roles, credentials, settings, and the catalog |
 
@@ -67,7 +67,7 @@ goes only to somebody who reads undisclosed work in that product.
 
 `approver` and `assigner` grant no visibility of their own. Each is a
 capability bounded by what its holder may read, so granted alone it reaches
-nothing — somebody who may agree to claims needs a read role as well, and a
+nothing — somebody who may agree to decisions needs a read role as well, and a
 deployment that grants only the capability has given somebody an empty tool.
 
 An administrator administers (REQ-42). People, roles, credentials, settings,
@@ -85,7 +85,7 @@ Two rules are not roles and cannot be granted:
 - **Visibility** narrows every answer. An endpoint you may call still shows
  only what you may see, so two people calling the same endpoint get different
  answers rather than one of them getting an error.
-- **Separation of duties**: the proposer of a claim may never approve it,
+- **Separation of duties**: the proposer of a decision may never approve it,
  whoever they are, however much they hold.
 
 ## Names without a directory

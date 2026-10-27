@@ -4,20 +4,20 @@
 import { describe, expect, it } from "vitest";
 import { happenedOf, stripeOf } from "./stripe";
 
-// The claim page and the finding screen draw the same stripe for the same
-// claim, because both ask this.
-describe("a claim's stripe", () => {
-  it("is neutral for a withdrawn claim", () => {
+// The decision page and the finding screen draw the same stripe for the same
+// decision, because both ask this.
+describe("a decision's stripe", () => {
+  it("is neutral for a withdrawn decision", () => {
     expect(stripeOf("withdrawn", true)).toBe("");
     expect(stripeOf(happenedOf("withdrawn", false), true)).toBe("");
   });
 
-  it("reads as in force for a proposed claim nothing waits on", () => {
+  it("reads as in force for a proposed decision nothing waits on", () => {
     expect(stripeOf("waiting", false)).toBe("approved");
     expect(stripeOf(happenedOf("proposed", false), false)).toBe("approved");
   });
 
-  it("is pending while a second person is needed or the claim is still argued", () => {
+  it("is pending while a second person is needed or the decision is still argued", () => {
     expect(stripeOf("waiting", true)).toBe("pending");
     expect(stripeOf("sent-back", true)).toBe("pending");
     expect(stripeOf("undone", true)).toBe("pending");

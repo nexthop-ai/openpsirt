@@ -22,16 +22,16 @@ var agreedThenWithdrawn = regexp.MustCompile(`^reviewer \d{4}-\d{2}-\d{2}T\S+ wi
 // release sign-off and an audit each asked for and could not get.
 //
 // A decision names no build — it is keyed on the product, the issue and the
-// place, so that it carries across releases sharing the code — so "what was
+// occurrence, so that it carries across releases sharing the code — so "what was
 // decided about what this release ships" could not be asked at all. And the
 // file dropped every approval date and every agreement taken back, which is
 // what an audit is looking for.
 func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{"batch":"a-batch"}`); got.Code >= 300 {
+			fmt.Sprintf("/v1/decisions/%d/approval", decision), `{"batch":"a-batch"}`); got.Code >= 300 {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 		// Taken back, which is the half the file dropped.
@@ -40,7 +40,7 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 			t.Fatalf("taking the agreement back answered %d: %s", got.Code, got.Body.String())
 		}
 
-		// The build the judgment is about.
+		// The build the decision is about.
 		var about struct {
 			Total int `json:"total"`
 		}
@@ -50,8 +50,8 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 			t.Errorf("the record narrowed to the build it was decided in holds %d", about.Total)
 		}
 
-		// A second build of the same product, holding nothing: the judgment
-		// is about a place that build does not have, and a decision names no
+		// A second build of the same product, holding nothing: the decision
+		// is about an occurrence that build does not have, and a decision names no
 		// build, so without the match through the findings it would answer
 		// here too.
 		r.AlsoIn(t, "mellanox")
@@ -61,7 +61,7 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 		httpapitest.Read(t, r, "private-triage",
 			"/v1/audit?product=mine&stream=master&variant=mellanox", &elsewhere)
 		if elsewhere.Total != 0 {
-			t.Errorf("a build holding none of it answers with %d judgments", elsewhere.Total)
+			t.Errorf("a build holding none of it answers with %d decisions", elsewhere.Total)
 		}
 
 		// A build of the same product that holds none of it.
@@ -91,7 +91,7 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 			t.Fatalf("the file has no agreements column: %v", body[0])
 		}
 		if len(body) < 2 {
-			t.Fatal("the file holds no judgment")
+			t.Fatal("the file holds no decision")
 		}
 		said := body[1][at]
 		if !strings.Contains(said, "reviewer") || !strings.Contains(said, "withdrawn") {
@@ -110,51 +110,51 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 	})
 }
 
-func TestTheRecordListsOneEntryPerClaimAndTheFileOneRowPerDecision(t *testing.T) {
-	// One act across a fold writes a decision per place. The screen's list is
-	// the act, once, saying how much it covers; the file is every decision,
-	// each carrying the claim it belongs to so a spreadsheet can group them.
+func TestTheRecordListsOneEntryPerDecisionAndTheFileOneRowPerOccurrence(t *testing.T) {
+	// One act across a fold covers several occurrences. The screen's list is
+	// the act, once, saying how much it covers; the file is every occurrence,
+	// each carrying the decision it belongs to so a spreadsheet can group them.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
-		claim := r.AgreedAcrossTheFold(t, "CVE-2026-CURL1", "vulnerable_code_not_present")
+		decision := r.AgreedAcrossTheFold(t, "CVE-2026-CURL1", "vulnerable_code_not_present")
 
-		var decisions struct {
+		var occurrences struct {
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "reviewer", "/v1/audit", &decisions)
-		if decisions.Total < 2 {
-			t.Fatalf("the act wrote %d decisions, want one per place across the fold", decisions.Total)
+		httpapitest.Read(t, r, "reviewer", "/v1/audit", &occurrences)
+		if occurrences.Total < 2 {
+			t.Fatalf("the act covered %d occurrences, want one per occurrence across the fold", occurrences.Total)
 		}
 
-		var claims struct {
+		var decisions struct {
 			Items []struct {
-				Claim     int64  `json:"claim"`
-				Decisions int    `json:"decisions"`
-				Places    int    `json:"places"`
-				State     string `json:"state"`
-				Standing  int    `json:"standing"`
-				TwoPeople bool   `json:"two_people"`
-				States    struct {
+				Decision    int64  `json:"decision"`
+				Rows        int    `json:"rows"`
+				Occurrences int    `json:"occurrences"`
+				State       string `json:"state"`
+				Standing    int    `json:"standing"`
+				TwoPeople   bool   `json:"two_people"`
+				States      struct {
 					Approved int `json:"approved"`
 				} `json:"states"`
 			} `json:"items"`
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "reviewer", "/v1/audit/decisions", &claims)
-		if claims.Total != 1 || len(claims.Items) != 1 || claims.Items[0].Claim != claim {
-			t.Fatalf("the record by claim lists %+v, want claim %d once", claims, claim)
+		httpapitest.Read(t, r, "reviewer", "/v1/audit/decisions", &decisions)
+		if decisions.Total != 1 || len(decisions.Items) != 1 || decisions.Items[0].Decision != decision {
+			t.Fatalf("the record by decision lists %+v, want decision %d once", decisions, decision)
 		}
-		got := claims.Items[0]
-		if got.Decisions != decisions.Total || got.Places != decisions.Total ||
-			got.States.Approved != decisions.Total || got.Standing != decisions.Total {
-			t.Errorf("the claim reads %+v, want all %d decisions, approved and standing",
-				got, decisions.Total)
+		got := decisions.Items[0]
+		if got.Rows != occurrences.Total || got.Occurrences != occurrences.Total ||
+			got.States.Approved != occurrences.Total || got.Standing != occurrences.Total {
+			t.Errorf("the decision reads %+v, want all %d occurrences, approved and standing",
+				got, occurrences.Total)
 		}
 		if got.State != "approved" || !got.TwoPeople {
-			t.Errorf("an agreed claim reads %q, two people %v", got.State, got.TwoPeople)
+			t.Errorf("an agreed decision reads %q, two people %v", got.State, got.TwoPeople)
 		}
 
-		// Narrowed to a state none of its decisions is in, the claim is absent
+		// Narrowed to a state none of its occurrences is in, the decision is absent
 		// and the total says so.
 		var lapsed struct {
 			Items []struct{} `json:"items"`
@@ -162,7 +162,7 @@ func TestTheRecordListsOneEntryPerClaimAndTheFileOneRowPerDecision(t *testing.T)
 		}
 		httpapitest.Read(t, r, "reviewer", "/v1/audit/decisions?state=lapsed", &lapsed)
 		if lapsed.Total != 0 || len(lapsed.Items) != 0 {
-			t.Errorf("asked for what lapsed, the record lists %d claims", lapsed.Total)
+			t.Errorf("asked for what lapsed, the record lists %d decisions", lapsed.Total)
 		}
 
 		file := httpapitest.AsPerson(t, r, "reviewer", http.MethodGet, "/v1/audit.csv", "")
@@ -174,16 +174,16 @@ func TestTheRecordListsOneEntryPerClaimAndTheFileOneRowPerDecision(t *testing.T)
 			t.Fatal(err)
 		}
 		body := httpapitest.RowsUnder(lines)
-		at := httpapitest.IndexOf(body[0], "claim")
+		at := httpapitest.IndexOf(body[0], "decision")
 		if at < 0 {
-			t.Fatalf("the file has no claim column: %v", body[0])
+			t.Fatalf("the file has no decision column: %v", body[0])
 		}
-		if len(body)-1 != decisions.Total {
-			t.Fatalf("the file holds %d rows, want one per decision: %d", len(body)-1, decisions.Total)
+		if len(body)-1 != occurrences.Total {
+			t.Fatalf("the file holds %d rows, want one per occurrence: %d", len(body)-1, occurrences.Total)
 		}
 		for _, row := range body[1:] {
-			if row[at] != fmt.Sprint(claim) {
-				t.Errorf("a decision of claim %d is filed under claim %q", claim, row[at])
+			if row[at] != fmt.Sprint(decision) {
+				t.Errorf("an occurrence of decision %d is filed under decision %q", decision, row[at])
 			}
 		}
 	})

@@ -413,7 +413,7 @@ func TestAFixReleaseSaysWhetherItsLatestScansHoldTheIssueOpen(t *testing.T) {
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		open := &finding.Finding{
 			TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
-			Visibility: access.Private, ComponentID: component, PlaceIdentity: "place-of-libfoo",
+			Visibility: access.Private, ComponentID: component, OccurrenceIdentity: "place-of-libfoo",
 			OpenedAt: now, OpenedRunID: &run.ID,
 		}
 		if _, err := f.db.DB.NewInsert().Model(open).Exec(ctx); err != nil {

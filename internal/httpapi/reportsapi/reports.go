@@ -54,18 +54,18 @@ type ChangedBody struct {
 	Severity      string  `json:"severity,omitempty"`
 	Because       closure `json:"because,omitempty" doc:"The reason it went. Only on an entry that left the affected list"`
 	ArrivedFrom   string  `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
-	FromVersion   string  `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
-	MovedTo       string  `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
+	FromVersion   string  `json:"from_version,omitempty" doc:"The version the occurrence held before the fix. Only on a fixed entry the version moved for"`
+	MovedTo       string  `json:"moved_to,omitempty" doc:"The version the occurrence moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
 	ClosedRun     int64   `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
 	// State is the decision standing on it, on a still-present entry and
 	// nowhere else. It turns a list of what is still there into something
 	// somebody can sign a release off against: an approved
 	// not-applicable and a row nobody has looked at are opposite answers
 	// and read alike without it.
-	State         core.Standing             `json:"state,omitempty" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
-	Outcome       core.VulnerabilityOutcome `json:"outcome,omitempty" doc:"The decision, where every standing one over its places says the same thing"`
+	State         core.Standing             `json:"state,omitempty" doc:"The decision state in this build. Only on a still-present entry. Absent where some occurrences are agreed and the rest were never decided, which is none of the four"`
+	Outcome       core.VulnerabilityOutcome `json:"outcome,omitempty" doc:"The decision, where every standing one over its occurrences says the same thing"`
 	Justification core.Justification        `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`
-	Due           string                    `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
+	Due           string                    `json:"due,omitempty" doc:"The soonest deadline among the occurrences still open, as a date"`
 }
 
 func registerReports(api huma.API, in core.Deps) {
@@ -223,7 +223,7 @@ func registerReports(api huma.API, in core.Deps) {
 		// faults as work done.
 		out.Body.Closed = changed(comparison.Closed, true, false)
 		out.Body.Newly = changed(comparison.Newly, false, false)
-		// Only the still-present column says what a place was bumped from. On
+		// Only the still-present column says what an occurrence was bumped from. On
 		// a fixed entry the closure already says what happened, and on a new
 		// one there was nothing to bump.
 		out.Body.Still = changed(comparison.Still, false, true)
@@ -438,16 +438,17 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 	return out
 }
 
-// InheritedBody is one claim a new line could take on.
+// InheritedBody is one decision, at one occurrence, that a new line could
+// take on.
 type InheritedBody struct {
-	Decision      int64                     `json:"decision"`
-	Vulnerability string                    `json:"vulnerability"`
-	Component     string                    `json:"component"`
-	Outcome       core.VulnerabilityOutcome `json:"outcome"`
-	Was           string                    `json:"was" doc:"The version the claim was made against"`
-	Now           string                    `json:"now" doc:"The new line's contents"`
-	Reasoning     string                    `json:"reasoning" doc:"The old words, to start from rather than start without"`
-	DeferredDays  int                       `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
+	DecisionOccurrence int64                     `json:"decision_occurrence"`
+	Vulnerability      string                    `json:"vulnerability"`
+	Component          string                    `json:"component"`
+	Outcome            core.VulnerabilityOutcome `json:"outcome"`
+	Was                string                    `json:"was" doc:"The version the decision was made against"`
+	Now                string                    `json:"now" doc:"The new line's contents"`
+	Reasoning          string                    `json:"reasoning" doc:"The old words, to start from rather than start without"`
+	DeferredDays       int                       `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
 }
 
 // CarriedBody is the set a new line inherits.
@@ -455,7 +456,7 @@ type CarriedBody struct {
 	Applying  int             `json:"applying" doc:"Reach it by matching. Nothing to choose"`
 	Moved     []InheritedBody `json:"moved" doc:"The version differs, so each needs a fresh answer"`
 	Postponed []InheritedBody `json:"postponed" doc:"Deferrals, offered separately and never carried by default"`
-	Expired   int             `json:"expired" doc:"Deferrals and promises at a place this line still holds whose date has passed. They cannot be carried, and each leaves a finding here with no answer"`
+	Expired   int             `json:"expired" doc:"Deferrals and promises at an occurrence this line still holds whose date has passed. They cannot be carried, and each leaves a finding here with no answer"`
 	Upgrades  int             `json:"upgrades" doc:"Promised upgrades at a version this line does not have. They cannot be carried: plan the upgrade from the component, naming this line"`
 	Absent    int             `json:"absent" doc:"Cover nothing in the new line"`
 }
@@ -470,13 +471,13 @@ func registerCarry(api huma.API, in core.Deps) {
 			"somebody is agreeing to.\n\n" +
 			"Six groups, because they need different things:\n\n" +
 			"`applying` reach this line by matching, and there is nothing to choose.\n\n" +
-			"`moved` held a claim at a version this line does not have. Each would come " +
-			"across as a proposal carrying the old reasoning, never as a decision.\n\n" +
+			"`moved` held a decision at a version this line does not have. Each would come " +
+			"across as a proposal carrying the old reasoning, never as an agreed decision.\n\n" +
 			"`postponed` were deferrals. Each says how long it has already been put off " +
 			"across every line it has come through, which is the total that carrying it " +
 			"again agrees to.\n\n" +
-			"`expired` are deferrals and promises at a place this line still holds whose " +
-			"date has passed. A carried judgment keeps its date, so these cannot be carried.\n\n" +
+			"`expired` are deferrals and promises at an occurrence this line still holds whose " +
+			"date has passed. A carried decision keeps its date, so these cannot be carried.\n\n" +
 			"`upgrades` are promised upgrades that moved. Plan the upgrade from the component, " +
 			"naming this line, rather than carrying it.\n\n" +
 			"`absent` cover nothing here and are left behind.",
@@ -515,19 +516,19 @@ func registerCarry(api huma.API, in core.Deps) {
 	})
 }
 
-// registerCarrying takes the chosen judgments onto the new line.
+// registerCarrying takes the chosen decisions onto the new line.
 func registerCarrying(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "carry-decisions", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
 		Summary: "Carry chosen triage onto a new line",
-		Description: "Takes the judgments named onto this build as claims waiting for " +
+		Description: "Takes the decisions named onto this build as new decisions waiting for " +
 			"agreement, each carrying the words from the line it came from.\n\n" +
 			"Reasoning travels and conclusions do not. Every one arrives needing approval, " +
 			"however confident whoever carried it was: a version moved, which is exactly what " +
-			"made the old judgment stop applying, so somebody has to look at the new code. " +
+			"made the old decision stop applying, so somebody has to look at the new code. " +
 			"What is inherited is the thinking rather than the answer.\n\n" +
-			"Only what the preview offered. A judgment that already applies here has " +
+			"Only what the preview offered. A decision that already applies here has " +
 			"nothing to agree to, and one covering nothing here has nothing to apply to; " +
 			"naming either is refused rather than skipped, because a caller that got the set " +
 			"wrong should hear so.\n\n" +
@@ -545,11 +546,11 @@ func registerCarrying(api huma.API, in core.Deps) {
 		// about which build is being carried from.
 		FromVariant string `query:"from_variant" required:"true" doc:"That line's variant"`
 		Body        struct {
-			Decisions []int64 `json:"decisions" minItems:"1" doc:"The offered judgments to carry"`
+			DecisionOccurrences []int64 `json:"decision_occurrences" minItems:"1" doc:"The offered decisions to carry, one per occurrence"`
 		}
 	}) (*struct {
 		Body struct {
-			Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
+			Carried int `json:"carried" doc:"The number of decisions written, each waiting for a second person"`
 		}
 	}, error) {
 		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
@@ -566,13 +567,13 @@ func registerCarrying(api huma.API, in core.Deps) {
 		}
 
 		carried, err := triage.NewStore(in.DB.DB).Carry(ctx, subject,
-			fromTarget.ID, targetID, input.Body.Decisions, triage.Bounds{})
+			fromTarget.ID, targetID, input.Body.DecisionOccurrences, triage.Bounds{})
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
 		out := &struct {
 			Body struct {
-				Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
+				Carried int `json:"carried" doc:"The number of decisions written, each waiting for a second person"`
 			}
 		}{}
 		out.Body.Carried = carried
@@ -584,7 +585,7 @@ func inherited(rows []triage.Inherited) []InheritedBody {
 	out := make([]InheritedBody, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, InheritedBody{
-			Decision: row.DecisionID, Vulnerability: row.Vulnerability,
+			DecisionOccurrence: row.DecisionOccurrenceID, Vulnerability: row.Vulnerability,
 			Component: row.Component, Outcome: core.VulnerabilityOutcome(row.Outcome),
 			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
 			DeferredDays: row.DeferredDays,

@@ -20,15 +20,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
-// Handoff is a confirmed lead recorded as a flaw here, by its place in a
+// Handoff is a confirmed lead recorded as a flaw here, by its occurrence in a
 // product.
 type Handoff struct {
 	bun.BaseModel `bun:"table:lead_handoff,alias:lh"`
 
-	ID              int64  `bun:"id,pk,autoincrement"`
-	ProductID       int64  `bun:"product_id,notnull"`
-	PlaceIdentity   string `bun:"place_identity,notnull"`
-	VulnerabilityID int64  `bun:"vulnerability_id,notnull"`
+	ID                 int64  `bun:"id,pk,autoincrement"`
+	ProductID          int64  `bun:"product_id,notnull"`
+	OccurrenceIdentity string `bun:"occurrence_identity,notnull"`
+	VulnerabilityID    int64  `bun:"vulnerability_id,notnull"`
 	// Visibility is what the lead's findings hold, and what a sighting
 	// opening later opens at: internal while its flaw is undisclosed, kept or
 	// moved, and public once a moved lead was disclosed with its flaw.
@@ -100,17 +100,17 @@ func (h Handoff) Unlink(ctx context.Context, db bun.IDB) error {
 }
 
 // Describing writes a run onto the hand-offs of the leads it is about to
-// describe in one product: those at the places given, and those of the
+// describe in one product: those at the occurrences given, and those of the
 // findings given. Written before the run reads a hand-off or writes a lead's
 // source, so a disclosure or a move of one of them either waits for the run
 // or finds the hand-off changed and reads again.
-func Describing(ctx context.Context, db bun.IDB, productID, runID int64, places []string, findingIDs []int64) error {
-	for start := 0; start < len(places); start += database.BatchSize {
-		batch := places[start:min(start+database.BatchSize, len(places))]
+func Describing(ctx context.Context, db bun.IDB, productID, runID int64, occurrences []string, findingIDs []int64) error {
+	for start := 0; start < len(occurrences); start += database.BatchSize {
+		batch := occurrences[start:min(start+database.BatchSize, len(occurrences))]
 		if _, err := db.NewUpdate().Model((*Handoff)(nil)).
 			Set(`"last_run_id" = ?`, runID).
 			Where(`"product_id" = ?`, productID).
-			Where(`"place_identity" IN (?)`, bun.List(batch)).
+			Where(`"occurrence_identity" IN (?)`, bun.List(batch)).
 			Exec(ctx); err != nil {
 			return fmt.Errorf("mark the leads the run opens at: %w", err)
 		}
@@ -119,7 +119,7 @@ func Describing(ctx context.Context, db bun.IDB, productID, runID int64, places 
 		_, err := db.NewUpdate().Model((*Handoff)(nil)).
 			Set(`"last_run_id" = ?`, runID).
 			Where(`"product_id" = ?`, productID).
-			Where(`"place_identity" IN (SELECT "df"."place_identity" FROM "finding" AS "df" WHERE "df"."id" IN (?))`,
+			Where(`"occurrence_identity" IN (SELECT "df"."occurrence_identity" FROM "finding" AS "df" WHERE "df"."id" IN (?))`,
 				bun.List(batch)).
 			Exec(ctx)
 		return err
@@ -135,13 +135,13 @@ func (h Handoff) Moved() bool { return h.MovedAt != nil }
 // Disclosed reports whether the lead's flaw is disclosed.
 func (h Handoff) Disclosed() bool { return h.DisclosedAt != nil }
 
-// HandoffAt is the hand-off of the lead at a place in a product, or nil where
-// it was not handed off.
-func HandoffAt(ctx context.Context, db bun.IDB, productID int64, placeIdentity string) (*Handoff, error) {
+// HandoffAt is the hand-off of the lead at an occurrence in a product, or nil
+// where it was not handed off.
+func HandoffAt(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity string) (*Handoff, error) {
 	var h Handoff
 	err := db.NewSelect().Model(&h).
 		Where(`"lh"."product_id" = ?`, productID).
-		Where(`"lh"."place_identity" = ?`, placeIdentity).
+		Where(`"lh"."occurrence_identity" = ?`, occurrenceIdentity).
 		Scan(ctx)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -155,12 +155,12 @@ func HandoffAt(ctx context.Context, db bun.IDB, productID int64, placeIdentity s
 // movedLead is the condition that the lead finding under "f", in the product
 // bound, was moved into its flaw's case.
 const movedLead = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-	WHERE "lh"."product_id" = ? AND "lh"."place_identity" = "f"."place_identity" AND "lh"."moved_at" IS NOT NULL)`
+	WHERE "lh"."product_id" = ? AND "lh"."occurrence_identity" = "f"."occurrence_identity" AND "lh"."moved_at" IS NOT NULL)`
 
 // movedInto is movedLead narrowed to the flaws bound in its second
 // placeholder, and every issue merged into them.
 const movedInto = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-	WHERE "lh"."product_id" = ? AND "lh"."place_identity" = "f"."place_identity" AND "lh"."moved_at" IS NOT NULL
+	WHERE "lh"."product_id" = ? AND "lh"."occurrence_identity" = "f"."occurrence_identity" AND "lh"."moved_at" IS NOT NULL
 	  AND ` + `"lh"."vulnerability_id" IN (SELECT "mv"."id" FROM "vulnerability" AS "mv"
 	    JOIN "vulnerability" AS "mi" ON "mi"."issue_id" = "mv"."issue_id" WHERE "mi"."id" IN (?)))`
 
@@ -168,7 +168,7 @@ const movedInto = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 // product bound, has a flaw nobody disclosed: a lead grant reaches it only
 // then.
 const undisclosedLead = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-	WHERE "lh"."product_id" = ? AND "lh"."place_identity" = "f"."place_identity" AND "lh"."disclosed_at" IS NOT NULL)`
+	WHERE "lh"."product_id" = ? AND "lh"."occurrence_identity" = "f"."occurrence_identity" AND "lh"."disclosed_at" IS NOT NULL)`
 
 // caseVisibilities is what a moved lead holds while its flaw is a case and
 // once it is disclosed.
@@ -209,9 +209,9 @@ func LeadReach(s access.Subject, productID int64) LeadReading {
 			args = append(args, bun.List(visible))
 		}
 	}
-	if places := s.Leads(productID); len(places) > 0 {
-		clauses = append(clauses, `("f"."visibility" IN (?) AND "f"."place_identity" IN (?) AND `+undisclosedLead+`)`)
-		args = append(args, bun.List(access.LeadGrantVisibilities()), bun.List(places), productID)
+	if occurrences := s.Leads(productID); len(occurrences) > 0 {
+		clauses = append(clauses, `("f"."visibility" IN (?) AND "f"."occurrence_identity" IN (?) AND `+undisclosedLead+`)`)
+		args = append(args, bun.List(access.LeadGrantVisibilities()), bun.List(occurrences), productID)
 	}
 	if cases := s.Cases(productID); len(cases) > 0 && s.Kind == access.Person {
 		clauses = append(clauses, `("f"."visibility" IN (?) AND `+movedInto+`)`)
@@ -243,7 +243,7 @@ func LeadVisible(s access.Subject, productID int64) ([]access.Visibility, error)
 }
 
 // leadsFollow carries the leads moved into one issue's case in one product to
-// public with it: their findings, the claims about them and their hand-off.
+// public with it: their findings, the decisions about them and their hand-off.
 // The snippets under a path the product does not disclose snippets for are
 // stripped first. Every lead handed off as the issue, kept or moved, is marked
 // disclosed. Run inside the disclosure's transaction.
@@ -283,16 +283,16 @@ func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int
 	if len(moved) == 0 {
 		return nil
 	}
-	places := make([]string, 0, len(moved))
+	occurrences := make([]string, 0, len(moved))
 	ids := make([]int64, 0, len(moved))
 	for _, h := range moved {
-		places = append(places, h.PlaceIdentity)
+		occurrences = append(occurrences, h.OccurrenceIdentity)
 		ids = append(ids, h.ID)
 	}
-	if err := stripUndisclosedSnippets(ctx, db, productID, places); err != nil {
+	if err := stripUndisclosedSnippets(ctx, db, productID, occurrences); err != nil {
 		return err
 	}
-	if err := SetLeadVisibility(ctx, db, productID, places, access.Internal, access.Public); err != nil {
+	if err := SetLeadVisibility(ctx, db, productID, occurrences, access.Internal, access.Public); err != nil {
 		return err
 	}
 	// Matched on what was read: a lead taken out of the case since is a
@@ -323,8 +323,8 @@ func StripDisclosedLeads(ctx context.Context, db bun.IDB, productID int64, findi
 	if err := database.IDsInBatches(ctx, findingIDs, func(ctx context.Context, batch []int64) error {
 		var some []string
 		if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "lead_handoff" AS "lh" ON "lh"."place_identity" = "f"."place_identity"`).
-			ColumnExpr(`DISTINCT "f"."place_identity"`).
+			Join(`JOIN "lead_handoff" AS "lh" ON "lh"."occurrence_identity" = "f"."occurrence_identity"`).
+			ColumnExpr(`DISTINCT "f"."occurrence_identity"`).
 			Where(`"lh"."product_id" = ?`, productID).
 			Where(`"lh"."visibility" = ?`, access.Public).
 			Where(`"f"."id" IN (?)`, bun.List(batch)).
@@ -342,40 +342,40 @@ func StripDisclosedLeads(ctx context.Context, db bun.IDB, productID int64, findi
 	return stripUndisclosedSnippets(ctx, db, productID, public)
 }
 
-// SetLeadVisibility moves the lead findings at these places in one product,
-// and the claims about them, from one visibility to another.
-func SetLeadVisibility(ctx context.Context, db bun.IDB, productID int64, places []string,
+// SetLeadVisibility moves the lead findings at these occurrences in one
+// product, and the decisions about them, from one visibility to another.
+func SetLeadVisibility(ctx context.Context, db bun.IDB, productID int64, occurrences []string,
 	from, to access.Visibility) error {
 
 	kinds, kindArgs := kind.Leads.Where(`"kind"`)
 	if _, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set(`"visibility" = ?`, to).
 		Where(kinds, kindArgs...).
-		Where(`"place_identity" IN (?)`, bun.List(places)).
+		Where(`"occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(`"visibility" = ?`, from).
 		Where(inThisProduct, productID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("move the lead's findings: %w", err)
 	}
-	// The claims about a lead are filed under its analyzer's rule, and a
-	// claim follows the finding it was made about.
-	if _, err := db.NewUpdate().TableExpr(`"decision"`).
+	// The decision occurrences about a lead are filed under its analyzer's
+	// rule, and each follows the finding it was made about.
+	if _, err := db.NewUpdate().TableExpr(`"decision_occurrence"`).
 		Set(`"visibility" = ?`, to).
 		Where(`"product_id" = ?`, productID).
-		Where(`"place_identity" IN (?)`, bun.List(places)).
+		Where(`"occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(`"visibility" = ?`, from).
 		Where(`"vulnerability_id" IN (SELECT "rv"."id" FROM "vulnerability" AS "rv" WHERE "rv"."kind" = ?)`,
 			string(kind.Rule)).
 		Exec(ctx); err != nil {
-		return fmt.Errorf("move the claims about the lead: %w", err)
+		return fmt.Errorf("move the decisions about the lead: %w", err)
 	}
 	return nil
 }
 
 // stripUndisclosedSnippets removes the source kept beside the leads at these
-// places in one product, under every path the product does not disclose
+// occurrences in one product, under every path the product does not disclose
 // snippets for.
-func stripUndisclosedSnippets(ctx context.Context, db bun.IDB, productID int64, places []string) error {
+func stripUndisclosedSnippets(ctx context.Context, db bun.IDB, productID int64, occurrences []string) error {
 	config, err := sourcelink.NewStore(db).Config(ctx, productID)
 	if err != nil {
 		return err
@@ -389,7 +389,7 @@ func stripUndisclosedSnippets(ctx context.Context, db bun.IDB, productID int64, 
 		Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 		ColumnExpr(`"ar"."finding_id" AS "id", "ar"."path"`).
 		Where(kinds, kindArgs...).
-		Where(`"f"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"f"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"ar"."snippet" IS NOT NULL`).
 		Scan(ctx, &kept); err != nil {
@@ -418,11 +418,11 @@ func stripUndisclosedSnippets(ctx context.Context, db bun.IDB, productID int64, 
 		Join(`JOIN "finding" AS "f" ON "f"."id" = "al"."finding_id"`).
 		ColumnExpr(`"al"."id", "al"."path"`).
 		Where(kinds, kindArgs...).
-		Where(`"f"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"f"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"al"."snippet" IS NOT NULL`).
 		Scan(ctx, &spots); err != nil {
-		return fmt.Errorf("read the snippets kept beside the leads' places: %w", err)
+		return fmt.Errorf("read the snippets kept beside the leads' occurrences: %w", err)
 	}
 	var locations []int64
 	for _, k := range spots {
@@ -437,7 +437,7 @@ func stripUndisclosedSnippets(ctx context.Context, db bun.IDB, productID int64, 
 			Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 		return err
 	}); err != nil {
-		return fmt.Errorf("strip the snippets of the leads' places: %w", err)
+		return fmt.Errorf("strip the snippets of the leads' occurrences: %w", err)
 	}
 	return nil
 }

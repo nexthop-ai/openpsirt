@@ -17,10 +17,10 @@ import (
 func TestWhatWaitsInAProductIsTheQueueForIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.claims(t, f.at())
+		f.decisions(t, f.at())
 		other := f.at()
-		other.PlaceIdentity = "place-of-libfoo-under-libbaz"
-		f.claims(t, other)
+		other.OccurrenceIdentity = "place-of-libfoo-under-libbaz"
+		f.decisions(t, other)
 
 		for _, who := range []struct {
 			name   string

@@ -279,7 +279,7 @@ func TestThereIsNothingToScanWhenNothingIsWaiting(t *testing.T) {
 	})
 }
 
-// decided records an agreed claim about the one issue in this build, the way
+// decided records an agreed decision about the one issue in this build, the way
 // somebody triaging would: keyed on where the finding sits and the versions it
 // has now.
 func (f *runFixture) decided(t *testing.T) int64 {
@@ -293,17 +293,17 @@ func (f *runFixture) decided(t *testing.T) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	where, err := finding.NewStore(f.db.DB).PlaceFor(ctx, people[0], f.target, issue,
-		finding.PlaceIdentity("libnl-3-200", "libswsscommon"))
+	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, people[0], f.target, issue,
+		finding.OccurrenceIdentity("libnl-3-200", "libswsscommon"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	store := triage.NewStore(f.db.DB)
 	made, err := store.Propose(ctx, people[0], triage.Proposal{
-		Place: triage.Place{
+		Occurrence: triage.Occurrence{
 			ProductID: where.ProductID, VulnerabilityID: where.VulnerabilityID,
-			PlaceIdentity: where.PlaceIdentity, Visibility: where.Visibility,
+			OccurrenceIdentity: where.OccurrenceIdentity, Visibility: where.Visibility,
 			ComponentUpstream: where.ComponentUpstream, ConsumerUpstream: where.ConsumerUpstream,
 		},
 		Outcome: triage.NotApplicable, Justification: triage.CodeNotInExecutePath,
@@ -313,9 +313,9 @@ func (f *runFixture) decided(t *testing.T) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Agreed to as a claim, which is what agreeing is: one act is one
+	// Agreed to as a decision, which is what agreeing is: one act is one
 	// argument, and this row is where it lands.
-	if _, err := store.ApproveClaim(ctx, people[1], made.ClaimID, "", nil, ""); err != nil {
+	if _, err := store.ApproveDecision(ctx, people[1], made.DecisionID, "", nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	return made.ID
@@ -361,7 +361,7 @@ func (f *runFixture) scan(t *testing.T, component graph.Described) *scanner.Outc
 	return outcome
 }
 
-func TestAScanMarksTheJudgmentsItMovedOutFromUnder(t *testing.T) {
+func TestAScanMarksTheDecisionsItMovedOutFromUnder(t *testing.T) {
 	// The half that is not automatic. A decision stops applying on its own
 	// when the versions move, because what applies is matched on them — but
 	// nobody finds out. Without this the finding reappears as though it had
@@ -377,7 +377,7 @@ func TestAScanMarksTheJudgmentsItMovedOutFromUnder(t *testing.T) {
 		outcome := f.scan(t, moved)
 
 		if outcome.Lapsed != 1 {
-			t.Fatalf("a version bump marked %d judgments, want 1", outcome.Lapsed)
+			t.Fatalf("a version bump marked %d occurrences, want 1", outcome.Lapsed)
 		}
 
 		// And it reads as superseded rather than having quietly vanished.
@@ -386,12 +386,12 @@ func TestAScanMarksTheJudgmentsItMovedOutFromUnder(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		decisions, _, _, err := triage.NewStore(f.db.DB).List(t.Context(), who, triage.Filter{}, 10, 0)
+		occurrences, _, _, err := triage.NewStore(f.db.DB).List(t.Context(), who, triage.Filter{}, 10, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(decisions) != 1 || decisions[0].State != triage.LapsedState {
-			t.Errorf("the superseded decision reads as %+v", decisions)
+		if len(occurrences) != 1 || occurrences[0].State != triage.LapsedState {
+			t.Errorf("the superseded decision reads as %+v", occurrences)
 		}
 	})
 }
@@ -427,7 +427,7 @@ func TestWhoeverProposedItIsToldThatItLapsed(t *testing.T) {
 		}
 		var said []string
 		for _, one := range waiting {
-			if one.Kind == notify.ClaimLapsed {
+			if one.Kind == notify.DecisionLapsed {
 				said = append(said, one.Body)
 			}
 		}
@@ -449,7 +449,7 @@ func TestWhoeverProposedItIsToldThatItLapsed(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, one := range theirs {
-			if one.Kind == notify.ClaimLapsed {
+			if one.Kind == notify.DecisionLapsed {
 				t.Errorf("somebody who proposed nothing was told a decision lapsed: %q", one.Body)
 			}
 		}
@@ -458,7 +458,7 @@ func TestWhoeverProposedItIsToldThatItLapsed(t *testing.T) {
 
 func TestARebuildThatMovedNothingMarksNothing(t *testing.T) {
 	// The dangerous direction. A sweep that marked too much would quietly
-	// unpick judgments nobody had revisited — nightly, since a rebuild is
+	// unpick decisions nobody had revisited — nightly, since a rebuild is
 	// nightly.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		f.scan(t, libnl)
@@ -466,26 +466,26 @@ func TestARebuildThatMovedNothingMarksNothing(t *testing.T) {
 
 		f.rebuilt(t, libnl)
 		if outcome := f.scan(t, libnl); outcome.Lapsed != 0 {
-			t.Errorf("a rebuild that moved nothing marked %d judgments", outcome.Lapsed)
+			t.Errorf("a rebuild that moved nothing marked %d occurrences", outcome.Lapsed)
 		}
 	})
 }
 
-func TestAScanRatingAnIssueWorseLapsesAClaimTheRatingBearsOn(t *testing.T) {
-	// A judgment that something does not matter much is not a judgment about
+func TestAScanRatingAnIssueWorseLapsesADecisionTheRatingBearsOn(t *testing.T) {
+	// A decision that something does not matter much is not a decision about
 	// what it has become (REQ-25). Nothing moved in the build; the report
 	// raised the issue from high to critical, and the proposer is told why.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		f.scan(t, libnl)
 		decided := f.decided(t)
-		// A claim a severity bears on, made against the rating the issue had.
-		if _, err := f.db.DB.NewUpdate().Table("claim").
+		// A decision a severity bears on, made against the rating the issue had.
+		if _, err := f.db.DB.NewUpdate().Table("decision").
 			Set(`"justification" = ?`, string(triage.CodeNotReachableByAdversary)).
-			Where(`"id" = (SELECT "claim_id" FROM "decision" WHERE "id" = ?)`, decided).
+			Where(`"id" = (SELECT "decision_id" FROM "decision_occurrence" WHERE "id" = ?)`, decided).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.db.DB.NewUpdate().Table("decision").
+		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"severity_centi" = ?`, 800).Where(`"id" = ?`, decided).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -503,7 +503,7 @@ func TestAScanRatingAnIssueWorseLapsesAClaimTheRatingBearsOn(t *testing.T) {
 			t.Fatalf("scan: %v", err)
 		}
 		if outcome.Lapsed != 1 {
-			t.Errorf("a scan rating the issue worse marked %d judgments, want 1", outcome.Lapsed)
+			t.Errorf("a scan rating the issue worse marked %d occurrences, want 1", outcome.Lapsed)
 		}
 
 		author, err := access.NewStore(f.db.DB).Resolve(t.Context(), "proposer")
@@ -516,7 +516,7 @@ func TestAScanRatingAnIssueWorseLapsesAClaimTheRatingBearsOn(t *testing.T) {
 		}
 		told := false
 		for _, one := range waiting {
-			if one.Kind == notify.ClaimLapsed && strings.Contains(one.Body, "rated worse") {
+			if one.Kind == notify.DecisionLapsed && strings.Contains(one.Body, "rated worse") {
 				told = true
 			}
 		}

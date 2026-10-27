@@ -12,9 +12,9 @@
 // not affected, vulnerable code not present" is exactly a VEX statement.
 //
 // It is mostly formatting over decisions already made and approved. Every
-// "not applicable" claim carries the VEX vocabulary, so the justification
+// "not applicable" decision carries the VEX vocabulary, so the justification
 // needs no translation. What makes it safe to publish is the approval the
-// claim already required: generating this puts our dismissals in writing,
+// decision already required: generating this puts our dismissals in writing,
 // machine-readable, in front of every customer, which is the feature and the
 // risk in one sentence.
 //
@@ -111,7 +111,7 @@ type Statement struct {
 	Justification string `json:"justification,omitempty"`
 	// ActionStatement is what a holder can do about a flaw that is not going
 	// to be fixed. The format requires one on an affected statement, which is
-	// why silence is not an option there and why only a claim carrying a
+	// why silence is not an option there and why only a decision carrying a
 	// mitigation is published as one.
 	ActionStatement string `json:"action_statement,omitempty"`
 	// ImpactStatement is what stops the flaw, where somebody named it.
@@ -136,7 +136,7 @@ type Issue struct {
 
 // Shipped is what somebody has: the build, with the component the statement is
 // about underneath it, or the component of the build that pulls it in where the
-// statement is about one place.
+// statement is about one occurrence.
 //
 // The build rather than the component, because a VEX statement is about a
 // thing somebody has — and what they have is our image, which happens to
@@ -167,7 +167,7 @@ const (
 	// deployment's name is a choice somebody makes on purpose.
 	Ours Kind = "ours"
 	// WithSuppliers is that, and beside it what a supplier states about its
-	// own product where the statement closed every place of a component in
+	// own product where the statement closed every occurrence of a component in
 	// the build, attributed to the supplier.
 	WithSuppliers Kind = "with-suppliers"
 )
@@ -233,7 +233,7 @@ func (s *Store) carrying() int {
 
 // For writes the document for one build.
 //
-// Approved claims only, besides the build's own patches. A proposal is one
+// Approved decisions only, besides the build's own patches. A proposal is one
 // person's opinion and this document is the deployment's word to a customer —
 // the two-person rule is what makes publishing a dismissal safe, and a
 // document carrying unapproved ones would route around it. A patch the build
@@ -345,9 +345,9 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		Purl            string `bun:"purl"`
 		finding.Covering
 	}
-	// One statement per issue and component, from the claims that stand and
+	// One statement per issue and component, from the decisions that stand and
 	// have been agreed to. Joined from the findings this build actually holds:
-	// a decision is a claim about a product's code and reaches every build
+	// a decision is about a product's code and reaches every build
 	// whose versions match it, so what belongs in this document is what this
 	// build ships rather than everything the product has ever decided.
 	q := s.idb().NewSelect().
@@ -371,16 +371,16 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		//
 		// Grouped by the issue and the component and nothing about the
 		// decision, because a statement is about a product and a component and
-		// the format has no finer grain to say it at. Two places decided in
+		// the format has no finer grain to say it at. Two occurrences decided in
 		// separate sittings differ in when and in what was written, and
-		// grouping on those emitted the same claim twice — or, where the
+		// grouping on those emitted the same decision twice — or, where the
 		// outcomes differed, two statements contradicting each other about one
 		// component.
 		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
 		// One more than the ceiling, so that reaching it is distinguishable
 		// from landing on it exactly.
 		Limit(int64(s.carrying() + 1))
-	// Every open place agreed, and agreed the same way.
+	// Every open occurrence agreed, and agreed the same way.
 	err := finding.WhollyCovered(q, named.ProductID, visible, finding.ForStatements).Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
@@ -389,9 +389,9 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, err
 	}
-	// Where a component's places disagree, each place a decision covers is
+	// Where a component's occurrences disagree, each occurrence a decision covers is
 	// stated on its own, naming what pulls the component in as the product.
-	placed, err := finding.CoveredAtPlaces(ctx, s.idb(), named.ProductID, target.ID, visible, s.carrying())
+	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, target.ID, visible, s.carrying())
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +413,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// what the limit is went to the log instead of to the person who can act
 	// on it.
 	if len(rows)+len(placed)+len(fixed)+len(stated) > s.carrying() {
-		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed claims: a "+
+		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed decisions: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
 			ErrTooLarge, named.Product, named.Stream, named.Variant, s.carrying())
@@ -500,7 +500,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		}
 		doc.Statements = append(doc.Statements, statement)
 	}
-	// A place stated on its own names what pulls the component in as the
+	// An occurrence stated on its own names what pulls the component in as the
 	// product, so a reader applies it beneath that product and nowhere else.
 	for _, row := range placed {
 		statement, err := claimed(Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
@@ -521,8 +521,8 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		})
 	}
 
-	// What suppliers state. An agreed claim is said only of a component with
-	// a place open, and a supplier's statement only of one with none, so the
+	// What suppliers state. An agreed decision is said only of a component with
+	// an occurrence open, and a supplier's statement only of one with none, so the
 	// two never speak about one issue in one component.
 	for _, row := range stated {
 		doc.Statements = append(doc.Statements, Statement{
@@ -590,7 +590,7 @@ const stillShips = `EXISTS (SELECT 1 FROM "graph_node" AS "n"
 	WHERE "n"."target_id" = "f"."target_id" AND "n"."component_id" = "f"."component_id"
 		AND "n"."closed_scan_id" IS NULL)`
 
-// noneOpenByNameAndPurl keeps a query to findings `f` with no place of the
+// noneOpenByNameAndPurl keeps a query to findings `f` with no occurrence of the
 // issue in their build open at a component `c` of the same name and package
 // identifier.
 //
@@ -631,7 +631,7 @@ type fixedByPatch struct {
 // while all of these hold:
 //
 //   - the component still ships in this build
-//   - no place of a component of that name and package identifier is open
+//   - no occurrence of a component of that name and package identifier is open
 //     against the issue
 //   - the claim that closed it is one the build still makes
 //
@@ -705,7 +705,7 @@ func known(justification string) string {
 }
 
 // statedBySupplier is an issue a supplier's statement about its own product
-// closed at every place of one component in the build.
+// closed at every occurrence of one component in the build.
 type statedBySupplier struct {
 	VulnerabilityID int64
 	Identifier      string
@@ -743,12 +743,12 @@ func (s statedBySupplier) attributed() string {
 // statement is made only while all of these hold:
 //
 //   - the component still ships in this build
-//   - no place of a component of that name and package identifier is open
+//   - no occurrence of a component of that name and package identifier is open
 //     against the issue
 //   - the statement that closed it still stands
-//   - nothing has been recorded at its place since, the build's own patch
+//   - nothing has been recorded at its occurrence since, the build's own patch
 //     included
-//   - no other supplier's statement closed a place of it
+//   - no other supplier's statement closed an occurrence of it
 func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	visible []access.Visibility) ([]statedBySupplier, error) {
 
@@ -762,19 +762,19 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	err := s.closedInBuild(targetID, visible, finding.Disclaimed).
 		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Where(`"ss"."superseded_at" IS NULL`).
-		// What the place holds now: a later row at it, patched by the build
+		// What the occurrence holds now: a later row at it, patched by the build
 		// or open again, is what the document goes by.
-		Where(finding.LatestAtItsPlace).
+		Where(finding.LatestAtItsOccurrence).
 		// One supplier's statement and no other. Two suppliers answering
-		// places of one component each spoke for their own product, and the
+		// occurrences of one component each spoke for their own product, and the
 		// format names the component once: credited to either, the document
 		// says one of them spoke for the other's.
 		//
 		// And only a statement that said not affected, counted over every
-		// statement closing a place of the component: an upstream's
-		// statement that a component is fixed closes places too, and is not a
+		// statement closing an occurrence of the component: an upstream's
+		// statement that a component is fixed closes occurrences too, and is not a
 		// statement that it is unaffected, and counted out before grouping it
-		// would leave one supplier answering for a place it did not close.
+		// would leave one supplier answering for an occurrence it did not close.
 		Having(`COUNT(DISTINCT "f"."stated_by") = 1 AND SUM(CASE WHEN "ss"."status" <> ? THEN 1 ELSE 0 END) = 0`,
 			string(sbom.NotAffected)).
 		Scan(ctx, &rows)
@@ -845,13 +845,13 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 // than published under a default, because the only safe default on a
 // published document is to say nothing.
 //
-// A claim that the scanner matched something that is not here publishes as
+// A decision that the scanner matched something that is not here publishes as
 // not-affected, carrying the reason it states: that the component is absent,
 // or that what ships is not the vulnerable code. Both are what the format's
 // vocabulary already says, so nothing about the match being ours to correct
 // has to be explained to a reader outside.
 //
-// A claim that will not be fixed is affected rather than dismissed, which is
+// A decision that it will not be fixed is affected rather than dismissed, which is
 // what it says: the flaw is there and is staying. It reaches a customer only
 // this way — it is a standing property of a shipped feature, so no scan closes
 // it and no advisory is issued about it, and under silence it would never be
@@ -881,13 +881,13 @@ func subject(purl, component string) string {
 	return purl
 }
 
-// claimed is the statement an agreed claim makes about one component beneath
+// claimed is the statement an agreed decision makes about one component beneath
 // one product, in the words the decision it rests on states.
 //
 // The same sentence goes in a different field depending on what is being said
-// about it. On a claim that something does not apply it is why, beside the
+// about it. On a decision that something does not apply it is why, beside the
 // category a machine reads; on one that will not be fixed it is what to do
-// instead, which is the field the format asks for and the reason such a claim
+// instead, which is the field the format asks for and the reason such a decision
 // is published at all.
 func claimed(issue Issue, product, about, outcome string, words finding.Stated) (Statement, error) {
 	statement := Statement{

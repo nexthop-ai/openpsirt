@@ -31,7 +31,7 @@ type DisposedBody struct {
 	Version       string                    `json:"version,omitempty"`
 	Ecosystem     string                    `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
 	Namespace     string                    `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Place         string                    `json:"place" doc:"The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
+	Occurrence    string                    `json:"occurrence" doc:"The occurrence in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
 	Consumer      string                    `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 	State         core.Standing             `json:"state" doc:"The decision state. undecided is a row nobody has decided anything about"`
 	Outcome       core.VulnerabilityOutcome `json:"outcome,omitempty"`
@@ -40,10 +40,10 @@ type DisposedBody struct {
 	ProposedAt    string                    `json:"proposed_at,omitempty"`
 	ApprovedBy    string                    `json:"approved_by,omitempty" doc:"The people who agreed, by name"`
 	ApprovedAt    string                    `json:"approved_at,omitempty"`
-	// AgreementCarried says the agreement was given for an earlier claim and
+	// AgreementCarried says the agreement was given for an earlier decision and
 	// carried onto this one, which is what a re-affirmation stands on. The
 	// person named read those words rather than these.
-	AgreementCarried bool   `json:"agreement_carried,omitempty" doc:"Whether the agreement was carried forward from an earlier claim rather than given for this one"`
+	AgreementCarried bool   `json:"agreement_carried,omitempty" doc:"Whether the agreement was carried forward from an earlier decision rather than given for this one"`
 	Opened           string `json:"opened"`
 	Closed           string `json:"closed,omitempty"`
 	// ClosedBecause is the category it closed under and ClosedNote the
@@ -60,7 +60,7 @@ type DisposedBody struct {
 	UnaffectedUnreadable bool `json:"unaffected_unreadable,omitempty" doc:"Whether the CVE record lines this row was closed by were recorded and cannot be read back"`
 	// Stated is the supplier's own words for why this is answered, so a
 	// reader can check the closure against the statement.
-	Stated *StatedBody `json:"stated,omitempty" doc:"The supplier's statement answering this place: the one that closed a row closed as disclaimed, or one answering an open row on the routes through the supplier's product"`
+	Stated *StatedBody `json:"stated,omitempty" doc:"The supplier's statement answering this occurrence: the one that closed a row closed as disclaimed, or one answering an open row on the routes through the supplier's product"`
 	Due    string      `json:"due,omitempty"`
 	Met    *bool       `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
 }
@@ -150,7 +150,7 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 // different question.
 type Registering struct {
 	State     []core.Standing             `query:"state,explode" uniqueItems:"true" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
-	Outcome   []core.VulnerabilityOutcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
+	Outcome   []core.VulnerabilityOutcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep rows whose standing decision is one of these. Repeatable"`
 	Component string                      `query:"component" doc:"Keep one component, by name"`
 	Issue     string                      `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
 	Standing  string                      `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
@@ -168,7 +168,7 @@ func (r Registering) narrow() finding.Registering {
 	}
 	for _, word := range r.State {
 		if word != "" {
-			only.States = append(only.States, finding.ClaimStanding(word))
+			only.States = append(only.States, finding.DecisionStanding(word))
 		}
 	}
 	for _, word := range r.Outcome {
@@ -184,8 +184,8 @@ func registerRegister(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-disposition-register", Method: http.MethodGet, Path: path,
 		Summary: "List every known vulnerability in a build and its disposition",
-		Description: "One row per issue and place in this build, with its state, what was " +
-			"claimed, who claimed it, who agreed, when each of those happened, its deadline " +
+		Description: "One row per issue and occurrence in this build, with its state, what was " +
+			"decided, who proposed it, who agreed, when each of those happened, its deadline " +
 			"and whether that was met.\n\n" +
 			"Every issue known in the build, decided or not: `undecided` rows are in here, " +
 			"and closed ones too. The audit list is what was decided.\n\n" +
@@ -257,7 +257,7 @@ func registerRegister(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		// No triage line is stated, because none is applied. The register is
-		// every place in the build with what stands there, which is what makes
+		// every occurrence in the build with what stands there, which is what makes
 		// it answerable to an auditor — narrowing it by what this deployment
 		// considers worth triaging would be the omission the document exists
 		// to rule out. A header stating a line has been applied where none
@@ -285,7 +285,7 @@ func registerRegister(api huma.API, in core.Deps) {
 				{Label: "build", Value: input.Product + " " + input.Stream + " (" + input.Variant + ")"},
 			}, measured.Stating()...),
 			Header: []string{
-				"issue", "severity", "component", "version", "place", "consumer", "state",
+				"issue", "severity", "component", "version", "occurrence", "consumer", "state",
 				"outcome", "justification", "proposed by", "proposed at",
 				"approved by", "approved at", "agreement carried",
 				"opened", "closed", "closed because", "closed note", "due", "met",
@@ -306,7 +306,7 @@ func registerRegister(api huma.API, in core.Deps) {
 						}
 						return each([]string{
 							body.Vulnerability, body.Severity, body.Component, body.Version,
-							body.Place, body.Consumer, string(body.State), string(body.Outcome), string(body.Justification),
+							body.Occurrence, body.Consumer, string(body.State), string(body.Outcome), string(body.Justification),
 							body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 							strconv.FormatBool(body.AgreementCarried),
 							body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
@@ -327,7 +327,7 @@ func registerRegister(api huma.API, in core.Deps) {
 	})
 }
 
-// StatedBody is a supplier's statement beside the place it answers.
+// StatedBody is a supplier's statement beside the occurrence it answers.
 type StatedBody struct {
 	Publisher     string `json:"publisher" doc:"Who published the statement"`
 	Product       string `json:"product" doc:"The supplier's product the statement is about"`
@@ -366,7 +366,7 @@ func saidLines(body DisposedBody) string {
 func disposedBody(ctx context.Context, in core.Deps, row finding.Disposed) DisposedBody {
 	body := DisposedBody{
 		Vulnerability: row.Vulnerability, Severity: row.Severity,
-		Component: row.Component, Version: row.Version, Place: row.Place,
+		Component: row.Component, Version: row.Version, Occurrence: row.Occurrence,
 		Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 		Consumer: row.Consumer,
 		State:    core.Standing(row.State), Outcome: core.VulnerabilityOutcome(row.Outcome),
@@ -432,13 +432,13 @@ func registerCompliance(api huma.API, in core.Deps) {
 			"A deferral is its own number and not a failure, so `deferred` is neither " +
 			"met nor late.\n\n" +
 			"Counted in the same unit as every other screen: one issue at one component, not " +
-			"one row per place. A group is closed when no place is still open, met when none " +
-			"of the closed ones was late, deferred when every open place is covered by a " +
+			"one row per occurrence. A group is closed when no occurrence is still open, met when none " +
+			"of the closed ones was late, deferred when every open occurrence is covered by a " +
 			"standing deferral, and overdue when anything open is past its date and " +
 			"uncovered.\n\n" +
 			"A closed finding keeps the deadline it carried; only open ones lose theirs at " +
 			"end of life or below the triage line.\n\n" +
-			"A product is required — a place identity carries no product, so this cannot " +
+			"A product is required — an occurrence identity carries no product, so this cannot " +
 			"be asked across the deployment.\n\n" +
 			"A period, or the whole of it. `from` and `to` bound what closed in them, " +
 			"which is the number a report on a quarter or a financial year is about; `days` " +
@@ -470,8 +470,8 @@ func registerCompliance(api huma.API, in core.Deps) {
 		// something not being recorded.
 		if scope.ProductID == nil {
 			return nil, huma.Error422UnprocessableEntity(
-				"name a product: a rate has to be about one, because a place " +
-					"identity carries no product and correlating decisions without " +
+				"name a product: a rate has to be about one, because an occurrence " +
+					"identity carries no product and correlating occurrences without " +
 					"one would reach every product in the deployment")
 		}
 		// Nothing by default, which is the lifetime figure this has always

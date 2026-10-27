@@ -154,7 +154,7 @@ func embargoedAt(t *testing.T, db *database.DB, targetID int64, identifier, comp
 	row := &finding.Finding{
 		TargetID: targetID, Kind: finding.Entered, Visibility: access.Private,
 		VulnerabilityID: ids[identifier], ComponentID: componentID,
-		PlaceIdentity: "place-of-" + identifier + "-" + component, OpenedAt: now,
+		OccurrenceIdentity: "place-of-" + identifier + "-" + component, OpenedAt: now,
 		DiscloseAt: &at, AssignedTo: &owner, AssignedAt: &now,
 	}
 	if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -162,9 +162,9 @@ func embargoedAt(t *testing.T, db *database.DB, targetID int64, identifier, comp
 	}
 }
 
-// An embargo is one condition per place it sits at, so each alert links the
-// place it is about and says the same thing on every sweep.
-func TestAnEmbargoAtTwoPlacesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
+// An embargo is one condition per occurrence it sits at, so each alert links the
+// occurrence it is about and says the same thing on every sweep.
+func TestAnEmbargoAtTwoOccurrencesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		ctx := t.Context()
@@ -202,7 +202,7 @@ func TestAnEmbargoAtTwoPlacesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
 		sort.Strings(links)
 		if len(links) != 2 || !strings.HasSuffix(links[0], "/components/libbar") ||
 			!strings.HasSuffix(links[1], "/components/libfoo") {
-			t.Fatalf("an embargo at two places was told as %q", links)
+			t.Fatalf("an embargo at two occurrences was told as %q", links)
 		}
 		// Nothing moved, so nothing is opened, cleared or rewritten.
 		opened, cleared, err := watch.Once(ctx)

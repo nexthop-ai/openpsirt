@@ -119,7 +119,7 @@ func ScopedFloor(ctx context.Context, in Deps, q ScopeQuery,
 // Tell records one notification, and says so where it cannot.
 //
 // A notification is never what the request was for, so a failure here does
-// not fail the act: the work stays assigned, the claim stays sent back, the
+// not fail the act: the work stays assigned, the decision stays sent back, the
 // agreement stays undone. What it must not do is disappear — an operator whose
 // notification writes are failing finds out from a log line, written once here
 // rather than at each call site.

@@ -13,7 +13,7 @@ type Prefill = {
   // it opens. Only a prepared rule carries one: a length is what a rule means
   // by "put this off for a quarter", and a date saved months ago is not.
   deferDays?: number;
-  // Cited, never applied: what a VEX document said is not this claim, and
+  // Cited, never applied: what a VEX document said is not this decision, and
   // this is what lets a later revision to it be noticed.
   fromStatement?: number;
 } | null;
@@ -22,7 +22,7 @@ type Prefill = {
 //
 // Two things fill it: something the reader started from on this finding, and
 // the saved filter the finding was opened under where that filter prepares a
-// claim. The reader's own wins, and clearing it clears the rule's too — the
+// decision. The reader's own wins, and clearing it clears the rule's too — the
 // rule fills a form nobody has answered yet, not one somebody is working in.
 //
 // `oneFinding` names the finding the screen is on. A params-only change does
@@ -54,8 +54,8 @@ export function useDecisionPrefill(oneFinding: string, rule: string) {
   // is a name that is not there. The filters are one list per person, so the
   // same rule applies in every product.
   const rules = useKept(rule !== "");
-  // The claim that filter prepares, in the words the form takes, and whether it
-  // prepares something no form can be submitted from. A rule prepares a claim
+  // The decision that filter prepares, in the words the form takes, and whether it
+  // prepares something no form can be submitted from. A rule prepares a decision
   // and a person proposes it: this fills the form in and nothing else.
   const offered = useMemo(() => {
     const one = (rules.data?.items ?? []).find((each) => each.name === rule);

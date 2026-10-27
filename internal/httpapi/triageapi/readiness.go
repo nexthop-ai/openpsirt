@@ -66,14 +66,14 @@ type BlockingBody struct {
 	// so one issue at three versions of one component is three rows here.
 	// Without it they arrive identical: four rows reading "CVE-2026-46595
 	// golang.org/x/crypto", differing only in a count the panel does not draw.
-	Version   string                 `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
-	Ecosystem string                 `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace string                 `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Severity  string                 `json:"severity,omitempty"`
-	Exploited bool                   `json:"exploited,omitempty"`
-	Places    int                    `json:"places" doc:"The number of places of the build it sits at"`
-	State     core.StandingUnsettled `json:"state,omitempty" doc:"The decision state. Anything agreed is not in this list"`
-	Due       string                 `json:"due,omitempty"`
+	Version     string                 `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
+	Ecosystem   string                 `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace   string                 `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
+	Severity    string                 `json:"severity,omitempty"`
+	Exploited   bool                   `json:"exploited,omitempty"`
+	Occurrences int                    `json:"occurrences" doc:"The number of occurrences of the build it sits at"`
+	State       core.StandingUnsettled `json:"state,omitempty" doc:"The decision state. Anything agreed is not in this list"`
+	Due         string                 `json:"due,omitempty"`
 }
 
 // blocking is how many of the worst are listed.
@@ -157,7 +157,7 @@ func registerReadiness(api huma.API, in core.Deps) {
 				// Everything nobody has agreed to. An agreed row is a
 				// decision somebody made to ship with it, which is the
 				// opposite of a blocker.
-				States: core.Which(finding.ClaimStandings(), finding.ClaimStanding.Unsettled),
+				States: core.Which(finding.DecisionStandings(), finding.DecisionStanding.Unsettled),
 			})
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
@@ -169,7 +169,7 @@ func registerReadiness(api huma.API, in core.Deps) {
 				Vulnerability: group.Vulnerability, Component: group.Component,
 				Version: group.Version, Ecosystem: group.Ecosystem, Namespace: group.Namespace,
 				Severity: group.Severity, Exploited: group.Exploited,
-				Places: group.Places, State: core.StandingUnsettled(group.State),
+				Occurrences: group.Occurrences, State: core.StandingUnsettled(group.State),
 			}
 			if group.DueAt != nil {
 				one.Due = group.DueAt.UTC().Format(time.DateOnly)

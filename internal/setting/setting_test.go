@@ -79,10 +79,10 @@ func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 		// A count the same way: nothing, or nothing positive, is the default.
 		// Read as written, a zero cap refuses every bulk act it bounds.
 		for _, bad := range []string{"lots", "", "-5", "0"} {
-			if _, _, err := s.Change(ctx, setting.TogetherCap, bad); err != nil {
+			if _, _, err := s.Change(ctx, setting.BulkDecisionCap, bad); err != nil {
 				t.Fatal(err)
 			}
-			got, err := s.Count(ctx, setting.TogetherCap, 100)
+			got, err := s.Count(ctx, setting.BulkDecisionCap, 100)
 			if err != nil {
 				t.Fatalf("%q: %v", bad, err)
 			}
@@ -120,7 +120,7 @@ func TestASettingThatCannotBeReadIsNotReportedAsUnset(t *testing.T) {
 		if _, err := s.Duration(stopped, setting.DeferralThreshold, time.Hour); err == nil {
 			t.Error("a reader was handed a default in place of a failure")
 		}
-		if _, err := s.Count(stopped, setting.TogetherCap, 100); err == nil {
+		if _, err := s.Count(stopped, setting.BulkDecisionCap, 100); err == nil {
 			t.Error("a reader was handed a default in place of a failure")
 		}
 	})
@@ -157,4 +157,92 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 			t.Errorf("the change reports it held %q, held=%v, want \"high\"", before, had)
 		}
 	})
+}
+
+// A setting renamed by an upgrade answers from a row under its former name
+// while its own name is unset, and its own name outranks the former when both
+// are held. Each state is reported, for the warning at startup.
+func TestARenamedSettingReadsItsFormerNameUntilItsOwnIsSet(t *testing.T) {
+	eachSetting(t, func(t *testing.T, s *setting.Store) {
+		ctx := t.Context()
+		if got := formersOf(t, s); len(got) != 0 {
+			t.Errorf("nothing under a former name reported as %v", got)
+		}
+		if _, _, err := s.Change(ctx, "triage.together-cap", "300"); err != nil {
+			t.Fatal(err)
+		}
+		if got := limitOf(t, s); got != 300 {
+			t.Errorf("the limit reads %d with only its former name set, want 300", got)
+		}
+		want := setting.FormerName{Former: "triage.together-cap", Name: setting.BulkDecisionCap}
+		if got := formersOf(t, s); len(got) != 1 || got[0] != want {
+			t.Errorf("the former name reported as %v, want %v", got, want)
+		}
+	})
+}
+
+// A row under the former name written after the setting's own, as an earlier
+// release still running writes it, is outranked and reported as shadowed.
+func TestARenamedSettingOutranksItsFormerNameWrittenAfter(t *testing.T) {
+	eachSetting(t, func(t *testing.T, s *setting.Store) {
+		ctx := t.Context()
+		if _, _, err := s.Change(ctx, setting.BulkDecisionCap, "40"); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := s.Change(ctx, "triage.together-cap", "300"); err != nil {
+			t.Fatal(err)
+		}
+		if got := limitOf(t, s); got != 40 {
+			t.Errorf("the limit reads %d with both names set, want its own 40", got)
+		}
+		want := setting.FormerName{Former: "triage.together-cap", Name: setting.BulkDecisionCap, Shadowed: true}
+		if got := formersOf(t, s); len(got) != 1 || got[0] != want {
+			t.Errorf("both names reported as %v, want %v", got, want)
+		}
+	})
+}
+
+// Changing a renamed setting replaces what its former name held, says so for
+// the trail, and clears the former row, so nothing is left to warn about.
+func TestChangingARenamedSettingTakesOverItsFormerName(t *testing.T) {
+	eachSetting(t, func(t *testing.T, s *setting.Store) {
+		ctx := t.Context()
+		if _, _, err := s.Change(ctx, "triage.together-cap", "300"); err != nil {
+			t.Fatal(err)
+		}
+		before, had, err := s.Change(ctx, setting.BulkDecisionCap, "40")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !had || before != "300" {
+			t.Errorf("the change replaced %q (held %v), want the former name's 300", before, had)
+		}
+		if got := limitOf(t, s); got != 40 {
+			t.Errorf("the limit reads %d after the change, want 40", got)
+		}
+		if got := formersOf(t, s); len(got) != 0 {
+			t.Errorf("the former name is still held after the change: %v", got)
+		}
+		if _, held, err := s.Get(ctx, "triage.together-cap"); err != nil || held {
+			t.Errorf("the former row is held=%v after the change (%v)", held, err)
+		}
+	})
+}
+
+func formersOf(t *testing.T, s *setting.Store) []setting.FormerName {
+	t.Helper()
+	got, err := s.FormerNames(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func limitOf(t *testing.T, s *setting.Store) int {
+	t.Helper()
+	got, err := s.Count(t.Context(), setting.BulkDecisionCap, 2000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
 }

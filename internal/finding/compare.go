@@ -27,7 +27,7 @@ type Changed struct {
 	// note: upgraded, patched, the component removed, and superseded — which
 	// is a bump that did not reach the fix and is not a fix at all.
 	Because Closure `bun:"because"`
-	// ArrivedFrom is the version this place held before, where the version
+	// ArrivedFrom is the version this occurrence held before, where the version
 	// moved and the issue came with it. Set on still-present entries,
 	// which is where it says something a reader cannot get any other way:
 	// this was bumped, and the bump fell short.
@@ -62,15 +62,15 @@ type Changed struct {
 	// still there with no way to tell an approved not-applicable from
 	// something nobody has looked at is not a list anybody can sign.
 	//
-	// The outcome and its reason are stated only where every standing
-	// decision over the row's places says the same thing, which is the rule
-	// the VEX document already publishes under: a row decided one way at one
-	// place and another way at a second is not one claim, and stating either
-	// over both would be a claim nobody made.
-	State         ClaimStanding
+	// The outcome and its reason are stated only where every standing decision
+	// over the row's occurrences says the same thing, which is the rule the VEX
+	// document already publishes under: a row decided one way at one occurrence
+	// and another way at a second is not one decision, and stating either over
+	// both would be a claim nobody made.
+	State         DecisionStanding
 	Outcome       string
 	Justification string
-	// Due is the soonest deadline among the places still open, which is the
+	// Due is the soonest deadline among the occurrences still open, which is the
 	// date a coordinator is reading against. Absent where none of them
 	// carries one.
 	Due *time.Time
@@ -229,7 +229,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// time, in a column heading, disagrees with this one.
 	comparison.Fixed, comparison.Closed = partition(comparison.Fixed)
 
-	// Judgments standing over what is still there. Read only for the
+	// Decisions standing over what is still there. Read only for the
 	// still-present entries, because that is the list somebody signs a release
 	// off against — what was fixed needs no justification and what is newly
 	// present has not been looked at yet.
@@ -442,7 +442,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 	return why, nil
 }
 
-// Gone is why a finding is no longer there, and what the place moved between
+// Gone is why a finding is no longer there, and what the occurrence moved between
 // where moving is the reason.
 type Gone struct {
 	Because     Closure
@@ -465,7 +465,7 @@ func pairKey(vulnerability, component string) string {
 
 // Stands is what a build has decided about one issue at one component.
 type Stands struct {
-	State         ClaimStanding
+	State         DecisionStanding
 	Outcome       string
 	Justification string
 	Due           *time.Time
@@ -474,8 +474,8 @@ type Stands struct {
 // whatStands reads how far the later build has decided each of the things it
 // still has, and what it decided.
 //
-// Two statements over groups rather than one over places. A real build
-// holds a quarter of a million places and a few hundred groups, and what is
+// Two statements over groups rather than one over occurrences. A real build
+// holds a quarter of a million occurrences and a few hundred groups, and what is
 // wanted is one answer per group — so the counts are aggregated in the
 // database and the outcomes are folded here, which is also where the rule
 // about disagreement lives.
@@ -490,7 +490,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	var counted []struct {
 		Vulnerability string     `bun:"vulnerability"`
 		Component     string     `bun:"component"`
-		Places        int        `bun:"places"`
+		Occurrences   int        `bun:"places"`
 		Waiting       int        `bun:"waiting_here"`
 		Approved      int        `bun:"approved_here"`
 		Lapsed        int        `bun:"lapsed_here"`
@@ -510,7 +510,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	// of each state, so a row here and the same row on the list cannot say
 	// different things about how far it has been decided.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
-	q = decisionCounts(q, "?", []any{productID}, claimWaiting, claimApproved, claimLapsed).
+	q = decisionCounts(q, "?", []any{productID}, decisionWaiting, decisionApproved, decisionLapsed).
 		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."closed_at" IS NULL`).
@@ -523,25 +523,25 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	out := make(map[string]Stands, len(counted))
 	for _, row := range counted {
 		out[pairKey(row.Vulnerability, row.Component)] = Stands{
-			State: stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
+			State: stateWord(row.Occurrences, row.Waiting, row.Approved, row.Lapsed),
 			Due:   row.Due,
 		}
 	}
 
-	// And what was decided, where something stands. One row per claim, so a
-	// group answered by two claims comes back as two — which is what says the
-	// row has no single judgment behind it.
+	// And what was decided, where something stands. One row per decision, so a
+	// group answered by two decisions comes back as two — which is what says the
+	// row has no single decision behind it.
 	//
-	// Grouped on the claim rather than on its words. MySQL and MariaDB
+	// Grouped on the decision rather than on its words. MySQL and MariaDB
 	// compare only the first `max_sort_length` bytes of a long text for
 	// GROUP BY, and a justification is bounded at sixty-four kilobytes — so
-	// two claims whose reasoning differs only past the first kilobyte counted
-	// as one there and as two on PostgreSQL. A claim identifier compares the
+	// two decisions whose reasoning differs only past the first kilobyte counted
+	// as one there and as two on PostgreSQL. A decision identifier compares the
 	// same everywhere.
 	var said []struct {
 		Vulnerability string `bun:"vulnerability"`
 		Component     string `bun:"component"`
-		Claim         int64  `bun:"claim"`
+		Decision      int64  `bun:"claim"`
 		Outcome       string `bun:"outcome"`
 		Justification string `bun:"justification"`
 	}
@@ -551,25 +551,26 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		// The decision at this place, in this product, in force at the
-		// versions the place holds now — the same match the agreed count above
-		// is made with, so a place counted as agreed contributes its outcome.
+		// The decision at this occurrence, in this product, in force at the
+		// versions the occurrence holds now — the same match the agreed count
+		// above is made with, so an occurrence counted as agreed contributes
+		// its outcome.
 		//
 		// The match is a condition of the query rather than of the join,
-		// because it asks the claim what outcome it is and the claim hangs off
-		// the decision: named in the decision's own ON clause it reaches an
-		// alias that is joined after it, which SQLite allows and MySQL and
-		// MariaDB refuse. Both joins are inner, so the two are the same
-		// question asked in the one place every engine agrees on.
-		Join(`JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+		// because it asks the decision what outcome it is and the decision
+		// hangs off its occurrence row: named in that row's own ON clause it
+		// reaches an alias that is joined after it, which SQLite allows and
+		// MySQL and MariaDB refuse. Both joins are inner, so the two are the
+		// same question asked in the one place every engine agrees on.
+		Join(`JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
 			AND `+inForce+` AND "de"."live_key" IS NOT NULL`, append([]any{productID}, held...)...).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(KeyMatches).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"cl"."id" AS "claim"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
-		// One value per group, because the group is one claim: which bytes an
+		// One value per group, because the group is one decision: which bytes an
 		// engine compares to take the minimum cannot change the answer.
 		ColumnExpr(`COALESCE(MIN("cl"."justification"), '') AS "justification"`).
 		Where(kinds, kindArgs...).
@@ -582,20 +583,20 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)
 	}
 	// Only where they agree, and agreement is about the outcome. A
-	// component argued away at one place and deferred at another is two
-	// claims, and stating either over the row would be a claim nobody made —
-	// the rule the VEX document publishes under. Two claims reaching the same
+	// component argued away at one occurrence and deferred at another is two
+	// decisions, and stating either over the row would be a claim nobody made —
+	// the rule the VEX document publishes under. Two decisions reaching the same
 	// outcome in different words are not that: they agree, and what the row
 	// cannot state is which wording, so it states the outcome and no reason.
 	outcomes := map[string]map[string]bool{}
-	claims := map[string]int{}
+	decisions := map[string]int{}
 	for _, row := range said {
 		at := pairKey(row.Vulnerability, row.Component)
 		if outcomes[at] == nil {
 			outcomes[at] = map[string]bool{}
 		}
 		outcomes[at][row.Outcome] = true
-		claims[at]++
+		decisions[at]++
 	}
 	for _, row := range said {
 		at := pairKey(row.Vulnerability, row.Component)
@@ -604,7 +605,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		}
 		held := out[at]
 		held.Outcome = row.Outcome
-		if claims[at] == 1 {
+		if decisions[at] == 1 {
 			held.Justification = row.Justification
 		}
 		out[at] = held

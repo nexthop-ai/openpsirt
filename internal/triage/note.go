@@ -4,7 +4,7 @@
 package triage
 
 // Notes on an issue in a product: what somebody wanted whoever decides to
-// know, without recording a judgment of their own.
+// know, without recording a decision of their own.
 
 import (
 	"context"
@@ -26,9 +26,9 @@ import (
 
 // IssueNote is something written about an issue in a product.
 //
-// Not a comment on a claim, and not a claim. A comment hangs off an argument
-// somebody made, and the box for one appears only where a claim already
-// exists — so the first person to say anything had to record a judgment in
+// Not a comment on a decision, and not a decision. A comment hangs off an argument
+// somebody made, and the box for one appears only where a decision already
+// exists — so the first person to say anything had to record a decision in
 // order to say it. A note records none.
 //
 // Keyed on the issue and the product, the way a rating is (REQ-29), because a
@@ -45,7 +45,7 @@ type IssueNote struct {
 	WrittenBy       int64     `bun:"written_by,notnull"`
 	WrittenAt       time.Time `bun:"written_at,notnull"`
 	// EditedAt marks that the author changed it. What it said before is kept
-	// too, for the reason a claim comment's is: a note is part of the record
+	// too, for the reason a decision comment's is: a note is part of the record
 	// that goes public at disclosure, and a record whose earlier text is
 	// unrecoverable is readable rather than checkable.
 	EditedAt *time.Time `bun:"edited_at"`
@@ -70,7 +70,7 @@ var ErrNoSuchNote = refusal.New("no note is recorded there")
 // NoteOn writes a note about an issue in a product.
 //
 // Writing asks for triage on that product at the issue's visibility there,
-// which is the same rule a claim comment holds to: saying something on the
+// which is the same rule a decision comment holds to: saying something on the
 // record about work is part of arguing about it. Reading is wider and is
 // answered by Notes.
 func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
@@ -310,11 +310,11 @@ func noteVisibility(ctx context.Context, db bun.IDB, productID,
 // noteReach is whether this subject may be told the issue is in this product
 // at all, and at what visibility a note about it is held.
 //
-// Undisclosed if any place of the issue in this product is, which is the
+// Undisclosed if any occurrence of the issue in this product is, which is the
 // rule the finding screen already applies to what may be said: one undisclosed
-// place among fifty makes the whole of it undisclosed for anybody deciding
+// occurrence among fifty makes the whole of it undisclosed for anybody deciding
 // what to write. A note is one thread for the issue, so it cannot be public
-// for some of its places and private for others — and the safe direction is
+// for some of its occurrences and private for others — and the safe direction is
 // the stricter one.
 //
 // The telling half comes first, and its refusal is spelled as an unused name,

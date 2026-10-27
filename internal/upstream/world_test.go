@@ -190,24 +190,24 @@ func (w *world) rescan() {
 	w.report(w.forkLater, portable, opensslNext, ownBuild, libnl)
 }
 
-// decide records an approved claim of not applicable, for the reason given,
-// at every open place of an issue in one component of a build.
+// decide records an approved decision of not applicable, for the reason given,
+// at every open occurrence of an issue in one component of a build.
 func (w *world) decide(target *catalog.Target, issue, component string, why triage.Justification) {
 	w.t.Helper()
-	w.claim(target, issue, component, triage.NotApplicable, why)
+	w.decision(target, issue, component, triage.NotApplicable, why)
 }
 
-// claim records one claim at every open place of an issue in one component of
+// decision records one decision at every open occurrence of an issue in one component of
 // a build, agreed by the second person where it needs one.
-func (w *world) claim(target *catalog.Target, issue, component string, outcome triage.Outcome,
+func (w *world) decision(target *catalog.Target, issue, component string, outcome triage.Outcome,
 	why triage.Justification) {
 
 	w.t.Helper()
-	w.claimCiting(target, issue, component, outcome, why, nil)
+	w.decisionCiting(target, issue, component, outcome, why, nil)
 }
 
-// claimCiting is claim, started from the statement cited where one is.
-func (w *world) claimCiting(target *catalog.Target, issue, component string, outcome triage.Outcome,
+// decisionCiting is decision, started from the statement cited where one is.
+func (w *world) decisionCiting(target *catalog.Target, issue, component string, outcome triage.Outcome,
 	why triage.Justification, cited *int64) {
 
 	w.t.Helper()
@@ -224,23 +224,23 @@ func (w *world) claimCiting(target *catalog.Target, issue, component string, out
 		Where(`"c"."name" = ?`, component).
 		Where(`"f"."closed_at" IS NULL`).
 		Scan(ctx); err != nil || len(open) == 0 {
-		w.t.Fatalf("%s is open at %d places of %s: %v", issue, len(open), component, err)
+		w.t.Fatalf("%s is open at %d occurrences of %s: %v", issue, len(open), component, err)
 	}
 	var proposals []triage.Proposal
 	placed := map[string]bool{}
 	for _, one := range open {
-		if placed[one.PlaceIdentity] {
+		if placed[one.OccurrenceIdentity] {
 			continue
 		}
-		placed[one.PlaceIdentity] = true
-		at, err := w.findings.PlaceFor(ctx, w.proposer, target.ID, vulnerability, one.PlaceIdentity)
+		placed[one.OccurrenceIdentity] = true
+		at, err := w.findings.OccurrenceFor(ctx, w.proposer, target.ID, vulnerability, one.OccurrenceIdentity)
 		if err != nil {
 			w.t.Fatal(err)
 		}
 		proposals = append(proposals, triage.Proposal{
-			Place: triage.Place{
+			Occurrence: triage.Occurrence{
 				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
+				OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
 				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 				OnTag: at.OnTag,
 			},
@@ -254,7 +254,7 @@ func (w *world) claimCiting(target *catalog.Target, issue, component string, out
 		w.t.Fatal(err)
 	}
 	if recorded[0].NeedsApproval {
-		if _, err := w.decisions.ApproveClaim(ctx, w.approver, recorded[0].ClaimID, "", nil, ""); err != nil {
+		if _, err := w.decisions.ApproveDecision(ctx, w.approver, recorded[0].DecisionID, "", nil, ""); err != nil {
 			w.t.Fatal(err)
 		}
 	}

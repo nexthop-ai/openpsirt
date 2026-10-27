@@ -132,11 +132,11 @@ the statement (REQ-31, REQ-84).
 | The component is matched by its package identifier, its version aside, and then at exactly the version the statement names | A statement about one version says nothing about the next |
 | A statement naming no package identifier or no version closes nothing | |
 | Wherever the component sits, the build's root included | The upstream speaks for the component, not for what pulls it in |
-| A place somebody here decided about stays as they decided, whatever they decided | A local decision stands over an upstream's word. A claim that the match is wrong stands at whatever version the place holds; every other decision at the versions it was made at. A place the statement closed can be decided about, and the next run opens it again |
+| An occurrence somebody here decided about stays as they decided, whatever they decided | A local decision stands over an upstream's word. A decision that the match is wrong stands at whatever version the occurrence holds; every other decision at the versions it was made at. An occurrence the statement closed can be decided about, and the next run opens it again |
 | A declined statement closes nothing | § Declined statements |
 | The build's own patch and the issue's CVE record are asked first | Both say the code is not vulnerable here |
 | What closes is worked out on every run | A statement set aside, revised away, declined or of an upstream no longer trusted closes nothing at the next run, which opens what it closed |
-| A statement that the component is fixed is not stated as not affected | The VEX document of one build carrying suppliers' statements states a component only where every statement closing a place of it said not affected |
+| A statement that the component is fixed is not stated as not affected | The VEX document of one build carrying suppliers' statements states a component only where every statement closing an occurrence of it said not affected |
 
 ## Offers for review
 
@@ -146,11 +146,11 @@ never applied by itself.
 | Rule | |
 |---|---|
 | Offered beside each open finding of the product it speaks about | The same issue, by its name or another it goes by, at a component of the same name and version |
-| Listed in the review queue | Beside the claims waiting for a second person, in the product the reader reads |
-| Not offered where somebody here decided about the place | A claim proposed or agreed takes it out of the list |
+| Listed in the review queue | Beside the decisions waiting for a second person, in the product the reader reads |
+| Not offered where somebody here decided about the occurrence | A decision proposed or agreed takes it out of the list |
 | A component named alone in a document other software generated is offered too | It closes nothing by itself (§ Statements recorded) |
 | A declined statement offers no prefill on the finding | |
-| Accepting one proposes an ordinary claim, citing the statement | The claim goes through approval as any other, and a later revision of the statement raises the alert a cited statement raises |
+| Accepting one proposes an ordinary decision, citing the statement | The decision goes through approval as any other, and a later revision of the statement raises the alert a cited statement raises |
 | Dismissing one declines it | § Declined statements |
 | At most 200, oldest statement first | The list is read by a person |
 
@@ -159,7 +159,7 @@ never applied by itself.
 | Rule | |
 |---|---|
 | Somebody who may triage the product declines one, or takes the decline back | Declining opens what the statement closed, which is work coming back rather than going away, so it needs nobody else |
-| Only a statement an upstream published | A supplier's statement is answered by deciding about the place |
+| Only a statement an upstream published | A supplier's statement is answered by deciding about the occurrence |
 | To anybody who may not triage the product, the statement does not exist | Authorized before anything about it is told |
 | Recorded in the administrative trail, and the product's builds are queued to be scanned again | |
 | A decision started from a statement is told when the statement is set aside | Stopping trusting the upstream is said as that, and the notice clears once the upstream, trusted again, says the same thing again |
@@ -196,7 +196,7 @@ fork reads it over TLS from a server on the same machine.
 | The first read | 0.40 s |
 | A read over nothing that moved | 18 ms, one request for the description and one for the feed, answered that nothing moved |
 | The fork's run over its build | 0.58 s before it trusts the upstream, 0.60 s with the 76 statements standing |
-| Findings that run closes | 508: the 76 issues at every place the image ships them |
+| Findings that run closes | 508: the 76 issues at every occurrence the image ships them |
 
 ## Choices beyond the decisions
 

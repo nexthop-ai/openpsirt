@@ -56,7 +56,7 @@ func TestPackageKindsAreCountedOverWhatTheReaderMaySee(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, kinded())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
-			// Two issues at a Debian package that sits at two places: two
+			// Two issues at a Debian package that sits at two occurrences: two
 			// rows on the list, and four findings.
 			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
 			// A Debian package and a Go module nobody has disclosed anything

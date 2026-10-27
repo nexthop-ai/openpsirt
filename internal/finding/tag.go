@@ -56,7 +56,7 @@ func TagAs(tag string) string { return typedname.Matching(tag) }
 // somebody who may only read a product should not be able to move work into or
 // out of somebody else's saved filter.
 //
-// A tag belongs to the fold, the unit a judgment covers and the finding screen
+// A tag belongs to the fold, the unit a decision covers and the finding screen
 // shows, so it is written on every component of the fold this product holds the
 // issue at. Each list row, which is one component, then carries it.
 //

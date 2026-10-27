@@ -15,12 +15,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// decide records one judgment about the scanned finding and returns whether
-// the claim was recorded as waiting on a second person.
-func decideOn(t *testing.T, r *httpapitest.Reach, place, body string) bool {
+// decide records one decision about the scanned finding and returns whether
+// the decision was recorded as waiting on a second person.
+func decideOn(t *testing.T, r *httpapitest.Reach, occurrence, body string) bool {
 	t.Helper()
 	at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-		"/findings/CVE-2026-9999/occurrences/%s/decision", place)
+		"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
 	got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at, body)
 	if got.Code != http.StatusCreated {
 		t.Fatalf("recording the promise answered %d: %s", got.Code, got.Body.String())
@@ -48,23 +48,23 @@ func deadlines(t *testing.T, r *httpapitest.Reach) {
 
 // A promise to act past the deadline the finding already has defers the worst
 // thing it covers, so a second person agrees. Recorded from a finding the gate
-// had no deadline to measure against at all: the place resolution never
+// had no deadline to measure against at all: the occurrence resolution never
 // carried one, so every backport recorded here stood the moment it was
 // written, suppressed the finding, and appeared in no review queue.
 func TestAPromisePastTheDeadlineTheFindingHasIsGated(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		deadlines(t, r)
 
 		// The finding is high, so its deadline is two days out. This lands a
 		// month past it.
 		past := time.Now().UTC().AddDate(0, 0, 30).Format(time.DateOnly)
-		if !decideOn(t, r, place, `{"outcome":"patch-needed","committed_to":"`+past+`",`+
+		if !decideOn(t, r, occurrence, `{"outcome":"patch-needed","committed_to":"`+past+`",`+
 			`"reasoning":"Backport is queued behind the release."}`) {
 			t.Error("a promise a month past the finding's deadline was recorded as needing nobody")
 		}
 
-		// And it is waiting rather than in force: a claim that hides risk and
+		// And it is waiting rather than in force: a decision that hides risk and
 		// has not been agreed to suppresses nothing.
 		var page struct {
 			Total int `json:"total"`
@@ -80,12 +80,12 @@ func TestAPromisePastTheDeadlineTheFindingHasIsGated(t *testing.T) {
 // gating it would put the most routine act of all through the review queue.
 func TestAPromiseInsideTheDeadlineTheFindingHasStandsOnItsOwn(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		deadlines(t, r)
 
 		// The high window is two days, so tomorrow is inside it.
 		soon := time.Now().UTC().AddDate(0, 0, 1).Format(time.DateOnly)
-		if decideOn(t, r, place, `{"outcome":"patch-needed","committed_to":"`+soon+`",`+
+		if decideOn(t, r, occurrence, `{"outcome":"patch-needed","committed_to":"`+soon+`",`+
 			`"reasoning":"Backport lands in tomorrow's build."}`) {
 			t.Error("a promise inside the finding's deadline was put through the queue")
 		}
@@ -98,7 +98,7 @@ func TestAPromiseInsideTheDeadlineTheFindingHasStandsOnItsOwn(t *testing.T) {
 // a promise could hide a finding for years on one signature.
 func TestAPromiseCoveringWorkWithNoDeadlineIsGated(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		// The product only triages criticals, and the finding is high, so
 		// the clock is taken off it and there is nothing to be past.
 		located, err := catalog.NewStore(r.DB.DB).Locate(t.Context(), "mine", "master", "broadcom")
@@ -112,7 +112,7 @@ func TestAPromiseCoveringWorkWithNoDeadlineIsGated(t *testing.T) {
 		deadlines(t, r)
 
 		past := time.Now().UTC().AddDate(0, 0, 30).Format(time.DateOnly)
-		if !decideOn(t, r, place, `{"outcome":"patch-needed","committed_to":"`+past+`",`+
+		if !decideOn(t, r, occurrence, `{"outcome":"patch-needed","committed_to":"`+past+`",`+
 			`"reasoning":"Backport is queued behind the release."}`) {
 			t.Error("a promise covering work with no deadline was recorded as needing nobody")
 		}

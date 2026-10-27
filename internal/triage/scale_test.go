@@ -5,16 +5,16 @@
 
 // The cost of an unbounded bulk promise, measured rather than assumed.
 //
-// A bulk judgment is bounded and a promise to upgrade is not, because the next
+// A bulk decision is bounded and a promise to upgrade is not, because the next
 // scan re-checks every row a promise names. Removing the bound moves the
 // question from "will this be refused" to "will this commit", and the answer
 // is a property of four database engines rather than of this code — so it is
 // measured on all four, on real servers, and the numbers are written down.
 //
 // It times the act that lost its bound, not a neighbour of it: PlanUpgrade
-// resolves every place on a component inside the transaction, folds them,
-// writes a claim, a decision per place and the fix targets. A measurement of
-// the bulk judgment path would describe a different transaction, and the whole
+// resolves every occurrence on a component inside the transaction, folds them,
+// writes a decision, a row per occurrence and the fix targets. A measurement of
+// the bulk decision path would describe a different transaction, and the whole
 // point of keeping a number beside a decision is that somebody can re-run it in
 // two years and get an answer to the same question.
 //
@@ -38,12 +38,12 @@ import (
 )
 
 // The sizes a real image produces. One kernel bump reaches 4,485 findings
-// across 44,016 places; a cumulative bundle reaches 243,945, which is the
+// across 44,016 occurrences; a cumulative bundle reaches 243,945, which is the
 // largest single act the data can ask for.
 var promiseSizes = []int{2_000, 44_016, 243_945}
 
 // holders is how many containers pull the bumped component in. A real image
-// reached 241,021 places from 7,035 components, so about 34.
+// reached 241,021 occurrences from 7,035 components, so about 34.
 const holders = 34
 
 func TestMeasureAnUnboundedPromise(t *testing.T) {
@@ -51,7 +51,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 		ctx := t.Context()
 		db := w.DB
 		product, target := w.Product, w.Target
-		// A real person row, because a claim names who made it and the schema
+		// A real person row, because a decision names who made it and the schema
 		// holds it to that.
 		rights := access.NewStore(db.DB)
 		person, err := rights.Ensure(ctx, "triager", "A triager", nil, nil)
@@ -62,7 +62,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 			map[int64][]access.Role{product.ID: {access.PublicTriage, access.PrivateTriage}}, 0)
 
 		// One component per size, each under the same containers, so the three
-		// acts do not decide about each other's places — and each with its own
+		// acts do not decide about each other's occurrences — and each with its own
 		// issues, since a promise covers everything open on the component.
 		root := described("sonic", "1.0")
 		snap := graph.Snapshot{Root: root, Components: []graph.Described{root}}
@@ -80,7 +80,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 				snap.Dependencies = append(snap.Dependencies,
 					graph.Dependency{Parent: holder, Child: bumped})
 			}
-			// Places are the issues at that component times the containers
+			// Occurrences are the issues at that component times the containers
 			// pulling it in, which is the shape a kernel has.
 			for i := range (size + holders - 1) / holders {
 				reported = append(reported, finding.Reported{
@@ -128,7 +128,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 		store := triage.NewStore(db.DB)
 		by := time.Now().UTC().AddDate(0, 0, 30)
 		for n, size := range promiseSizes {
-			t.Run(fmt.Sprintf("%d places", size), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%d occurrences", size), func(t *testing.T) {
 				started := time.Now()
 				done, err := store.PlanUpgrade(ctx, who, triage.Upgrade{
 					ProductID: product.ID,
@@ -139,11 +139,11 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 				})
 				took := time.Since(started)
 				if err != nil {
-					t.Fatalf("a promise over %d places: %v (after %s)", size, err, took)
+					t.Fatalf("a promise over %d occurrences: %v (after %s)", size, err, took)
 				}
-				t.Logf("%8d decisions over %d issues in one transaction: %s (%.0f rows/s)",
-					done.Decisions, done.Issues, took.Round(time.Millisecond),
-					float64(done.Decisions)/took.Seconds())
+				t.Logf("%8d rows over %d issues in one transaction: %s (%.0f rows/s)",
+					done.Occurrences, done.Issues, took.Round(time.Millisecond),
+					float64(done.Occurrences)/took.Seconds())
 			})
 		}
 	})

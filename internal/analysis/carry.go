@@ -17,15 +17,15 @@ import (
 )
 
 // carried is the lead of the series elsewhere a result new to this build is
-// the same result as: the place it takes, and how it was found.
+// the same result as: the occurrence it takes, and how it was found.
 type carried struct {
-	place string
-	on    string
+	occurrence string
+	on         string
 	// from says where the lead was found.
 	from string
 }
 
-// Where a carried place was found.
+// Where a carried occurrence was found.
 const (
 	// fromParent is a lead of the stream this one was cut from, on the
 	// build of the same variant, paired by the layers on the build's first
@@ -44,7 +44,7 @@ const (
 // it was cut from has decided. Whatever is left is looked up across the
 // series, open or closed, on the whole key alone: a probable pairing with a
 // lead the build never saw is a guess. A result found nowhere is absent from
-// the answer, and opens a place of its own.
+// the answer, and opens an occurrence of its own.
 func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, first bool, fresh []Keyed) (
 	map[int]carried, error) {
 
@@ -108,7 +108,7 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 	if err != nil {
 		return fmt.Errorf("read what the branch this was cut from holds open: %w", err)
 	}
-	places, err := placesOf(ctx, db, ids)
+	occurrences, err := occurrencesOf(ctx, db, ids)
 	if err != nil {
 		return err
 	}
@@ -118,26 +118,26 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 	}
 	for _, p := range layers(candidates, fresh) {
 		id := candidates[p.candidate].findingID
-		out[p.result] = carried{place: places[id], on: p.on, from: fromParent}
+		out[p.result] = carried{occurrence: occurrences[id], on: p.on, from: fromParent}
 	}
 	return nil
 }
 
-// placesOf is the place each of these findings is at.
-func placesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
+// occurrencesOf is the occurrence each of these findings is at.
+func occurrencesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
 	out := make(map[int64]string, len(ids))
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var rows []struct {
-			ID    int64  `bun:"id"`
-			Place string `bun:"place_identity"`
+			ID         int64  `bun:"id"`
+			Occurrence string `bun:"occurrence_identity"`
 		}
 		if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr(`"f"."id", "f"."place_identity"`).
+			ColumnExpr(`"f"."id", "f"."occurrence_identity"`).
 			Where(`"f"."id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
 			return err
 		}
 		for _, r := range rows {
-			out[r.ID] = r.Place
+			out[r.ID] = r.Occurrence
 		}
 		return nil
 	})
@@ -161,11 +161,11 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 		}
 	}
 	type held struct {
-		ID       int64      `bun:"id"`
-		Key      string     `bun:"match_key"`
-		Place    string     `bun:"place_identity"`
-		TargetID int64      `bun:"target_id"`
-		ClosedAt *time.Time `bun:"closed_at"`
+		ID         int64      `bun:"id"`
+		Key        string     `bun:"match_key"`
+		Occurrence string     `bun:"occurrence_identity"`
+		TargetID   int64      `bun:"target_id"`
+		ClosedAt   *time.Time `bun:"closed_at"`
 	}
 	byKey := map[string][]held{}
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
@@ -176,7 +176,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 			TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-			ColumnExpr(`"f"."id", "ar"."match_key", "f"."place_identity", "f"."target_id"`).
+			ColumnExpr(`"f"."id", "ar"."match_key", "f"."occurrence_identity", "f"."target_id"`).
 			ColumnExpr(`"f"."closed_at"`).
 			Where(`"si"."series_id" = ?`, seriesID).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
@@ -204,7 +204,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 		if _, done := out[i]; done || len(hits) == 0 {
 			continue
 		}
-		c := carried{place: hits[0].Place, on: onKey, from: fromSeries}
+		c := carried{occurrence: hits[0].Occurrence, on: onKey, from: fromSeries}
 		if hits[0].TargetID == targetID && hits[0].ClosedAt != nil {
 			c.from = fromReopened
 		}

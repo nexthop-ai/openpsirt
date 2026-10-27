@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap, whichOf } from "../api/queries";
-import { claimAt, componentAt, decideAt, dependenciesAt } from "../app/routes";
+import { decisionAt, componentAt, bulkDecisionAt, dependenciesAt } from "../app/routes";
 import { aroundKey, fetchAround } from "../api/around";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
@@ -69,15 +69,15 @@ function pickPackage(row: Build, asked: string): Package | undefined {
   );
 }
 
-// One judgment about many issues at this component, which is the answer where
+// One decision about many issues at this component, which is the answer where
 // no version fixes them. The screen was built, works, and had no link to it
 // anywhere in the application: this page is where the question is asked, so
 // this is where the way to it belongs.
 //
 // The package's version, ecosystem and namespace travel with the name, because
 // a build can hold one name as more than one component.
-const decideHere = (product: string, row: Build, component: string, pkg?: Package) =>
-  decideAt(
+const bulkDecisionHere = (product: string, row: Build, component: string, pkg?: Package) =>
+  bulkDecisionAt(
     { product, stream: row.stream ?? "", variant: row.variant ?? "" },
     component,
     whichOf({ version: pkg?.version, ecosystem: row.ecosystem, namespace: pkg?.namespace }),
@@ -786,7 +786,7 @@ function Upgrade({
   // Where the promise just made is followed: its own page while it waits for
   // a second person, and the pending upgrades of the builds it names.
   const [made, setMade] = useState<{
-    claimId: number;
+    decisionId: number;
     waiting: boolean;
     builds: { stream: string; variant: string }[];
   } | null>(null);
@@ -820,7 +820,7 @@ function Upgrade({
       ),
     onSuccess: (done) => {
       setSaid(
-        `Recorded against ${done.decisions} ${done.decisions === 1 ? "place" : "places"}` +
+        `Recorded against ${done.occurrences} ${done.occurrences === 1 ? "occurrence" : "occurrences"}` +
           ` across ${done.issues} ${done.issues === 1 ? "issue" : "issues"}.` +
           (done.waiting
             ? " Past the earliest deadline it covers, so it waits."
@@ -828,7 +828,7 @@ function Upgrade({
           (done.held ? ` Carried by ${holder?.name ?? "them"}.` : ""),
       );
       setMade({
-        claimId: done.claim_id,
+        decisionId: done.decision_id,
         waiting: done.waiting,
         builds: [...chosen].map((each) => {
           const { stream, variant } = fromBuildKey(each);
@@ -852,7 +852,7 @@ function Upgrade({
           {said}{" "}
           {made?.waiting && (
             <>
-              <Link to={claimAt(made.claimId)} className="linkish">
+              <Link to={decisionAt(made.decisionId)} className="linkish">
                 Open the decision →
               </Link>{" "}
             </>
@@ -873,7 +873,7 @@ function Upgrade({
   }
 
   // Nothing to move to is a state rather than an empty form: the work is a
-  // judgment, and a form that cannot be filled in is one somebody tries anyway.
+  // decision, and a form that cannot be filled in is one somebody tries anyway.
   if (landed.length === 0) {
     if ((here.issues ?? 0) === 0) return null;
     return (
@@ -886,8 +886,8 @@ function Upgrade({
           Nothing fixes the {here.issues} open here.
         </p>
         <p style={{ marginTop: 10 }}>
-          <Link className="btn" to={decideHere(product, here, component, pkg)}>
-            Decide them together
+          <Link className="btn" to={bulkDecisionHere(product, here, component, pkg)}>
+            Bulk decision
           </Link>{" "}
           <Link className="btn quiet" to={findingsAt(product, here, binaries(here))}>
             Open issues
@@ -911,7 +911,7 @@ function Upgrade({
 
       {/* The pair that needs no version comparison, from the scanner's own
           word on whether a fix exists at all. Read first, because the half no
-          upgrade closes is the half that still needs a judgment after the work
+          upgrade closes is the half that still needs a decision after the work
           ships. */}
       <div className="kpis tight">
         <span className="kpi">
@@ -922,16 +922,16 @@ function Upgrade({
         <span className="kpi">
           <span className="l">No version fixes</span>
           <span className="n">{noFix.toLocaleString()}</span>
-          <span className="d">a judgment rather than an upgrade</span>
+          <span className="d">a decision rather than an upgrade</span>
         </span>
       </div>
-      {/* The way to make that judgment, beside the number that says how much
+      {/* The way to make that decision, beside the number that says how much
           of it there is. Scheduling an upgrade answers the other half of this
           card and nothing on this page answered this one. */}
       {noFix > 0 && (
         <p style={{ marginTop: 6 }}>
-          <Link className="linkish" to={decideHere(product, here, component, pkg)}>
-            Decide those together →
+          <Link className="linkish" to={bulkDecisionHere(product, here, component, pkg)}>
+            Bulk decision on those →
           </Link>
         </p>
       )}
@@ -1079,7 +1079,7 @@ function Ships({ product, rows, here }: { product: string; rows: Build[]; here: 
               <th>Ships</th>
               <th className="num">Open on it</th>
               <th className="num">Consumers</th>
-              <th className="num">Places</th>
+              <th className="num">Occurrences</th>
               <th>Due</th>
               <th>Upgrade scheduled</th>
             </tr>
@@ -1104,7 +1104,7 @@ function Ships({ product, rows, here }: { product: string; rows: Build[]; here: 
                 </td>
                 <td className="num">{(row.consumers ?? 0).toLocaleString()}</td>
                 <td className="num" style={{ color: "var(--faint)" }}>
-                  {(row.places ?? 0).toLocaleString()}
+                  {(row.occurrences ?? 0).toLocaleString()}
                 </td>
                 <td className="hint">{row.due_at ? on(row.due_at) : "—"}</td>
                 <td>

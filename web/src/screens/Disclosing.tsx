@@ -182,7 +182,7 @@ export function Disclosing() {
           </select>
         </label>
         {/* A shortcut to the form every flaw is reported through. Reporting a
-            flaw from outside starts a date; the other way is a claim from
+            flaw from outside starts a date; the other way is a decision from
             outside ruled a duplicate, which is made on the report. */}
         {mayRecord && (
           <Link className="btn" to={reportFlawAt(scope.product ?? "", undefined, "outside")}>
@@ -229,7 +229,12 @@ export function Disclosing() {
                 <th>Issue</th>
                 <th>Where</th>
                 <th>Discloses</th>
-                <th className="num">Locations</th>
+                <th
+                  className="num"
+                  title="Each way this component enters the build, judged on its own"
+                >
+                  Occurrences
+                </th>
                 <th />
               </tr>
             </thead>
@@ -260,7 +265,7 @@ export function Disclosing() {
                         {row.passed && " · past"}
                       </span>
                     </td>
-                    <td className="num">{row.places}</td>
+                    <td className="num">{row.occurrences}</td>
                     {/* The form opens in this cell, and a click in it is the
                         form's rather than the row's. */}
                     <td onClick={(event) => event.stopPropagation()}>

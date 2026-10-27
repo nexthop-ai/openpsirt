@@ -38,13 +38,13 @@ type Entering struct {
 	// than one, because the same code ships on several lines and as several
 	// variants at once.
 	//
-	// One issue, and one finding per place it sits at in each build. That
+	// One issue, and one finding per occurrence it has in each build. That
 	// is the shape a scanner's findings already take, so a flaw somebody
 	// recorded lists, ranks, comes due, carries decisions and appears in a
 	// comparison exactly as one that was reported does — rather than in a
 	// scheme of its own that everything downstream would need to know about.
-	// A component two things pull in is two places, and a decision is keyed
-	// on one of them.
+	// A component two things pull in is two occurrences, and a decision
+	// occurrence is keyed on one of them.
 	TargetIDs []int64
 	// Component names what in the build carries it, as the build calls it.
 	// Empty is the build itself, which is the honest answer where the flaw is
@@ -146,15 +146,15 @@ const MostWeaknesses = 16
 var ErrNotAWeakness = refusal.Errorf("a flaw states at most %d weaknesses, each written as CWE- "+
 	"and a number, such as CWE-125", MostWeaknesses)
 
-// ErrTooManyPlaces says one recording would open more findings than this
+// ErrTooManyOccurrences says one recording would open more findings than this
 // deployment allows one action to write.
 //
-// A recording opens one finding per place the component sits at, in every
+// A recording opens one finding per occurrence the component has, in every
 // build named — so a widely vendored component across a long list of builds is
 // a large write from a small request, which is the shape REQ-27 bounds: what
 // is written rather than what was asked for. The same cap the bulk triage
 // action is held to, because it is the same question about the same table.
-var ErrTooManyPlaces = refusal.New("that would open more findings than one action may")
+var ErrTooManyOccurrences = refusal.New("that would open more findings than one action may")
 
 // ErrNothingScanned says the build holds no contents to record against.
 var ErrNothingScanned = refusal.New(
@@ -181,8 +181,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	if len(in.TargetIDs) == 0 {
 		return nil, "", ErrNoBuild
 	}
-	// A build named twice is one build: a finding is a component at a place,
-	// and two rows at one place are two findings for one flaw.
+	// A build named twice is one build: a finding is a component at an
+	// occurrence, and two rows at one occurrence are two findings for one flaw.
 	in.TargetIDs = distinct(in.TargetIDs)
 	// One product, because an identifier is minted per product and a flaw
 	// recorded across two would have to be two records. Read from the builds
@@ -282,9 +282,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		target    int64
 		component int64
 		name      string
-		// The component's place in that build, which is what a decision is
-		// keyed on. One entry per place, because a component can sit in more
-		// than one at once.
+		// The component's occurrence in that build, which is what a decision
+		// occurrence is keyed on. One entry per occurrence, because a
+		// component can sit in more than one at once.
 		consumerID int64
 		consumer   string
 	}
@@ -336,27 +336,27 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// this against a database that has moved: a scan landing
 		// between two attempts can take a component out of a build,
 		// and the row would still have been written, filing a flaw at
-		// a place the build no longer holds. Each of these is one
+		// an occurrence the build no longer holds. Each of these is one
 		// indexed lookup, so asking again costs about what carrying
 		// the answer in did.
-		places := make([]at, 0, len(in.TargetIDs))
+		occurrences := make([]at, 0, len(in.TargetIDs))
 		for _, target := range in.TargetIDs {
 			componentID, componentName, err := carrying(ctx, tx, target, in)
 			if err != nil {
 				return err
 			}
-			// Its place, read from the same graph a scan reads. A flaw a
+			// Its occurrence, read from the same graph a scan reads. A flaw a
 			// person records and the same flaw a scan finds are one thing, so
-			// they are keyed the same way — and a place recorded as "directly
-			// under the product" when the component is nested is a key no
-			// scanned row will ever share, which is two findings and two
-			// decisions for one flaw.
+			// they are keyed the same way — and an occurrence recorded as
+			// "directly under the product" when the component is nested is a
+			// key no scanned row will ever share, which is two findings and
+			// two decision occurrences for one flaw.
 			sittings, err := sittingsOf(ctx, tx, target, componentID)
 			if err != nil {
 				return err
 			}
 			for _, sitting := range sittings {
-				places = append(places, at{
+				occurrences = append(occurrences, at{
 					target: target, component: componentID, name: componentName,
 					consumerID: sitting.consumerID, consumer: sitting.consumer,
 				})
@@ -372,9 +372,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return fmt.Errorf("read how much one action may write: %w", err)
 		}
-		if len(places) > cap {
-			return fmt.Errorf("%w: it sits at %d places across those builds, "+
-				"and one action here writes %d", ErrTooManyPlaces, len(places), cap)
+		if len(occurrences) > cap {
+			return fmt.Errorf("%w: it sits at %d occurrences across those builds, "+
+				"and one action here writes %d", ErrTooManyOccurrences, len(occurrences), cap)
 		}
 
 		// The product, read again in here. It was resolved before the
@@ -463,20 +463,20 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			carriesDeadlines[id] = true
 		}
 
-		// One row per place in every build, all pointing at the one issue.
+		// One row per occurrence in every build, all pointing at the one issue.
 		// Every one of them gets the same embargo, rank and deadline, except
 		// that a build carrying no deadlines gets none: they are the same
 		// flaw, and a deadline that differed per build would be the tool
 		// deciding that one release matters more.
-		rows = make([]Finding, 0, len(places))
-		for _, place := range places {
+		rows = make([]Finding, 0, len(occurrences))
+		for _, occurrence := range occurrences {
 			row := Finding{
-				TargetID: place.target, Kind: Entered, Visibility: visibility,
-				VulnerabilityID: vulnerabilityID,
-				ComponentID:     place.component,
-				ConsumerID:      optional(place.consumerID),
-				PlaceIdentity:   PlaceIdentity(place.name, place.consumer),
-				OpenedAt:        now,
+				TargetID: occurrence.target, Kind: Entered, Visibility: visibility,
+				VulnerabilityID:    vulnerabilityID,
+				ComponentID:        occurrence.component,
+				ConsumerID:         optional(occurrence.consumerID),
+				OccurrenceIdentity: OccurrenceIdentity(occurrence.name, occurrence.consumer),
+				OpenedAt:           now,
 			}
 			// An embargo gets an end where somebody outside reported
 			// it (REQ-37). A public finding gets none — it is already
@@ -513,7 +513,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				rated := now
 				row.RatedAt = &rated
 			}
-			if carriesDeadlines[place.target] {
+			if carriesDeadlines[occurrence.target] {
 				row.DueAt = ownDeadline(own, severity, row.RatedAt, row.FixState,
 					false, ranked.ExploitedHere, now, nil, row.FixedAt, floor)
 			}
@@ -612,9 +612,9 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 			return 0, "", err
 		}
 		// Named, and it is what the build is. Keyed with no name like the
-		// branch below, because it is the same place: the root's name differs
-		// per variant, and a place keyed on it is a different place in each
-		// of them.
+		// branch below, because it is the same occurrence: the root's name
+		// differs per variant, and an occurrence keyed on it is a different
+		// occurrence in each of them.
 		root, err := isRootIn(ctx, db, targetID, id)
 		if err != nil {
 			return 0, "", err
@@ -630,8 +630,9 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 	// inventory describes.
 	//
 	// The root is returned with no name. The product's name differs per
-	// variant, so a place keyed on it is a different place in each of them:
-	// one flaw across three variants became three places and three decisions.
+	// variant, so an occurrence keyed on it is a different occurrence in each
+	// of them: one flaw across three variants became three occurrences and
+	// three decision occurrences.
 	// The scan path collapses a root to no name for the same reason.
 	var root struct {
 		ID int64 `bun:"id"`

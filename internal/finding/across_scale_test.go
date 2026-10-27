@@ -26,18 +26,19 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// issuesAtAKernelPlace is how many issues one kernel place carries. A real switch
-// image carried 6,610 undecided issues at the place of one kernel claim, which
-// is what the case against that claim counts on the review queue.
-const issuesAtAKernelPlace = 6_000
+// issuesAtAKernelOccurrence is how many issues one kernel occurrence carries. A real
+// switch image carried 6,610 undecided issues at the occurrence of one kernel
+// decision, which is what the case against that decision counts on the review
+// queue.
+const issuesAtAKernelOccurrence = 6_000
 
 // The two screens a person opens first, across products: the findings list
 // with its default filters, and the review queue.
 //
 // Both read decisions against a large open set. The list asks every open row
 // whether a decision stands at it, and the queue counts what else sits
-// undecided at a claim's place. Each prints the per-product list beside it,
-// because that is the same work bound to one product, and a gap between the
+// undecided at a decision's occurrence. Each prints the per-product list beside
+// it, because that is the same work bound to one product, and a gap between the
 // two is a join order rather than a size.
 func TestMeasureTheListAcrossProducts(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -47,10 +48,11 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		other := seedAcross(t, w)
 
 		// Decisions to read: an upgrade promised over ten packages, and one
-		// claim at a kernel place waiting for a second person. The kernel is a
-		// second build of the same product, so the claim is counted against
-		// the promises' decisions, and the promises are planned over the build
-		// without it. Planning over the kernel is measured on its own, below.
+		// decision at a kernel occurrence waiting for a second person. The
+		// kernel is a second build of the same product, so the decision is
+		// counted against the promises' occurrences, and the promises are
+		// planned over the build without it. Planning over the kernel is
+		// measured on its own, below.
 		person, err := access.NewStore(db.DB).Ensure(ctx, "triager", "A triager", nil, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -72,12 +74,12 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			promised += done.Decisions
+			promised += done.Occurrences
 		}
 		newest := func() int64 {
 			t.Helper()
 			var id int64
-			if err := db.DB.NewSelect().TableExpr(`"decision" AS "de"`).
+			if err := db.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 				ColumnExpr(`COALESCE(MAX("de"."id"), 0)`).Scan(ctx, &id); err != nil {
 				t.Fatal(err)
 			}
@@ -92,7 +94,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		for n := 5; n < 10; n++ {
 			plan(n, target.ID)
 		}
-		if _, err := db.DB.NewUpdate().TableExpr(`"decision" AS "de"`).
+		if _, err := db.DB.NewUpdate().TableExpr(`"decision_occurrence" AS "de"`).
 			Set(`"state" = ?`, "lapsed").Set(`"live_key" = NULL`).Set(`"ended_at" = ?`, time.Now().UTC()).
 			Where(`"de"."id" > ? AND "de"."id" <= ?`, before, newest()).
 			Exec(ctx); err != nil {
@@ -104,19 +106,19 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		}
 		var kernel struct {
 			Issue      int64  `bun:"vulnerability_id"`
-			Place      string `bun:"place_identity"`
+			Occurrence string `bun:"occurrence_identity"`
 			Visibility string `bun:"visibility"`
 		}
 		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-			ColumnExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility"`).
+			ColumnExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility"`).
 			Where(`"c"."name" = ?`, "kernel").OrderExpr(`"f"."id"`).Limit(1).
 			Scan(ctx, &kernel); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := decisions.Propose(ctx, triager, triage.Proposal{
-			Place: triage.Place{
-				ProductID: product.ID, VulnerabilityID: kernel.Issue, PlaceIdentity: kernel.Place,
+			Occurrence: triage.Occurrence{
+				ProductID: product.ID, VulnerabilityID: kernel.Issue, OccurrenceIdentity: kernel.Occurrence,
 				Visibility:        access.Visibility(kernel.Visibility),
 				ComponentUpstream: "6.1", ConsumerUpstream: "1.0",
 			},
@@ -130,7 +132,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			Where(`"f"."closed_at" IS NULL`).Scan(ctx, &open); err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("%d open rows, %d promised decisions and one kernel claim", open, promised)
+		t.Logf("%d open rows, %d promised occurrences and one kernel decision", open, promised)
 		dbtest.SettleStatistics(t, db)
 
 		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_MEASURE_SLOW")}
@@ -147,13 +149,13 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			filter finding.Filter
 		}{
 			{"no filter", finding.Filter{}},
-			{"undecided", finding.Filter{States: []finding.ClaimStanding{finding.StandingUndecided}}},
+			{"undecided", finding.Filter{States: []finding.DecisionStanding{finding.StandingUndecided}}},
 			{"differs, undecided", finding.Filter{DiffersBetweenBuilds: true,
-				States: []finding.ClaimStanding{finding.StandingUndecided}}},
+				States: []finding.DecisionStanding{finding.StandingUndecided}}},
 			{"unassigned", finding.Filter{Assigned: []string{"nobody"}}},
 			{"the list's defaults", finding.Filter{
 				Workable: finding.Working([]string{finding.OnBranch}, []string{finding.InSupport}),
-				States:   []finding.ClaimStanding{finding.StandingUndecided},
+				States:   []finding.DecisionStanding{finding.StandingUndecided},
 				Assigned: []string{"nobody"},
 				Planned:  finding.NotPlanned,
 			}},
@@ -205,10 +207,10 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			name   string
 			filter finding.Filter
 		}{
-			{"undecided", finding.Filter{States: []finding.ClaimStanding{finding.StandingUndecided}}},
-			{"waiting", finding.Filter{States: []finding.ClaimStanding{finding.StandingWaiting}}},
-			{"lapsed", finding.Filter{States: []finding.ClaimStanding{finding.StandingLapsed}}},
-			{"agreed", finding.Filter{States: []finding.ClaimStanding{finding.StandingAgreed}}},
+			{"undecided", finding.Filter{States: []finding.DecisionStanding{finding.StandingUndecided}}},
+			{"waiting", finding.Filter{States: []finding.DecisionStanding{finding.StandingWaiting}}},
+			{"lapsed", finding.Filter{States: []finding.DecisionStanding{finding.StandingLapsed}}},
+			{"agreed", finding.Filter{States: []finding.DecisionStanding{finding.StandingAgreed}}},
 			{"upgrade needed", finding.Filter{Outcomes: []string{string(triage.UpgradeNeeded)}}},
 			{"planned", finding.Filter{Planned: finding.PlannedOnly}},
 		} {
@@ -236,7 +238,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		if len(page) > 0 {
 			undecided = page[0].Counter.Undecided
 		}
-		t.Logf("review queue, first card %s (%d waiting, %d undecided beside the claim)",
+		t.Logf("review queue, first card %s (%d waiting, %d undecided beside the decision)",
 			time.Since(at).Round(time.Millisecond), waiting, undecided)
 	})
 }
@@ -244,11 +246,11 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 // Planning an upgrade in the build that carries the kernel, beside that build's
 // findings list.
 //
-// Planning resolves every place it covers in one read and then writes a
-// decision at each. The read is timed on its own, on the statistics the load
-// left and again once they are refreshed, because a large scan leaves the
-// server's statistics behind the table until its own refresh reaches it. The
-// acts are timed whole: a small package on both, and the kernel once, after
+// Planning resolves every occurrence it covers in one read and then writes a
+// decision occurrence at each. The read is timed on its own, on the statistics
+// the load left and again once they are refreshed, because a large scan leaves
+// the server's statistics behind the table until its own refresh reaches it.
+// The acts are timed whole: a small package on both, and the kernel once, after
 // the refresh, since its act commits. Each is bounded rather than left to run.
 func TestMeasurePlanningOverAKernel(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -274,20 +276,20 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 			bounded, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			defer cancel()
 			at := time.Now()
-			bundled, err := store.PlacesOnComponentWithin(bounded, db.DB, triager, product.ID,
+			bundled, err := store.OccurrencesOnComponentWithin(bounded, db.DB, triager, product.ID,
 				[]int64{kernelBuild.ID}, "kernel", "")
 			took := time.Since(at)
-			places := 0
+			occurrences := 0
 			for _, one := range bundled {
-				places += len(one.Places)
+				occurrences += len(one.Occurrences)
 			}
 			switch {
 			case bounded.Err() != nil:
-				t.Logf("the kernel's places, %-11s unfinished after %s", statistics, took.Round(time.Second))
+				t.Logf("the kernel's occurrences, %-11s unfinished after %s", statistics, took.Round(time.Second))
 			case err != nil:
 				t.Fatal(err)
 			default:
-				t.Logf("the kernel's places, %-11s %9s (%d)", statistics, took.Round(time.Millisecond), places)
+				t.Logf("the kernel's occurrences, %-11s %9s (%d)", statistics, took.Round(time.Millisecond), occurrences)
 			}
 		}
 		plan := func(statistics, component string) {
@@ -307,8 +309,8 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 			case err != nil:
 				t.Fatalf("planning %s: %v", component, err)
 			default:
-				t.Logf("planning %-9s %-11s %9s (%d decisions over %d issues)", component, statistics,
-					took.Round(time.Millisecond), done.Decisions, done.Issues)
+				t.Logf("planning %-9s %-11s %9s (%d occurrences over %d issues)", component, statistics,
+					took.Round(time.Millisecond), done.Occurrences, done.Issues)
 			}
 		}
 
@@ -437,7 +439,7 @@ func seedAcross(t *testing.T, w *world.World) *catalog.Product {
 	other := w.DeclareProduct("other", "Other")
 	seed(w.TargetFor(w.DeclareStream(other, "main", catalog.Branch, nil),
 		w.DeclareVariant(other, "only", true)), 0, 0)
-	seed(w.TargetFor(w.Branch, w.Internal), 0, issuesAtAKernelPlace)
+	seed(w.TargetFor(w.Branch, w.Internal), 0, issuesAtAKernelOccurrence)
 	return other
 }
 

@@ -50,12 +50,12 @@ REQ-37, REQ-78, REQ-85.
 A scanner reports that a package at a version is affected and stops. It never
 saw the dependency graph — it was given a list.
 
-Fanning one reported issue out across the places it occupies is this
+Fanning one reported issue out across the occurrences it occupies is this
 deployment's work, derived from the edges the inventory described. It is the
 step where one line in a report becomes the number of decisions somebody has to
 make.
 
-A place is the component and what directly pulled it in. One issue in a shared
+An occurrence is the component and what directly pulled it in. One issue in a shared
 library used by two things is two findings, because different consumers use
 different parts of what they depend on.
 
@@ -65,7 +65,7 @@ builds.
 
 ## The row a person reads
 
-Store expanded, present collapsed. Every place is stored, because the graph has
+Store expanded, present collapsed. Every occurrence is stored, because the graph has
 to stay answerable and the exact record has to name the artifact that shipped.
 What a person reads is the fold: one issue at one source package, at the version
 it was built at.
@@ -77,11 +77,11 @@ it was built at.
 
 Concentrated rather than uniform. Most rows are untouched; what collapses is the
 work that was already one thing — `util-linux` was fourteen rows of the same
-judgment, the same upgrade and the same routing rule.
+decision, the same upgrade and the same routing rule.
 
 Every number a person sees is counted in the unit they acted in. A row says how
 many packages of the fold sit here and how many things pull them in, because
-deciding on the row decides about all of them. The place count is still stored
+deciding on the row decides about all of them. The occurrence count is still stored
 and still what the ceiling on one action is measured against and what the disposition
 register expands to — it is not a figure a reader is asked to reconcile with the
 two above.
@@ -102,8 +102,8 @@ names**: every name resolves to one row, and a decision holds across all of them
 | A name a report gives twice is one name | A report may list its own identifier among its aliases, or one alias twice, in any case and spacing. A name is recorded once, under a unique index on its normalized form, so the report interns as one issue and the scan carrying it applies |
 | A report naming two issues held apart merges them into one (REQ-18) | The alias that joins them is the report learning what the issue is, and one issue is one issue under every name. § Merged issues holds the rules |
 | The filed name, folded, is what makes one issue one row | It was a hash of the unfolded name in a column of its own, which nothing read and which only one of the two paths that refile an issue under a better-known name maintained — so the key drifted away from the row it identified, and the collision when it came named a name neither issue was filed under |
-| The fold is what a screen reports about | The rows a finding screen shows are the whole fold, so who holds it, what rule placed it and everything else reported beside them is asked of the fold too. Asked of one component, a rule that placed a third of a fold reported as no rule under one name and as the whole thing under another — while the guarantee those reads state is "one name for the whole group, and empty where its places disagree" |
-| **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
+| The fold is what a screen reports about | The rows a finding screen shows are the whole fold, so who holds it, what rule placed it and everything else reported beside them is asked of the fold too. Asked of one component, a rule that placed a third of a fold reported as no rule under one name and as the whole thing under another — while the guarantee those reads state is "one name for the whole group, and empty where its occurrences disagree" |
+| **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each occurrence carries |
 
 ### Merged issues
 
@@ -121,29 +121,29 @@ issue that is absorbed stays filed under it, and is read as the issue kept.
 |---|---|
 | The issue kept is the one filed under the best-known of all the names, and otherwise the one recorded first | It is filed under that name already. Every name the absorbed issue answers to answers to it |
 | A merge record names the issue absorbed, the issue kept, the names the report gave, the run and the moment | The issue's page reads it to say where a name came from |
-| Every issue states the issue it is read as: itself, or the one it merged into, one step away however many merges led there | A decision is related to a finding by equality on that column, which every engine answers from an index. Counting the decisions over a build of 300,000 findings and 150,000 decisions takes 72 ms on PostgreSQL, 0.47 s on MySQL and 2.5 s on MariaDB, the same as the exact match. Related through a subquery, the count runs for more than ten minutes on PostgreSQL; through a null meaning itself, it takes 0.19 s and hashes every decision |
+| Every issue states the issue it is read as: itself, or the one it merged into, one step away however many merges led there | A decision occurrence is related to a finding by equality on that column, which every engine answers from an index. Counting the decision rows over a build of 300,000 findings and 150,000 rows takes 72 ms on PostgreSQL, 0.47 s on MySQL and 2.5 s on MariaDB, the same as the exact match. Related through a subquery, the count runs for more than ten minutes on PostgreSQL; through a null meaning itself, it takes 0.19 s and hashes every row |
 | Two scans merging overlapping sets take the issues in turn | Each takes every issue it names before reading them, and goes again where one is no longer its own issue, so no issue ends two steps from the one that stands |
-| Decisions, their claims, approvals and revisions, notes, rating claims, records of being attacked, attachments, case grants, advisories covering the issue, embargo movements and reports stay filed under the absorbed issue | Each is read as the issue kept, through the issue it states. A decision about the absorbed issue suppresses, counts and is listed at the kept issue's findings as it does at its own. The rows below are the whole of what a merge writes to any of them |
+| Decisions, their occurrences, approvals and revisions, notes, rating claims, records of being attacked, attachments, case grants, advisories covering the issue, embargo movements and reports stay filed under the absorbed issue | Each is read as the issue kept, through the issue it states. A decision about the absorbed issue suppresses, counts and is listed at the kept issue's findings as it does at its own. The rows below are the whole of what a merge writes to any of them |
 | A case grant under either name reaches every record filed under either | A collaborator reads, revises and re-affirms what they made under the absorbed name |
 | An advisory covering either name covers the kept issue, once per product | Generating it reads the kept issue's findings. A search by either name finds it |
 | One report stands for an issue across its names | A second report is refused as the record of an issue whose absorbed name already has one |
-| A re-affirmation reads the rating in force for the kept issue, and accepts a decision filed under the absorbed name at the same place | The absorbed row keeps only what it held when absorbed, and the place is the kept issue's |
+| A re-affirmation reads the rating in force for the kept issue, and accepts a decision filed under the absorbed name at the same occurrence | The absorbed row keeps only what it held when absorbed, and the occurrence is the kept issue's |
 | What a report said moves to the issue kept: its names, its findings, its classification, its ratings, its references and the signals that rank it | That is observed state and it describes the one issue. The absorbed row keeps its own copy of what it held |
-| A place in one build open under both names as a scanned finding keeps the finding open longer, and the other closes as invalid | It is one finding held twice, and the reason for an invalid closure is a record that duplicates an issue already tracked. A finding a person entered is never closed this way |
+| An occurrence in one build open under both names as a scanned finding keeps the finding open longer, and the other closes as invalid | It is one finding held twice, and the reason for an invalid closure is a record that duplicates an issue already tracked. A finding a person entered is never closed this way |
 | The finding that stays open takes the other's assignment where it has none | The work stays in the queue it is in |
-| Two live decisions at one product and place under the two names collide where their versions agree, or where both stand at any version | Those hold one key under one issue. A claim at any version and a claim about particular versions stand side by side under one issue, and after a merge (REQ-25) |
-| Of two that collide, the approved one stays over the proposed one, and otherwise the newer. The other lapses, with a record naming the merge and the decision standing in its place | One live decision per place, chosen by standing rather than by which name the report led with |
-| A live decision filed under the absorbed issue holds its key under the issue kept | The key is what makes one live decision per place a rule the database keeps. Left under the old name, a second claim about the same place finds nothing in its way |
-| The key is the one column of a standing decision a merge rewrites, and that is accepted under REQ-22 | The key is an index over what a decision is about, never a field anybody decided. The issue a decision is filed under, its claim, place, state, author and time are untouched, and a test pins each of them across a merge |
+| Two live decisions at one product and occurrence under the two names collide where their versions agree, or where both stand at any version | Those hold one key under one issue. A decision at any version and a decision about particular versions stand side by side under one issue, and after a merge (REQ-25) |
+| Of two that collide, the approved one stays over the proposed one, and otherwise the newer. The other lapses, with a record naming the merge and the decision standing in its place | One live decision per occurrence, chosen by standing rather than by which name the report led with |
+| A live decision filed under the absorbed issue holds its key under the issue kept | The key is what makes one live decision per occurrence a rule the database keeps. Left under the old name, a second decision about the same occurrence finds nothing in its way |
+| The key is the one column of a standing decision occurrence a merge rewrites, and that is accepted under REQ-22 | The key is an index over what a decision is about, never a field anybody decided. The issue a decision occurrence is filed under, its decision, occurrence, state, author and time are untouched, and a test pins each of them across a merge |
 | Tags move to the issue kept, once per word on each component | A tag is a word kept only while it is on a row. One the kept issue already carries is dropped |
 | The rating in force moves to the issue kept unless the kept issue holds its own in that product, and then the absorbed one's is dropped | It is derived from the rating claims, which the next rows settle |
 | A rating claim and a record of being attacked standing under either name hold their key under the issue kept | One standing per issue and product is a rule the database keeps |
-| Where a rating claim stands under each name in one product, the one in force stays over the one waiting for a second person, and otherwise the newer | The standing rule two decisions at one place follow |
+| Where a rating claim stands under each name in one product, the one in force stays over the one waiting for a second person, and otherwise the newer | The standing rule two decisions at one occurrence follow |
 | The other rating claim is withdrawn, naming no person, with the reason "Superseded when the absorbed issue merged into the kept one" | A claim nobody withdrew states why it stopped standing. The rating in force is worked out again from the claim that stands, which re-ranks and re-clocks the product's findings |
 | Where a record of being attacked stands under each name in one product, the newer stays | Every standing record has the same standing |
 | The other record is cleared, naming no person, with the same reason | A clearing names who cleared it and why |
 | Each rating claim withdrawn and record cleared this way is a row in the administration trail, with a merge as its actor | What a product lost is asked about afterwards, and no person acted. `DESIGN-access.md` § The administration trail holds the actors |
-| Two judgments that disagree are told to everybody who triages the product: two decisions with different outcomes, two rating claims with different ratings, two records with different dates of attack. Two that agree tell nobody | Nobody chooses which of two judgments stands. The date is what every window after an attack counts from, so a different date is a different obligation |
+| Two answers that disagree are told to everybody who triages the product: two decisions with different outcomes, two rating claims with different ratings, two records with different dates of attack. Two that agree tell nobody | Nobody chooses which of two answers stands. The date is what every window after an attack counts from, so a different date is a different obligation |
 | Published advisories and VEX documents that named the absorbed issue are left as issued | What went out is a fact about the moment it went |
 | A name recorded by hand that another issue holds is still refused | Recording a name is a person asserting identity, and nothing reported says the two are one |
 
@@ -173,7 +173,7 @@ being parsed and thrown away.
 | Severity | Stored as a word, which is what ranks and what sets a deadline. A number is taken where the report carries one — the first rating stating both a score and its vector, worst claim winning. The vector travels with the number |
 | What counts as a fix | One list, named once. A closure not on it is churn or a correction, never progress — it was a positive list of four words spliced into SQL, a negative list of three in Go, and a third list of the same four as a switch returning prose, none of them checked by the compiler and all three disagreeing about any closure added later |
 | Fix state | Three situations, not two: no fix available, upstream declined to fix, and a fixed version exists. "Upstream will not fix this" is a permanent condition that changes the outcome somebody should reach, and is invisible if the only record is that a fix is absent |
-| A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
+| A group whose occurrences disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing occurrences is a fix attached to a group that does not have one |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered, with the one the data calls the root cause first. It groups findings by the shape of the mistake rather than the package it landed in, and a published advisory states one of them — which is what the order says |
 
 ## Issue dates
@@ -605,7 +605,7 @@ record is read against an upstream release number instead, which is
 | Unrecognized reads as the weaker of the two | A word this does not know is a word whose strength nobody has checked, and reading it as authoritative hides something |
 | Unknown is not unconfirmed | Where a scanner said nothing, nothing is claimed. A working list that quietly holds everything nobody classified is one nobody can work down |
 | Kept on the finding, not the issue | One issue reached through two ecosystems has two answers and the issue can hold only one. An issue first seen in a Debian image and later matched in an Alpine one showed Debian's tracker against the Alpine package |
-| One answer per group | Every place of an issue at a component comes from the same line of a scanner's report |
+| One answer per group | Every occurrence of an issue at a component comes from the same line of a scanner's report |
 
 ## Declared dependency scope
 
@@ -648,12 +648,12 @@ exception agree rather than contradict.
 
 | Surface | What it does |
 |---|---|
-| A filter on the findings list | The only way to ask about the deferral class at all. Asked of the component's incoming edges in the build, so one reached from two consumers scoped differently answers to both words — a place is a pair of columns, and no engine here compares a pair against a set the same way |
-| An evidence line on the finding's dependency path | Beside the place it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it. A place two edges reach under two words shows the word from the earliest scan, and of two words one scan stated, the first in byte order, so every engine and every read shows the same one |
+| A filter on the findings list | The only way to ask about the deferral class at all. Asked of the component's incoming edges in the build, so one reached from two consumers scoped differently answers to both words — an occurrence is a pair of columns, and no engine here compares a pair against a set the same way |
+| An evidence line on the finding's dependency path | Beside the occurrence it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it. An occurrence two edges reach under two words shows the word from the earliest scan, and of two words one scan stated, the first in byte order, so every engine and every read shows the same one |
 
 It appears nowhere else: not in the urgency ranking, not as a prefilled
-outcome on a claim, and not as a default narrowing on any list. A person deciding that a
-build-time dependency does not ship is making a judgment, and the judgment stays
+outcome on a decision, and not as a default narrowing on any list. A person deciding that a
+build-time dependency does not ship is making a decision, and the decision stays
 theirs.
 
 ## Component interning
@@ -709,7 +709,7 @@ somebody holds and a name nobody holds identically (REQ-43).
 | A flaw found here is marked so on its report | It carries no disclosure date (REQ-37) and nobody is owed an answer. Unmarked is a report from outside, because that is the case with somebody counting down to a publication |
 | Its deadline uses the windows for our own products, counted from its first severity (REQ-33) | `DESIGN-remediation.md` § Recorded flaws holds the rule. Recorded without a severity, it is listed and assignable with no deadline, and the reason given is `not-rated` |
 
-One identifier, one finding per place in every build. The same code goes out on
+One identifier, one finding per occurrence in every build. The same code goes out on
 several lines and as several variants at once, so a flaw in it is not a fact
 about one build. This is the shape a scanner's findings already have, so it
 lists, ranks, comes due, carries decisions, groups across variants and appears
@@ -719,12 +719,12 @@ in a comparison exactly as a reported one does.
 |---|---|
 | Every build is resolved before anything is written | A component name one build holds and another does not is a question about which builds are affected, so it is refused and names the build rather than recorded against some of them and silently not the rest |
 | One product | The identifier is minted per product, so a flaw in two products is two records |
-| A build named twice is one build, here and wherever a request names builds for a fix | Two rows at one place are two findings for one flaw (REQ-17), and a repeat compared by count against the product's builds reads as a build of another product |
-| What one recording writes is held to the write ceiling alone | Recording a flaw adds findings and hides none, so the review-sized limits on a judgment do not apply. The ceiling, 50,000 findings by default, guards against a runaway write, and adding builds to a flaw later is held to it the same way |
+| A build named twice is one build, here and wherever a request names builds for a fix | Two rows at one occurrence are two findings for one flaw (REQ-17), and a repeat compared by count against the product's builds reads as a build of another product |
+| What one recording writes is held to the write ceiling alone | Recording a flaw adds findings and hides none, so the review-sized limits on a decision do not apply. The ceiling, 50,000 findings by default, guards against a runaway write, and adding builds to a flaw later is held to it the same way |
 | Every row gets the same embargo, rank and deadline | They are the same flaw. A build added later copies them, or the newest build would get a later deadline for the same flaw |
 | What carries it is a component of the build, or the build itself | Naming nothing puts it on the root, which is honest where the flaw is in how the pieces fit together. Naming something the build does not hold is refused |
-| It is a component at a place, keyed exactly as a scanned one is (REQ-17) | The place is derived from the build's own graph rather than asked for: the entry path has already resolved the component there, and a component can sit in more than one place at once, which a form question could not express and which is why one recording opens one finding per place. Recorded as sitting directly under the product whatever the graph said, a flaw a person recorded and the same flaw a scan found were two places and two decisions — triaging either did nothing for the other |
-| Recorded against the build itself, the place is the build's root, which has no name of its own | The product's name differs per variant, so a place keyed on it is a different place in each of them: one flaw across three variants was three places and three decisions. The scan path collapses a root parent for the same reason |
+| It is a component at an occurrence, keyed exactly as a scanned one is (REQ-17) | The occurrence is derived from the build's own graph rather than asked for: the entry path has already resolved the component there, and a component can have more than one occurrence at once, which a form question could not express and which is why one recording opens one finding per occurrence. Recorded as sitting directly under the product whatever the graph said, a flaw a person recorded and the same flaw a scan found were two occurrences and two decisions — triaging either did nothing for the other |
+| Recorded against the build itself, the occurrence is the build's root, which has no name of its own | The product's name differs per variant, so an occurrence keyed on it is a different occurrence in each of them: one flaw across three variants was three occurrences and three decisions. The scan path collapses a root parent for the same reason |
 | A name the build holds more than once is refused with the choices | A name is not unique within a build and not rarely: a real switch image ships three vendored copies of one library, and thirteen names in it are held at one version by two components. The resolution goes through the same lookup every other component reference takes — it did not, and took the first row a name matched |
 | A flaw is recorded from a confirmed lead through this same path, found here, undisclosed and at no version, and the flaw and the link to the lead are written in one transaction | The lead's builds and component are proposed and a person confirms them; `DESIGN-analysis.md` § Hand-off holds the offer and what happens to the lead |
 | A flaw recorded from a lead records the lead, the component the hand-off ranked first and the builds it proposed, and keeps them once the hand-off is undone | What the person was offered beside what they chose. `DESIGN-analysis.md` § Hand-off holds who reads them |
@@ -743,11 +743,11 @@ contact address is published rather than at some volume of them.
 
 | Rule | Reason |
 |---|---|
-| A report exists without an issue | Whether a claim is a flaw is a judgment somebody makes afterwards, and the record has to stand before it is made |
+| A report exists without an issue | Whether a claim is a flaw is a decision somebody makes afterwards, and the record has to stand before it is made |
 | It carries what was claimed, and an empty claim is refused | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. Refused at recording and at every edit. A report written in the same act as a flaw recorded by hand carries the flaw's summary as its claim, and the upgrade gives every report v0.10.0 left with no claim on a flaw recorded here the flaw's summary. Any other report v0.10.0 recorded with no claim keeps none |
 | It may carry a title | One line naming the claim, which a list of reports is read by. Optional, because a claim arriving as a mail has a subject at best |
 | Everything about the reporter is optional | A claim arriving anonymously is an ordinary claim, and a flaw found by whoever is typing has no reporter at all. A form demanding one asks them to invent an answer |
-| A report says whether it was found here | The one fact that separates a flaw somebody here found from a claim that arrived. It decides the disclosure date and whether an answer is owed, and nothing else: the same fields, the same judgment and the same rulings apply to both |
+| A report says whether it was found here | The one fact that separates a flaw somebody here found from a claim that arrived. It decides the disclosure date and whether an answer is owed, and nothing else: the same fields, the same triage and the same rulings apply to both |
 | One row per issue, not per finding | A flaw recorded against four builds is one report from one person, and four copies of their address is four places for it to be wrong |
 | **It records the product it was reported against, and that is who may read it** | Read with the right every read of a report asks, reading undisclosed work in that product, on the issue as on the report itself: one reporter has one rule. Writing to them is working the report and asks for triage there. An issue's identity spans its aliases, so once a CVE is recorded the same issue is open in every product a scan reports it in; keyed on the product, the reporter's name, address and received date stay with the product they wrote to, and a message recorded in one product answers nobody in another |
 | An issue merged from issues reported in two products answers each product with its own report | Each name carried its own report. The one a reader reads and writes to is the first received that they may read, and a message on what nobody here may read is refused as no such report |
@@ -798,16 +798,16 @@ act is kept and readable.
 | Part | Rule |
 |---|---|
 | Edits | The title, the claim and what is known of the reporter change while the report is open: not judged, and no ruling waiting over it. Every version an edit replaces is kept with who replaced it and when, numbered from one, and version one is the report as recorded. An edit that changes nothing keeps nothing |
-| Edits once judged | Refused. A judgment is of particular words, as an approval is (REQ-28); the claim a ruling or an acceptance answered is the one on record |
+| Edits once judged | Refused. A decision is of particular words, as an approval is (REQ-28); the claim a ruling or an acceptance answered is the one on record |
 | Correspondence | A message is recorded with its direction, sent or received, the day it carries and what it said, which may reference files attached to the report. Nothing is sent from this deployment: a message is recorded after somebody sent it, from an address they already have |
 | Message days | Today where none is given. More than a day ahead of today is refused; one day ahead is the reach of a time zone. A message is never edited or removed, because it is evidence of what the reporter was told |
 | Correspondence on a flaw found here | Refused. Nobody outside sent it, so there is nobody to write to |
 | Notes | Markdown written by somebody who works the report, editable by its author, with every earlier wording kept. A name mentioned is told only where that person reads the product's reports; a name nobody reading reports holds is returned unnotified, worded alike whether or not the person exists (§ Report visibility) |
-| Notes and messages after judgment | Accepted. The conversation with a reporter outlasts the judgment of their claim, and both stay readable from the issue it became, under the report rule |
+| Notes and messages after a decision | Accepted. The conversation with a reporter outlasts the decision on their claim, and both stay readable from the issue it became, under the report rule |
 | Assignment | A report is held by one person or routed to one team's queue, as a finding is (`DESIGN-access.md` § Assignment). Given to a person only where they read the product's reports, and to a team only where one member does. Taking one nobody holds, or handing back your own, needs the right to work it; giving one away needs the assigner right as well. A holder who stops reading the product's reports gives back the ones they hold, and a team does where no member still reads them (`DESIGN-access.md` § Lost reading) |
 | Assignment once judged | Refused. Its work goes on as the issue it became, or ended with its ruling. A report under a waiting ruling is still open and may be handed over |
 | Held lists | Open reports by holder: one person with their teams' queues, one team's queue, or nobody. Narrowed to the products where the reader reads reports, and to one of them when asked. A team's queue is not in the list of reports nobody holds |
-| Routing | A routing rule may place a product's reports instead of findings, naming no package and no place since a report sits at neither. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when the rule is added. First match wins, as for findings |
+| Routing | A routing rule may place a product's reports instead of findings, naming no package and no occurrence since a report sits at neither. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when the rule is added. First match wins, as for findings |
 | Hand-over | Releasing a person's work and an administrator's hand-over move their open reports with their findings |
 | Notices | The person given a report is told, where that is not whoever gave it. The unanswered report, every message and every note reach the report's audience (`DESIGN-notifications.md` § Report audience); a name a note mentions is told of the mention instead. Each is undisclosed work, so nothing leaving the deployment names the report |
 | History | Every act, oldest first: recorded, edited, noted, a note edited, a message sent or received, assigned or handed back with the rule that routed it, a file attached, a ruling proposed, in force or withdrawn, and accepted as an issue. Assembled from the rows that hold each act rather than stored twice |
@@ -833,11 +833,11 @@ one.
 |---|---|
 | The date is set in the ruling's act | Inside the one write that records the ruling, with the disclosure window read there |
 | It counts from the earliest claim from outside the ruling covers | When it arrived, or when it was recorded where it does not say. A claim found here starts nothing |
-| It reaches a flaw recorded here, at its undisclosed open places in the ruling's product | A scanned issue is published by whoever published its advisory, so no reporter counts down to it here. The places take the date where they have none or a later one |
+| It reaches a flaw recorded here, at its undisclosed open occurrences in the ruling's product | A scanned issue is published by whoever published its advisory, so no reporter counts down to it here. The occurrences take the date where they have none or a later one |
 | It is a movement of the embargo | Recorded with the act `duplicate`, naming the ruling and the claim the date counts from |
 | A first date needs nobody | As recording a report from outside needs nobody |
 | Bringing an existing date earlier is a shortening | Held to the movement threshold as a person's shortening is, and past it the date stays until a second person agrees (`DESIGN-access.md` § Disclosure-date movements). The arrival it counts from is typed by whoever records the claim, so a ruling is no route around the control a shortening needs |
-| Withdrawing the ruling puts the date back only where the ruling set it | The embargo's record is replayed without every withdrawn ruling, in the order each movement took effect — when it was agreed to, where it waited: a person's extension or shortening sets an end, and a ruling brings it earlier. Where the answer is where the embargo stands, nothing moves. Where it differs, the places take it, which may be no date at all, and the act `duplicate-undone` records it naming the ruling |
+| Withdrawing the ruling puts the date back only where the ruling set it | The embargo's record is replayed without every withdrawn ruling, in the order each movement took effect — when it was agreed to, where it waited: a person's extension or shortening sets an end, and a ruling brings it earlier. Where the answer is where the embargo stands, nothing moves. Where it differs, the occurrences take it, which may be no date at all, and the act `duplicate-undone` records it naming the ruling |
 | The ruling form says the date before it is submitted | "This starts a disclosure date of *date* on *flaw*", and that it waits for a second person where it would, asked of the server with the reports and the issue typed, under the right to propose the ruling. Nothing is shown where the ruling would start no date |
 | A duplicate ruled before the date was set by a ruling is dated by the upgrade to v0.5.0 | A database that release upgraded holds the movement with its ruling and proposer, as one a ruling records today |
 
@@ -931,7 +931,7 @@ one act, with one reason, covering one or more reports in one product.
 | Rejecting and declaring out of scope wait for a second person (REQ-24) | Both set a claim aside with nothing left anywhere to work on, which is hiding risk. The proposer never approves their own, with no override |
 | A duplicate needs nobody else, and names an issue open in this product | The work exists elsewhere, so nothing is hidden. The target is resolved against what the proposer may be told of, and one they may not answers as one that is not here |
 | Not reproducible needs nobody else | It records that an attempt failed rather than that the claim is false. The reporter is still owed an answer and the report is raised as unanswered until they have one, and a reply carrying a way to reproduce it is met by withdrawing the ruling |
-| A duplicate of an issue not open here is refused at submission | Nothing is left to work on, so it buries the report with nobody having agreed. Open is a place not closed, not suppressed by what the build said, and not dismissed by a decision in force; a deferral or a promised upgrade is work that comes back, and counts as open. The refusal says to reject it instead, which takes the second person |
+| A duplicate of an issue not open here is refused at submission | Nothing is left to work on, so it buries the report with nobody having agreed. Open is an occurrence not closed, not suppressed by what the build said, and not dismissed by a decision in force; a deferral or a promised upgrade is work that comes back, and counts as open. The refusal says to reject it instead, which takes the second person |
 | A reason is required on everything but a duplicate, and goes through the submission policy | A reviewer and a reporter asking why are owed a sentence. A duplicate's reason is the issue it names |
 | A reason is never edited (REQ-28) | An approval is of particular words. Different words are a new ruling |
 | A ruling covers many reports and is approved, sent back or undone as one act (REQ-28) | Twenty slop reports rejected in one sentence take one approval. An approver facing one row per report is given "select all", which is not review |
@@ -1031,7 +1031,7 @@ releases ago still reading as present, invisibly.
 | Rule | Reason |
 |---|---|
 | A scanner's finding is refused | The evidence exists, and overruling it is what computing resolution was chosen to prevent |
-| Closed per build, across every place the issue sits at there | A fix ships in a release |
+| Closed per build, across every occurrence the issue sits at there | A fix ships in a release |
 | It carries who, when and why | A closure with no reason is refused |
 | The reason is published, on the register | What is required of a person is readable: the category says a fix happened, the sentence says what the fix was, and the second is what somebody has years later. The refusal is a promise to whoever typed it that the sentence goes somewhere. A closure a scan performed carries a category and no sentence, because nobody typed one. It is not in a release note: a person's internal words are not a customer document, and a comparison of two builds already says what was fixed in the terms a release note needs |
 | It asks the same right recording it asked, checked against each row | Somebody who may argue about disclosed findings has not been handed the undisclosed ones |
@@ -1097,7 +1097,7 @@ change" is counted by.
 | The order is written from each finding's own value | Chosen by the finding's identifier inside the statement. The likelihood is close to unique to an issue, so grouping by the order is a statement per issue |
 | The fix, the match and what answers a finding are written only where one of them moved | Where none did, the row already holds what the update would write, and grouping by them splits a statement by every issue and component |
 | An open finding is read in the columns the comparison uses | Every open row of the build is read on every scan, and the rest of the row is nothing the comparison asks |
-| What closed before at a place is read as its latest row | One row per issue, component and consumer, and one per issue and place name. A place whose version moves gathers a closed row at every move |
+| What closed before at an occurrence is read as its latest row | One row per issue, component and consumer, and one per issue and occurrence identity. An occurrence whose version moves gathers a closed row at every move |
 | The intervals are the change record | Every node, edge, finding and claim records the run that opened it and the run that closed it, so asking what changed between two points is a query over those. There is no second table duplicating them |
 
 Measured on one image of 324,508 open findings, rescanned the day a likelihood
@@ -1106,7 +1106,7 @@ grouped by every value including the order and 324,508 a finding at a time.
 No row is re-ranked a second time.
 
 The same day on every engine, as `make measure` takes it: 7,600 issues moved,
-each at three places in the scanned build and three in a tag. The application
+each at three occurrences in the scanned build and three in a tag. The application
 is 367 statements, against 23,074 with a statement per issue for each of the
 estimate, the scanned build's order and the tag's order.
 
@@ -1129,8 +1129,8 @@ estimate, the scanned build's order and the tag's order.
 | Fixed | Somebody declared a recorded flaw fixed here. The only closure a person writes |
 | Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: this build never shipped it, the entry named the wrong product, or it duplicates an issue already tracked |
-| Unaffected | The issue's CVE record states the upstream release this place holds is not affected (§ CVE record ranges) |
-| Disclaimed | A supplier states the product this place sits in, at the version the build ships, is not affected, and every route up the tree from the place runs through that product (`DESIGN-triage.md` § Evidence from publishers); or an upstream this product trusts states the component, at the version the build ships, is not affected or is fixed, for anybody shipping it (`DESIGN-upstream.md` § Statements applied) |
+| Unaffected | The issue's CVE record states the upstream release this occurrence holds is not affected (§ CVE record ranges) |
+| Disclaimed | A supplier states the product this occurrence sits in, at the version the build ships, is not affected, and every route up the tree from the occurrence runs through that product (`DESIGN-triage.md` § Evidence from publishers); or an upstream this product trusts states the component, at the version the build ships, is not affected or is fixed, for anybody shipping it (`DESIGN-upstream.md` § Statements applied) |
 
 Superseded is told apart from Upgraded because they are opposite answers to "was
 this fixed", and conflating them put one issue in a release comparison as both
@@ -1145,7 +1145,7 @@ that fits, agreed by a second person and exported as VEX. Letting the closure
 absorb that case would route dismissals around approval.
 
 Disclaimed is on neither axis. Nothing in the build changed, so it is no fix,
-and the release is counted as having held the issue: a trend counts the place
+and the release is counted as having held the issue: a trend counts the occurrence
 open until it closes. That holds for an upstream's statement that the
 component is fixed at the version shipped too. The statement is somebody
 else's judgment rather than a change anybody here made or a record anybody can
@@ -1155,7 +1155,7 @@ deployment's own releases. It is the one closure that says the finding exists
 and does not apply here, and it routes no dismissal around approval: the
 judgment is the supplier's, about its own product, or the upstream's, about a
 component it ships too, applied the way a build's own patch is (REQ-31,
-REQ-84). Somebody who disagrees decides about the place, and the statement does
+REQ-84). Somebody who disagrees decides about the occurrence, and the statement does
 not close it there.
 
 Unexplained is always reported and never suppressed. There is no volume at which
@@ -1248,7 +1248,7 @@ excludes as unaffected.
 | Build | CVE List of | Kernel issues open | Excluded | Findings closed |
 |---|---|---|---|---|
 | ONIE, upstream 6.18.55 | 2026-10-07 | 183 | 37, 36 of them fixed on 6.18.y at or before 6.18.55 | 37 |
-| SONiC, Debian 6.12.41-1 and its `linux-perf` at 6.12.107-1 | 2026-10-15 | 6,833 | 174 at one place or more, 121 of them at every place | 7,790 |
+| SONiC, Debian 6.12.41-1 and its `linux-perf` at 6.12.107-1 | 2026-10-15 | 6,833 | 174 at one occurrence or more, 121 of them at every occurrence | 7,790 |
 
 ### Entries
 
@@ -1341,8 +1341,8 @@ queue for five minutes without spending an attempt (`DESIGN-queue.md`
 and a run begun keeps the schedule from asking again for a day.
 
 The register lists the findings closed this way under their own reason, with
-the lines. A closure saying the issue was never present is in no deadline
-judgment: it met nothing and missed nothing.
+the lines. A closure saying the issue was never present is judged against no deadline:
+it met nothing and missed nothing.
 
 `DESIGN-ingest.md` § CVE records holds where the snapshot comes from.
 
@@ -1363,10 +1363,10 @@ Those edges are real and the producer emits them deliberately, so anyone can
 reason about kernel-ABI risk — but which module is loaded does not change whether
 the kernel has a bug.
 
-The model is not wrong: a finding is a component at a place, and those are the
-places. What the number settles is that grouping cannot be an afterthought in
+The model is not wrong: a finding is a component at an occurrence, and those are the
+occurrences. What the number settles is that grouping cannot be an afterthought in
 presentation. What is read back is one row per issue in a component, carrying
-how many places it occupies and how many the build has already argued about. The
+how many occurrences it occupies and how many the build has already argued about. The
 same image reads as 7,906 rows rather than 335,021.
 
 The grouping is done by the database. A page of fifty grouped rows read out of a
@@ -1382,39 +1382,39 @@ filter takes and by the same definition:
 
 | State | Condition |
 |---|---|
-| Undecided | Nothing stands, waits or has lapsed at any place |
-| Waiting | A claim that needs a second person stands proposed and nobody has agreed |
-| Agreed | Every place is answered by a decision in force: agreed to, or proposed and needing nobody |
+| Undecided | Nothing stands, waits or has lapsed at any occurrence |
+| Waiting | A decision that needs a second person stands proposed and nobody has agreed |
+| Agreed | Every occurrence is answered by a decision in force: agreed to, or proposed and needing nobody |
 | Lapsed | A decision here stopped applying and nothing replaced it |
 
-Some places approved and the rest never decided, with nothing waiting or lapsed,
+Some occurrences approved and the rest never decided, with nothing waiting or lapsed,
 is none of the four: the row carries no state, and the interface labels it partly
 decided. Every screen draws it in the waiting color, from the one table that
 draws the four.
 
 Undecided is nothing standing, not nothing ever said. Read as "no decision row
-covers this place" it leaves a withdrawn claim in no state at all: the row a
-withdrawal leaves behind covers the place, deliberately, so that "lapsed" can
-be said about a claim holding no key. A finding somebody claimed and took back
+covers this occurrence" it leaves a withdrawn decision in no state at all: the row a
+withdrawal leaves behind covers the occurrence, deliberately, so that "lapsed" can
+be said about a decision holding no key. A finding somebody decided and took back
 is then neither undecided nor any of the other three, disappears from the count
 above the list as well as from the list, and is never offered as work again —
 with the product's own totals counting it the same way and agreeing.
 
 The word on the row and the filter's own buckets are one rule, not two
-spellings of it. Two spellings come apart: a filter counting a place as waiting
-without asking whether the claim still holds its key, against a row that
-requires it, puts a claim proposed and withdrawn in the waiting list with a
+spellings of it. Two spellings come apart: a filter counting an occurrence as waiting
+without asking whether the decision still holds its key, against a row that
+requires it, puts a decision proposed and withdrawn in the waiting list with a
 blank state column; and a row asking "was anything ever said" for undecided
 against a filter asking "does anything stand" makes one group undecided to one
 and nothing to the other. Both ask the filter's question.
 
-A live decision covers a place at the versions it was keyed on and no other.
-These counts match a live decision by product, issue, place and both versions,
-and match a lapsed or withdrawn one — which holds no key — by place alone.
-Matched by place alone, a decision approved against one build's version read as
+A live decision covers an occurrence at the versions it was keyed on and no other.
+These counts match a live decision by product, issue, occurrence and both versions,
+and match a lapsed or withdrawn one — which holds no key — by occurrence alone.
+Matched by occurrence alone, a decision approved against one build's version read as
 agreed over the next build shipping another.
 
-A row also states when a live claim at one of its places is with its author, sent
+A row also states when a live decision at one of its occurrences is with its author, sent
 back for more. That is the row a proposer is looking for, and the one the queue
 no longer shows.
 
@@ -1430,80 +1430,80 @@ The page is read in two statements:
 2. Read what the page shows about those fifty groups and no others: likelihood
    and score, the four decision counts, how many ways down there are, the fix.
 
-Every condition on a place narrows both statements through the same clauses, and
+Every condition on an occurrence narrows both statements through the same clauses, and
 none needs the issue or the component joined under the grouping — a rating or a
 name is asked as a membership test against the table that holds it. The decision-state filter is
-built from the decisions outward rather than as a lookup per open row, and in
-the first statement alone: the decided places are counted beside the first
+built from the decision occurrences outward rather than as a lookup per open row, and in
+the first statement alone: the decided occurrences are counted beside the first
 level of the grouping (§ Two-level grouping). The second statement reads the
-page's groups by the conditions on a place and none over a group, because the
+page's groups by the conditions on an occurrence and none over a group, because the
 first statement already chose the groups by those, and a group it reads that is
 not on the page is dropped. Built for the page's issues and joined to its
-places, the table is estimated against one place and built again for each:
+occurrences, the table is estimated against one occurrence and built again for each:
 87 s for a page of fifty undecided high issues on PostgreSQL with 133,549
-decisions, against 35 ms without it. Another view keeping the list's groups
+decision occurrences, against 35 ms without it. Another view keeping the list's groups
 under a condition on the decisions reads them from the list's own statement,
-which counts the decided places beside its first level, narrowed to the
+which counts the decided occurrences beside its first level, narrowed to the
 decisions' issues where the filter needs a decision (§ Two-level grouping).
 
 | Rule | |
 |---|---|
-| A filter needing a decision reads the issues of those decisions first | Every state but undecided needs a decision in that state at one of a group's places, and an outcome or a promised upgrade one in force. Those decisions' issues narrow the places and the decisions both. The set is a superset: a decision covering nothing open still names its issue, and the conditions over a group decide what passes |
-| Under a filter needing a decision, the issues are stated on the decisions and on the list's places, never on the decided side's places | A planner estimates the match between a decision and a place as two independent equalities, a tenth to a twentieth of the rows it produces. With the decided side's places narrowed too, PostgreSQL took them for the outer side and probed the place index once per decision |
-| A filter that can pass with no decision narrows the decided side's places to the issues of every decision that can mark one | Undecided passes with none, so the decisions are every decision of the product and the list's places are not narrowed. A lapsed decision or one holding its key can mark a place, and a place of an issue none of them names has nothing to match. With 133,549 decisions naming 3,013 of 7,550 issues, the undecided page's grouping takes 479 ms against 543 ms over every place, and a build's blocking list 403 ms against 523 ms; the issues are read in 37 ms |
-| The versions a live decision is keyed on are compared inside an EXISTS on the component's key, never through a component joined beside the match | Narrowed to the decisions' issues, the match is estimated at one row, and against that estimate a scan of a small component table costs the same as a lookup by key. Joined, PostgreSQL scans every component once per decided place: 1,570,516 rows read and discarded for 4,081 decided places, 290 ms of the one-product default list's 433 ms with 3,673 decisions and 737 components. An EXISTS has no join order: PostgreSQL looks the component up by its key where it expects few decided places, and hashes the components once where it expects many and they fit in memory. A place with no consumer holds the empty version and is compared as such, with nothing to look up |
-| Conditions over the decision counts are ranges | A count is never negative and never more than the places, so "none" is below one and "every place" is at least the places. A planner estimates a range over an aggregate at a third of the groups and an equality at a two hundredth, and multiplies estimates joined by AND |
+| A filter needing a decision reads the issues of those decisions first | Every state but undecided needs a decision in that state at one of a group's occurrences, and an outcome or a promised upgrade one in force. Those decisions' issues narrow the occurrences and the decisions both. The set is a superset: a decision covering nothing open still names its issue, and the conditions over a group decide what passes |
+| Under a filter needing a decision, the issues are stated on the decisions and on the list's occurrences, never on the decided side's occurrences | A planner estimates the match between a decision and an occurrence as two independent equalities, a tenth to a twentieth of the rows it produces. With the decided side's occurrences narrowed too, PostgreSQL took them for the outer side and probed the occurrence index once per decision |
+| A filter that can pass with no decision narrows the decided side's occurrences to the issues of every decision that can mark one | Undecided passes with none, so the decisions are every decision of the product and the list's occurrences are not narrowed. A lapsed decision or one holding its key can mark an occurrence, and an occurrence of an issue none of them names has nothing to match. With 133,549 decision occurrences naming 3,013 of 7,550 issues, the undecided page's grouping takes 479 ms against 543 ms over every occurrence, and a build's blocking list 403 ms against 523 ms; the issues are read in 37 ms |
+| The versions a live decision is keyed on are compared inside an EXISTS on the component's key, never through a component joined beside the match | Narrowed to the decisions' issues, the match is estimated at one row, and against that estimate a scan of a small component table costs the same as a lookup by key. Joined, PostgreSQL scans every component once per decided occurrence: 1,570,516 rows read and discarded for 4,081 decided occurrences, 290 ms of the one-product default list's 433 ms with 3,673 decision occurrences and 737 components. An EXISTS has no join order: PostgreSQL looks the component up by its key where it expects few decided occurrences, and hashes the components once where it expects many and they fit in memory. An occurrence with no consumer holds the empty version and is compared as such, with nothing to look up |
+| Conditions over the decision counts are ranges | A count is never negative and never more than the occurrences, so "none" is below one and "every occurrence" is at least the occurrences. A planner estimates a range over an aggregate at a third of the groups and an equality at a two hundredth, and multiplies estimates joined by AND |
 
-Measured on PostgreSQL 16 with one CPU, 368,847 open places and 133,549
-decisions, 59,762 of them lapsed:
+Measured on PostgreSQL 16 with one CPU, 368,847 open occurrences and 133,549
+decision occurrences, 59,762 of them lapsed:
 
-| Statement | Equalities, the table joined to every place | Ranges, the decided groups stacked with the first level |
+| Statement | Equalities, the table joined to every occurrence | Ranges, the decided groups stacked with the first level |
 |---|---|---|
 | Undecided, groups estimated where 6,196 pass | 1 | 837 |
 | Undecided, the page's grouping | 1,149 ms | 635 ms |
 | The lapsed tile's grouping, with its issues read first in 19 ms: 1,330 of 7,549 | 1,200 ms | 419 ms |
-| The same, with the issues stated on the decided side's places as well | — | 2,726 ms |
+| The same, with the issues stated on the decided side's occurrences as well | — | 2,726 ms |
 
 The four decision counts take two shapes, and the conditions are the same in
 both:
 
 | Shape | Asked by | Reason |
 |---|---|---|
-| A lookup per place | The page's groups | A page reads a few hundred places |
-| One row per decided place, built once from the decisions and joined on the finding | The product page's totals and build rows | They read every open place in the product. As a lookup per place that is 367,000 lookups a statement: 2.1 s against 0.2 s joined with 13 decisions, and 4.6 s against 1.2 s with 133,000 |
+| A lookup per occurrence | The page's groups | A page reads a few hundred occurrences |
+| One row per decided occurrence, built once from the decisions and joined on the finding | The product page's totals and build rows | They read every open occurrence in the product. As a lookup per occurrence that is 367,000 lookups a statement: 2.1 s against 0.2 s joined with 13 decision occurrences, and 4.6 s against 1.2 s with 133,000 |
 
 The product page reads its build rows and its totals from one statement, one row
 per build, issue and component, and folds those rows again by issue and
-component for the totals. Every column folds exactly: places and decided places
+component for the totals. Every column folds exactly: occurrences and decided occurrences
 are sums, the deadline a minimum, the exploitation flag a maximum. A second
-statement for the totals builds the table of decided places a second time, 0.9 s
-each with 133,549 decisions; the page takes 1.2 s against 2.0 s for two.
+statement for the totals builds the table of decided occurrences a second time, 0.9 s
+each with 133,549 decision occurrences; the page takes 1.2 s against 2.0 s for two.
 
 Measured on the full-size build, 241,479 open rows in 7,329 groups: the page
 went from 2.0 s to 0.12 s, and asking for what is undecided from 2.3 s to 0.18
 s.
 
 The list across products asks the same question without naming a product, so
-each decision is matched to the product of the finding it reaches. The
-decisions stay on the outside of that join, written `CROSS JOIN ... WHERE`,
+each decision occurrence is matched to the product of the finding it reaches. The
+decision occurrences stay on the outside of that join, written `CROSS JOIN ... WHERE`,
 which is an inner join on every engine and on SQLite also fixes the order.
-Left to choose, SQLite starts from every open finding and reads every decision
+Left to choose, SQLite starts from every open finding and reads every decision occurrence
 of its product once per row.
 
 | Undecided, first page and total | SQLite | PostgreSQL | MySQL | MariaDB |
 |---|---|---|---|---|
-| Across products, decisions outermost | 0.78 s | 0.57 s | 1.7 s | 0.78 s |
+| Across products, decision occurrences outermost | 0.78 s | 0.57 s | 1.7 s | 0.78 s |
 | Across products, findings outermost | 331 s, without statistics | 0.56 s | 1.7 s | 0.77 s |
 | Inside one product | 1.3 s | 0.57 s | 1.2 s | 0.98 s |
 
 Measured over 425,680 open rows in two products, a kernel carrying 6,000 issues
-under 34 consumers among them, and 3,060 decisions, one row per page. Every
+under 34 consumers among them, and 3,060 decision occurrences, one row per page. Every
 figure but one is taken after the planner statistics are refreshed, which a
 server does on its own once about a tenth of a table has changed and a SQLite
 deployment does at start and after every scan. SQLite with the findings
 outermost was taken without them. Before that refresh the servers plan freshly
 loaded tables from one-row estimates: MySQL then reaches the findings through
-the index on open rows instead of the place index and takes minutes, whichever
+the index on open rows instead of the occurrence index and takes minutes, whichever
 way the statement is written.
 
 ### Two-level grouping
@@ -1516,21 +1516,21 @@ package — reach the join to the component and the second grouping.
 
 | Rule | |
 |---|---|
-| A condition on a place is asked of the first level | It narrows which rows reach a partial group, which is what it narrows in one level |
+| A condition on an occurrence is asked of the first level | It narrows which rows reach a partial group, which is what it narrows in one level |
 | A condition on a group is asked of the second level | A fold with one package decided and one not is neither undecided nor agreed. Asked of each package, it would be one row of each |
 | The first level carries the aggregates the second reads | A count is summed, a minimum and a maximum taken again, the earliest opening and the soonest deadline carried under their own names so the conditions and orders over them read the same at both levels |
 | A count of distinct builds adds the build to the first level's key | It is the one aggregate that does not decompose; carried as a key, the second level counts it distinctly over a few rows |
-| The issue is joined after the first level | An order by likelihood or score reads it once per partial group rather than once per place |
-| The decision flags are counted beside the first level, on its keys | The decisions are matched to the places of the same population with every condition on a place applied and folded to the first level's keys. Joined to every open place instead, each of 368,847 rows is looked up in 148,102 decided places and the partial groups cannot be read from the covering index: 1,067 ms against 575 ms for a build's unsettled work |
-| The decided groups are stacked with the partial groups, never joined to them | The two are put one under the other and folded on the keys. Joined on the keys, MariaDB worked out the decided groups again for each of 12,260 partial groups it joined them to: 71 s for the undecided list across products, which takes 0.37 s joined to every place and 0.23 s stacked |
-| Who holds a place is read from the covering index | The index carries the assignee after its other columns, so the partial groups of a list asking who holds a group read no table. Home's unassigned badge over 368,849 open places takes 0.67 s against 1.08 s reading the table. Counted instead over the held places in an arm of their own, stacked like the decided groups, the arm grows with what is held: 2.5 s against 1.3 s across products on MySQL with 127,704 of 425,680 places held, and 1.01 s against 0.26 s inside one product on SQLite |
-| Each place is counted once only where a condition compares decided places with places | Agreed and an outcome hold where every place does, so the decisions are folded to the place before the keys. Every other condition asks whether any place carries a flag or none does, and the decisions fold straight to the keys |
-| Across products, the line is applied after the first level | The first level also keys on the product and on whether the place carries an exploitation signal, so each partial group is wholly above a product's line or wholly below it. The issue, the product's rating and its line are read once per partial group, and every aggregate after it counts exactly the places the line admits |
+| The issue is joined after the first level | An order by likelihood or score reads it once per partial group rather than once per occurrence |
+| The decision flags are counted beside the first level, on its keys | The decision occurrences are matched to the occurrences of the same population with every condition on an occurrence applied and folded to the first level's keys. Joined to every open occurrence instead, each of 368,847 rows is looked up in 148,102 decided occurrences and the partial groups cannot be read from the covering index: 1,067 ms against 575 ms for a build's unsettled work |
+| The decided groups are stacked with the partial groups, never joined to them | The two are put one under the other and folded on the keys. Joined on the keys, MariaDB worked out the decided groups again for each of 12,260 partial groups it joined them to: 71 s for the undecided list across products, which takes 0.37 s joined to every occurrence and 0.23 s stacked |
+| Who holds an occurrence is read from the covering index | The index carries the assignee after its other columns, so the partial groups of a list asking who holds a group read no table. Home's unassigned badge over 368,849 open occurrences takes 0.67 s against 1.08 s reading the table. Counted instead over the held occurrences in an arm of their own, stacked like the decided groups, the arm grows with what is held: 2.5 s against 1.3 s across products on MySQL with 127,704 of 425,680 occurrences held, and 1.01 s against 0.26 s inside one product on SQLite |
+| Each occurrence is counted once only where a condition compares decided occurrences with occurrences | Agreed and an outcome hold where every occurrence does, so the decision occurrences are folded to the occurrence before the keys. Every other condition asks whether any occurrence carries a flag or none does, and the decision occurrences fold straight to the keys |
+| Across products, the line is applied after the first level | The first level also keys on the product and on whether the occurrence carries an exploitation signal, so each partial group is wholly above a product's line or wholly below it. The issue, the product's rating and its line are read once per partial group, and every aggregate after it counts exactly the occurrences the line admits |
 | The groups another view keeps under a condition over a group that reads no decision are grouped in one level | They are joined back to the finding rows, and the planner's estimate of how many groups a condition keeps falls by a factor of ten over two levels: 186 where 7,742 are kept. On that estimate PostgreSQL read one component's rows once per kept group and did not finish in two minutes; over one level it hashes the join in 2 s |
-| The groups another view keeps under a condition on the decisions are the list's own two-level statement | The decided places are stacked beside the first level. In one level the decision table is grouped per place and joined to every open place, and MariaDB works that table out again for each place it is joined to: no answer in 985 s for the component view of what is undecided among 425,680 open rows with 3,060 decisions, against 2.6 s in two levels, and none in three minutes for what is waiting |
-| Under a filter needing a decision, the view's own first level is restricted after it groups | The view's first level groups the places on its keys, the component and the issue among them, and keeps a group where its issue and its component's fold are among the list's kept groups, asked as a membership test. Joined to the finding rows instead, PostgreSQL estimates the kept groups at 279 where 1,753 pass and walks a component's rows once per group: 185 s for the lapsed fix bundles, and 215 s for the components lapsed and fixable in one level. A group has no index to probe, so the misestimate does not multiply the work, and MariaDB materializes the membership test once |
+| The groups another view keeps under a condition on the decisions are the list's own two-level statement | The decided occurrences are stacked beside the first level. In one level the `decision_occurrence` table is grouped per occurrence and joined to every open occurrence, and MariaDB works that table out again for each occurrence it is joined to: no answer in 985 s for the component view of what is undecided among 425,680 open rows with 3,060 decision occurrences, against 2.6 s in two levels, and none in three minutes for what is waiting |
+| Under a filter needing a decision, the view's own first level is restricted after it groups | The view's first level groups the occurrences on its keys, the component and the issue among them, and keeps a group where its issue and its component's fold are among the list's kept groups, asked as a membership test. Joined to the finding rows instead, PostgreSQL estimates the kept groups at 279 where 1,753 pass and walks a component's rows once per group: 185 s for the lapsed fix bundles, and 215 s for the components lapsed and fixable in one level. A group has no index to probe, so the misestimate does not multiply the work, and MariaDB materializes the membership test once |
 | Under a filter that can pass with no decision, the kept groups are joined to the view's finding rows | Undecided is one such filter. Its kept groups are most of the list, and joined to the rows they answer in 2.6 s on MariaDB and 2.1 s on PostgreSQL |
-| A bundle's names are grouped over the page's components | The components of the page's folds are read first and named as a list, and the places are grouped on the component, the build and the fixed version before the names and the fold are joined. Named as a list, PostgreSQL estimates the places from the components' own statistics and hashes them into groups; joined to the component, it expects 690 places a worker for 90,467 and sorts them on disk. 166 ms named as a list against 287 ms joined, over the kernel's 271,400 places in two builds |
+| A bundle's names are grouped over the page's components | The components of the page's folds are read first and named as a list, and the occurrences are grouped on the component, the build and the fixed version before the names and the fold are joined. Named as a list, PostgreSQL estimates the occurrences from the components' own statistics and hashes them into groups; joined to the component, it expects 690 occurrences a worker for 90,467 and sorts them on disk. 166 ms named as a list against 287 ms joined, over the kernel's 271,400 occurrences in two builds |
 | The by-component view and the fix bundles group the same way | By component, the first level is one row per issue, so the count of distinct issues is a count of rows. By upgrade, the first level keys on component, issue, build and fixed version |
 
 Measured on PostgreSQL 16 with one CPU over 375,843 finding rows in 10,255
@@ -1556,7 +1556,7 @@ Each finding carries an urgency, worked out when a scan is applied and read back
 as written. Computing it while reading would mean joining every signal it is made
 of, for every row, on every page of every list.
 
-Ordering by how many places something occupies puts whatever is most widespread
+Ordering by how many occurrences something occupies puts whatever is most widespread
 at the top, which on a real image is the kernel.
 
 It is worked out from what is on record about the issue, not from the report
@@ -1652,7 +1652,7 @@ not this one.
 
 Where a report rates an issue only in words, the word stands in for a number, so
 a finding rated in words does not sort below everything rated at all. A group
-takes the urgency of the worst place it covers.
+takes the urgency of the worst occurrence it covers.
 
 What is known changes under a finding that has not:
 
@@ -1664,7 +1664,7 @@ What is known changes under a finding that has not:
 
 ## Work across builds
 
-A judgment carries no variant: it is keyed on the product, the place and the
+A decision carries no variant: it is keyed on the product, the occurrence and the
 upstream versions, so answering it on one build answers it on every build of that
 product holding the same code.
 
@@ -1677,12 +1677,12 @@ the day a second variant was seeded, and the list went from 7,354 items to
 | Rule | Reason |
 |---|---|
 | Genuine differences break out by themselves | A component row is one name at one version, shared by every build shipping it, so two variants at the same version group together and two at different versions do not |
-| The product stays in the key | A decision is a claim about one product's code, so two products shipping the identical component at the identical version are two judgments |
+| The product stays in the key | A decision is about one product's code, so two products shipping the identical component at the identical version are two decisions |
 | An item still names a build | A screen has to link somewhere. It is one of the builds rather than the only one, chosen stably, with the count of builds beside it |
 | Acting on it acts on all of it | Assigning covers every build of the product holding the component. Assigning one build would leave the identical work unassigned beside it |
-| Counted in pieces of work | Counted in findings, one kernel flaw assigned to one person read as forty-eight held against her on the summary and as the single item it is in her own list. Late is counted the same way: a piece of work is late when any of its places is |
-| The spread over variants is asked on a place's own branch | A place is specific to a variant when no other variant of the branch it sits on holds the issue at the same fold, and common when every build of that branch holds it. Asked over a selection's branches together, a variant built on two branches is compared against the other variants of both: a place nothing shares on its own branch is dropped because a different variant of a different branch has it. A place held at another version is a different row and counts as not held, which is the rule above that genuine differences break out by themselves |
-| A group keeps the places the spread admits | The question is about a place rather than about the group, so a group open on two branches keeps the places its variant is alone with and drops the places it is not. Answered for the group, one branch's unanimity would decide the other's |
+| Counted in pieces of work | Counted in findings, one kernel flaw assigned to one person read as forty-eight held against her on the summary and as the single item it is in her own list. Late is counted the same way: a piece of work is late when any of its occurrences is |
+| The spread over variants is asked on an occurrence's own branch | An occurrence is specific to a variant when no other variant of the branch it sits on holds the issue at the same fold, and common when every build of that branch holds it. Asked over a selection's branches together, a variant built on two branches is compared against the other variants of both: an occurrence nothing shares on its own branch is dropped because a different variant of a different branch has it. An occurrence held at another version is a different row and counts as not held, which is the rule above that genuine differences break out by themselves |
+| A group keeps the occurrences the spread admits | The question is about an occurrence rather than about the group, so a group open on two branches keeps the occurrences its variant is alone with and drops the occurrences it is not. Answered for the group, one branch's unanimity would decide the other's |
 | A build answers once its first scan has been read | A build exists from the moment a scan is filed against it, so a branch whose newest variant is still being read holds nothing common to every variant until that scan lands. The answer corrects itself as the scan does, which is the conservative half of not yet knowing |
 
 Measured on two variants of one switch image: 7,587 rows on one and 7,610 on the
@@ -1697,16 +1697,16 @@ rather than filled from whichever build the row named. That is why the screens
 subtree is refused rather than answered with the empty list walking no build
 would produce.
 
-A finding reads as one row per place. Two of its rows share a place where an
+A finding reads as one row per occurrence. Two of its rows share an occurrence where an
 inventory describes one consumer twice — as a source package and as the
 distribution's package: two components, one pair of names, and the key is the
 names.
 
-| Folding two rows into one place | |
+| Folding two rows into one occurrence | |
 |---|---|
 | The way down is whichever of the two the graph could be walked to | Usually only one of them is reachable from the root |
-| It is argued away by the build only where the build argued away both | An argument about one of two components is not an argument about the place |
-| A claim standing on either row stands at the place, the lowest identifier first | A decision is keyed on the place and expires on the versions, and the two rows need not hold the same versions — a source package and the distribution's package of one name differ by a packaging revision, so a decision matches one row and not the other |
+| It is argued away by the build only where the build argued away both | An argument about one of two components is not an argument about the occurrence |
+| A decision standing on either row stands at the occurrence, the lowest identifier first | A decision is keyed on the occurrence and expires on the versions, and the two rows need not hold the same versions — a source package and the distribution's package of one name differ by a packaging revision, so a decision matches one row and not the other |
 
 A row names what pulls it in even where the route up is unknown. Where the walk
 up reaches nothing, the finding still records its consumer: what is missing is
@@ -1716,10 +1716,10 @@ nothing records what pulls this in, which is a different statement and a false
 one. A row with no walkable chain names
 its consumer and leaves the owner empty.
 
-A place names the claim standing on it, not only the decision. At most one live
-decision stands per combination of code, so the two reach the same row — but the
-claim is what a person acts on, and without it a claim shown there can count its
-places and cannot name them.
+An occurrence names the decision standing on it, not only the decision's row there. At most one live
+row stands per combination of code, so either reaches the same finding row — but the
+decision is what a person acts on, and without it a decision shown there can count its
+occurrences and cannot name them.
 
 ## Incomplete upgrades
 
@@ -1767,7 +1767,7 @@ The interval storage is shaped so a rebuild changing nothing writes nothing,
 and a test asserts that. The shape after a year is a separate question.
 
 The model, stated because every number depends on it: a build of 700 components,
-each sitting in 34 containers, so 23,800 places; 260 issues open at the start;
+each sitting in 34 containers, so 23,800 occurrences; 260 issues open at the start;
 365 nightly rebuilds; 1% of components changing version each night; three new
 issues a night matching something already shipped. A real image at about a tenth
 of its size, with the shape kept and the constant shrunk.
@@ -1955,9 +1955,9 @@ question next year should find the answer rather than the question.
 | A host's share bounds time, not disk | One arriving copy may grow to the whole quota and remove every other copy to make room. The share stops a host taking the pass again within the day; the copies it removed are fetched again as their commits fall due |
 | Incomplete upgrades are stated as inequality, not ordering | Saying that a version moved and is still not the one that fixes it needs no comparison, and the fixed-in field is free text and is sometimes a list. An ordering exists per ecosystem and refuses the rest — `DESIGN-remediation.md` § Version ordering holds it — and it ranks a set of candidates rather than deciding what a finding says. An order given confidently for a pair it cannot order is worse than none, because the wrong answer is a recommendation somebody acts on |
 | The inverse is not detected | A component at or past the named fix while the scanner still reports the issue means the scanner and the fix data disagree. Deciding that needs an ordering for the ecosystem in hand, which exists for some of them, so it is not asked at all rather than asked where it happens to be answerable |
-| A component nothing leads to still has a place — itself | It ships, and an incomplete graph is normal |
+| A component nothing leads to still has an occurrence — itself | It ships, and an incomplete graph is normal |
 | Severity is stored on the issue, fix state on the finding | Severity is a property of the vulnerability; whether a fix exists is a property of the version in front of you |
-| A place under the product records no consumer at all | Rather than recording the root and excluding it later. The root's name differs per variant, and a key that has to be remembered to ignore is one somebody will forget |
+| An occurrence under the product records no consumer at all | Rather than recording the root and excluding it later. The root's name differs per variant, and a key that has to be remembered to ignore is one somebody will forget |
 | A derived address refuses a name that is nothing but dots, rather than escaping it | A name and a version become path segments, and "." and ".." are resolved by the browser before the request leaves it. Everything else, separators included, is escaped into its segment (REQ-66) |
 | An identifier is matched against an anchored scheme before it resolves | A flaw this deployment recorded is filed under a name it minted, and a loose match sends somebody to a public page about something else |
 | A package kind nothing here knows produces no link | A link that lands on the wrong thing costs more than no link, because it is followed before it is disbelieved |
@@ -1971,12 +1971,12 @@ question next year should find the answer rather than the question.
 | A CVE record is trusted equally whoever wrote it | The scanner's range is a reading of the same record by a third party. A wrong record hides a real finding, which a wrong fix version already does in the other direction |
 | A vendor patch backporting a bug into a release older than the record says it arrived in is not seen | The record speaks for upstream's releases. Fix-version matching misses the same backport |
 | A corrected record reaches the findings at the next scan | The run is the one writer of what it closes. A snapshot arriving between scans writes nothing |
-| The finding screen reads open findings, and a finding closed as unaffected is read in the register with the record's lines | The screen is where a judgment is made, and the record has made this one |
+| The finding screen reads open findings, and a finding closed as unaffected is read in the register with the record's lines | The screen is where a decision is made, and the record has made this one |
 | A wrong record cannot be overridden here | Nothing records that a release is affected against a record saying it is not, and a run consults no decision before closing. The register lists every such closure so a wrong one can be found; correcting it is correcting the record, which the next snapshot carries. Not built |
 | The outbound VEX document says nothing about a finding closed as unaffected | A statement to customers that a release is not affected is a decision this deployment makes, and a closure is not one |
 | The component and fix-bundle views depend on statement shape to stay fast on MariaDB | MariaDB can work a grouped table out again for every row it is joined to on its grouping keys, and materializes a membership test once. The kept groups under a filter needing a decision are therefore asked as a membership test of the view's groups and never joined: joined, the components waiting gave no answer in three minutes among 425,680 open rows. Nothing checks the shape but the across-products measurement. It bounds each reading at three minutes and records a reading past the bound as no answer. The readings after it on that engine are reported as not measured: MySQL and MariaDB keep running a statement whose client is gone, and a reading taken beside it is not a reading of its filter alone |
-| Undecided matches every decision to the places of the issues they name | Whether a group is undecided needs whether any of its places is decided, for every group, so the page and its total wait on the match. With 133,549 decisions it is most of the undecided page's 0.5 s, against 0.11 s with no filter. A probe per partial group stopping at its first decided place answers in 148 ms on the same data, and PostgreSQL then compiles the plan before running it, at its default settings, for 0.6 s more: the planner costs the probe once per estimated group. Nothing below the match was found that stores no decision state |
-| A plan PostgreSQL estimates as expensive is compiled before it runs | At the default settings a plan costed above 100,000 is compiled first, which took 0.36 s of a 1.07 s statement over 368,849 open places. A change that moves a statement's estimate across the line moves its time by that much, and nothing but a measurement shows it |
-| On MariaDB a list inside one product reads its open places through the index on when a finding closed | MariaDB answers "open" from that index and looks up every row it names, where a scan of the table takes 0.19 s against 0.45 s over 425,680 open rows. Every list inside one product whose partial groups read only the covering index's columns takes that path, nobody's work among them, and a list across products does not |
+| Undecided matches every decision occurrence to the occurrences of the issues they name | Whether a group is undecided needs whether any of its occurrences is decided, for every group, so the page and its total wait on the match. With 133,549 decision occurrences it is most of the undecided page's 0.5 s, against 0.11 s with no filter. A probe per partial group stopping at its first decided occurrence answers in 148 ms on the same data, and PostgreSQL then compiles the plan before running it, at its default settings, for 0.6 s more: the planner costs the probe once per estimated group. Nothing below the match was found that stores no decision state |
+| A plan PostgreSQL estimates as expensive is compiled before it runs | At the default settings a plan costed above 100,000 is compiled first, which took 0.36 s of a 1.07 s statement over 368,849 open occurrences. A change that moves a statement's estimate across the line moves its time by that much, and nothing but a measurement shows it |
+| On MariaDB a list inside one product reads its open occurrences through the index on when a finding closed | MariaDB answers "open" from that index and looks up every row it names, where a scan of the table takes 0.19 s against 0.45 s over 425,680 open rows. Every list inside one product whose partial groups read only the covering index's columns takes that path, nobody's work among them, and a list across products does not |
 | A merge is not undone | Two issues a report wrongly named together stay one. Nothing a report says is taken to unmerge, and unmerging would have to divide findings and decisions made since |
 | An issue absorbed keeps the name it was filed under | The kept issue is not refiled under a name the absorbed row holds. Where the best-known name is one the absorbed row holds, the kept issue stays filed where it is |

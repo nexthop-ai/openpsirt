@@ -31,7 +31,7 @@ func TestTheListSortsOnlyByColumnsItNames(t *testing.T) {
 		}
 
 		// The named orders answer, and answer the same population.
-		for _, by := range []string{"urgency", "age", "deadline", "places", "epss", "severity"} {
+		for _, by := range []string{"urgency", "age", "deadline", "occurrences", "epss", "severity"} {
 			var page struct {
 				Items []struct{} `json:"items"`
 				Total int        `json:"total"`

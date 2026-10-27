@@ -386,7 +386,7 @@ select.triageline {
 }
 
 /* The words people put on a finding. Deliberately quieter than a severity or
-   a state chip: a mark is somebody's own note about the work, not a judgment
+   a state chip: a mark is somebody's own note about the work, not a decision
    the tool made, and one styled like a verdict would be read as one. */
 .marks {
   display: flex;

@@ -8,11 +8,11 @@ import type { Readable } from "./Count";
 import { Failed } from "./Failed";
 import { Loading } from "./Loading";
 
-// The places a decision covers.
+// The occurrences a decision covers.
 //
 // All of them by default, which is the rule a decision is written under. A
-// summary line rather than a checkbox per place, and excluding is a deliberate
-// second step that groups places by what pulls the component in —
+// summary line rather than a checkbox per occurrence, and excluding is a deliberate
+// second step that groups occurrences by what pulls the component in —
 // so leaving out a whole container is one click, leaving out one module is
 // still possible, and the result reads back as "59 of 62, three left open
 // under X".
@@ -20,44 +20,45 @@ import { Loading } from "./Loading";
 export type Sitting = Body<"SittingBody">;
 
 // A component the inventory placed nowhere. Not "the product itself", which
-// would be a claim the inventory never made.
+// would be a statement the inventory never made.
 export const UNPLACED = "nothing recorded what pulls this in";
 
 type Group = { consumer: string; note?: string; items: Sitting[] };
 
-// How many consumers a set of places sits under, which is the unit the
+// How many consumers a set of occurrences sits under, which is the unit the
 // control below narrows in and the one a reader can reconcile with it.
-export function consumersOf(places: Sitting[]): number {
-  return groupsOf(places).length;
+export function consumersOf(occurrences: Sitting[]): number {
+  return groupsOf(occurrences).length;
 }
 
-function groupsOf(places: Sitting[]): Group[] {
+function groupsOf(occurrences: Sitting[]): Group[] {
   const byConsumer = new Map<string, Group>();
-  for (const place of places) {
-    const chain = place.chain ?? [];
+  for (const occurrence of occurrences) {
+    const chain = occurrence.chain ?? [];
     const consumer =
-      place.consumer || (chain.length > 1 ? (chain[chain.length - 2]?.component ?? "") : "");
+      occurrence.consumer || (chain.length > 1 ? (chain[chain.length - 2]?.component ?? "") : "");
     const key = consumer || UNPLACED;
     const note = !consumer ? undefined : chain.length === 2 ? "the build itself" : undefined;
     const group = byConsumer.get(key) ?? { consumer: key, note, items: [] };
-    if (!group.items.some((p) => p.place === place.place)) group.items.push(place);
+    if (!group.items.some((p) => p.occurrence === occurrence.occurrence))
+      group.items.push(occurrence);
     byConsumer.set(key, group);
   }
   return [...byConsumer.values()].sort((a, b) => b.items.length - a.items.length);
 }
 
 export function Covering({
-  places,
+  occurrences,
   excluded,
   onChange,
   matching,
   differing,
   reach,
 }: {
-  places: Sitting[];
+  occurrences: Sitting[];
   excluded: Set<string>;
   onChange: (next: Set<string>) => void;
-  // Other builds, merged from the reach of the covered places.
+  // Other builds, merged from the reach of the covered occurrences.
   matching: number;
   differing: number;
   // The read the two counts come from. Until it answers they are not zero.
@@ -66,28 +67,28 @@ export function Covering({
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [filter, setFilter] = useState("");
-  const groups = groupsOf(places);
-  const total = places.length;
+  const groups = groupsOf(occurrences);
+  const total = occurrences.length;
   const covered = total - excluded.size;
-  // Counted in the units somebody acts in. A judgment covers the whole fold,
-  // so what it reaches is packages and the things that pull them in — a place
+  // Counted in the units somebody acts in. A decision covers the whole fold,
+  // so what it reaches is packages and the things that pull them in — an occurrence
   // count is a figure a reader cannot reconcile with anything else on the
   // screen, and it is what the narrowing below works at rather than what the
   // summary states.
-  const packages = new Set(places.map((place) => place.component)).size;
+  const packages = new Set(occurrences.map((occurrence) => occurrence.component)).size;
   const leftUnder = groups
-    .filter((g) => g.items.some((p) => excluded.has(p.place ?? "")))
+    .filter((g) => g.items.some((p) => excluded.has(p.occurrence ?? "")))
     .map((g) => g.consumer);
 
   // The rows it is given, which are the rows on screen. Handed the whole group
   // while a filter was narrowing what was drawn, unticking a consumer showing
   // one row excluded all forty under it — and this control is what decides
-  // what a claim covers, which is the thing the panel exists to get right.
+  // what a decision covers, which is the thing the panel exists to get right.
   function toggleGroup(items: Sitting[], on: boolean) {
     const next = new Set(excluded);
-    for (const place of items) {
-      if (on) next.delete(place.place ?? "");
-      else next.add(place.place ?? "");
+    for (const occurrence of items) {
+      if (on) next.delete(occurrence.occurrence ?? "");
+      else next.add(occurrence.occurrence ?? "");
     }
     onChange(next);
   }
@@ -109,7 +110,7 @@ export function Covering({
           in this build.{" "}
           {total > 1 && (
             <button type="button" className="linkish" onClick={() => setOpen(!open)}>
-              {open ? "Done" : "Exclude places…"}
+              {open ? "Done" : "Exclude occurrences…"}
             </button>
           )}
         </p>
@@ -150,8 +151,8 @@ export function Covering({
               {...notACredential}
               type="text"
               className="locfilter"
-              placeholder="Filter places…"
-              aria-label="Filter places"
+              placeholder="Filter occurrences…"
+              aria-label="Filter occurrences"
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
             />
@@ -172,7 +173,7 @@ export function Covering({
             // is on. Its header would offer a checkbox over no rows and a
             // count of none, which is a control that does nothing.
             if (shown.length === 0) return null;
-            const out = shown.filter((p) => excluded.has(p.place ?? "")).length;
+            const out = shown.filter((p) => excluded.has(p.occurrence ?? "")).length;
             const state = out === 0 ? "all" : out === shown.length ? "none" : "some";
             const isOpen = expanded.has(group.consumer);
             return (
@@ -209,10 +210,12 @@ export function Covering({
                   )}
                 </div>
                 {isOpen &&
-                  shown.map((place) => {
+                  shown.map((occurrence) => {
                     const name =
-                      place.chain?.[place.chain.length - 1]?.component ?? place.place ?? "";
-                    const key = place.place ?? "";
+                      occurrence.chain?.[occurrence.chain.length - 1]?.component ??
+                      occurrence.occurrence ??
+                      "";
+                    const key = occurrence.occurrence ?? "";
                     return (
                       <label key={key} className="loc">
                         <input
@@ -226,9 +229,9 @@ export function Covering({
                           }}
                         />
                         <span className="id">{name}</span>
-                        {(place.chain ?? []).length > 2 && (
+                        {(occurrence.chain ?? []).length > 2 && (
                           <span className="hint">
-                            {(place.chain ?? [])
+                            {(occurrence.chain ?? [])
                               .slice(0, -1)
                               .map((s) => s.component)
                               .join(" › ")}
@@ -241,7 +244,7 @@ export function Covering({
             );
           })}
           <p className="hint" style={{ margin: "8px 0 0" }}>
-            A place left out stays <b>open</b> and asks nothing further of you.
+            An occurrence left out stays <b>open</b> and asks nothing further of you.
           </p>
         </div>
       )}

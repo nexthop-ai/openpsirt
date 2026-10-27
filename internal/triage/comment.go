@@ -27,13 +27,13 @@ import (
 // true" — is ordinary, and an approval that fell over each time somebody added
 // a note would teach people not to add notes.
 type Comment struct {
-	bun.BaseModel `bun:"table:claim_comment,alias:dc"`
+	bun.BaseModel `bun:"table:decision_comment,alias:dc"`
 
-	ID        int64     `bun:"id,pk,autoincrement"`
-	ClaimID   int64     `bun:"claim_id,notnull"`
-	Body      string    `bun:"body,notnull"`
-	WrittenBy int64     `bun:"written_by,notnull"`
-	WrittenAt time.Time `bun:"written_at,notnull"`
+	ID         int64     `bun:"id,pk,autoincrement"`
+	DecisionID int64     `bun:"decision_id,notnull"`
+	Body       string    `bun:"body,notnull"`
+	WrittenBy  int64     `bun:"written_by,notnull"`
+	WrittenAt  time.Time `bun:"written_at,notnull"`
 	// EditedAt marks that the author changed it. What it said before is kept
 	// too: a comment is part of the record that goes public at
 	// disclosure, and a record whose earlier text is unrecoverable is readable
@@ -48,7 +48,7 @@ type Comment struct {
 // including the current one: the comment row holds what it says now, and this
 // holds what it stopped saying, which is the part nothing else keeps.
 type WasSaid struct {
-	bun.BaseModel `bun:"table:claim_comment_revision,alias:dcr"`
+	bun.BaseModel `bun:"table:decision_comment_revision,alias:dcr"`
 
 	ID         int64     `bun:"id,pk,autoincrement"`
 	CommentID  int64     `bun:"comment_id,notnull"`
@@ -57,14 +57,14 @@ type WasSaid struct {
 	ReplacedAt time.Time `bun:"replaced_at,notnull"`
 }
 
-// Say adds a comment to a claim.
+// Say adds a comment to a decision.
 //
 // Allowed at any point, including long after an approval, and it disturbs
-// nothing. On the claim rather than on a row of it, because the conversation
-// is about the argument: a note on one place of forty-four is one nobody else
-// reading the claim would see.
-func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, body string) (*Comment, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, mayTakePartOn); err != nil {
+// nothing. On the decision rather than on a row of it, because the conversation
+// is about the argument: a note on one occurrence of forty-four is one nobody else
+// reading the decision would see.
+func (s *Store) Say(ctx context.Context, subject access.Subject, decisionID int64, body string) (*Comment, error) {
+	if _, _, err := s.decisionRows(ctx, subject, decisionID, mayTakePartOn); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(body) == "" {
@@ -75,7 +75,7 @@ func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, 
 	}
 
 	comment := &Comment{
-		ClaimID: claimID, Body: body,
+		DecisionID: decisionID, Body: body,
 		WrittenBy: subject.ID, WrittenAt: s.now().Truncate(time.Microsecond),
 	}
 	// Both writes or neither. Attaching is what makes a file listable and
@@ -98,15 +98,15 @@ func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, 
 // change somebody's words — an edit that could be made by another person is
 // not a correction, it is a forgery with a timestamp.
 //
-// The asker's reach to the claim is settled before anything about the
-// comment is said back. The row is read first, because the claim it hangs off
+// The asker's reach to the decision is settled before anything about the
+// comment is said back. The row is read first, because the decision it hangs off
 // is not knowable otherwise, but no answer turns on what was in it until the
 // asker has been let in: refusing on authorship first told anybody holding
 // triage anywhere that a comment with this identifier exists, one request at a
 // time, including on findings nobody has disclosed. A comment that is not there
-// and one on a claim this person may not reach answer identically.
+// and one on a decision this person may not reach answer identically.
 //
-// It answers with the claim the comment hangs off, because whoever edited it
+// It answers with the decision the comment hangs off, because whoever edited it
 // may have named somebody the first version did not, and telling them needs to
 // know what the text is about.
 func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID int64,
@@ -121,7 +121,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 		// identical. A read that failed is a fault, and carries its cause.
 		return 0, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
-	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, mayTakePartOn); err != nil {
+	if _, _, err := s.decisionRows(ctx, subject, comment.DecisionID, mayTakePartOn); err != nil {
 		return 0, err
 	}
 	if comment.WrittenBy != subject.ID {
@@ -185,17 +185,17 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 	}); err != nil {
 		return 0, err
 	}
-	return comment.ClaimID, nil
+	return comment.DecisionID, nil
 }
 
-// Discussion returns what has been said about a claim, oldest first.
-func (s *Store) Discussion(ctx context.Context, subject access.Subject, claimID int64) ([]Comment, error) {
-	if _, _, err := s.readableClaimRows(ctx, subject, claimID); err != nil {
+// Discussion returns what has been said about a decision, oldest first.
+func (s *Store) Discussion(ctx context.Context, subject access.Subject, decisionID int64) ([]Comment, error) {
+	if _, _, err := s.readableDecisionRows(ctx, subject, decisionID); err != nil {
 		return nil, err
 	}
 	var comments []Comment
 	if err := s.db.NewSelect().Model(&comments).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, decisionID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the discussion: %w", err)
 	}
@@ -218,7 +218,7 @@ func noting(ctx context.Context, db bun.IDB, body string, now time.Time) error {
 
 // Earlier is what a comment said before, oldest first.
 //
-// Narrowed by the claim it belongs to rather than by the comment: who may read
+// Narrowed by the decision it belongs to rather than by the comment: who may read
 // a comment is who may read what it is about, and asking the question about the
 // comment alone would be a second rule to keep in step.
 func (s *Store) Earlier(ctx context.Context, subject access.Subject,
@@ -229,7 +229,7 @@ func (s *Store) Earlier(ctx context.Context, subject access.Subject,
 		Where(`"id" = ?`, commentID).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
-	if _, _, err := s.readableClaimRows(ctx, subject, comment.ClaimID); err != nil {
+	if _, _, err := s.readableDecisionRows(ctx, subject, comment.DecisionID); err != nil {
 		return nil, err
 	}
 	var rows []WasSaid

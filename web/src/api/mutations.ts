@@ -4,10 +4,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { unwrap } from "./queries";
-import { useAfterClaim } from "./claims";
+import { useAfterDecision } from "./decisions";
 
 export function useWithdraw() {
-  const done = useAfterClaim();
+  const done = useAfterDecision();
   return useMutation({
     mutationFn: async ({ id }: { id: number }) =>
       unwrap(await api.DELETE("/v1/decisions/{id}", { params: { path: { id } } })),
@@ -16,7 +16,7 @@ export function useWithdraw() {
 }
 
 export function useRevise() {
-  const done = useAfterClaim();
+  const done = useAfterDecision();
   return useMutation({
     mutationFn: async ({ id, reasoning }: { id: number; reasoning: string }) =>
       unwrap(
@@ -67,9 +67,9 @@ export function useComment() {
   });
 }
 
-// A note about an issue in a product, which records no judgment.
+// A note about an issue in a product, which records no decision.
 //
-// Keyed on the issue and the product rather than on a claim, so it can be
+// Keyed on the issue and the product rather than on a decision, so it can be
 // written before anybody has decided anything — which is the whole of what it
 // is for. A row in the findings list is one issue at one source package and
 // one issue is often several rows, so a note kept against a row would be
@@ -99,7 +99,7 @@ export function useNote() {
 // Replacing the text of a note somebody already wrote.
 //
 // The earlier wording is kept and read back behind the "edited" mark, the way
-// a claim comment's is: a note goes public at disclosure with the rest of the
+// a decision comment's is: a note goes public at disclosure with the rest of the
 // record, and a record whose earlier text is unrecoverable is readable rather
 // than checkable.
 export function useEditNote() {

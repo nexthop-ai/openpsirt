@@ -21,8 +21,8 @@ import (
 type LeadAct struct {
 	Kind      Kind
 	ProductID int64
-	// Place is the lead's place identity.
-	Place string
+	// Occurrence is the lead's occurrence identity.
+	Occurrence string
 	// By is who did it, and is not told.
 	By int64
 	// Into says a move took the lead into its flaw's case, and its absence
@@ -34,7 +34,7 @@ type LeadAct struct {
 // what was done to a lead. Each is an event: what happened stays true of the
 // moment it happened.
 func TellLeadTriagers(ctx context.Context, db *bun.DB, act LeadAct) error {
-	lead, err := leadNamed(ctx, db, act.ProductID, act.Place)
+	lead, err := leadNamed(ctx, db, act.ProductID, act.Occurrence)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func TellLeadTriagers(ctx context.Context, db *bun.DB, act LeadAct) error {
 	case LeadHandedOff:
 		body = what + " was handed off as a flaw."
 	case LeadMoved:
-		body = what + " was moved into its flaw's case. Internal readers keep its state, rule, place and sightings."
+		body = what + " was moved into its flaw's case. Internal readers keep its state, rule, occurrence and sightings."
 		if !act.Into {
 			body = what + " was taken back out of its flaw's case and is internal again."
 		}
@@ -61,7 +61,7 @@ func TellLeadTriagers(ctx context.Context, db *bun.DB, act LeadAct) error {
 	if err != nil {
 		return err
 	}
-	link := weblink.Lead(lead.ProductName, lead.StreamName, lead.VariantName, act.Place)
+	link := weblink.Lead(lead.ProductName, lead.StreamName, lead.VariantName, act.Occurrence)
 	productID := act.ProductID
 	var failed error
 	for personID, per := range reach {
@@ -71,7 +71,7 @@ func TellLeadTriagers(ctx context.Context, db *bun.DB, act LeadAct) error {
 		if err := NewStore(db).Tell(ctx, Telling{
 			PersonID: personID, Kind: act.Kind, Body: body, Link: link,
 			ProductID: &productID, Private: true, Internal: true,
-			Concerns: ConcerningLead(productID, act.Place),
+			Concerns: ConcerningLead(productID, act.Occurrence),
 		}); err != nil {
 			// Carried on: an event has no retry, so stopping tells a random
 			// subset.
@@ -94,10 +94,10 @@ type namedLead struct {
 	VariantName string `bun:"variant_name"`
 }
 
-// leadNamed is the lead at a place in a product as its newest open finding
+// leadNamed is the lead at an occurrence in a product as its newest open finding
 // there names it, or its newest finding where none is open. Nil where the
-// place holds none.
-func leadNamed(ctx context.Context, db bun.IDB, productID int64, place string) (*namedLead, error) {
+// occurrence holds none.
+func leadNamed(ctx context.Context, db bun.IDB, productID int64, occurrence string) (*namedLead, error) {
 	var out namedLead
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -116,7 +116,7 @@ func leadNamed(ctx context.Context, db bun.IDB, productID int64, place string) (
 		ColumnExpr(`"st"."name" AS "stream_name"`).
 		ColumnExpr(`"va"."name" AS "variant_name"`).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, place).
+		Where(`"f"."occurrence_identity" = ?`, occurrence).
 		Where(`"f"."kind" = ?`, kind.Analysis).
 		OrderExpr(`(CASE WHEN "f"."closed_at" IS NULL THEN 0 ELSE 1 END), "f"."id" DESC`).
 		Limit(1).

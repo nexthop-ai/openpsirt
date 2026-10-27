@@ -50,14 +50,14 @@ func (f *fixture) secondProduct(t *testing.T) int64 {
 	return product.ID
 }
 
-// proposes records one judgment across the places given, as the subject
+// proposes records one decision across the occurrences given, as the subject
 // given, waiting on a second person.
-func (f *fixture) proposes(t *testing.T, who access.Subject, places ...triage.Place) *triage.Decision {
+func (f *fixture) proposes(t *testing.T, who access.Subject, occurrences ...triage.Occurrence) *triage.DecisionOccurrence {
 	t.Helper()
-	proposals := make([]triage.Proposal, 0, len(places))
-	for _, at := range places {
+	proposals := make([]triage.Proposal, 0, len(occurrences))
+	for _, at := range occurrences {
 		proposals = append(proposals, triage.Proposal{
-			Place: at, Outcome: triage.NotApplicable,
+			Occurrence: at, Outcome: triage.NotApplicable,
 			Justification: triage.CodeNotInExecutePath,
 			Reasoning:     "The parser is never reached: we only call the encoder.",
 			By:            who.ID, NeedsApproval: true,
@@ -70,33 +70,33 @@ func (f *fixture) proposes(t *testing.T, who access.Subject, places ...triage.Pl
 	return recorded[0]
 }
 
-// placeIn is a place in one product at one visibility, keyed at the version
+// occurrenceIn is an occurrence in one product at one visibility, keyed at the version
 // the fixture's findings ship and with no consumer, so it matches them.
-func (f *fixture) placeIn(product int64, identity string, visibility access.Visibility) triage.Place {
+func (f *fixture) occurrenceIn(product int64, identity string, visibility access.Visibility) triage.Occurrence {
 	at := f.at()
 	at.ProductID = product
-	at.PlaceIdentity = identity
+	at.OccurrenceIdentity = identity
 	at.Visibility = visibility
 	at.ConsumerUpstream = ""
 	return at
 }
 
-// splitAcrossBuilds opens the fixture's issue at one place in two builds of a
+// splitAcrossBuilds opens the fixture's issue at one occurrence in two builds of a
 // product, disclosed in the first and undisclosed in the second, and answers
 // the two builds' names.
-func (f *fixture) splitAcrossBuilds(t *testing.T, product int64, place string) (disclosed, undisclosed string) {
+func (f *fixture) splitAcrossBuilds(t *testing.T, product int64, occurrence string) (disclosed, undisclosed string) {
 	t.Helper()
 	libfoo := f.component(t, fmt.Sprintf("libfoo-%d", product), "1.2.3")
-	f.finds(t, f.build(t, product, "2026.03"), libfoo, place, access.Public)
-	f.finds(t, f.build(t, product, "2026.06"), libfoo, place, access.Private)
+	f.finds(t, f.build(t, product, "2026.03"), libfoo, occurrence, access.Public)
+	f.finds(t, f.build(t, product, "2026.06"), libfoo, occurrence, access.Private)
 	return "2026.03 · broadcom", "2026.06 · broadcom"
 }
 
-// coversOnly checks what one reader is told a claim reaches: the builds named
+// coversOnly checks what one reader is told a decision reaches: the builds named
 // and the findings counted, both narrowed to the findings they read.
-func (f *fixture) coversOnly(t *testing.T, who access.Subject, claimID int64, what string, builds ...string) {
+func (f *fixture) coversOnly(t *testing.T, who access.Subject, decisionID int64, what string, builds ...string) {
 	t.Helper()
-	whole, err := f.store.Whole(t.Context(), who, claimID)
+	whole, err := f.store.Whole(t.Context(), who, decisionID)
 	if err != nil {
 		t.Fatalf("reading %s: %v", what, err)
 	}
@@ -109,19 +109,19 @@ func (f *fixture) coversOnly(t *testing.T, who access.Subject, claimID int64, wh
 }
 
 func TestReadingUndisclosedFindingsDoesNotReachDisclosedOnesThroughADecision(t *testing.T) {
-	// A decision matches every finding at its place, whatever the finding's
+	// A decision matches every finding at its occurrence, whatever the finding's
 	// own visibility. Somebody holding private reading alone reads the
 	// undisclosed findings it matches and none of the disclosed ones, because
 	// each visibility is its own grant.
 	each(t, func(t *testing.T, f *fixture) {
 		_, undisclosed := f.splitAcrossBuilds(t, f.product, "place-of-libfoo")
-		claim := f.proposes(t, f.privately(t),
-			f.placeIn(f.product, "place-of-libfoo", access.Private))
+		decision := f.proposes(t, f.privately(t),
+			f.occurrenceIn(f.product, "place-of-libfoo", access.Private))
 
 		privately := f.holding(t, "private-reader", map[int64][]access.Role{
 			f.product: {access.PrivateRead},
 		})
-		f.coversOnly(t, privately, claim.ClaimID, "an undisclosed claim, to a private reader", undisclosed)
+		f.coversOnly(t, privately, decision.DecisionID, "an undisclosed decision, to a private reader", undisclosed)
 	})
 }
 
@@ -134,24 +134,24 @@ func TestAFindingIsReadAtTheVisibilityHeldInItsOwnProduct(t *testing.T) {
 		disclosedHere, _ := f.splitAcrossBuilds(t, f.product, "place-of-libfoo")
 		_, undisclosedThere := f.splitAcrossBuilds(t, other, "place-of-libfoo")
 
-		here := f.proposes(t, f.triager, f.placeIn(f.product, "place-of-libfoo", access.Public))
+		here := f.proposes(t, f.triager, f.occurrenceIn(f.product, "place-of-libfoo", access.Public))
 		insider := f.holding(t, "switchd-insider", map[int64][]access.Role{
 			other: {access.PublicTriage, access.PrivateTriage},
 		})
-		there := f.proposes(t, insider, f.placeIn(other, "place-of-libfoo", access.Private))
+		there := f.proposes(t, insider, f.occurrenceIn(other, "place-of-libfoo", access.Private))
 
 		mixed := f.holding(t, "mixed-reader", map[int64][]access.Role{
 			f.product: {access.PublicRead},
 			other:     {access.PrivateRead},
 		})
-		f.coversOnly(t, mixed, here.ClaimID, "a disclosed claim in the public product", disclosedHere)
-		f.coversOnly(t, mixed, there.ClaimID, "an undisclosed claim in the private product", undisclosedThere)
+		f.coversOnly(t, mixed, here.DecisionID, "a disclosed decision in the public product", disclosedHere)
+		f.coversOnly(t, mixed, there.DecisionID, "an undisclosed decision in the private product", undisclosedThere)
 	})
 }
 
-func TestSomebodyBroughtOntoACaseReadsTheFindingsOfTheirOwnClaim(t *testing.T) {
+func TestSomebodyBroughtOntoACaseReadsTheFindingsOfTheirOwnDecision(t *testing.T) {
 	// A collaborator holds nothing on the product and reads the one issue
-	// they were brought in on at either visibility. A claim they made about
+	// they were brought in on at either visibility. A decision they made about
 	// it names the builds it covers and is among what stands there; another
 	// issue in the same product is not reached.
 	each(t, func(t *testing.T, f *fixture) {
@@ -173,8 +173,8 @@ func TestSomebodyBroughtOntoACaseReadsTheFindingsOfTheirOwnClaim(t *testing.T) {
 			t.Fatal("the collaborator holds the product outright, so this tests nothing")
 		}
 
-		theirs := f.proposes(t, brought, f.placeIn(f.product, "place-of-libfoo", access.Private))
-		f.coversOnly(t, brought, theirs.ClaimID, "the collaborator's own claim", disclosed, undisclosed)
+		theirs := f.proposes(t, brought, f.occurrenceIn(f.product, "place-of-libfoo", access.Private))
+		f.coversOnly(t, brought, theirs.DecisionID, "the collaborator's own decision", disclosed, undisclosed)
 
 		keyed := f.keyed("place-of-libfoo")
 		keyed[0].ConsumerUpstream = ""
@@ -183,27 +183,27 @@ func TestSomebodyBroughtOntoACaseReadsTheFindingsOfTheirOwnClaim(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(standing) != 1 {
-			t.Errorf("the collaborator's own claim reads as %d claims standing on their case", len(standing))
+			t.Errorf("the collaborator's own decision reads as %d decisions standing on their case", len(standing))
 		}
 
-		// Another issue at the same place, which the case does not name.
+		// Another issue at the same occurrence, which the case does not name.
 		elsewhere := f.secondIssue(t)
-		at := f.placeIn(f.product, "place-of-libfoo", access.Private)
+		at := f.occurrenceIn(f.product, "place-of-libfoo", access.Private)
 		at.VulnerabilityID = elsewhere
 		notTheirs := f.proposes(t, f.privately(t), at)
 		if standing, err := f.store.StandingAt(ctx, f.privately(t), f.product, elsewhere, keyed); err != nil ||
 			len(standing) != 1 {
-			t.Fatalf("the claim about the other issue reads as %+v to its proposer (%v)", standing, err)
+			t.Fatalf("the decision about the other issue reads as %+v to its proposer (%v)", standing, err)
 		}
 		standing, err = f.store.StandingAt(ctx, brought, f.product, elsewhere, keyed)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(standing) != 0 {
-			t.Errorf("the case grant reached %d claims about an issue it does not name", len(standing))
+			t.Errorf("the case grant reached %d decisions about an issue it does not name", len(standing))
 		}
-		if _, err := f.store.Whole(ctx, brought, notTheirs.ClaimID); !errors.Is(err, triage.ErrNotTheirs) {
-			t.Errorf("the case grant read a claim about an issue it does not name: %v", err)
+		if _, err := f.store.Whole(ctx, brought, notTheirs.DecisionID); !errors.Is(err, triage.ErrNotTheirs) {
+			t.Errorf("the case grant read a decision about an issue it does not name: %v", err)
 		}
 	})
 }
@@ -212,7 +212,7 @@ func TestADecisionIsReadAndAgreedToAtTheVisibilityHeldInItsOwnProduct(t *testing
 	// Reading and agreeing are asked per product and per visibility. With
 	// public reading on one product and private reading on another, somebody
 	// holding the approver capability on both reads and is asked to agree to
-	// the disclosed claim in the first and the undisclosed claim in the
+	// the disclosed decision in the first and the undisclosed decision in the
 	// second, and neither of the other two.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -220,11 +220,11 @@ func TestADecisionIsReadAndAgreedToAtTheVisibilityHeldInItsOwnProduct(t *testing
 		insiderThere := f.holding(t, "switchd-insider", map[int64][]access.Role{
 			other: {access.PublicTriage, access.PrivateTriage},
 		})
-		publicHere := f.proposes(t, f.triager, f.placeIn(f.product, "under-a", access.Public))
-		f.proposes(t, f.privately(t), f.placeIn(f.product, "under-b", access.Private))
-		f.proposes(t, insiderThere, f.placeIn(other, "under-c", access.Public))
-		privateThere := f.proposes(t, insiderThere, f.placeIn(other, "under-d", access.Private))
-		want := []int64{publicHere.ClaimID, privateThere.ClaimID}
+		publicHere := f.proposes(t, f.triager, f.occurrenceIn(f.product, "under-a", access.Public))
+		f.proposes(t, f.privately(t), f.occurrenceIn(f.product, "under-b", access.Private))
+		f.proposes(t, insiderThere, f.occurrenceIn(other, "under-c", access.Public))
+		privateThere := f.proposes(t, insiderThere, f.occurrenceIn(other, "under-d", access.Private))
+		want := []int64{publicHere.DecisionID, privateThere.DecisionID}
 		slices.Sort(want)
 
 		mixed := f.holding(t, "mixed-approver", map[int64][]access.Role{
@@ -238,11 +238,11 @@ func TestADecisionIsReadAndAgreedToAtTheVisibilityHeldInItsOwnProduct(t *testing
 		}
 		var read []int64
 		for _, one := range judged {
-			read = append(read, one.ClaimID)
+			read = append(read, one.DecisionID)
 		}
 		slices.Sort(read)
 		if !slices.Equal(read, want) {
-			t.Errorf("the record shows claims %v, want %v", read, want)
+			t.Errorf("the record shows decisions %v, want %v", read, want)
 		}
 
 		waiting, _, err := f.store.Queue(ctx, mixed, triage.QueueFilter{}, 50, 0)
@@ -251,27 +251,27 @@ func TestADecisionIsReadAndAgreedToAtTheVisibilityHeldInItsOwnProduct(t *testing
 		}
 		var asked []int64
 		for _, one := range waiting {
-			asked = append(asked, one.Claim.ID)
+			asked = append(asked, one.Decision.ID)
 		}
 		slices.Sort(asked)
 		if !slices.Equal(asked, want) {
-			t.Errorf("the queue asks for agreement to claims %v, want %v", asked, want)
+			t.Errorf("the queue asks for agreement to decisions %v, want %v", asked, want)
 		}
 	})
 }
 
-func TestAClaimWithARowTheReaderMayNotAgreeToIsNotWaitingOnThem(t *testing.T) {
-	// A claim is agreed to whole. Somebody who may agree to undisclosed work
-	// alone is asked about a claim that is wholly undisclosed, and not about
+func TestADecisionWithARowTheReaderMayNotAgreeToIsNotWaitingOnThem(t *testing.T) {
+	// A decision is agreed to whole. Somebody who may agree to undisclosed work
+	// alone is asked about a decision that is wholly undisclosed, and not about
 	// one with a disclosed row in it or one that is wholly disclosed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		insider := f.privately(t)
-		private := f.proposes(t, insider, f.placeIn(f.product, "under-a", access.Private))
-		mixedClaim := f.proposes(t, insider,
-			f.placeIn(f.product, "under-b", access.Private),
-			f.placeIn(f.product, "under-c", access.Public))
-		public := f.proposes(t, f.triager, f.placeIn(f.product, "under-d", access.Public))
+		private := f.proposes(t, insider, f.occurrenceIn(f.product, "under-a", access.Private))
+		mixedDecision := f.proposes(t, insider,
+			f.occurrenceIn(f.product, "under-b", access.Private),
+			f.occurrenceIn(f.product, "under-c", access.Public))
+		public := f.proposes(t, f.triager, f.occurrenceIn(f.product, "under-d", access.Public))
 
 		privateApprover := f.holding(t, "private-approver", map[int64][]access.Role{
 			f.product: {access.PrivateRead, access.Approver},
@@ -280,31 +280,31 @@ func TestAClaimWithARowTheReaderMayNotAgreeToIsNotWaitingOnThem(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if total != 1 || len(waiting) != 1 || waiting[0].Claim.ID != private.ClaimID {
+		if total != 1 || len(waiting) != 1 || waiting[0].Decision.ID != private.DecisionID {
 			var asked []int64
 			for _, one := range waiting {
-				asked = append(asked, one.Claim.ID)
+				asked = append(asked, one.Decision.ID)
 			}
-			t.Errorf("a private approver is asked about claims %v of %d; want only the undisclosed claim %d"+
-				" (the mixed claim is %d, the disclosed one %d)",
-				asked, total, private.ClaimID, mixedClaim.ClaimID, public.ClaimID)
+			t.Errorf("a private approver is asked about decisions %v of %d; want only the undisclosed decision %d"+
+				" (the mixed decision is %d, the disclosed one %d)",
+				asked, total, private.DecisionID, mixedDecision.DecisionID, public.DecisionID)
 		}
 		if count, err := f.store.WaitingIn(ctx, privateApprover, f.product); err != nil || count != 1 {
-			t.Errorf("the product counts %d claims waiting on a private approver (%v), want 1", count, err)
+			t.Errorf("the product counts %d decisions waiting on a private approver (%v), want 1", count, err)
 		}
 
 		// Somebody who may agree at both visibilities is asked about all
-		// three, so the narrowing above is the visibility and not the claims.
+		// three, so the narrowing above is the visibility and not the decisions.
 		both := f.holding(t, "approver-of-both", map[int64][]access.Role{
 			f.product: {access.PublicRead, access.PrivateRead, access.Approver},
 		})
 		if _, total, err := f.store.Queue(ctx, both, triage.QueueFilter{}, 50, 0); err != nil || total != 3 {
-			t.Errorf("an approver at both visibilities is asked about %d claims (%v), want 3", total, err)
+			t.Errorf("an approver at both visibilities is asked about %d decisions (%v), want 3", total, err)
 		}
 	})
 }
 
-func TestADecisionOnAnIssueDisclosedSinceThePlaceWasReadIsPublic(t *testing.T) {
+func TestADecisionOnAnIssueDisclosedSinceTheOccurrenceWasReadIsPublic(t *testing.T) {
 	// The visibility a proposal carries is read before the proposing
 	// transaction opens. An issue disclosed in between has no undisclosed
 	// finding left in the product, and a row written private then would
@@ -314,7 +314,7 @@ func TestADecisionOnAnIssueDisclosedSinceThePlaceWasReadIsPublic(t *testing.T) {
 		f.finds(t, f.build(t, f.product, "2026.03"), libfoo, "place-of-libfoo", access.Public)
 
 		written := f.proposes(t, f.privately(t),
-			f.placeIn(f.product, "place-of-libfoo", access.Private))
+			f.occurrenceIn(f.product, "place-of-libfoo", access.Private))
 		if written.Visibility != access.Public {
 			t.Errorf("a decision on a disclosed issue was written %s", written.Visibility)
 		}
@@ -327,7 +327,7 @@ func TestADecisionOnAnIssueDisclosedSinceThePlaceWasReadIsPublic(t *testing.T) {
 		insider := f.holding(t, "switchd-insider", map[int64][]access.Role{
 			other: {access.PublicTriage, access.PrivateTriage},
 		})
-		kept := f.proposes(t, insider, f.placeIn(other, "under-e", access.Private))
+		kept := f.proposes(t, insider, f.occurrenceIn(other, "under-e", access.Private))
 		if kept.Visibility != access.Private {
 			t.Errorf("a decision on an undisclosed issue was written %s", kept.Visibility)
 		}
@@ -350,21 +350,21 @@ func TestDecisionsAcrossProductsAreDescribedAtTheVisibilityReadInEach(t *testing
 			f.product: {access.PublicTriage, access.PrivateTriage},
 			other:     {access.PublicTriage, access.PrivateTriage},
 		})
-		here := f.proposes(t, both, f.placeIn(f.product, "place-here", access.Private))
-		there := f.proposes(t, both, f.placeIn(other, "place-there", access.Public))
+		here := f.proposes(t, both, f.occurrenceIn(f.product, "place-here", access.Private))
+		there := f.proposes(t, both, f.occurrenceIn(other, "place-there", access.Public))
 
 		mixed := f.holding(t, "mixed-reader", map[int64][]access.Role{
 			f.product: {access.PublicRead, access.PrivateRead},
 			other:     {access.PublicRead},
 		})
-		described, err := f.store.Describe(ctx, mixed, []triage.Decision{*here, *there})
+		described, err := f.store.Describe(ctx, mixed, []triage.DecisionOccurrence{*here, *there})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if card, ok := described[here.ID]; !ok || card.Places != 1 {
+		if card, ok := described[here.ID]; !ok || card.Occurrences != 1 {
 			t.Errorf("an undisclosed decision in a product read privately was described as %+v", card)
 		}
-		if card, ok := described[there.ID]; !ok || card.Places != 1 {
+		if card, ok := described[there.ID]; !ok || card.Occurrences != 1 {
 			t.Errorf("a disclosed decision in a product read publicly was described as %+v", card)
 		}
 	})
@@ -372,7 +372,7 @@ func TestDecisionsAcrossProductsAreDescribedAtTheVisibilityReadInEach(t *testing
 
 func TestGrowthSinceAgreementIsCountedAtTheVisibilityReadInEachProduct(t *testing.T) {
 	// The growth report spans products, and each visibility is a grant held
-	// per product. An undisclosed finding a claim reached since it was agreed
+	// per product. An undisclosed finding a decision reached since it was agreed
 	// to is growth to somebody reading undisclosed work in its product,
 	// whatever else the page holds.
 	each(t, func(t *testing.T, f *fixture) {
@@ -390,14 +390,14 @@ func TestGrowthSinceAgreementIsCountedAtTheVisibilityReadInEachProduct(t *testin
 		approver := f.holding(t, "approver-of-both", map[int64][]access.Role{
 			f.product: approving, other: approving,
 		})
-		here := f.proposes(t, both, f.placeIn(f.product, "place-here", access.Private))
-		there := f.proposes(t, both, f.placeIn(other, "place-there", access.Public))
-		for _, claim := range []int64{here.ClaimID, there.ClaimID} {
-			if _, err := f.store.ApproveClaim(ctx, approver, claim, "", nil, ""); err != nil {
+		here := f.proposes(t, both, f.occurrenceIn(f.product, "place-here", access.Private))
+		there := f.proposes(t, both, f.occurrenceIn(other, "place-there", access.Public))
+		for _, decision := range []int64{here.DecisionID, there.DecisionID} {
+			if _, err := f.store.ApproveDecision(ctx, approver, decision, "", nil, ""); err != nil {
 				t.Fatal(err)
 			}
 		}
-		// A build arriving afterwards, which the claim reaches by matching.
+		// A build arriving afterwards, which the decision reaches by matching.
 		f.finds(t, f.build(t, f.product, "2026.06"), libfoo, "place-here", access.Private)
 
 		mixed := f.holding(t, "mixed-reader", map[int64][]access.Role{
@@ -410,18 +410,18 @@ func TestGrowthSinceAgreementIsCountedAtTheVisibilityReadInEachProduct(t *testin
 		}
 		grown := false
 		for _, row := range read.Grew {
-			if row.ClaimID == here.ClaimID && row.Covered == 1 && row.CoversNow == 2 {
+			if row.DecisionID == here.DecisionID && row.Covered == 1 && row.CoversNow == 2 {
 				grown = true
 			}
 		}
 		if !grown {
-			t.Errorf("an undisclosed claim in a product read privately was not reported grown: %+v", read.Grew)
+			t.Errorf("an undisclosed decision in a product read privately was not reported grown: %+v", read.Grew)
 		}
 	})
 }
 
 func TestWhatAnApprovalCoveredIsCountedAtTheVisibilityHeldInEachProduct(t *testing.T) {
-	// One claim over two products, agreed to by somebody reading undisclosed
+	// One decision over two products, agreed to by somebody reading undisclosed
 	// work in one and disclosed work in the other. What they agreed to is
 	// both findings, each at the visibility they hold in its product.
 	each(t, func(t *testing.T, f *fixture) {
@@ -435,20 +435,20 @@ func TestWhatAnApprovalCoveredIsCountedAtTheVisibilityHeldInEachProduct(t *testi
 		both := f.holding(t, "triager-of-both", map[int64][]access.Role{
 			f.product: triaging, other: triaging,
 		})
-		claim := f.proposes(t, both,
-			f.placeIn(f.product, "place-here", access.Private),
-			f.placeIn(other, "place-there", access.Public))
+		decision := f.proposes(t, both,
+			f.occurrenceIn(f.product, "place-here", access.Private),
+			f.occurrenceIn(other, "place-there", access.Public))
 
 		mixed := f.holding(t, "mixed-approver", map[int64][]access.Role{
 			f.product: {access.Approver, access.PublicTriage, access.PrivateTriage},
 			other:     {access.Approver, access.PublicTriage},
 		})
-		if _, err := f.store.ApproveClaim(ctx, mixed, claim.ClaimID, "", nil, ""); err != nil {
+		if _, err := f.store.ApproveDecision(ctx, mixed, decision.DecisionID, "", nil, ""); err != nil {
 			t.Fatal(err)
 		}
 		var covered int
-		if err := f.db.NewRaw(`SELECT "covered" FROM "claim_approval" WHERE "claim_id" = ?`,
-			claim.ClaimID).Scan(ctx, &covered); err != nil {
+		if err := f.db.NewRaw(`SELECT "covered" FROM "decision_approval" WHERE "decision_id" = ?`,
+			decision.DecisionID).Scan(ctx, &covered); err != nil {
 			t.Fatal(err)
 		}
 		if covered != 2 {

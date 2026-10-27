@@ -14,7 +14,7 @@ import (
 // A group is one issue at one fold, and the fold is a text key on the
 // component. Grouping a build's open rows on it directly sorts every row on a
 // 64-character string: on 367,000 open rows that sort spills to disk, and it is
-// most of the time the list takes. So the places are grouped first on two
+// most of the time the list takes. So the occurrences are grouped first on two
 // integers — the issue and the component — and only those partial groups are
 // joined to the component and grouped again on the fold. A fold is a handful
 // of components at most, so the second grouping sorts thousands of rows rather
@@ -35,20 +35,20 @@ import (
 // order that read it are spelled the same at both levels.
 
 // grain is which level a condition over a group is spelled at: over the
-// places themselves, or over the partial groups of the two-level form.
+// occurrences themselves, or over the partial groups of the two-level form.
 type grain bool
 
 const (
-	// overRows asks a group's aggregates of its places.
+	// overRows asks a group's aggregates of its occurrences.
 	overRows grain = false
 	// overParts asks them of the partial groups, read under the alias "f".
 	overParts grain = true
 )
 
-// places is how many places the group holds.
-func (g grain) places() string { return g.pick("COUNT(*)", `SUM("f"."n")`) }
+// occurrences is how many occurrences the group holds.
+func (g grain) occurrences() string { return g.pick("COUNT(*)", `SUM("f"."n")`) }
 
-// peak is the highest urgency among the group's places.
+// peak is the highest urgency among the group's occurrences.
 func (g grain) peak() string { return g.pick(`MAX("f"."urgency")`, `MAX("f"."peak")`) }
 
 // exploited and exploitedHere are the two exploitation flags.
@@ -56,7 +56,7 @@ func (g grain) exploited() string { return g.pick(exploitedAcross, `MAX("f"."hit
 
 func (g grain) exploitedHere() string { return g.pick(exploitedHereAcross, `MAX("f"."hit_here")`) }
 
-// withFix is how many places name a version that fixes the issue.
+// withFix is how many occurrences name a version that fixes the issue.
 func (g grain) withFix() string { return g.pick(withFixAcross, `SUM("f"."with_fix")`) }
 
 // fixLeast and fixMost are the two ends of what upstream did.
@@ -64,16 +64,16 @@ func (g grain) fixLeast() string { return g.pick(`MIN("f"."fix_state")`, `MIN("f
 
 func (g grain) fixMost() string { return g.pick(`MAX("f"."fix_state")`, `MAX("f"."fix_most")`) }
 
-// held is how many places somebody holds, and heldLeast and heldMost the two
-// ends of who.
+// held is how many occurrences somebody holds, and heldLeast and heldMost the
+// two ends of who.
 func (g grain) held() string { return g.pick(`COUNT("f"."assigned_to")`, `SUM("f"."held")`) }
 
 func (g grain) heldLeast() string { return g.pick(`MIN("f"."assigned_to")`, `MIN("f"."held_least")`) }
 
 func (g grain) heldMost() string { return g.pick(`MAX("f"."assigned_to")`, `MAX("f"."held_most")`) }
 
-// decided is how many places carry one of the flags byState's derived table
-// computes per place.
+// decided is how many occurrences carry one of the flags byState's derived
+// table computes per occurrence.
 func (g grain) decided(flag string) string {
 	switch flag {
 	case "waiting", "approved", "lapsed", "planned", "this_outcome":
@@ -90,12 +90,12 @@ func (g grain) pick(rows, parts string) string {
 	return rows
 }
 
-// withFixAcross counts the places naming a fixed version.
+// withFixAcross counts the occurrences naming a fixed version.
 const withFixAcross = `SUM(CASE WHEN "f"."fixed_in" IS NULL OR "f"."fixed_in" = '' THEN 0 ELSE 1 END)`
 
 // partKey is one key of the first level: the expression a partial group is
 // grouped on, and the column it is selected as. The second level and the
-// decided places beside the first level read it by that name.
+// decided occurrences beside the first level read it by that name.
 type partKey struct {
 	expr string
 	args []any
@@ -116,7 +116,7 @@ func keyedBy(q *bun.SelectQuery, keys []partKey) *bun.SelectQuery {
 // rows is the population: open findings of the selection, read as "f", with
 // whatever joins the caller's own conditions need. keys are the first level's
 // grouping keys; the issue and the component are always among them.
-// Everything the filter asks of a place is applied to the first level and
+// Everything the filter asks of an occurrence is applied to the first level and
 // everything it asks of a group to the second, so a caller adds its columns,
 // its grouping on the fold and its order, and nothing else.
 //
@@ -131,7 +131,7 @@ func (f Filter) folded(db bun.IDB, rows *bun.SelectQuery, keys []partKey) *bun.S
 	if f.asksDecided() {
 		inner = f.decidedBeside(db, rows, keys)
 	} else {
-		inner = f.partials(placeHeads(keyedBy(f.narrowRows(rows), keys)))
+		inner = f.partials(occurrenceHeads(keyedBy(f.narrowRows(rows), keys)))
 	}
 	outer := db.NewSelect().
 		TableExpr(`(?) AS "f"`, inner).
@@ -140,16 +140,17 @@ func (f Filter) folded(db bun.IDB, rows *bun.SelectQuery, keys []partKey) *bun.S
 }
 
 // decidedBeside is the first level of a filter that asks how far a group has
-// been decided: the partial groups, each with how many of its places carry
+// been decided: the partial groups, each with how many of its occurrences carry
 // each decision flag, folded together on the partial group's keys.
 //
-// The flags are counted over the decided places alone. The decision table is
-// built from the decisions outward over the same population the partial groups
-// read, with every condition on a place applied, and folded to the first
-// level's keys. Joined to every open place instead, each of a product's 368,847
-// open rows is looked up in a table of 148,102 decided places, and the partial
-// groups can no longer be read from finding's covering index: 1,067 ms against
-// 575 ms for a build's unsettled work on PostgreSQL with 133,549 decisions.
+// The flags are counted over the decided occurrences alone. The decision table
+// is built from the decision occurrences outward over the same population the
+// partial groups read, with every condition on an occurrence applied, and
+// folded to the first level's keys. Joined to every open occurrence instead,
+// each of a product's 368,847 open rows is looked up in a table of 148,102
+// decided occurrences, and the partial groups can no longer be read from
+// finding's covering index: 1,067 ms against 575 ms for a build's unsettled
+// work on PostgreSQL with 133,549 decision occurrences.
 func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey) *bun.SelectQuery {
 	col := func(name string) string { return string(database.Column(db, name)) }
 	apart := f
@@ -157,52 +158,56 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	columns := append(append([]partColumn{}, headColumns...), apart.partialColumns()...)
 	parts := selecting(keyedBy(apart.narrowRows(rows.Clone()), keys), columns)
 
-	// One row per place in the population, carrying what the match to a
-	// decision reads and the keys it is folded to. The issues a filter needing
-	// a decision can reach are stated on the decisions rather than here: a
-	// planner estimates the match between a decision and a place as the
-	// product of two equalities that are not independent, a tenth to a
-	// twentieth of the rows it produces, and with the population narrowed as
-	// well PostgreSQL took the small side for the outer one and probed the
-	// place index once per decision, 2.7 s for the lapsed tile where the
-	// places hashed take 0.42 s. A decided place outside those issues joins
-	// no partial group, because the partial groups are narrowed to them.
+	// One row per occurrence in the population, carrying what the match to a
+	// decision occurrence reads and the keys it is folded to. The issues a
+	// filter needing a decision can reach are stated on the decision
+	// occurrences rather than here: a planner estimates the match between a
+	// decision occurrence and an occurrence as the product of two equalities
+	// that are not independent, a tenth to a twentieth of the rows it produces,
+	// and with the population narrowed as well PostgreSQL took the small side
+	// for the outer one and probed the occurrence index once per decision
+	// occurrence, 2.7 s for the lapsed tile where the occurrences hashed take
+	// 0.42 s. A decided occurrence outside those issues joins no partial group,
+	// because the partial groups are narrowed to them.
 	//
-	// Where a group can pass with no decision the decisions are every
-	// decision of the product, and the places are narrowed to the issues any
-	// of them names (placedIssues) rather than the decisions: a place of
-	// another issue has no decision to match. With 133,549 decisions naming
-	// 3,013 of 7,550 issues, the undecided page's grouping takes 479 ms
-	// against 543 ms over every place, and the blocking list on a build's
-	// readiness 403 ms against 523 ms.
+	// Where a group can pass with no decision the decision occurrences are
+	// every decision occurrence of the product, and the occurrences are
+	// narrowed to the issues any of them names (placedIssues) rather than the
+	// decision occurrences: an occurrence of another issue has no decision to
+	// match. With 133,549 decision occurrences naming 3,013 of 7,550 issues,
+	// the undecided page's grouping takes 479 ms against 543 ms over every
+	// occurrence, and the blocking list on a build's readiness 403 ms against
+	// 523 ms.
 	whole := apart
 	whole.decidedIssues = f.placedIssues
 	population := whole.narrowRows(rows).
 		ColumnExpr(`"f"."id" AS "id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`)
 	for _, key := range keys {
 		population = population.ColumnExpr(key.expr+` AS "`+key.name+`"`, key.args...)
 	}
-	places := f.flagColumns(decisionsOver(db.NewSelect(), `(?) AS "f2"`, population))
-	// A condition comparing a count of decided places with the places a group
-	// holds needs each place counted once, so the decisions are folded to the
-	// place before they are folded to the keys. Every other condition asks
-	// whether any place carries a flag or none does, which a fold straight to
-	// the keys answers the same: with the flag at most one per partial group
-	// instead of one per place, "more than none" and "none" are unchanged. It
-	// skips grouping 148,102 decided places one at a time: 726 ms against
-	// 635 ms for the undecided page's grouping on PostgreSQL.
-	perPlace := f.comparesDecidedPlaces()
-	if perPlace {
-		places = places.GroupExpr(`"f2"."id"`)
+	occurrences := f.flagColumns(decisionsOver(db.NewSelect(), `(?) AS "f2"`, population))
+	// A condition comparing a count of decided occurrences with the occurrences
+	// a group holds needs each occurrence counted once, so the decision
+	// occurrences are folded to the occurrence before they are folded to the
+	// keys. Every other condition asks whether any occurrence carries a flag or
+	// none does, which a fold straight to the keys answers the same: with the
+	// flag at most one per partial group instead of one per occurrence, "more
+	// than none" and "none" are unchanged. It skips grouping 148,102 decided
+	// occurrences one at a time: 726 ms against 635 ms for the undecided page's
+	// grouping on PostgreSQL.
+	perOccurrence := f.comparesDecidedOccurrences()
+	if perOccurrence {
+		occurrences = occurrences.GroupExpr(`"f2"."id"`)
 	}
 	if f.decidedIssues != nil {
-		places = f.amongDecidedIssues(places, `"dv"."issue_id"`)
+		occurrences = f.amongDecidedIssues(occurrences, `"dv"."issue_id"`)
 	}
 	if f.Across {
-		// Across products each place carries its own product, and the decision
-		// has to belong to the product the place sits in.
+		// Across products each occurrence carries its own product, and the
+		// decision occurrence has to belong to the product the occurrence sits
+		// in.
 		named := false
 		for _, key := range keys {
 			named = named || key.name == "product_id"
@@ -210,16 +215,16 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 		if !named {
 			panic("finding: a first level across products is keyed on the product")
 		}
-		places = places.Where(`"de"."product_id" = "f2"."product_id"`)
+		occurrences = occurrences.Where(`"de"."product_id" = "f2"."product_id"`)
 	} else {
-		places = places.Where(`"de"."product_id" = ?`, f.ProductID)
+		occurrences = occurrences.Where(`"de"."product_id" = ?`, f.ProductID)
 	}
 	for _, key := range keys {
-		places = places.ColumnExpr(col("f2."+key.name) + ` AS "` + key.name + `"`).GroupExpr(col("f2." + key.name))
+		occurrences = occurrences.ColumnExpr(col("f2."+key.name) + ` AS "` + key.name + `"`).GroupExpr(col("f2." + key.name))
 	}
-	decided := places
-	if perPlace {
-		decided = db.NewSelect().TableExpr(`(?) AS "dp"`, places)
+	decided := occurrences
+	if perOccurrence {
+		decided = db.NewSelect().TableExpr(`(?) AS "dp"`, occurrences)
 		for _, key := range keys {
 			decided = decided.ColumnExpr(col("dp." + key.name)).GroupExpr(col("dp." + key.name))
 		}
@@ -228,17 +233,17 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 		}
 	}
 
-	// The partial groups and the decided ones are put together by stacking
-	// the two and folding them on the keys, rather than by joining one to the
+	// The partial groups and the decided ones are put together by stacking the
+	// two and folding them on the keys, rather than by joining one to the
 	// other. Joined on the keys, MariaDB read the decided groups as a table to
 	// work out again for each partial group it was joined to, and re-ran the
-	// decisions 12,260 times: 71 s where the list across products takes 0.37 s.
-	// Stacked, each side is worked out once on every engine. Each side has
-	// every column, in one order: the decided groups' aggregates are none where
-	// they fold by a sum and absent where they fold by a minimum or a maximum.
-	// The decided side is an arm of the union itself rather than a table read
-	// by one, so an absent value takes its type from the partial groups'
-	// column.
+	// decided table 12,260 times: 71 s where the list across products takes
+	// 0.37 s. Stacked, each side is worked out once on every engine. Each side
+	// has every column, in one order: the decided groups' aggregates are none
+	// where they fold by a sum and absent where they fold by a minimum or a
+	// maximum. The decided side is an arm of the union itself rather than a
+	// table read by one, so an absent value takes its type from the partial
+	// groups' column.
 	others := db.NewSelect().TableExpr(`(?) AS "d"`, decided)
 	for _, key := range keys {
 		others = others.ColumnExpr(col("d."+key.name) + ` AS "` + key.name + `"`)
@@ -265,15 +270,16 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	for _, flag := range decidedFlags {
 		stacked = stacked.ColumnExpr(`SUM(` + col("u."+flag) + `) AS "` + flag + `"`)
 	}
-	// A decided group always has places in the partial groups, because both
-	// read the same population; a group with none is not one the list holds.
+	// A decided group always has occurrences in the partial groups, because
+	// both read the same population; a group with none is not one the list
+	// holds.
 	return stacked.Having(`SUM("u"."n") > 0`)
 }
 
-// comparesDecidedPlaces is whether a condition the filter asks of a group
-// compares how many places carry a decision flag with how many places it has:
-// agreed, and an outcome, which hold where every place does.
-func (f Filter) comparesDecidedPlaces() bool {
+// comparesDecidedOccurrences is whether a condition the filter asks of a group
+// compares how many occurrences carry a decision flag with how many occurrences
+// it has: agreed, and an outcome, which hold where every occurrence does.
+func (f Filter) comparesDecidedOccurrences() bool {
 	if len(trimmed(f.Outcomes)) > 0 {
 		return true
 	}
@@ -286,8 +292,8 @@ func (f Filter) comparesDecidedPlaces() bool {
 }
 
 // partColumn is one aggregate of the first level: the expression over the
-// places, how the values of two partial groups fold together, and the column
-// it is selected as.
+// occurrences, how the values of two partial groups fold together, and the
+// column it is selected as.
 type partColumn struct {
 	expr string
 	fold string
@@ -295,10 +301,10 @@ type partColumn struct {
 }
 
 // headColumns is the first-level columns every second level reads: how many
-// places a partial group holds, their highest urgency and the two exploitation
-// flags, under the names the overParts spellings read.
+// occurrences a partial group holds, their highest urgency and the two
+// exploitation flags, under the names the overParts spellings read.
 var headColumns = []partColumn{
-	{overRows.places(), "SUM", "n"},
+	{overRows.occurrences(), "SUM", "n"},
 	{overRows.peak(), "MAX", "peak"},
 	{overRows.exploited(), "MAX", "hit"},
 	{overRows.exploitedHere(), "MAX", "hit_here"},
@@ -312,8 +318,8 @@ func selecting(q *bun.SelectQuery, columns []partColumn) *bun.SelectQuery {
 	return q
 }
 
-// placeHeads selects headColumns.
-func placeHeads(q *bun.SelectQuery) *bun.SelectQuery {
+// occurrenceHeads selects headColumns.
+func occurrenceHeads(q *bun.SelectQuery) *bun.SelectQuery {
 	return selecting(q, headColumns)
 }
 
@@ -359,7 +365,7 @@ func (f Filter) partialColumns() []partColumn {
 			partColumn{`MAX("f"."assigned_to")`, "MAX", "held_most"})
 	}
 	// The decision flags are not among them: a filter asking how far a group
-	// has been decided counts its decided places beside the first level (see
-	// decidedBeside).
+	// has been decided counts its decided occurrences beside the first level
+	// (see decidedBeside).
 	return columns
 }

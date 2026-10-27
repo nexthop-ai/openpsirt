@@ -195,7 +195,7 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		Where(`"f"."visibility" = ?`, access.Public).
 		Where(kinds, kindArgs...).
 		Where(`"f"."vulnerability_id" IN (`+issued+`)`).
-		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+` WHERE `+DecisionAt(`"st"."product_id"`)+`
+		Where(`NOT EXISTS (SELECT 1 FROM `+DecisionOccurrences+` WHERE `+DecisionOccurrenceAt(`"st"."product_id"`)+`
 			AND "de"."live_key" IS NOT NULL AND "de"."state" IN (?))`,
 			bun.List([]string{"approved", "proposed"})).
 		OrderExpr(`"ss"."id", "f"."id"`).

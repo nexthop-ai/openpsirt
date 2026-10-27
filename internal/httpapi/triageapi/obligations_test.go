@@ -274,8 +274,8 @@ func TestANoticeNamingAPassedWindowClearsIt(t *testing.T) {
 	})
 }
 
-func TestTheListABulkJudgmentIsPickedFromMarksAnAttackedIssue(t *testing.T) {
-	// A judgment over a selection reaching an attacked issue is refused
+func TestTheListABulkDecisionIsPickedFromMarksAnAttackedIssue(t *testing.T) {
+	// A decision over a selection reaching an attacked issue is refused
 	// whole, so the list it is picked from says which issue that is.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)

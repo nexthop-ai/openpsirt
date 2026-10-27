@@ -5,29 +5,29 @@ package finding
 
 import "testing"
 
-// Every standing the list offers is one the row can say, the list can filter
-// by and the register can filter by. The four are spelled in four places — the
-// word a group draws, the word one place draws, the list's condition and the
-// register's — and a standing any one of them does not know puts a row in one
-// bucket while it reads as another, or in none.
+// Every standing the list offers is one the row can say, the list can filter by
+// and the register can filter by. The four are spelled in four places — the
+// word a group draws, the word one occurrence draws, the list's condition and
+// the register's — and a standing any one of them does not know puts a row in
+// one bucket while it reads as another, or in none.
 func TestEveryStandingIsSaidAndFilteredByTheSameRules(t *testing.T) {
-	drawn := map[ClaimStanding]bool{}
-	for places := 1; places <= 2; places++ {
+	drawn := map[DecisionStanding]bool{}
+	for occurrences := 1; occurrences <= 2; occurrences++ {
 		for waiting := 0; waiting <= 1; waiting++ {
-			for approved := 0; approved <= places; approved++ {
+			for approved := 0; approved <= occurrences; approved++ {
 				for lapsed := 0; lapsed <= 1; lapsed++ {
-					drawn[stateWord(places, waiting, approved, lapsed)] = true
+					drawn[stateWord(occurrences, waiting, approved, lapsed)] = true
 				}
 			}
 		}
 	}
-	placed := map[ClaimStanding]bool{}
-	for _, decision := range []string{"", "proposed", "approved", "withdrawn", "lapsed"} {
-		placed[placeStanding(decision)] = true
+	placed := map[DecisionStanding]bool{}
+	for _, occurrence := range []string{"", "proposed", "approved", "withdrawn", "lapsed"} {
+		placed[occurrenceStanding(occurrence)] = true
 	}
 
 	checked := 0
-	for _, standing := range ClaimStandings() {
+	for _, standing := range DecisionStandings() {
 		checked++
 		if stateHaving(standing, overRows) == "" {
 			t.Errorf("the list cannot filter by %q", standing)
@@ -39,7 +39,7 @@ func TestEveryStandingIsSaidAndFilteredByTheSameRules(t *testing.T) {
 			t.Errorf("no group draws %q", standing)
 		}
 		if !placed[standing] {
-			t.Errorf("no place draws %q", standing)
+			t.Errorf("no occurrence draws %q", standing)
 		}
 	}
 	if checked == 0 {

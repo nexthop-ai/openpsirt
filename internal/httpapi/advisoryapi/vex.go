@@ -25,15 +25,15 @@ func registerVEX(api huma.API, in core.Deps) {
 		Summary: "Generate a VEX document for a build",
 		Description: "Returns an OpenVEX document saying what stands about the third-party " +
 			"components this build ships: every approved `not applicable` and `already fixed` " +
-			"claim, as `not_affected` and `fixed` statements with the justification and the " +
+			"decision, as `not_affected` and `fixed` statements with the justification and the " +
 			"reasoning somebody wrote.\n\n" +
-			"Approved claims only, and a deferral is absent rather than exported as " +
+			"Approved decisions only, and a deferral is absent rather than exported as " +
 			"anything — silence already reads as affected in this format.\n\n" +
 			"Public findings only. `undisclosed=true` includes the rest for somebody who " +
 			"may read them, which is a preview rather than a thing to publish.\n\n" +
 			"`kind=with-suppliers` is a second document with an identifier of its own. It adds, " +
 			"as `not_affected`, what a supplier states about its own product where the " +
-			"statement closed every place of a component in the build, in the supplier's " +
+			"statement closed every occurrence of a component in the build, in the supplier's " +
 			"name.\n\n" +
 			"Requires a publisher configured for this deployment: a document naming none has " +
 			"nobody as its author.",
@@ -127,7 +127,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			"that was recorded, which is the one to send: it carries the version it is " +
 			"recorded under, and a document generated before recording may not.\n\n" +
 			"A fact about a moment rather than a derived value. What was published on a date " +
-			"cannot be worked out again once a claim is withdrawn, a decision is revised or a " +
+			"cannot be worked out again once a decision is withdrawn or revised or a " +
 			"scan closes a finding.\n\n" +
 			"It is what the document's version counts. A document is assembled from what " +
 			"stands now and holds no history of its own, so without this every generation is " +
@@ -138,7 +138,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			"never the preview that includes work nobody has announced.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "The document is this deployment's word to a customer. The second pair of "+
-		"eyes on each statement it carries was taken when the claim was approved.",
+		"eyes on each statement it carries was taken when the decision was approved.",
 		access.PublicTriage),
 		func(ctx context.Context, input *struct {
 			Product string       `path:"product"`

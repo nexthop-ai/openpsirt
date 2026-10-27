@@ -101,7 +101,7 @@ func NoSuchKey() error {
 	return huma.Error404NotFound("no credential is recorded under that name")
 }
 
-func noSuchDecision() error {
+func noSuchDecisionOccurrence() error {
 	return huma.Error404NotFound("no decision is recorded there")
 }
 
@@ -574,9 +574,9 @@ func TargetRow(ctx context.Context, in Deps, streamID, variantID int64) (*catalo
 	return target, nil
 }
 
-// IssueHere resolves an issue named in a path about a place, and answers as
-// though the name were unused wherever the subject may not read a finding of
-// it in this product.
+// IssueHere resolves an issue named in a path about an occurrence, and answers
+// as though the name were unused wherever the subject may not read a finding
+// of it in this product.
 //
 // One helper rather than a check at each route, because the shape that leaks
 // is the ordering — resolve the name, then check what it reached — and every
@@ -584,7 +584,7 @@ func TargetRow(ctx context.Context, in Deps, streamID, variantID int64) (*catalo
 // resolver rather than by remembering the rule.
 //
 // The refusal is NoSuchFinding, which is what these routes already answer when
-// the place is not one the caller may read. That is the point: the two have to
+// the occurrence is not one the caller may read. That is the point: the two have to
 // be the same sentence, or the difference between them is the disclosure.
 func IssueHere(ctx context.Context, in Deps, subject access.Subject,
 	productID int64, name string) (int64, error) {

@@ -67,13 +67,13 @@ func (f *fixture) component(t *testing.T, name, version string) int64 {
 	return row.ID
 }
 
-// finds opens the fixture's issue against a component at a place in a build,
+// finds opens the fixture's issue against a component at an occurrence in a build,
 // with no consumer, and returns the finding.
-func (f *fixture) finds(t *testing.T, in build, componentID int64, place string, visibility access.Visibility) int64 {
+func (f *fixture) finds(t *testing.T, in build, componentID int64, occurrence string, visibility access.Visibility) int64 {
 	t.Helper()
 	row := &finding.Finding{
 		TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
-		Visibility: visibility, ComponentID: componentID, PlaceIdentity: place,
+		Visibility: visibility, ComponentID: componentID, OccurrenceIdentity: occurrence,
 		OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
@@ -82,10 +82,10 @@ func (f *fixture) finds(t *testing.T, in build, componentID int64, place string,
 	return row.ID
 }
 
-// moves closes a build's finding and opens the same issue at the same place
+// moves closes a build's finding and opens the same issue at the same occurrence
 // against another component, which is what a version bump looks like on the
 // finding's side.
-func (f *fixture) moves(t *testing.T, in build, findingID, toComponent int64, place string) {
+func (f *fixture) moves(t *testing.T, in build, findingID, toComponent int64, occurrence string) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 		Set(`"closed_at" = ?`, time.Now().UTC()).
@@ -93,13 +93,13 @@ func (f *fixture) moves(t *testing.T, in build, findingID, toComponent int64, pl
 		Where(`"id" = ?`, findingID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	f.finds(t, in, toComponent, place, access.Public)
+	f.finds(t, in, toComponent, occurrence, access.Public)
 }
 
-// stateOf reads where a decision has got to.
+// stateOf reads where a decision occurrence has got to.
 func (f *fixture) stateOf(t *testing.T, id int64) triage.State {
 	t.Helper()
-	var row triage.Decision
+	var row triage.DecisionOccurrence
 	if err := f.db.DB.NewSelect().Model(&row).Where(`"id" = ?`, id).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func (f *fixture) stateOf(t *testing.T, id int64) triage.State {
 func TestADecisionStandsWhileAnyBuildInTheProductStillMatchesIt(t *testing.T) {
 	// A decision is a lookup shared by every build whose code matches it .
 	// One release stream moving on while another still ships the version
-	// decided about leaves the judgment covering the other, and a judgment
+	// decided about leaves the decision covering the other, and a decision
 	// about code that is still there is not one anybody needs to make
 	// again. It lapses when the last build holding those versions moves.
 	each(t, func(t *testing.T, f *fixture) {
@@ -122,13 +122,13 @@ func TestADecisionStandsWhileAnyBuildInTheProductStillMatchesIt(t *testing.T) {
 		inSecond := f.finds(t, second, old, "place-of-libfoo", access.Public)
 
 		at := f.at()
-		at.PlaceIdentity = "place-of-libfoo"
+		at.OccurrenceIdentity = "place-of-libfoo"
 		at.ConsumerUpstream = ""
 		decided := f.agreed(t, at)
 
 		// A sweep of a build that moved nothing marks nothing.
 		if n, err := f.store.Lapse(ctx, first.target); err != nil || n.Rows != 0 {
-			t.Fatalf("a sweep of an unmoved build marked %d decisions (%v)", n.Rows, err)
+			t.Fatalf("a sweep of an unmoved build marked %d rows (%v)", n.Rows, err)
 		}
 
 		// The first build moves. The second still ships 1.2.3, so the
@@ -144,7 +144,7 @@ func TestADecisionStandsWhileAnyBuildInTheProductStillMatchesIt(t *testing.T) {
 		// The second moves too, and nothing in the product matches any more.
 		f.moves(t, second, inSecond, bumped, "place-of-libfoo")
 		if n, err := f.store.Lapse(ctx, second.target); err != nil || n.Rows != 1 {
-			t.Fatalf("the last build moving marked %d decisions, want 1 (%v)", n.Rows, err)
+			t.Fatalf("the last build moving marked %d rows, want 1 (%v)", n.Rows, err)
 		}
 		if state := f.stateOf(t, decided.ID); state != triage.LapsedState {
 			t.Errorf("the decision is %s after every build moved on", state)
@@ -153,8 +153,8 @@ func TestADecisionStandsWhileAnyBuildInTheProductStillMatchesIt(t *testing.T) {
 }
 
 func TestASweepOfAnotherProductLeavesADecisionAlone(t *testing.T) {
-	// A place is a pair of names, and the same pair sits in other products.
-	// Their versions moving says nothing about this product's judgment.
+	// An occurrence is a pair of names, and the same pair sits in other products.
+	// Their versions moving says nothing about this product's decision.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		other, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "other", "Other")
@@ -165,12 +165,12 @@ func TestASweepOfAnotherProductLeavesADecisionAlone(t *testing.T) {
 		f.finds(t, theirs, f.component(t, "libfoo", "1.2.4"), "place-of-libfoo", access.Public)
 
 		at := f.at()
-		at.PlaceIdentity = "place-of-libfoo"
+		at.OccurrenceIdentity = "place-of-libfoo"
 		at.ConsumerUpstream = ""
 		decided := f.agreed(t, at)
 
 		if n, err := f.store.Lapse(ctx, theirs.target); err != nil || n.Rows != 0 {
-			t.Fatalf("another product's sweep marked %d decisions (%v)", n.Rows, err)
+			t.Fatalf("another product's sweep marked %d rows (%v)", n.Rows, err)
 		}
 		if state := f.stateOf(t, decided.ID); state != triage.Approved {
 			t.Errorf("the decision is %s after another product's sweep", state)
@@ -178,35 +178,35 @@ func TestASweepOfAnotherProductLeavesADecisionAlone(t *testing.T) {
 	})
 }
 
-func TestAClaimStandsOnlyAtTheVersionsItWasMadeAbout(t *testing.T) {
-	// The same place sits in every build of a product, at whatever version
-	// each ships. A finding asks what stands at its places by key — the
+func TestADecisionStandsOnlyAtTheVersionsItWasMadeAbout(t *testing.T) {
+	// The same occurrence sits in every build of a product, at whatever version
+	// each ships. A finding asks what stands at its occurrences by key — the
 	// versions it holds — or a decision keyed at one build's version would
 	// stand on a build shipping another.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.claimsMany(t, f.places("under-a"))
+		f.decisionsMany(t, f.occurrences("under-a"))
 
 		standing, err := f.store.StandingAt(ctx, f.reviewer, f.product, f.issue, f.keyed("under-a"))
 		if err != nil || len(standing) != 1 {
-			t.Fatalf("the claim does not stand at the versions it was made about: %d (%v)", len(standing), err)
+			t.Fatalf("the decision does not stand at the versions it was made about: %d (%v)", len(standing), err)
 		}
 		moved := f.keyed("under-a")
 		moved[0].ComponentUpstream = "1.2.4"
 		standing, err = f.store.StandingAt(ctx, f.reviewer, f.product, f.issue, moved)
 		if err != nil || len(standing) != 0 {
-			t.Errorf("the claim stands at a version it was not made about: %d (%v)", len(standing), err)
+			t.Errorf("the decision stands at a version it was not made about: %d (%v)", len(standing), err)
 		}
 	})
 }
 
 func TestTheProposerMayNotSetTheirOwnRowsAside(t *testing.T) {
 	// Setting rows aside is an approver's act as much as agreeing is, so the
-	// proposer naming every row of their own claim as set aside is the
-	// proposer acting on their own claim.
+	// proposer naming every row of their own decision as set aside is the
+	// proposer acting on their own decision.
 	each(t, func(t *testing.T, f *fixture) {
-		recorded := f.claimsMany(t, f.places("under-a", "under-b"))
-		_, err := f.store.ApproveClaim(t.Context(), f.triager, recorded[0].ClaimID, "",
+		recorded := f.decisionsMany(t, f.occurrences("under-a", "under-b"))
+		_, err := f.store.ApproveDecision(t.Context(), f.triager, recorded[0].DecisionID, "",
 			[]int64{recorded[0].ID, recorded[1].ID}, "Not these.")
 		if !errors.Is(err, triage.ErrSamePerson) {
 			t.Errorf("the proposer set their own rows aside: %v", err)
@@ -214,8 +214,8 @@ func TestTheProposerMayNotSetTheirOwnRowsAside(t *testing.T) {
 	})
 }
 
-func TestBuildsAClaimCoversAreOnlyThoseTheReaderMaySee(t *testing.T) {
-	// A build named beside a claim says the build holds the issue. A
+func TestBuildsADecisionCoversAreOnlyThoseTheReaderMaySee(t *testing.T) {
+	// A build named beside a decision says the build holds the issue. A
 	// decision somebody may read can match findings they may not, so the
 	// builds are narrowed like every other count served back.
 	each(t, func(t *testing.T, f *fixture) {
@@ -227,11 +227,11 @@ func TestBuildsAClaimCoversAreOnlyThoseTheReaderMaySee(t *testing.T) {
 		f.finds(t, undisclosed, libfoo, "place-of-libfoo", access.Private)
 
 		at := f.at()
-		at.PlaceIdentity = "place-of-libfoo"
+		at.OccurrenceIdentity = "place-of-libfoo"
 		at.ConsumerUpstream = ""
-		f.claimsMany(t, []triage.Place{at})
+		f.decisionsMany(t, []triage.Occurrence{at})
 		keyed := []finding.Deciding{{
-			PlaceIdentity: "place-of-libfoo", ComponentUpstream: "1.2.3",
+			OccurrenceIdentity: "place-of-libfoo", ComponentUpstream: "1.2.3",
 		}}
 
 		standing, err := f.store.StandingAt(ctx, f.reviewer, f.product, f.issue, keyed)
@@ -251,30 +251,30 @@ func TestBuildsAClaimCoversAreOnlyThoseTheReaderMaySee(t *testing.T) {
 	})
 }
 
-func TestAClaimCoversOnlyWhatItsLiveRowsMatch(t *testing.T) {
-	// A card says how many of the issue's places in a build the claim
-	// covers. Counted over every place the claim ever named, a claim whose
+func TestADecisionCoversOnlyWhatItsLiveRowsMatch(t *testing.T) {
+	// A card says how many of the issue's occurrences in a build the decision
+	// covers. Counted over every occurrence the decision ever named, a decision whose
 	// rows lapsed, or which was keyed at another build's version, reported
-	// places it does not cover.
+	// occurrences it does not cover.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		in := f.build(t, f.product, "2026.03")
 		f.finds(t, in, f.component(t, "libfoo", "1.2.4"), "place-of-libfoo", access.Public)
 
 		at := f.at()
-		at.PlaceIdentity = "place-of-libfoo"
+		at.OccurrenceIdentity = "place-of-libfoo"
 		at.ConsumerUpstream = ""
-		decided := f.claims(t, at)
-		described, err := f.store.Describe(ctx, f.reviewer, []triage.Decision{*decided})
+		decided := f.decisions(t, at)
+		described, err := f.store.Describe(ctx, f.reviewer, []triage.DecisionOccurrence{*decided})
 		if err != nil {
 			t.Fatal(err)
 		}
 		card, ok := described[decided.ID]
 		if !ok {
-			t.Fatal("a decision at a place the build holds was not described")
+			t.Fatal("a decision at an occurrence the build holds was not described")
 		}
-		if card.Places != 1 || card.Decided != 0 {
-			t.Errorf("a claim keyed at 1.2.3 reads as covering %d of %d places at 1.2.4", card.Decided, card.Places)
+		if card.Occurrences != 1 || card.Decided != 0 {
+			t.Errorf("a decision keyed at 1.2.3 reads as covering %d of %d occurrences at 1.2.4", card.Decided, card.Occurrences)
 		}
 	})
 }

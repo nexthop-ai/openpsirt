@@ -23,24 +23,24 @@ import (
 // counts the backlog — what is open, what is overdue, how long things wait.
 // None of them answers the question a manager asks at a planning meeting:
 // what did the last quarter actually go into. Read from the record, because
-// the record is where the acts are: a claim argued is a piece of work
+// the record is where the acts are: a decision argued is a piece of work
 // somebody did, whatever it concluded.
 type Spent struct {
 	Product     string `bun:"product"`
 	ProductName string `bun:"product_name"`
 	Component   string `bun:"component"`
-	// Claims is how many arguments were made — the unit a person works in,
-	// one act however many rows it wrote — and Decisions how many places
-	// those reached. The pair is the point: ten claims over ten places and
-	// one claim over a thousand are different afternoons.
-	Claims    int `bun:"claims"`
-	Decisions int `bun:"decisions"`
+	// Decisions is how many arguments were made — the unit a person works in,
+	// one act however many rows it wrote — and Occurrences how many occurrences
+	// those reached. The pair is the point: ten decisions over ten occurrences and
+	// one decision over a thousand are different afternoons.
+	Decisions   int `bun:"claims"`
+	Occurrences int `bun:"decisions"`
 	// People is how many different people argued about it. One person's
 	// component and a whole team's are different situations, and a list
 	// carrying only the volume hides which it is.
 	People int `bun:"people"`
-	// Promised, Dismissed and Deferred are what came out of those claims,
-	// counted as claims for the same reason: what a component's time went
+	// Promised, Dismissed and Deferred are what came out of those decisions,
+	// counted as decisions for the same reason: what a component's time went
 	// into is as much the shape of the answers as the volume of them. Forty
 	// arguments that produced forty dismissals and forty that produced forty
 	// upgrades are different quarters.
@@ -54,8 +54,8 @@ type Spent struct {
 
 // Effort is what the work went into over a period, worst first.
 //
-// Counted over the claims rather than over the rows they wrote, for the
-// reason the review queue is: a claim is one person's act, and counting its
+// Counted over the decisions rather than over the rows they wrote, for the
+// reason the review queue is: a decision is one person's act, and counting its
 // rows measures how far a component fans out through an image rather than
 // anybody's afternoon.
 func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuring,
@@ -77,7 +77,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	// The joins, the narrowing and the grouping on their own, so the page and
 	// the count ask the same question.
 	// The findings a component name is read off are the ones in the
-	// judgment's own product that this reader may read: a place is a pair of
+	// decision's own product that this reader may read: an occurrence is a pair of
 	// names with no product in it, so it matches the same pair in every
 	// product, and a name read off a finding the reader may not read is the
 	// disclosure.
@@ -89,13 +89,13 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	onArgs = append(onArgs, readableArgs...)
 	grouped := func() *bun.SelectQuery {
 		q := s.db.NewSelect().
-			TableExpr(finding.Decisions).
+			TableExpr(finding.DecisionOccurrences).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 			// The argument, which is where an outcome lives.
-			Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-			// The judgment's subject, reached through the findings at the
-			// place — the same correlation the record's own component filter
-			// makes. A judgment about something since removed matches nothing and
+			Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+			// The decision's subject, reached through the findings at the
+			// occurrence — the same correlation the record's own component filter
+			// makes. A decision about something since removed matches nothing and
 			// keeps its row, which is what a report about where the time went has
 			// to keep.
 			//
@@ -105,11 +105,11 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// columns the grouping does not carry — so the report answered on two
 			// engines and was a 500 on the other two.
 			//
-			// A place sits in as many builds as hold it, so this multiplies the
+			// An occurrence sits in as many builds as hold it, so this multiplies the
 			// rows. Every figure below counts distinct identifiers for that
 			// reason: what is being counted is acts, and an act is one row of the
-			// decision table however many builds share the place it names.
-			Join(`LEFT JOIN "finding" AS "pf" ON `+finding.DecisionAtPlace("pf")+`
+			// decision_occurrence table however many builds share the occurrence it names.
+			Join(`LEFT JOIN "finding" AS "pf" ON `+finding.DecisionOccurrenceOf("pf")+`
 			AND "pf"."target_id" IN (SELECT "et"."id" FROM "target" AS "et"
 				JOIN "stream" AS "es" ON "es"."id" = "et"."stream_id"
 				WHERE "es"."product_id" = "de"."product_id")
@@ -125,17 +125,17 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
 		ColumnExpr(`COALESCE("pc"."name", '') AS "component"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."id") AS "decisions"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."proposed_by") AS "people"`).
-		// The upgrades that came out of them, each counted as claims: the
-		// outcome is the claim's, and counting its rows would weigh a judgment
+		// The upgrades that came out of them, each counted as decisions: the
+		// outcome is the decision's, and counting its rows would weigh a decision
 		// by how far its component happens to fan out.
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."claim_id" END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."decision_id" END)`+
 			` AS "promised"`, bun.List([]Outcome{UpgradeNeeded, PatchNeeded})).
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."claim_id" END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."decision_id" END)`+
 			` AS "dismissed"`, bun.List(OutcomesDismissing())).
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" = ? THEN "de"."claim_id" END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" = ? THEN "de"."decision_id" END)`+
 			` AS "deferred"`, Deferred).
 		// How many rows the question has, counted over the grouped result
 		// and before the limit. A total taken off the page reads a list cut

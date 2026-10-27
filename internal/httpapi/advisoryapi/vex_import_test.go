@@ -186,11 +186,11 @@ func TestTheListFindsWhatAVexPublisherHasSpokenAbout(t *testing.T) {
 
 func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T) {
 	// A publisher changing their mind does not withdraw somebody's
-	// judgment — a third party's claim never becomes ours — but something
+	// decision — a third party's claim never becomes ours — but something
 	// has to notice that the ground moved under a dismissal approved on
 	// the strength of it.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		if got := r.Vexed(t, "admin", "debian", httpapitest.Said("not_affected",
 			"vulnerable_code_not_present", "Not built here.")); got.Code != http.StatusCreated {
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
@@ -211,7 +211,7 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 		// A dismissal started from it, agreed to by somebody else.
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
+				"/findings/CVE-2026-9999/occurrences/"+occurrence+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"Debian says the affected routine is not built.",`+
 				`"from_statement":`+httpapitest.Itoa(detail.Said[0].ID)+`}`)
@@ -219,14 +219,14 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
 		}
 		var recorded struct {
-			ID      int64 `json:"id"`
-			ClaimID int64 `json:"claim_id"`
+			ID         int64 `json:"id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
 			t.Fatal(err)
 		}
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/decisions/"+httpapitest.Itoa(recorded.ClaimID)+"/approval", `{}`); got.Code >= 300 {
+			"/v1/decisions/"+httpapitest.Itoa(recorded.DecisionID)+"/approval", `{}`); got.Code >= 300 {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -246,7 +246,7 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 		}
 
 		// The decision stands. A publisher changing their mind is not a
-		// withdrawal of somebody's judgment.
+		// withdrawal of somebody's decision.
 		var still struct {
 			Total int `json:"total"`
 		}

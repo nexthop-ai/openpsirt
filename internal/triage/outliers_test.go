@@ -10,27 +10,27 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// bulkOver is a bulk claim's issues as outliersOf reads them: one row each,
+// bulkOver is a bulk decision's issues as outliersOf reads them: one row each,
 // rated by the word given, attacked here where marked.
 func bulkOver(words []string, attackedHere []bool) (map[int64][]int64,
 	map[int64]finding.Vulnerability, map[int64]bool) {
 
-	decisionsOf := map[int64][]int64{}
+	occurrencesOf := map[int64][]int64{}
 	byIssue := map[int64]finding.Vulnerability{}
 	attacked := map[int64]bool{}
 	for i, word := range words {
 		id := int64(i + 1)
-		decisionsOf[id] = []int64{id * 10}
+		occurrencesOf[id] = []int64{id * 10}
 		byIssue[id] = finding.Vulnerability{
 			ID: id, Identifier: fmt.Sprintf("CVE-2026-%04d", id), Severity: word,
 		}
 		attacked[id] = attackedHere[i]
 	}
-	return decisionsOf, byIssue, attacked
+	return occurrencesOf, byIssue, attacked
 }
 
-func TestNoAttackedIssueIsLeftOffABulkClaimsCard(t *testing.T) {
-	// Agreeing is refused while an attacked issue is in the claim, so it is
+func TestNoAttackedIssueIsLeftOffABulkDecisionsCard(t *testing.T) {
+	// Agreeing is refused while an attacked issue is in the decision, so it is
 	// the row an approver has to set aside. The cap gives way to it, and
 	// everything else past the cap is dropped.
 	words := make([]string, outlierRows+5)
@@ -42,8 +42,8 @@ func TestNoAttackedIssueIsLeftOffABulkClaimsCard(t *testing.T) {
 			words[i] = "critical"
 		}
 	}
-	decisionsOf, byIssue, attacked := bulkOver(words, attackedHere)
-	out := outliersOf(Claim{}, 1, decisionsOf, byIssue, nil, nil, attacked)
+	occurrencesOf, byIssue, attacked := bulkOver(words, attackedHere)
+	out := outliersOf(Decision{}, 1, occurrencesOf, byIssue, nil, nil, attacked)
 
 	if len(out.Rows) != outlierRows+2 {
 		t.Fatalf("the card carries %d rows, want every one of the %d attacked issues",
@@ -56,7 +56,7 @@ func TestNoAttackedIssueIsLeftOffABulkClaimsCard(t *testing.T) {
 	}
 }
 
-func TestABulkClaimsCardIsCappedAttackedFirstThenWorstThenByName(t *testing.T) {
+func TestABulkDecisionsCardIsCappedAttackedFirstThenWorstThenByName(t *testing.T) {
 	// Under the cap's pressure what stays is what matters most, in an order
 	// that is the same on every engine.
 	words := make([]string, outlierRows+10)
@@ -71,8 +71,8 @@ func TestABulkClaimsCardIsCappedAttackedFirstThenWorstThenByName(t *testing.T) {
 			words[i] = "critical"
 		}
 	}
-	decisionsOf, byIssue, attacked := bulkOver(words, attackedHere)
-	out := outliersOf(Claim{}, 1, decisionsOf, byIssue, nil, nil, attacked)
+	occurrencesOf, byIssue, attacked := bulkOver(words, attackedHere)
+	out := outliersOf(Decision{}, 1, occurrencesOf, byIssue, nil, nil, attacked)
 
 	if len(out.Rows) != outlierRows {
 		t.Fatalf("the card carries %d rows, want the cap of %d", len(out.Rows), outlierRows)

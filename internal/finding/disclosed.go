@@ -108,12 +108,12 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 	return out, nil
 }
 
-// AnyUndisclosed reports whether any place of this issue in this product is
+// AnyUndisclosed reports whether any occurrence of this issue in this product is
 // undisclosed, open or closed, whoever is asking.
 //
 // Asked where a statement about the whole issue is made from it, such as the
-// distribution label an advisory carries: one undisclosed place makes the
-// issue embargoed there, whichever place a reader happens to see first.
+// distribution label an advisory carries: one undisclosed occurrence makes the
+// issue embargoed there, whichever occurrence a reader happens to see first.
 func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (bool, error) {
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	held, err := db.NewSelect().
@@ -132,16 +132,16 @@ func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID 
 // undisclosedHere reads whether anything of this issue in this product is
 // undisclosed, and where its embargo ends.
 //
-// Closed places count. A place that closed while undisclosed still carries a
-// record — comments, decisions, who did what — and disclosing the issue is
-// disclosing that record too (REQ-40). The end is read from the open places,
-// which are the ones a movement reads and moves, and from the closed ones only
-// where nothing is open; it is nil where none carries a date.
+// Closed occurrences count. An occurrence that closed while undisclosed still
+// carries a record — comments, decisions, who did what — and disclosing the
+// issue is disclosing that record too (REQ-40). The end is read from the open
+// occurrences, which are the ones a movement reads and moves, and from the
+// closed ones only where nothing is open; it is nil where none carries a date.
 func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (*time.Time, error) {
 	var held struct {
-		Places int        `bun:"places"`
-		Public int        `bun:"public"`
-		Ends   *time.Time `bun:"ends"`
+		Occurrences int        `bun:"places"`
+		Public      int        `bun:"public"`
+		Ends        *time.Time `bun:"ends"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().
@@ -159,7 +159,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 		return nil, fmt.Errorf("read whether this issue is undisclosed: %w", err)
 	}
 	switch {
-	case held.Places > 0:
+	case held.Occurrences > 0:
 		return held.Ends, nil
 	case held.Public > 0:
 		return nil, ErrDisclosed
@@ -168,14 +168,15 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 	}
 }
 
-// makePublic turns every place of one issue in one product public, open and
-// closed, along with every decision made about it there and every lead moved
-// into its case.
+// makePublic turns every occurrence of one issue in one product public, open
+// and closed, along with every decision occurrence recorded about it there and
+// every lead moved into its case.
 //
-// A decision carries the visibility of the finding it was made about, so that
-// who may reach it is answered by the row. Left behind, the decisions of a
-// disclosed issue would stay readable only to the people who could read it
-// before, which is the opposite of what disclosing says.
+// A decision occurrence carries the visibility of the finding it was recorded
+// about, so that who may reach it is answered by the row. Left behind, the
+// decision occurrences of a disclosed issue would stay readable only to the
+// people who could read it before, which is the opposite of what disclosing
+// says.
 //
 // The disclosure date goes with it. A public finding carries none, and one
 // left behind is read back as the date an embargo ends that has already
@@ -192,15 +193,15 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 		Exec(ctx); err != nil {
 		return fmt.Errorf("disclose the findings: %w", err)
 	}
-	if _, err := db.NewUpdate().TableExpr(`"decision"`).
+	if _, err := db.NewUpdate().TableExpr(`"decision_occurrence"`).
 		Set(`"visibility" = ?`, access.Public).
 		Where(`"product_id" = ?`, productID).
-		// Every decision about the issue, including those filed under an
-		// issue that merged into it.
+		// Every decision occurrence about the issue, including those filed
+		// under an issue that merged into it.
 		Where(FiledUnder(filed.Issue), vulnerabilityID).
 		Where(`"visibility" = ?`, access.Private).
 		Exec(ctx); err != nil {
-		return fmt.Errorf("disclose the decisions: %w", err)
+		return fmt.Errorf("disclose the decision occurrences: %w", err)
 	}
 	// A lead moved into the case is part of the record disclosed with it.
 	return leadsFollow(ctx, db, productID, vulnerabilityID, now)
@@ -211,9 +212,9 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 type Audience struct {
 	Product       string
 	Vulnerability string
-	// People is every person holding a place of the issue in the product,
-	// open or closed. People only: a place in a team's queue has nobody to
-	// tell, and the queue itself shows the change.
+	// People is every person holding an occurrence of the issue in the product,
+	// open or closed. People only: an occurrence in a team's queue has nobody
+	// to tell, and the queue itself shows the change.
 	People []int64
 }
 

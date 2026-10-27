@@ -12,10 +12,10 @@ import (
 )
 
 func TestTheFindingPackageNamesTheSameDismissalsAsTriage(t *testing.T) {
-	// A duplicate may only point at work still open, and a place dismissed
+	// A duplicate may only point at work still open, and an occurrence dismissed
 	// is not open. The finding package cannot import this one, so it spells
 	// the list; an outcome added here and not there would count a dismissed
-	// place as open.
+	// occurrence as open.
 	var owned []string
 	for _, each := range triage.OutcomesDismissing() {
 		owned = append(owned, string(each))

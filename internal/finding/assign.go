@@ -51,7 +51,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 }
 
 // asPieces keeps a write to the kinds whose work is an issue at a component:
-// the findings list's kinds. A lead is one place, named by moveLead, and an
+// the findings list's kinds. A lead is one occurrence, named by moveLead, and an
 // analyzer rule at a component is many leads rather than one piece of work.
 func asPieces(q *bun.UpdateQuery) *bun.UpdateQuery {
 	kinds, kindArgs := kind.Triage.Where(`"kind"`)
@@ -80,7 +80,7 @@ func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subjec
 	update := naming(db.NewUpdate().Model((*Finding)(nil)).
 		Where(kinds, kindArgs...).
 		// Across the product's builds, not one of them. The same code
-		// built as several variants is one piece of work — a judgment
+		// built as several variants is one piece of work — a decision
 		// carries no variant, so somebody taking this on has taken on
 		// every build of the product holding the same component.
 		// Assigning one build left the identical work unassigned
@@ -212,11 +212,11 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 // Assign records who is dealing with an issue in a component, across every
 // build of one product that holds it.
 //
-// Set for the whole group at once rather than per place: assigning one place
-// of an issue and not another is not something anybody means to do, and the
-// places of a group are the same problem seen from several parents. Across
-// builds for the same reason — the same code built as several variants is
-// one piece of work, and it is answered by one judgment.
+// Set for the whole group at once rather than per occurrence: assigning one
+// occurrence of an issue and not another is not something anybody means to do,
+// and the occurrences of a group are the same problem seen from several
+// parents. Across builds for the same reason — the same code built as several
+// variants is one piece of work, and it is answered by one decision.
 //
 // Assigning to nobody is how something is handed back, and is deliberately the
 // same operation — taking work back is not a different kind of act from giving
@@ -253,8 +253,8 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 // assign is Assign inside the transaction it opened.
 //
 // One transaction, because whether the recipient may hold the work depends on
-// what is open there, and a scan recording an undisclosed place between a read
-// of that and the write would hand the new row over unasked.
+// what is open there, and a scan recording an undisclosed occurrence between a
+// read of that and the write would hand the new row over unasked.
 func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
 	componentID int64, to *int64, admits Admits) (int64, []access.Visibility, error) {
 
@@ -347,7 +347,7 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 	// from where it stands. Asked after the write and narrowed the same
 	// way, so it describes what actually moved. Any one row answers: they
 	// are one issue at one component in one build, and visibility belongs
-	// to the finding rather than to the place.
+	// to the finding rather than to the occurrence.
 	//
 	// Asked of every visibility rather than of what the caller may read: what
 	// moved carries its visibility to whoever now holds it, whether or not the
@@ -598,10 +598,10 @@ type Holding struct {
 	// Open is how many pieces of work they hold — an issue in a component
 	// in a product, which is the unit everything else here counts in.
 	Open int `bun:"open"`
-	// Places is how many findings those cover. The fan-out, kept alongside
-	// rather than instead: one kernel flaw at forty-eight places is one thing
-	// to answer and forty-eight rows to write, and both are worth saying.
-	Places int `bun:"places"`
+	// Occurrences is how many findings those cover. The fan-out, kept alongside
+	// rather than instead: one kernel flaw at forty-eight occurrences is one
+	// thing to answer and forty-eight rows to write, and both are worth saying.
+	Occurrences int `bun:"places"`
 	// Overdue is how much of it is past its deadline. The number that says
 	// whether somebody is holding work or sitting on it — a large open count
 	// on somebody who is keeping up is not the same signal at all.
@@ -694,8 +694,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	// the four engines, and a cast to make it an integer is exactly the kind
 	// of engine-specific spelling that has already been wrong here once.
 	var spread []struct {
-		PersonID int64 `bun:"person_id"`
-		Places   int   `bun:"places"`
+		PersonID    int64 `bun:"person_id"`
+		Occurrences int   `bun:"places"`
 	}
 	if err := mine().
 		ColumnExpr(`"f"."assigned_to" AS "person_id"`).
@@ -704,12 +704,12 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		Scan(ctx, &spread); err != nil {
 		return nil, fmt.Errorf("read how far what they hold reaches: %w", err)
 	}
-	places := map[int64]int{}
+	occurrences := map[int64]int{}
 	for _, row := range spread {
-		places[row.PersonID] = row.Places
+		occurrences[row.PersonID] = row.Occurrences
 	}
 	for i := range held {
-		held[i].Places = places[held[i].PartyID]
+		held[i].Occurrences = occurrences[held[i].PartyID]
 	}
 
 	// counted is how much of it is late. One pass, against the deadline stored
@@ -728,8 +728,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	}
 	//
 	// Counted in the same units as the rest of this: a piece of work is late
-	// when any of its places is. The alternative reads worse in both
-	// directions — a group with one late place among forty is late, and
+	// when any of its occurrences is. The alternative reads worse in both
+	// directions — a group with one late occurrence among forty is late, and
 	// calling it a fortieth of one is a number nobody acts on.
 	standing, args := OffTheClock(`"st"."product_id"`, s.now())
 	late := mine().
@@ -797,41 +797,41 @@ type Owned struct {
 	// OpenedAt is when the newest of them opened, which is what "since the
 	// last digest" is measured against.
 	OpenedAt time.Time `bun:"opened_at"`
-	// Places is how many findings this covers, across every build it is in.
-	// It is what a judgment here would be recorded against.
-	Places int `bun:"places"`
+	// Occurrences is how many findings this covers, across every build it is in.
+	// It is what a decision here would be recorded against.
+	Occurrences int `bun:"places"`
 	// Builds is how many builds hold it. One is the ordinary answer and reads
 	// as it always did; more than one is the whole point of collapsing them.
 	Builds int `bun:"builds"`
-	// Place is the lead's place where this is a lead, and empty for any
-	// other finding. A lead is one piece of work at one place, whatever
+	// Occurrence is the lead's occurrence where this is a lead, and empty for any
+	// other finding. A lead is one piece of work at one occurrence, whatever
 	// component its builds name.
-	Place string `bun:"place"`
+	Occurrence string `bun:"place"`
 }
 
-// leadPlace is the place of the finding under "f" where it is a lead, and
-// the empty string for any other kind.
-const leadPlace = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."place_identity" ELSE '' END`
+// leadOccurrence is the occurrence of the finding under "f" where it is a lead,
+// and the empty string for any other kind.
+const leadOccurrence = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
 
 // notHandedOff is whether the finding under "f", in the product of the
 // stream under "st", is no lead handed off as a flaw. A handed-off lead is
 // closed work for its holder: its flaw is held and listed as itself.
 const notHandedOff = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."place_identity" = "f"."place_identity")`
+	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // notHandedOffIn is notHandedOff over the finding under "f" alone, in the
 // product its build is in, for a statement that joins no stream.
 const notHandedOffIn = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 	JOIN "stream" AS "hs" ON "hs"."product_id" = "lh"."product_id"
 	JOIN "target" AS "ht" ON "ht"."stream_id" = "hs"."id"
-	WHERE "ht"."id" = "f"."target_id" AND "lh"."place_identity" = "f"."place_identity")`
+	WHERE "ht"."id" = "f"."target_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // pieceOfWork is what one piece of work held is grouped by, over the finding
 // under "f" and its stream under "st": an issue in a component in a product,
 // or one lead in a product. A lead's builds may name different versions of
-// its component, and it is still one place to judge.
+// its component, and it is still one occurrence to judge.
 const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` +
-	`CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN 0 ELSE "f"."component_id" END, ` + leadPlace
+	`CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN 0 ELSE "f"."component_id" END, ` + leadOccurrence
 
 // Unassigned reports the work nobody is dealing with, across every product the
 // subject may see, most urgent first.
@@ -840,22 +840,21 @@ const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` +
 // per-product problem — it is exactly the thing that hides when every screen
 // is scoped to one product and nobody looks at the others.
 //
-// One item per issue in a component in a product, not one per build
-// . Variants are mostly the same thing built twice: a decision is keyed
-// on the product, the place and the upstream versions and carries no variant,
-// so answering this on one build answers it on every build of that product
-// holding the same code. Listed per build, a second variant doubled this
-// screen while doubling none of the work — which is how a queue stops being
-// read.
+// One item per issue in a component in a product, not one per build . Variants
+// are mostly the same thing built twice: a decision occurrence is keyed on the
+// product, the occurrence and the upstream versions and carries no variant, so
+// answering this on one build answers it on every build of that product holding
+// the same code. Listed per build, a second variant doubled this screen while
+// doubling none of the work — which is how a queue stops being read.
 //
 // Genuine differences still break out, and they break out by themselves. A
 // component row is one name at one version, shared by every build that ships
 // it, so two variants at the same version group together and two at different
 // versions do not. Nothing here has to decide which case it is looking at.
 //
-// The product stays in the key. A decision is a claim about one product's code
+// The product stays in the key. A decision is about one product's code
 // , so two products shipping the identical component at the identical version
-// are two judgments, and merging them would offer one answer for work that is
+// are two decisions, and merging them would offer one answer for work that is
 // answered separately.
 func (s *Store) Unassigned(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int) ([]Owned, int, error) {
@@ -870,7 +869,7 @@ func (s *Store) Unassigned(ctx context.Context, subject access.Subject, scope Sc
 // The same shape deliberately. "What is waiting for me" and "what is waiting
 // for nobody" are the same question asked of a different holder, and answering
 // them in two shapes is how a screen ends up saying somebody holds ninety
-// things because it counted places where the other counted judgments.
+// things because it counted occurrences where the other counted decisions.
 func (s *Store) AssignedTo(ctx context.Context, c kind.Consumer, subject access.Subject, parties []int64,
 	scope Scope, limit, offset int) ([]Owned, int, error) {
 
@@ -989,8 +988,8 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		Urgency         int64     `bun:"urgency"`
 		Exploited       int       `bun:"exploited"`
 		ExploitedHere   int       `bun:"exploited_here"`
-		Places          int       `bun:"places"`
-		Place           string    `bun:"place"`
+		Occurrences     int       `bun:"places"`
+		Occurrence      string    `bun:"place"`
 		Total           int       `bun:"total"`
 		Undisclosed     bool      `bun:"undisclosed"`
 		OpenedAt        time.Time `bun:"opened_at"`
@@ -1000,7 +999,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		// The lowest of a lead's components, as one of its builds names it.
 		// Every other piece of work is one component.
 		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
-		ColumnExpr(`MAX(`+leadPlace+`) AS "place"`).
+		ColumnExpr(`MAX(`+leadOccurrence+`) AS "place"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		// One of the builds, and how many there are. The one is what a link
 		// and an action need somewhere to point; the count is what stops a
@@ -1012,11 +1011,11 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
-		// The oldest place decides, as it does everywhere else here: a group
-		// open for a month with one place added yesterday has been somebody's
-		// problem for a month, and a maximum made it read as a day old — so
-		// the unassigned queue and the digest built on it sorted a six-week
-		// backlog item as new work.
+		// The oldest occurrence decides, as it does everywhere else here: a
+		// group open for a month with one occurrence added yesterday has been
+		// somebody's problem for a month, and a maximum made it read as a day
+		// old — so the unassigned queue and the digest built on it sorted a
+		// six-week backlog item as new work.
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
 		// Any undisclosed row makes the group undisclosed. Written as a sum
 		// rather than a boolean aggregate: the four engines do not agree on
@@ -1029,7 +1028,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(pieceOfWork).
 		OrderExpr(`"urgency" DESC, "f"."vulnerability_id", MIN("f"."component_id"), "st"."product_id", `+
-			`MAX(`+leadPlace+`)`).
+			`MAX(`+leadOccurrence+`)`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &heads)
 	if err != nil {
@@ -1091,8 +1090,8 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		row := Owned{
 			VulnerabilityID: head.VulnerabilityID, ComponentID: head.ComponentID,
 			ProductID: head.ProductID,
-			Urgency:   head.Urgency, Places: head.Places, Builds: head.Builds,
-			Undisclosed: head.Undisclosed, OpenedAt: head.OpenedAt, Place: head.Place,
+			Urgency:   head.Urgency, Occurrences: head.Occurrences, Builds: head.Builds,
+			Undisclosed: head.Undisclosed, OpenedAt: head.OpenedAt, Occurrence: head.Occurrence,
 			Exploited: head.Exploited == 1, ExploitedHere: head.ExploitedHere == 1,
 		}
 		if issue, held := named[head.VulnerabilityID]; held {

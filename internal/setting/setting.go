@@ -14,6 +14,7 @@ package setting
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -110,7 +111,7 @@ const (
 	OwnDueHigh      = "remediation.own.due.high"
 	OwnDueMedium    = "remediation.own.due.medium"
 	OwnDueLow       = "remediation.own.due.low"
-	// TogetherCap is how many reports one ruling may cover, how many places
+	// BulkDecisionCap is how many reports one ruling may cover, how many occurrences
 	// one answer about one issue may cover, and how many rows a screen acts
 	// on one request at a time. A bound rather than none, because a single
 	// action writing an unbounded number of rows is a denial of service
@@ -121,11 +122,11 @@ const (
 	// either. The distinction is reversibility rather than size: nothing
 	// re-checks a dismissal, while the next scan re-checks every row a
 	// promise names.
-	TogetherCap = "triage.together-cap"
+	BulkDecisionCap = "triage.bulk-decision-cap"
 	// ReviewIssues is how many issues one act may answer where a second
 	// person has to agree to it: a new answer about many issues at once, or
 	// one carried or re-confirmed that goes back to an approver. It counts
-	// issues rather than places, because issues are what a reviewer reads.
+	// issues rather than occurrences, because issues are what a reviewer reads.
 	ReviewIssues = "triage.review-issues"
 	// LeadRuleGrowth is how many times the leads its approver was shown a
 	// standing rule naming an analyzer rule may cover before it asks to be
@@ -281,14 +282,14 @@ const (
 	// asked to send again.
 	UploadsAtOnce = "upload.max-concurrent"
 	// RoutingBatch is how many findings one pass of the routing sweep may
-	// place. A bulk judgment is bounded, and the bound is a setting: an
+	// place. A bulk decision is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
 	RoutingBatch = "routing.batch"
 	// SavedPerPerson is how many filters one person may keep.
 	//
 	// A ceiling on rows one person writes one at a time, which is the
-	// neighboring case to a bulk judgment and is bounded for the same reason:
+	// neighboring case to a bulk decision and is bounded for the same reason:
 	// nothing else stopped a script, or a keyboard shortcut held down, from
 	// filling the table — and the panel that lists them reads every row it
 	// finds on every open. Settable because how many narrowings a person
@@ -306,18 +307,18 @@ const (
 	// Settings rather than constants for the reason every other threshold
 	// here is one: what counts as stale is a judgment about a deployment.
 	// A team approving twice a week and a team approving twice a day
-	// disagree about when a claim has been waiting too long, and neither
+	// disagree about when a decision has been waiting too long, and neither
 	// is wrong.
 	//
-	// Four rather than one, because they are four different waits. A claim
+	// Four rather than one, because they are four different waits. A decision
 	// waiting on a second person is somebody else's turn and the ordinary
-	// case is days; a claim sent back is the proposer's own turn and
+	// case is days; a decision sent back is the proposer's own turn and
 	// should be shorter, because they were asked a question; a deferral
 	// ending needs enough warning to do the work again before it lapses;
 	// and a team queue is nobody's turn at all, which is why it is the one
 	// that hides.
 	WaitingAfter = "triage.waiting-after"
-	// SentBackAfter is how long a claim an approver asked more of may sit
+	// SentBackAfter is how long a decision an approver asked more of may sit
 	// untouched before its proposer is told again.
 	SentBackAfter = "triage.sent-back-after"
 	// DeferralLead is how long before a deferral's end date its proposer hears
@@ -363,7 +364,7 @@ const DefaultAbsentAfter = 14 * 24 * time.Hour
 
 // The four staleness periods where nobody has said.
 //
-// A working week for a claim waiting on somebody else, which is long enough
+// A working week for a decision waiting on somebody else, which is long enough
 // that an approver who reviews on Fridays is not told about Monday's work on
 // Tuesday. Three days for one sent back, because the question was asked of the
 // person who is already holding it. A week of warning before a deferral ends,
@@ -400,13 +401,13 @@ const DefaultRoutingBatch = 2000
 // hundred is a suspicious number.
 const DefaultSavedPerPerson = 100
 
-// DefaultTogetherCap is how many rows one ruling, one answer about one issue,
+// DefaultBulkDecisionCap is how many rows one ruling, one answer about one issue,
 // or one screen's loop may reach where nobody has said.
 //
 // The bound is there because an unbounded write is something somebody
 // triggers by accident, and because one click that becomes a request per row
 // has to stay a size a screen can finish.
-const DefaultTogetherCap = 2000
+const DefaultBulkDecisionCap = 2000
 
 // DefaultReviewIssues is how many issues a second person is asked to read in
 // one act where nobody has said. A kernel answer over 805 issues is five acts
@@ -656,7 +657,22 @@ func NewStore(db bun.IDB) *Store {
 // deciding which deferrals need a second person. A policy that quietly becomes
 // a different policy under load is the kind of failure nobody finds, because
 // nothing anywhere reports it.
+//
+// A setting with a former name answers from a row under that name where none
+// is under its own, so a value written there still holds.
 func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
+	value, set, err := s.read(ctx, name)
+	if err != nil || set {
+		return value, set, err
+	}
+	if former, ok := formerNames[name]; ok {
+		return s.read(ctx, former)
+	}
+	return "", false, nil
+}
+
+// read reads the row under one name.
+func (s *Store) read(ctx context.Context, name string) (string, bool, error) {
 	row := new(Setting)
 	switch err := s.db.NewSelect().Model(row).Where(`"name" = ?`, name).Scan(ctx); {
 	case database.IsNoRows(err):
@@ -665,6 +681,68 @@ func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
 		return "", false, fmt.Errorf("read the %q setting: %w", name, err)
 	}
 	return row.Value, true, nil
+}
+
+// formerNames is the name each renamed setting had, by its name now. The
+// upgrade that renamed it moves the row; a row under the former name is one a
+// binary of the earlier release wrote afterwards.
+var formerNames = map[string]string{
+	BulkDecisionCap: "triage.together-cap",
+}
+
+// clearFormer removes the row under a setting's former name, inside the
+// transaction writing the setting, and answers what it held.
+func clearFormer(ctx context.Context, tx bun.IDB, name string) (string, bool, error) {
+	former, ok := formerNames[name]
+	if !ok {
+		return "", false, nil
+	}
+	row := new(Setting)
+	switch err := tx.NewSelect().Model(row).Where(`"name" = ?`, former).Scan(ctx); {
+	case database.IsNoRows(err):
+		return "", false, nil
+	case err != nil:
+		return "", false, fmt.Errorf("read the %q setting: %w", former, err)
+	}
+	if _, err := tx.NewDelete().Model((*Setting)(nil)).Where(`"name" = ?`, former).Exec(ctx); err != nil {
+		return "", false, fmt.Errorf("clear the %q setting: %w", former, err)
+	}
+	return row.Value, true, nil
+}
+
+// FormerName is a row held under a setting's former name.
+type FormerName struct {
+	// Former is the name the row is under, and Name the one the setting has.
+	Former, Name string
+	// Shadowed says a row under Name is set too, which is the one read.
+	Shadowed bool
+}
+
+// FormerNames is every row held under a setting's former name, in the order
+// of the names they stand for.
+func (s *Store) FormerNames(ctx context.Context) ([]FormerName, error) {
+	names := make([]string, 0, len(formerNames))
+	for name := range formerNames {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	var out []FormerName
+	for _, name := range names {
+		former := formerNames[name]
+		_, held, err := s.read(ctx, former)
+		if err != nil {
+			return nil, err
+		}
+		if !held {
+			continue
+		}
+		_, shadowed, err := s.read(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, FormerName{Former: former, Name: name, Shadowed: shadowed})
+	}
+	return out, nil
 }
 
 // Change records a setting and answers what it replaced.
@@ -726,6 +804,14 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 			before, had = held.Value, true
 		}
 
+		// A row under the setting's former name is what was read while the
+		// name was unset, so it is what this replaces, and it goes: the
+		// setting is held under one name from here.
+		formerValue, formerHeld, err := clearFormer(ctx, tx, name)
+		if err != nil {
+			return err
+		}
+
 		if s.beforeWrite != nil {
 			s.beforeWrite()
 		}
@@ -743,6 +829,9 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 					return fmt.Errorf("record the %q setting: %w", name, database.ErrGoAgain)
 				}
 				return fmt.Errorf("record the %q setting: %w", name, err)
+			}
+			if formerHeld {
+				before, had = formerValue, true
 			}
 			return nil
 		}

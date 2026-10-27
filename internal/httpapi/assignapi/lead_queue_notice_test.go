@@ -51,13 +51,13 @@ func queueNotices(t *testing.T, r *httpapitest.Reach, who string) []string {
 // read internal work, as any queued work is, and to nobody else on the team.
 func TestALeadLeftInATeamsQueueIsToldToTheMembersWhoReadIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		granted(t, r, "internal-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
 			`{"name":"analysis-desk","members":["internal-reader","reader"]}`); made.Code != http.StatusCreated {
 			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("queueing the lead with the team answered %d: %s", got.Code, got.Body)
 		}
@@ -66,7 +66,7 @@ func TestALeadLeftInATeamsQueueIsToldToTheMembersWhoReadIt(t *testing.T) {
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
 			Set(`"assigned_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
-			Where(`"place_identity" = ?`, place).Exec(t.Context()); err != nil {
+			Where(`"occurrence_identity" = ?`, occurrence).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		told := queueNotices(t, r, "internal-reader")
@@ -77,12 +77,12 @@ func TestALeadLeftInATeamsQueueIsToldToTheMembersWhoReadIt(t *testing.T) {
 			t.Errorf("a member reading only disclosed work was told of internal work: %q", told)
 		}
 		// Judged, it is being worked on, and no longer waits in the queue.
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
 		if told := queueNotices(t, r, "internal-reader"); len(told) != 0 {
-			t.Errorf("a lead a claim stands on was still told as waiting: %q", told)
+			t.Errorf("a lead a decision stands on was still told as waiting: %q", told)
 		}
 	})
 }

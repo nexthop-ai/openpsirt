@@ -36,12 +36,12 @@ type BundleBody struct {
 	To       string `json:"to" doc:"The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped"`
 	// Components are the names this bundle moves, which is what makes a
 	// bundle keyed on a source package readable.
-	Components []string `json:"components" doc:"The packages this one upgrade moves. More than one where a source package builds several"`
-	Issues     int      `json:"issues" doc:"Distinct vulnerabilities the upgrade closes"`
-	Places     int      `json:"places" doc:"The number of findings those sit at"`
-	Builds     int      `json:"builds,omitempty" doc:"The number of builds of the selection holding any of it. Absent where the selection is one build"`
-	Severity   string   `json:"severity,omitempty" doc:"The worst of what it closes"`
-	Exploited  bool     `json:"exploited,omitempty" doc:"Some of what it closes is being exploited"`
+	Components  []string `json:"components" doc:"The packages this one upgrade moves. More than one where a source package builds several"`
+	Issues      int      `json:"issues" doc:"Distinct vulnerabilities the upgrade closes"`
+	Occurrences int      `json:"occurrences" doc:"The number of findings those sit at"`
+	Builds      int      `json:"builds,omitempty" doc:"The number of builds of the selection holding any of it. Absent where the selection is one build"`
+	Severity    string   `json:"severity,omitempty" doc:"The worst of what it closes"`
+	Exploited   bool     `json:"exploited,omitempty" doc:"Some of what it closes is being exploited"`
 	// ExploitedHere is the other exploitation signal, and the one that
 	// outranks it: a bundle carrying it closes something this product was
 	// attacked through.
@@ -76,7 +76,7 @@ func (q BundleQuery) narrow(floor finding.Floor) finding.Filter {
 	return finding.Filter{
 		MinSeverity: string(q.Severity), Exploited: q.Exploited,
 		Components: []string{q.Component}, Search: q.Search,
-		Ecosystems: []string{q.Ecosystem}, States: []finding.ClaimStanding{finding.ClaimStanding(q.State)},
+		Ecosystems: []string{q.Ecosystem}, States: []finding.DecisionStanding{finding.DecisionStanding(q.State)},
 		BundleSort: finding.BundleSortKey(q.Sort), Ascending: q.Ascending,
 		Floor: floor,
 	}
@@ -94,13 +94,13 @@ func registerBundles(api huma.API, in core.Deps) {
 			"libcurl4t64 and libcurl3t64 are upgraded once.\n\n" +
 			"Only what has a fix: a bundle is a version to move to, so a finding upstream has " +
 			"released nothing for is not in one.\n\n" +
-			"Grouping is presentation: one act still writes one decision per component and " +
-			"per place.\n\n" +
+			"Grouping is presentation: one act still records its decision separately at " +
+			"every occurrence of every component.\n\n" +
 			"Takes the same selection as the findings list, and six of its filters: " +
 			"severity, exploited, component, search, ecosystem and state. Not the rest: a " +
-			"filter that answers about a place or a deadline has no row here to narrow.\n\n" +
+			"filter that answers about an occurrence or a deadline has no row here to narrow.\n\n" +
 			"Ordered worst first, and `sort` takes any of: what the upgrade would close " +
-			"(`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is " +
+			"(`issues`, `occurrences`), how far it reaches (`builds`), how bad the worst of it is " +
 			"(`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). " +
 			"`asc` orders the other way. The default answers what should worry you; " +
 			"`sort=issues` answers what to do this afternoon.\n\n" +
@@ -172,7 +172,7 @@ func registerBundles(api huma.API, in core.Deps) {
 			What:  "findings by upgrade",
 			About: []core.Stated{{Label: "triaged at or above", Value: line}},
 			Header: []string{
-				"upstream", "from", "to", "components", "issues", "places",
+				"upstream", "from", "to", "components", "issues", "occurrences",
 				"builds", "severity", "exploited", "exploited here", "in",
 			},
 			// Paged through the store the screen reads, so the file is the
@@ -198,7 +198,7 @@ func registerBundles(api huma.API, in core.Deps) {
 					rows = append(rows, []string{
 						body.Upstream, body.From, body.To,
 						strings.Join(body.Components, " "),
-						strconv.Itoa(body.Issues), strconv.Itoa(body.Places),
+						strconv.Itoa(body.Issues), strconv.Itoa(body.Occurrences),
 						count, body.Severity,
 						strconv.FormatBool(body.Exploited),
 						strconv.FormatBool(body.ExploitedHere),
@@ -221,7 +221,7 @@ func bundleBodies(bundles []finding.Bundle, oneBuild bool) []BundleBody {
 		body := BundleBody{
 			Upstream: bundle.Upstream, From: bundle.From, To: bundle.To,
 			Components: bundle.Components,
-			Issues:     bundle.Issues, Places: bundle.Places,
+			Issues:     bundle.Issues, Occurrences: bundle.Occurrences,
 			Severity: bundle.Severity, Exploited: bundle.Exploited,
 			ExploitedHere: bundle.ExploitedHere,
 			In:            make([]BuildName, 0, len(bundle.In)),
@@ -247,14 +247,14 @@ type BuildName struct {
 
 // PlannedBody is one bump a release is waiting on.
 type PlannedBody struct {
-	Fold       string   `json:"fold" doc:"The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"`
-	Upstream   string   `json:"upstream" doc:"The name: the source package"`
-	From       string   `json:"from"`
-	To         string   `json:"to" doc:"The version it moves to, as the commitment recorded it"`
-	Components []string `json:"components"`
-	Issues     int      `json:"issues" doc:"Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"`
-	Places     int      `json:"places" doc:"The number of findings those issues sit at"`
-	DeclaredAt string   `json:"declared_at" doc:"The moment the commitment was made, which is what this release has been waiting since"`
+	Fold        string   `json:"fold" doc:"The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"`
+	Upstream    string   `json:"upstream" doc:"The name: the source package"`
+	From        string   `json:"from"`
+	To          string   `json:"to" doc:"The version it moves to, as the commitment recorded it"`
+	Components  []string `json:"components"`
+	Issues      int      `json:"issues" doc:"Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"`
+	Occurrences int      `json:"occurrences" doc:"The number of findings those issues sit at"`
+	DeclaredAt  string   `json:"declared_at" doc:"The moment the commitment was made, which is what this release has been waiting since"`
 	// By, HeldBy and State are the promise, who is carrying it, and where
 	// it stands. The state is derived on every read from the scans and the
 	// date, and set by nobody.
@@ -262,9 +262,9 @@ type PlannedBody struct {
 	HeldBy     string            `json:"held_by,omitempty" doc:"The identity or team name of the party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
 	HeldByName string            `json:"held_by_name,omitempty" doc:"The carrying party's display name, where it differs from held_by"`
 	State      core.UpgradeState `json:"state" doc:"The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
-	// ClaimID is the claim that argued for it, which is the way through to
+	// DecisionID is the decision that argued for it, which is the way through to
 	// the reasoning, the approval and the conversation about the upgrade.
-	ClaimID int64 `json:"claim_id,omitempty" doc:"The claim that argued for it, where one did: its reasoning, its approval and its comments"`
+	DecisionID int64 `json:"decision_id,omitempty" doc:"The decision that argued for it, where one did: its reasoning, its approval and its comments"`
 }
 
 func registerPendingUpgrades(api huma.API, in core.Deps) {
@@ -349,8 +349,8 @@ func registerPendingUpgrades(api huma.API, in core.Deps) {
 				{Label: "build", Value: input.Product + " " + input.Stream + " (" + input.Variant + ")"},
 			},
 			Header: []string{
-				"upstream", "from", "to", "components", "issues", "places",
-				"declared_at", "by", "held_by", "held_by_name", "state", "claim",
+				"upstream", "from", "to", "components", "issues", "occurrences",
+				"declared_at", "by", "held_by", "held_by_name", "state", "decision",
 			},
 			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
 				page := core.Window(rows, limit, offset)
@@ -359,15 +359,15 @@ func registerPendingUpgrades(api huma.API, in core.Deps) {
 				}
 				written := make([][]string, 0, len(page))
 				for _, row := range page {
-					claim := ""
-					if row.ClaimID != 0 {
-						claim = strconv.FormatInt(row.ClaimID, 10)
+					decision := ""
+					if row.DecisionID != 0 {
+						decision = strconv.FormatInt(row.DecisionID, 10)
 					}
 					written = append(written, []string{
 						row.Upstream, row.From, row.To,
 						strings.Join(row.Components, " "),
-						strconv.Itoa(row.Issues), strconv.Itoa(row.Places),
-						row.DeclaredAt, row.By, row.HeldBy, row.HeldByName, string(row.State), claim,
+						strconv.Itoa(row.Issues), strconv.Itoa(row.Occurrences),
+						row.DeclaredAt, row.By, row.HeldBy, row.HeldByName, string(row.State), decision,
 					})
 				}
 				return written, nil
@@ -387,11 +387,11 @@ func plannedBodies(planned []finding.Planned) []PlannedBody {
 		row := PlannedBody{
 			Fold: one.Fold, Upstream: one.Upstream, From: one.From, To: one.To,
 			Components: one.Components,
-			Issues:     one.Issues, Places: one.Places,
+			Issues:     one.Issues, Occurrences: one.Occurrences,
 			DeclaredAt: one.DeclaredAt.UTC().Format(time.DateOnly),
 			HeldBy:     one.HeldBy, HeldByName: core.LabelBeside(one.HeldByName, one.HeldBy),
-			State:   core.UpgradeState(one.State),
-			ClaimID: one.ClaimID,
+			State:      core.UpgradeState(one.State),
+			DecisionID: one.DecisionID,
 		}
 		if row.Components == nil {
 			row.Components = []string{}

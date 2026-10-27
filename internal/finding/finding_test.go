@@ -67,7 +67,7 @@ var (
 )
 
 // shipped stores a graph: libnl sits under two consumers, which is the case
-// the whole place definition exists for.
+// the whole occurrence definition exists for.
 func (f *fixture) shipped(t *testing.T, snap graph.Snapshot) {
 	t.Helper()
 	f.seq++
@@ -351,21 +351,23 @@ func (f *fixture) somebodyElse(t *testing.T) int64 {
 	return person.ID
 }
 
-// decisionRow is one decision a test writes directly, as the triage store
-// would have written it. A zero field takes the value every writer here
+// decisionRow is one decision occurrence a test writes directly, as the triage
+// store would have written it. A zero field takes the value every writer here
 // shares; a nil version and an empty key leave their column unset.
 type decisionRow struct {
 	By int64
-	// Claim is the claim the row belongs to. Zero records a dismissal by By.
-	Claim int64
+	// Decision is the decision the row belongs to. Zero records a dismissal by
+	// By.
+	Decision int64
 	// Product is the fixture's product where zero.
-	Product int64
-	Issue   int64
-	Place   string
-	State   string
+	Product    int64
+	Issue      int64
+	Occurrence string
+	State      string
 	// Visibility is public where empty.
 	Visibility string
-	// Unreviewed is a decision that takes effect without a second person.
+	// Unreviewed is a decision occurrence that takes effect without a second
+	// person.
 	Unreviewed          bool
 	Component, Consumer *string
 	Key                 string
@@ -374,11 +376,11 @@ type decisionRow struct {
 	SentBack, Ended *time.Time
 }
 
-// decision writes one decision row.
+// decision writes one decision occurrence row.
 func (f *fixture) decision(t *testing.T, d decisionRow) {
 	t.Helper()
-	if d.Claim == 0 {
-		d.Claim = claimBy(t, f.db, d.By)
+	if d.Decision == 0 {
+		d.Decision = decisionBy(t, f.db, d.By)
 	}
 	if d.Product == 0 {
 		d.Product = f.productID
@@ -390,8 +392,8 @@ func (f *fixture) decision(t *testing.T, d decisionRow) {
 		d.ProposedAt = time.Now().UTC()
 	}
 	row := map[string]any{
-		"claim_id": d.Claim, "product_id": d.Product, "vulnerability_id": d.Issue,
-		"place_identity": d.Place, "visibility": d.Visibility, "state": d.State,
+		"decision_id": d.Decision, "product_id": d.Product, "vulnerability_id": d.Issue,
+		"occurrence_identity": d.Occurrence, "visibility": d.Visibility, "state": d.State,
 		"needs_approval": !d.Unreviewed, "proposed_by": d.By, "proposed_at": d.ProposedAt,
 	}
 	if d.Component != nil {
@@ -401,8 +403,8 @@ func (f *fixture) decision(t *testing.T, d decisionRow) {
 		row["consumer_upstream_version"] = *d.Consumer
 	}
 	if d.Key != "" {
-		// Short, and not the place: the column holds sixty-four characters,
-		// which a place identity fills on its own.
+		// Short, and not the occurrence: the column holds sixty-four
+		// characters, which an occurrence identity fills on its own.
 		row["live_key"] = d.Key
 	}
 	if d.SentBack != nil {
@@ -411,8 +413,8 @@ func (f *fixture) decision(t *testing.T, d decisionRow) {
 	if d.Ended != nil {
 		row["ended_at"] = *d.Ended
 	}
-	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision"`).Exec(t.Context()); err != nil {
-		t.Fatalf("record a %s decision: %v", d.State, err)
+	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision_occurrence"`).Exec(t.Context()); err != nil {
+		t.Fatalf("record a %s decision occurrence: %v", d.State, err)
 	}
 }
 

@@ -276,7 +276,7 @@ type Subject struct {
 	// four answers that can disagree.
 	cases map[int64][]int64
 	// leads is the handed-off leads this person was granted one at a time,
-	// as places per product. It reads those leads' evidence and nothing else
+	// as occurrences per product. It reads those leads' evidence and nothing else
 	// of the product. Carried on the subject for the reason cases are.
 	leads map[int64][]string
 	// casesReadOnly takes the write half of a case grant away, for a
@@ -325,14 +325,14 @@ func (s Subject) OnCaseToAct(productID, vulnerabilityID int64) bool {
 }
 
 // OnLead reports whether this subject was granted one handed-off lead: one
-// place, in one product. Deliberately not part of Reads, for the reason OnCase
+// occurrence, in one product. Deliberately not part of Reads, for the reason OnCase
 // is not.
-func (s Subject) OnLead(productID int64, placeIdentity string) bool {
+func (s Subject) OnLead(productID int64, occurrenceIdentity string) bool {
 	if s.Kind != Person {
 		return false
 	}
-	for _, place := range s.leads[productID] {
-		if place == placeIdentity {
+	for _, occurrence := range s.leads[productID] {
+		if occurrence == occurrenceIdentity {
 			return true
 		}
 	}
@@ -610,16 +610,16 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 	return s.Holds(triage, productID)
 }
 
-// MayApprove is who may agree to somebody else's claim at one visibility: the
+// MayApprove is who may agree to somebody else's decision at one visibility: the
 // right to read there, and either the approver capability or the right to
 // triage there. At internal visibility it is the capability alone beside the
-// reading: a claim there is about a lead, and a dismissed lead is a result
+// reading: a decision there is about a lead, and a dismissed lead is a result
 // nobody acts on again, so its second person is somebody granted the right to
 // agree.
 //
 // The approver capability grants no reading of its own, so reading is asked
 // alongside it. A triager may approve disclosed and undisclosed work too: the
-// control that matters is that claimant and approver are different people,
+// control that matters is that proposer and approver are different people,
 // which is checked separately. The one spelling of the rule, for a signed-in
 // subject and for the sweeps that work out who to tell.
 func MayApprove(visibility Visibility, approver, reads, triages bool) bool {
@@ -881,7 +881,7 @@ func (s Subject) ReachesLead(productID int64) bool {
 // first, and the question about the right product runs after the row is in
 // hand and answers in the words a row that is not there gets.
 //
-// It is not a rule on its own. Every judgment here belongs to a product,
+// It is not a rule on its own. Every decision here belongs to a product,
 // including a rating (REQ-29), and "holds the role somewhere" is not "may act
 // on this".
 //

@@ -36,7 +36,7 @@ type RetiredBody struct {
 	// Negative on a release whose date has not arrived: the same figure read
 	// the other way, which is how long there is left.
 	EndedDays int `json:"ended_days" doc:"The days since support ended. Negative where the date has not arrived, which is how many days are left"`
-	Open      int `json:"open" doc:"Issues open against it, counted at components rather than at every place they sit"`
+	Open      int `json:"open" doc:"Issues open against it, counted at components rather than at every occurrence they sit at"`
 	// Ended says the date has passed. The two populations are drawn apart
 	// rather than sorted together, because one is exposure nobody can work on
 	// and the other is a date somebody can still act before.
@@ -67,7 +67,7 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 			"either. Nothing is deleted or hidden: the findings and the history stay, and stay " +
 			"reportable.\n\n" +
 			"`inherited` means the date came from the product rather than from the release " +
-			"itself. `open` counts issues at components, not one per place — the same unit " +
+			"itself. `open` counts issues at components, not one per occurrence — the same unit " +
 			"every release-level count here uses.\n\n" +
 			"`within` asks what is about to go, in days ahead. Those come back under " +
 			"`ending`, soonest first and never mixed into what has already gone: the day a " +
@@ -109,7 +109,7 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		Description: "The same answer as a file: every release you can see whose end-of-life " +
 			"date has passed, how long ago that was, and how many issues are still open " +
 			"against it.\n\n" +
-			"`open` counts issues at components rather than one per place, the same unit " +
+			"`open` counts issues at components rather than one per occurrence, the same unit " +
 			"every release-level count here uses. `inherited` means the date came from the " +
 			"product rather than from the release itself.\n\n" +
 			"`within` writes out what is about to go as well, marked `ending` in the state " +
@@ -202,8 +202,8 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 	if err != nil {
 		return nil, core.WentWrong(in.Logger, "which releases are out of support could not be read", err)
 	}
-	// The count open on each: an issue at a component, not one per place it
-	// sits at. The same count every other release-level figure here uses, so a
+	// The count open on each: an issue at a component, not one per occurrence
+	// it sits at. The same count every other release-level figure here uses, so a
 	// release reads the same on this report and on its product's own list.
 	// The findings list can show slightly fewer rows than this, because it
 	// folds sibling packages cut from one source together, and that is a

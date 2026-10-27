@@ -14,7 +14,7 @@
 
 // An ordering held by a set of candidates. An answer that has not arrived is
 // not a ranking: a count drawn as though it were ordered, off a list that
-// failed to read, is an authoritative claim about nothing.
+// failed to read, is an authoritative statement about nothing.
 export function ranked(upgrades: readonly { ordered?: boolean }[]): boolean {
   return upgrades[0]?.ordered ?? false;
 }

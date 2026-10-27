@@ -18,8 +18,8 @@ import (
 // way, which is worse, because that is the pile nothing else counts.
 func TestNamingOneWholeBuildIsNotNarrowedByWhatKindOfReleaseItIs(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
-		_ = place
+		occurrence := r.Scanned(t)
+		_ = occurrence
 
 		var onBranch struct {
 			Total int `json:"total"`

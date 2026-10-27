@@ -83,13 +83,13 @@ func TestACommitmentHidesRiskAndSaysSo(t *testing.T) {
 	}
 }
 
-// The commitment is stored with the claim, so a report asking what is promised
+// The commitment is stored with the decision, so a report asking what is promised
 // and overdue does not have to know which outcome a date belongs to.
-func TestACommitmentIsStoredWithTheClaim(t *testing.T) {
+func TestACommitmentIsStoredWithTheDecision(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		by := time.Now().UTC().Add(14 * 24 * time.Hour).Truncate(time.Second)
 		made, err := f.store.Propose(t.Context(), f.triager, triage.Proposal{
-			Place:       f.at(),
+			Occurrence:  f.at(),
 			Outcome:     triage.UpgradeNeeded,
 			CommittedTo: &by,
 			UpgradeTo:   "3.5.2",
@@ -99,21 +99,21 @@ func TestACommitmentIsStoredWithTheClaim(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if made.Claim.CommittedTo == nil {
+		if made.Decision.CommittedTo == nil {
 			t.Fatal("the date the work was promised for was not kept")
 		}
-		if !made.Claim.CommittedTo.Equal(by) {
-			t.Errorf("committed to %v, want %v", made.Claim.CommittedTo, by)
+		if !made.Decision.CommittedTo.Equal(by) {
+			t.Errorf("committed to %v, want %v", made.Decision.CommittedTo, by)
 		}
-		if made.Claim.UpgradeTo == nil || *made.Claim.UpgradeTo != "3.5.2" {
-			t.Errorf("the version it moves to is %v", made.Claim.UpgradeTo)
+		if made.Decision.UpgradeTo == nil || *made.Decision.UpgradeTo != "3.5.2" {
+			t.Errorf("the version it moves to is %v", made.Decision.UpgradeTo)
 		}
 
-		// And read back the same way, since a claim is read far more often
+		// And read back the same way, since a decision is read far more often
 		// than it is written. The column holds a day.
-		var stored triage.Claim
+		var stored triage.Decision
 		if err := f.db.DB.NewSelect().Model(&stored).
-			Where(`"cl"."id" = ?`, made.ClaimID).Scan(t.Context()); err != nil {
+			Where(`"cl"."id" = ?`, made.DecisionID).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if stored.CommittedTo == nil || stored.CommittedTo.Format(time.DateOnly) != by.Format(time.DateOnly) {

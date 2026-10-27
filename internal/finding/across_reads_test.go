@@ -18,7 +18,7 @@ import (
 )
 
 // curlTwice is one source package built as two binaries, one of them pulled in
-// at two places, carrying three issues: one on both binaries, one on each.
+// at two occurrences, carrying three issues: one on both binaries, one on each.
 func (f *fixture) curlTwice(t *testing.T) (lib, gnutls graph.Described) {
 	t.Helper()
 	lib, gnutls = builtFrom("libcurl4t64", "8.5.0-2"), builtFrom("libcurl3t64-gnutls", "8.5.0-2")
@@ -48,11 +48,11 @@ func (f *fixture) curlTwice(t *testing.T) (lib, gnutls graph.Described) {
 	return lib, gnutls
 }
 
-func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *testing.T) {
-	// The places are grouped to one row per issue on each binary before the
+func TestASourcePackageCountsEachIssueOnceAndEveryOccurrenceAcrossItsBinaries(t *testing.T) {
+	// The occurrences are grouped to one row per issue on each binary before the
 	// binaries are folded together, so what is counted per issue has to be
 	// counted again across binaries rather than summed: an issue on both is
-	// one issue, and its three places are three places.
+	// one issue, and its three occurrences are three occurrences.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		_, gnutls := f.curlTwice(t)
@@ -63,8 +63,8 @@ func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *test
 			Set(`"due_at" = ?`, later).Where(`"target_id" = ?`, f.target).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		// The soonest deadline sits on one band and the one exploited place
-		// on another, each on the binary carrying the fewest places, so
+		// The soonest deadline sits on one band and the one exploited occurrence
+		// on another, each on the binary carrying the fewest occurrences, so
 		// neither survives a fold that keeps one binary's answer or one
 		// band's.
 		mark := func(issue, column string, value any) {
@@ -91,8 +91,8 @@ func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *test
 		if got.Issues != 3 {
 			t.Errorf("%d issues, want 3: the one on both binaries counted once", got.Issues)
 		}
-		if got.Places != 6 {
-			t.Errorf("%d places, want 6: three for the issue on both binaries, two and one for the others", got.Places)
+		if got.Occurrences != 6 {
+			t.Errorf("%d occurrences, want 6: three for the issue on both binaries, two and one for the others", got.Occurrences)
 		}
 		if got.Fixable != 2 {
 			t.Errorf("%d fixable, want the 2 issues a version fixes, each once", got.Fixable)
@@ -127,7 +127,7 @@ func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *test
 }
 
 func TestAnIssueWhoseBinariesNameDifferentFixesCountsOnceUnderEach(t *testing.T) {
-	// The places are counted under the one fix an issue names across its
+	// The occurrences are counted under the one fix an issue names across its
 	// source package. An issue whose binaries disagree names two, and is
 	// counted under each of them once, and once in what is fixable. In
 	// another build, where its binaries agree, it is counted under its one
@@ -204,9 +204,10 @@ func TestAnIssueWhoseBinariesNameDifferentFixesCountsOnceUnderEach(t *testing.T)
 }
 
 func TestAPromiseInAnotherProductDoesNotStandOverThisProductsBuild(t *testing.T) {
-	// The product a decision is correlated by is the scope's, bound once. Two
-	// products shipping one component carry the same issue at the same place
-	// identity, so a promise is told apart by its product and nothing else.
+	// The product a decision occurrence is correlated by is the scope's, bound
+	// once. Two products shipping one component carry the same issue at the
+	// same occurrence identity, so a promise is told apart by its product and
+	// nothing else.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
@@ -221,15 +222,15 @@ func TestAPromiseInAnotherProductDoesNotStandOverThisProductsBuild(t *testing.T)
 		somebody := f.somebodyElse(t)
 		promise := func(product int64, to, key string) {
 			t.Helper()
-			claim := claimSaying(t, f.db, somebody, "upgrade-needed")
-			if _, err := f.db.DB.NewUpdate().Table("claim").
+			decision := decisionSaying(t, f.db, somebody, "upgrade-needed")
+			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"committed_to" = ?`, time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)).
-				Set(`"upgrade_to" = ?`, to).Where(`"id" = ?`, claim).Exec(ctx); err != nil {
+				Set(`"upgrade_to" = ?`, to).Where(`"id" = ?`, decision).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			f.decision(t, decisionRow{
-				By: somebody, Claim: claim, Product: product,
-				Issue: f.issueID(t, "CVE-2026-1"), Place: finding.PlaceIdentity(libnl.Name, swss.Name),
+				By: somebody, Decision: decision, Product: product,
+				Issue: f.issueID(t, "CVE-2026-1"), Occurrence: finding.OccurrenceIdentity(libnl.Name, swss.Name),
 				State: "approved", Component: ptr(libnl.Version), Key: key,
 			})
 		}
@@ -285,7 +286,7 @@ func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testi
 	// rows as values, rather than joining the fold key to restrict them: an
 	// estimate for an average component is wrong for a kernel by three orders
 	// of magnitude. The counts, each binary's count, where it could go and
-	// what was promised are one pass over the places, and come back one row
+	// what was promised are one pass over the occurrences, and come back one row
 	// per fix and rating rather than one per issue, because one per issue is
 	// the size of the kernel.
 	each(t, func(t *testing.T, f *fixture) {
@@ -345,7 +346,7 @@ func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testi
 			}
 			if strings.Contains(statement, `"f"."fixed_in" AS "fixed_in"`) {
 				fixes++
-				// Six places, four issues on one binary and two of them on
+				// Six occurrences, four issues on one binary and two of them on
 				// the other, every one rated high and fixed in one version.
 				if rows[i] != 1 {
 					t.Errorf("the counts read %d rows, want 1, one per fix and rating", rows[i])
@@ -362,7 +363,7 @@ func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testi
 }
 
 func TestEachBinarysCountIsTheSameReadInThePassOrOnItsOwn(t *testing.T) {
-	// Each binary's count rides the pass over the places as a column of its
+	// Each binary's count rides the pass over the occurrences as a column of its
 	// own, up to a bound past which it is read in a statement of its own. The
 	// two give one answer, checked against binaries carrying different counts.
 	each(t, func(t *testing.T, f *fixture) {

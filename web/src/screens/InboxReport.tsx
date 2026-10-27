@@ -136,7 +136,7 @@ function Claim({ report: it, works }: { report: Report; works: boolean }) {
   const edits = it.edits ?? 0;
   return (
     <div className="card">
-      <h3>Claim</h3>
+      <h3>Reported problem</h3>
       {editing ? (
         <EditClaim report={it} onDone={() => setEditing(false)} />
       ) : (

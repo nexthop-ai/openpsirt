@@ -116,15 +116,15 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		ClosedAt        *time.Time `bun:"closed_at"`
 		ClosedBecause   string     `bun:"closed_because"`
 	}
-	// The moments are reduced before anything is joined to them. What the
-	// count below reads of a row is its issue, its product's rating and three
-	// facts about when, and a scan opens one issue at every place it reaches
-	// at the same instant: on a real image 367,000 rows in range are 15,000
+	// The moments are reduced before anything is joined to them. What the count
+	// below reads of a row is its issue, its product's rating and three facts
+	// about when, and a scan opens one issue at every occurrence it reaches at
+	// the same instant: on a real image 367,000 rows in range are 15,000
 	// distinct moments. Grouped first, the rating is joined to the 15,000 and
-	// only they are sent; joined first, every place drags the issue's row
-	// along to be discarded after. A DISTINCT over the joined rows reaches
-	// the same answer and was measured slower on PostgreSQL, because the
-	// join runs before it.
+	// only they are sent; joined first, every occurrence drags the issue's row
+	// along to be discarded after. A DISTINCT over the joined rows reaches the
+	// same answer and was measured slower on PostgreSQL, because the join runs
+	// before it.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	moments := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -159,9 +159,10 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// that is absent and one that is empty fold to the same word, so at
 		// worst one moment arrives twice, and a set counts it once.
 		GroupExpr(`"f"."vulnerability_id", "st"."product_id", "f"."opened_at", "f"."closed_at", "f"."closed_because"`)
-	// Every narrowing is a condition on a place, so each is applied before
-	// the places are reduced: what a subject may read is decided per finding,
-	// and a moment survives when any place behind it is readable.
+	// Every narrowing is a condition on an occurrence, so each is applied
+	// before the occurrences are reduced: what a subject may read is decided
+	// per finding, and a moment survives when any occurrence behind it is
+	// readable.
 	moments = scope.Narrow(onlyReadable(moments, subject, products, all))
 
 	// The same two narrowings the findings list takes, applied to the same
@@ -209,14 +210,14 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		return nil, fmt.Errorf("read what changed over time: %w", err)
 	}
 
-	// Counted as issues, not as places.
+	// Counted as issues, not as occurrences.
 	//
-	// A finding is a component at a place, and one issue in one shared library
-	// reaches every consumer of it — on a real image the kernel alone produced
-	// 305,487 findings for a few thousand issues. Counting rows here reported
-	// 441,108 open where 5,661 issues were open, which is not a chart anybody
-	// can read: it measures how much the dependency graph shares rather than
-	// how much there is to answer.
+	// A finding is a component at an occurrence, and one issue in one shared
+	// library reaches every consumer of it — on a real image the kernel alone
+	// produced 305,487 findings for a few thousand issues. Counting rows here
+	// reported 441,108 open where 5,661 issues were open, which is not a chart
+	// anybody can read: it measures how much the dependency graph shares rather
+	// than how much there is to answer.
 	//
 	// So each point is a *set* of issues, and the three numbers come from the
 	// same set. That also settles what "resolved" means without a second rule:

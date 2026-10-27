@@ -15,76 +15,76 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// ClaimDetail is one claim, whole: its argument, its landing place, its
+// DecisionDetail is one decision, whole: its argument, where it lands, its
 // present reach, and its fate.
 //
-// Everything on it is at claim scope. A claim is one argument, and a page
-// built on a representative row reports the row's state as the claim's — one
+// Everything on it is at decision scope. A decision is one argument, and a page
+// built on a representative row reports the row's state as the decision's — one
 // row approved beside forty-three sent back reading as approved, which is the
-// defect the claim grain exists to prevent.
-type ClaimDetail struct {
-	Claim ClaimBody `json:"claim" doc:"The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening"`
-	// Argument is the claim's own words, reasoning included. It names no
-	// decision and carries no state: those belong to rows, and nothing here
+// defect the decision grain exists to prevent.
+type DecisionDetail struct {
+	Decision DecisionBody `json:"decision" doc:"The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening"`
+	// Argument is the decision's own words, reasoning included. It names no
+	// occurrence and carries no state: those belong to rows, and nothing here
 	// acts on one.
-	Argument core.DecisionBody `json:"argument" doc:"The claim's contents: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands"`
-	// Place is where a representative row sits — the earliest — and Finding is
+	Argument core.DecisionOccurrenceBody `json:"argument" doc:"The decision's contents: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands"`
+	// Occurrence is where a representative row sits — the earliest — and Finding is
 	// its subject, so the page has somewhere to link to.
-	Place   core.PlaceBody       `json:"place"`
-	Finding *core.FindingRefBody `json:"finding,omitempty" doc:"A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place"`
-	AgeDays int                  `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
-	// Happened is the claim's fate, read from its rows.
-	Happened     core.Happened `json:"happened" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
+	Occurrence core.OccurrenceBody  `json:"occurrence"`
+	Finding    *core.FindingRefBody `json:"finding,omitempty" doc:"A representative occurrence's subject — build, issue, component, where it sits. Absent where no open finding sits at that occurrence"`
+	AgeDays    int                  `json:"age_days" doc:"The age of the decision. An old decision should look like one"`
+	// Happened is the decision's fate, read from its rows.
+	Happened     core.Happened `json:"happened" doc:"The decision's outcome. mixed is a decision whose occurrences did not all end the same way"`
 	When         string        `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
 	By           string        `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
 	ByName       string        `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and a place of it is not a lead past its end of life"`
+	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and an occurrence of it is not a lead past its end of life"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
-	// Rows is the decisions the claim wrote.
-	Rows   int `json:"rows" doc:"The number of decisions the claim wrote"`
-	Issues int `json:"issues" doc:"The number of distinct issues it covers"`
-	Places int `json:"places" doc:"The number of distinct places it wrote at. The ceiling on one action is measured against this"`
-	// Folds is its present reach. A claim reaches by matching, so this grows
+	// Rows is the rows the decision wrote, one per issue at each occurrence.
+	Rows        int `json:"rows" doc:"The number of occurrences it covers, counted once for each issue"`
+	Issues      int `json:"issues" doc:"The number of distinct issues it covers"`
+	Occurrences int `json:"occurrences" doc:"The number of distinct occurrences it covers. The ceiling on one action is measured against this"`
+	// Folds is its present reach. A decision reaches by matching, so this grows
 	// as builds appear with nobody acting; the reach an approver agreed to is
 	// on the approval.
 	Folds     int      `json:"folds" doc:"The number of things to decide about"`
 	Packages  int      `json:"packages" doc:"The number of binaries those fold together"`
 	Consumers int      `json:"consumers" doc:"The number of things pulling them in"`
 	Findings  int      `json:"findings" doc:"The number of findings underneath, which is what the disposition register expands to"`
-	Builds    []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
+	Builds    []string `json:"builds" doc:"Every build the decision currently covers, as stream and variant"`
 	// Ended is what the rows that stopped applying reached when they stopped,
 	// apart from the present reach above, which counts live rows alone.
-	Ended []EndedReachBody `json:"ended" doc:"The claim's withdrawn rows and its lapsed rows, each with what they reached when they stopped. Empty while every row is live"`
+	Ended []EndedReachBody `json:"ended" doc:"The occurrences of the decision that were withdrawn or lapsed, each with what they reached when they stopped. Empty while it is live at every occurrence"`
 	// Outliers is the rows of a bulk set that do not look like the rest.
-	Outliers *OutliersBody `json:"outliers,omitempty" doc:"For a claim over many issues: the rows that do not look like the rest, and how many there are"`
+	Outliers *OutliersBody `json:"outliers,omitempty" doc:"For a decision over many issues: the issues that do not look like the rest, and how many there are"`
 	// Undisclosed says at least one row is about a finding nobody has
 	// announced. A screen uses it to offer the right people to name: the set
 	// that may be mentioned follows the visibility of what is being discussed,
-	// and a claim is as careful as its most careful row.
-	Undisclosed bool `json:"undisclosed,omitempty" doc:"At least one row is about a finding nobody has announced"`
+	// and a decision is as careful as its most careful row.
+	Undisclosed bool `json:"undisclosed,omitempty" doc:"At least one occurrence it covers is about a finding nobody has announced"`
 	// Internal says at least one row is about internal material, which
 	// decides who may agree to it.
-	Internal bool `json:"internal,omitempty" doc:"At least one row is about internal material, a static analysis lead. Agreeing to it takes the approver capability"`
+	Internal bool `json:"internal,omitempty" doc:"At least one occurrence it covers is about internal material, a static analysis lead. Agreeing to it takes the approver capability"`
 }
 
-// EndedReachBody is the rows of a claim that stopped applying one way, and
+// EndedReachBody is the rows of a decision that stopped applying one way, and
 // what they reached at that moment.
 type EndedReachBody struct {
-	State  core.ClaimStateEnded `json:"state" doc:"How these rows stopped applying"`
-	At     string               `json:"at,omitempty" doc:"The latest moment one of them stopped. Absent where none of them says when"`
-	Rows   int                  `json:"rows" doc:"The number of decisions that stopped this way"`
-	Places int                  `json:"places" doc:"The number of distinct places they sat at. The findings list takes claim and claim_state to list what sits there now"`
-	Builds []string             `json:"builds" doc:"Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant"`
+	State       core.DecisionStateEnded `json:"state" doc:"How these occurrences stopped applying"`
+	At          string                  `json:"at,omitempty" doc:"The latest moment one of them stopped. Absent where none of them says when"`
+	Rows        int                     `json:"rows" doc:"The number of occurrences that stopped this way, counted once for each issue"`
+	Occurrences int                     `json:"occurrences" doc:"The number of distinct occurrences they sat at. The findings list takes decision and decision_state to list what sits there now"`
+	Builds      []string                `json:"builds" doc:"Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as stream and variant"`
 }
 
-// endedReach renders the parts of a claim that stopped applying.
+// endedReach renders the parts of a decision that stopped applying.
 func endedReach(parts []triage.EndedPart) []EndedReachBody {
 	out := make([]EndedReachBody, 0, len(parts))
 	for _, part := range parts {
 		body := EndedReachBody{
-			State: core.ClaimStateEnded(part.State), Rows: part.Rows, Places: part.Places,
+			State: core.DecisionStateEnded(part.State), Rows: part.Rows, Occurrences: part.Occurrences,
 			Builds: part.Builds,
 		}
 		body.At = core.Stamp(part.At)
@@ -112,20 +112,20 @@ type ApprovalBody struct {
 	ApprovedAt     string `json:"approved_at"`
 	WithdrawnAt    string `json:"withdrawn_at,omitempty" doc:"The moment this approval was taken back, if it was"`
 	Batch          string `json:"batch,omitempty" doc:"The batch it was approved under, if it was a bulk approval"`
-	// Covered is how many findings the claim covered when this approval was
+	// Covered is how many findings the decision covered when this approval was
 	// given. A decision reaches by matching, so it covers more as builds
 	// appear — and against the present reach it states the growth: agreed
 	// covering six, now covering sixty-one.
 	Covered int `json:"covered,omitempty" doc:"Findings this covered when it was agreed to"`
 	// CarriedFrom names the agreement this one was carried forward from,
 	// where a re-affirmation stood on the agreement its predecessor had. The
-	// approver named here read that claim's reasoning rather than this one's.
+	// approver named here read that decision's reasoning rather than this one's.
 	CarriedFrom int64 `json:"carried_from,omitempty" doc:"The approval this was carried forward from, where a re-affirmation stood on an earlier agreement rather than a fresh one"`
 }
 
 func registerTriageReading(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-decisions", Method: http.MethodGet, Path: "/v1/decision-occurrences",
+		OperationID: "list-decision-occurrences", Method: http.MethodGet, Path: "/v1/decision-occurrences",
 		Summary: "List triage decisions by occurrence",
 		Description: "Returns triage decisions on products you may triage, newest first, with " +
 			"the justification text for each.\n\n" +
@@ -140,14 +140,14 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			"and adding the totals counts some of them twice.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string          `query:"product" doc:"Limit to one product, by name"`
-		Outcome core.Outcome    `query:"outcome" doc:"Limit to one outcome"`
-		State   core.ClaimState `query:"state" doc:"Limit to one state"`
-		Expired bool            `query:"expired" doc:"Only deferrals whose date has passed"`
-		Stopped bool            `query:"stopped" doc:"Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up"`
-		Limit   int             `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset  int             `query:"offset" minimum:"0"`
-	}) (*DecisionsOutput, error) {
+		Product string             `query:"product" doc:"Limit to one product, by name"`
+		Outcome core.Outcome       `query:"outcome" doc:"Limit to one outcome"`
+		State   core.DecisionState `query:"state" doc:"Limit to one state"`
+		Expired bool               `query:"expired" doc:"Only deferrals whose date has passed"`
+		Stopped bool               `query:"stopped" doc:"Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up"`
+		Limit   int                `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset  int                `query:"offset" minimum:"0"`
+	}) (*DecisionOccurrencesOutput, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -175,69 +175,69 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			filter.ProductIDs = []int64{product.ID}
 		}
 
-		decisions, reasoning, total, err := store.List(ctx, subject, filter, input.Limit, input.Offset)
+		occurrences, reasoning, total, err := store.List(ctx, subject, filter, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided could not be read", err)
 		}
-		details, err := core.DescribeDecisions(ctx, in, store, decisions, reasoning)
+		details, err := core.DescribeDecisionOccurrences(ctx, in, store, occurrences, reasoning)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided could not be read", err)
 		}
-		out := &DecisionsOutput{}
+		out := &DecisionOccurrencesOutput{}
 		out.Body.Items = details
 		out.Body.Total = total
 		return out, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-decision", Method: http.MethodGet, Path: "/v1/decision-occurrences/{id}",
+		OperationID: "get-decision-occurrence", Method: http.MethodGet, Path: "/v1/decision-occurrences/{id}",
 		Summary: "Get a triage decision at one occurrence",
-		Description: "Returns one decision with the justification as it currently stands, where " +
+		Description: "Returns one decision at one occurrence, with the justification as it currently stands, where " +
 			"it applies, who proposed it and how long it has stood.\n\n" +
-			"What it says — the outcome, the justification, the dates — belongs to the claim " +
-			"it is one row of, at `claim_id`. For the earlier justifications see " +
+			"What it says — the outcome, the justification, the dates — belongs to the decision " +
+			"as a whole, at `decision_id`. For the earlier justifications see " +
 			"`GET /v1/decisions/{id}/revisions`, and for who agreed to which of them see " +
 			"`GET /v1/decisions/{id}/approvals`.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
-	}) (*struct{ Body core.DecisionDetail }, error) {
+	}) (*struct{ Body core.DecisionOccurrenceDetail }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		decision, reasoning, err := store.Read(ctx, subject, input.ID)
+		occurrence, reasoning, err := store.Read(ctx, subject, input.ID)
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
-		details, err := core.DescribeDecisions(ctx, in, store, []triage.Decision{*decision},
-			map[int64]string{decision.ID: reasoning})
+		details, err := core.DescribeDecisionOccurrences(ctx, in, store, []triage.DecisionOccurrence{*occurrence},
+			map[int64]string{occurrence.ID: reasoning})
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
-		return &struct{ Body core.DecisionDetail }{Body: details[0]}, nil
+		return &struct{ Body core.DecisionOccurrenceDetail }{Body: details[0]}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-claim", Method: http.MethodGet, Path: "/v1/decisions/{id}",
+		OperationID: "get-decision", Method: http.MethodGet, Path: "/v1/decisions/{id}",
 		Summary: "Get a decision",
-		Description: "Returns one claim whole: what it says, where it lands, what it covers " +
+		Description: "Returns one decision whole: what it says, where it lands, what it covers " +
 			"now, and what became of it.\n\n" +
-			"A claim is one proposer's action however many decisions it wrote, so the " +
-			"outcome, the reason, the dates and the version are the claim's rather than any " +
-			"row's. `happened` reads the claim as a whole — `mixed` where its rows did not " +
-			"all end the same way — and `argument` names no decision, because nothing here " +
+			"A decision is one proposer's action however many occurrences it covers, so the " +
+			"outcome, the reason, the dates and the version are the decision's rather than any " +
+			"one occurrence's. `happened` reads the decision as a whole — `mixed` where its occurrences did not " +
+			"all end the same way — and `argument` names no occurrence, because nothing here " +
 			"acts on one.\n\n" +
-			"`rows`, `issues` and `places` are what it wrote. `folds`, `packages`, " +
+			"`rows`, `issues` and `occurrences` are what it wrote. `folds`, `packages`, " +
 			"`consumers` and `findings` are what it covers now, which grows as builds " +
 			"appear with nobody acting; what somebody consented to is on the approval, at " +
 			"`GET /v1/decisions/{id}/approvals`.\n\n" +
 			"For the earlier justifications see `GET /v1/decisions/{id}/revisions` and for the " +
 			"discussion `GET /v1/decisions/{id}/comments`.",
 		Tags: []string{"Triage"},
-	}, core.AnyPerson, "Answers only claims you may read every row of."), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, "Answers only decisions you may read in full."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
-	}) (*struct{ Body ClaimDetail }, error) {
+	}) (*struct{ Body DecisionDetail }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -245,28 +245,28 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		whole, err := store.Whole(ctx, subject, input.ID)
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {
-				return nil, noSuchClaim()
+				return nil, noSuchDecision()
 			}
-			return nil, core.WentWrong(in.Logger, "that claim could not be read", err)
+			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
-		described, err := core.DescribeDecisions(ctx, in, store, []triage.Decision{whole.Decision},
-			map[int64]string{whole.Decision.ID: whole.Reasoning})
+		described, err := core.DescribeDecisionOccurrences(ctx, in, store, []triage.DecisionOccurrence{whole.DecisionOccurrence},
+			map[int64]string{whole.DecisionOccurrence.ID: whole.Reasoning})
 		if err != nil || len(described) == 0 {
-			return nil, core.WentWrong(in.Logger, "that claim could not be read", err)
+			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
 		about := described[0]
 
-		body := ClaimDetail{
-			Claim:              claimBody(whole.Claim, about.ProposedBy, about.ProposedByName),
-			Argument:           core.ClaimArgument(whole.Claim, whole.Reasoning),
-			Place:              about.Place,
+		body := DecisionDetail{
+			Decision:           decisionBody(whole.Decision, about.ProposedBy, about.ProposedByName),
+			Argument:           core.DecisionArgument(whole.Decision, whole.Reasoning),
+			Occurrence:         about.Occurrence,
 			Finding:            about.Finding,
 			AgeDays:            about.AgeDays,
 			Happened:           core.Happened(whole.Happened),
 			PreviouslyApproved: whole.PreviouslyApproved,
 			Rows:               whole.Rows,
 			Issues:             whole.Issues,
-			Places:             whole.Places,
+			Occurrences:        whole.Occurrences,
 			Folds:              whole.Reach.Folds,
 			Packages:           whole.Reach.Packages,
 			Consumers:          whole.Reach.Consumers,
@@ -280,7 +280,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		if whole.By != 0 {
 			who, err := core.WhoSigned(ctx, in.DB.DB, []int64{whole.By})
 			if err != nil {
-				return nil, core.WentWrong(in.Logger, "that claim could not be read", err)
+				return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 			}
 			body.By, body.ByName = who.Identity(whole.By), who.Label(whole.By)
 		}
@@ -288,18 +288,18 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			body.Outliers = outliersBody(*whole.Outliers)
 		}
 		if body.Reaffirmable, err = store.Reaffirmable(ctx, subject, input.ID); err != nil {
-			return nil, core.WentWrong(in.Logger, "that claim could not be read", err)
+			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
-		return &struct{ Body ClaimDetail }{Body: body}, nil
+		return &struct{ Body DecisionDetail }{Body: body}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-claim-revisions", Method: http.MethodGet,
+		OperationID: "list-decision-revisions", Method: http.MethodGet,
 		Path:    "/v1/decisions/{id}/revisions",
 		Summary: "List a decision's justification history",
 		Description: "Returns every revision of the justification, oldest first, with who wrote " +
 			"each and when.\n\n" +
-			"A claim is one argument however many places it covers, so its reasoning is one text " +
+			"A decision is one argument however many occurrences it covers, so its reasoning is one text " +
 			"with one history. An approval names the specific revision that was agreed to, so " +
 			"this is how to read what an approver actually saw rather than what the text says " +
 			"now.",
@@ -339,18 +339,18 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-claim-approvals", Method: http.MethodGet,
+		OperationID: "list-decision-approvals", Method: http.MethodGet,
 		Path:    "/v1/decisions/{id}/approvals",
 		Summary: "List who approved a decision",
-		Description: "Returns every approval recorded against this claim, including ones later " +
+		Description: "Returns every approval recorded against this decision, including ones later " +
 			"withdrawn, each naming the revision of the justification it was given for.\n\n" +
-			"An approval carrying `carried_from` was not given for this claim. A " +
+			"An approval carrying `carried_from` was not given for this decision. A " +
 			"re-affirmation states its own reasoning and stands on the agreement its " +
-			"predecessor had, so the person named agreed to the earlier claim's words; " +
+			"predecessor had, so the person named agreed to the earlier decision's words; " +
 			"`carried_from` is the approval where those are.\n\n" +
 			"A withdrawn approval is kept rather than deleted: who agreed to what, and when it " +
 			"stopped counting, is part of the record.\n\n" +
-			"`covered` is how many findings the claim covered when it was agreed to. A claim " +
+			"`covered` is how many findings the decision covered when it was agreed to. A decision " +
 			"applies to every build running the same versions, so it covers more as builds " +
 			"appear — with nobody acting, and nobody having agreed to the larger number. " +
 			"Comparing this against what it covers now is the point of keeping it.",
@@ -401,60 +401,60 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	})
 }
 
-// StandingBody is the decision in force at a place, and the ones before it.
+// StandingBody is the decision in force at an occurrence, and the ones before it.
 type StandingBody struct {
 	// Standing is the decision suppressing this finding, absent where nothing
 	// is. Absent is the ordinary answer for a finding nobody has judged.
-	Standing *core.DecisionDetail `json:"standing,omitempty"`
-	// Previously is the decisions made here before, newest first: claims that
-	// were withdrawn, and claims the code moved out from under. It is what
+	Standing *core.DecisionOccurrenceDetail `json:"standing,omitempty"`
+	// Previously is the decisions made here before, newest first: decisions that
+	// were withdrawn, and decisions the code moved out from under. It is what
 	// makes re-deciding a re-reading rather than a blank page.
-	Previously []core.DecisionDetail `json:"previously"`
+	Previously []core.DecisionOccurrenceDetail `json:"previously"`
 }
 
-func registerPlaceDecisions(api huma.API, in core.Deps) {
-	const at = placeDecisionPath
+func registerOccurrenceDecisions(api huma.API, in core.Deps) {
+	const at = occurrenceDecisionPath
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-finding-decision", Method: http.MethodGet, Path: at,
 		Summary: "Get what has been decided about a finding",
 		Description: "Returns the decision currently suppressing this finding, if any, together " +
-			"with everything decided here before — withdrawn claims, and claims that stopped " +
+			"with everything decided here before — withdrawn decisions, and decisions that stopped " +
 			"applying when an upstream version changed.\n\n" +
-			"`standing` is absent when nothing has been decided, or when a claim is still waiting " +
-			"for approval: a claim nobody has agreed to suppresses nothing.\n\n" +
-			"Read `previously` before deciding again. A claim that lapsed on a version upgrade is " +
+			"`standing` is absent when nothing has been decided, or when a decision is still waiting " +
+			"for approval: a decision nobody has agreed to suppresses nothing.\n\n" +
+			"Read `previously` before deciding again. A decision that lapsed on a version upgrade is " +
 			"usually still the right answer, and re-affirming it is a different request from " +
 			"making a new one.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		PlacePath
+		OccurrencePath
 	}) (*struct{ Body StandingBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
 		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
-			input.Vulnerability, input.Place)
+			input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err
 		}
-		place := placeOf(*where)
+		occurrence := occurrenceOf(*where)
 
-		standing, err := store.Applying(ctx, place)
+		standing, err := store.Applying(ctx, occurrence)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what applies here could not be read", err)
 		}
-		previously, err := store.PreviouslyAt(ctx, subject, place)
+		previously, err := store.PreviouslyAt(ctx, subject, occurrence)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided here could not be read", err)
 		}
 
 		all := previously
 		if standing != nil {
-			// The standing decision is read at the place too, and it is
+			// The standing decision is read at the occurrence too, and it is
 			// answered once, as what stands.
-			all = []triage.Decision{*standing}
+			all = []triage.DecisionOccurrence{*standing}
 			for _, d := range previously {
 				if d.ID != standing.ID {
 					all = append(all, d)
@@ -465,12 +465,12 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the reasoning could not be read", err)
 		}
-		details, err := core.DescribeDecisions(ctx, in, store, all, reasoning)
+		details, err := core.DescribeDecisionOccurrences(ctx, in, store, all, reasoning)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided here could not be read", err)
 		}
 
-		body := StandingBody{Previously: []core.DecisionDetail{}}
+		body := StandingBody{Previously: []core.DecisionOccurrenceDetail{}}
 		if standing != nil {
 			body.Standing = &details[0]
 			details = details[1:]
@@ -480,46 +480,46 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "reaffirm-decision", Method: http.MethodPost, Path: at + "/reaffirmation",
+		OperationID: "reaffirm-finding-decision", Method: http.MethodPost, Path: at + "/reaffirmation",
 		Summary: "Re-affirm a decision after an upstream version changed",
 		Description: "Re-makes a decision that stopped applying because an upstream version " +
 			"moved, at the versions this finding has now. `previous` is the decision being " +
 			"re-made, from `previously` in `GET .../decision`.\n\n" +
 			"Only the person who made the original may do this, and it normally needs no second " +
-			"approver: two people already agreed to the claim, and a version upgrade is a prompt to " +
-			"re-check rather than a new claim.\n\n" +
+			"approver: two people already agreed to the decision, and a version upgrade is a prompt to " +
+			"re-check rather than a new decision.\n\n" +
 			"It does need approval again if nothing was ever agreed to, or if the issue is " +
-			"rated a band worse since the original was agreed to and the claim is one a " +
-			"severity bears on. A rescoring within one band — 7.5 to 7.6 — is not. A severity bears on every claim except " +
+			"rated a band worse since the original was agreed to and the decision is one a " +
+			"severity bears on. A rescoring within one band — 7.5 to 7.6 — is not. A severity bears on every decision except " +
 			"`already-fixed`, and `not-applicable` because the component or the vulnerable " +
 			"code is not present or not in the execute path. The response says whether a " +
 			"second person is needed.\n\n" +
 			"Where no second person is needed, the earlier agreement is carried onto the new " +
-			"claim and recorded as carried. The approver named agreed to the previous " +
-			"claim's reasoning, not to what is written here.\n\n" +
+			"decision and recorded as carried. The approver named agreed to the previous " +
+			"decision's reasoning, not to what is written here.\n\n" +
 			"`reasoning` is required. \"Still true\" with nothing behind it is what a " +
 			"re-affirmation becomes when it is made too easy.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
-		PlacePath
+		OccurrencePath
 		Body struct {
 			Previous  int64  `json:"previous" doc:"The decision being re-made"`
 			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason it still holds, in markdown"`
 		}
-	}) (*struct{ Body core.DecisionBody }, error) {
+	}) (*struct{ Body core.DecisionOccurrenceBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
 		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
-			input.Vulnerability, input.Place)
+			input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err
 		}
 
 		made, err := store.Reaffirm(ctx, subject, triage.Reaffirmation{
 			PreviousID: input.Body.Previous,
-			Place:      placeOf(*where),
+			Occurrence: occurrenceOf(*where),
 			Reasoning:  input.Body.Reasoning,
 			By:         subject.ID,
 		})
@@ -527,8 +527,8 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
 
-		body := core.DecisionBodyOf(*made)
+		body := core.DecisionOccurrenceBodyOf(*made)
 		body.Reasoning = input.Body.Reasoning
-		return &struct{ Body core.DecisionBody }{Body: body}, nil
+		return &struct{ Body core.DecisionOccurrenceBody }{Body: body}, nil
 	})
 }

@@ -158,8 +158,8 @@ func TestAnEmbargoIsOneRowPerIssueAndProductAndPagesCountEmbargoes(t *testing.T)
 			if len(row.Builds) != 2 || row.Builds[0].Stream != "202411" || row.Builds[1].Stream != "master" {
 				t.Errorf("%s names the builds %+v, want 202411 and master", row.Vulnerability, row.Builds)
 			}
-			if row.Places != 2 {
-				t.Errorf("%s counts %d findings, want one in each build", row.Vulnerability, row.Places)
+			if row.Occurrences != 2 {
+				t.Errorf("%s counts %d findings, want one in each build", row.Vulnerability, row.Occurrences)
 			}
 		}
 
@@ -212,8 +212,8 @@ func TestTheDisclosingListIsNarrowedToTheScopeAskedFor(t *testing.T) {
 		if b := rows[0].Builds; len(b) != 1 || b[0].Stream != "202411" {
 			t.Errorf("narrowed to 202411 the row names %+v", b)
 		}
-		if rows[0].Places != 1 {
-			t.Errorf("narrowed to one build the row counts %d findings, want 1", rows[0].Places)
+		if rows[0].Occurrences != 1 {
+			t.Errorf("narrowed to one build the row counts %d findings, want 1", rows[0].Occurrences)
 		}
 
 		elsewhere := f.inAnotherProduct(t, "hedgehog")

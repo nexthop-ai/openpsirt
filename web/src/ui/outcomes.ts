@@ -7,14 +7,14 @@ import { useWho } from "../app/session";
 
 // Every outcome the server records, read from the published API document so a
 // word the server adds is a compile error wherever a screen names it.
-export type Outcome = NonNullable<Body<"DecisionBody">["outcome"]>;
+export type Outcome = NonNullable<Body<"DecisionOccurrenceBody">["outcome"]>;
 
 // The outcomes about a vulnerability, which the findings lists and the reports
 // filter by. A lead's outcomes are recorded on a lead and nowhere else.
 export type VulnerabilityOutcome = NonNullable<Body<"DisposedBody">["outcome"]>;
 
-// What one outcome claims, as the server publishes it beside the caller.
-export type Claims = Body<"OutcomeBody">;
+// What one outcome says, as the server publishes it beside the caller.
+export type Decisions = Body<"OutcomeBody">;
 
 // The outcomes sorted by what they claim, in the terms the server counts,
 // filters and refuses by. Built from what the server publishes rather than
@@ -42,7 +42,7 @@ export type Classes = {
 
 // The classes over one published list. A word the list does not hold is in
 // none of them, and the server is the one to refuse it.
-export function classesOf(published: readonly Claims[] | null | undefined): Classes {
+export function classesOf(published: readonly Decisions[] | null | undefined): Classes {
   const by = new Map((published ?? []).map((each) => [each.outcome as string, each]));
   const has = (field: "hides_risk" | "dated" | "needs_justification") => (outcome?: string) =>
     by.get(outcome ?? "")?.[field] ?? false;

@@ -402,7 +402,7 @@ function Discloses({ discloses }: { discloses: HandoffOffer["discloses"] }) {
           {(a.notes ?? []).map((n, i) => (
             <div key={i}>
               <p className="hint">
-                {n.comment ? "Comment" : "Reasoning"} on claim {n.claim}
+                {n.comment ? "Comment" : "Reasoning"} on decision {n.decision}
               </p>
               <Markdown source={n.body} />
             </div>

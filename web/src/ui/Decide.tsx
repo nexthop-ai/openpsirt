@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useAfterClaim } from "../api/claims";
+import { useAfterDecision } from "../api/decisions";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
@@ -18,13 +18,13 @@ import { useOutcomes, type Classes } from "./outcomes";
 import { DECIDE_KEPT, keepAnswer, ownsSession, restoreAnswer } from "../app/drafts";
 import { DAY_MS } from "./when";
 
-// One judgment about this finding. Outcome, the justification where it does
-// not apply, a date where it is deferred, the reasoning, which places it
+// One decision about this finding. Outcome, the justification where it does
+// not apply, a date where it is deferred, the reasoning, which occurrences it
 // covers, and — on submit — a guided review of where it applies beyond this
 // build.
 //
 // The finding screen carries it and so does a row opened in the findings list,
-// which is the same form in both: what a claim requires and what it writes do
+// which is the same form in both: what a decision requires and what it writes do
 // not change with where it is typed.
 
 export type At = {
@@ -42,9 +42,9 @@ export type At = {
 
 // The outcomes that may carry advice for a holder, and the ones that must.
 //
-// Two of them carry a mitigation and they ask for it differently. A claim that
+// Two of them carry a mitigation and they ask for it differently. A decision that
 // something already stops it *is* the mitigation, so it is required there. A
-// claim that something will not be fixed is a standing property of a shipped
+// decision that something will not be fixed is a standing property of a shipped
 // feature — a protocol that cannot change without breaking what it is
 // compatible with — and there is often a real answer and often none, so it is
 // offered and optional.
@@ -67,7 +67,7 @@ export function mayMitigate(outcome: string, justification: string): boolean {
 // name at more than one version often enough that leaving it out shares a
 // draft between two of them: a justification typed about one version came back
 // pre-filled against the other, which is different code at a different number
-// of places — on the text a second person has to approve. The ecosystem and
+// of occurrences — on the text a second person has to approve. The ecosystem and
 // namespace are added only where the address has them, so a draft kept for a
 // component named without them is still found.
 export function draftKeyFor(at: At): string {
@@ -89,9 +89,9 @@ export function said(outcome: string): string {
     case "deferred":
       return "deferral";
     case "affected":
-      return "claim";
+      return "decision";
     case "already-fixed":
-      return "claim that it is already fixed";
+      return "decision that it is already fixed";
     case "patch-needed":
       return "promise to backport a fix";
     case "upgrade-needed":
@@ -118,12 +118,12 @@ export function whereOf(at: At) {
 }
 
 export type Recorded = {
-  claimId: number;
+  decisionId: number;
   recorded: number;
   covered: number;
   left: number;
   needsApproval: boolean;
-  // The other builds the same judgment covered. Named rather than reported
+  // The other builds the same decision covered. Named rather than reported
   // on: it is one transaction, so there is no per-build outcome to have.
   applied: string[];
   matching: number;
@@ -173,7 +173,7 @@ const OFFERED = Object.keys(OFFERS) as OneAtATime[];
 //
 // Offered, never applied. Somebody deciding a hundred findings in a day
 // answers the same way for runs of them, and retyping the pair is the cost the
-// review measured. But a judgment prefilled with the last one made is a record
+// review measured. But a decision prefilled with the last one made is a record
 // that can say something nobody meant — and this is the one form where that
 // matters, since a dismissal hides risk and carries a name. So it is a button
 // saying what it will fill in, and the fill is somebody's own click.
@@ -182,13 +182,13 @@ const OFFERED = Object.keys(OFFERS) as OneAtATime[];
 // not what they are doing now, and a default that survives a night is a
 // default nobody chose.
 //
-// The place the tab remembers the last judgment, to offer back. Named beside
+// The place the tab remembers the last decision, to offer back. Named beside
 // the sign-out clear that takes it away, so the two cannot drift apart.
 const LAST = DECIDE_KEPT;
 
 type Same = { outcome: string; justification: string };
 
-// Nothing where the judgment was somebody else's, whose reasoning is not the
+// Nothing where the decision was somebody else's, whose reasoning is not the
 // person here's to be offered.
 function lastUsed(): Same | null {
   if (!ownsSession()) return null;
@@ -220,16 +220,16 @@ function deferredDays(until: string): number {
   return Math.max(0, (then - Date.now()) / DAY_MS);
 }
 
-// Whether a claim stands on its own or waits for a second person, said before
+// Whether a decision stands on its own or waits for a second person, said before
 // it is sent and in the terms the server decides it in.
 //
-// What an outcome claims comes from the classes the server publishes: one that
+// What an outcome says comes from the classes the server publishes: one that
 // hides no risk needs nobody, and one that hides risk and stores no date always
 // waits for a second person. Of the dated ones, a deferral is measured with
-// what the place was already put off for, and a promise to act by a date
+// what the occurrence was already put off for, and a promise to act by a date
 // against the earliest deadline it covers. One function for the aside and the
 // field beside the date, so the two cannot come to say different things about
-// one claim. Nothing is said before the classes have arrived.
+// one decision. Nothing is said before the classes have arrived.
 export function forecast(
   outcome: string,
   classes: Classes,
@@ -262,7 +262,7 @@ export function forecast(
 
 export function Decide({
   at,
-  places,
+  occurrences,
   onDone,
   extending,
   prefill,
@@ -270,7 +270,7 @@ export function Decide({
   assigning,
 }: {
   at: At;
-  places: Sitting[];
+  occurrences: Sitting[];
   // The person dealing with it, drawn at the head of the same pane. Triage is
   // both questions: who is on it, and what was decided.
   assigning?: ReactNode;
@@ -281,8 +281,8 @@ export function Decide({
   // Opened inside the findings list, where the keys are live and there is a
   // next row to go to.
   onDone: (recorded: Recorded) => void;
-  // An approved claim this extends, where the backend offers one.
-  extending?: { claimId: number; decisionId: number } | null;
+  // An approved decision this extends, where the backend offers one.
+  extending?: { decisionId: number; decisionOccurrenceId: number } | null;
   prefill?: {
     outcome?: string;
     justification?: string;
@@ -293,7 +293,7 @@ export function Decide({
     // and the days are turned into one here.
     deferDays?: number;
     // The VEX statement this was started from, cited so that a later revision
-    // to it raises an alert. Never what the claim rests on.
+    // to it raises an alert. Never what the decision rests on.
     fromStatement?: number;
   } | null;
 }) {
@@ -301,7 +301,7 @@ export function Decide({
   // a value merged into what is on screen — "start from this" means this and
   // not what somebody had half written — so the screen that offers one mounts
   // the form again, and the fields below seed themselves from it.
-  const after = useAfterClaim();
+  const after = useAfterDecision();
   const draftKey = draftKeyFor(at);
   // The draft chosen here and not sent, read once as the form is built.
   //
@@ -316,7 +316,7 @@ export function Decide({
   // offered as the default for the ordinary case.
   const [outcome, setOutcome] = useState(prefill?.outcome ?? kept.outcome ?? "");
   const [fixedVersion, setFixedVersion] = useState(kept.fixedVersion ?? "");
-  // Likewise unchosen. A justification is a claim about our build that a
+  // Likewise unchosen. A justification is a statement about our build that a
   // reader is entitled to take literally, so the first one in the list is not
   // an answer — it is whichever happened to be written first.
   const [justification, setJustification] = useState<Justification | "">(
@@ -357,12 +357,15 @@ export function Decide({
     keepAnswer(draftKey, { outcome, justification, until, fixedVersion, mitigation, lands, scope });
   }, [draftKey, outcome, justification, until, fixedVersion, mitigation, lands, scope]);
 
-  const open = useMemo(() => places.filter((p) => p.decision == null), [places]);
-  const answered = places.length - open.length;
-  const covering = open.filter((p) => !excluded.has(p.place ?? ""));
-  // What the most put-off place this covers was put off for before. The server
-  // measures each place's deferral with its own, and one place over the
-  // threshold sends the claim to a second person.
+  const open = useMemo(
+    () => occurrences.filter((p) => p.decision_occurrence == null),
+    [occurrences],
+  );
+  const answered = occurrences.length - open.length;
+  const covering = open.filter((p) => !excluded.has(p.occurrence ?? ""));
+  // What the most put-off occurrence this covers was put off for before. The server
+  // measures each occurrence's deferral with its own, and one occurrence over the
+  // threshold sends the decision to a second person.
   const soFar = Math.max(0, ...covering.map((p) => p.deferred_days ?? 0));
   const classes = useOutcomes();
   const needsJustification = classes.needsJustification(outcome);
@@ -376,13 +379,13 @@ export function Decide({
   // A deferral says nothing a reader could take, so it states nobody it holds
   // for, and the server refuses one that does.
   const offerScope = outcome !== "" && outcome !== "deferred";
-  // A claim that the fix is already here is a fact somebody can check against
+  // A decision that the fix is already here is a fact somebody can check against
   // whoever packages the component, and it is required for that reason . The
   // server refuses it empty; asking here means the person finds out while they
   // are still looking at the tracker.
   const needsFixedVersion = outcome === "already-fixed";
   // A promise with no date is what leaving the finding alone already says, so
-  // the date is what makes it a claim at all.
+  // the date is what makes it a decision at all.
   const needsLanding = outcome === "patch-needed";
   // Ctrl or ⌘ with Enter, from inside the form. Only when it is ready, so the
   // shortcut cannot submit something the button would refuse. Not from outside
@@ -408,14 +411,14 @@ export function Decide({
   const needsMitigation = mustMitigate(outcome, reason);
   const offerMitigation = mayMitigate(outcome, reason);
 
-  // A judgment's reach beyond this build, answered whole by the
+  // A decision's reach beyond this build, answered whole by the
   // server rather than sampled here.
   //
-  // Asked per place and sampled — a kernel flaw sits at sixty places, and
+  // Asked per occurrence and sampled — a kernel flaw sits at sixty occurrences, and
   // that is sixty requests from one screen — the answer is not only shown:
   // the builds at differing versions become the ones offered to include, and
-  // what is offered is what gets written. A build reachable only from a place
-  // past the sample is then never offered and the judgment silently does not
+  // what is offered is what gets written. A build reachable only from an occurrence
+  // past the sample is then never offered and the decision silently does not
   // travel there, which is a cost control on the interface turned into a rule
   // about what a decision covers.
   const reach = useQuery({
@@ -459,13 +462,13 @@ export function Decide({
       for (const m of reach.data?.automatic ?? []) auto.set(shown(m), true);
       // silent-read: handed whole to Covering, which draws its failure.
       for (const m of reach.data?.differing ?? []) {
-        // Its place, said as an aside. The subject of the question is the
+        // Its occurrence, said as an aside. The subject of the question is the
         // version — a build at matching versions never reaches this list — so
         // "this build" is the honest label for another version sitting beside
         // the one in hand, rather than the build's own name repeated back.
         const build = m.here ? "this build" : shown(m);
         // One question per version, not one per build: a build carrying the
-        // component at four versions is four claims about different code, and
+        // component at four versions is four decisions about different code, and
         // each is posted with its own version.
         const key = `${build} @ ${m.version ?? ""}`;
         const had = diff.get(key);
@@ -476,7 +479,7 @@ export function Decide({
           stream: m.stream ?? "",
           variant: m.variant ?? "",
           version: m.version ?? "",
-          places: (had?.places ?? 0) + (m.places ?? 0),
+          occurrences: (had?.occurrences ?? 0) + (m.occurrences ?? 0),
         });
       }
     }
@@ -519,8 +522,8 @@ export function Decide({
       ...(needsFixedVersion ? { fixed_version: fixedVersion.trim() } : {}),
       ...(needsLanding ? { committed_to: lands } : {}),
       reasoning,
-      ...(excluded.size > 0 ? { places: covering.map((p) => p.place) } : {}),
-      ...(extending ? { extends: extending.claimId } : {}),
+      ...(excluded.size > 0 ? { occurrences: covering.map((p) => p.occurrence) } : {}),
+      ...(extending ? { extends: extending.decisionId } : {}),
       ...(prefill?.fromStatement ? { from_statement: prefill.fromStatement } : {}),
     };
   }
@@ -528,7 +531,7 @@ export function Decide({
   const submit = useMutation({
     mutationFn: async (applied: Other[]): Promise<Recorded> => {
       // One request and one transaction, however many builds it reaches. Sent
-      // a build at a time, a refusal part-way left the judgment recorded in
+      // a build at a time, a refusal part-way left the decision recorded in
       // some releases and not others — an act nobody performed.
       const here = unwrap(
         await api.POST(
@@ -553,7 +556,7 @@ export function Decide({
         ),
       );
       return {
-        claimId: here.claim_id,
+        decisionId: here.decision_id,
         recorded: here.recorded,
         covered: here.covered,
         left: here.left,
@@ -584,7 +587,7 @@ export function Decide({
     // With the reach known and empty the sheet asks nothing, so the
     // decision goes straight through. What it would have said is still said
     // afterwards: the confirmation names the builds reached by lookup and the
-    // places written.
+    // occurrences written.
     if (nothingToReview(reach, offered)) {
       submit.mutate([]);
       return;
@@ -597,7 +600,9 @@ export function Decide({
       <div className="card">
         <div>
           <h3 style={{ margin: "0 0 6px" }}>Decision</h3>
-          <p className="reading">Every place has been decided. Revise from the claim itself.</p>
+          <p className="reading">
+            Every occurrence has been decided. Revise from the decision itself.
+          </p>
         </div>
       </div>
     );
@@ -607,7 +612,7 @@ export function Decide({
     <div>
       {answered > 0 && (
         <p className="hint" style={{ margin: "-4px 0 12px" }}>
-          {answered} of {places.length} places already decided. This covers what is left.
+          {answered} of {occurrences.length} occurrences already decided. This covers what is left.
         </p>
       )}
       {extending && (
@@ -635,7 +640,7 @@ export function Decide({
         {/* The pair last recorded in this session, offered as a click rather
             than filled in. Somebody deciding a hundred findings answers the
             same way for runs of them, and retyping the pair is the cost; but
-            a judgment prefilled with the last one made is a record that can
+            a decision prefilled with the last one made is a record that can
             say what nobody meant, and this is the form where that matters. */}
         {same && same.outcome !== outcome && (
           <p className="hint" style={{ marginTop: 6 }}>
@@ -664,12 +669,12 @@ export function Decide({
             onChange={(event) => setJustification(event.target.value as Justification)}
           >
             {/* An unchosen state, so the first justification in the list is
-                not offered as an answer. Each is a claim about our build that
+                not offered as an answer. Each is a statement about our build that
                 a reader takes literally, and which one was written first says
                 nothing about which is true here. */}
             <option value="">Say which…</option>
-            {/* The label and what it claims, because the choice made here is
-                what ships to a customer as our claim about their exposure
+            {/* The label and what it says, because the choice made here is
+                what ships to a customer as our statement about their exposure
 . The token itself is on the title, for whoever is
                 checking what will be exported. */}
             {reasons.map((each) => (
@@ -830,7 +835,7 @@ export function Decide({
   const aside = (
     <aside style={{ alignSelf: "start", display: "flex", flexDirection: "column", gap: 10 }}>
       <Covering
-        places={open}
+        occurrences={open}
         excluded={excluded}
         onChange={setExcluded}
         matching={matching.length}
@@ -850,7 +855,7 @@ export function Decide({
           <h3>Triage</h3>
           {assigning}
           {/* The pane is named for both questions, so the box somebody types
-              a judgment into carries its own name. */}
+              a decision into carries its own name. */}
           <h4 className="deciding-head">Decision</h4>
           <div className="writing" ref={rootRef}>
             {form}

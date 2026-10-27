@@ -474,7 +474,7 @@ func changed(rows []movedRow) map[int64][]Change {
 				change.Kind = Changed
 			default:
 				// The same versions on both sides. A scan that closed one
-				// place of a name and opened another at the same version has
+				// occurrence of a name and opened another at the same version has
 				// moved nothing about what the build ships.
 				continue
 			}

@@ -26,7 +26,7 @@ func Register(api huma.API, in core.Deps) {
 	registerAdvisorySources(api, in)
 	// The upstream a product trusts, and what it offers for review.
 	registerUpstream(api, in)
-	// Standing claims about the third-party components a build ships.
+	// Standing decisions about the third-party components a build ships.
 	registerVEX(api, in)
 	// The destinations this deployment posts to.
 	registerOutbound(api, in, core.Administering{

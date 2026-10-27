@@ -116,7 +116,7 @@ func TestAReconcileWritesABatchAStatementHoweverManyConditionsMove(t *testing.T)
 			sent.mu.Lock()
 			sent.sent = nil
 			sent.mu.Unlock()
-			opened, cleared, err := store.Reconcile(ctx, who.ID, notify.ClaimWaiting, held)
+			opened, cleared, err := store.Reconcile(ctx, who.ID, notify.DecisionWaiting, held)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -130,7 +130,7 @@ func TestAReconcileWritesABatchAStatementHoweverManyConditionsMove(t *testing.T)
 		if n := writesTo(sent, "INSERT"); n != 3 {
 			t.Errorf("%d conditions were opened in %d statements, want 3", len(held), n)
 		}
-		saysExactly(t, openNow(t, w.DB.DB, who.ID, notify.ClaimWaiting), held)
+		saysExactly(t, openNow(t, w.DB.DB, who.ID, notify.DecisionWaiting), held)
 
 		// Every sentence moves, and which rows name a product swaps over:
 		// the ones that named it stop, and the others name it undisclosed.
@@ -148,7 +148,7 @@ func TestAReconcileWritesABatchAStatementHoweverManyConditionsMove(t *testing.T)
 		if n := writesTo(sent, "UPDATE"); n != 3 {
 			t.Errorf("%d conditions were restated in %d statements, want 3", len(moved), n)
 		}
-		saysExactly(t, openNow(t, w.DB.DB, who.ID, notify.ClaimWaiting), moved)
+		saysExactly(t, openNow(t, w.DB.DB, who.ID, notify.DecisionWaiting), moved)
 
 		if opened, cleared := reconcile(nil); opened != 0 || cleared != len(moved) {
 			t.Fatalf("clearing opened %d cleared %d, want 0 and %d", opened, cleared, len(moved))
@@ -156,7 +156,7 @@ func TestAReconcileWritesABatchAStatementHoweverManyConditionsMove(t *testing.T)
 		if n := writesTo(sent, "UPDATE"); n != 3 {
 			t.Errorf("%d conditions were cleared in %d statements, want 3", len(moved), n)
 		}
-		saysExactly(t, openNow(t, w.DB.DB, who.ID, notify.ClaimWaiting), nil)
+		saysExactly(t, openNow(t, w.DB.DB, who.ID, notify.DecisionWaiting), nil)
 	})
 }
 

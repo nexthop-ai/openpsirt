@@ -487,6 +487,21 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 			"mapping", mapping.String(), "grants", mapping.Grants)
 	}
 	settings := setting.NewStore(db.DB)
+	// A row under a setting's former name is one an earlier release wrote
+	// after the upgrade renamed it, and is read only while the new name is unset.
+	formers, err := settings.FormerNames(ctx)
+	if err != nil {
+		return nil, passes{}, startupFailed(err, "reading settings held under a former name", cfg)
+	}
+	for _, f := range formers {
+		if f.Shadowed {
+			logger.Warn("a setting is held under its former name and its new one: the new one is read",
+				"former", f.Former, "setting", f.Name)
+			continue
+		}
+		logger.Warn("a setting is held under its former name and is read from there: set it under its new name",
+			"former", f.Former, "setting", f.Name)
+	}
 	rights := httpapi.Rights(db.DB)
 	logger.Info("roles are assigned", "mode", mode)
 
@@ -566,7 +581,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// somebody about it are separate concerns.
 	reader := ingest.NewReader(db, work, cfg.Limits(), logger, name).
 		Telling(notify.Movements(db.DB, logger))
-	// A scan that moves the code out from under somebody's judgment hands
+	// A scan that moves the code out from under somebody's decision hands
 	// them work back that they did nothing to cause, so they are told.
 	// Wired here rather than inside the scanner: what a scan does and how
 	// anybody hears about it are separate concerns, and the notification

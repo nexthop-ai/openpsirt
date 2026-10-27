@@ -12,20 +12,20 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-func TestAClaimSaysWhereTheWorkIsHappening(t *testing.T) {
+func TestADecisionSaysWhereTheWorkIsHappening(t *testing.T) {
 	// A hand-off to a tracker needs no deployment to decide to let anything
 	// out: a stored link has no egress at all, and it connects what is
 	// decided here to the work being done there.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200",
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200",
 			`{"outcome":"affected","reasoning":"Reachable from the request path."}`)
 
-		// The claim points at where it is being worked on.
+		// The decision points at where it is being worked on.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
+			fmt.Sprintf("/v1/decisions/%d/elsewhere", decision),
 			`{"elsewhere":"https://tracker.example/PSIRT-42"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("pointing the claim answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("pointing the decision answered %d: %s", got.Code, got.Body.String())
 		}
 		var standing struct {
 			Standing []struct {
@@ -40,21 +40,21 @@ func TestAClaimSaysWhereTheWorkIsHappening(t *testing.T) {
 
 		// Somebody who may only read it cannot point it anywhere.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
+			fmt.Sprintf("/v1/decisions/%d/elsewhere", decision),
 			`{"elsewhere":"https://elsewhere.example/1"}`), http.StatusNotFound)
 
 		// An address nobody should be handed as a link is refused in words
 		// naming it, and is not a fault here.
 		for _, address := range []string{"ms-msdt:calc", "//evil.example/x"} {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-				fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
+				fmt.Sprintf("/v1/decisions/%d/elsewhere", decision),
 				fmt.Sprintf(`{"elsewhere":%q}`, address))
 			if got.Code != http.StatusUnprocessableEntity {
-				t.Errorf("pointing the claim at %s answered %d: %s", address, got.Code, got.Body.String())
+				t.Errorf("pointing the decision at %s answered %d: %s", address, got.Code, got.Body.String())
 			}
 		}
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
+			fmt.Sprintf("/v1/decisions/%d/elsewhere", decision),
 			`{"elsewhere":"ms-msdt:calc"}`); !strings.Contains(got.Body.String(), "ms-msdt") {
 			t.Errorf("the refusal does not name the scheme: %s", got.Body.String())
 		}

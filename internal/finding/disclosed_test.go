@@ -13,9 +13,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// undisclosed counts the findings and the decisions of one issue that are
-// still undisclosed, closed places included.
-func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, decisions int64) {
+// undisclosed counts the findings and the decision occurrences of one issue
+// that are still undisclosed, closed occurrences included.
+func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, occurrences int64) {
 	t.Helper()
 	var err error
 	findings, err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
@@ -24,16 +24,16 @@ func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, decisions in
 	if err != nil {
 		t.Fatal(err)
 	}
-	decisions, err = f.db.DB.NewSelect().TableExpr(`"decision"`).
+	occurrences, err = f.db.DB.NewSelect().TableExpr(`"decision_occurrence"`).
 		Where(`"vulnerability_id" = ?`, issue).
 		Where(`"visibility" = ?`, access.Private).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return findings, decisions
+	return findings, occurrences
 }
 
-// dated moves every place of an issue's embargo to end at one moment.
+// dated moves every occurrence of an issue's embargo to end at one moment.
 func (f *fixture) dated(t *testing.T, issue int64, at time.Time) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
@@ -44,9 +44,9 @@ func (f *fixture) dated(t *testing.T, issue int64, at time.Time) {
 }
 
 func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
-	// Disclosed, the whole record goes public (REQ-40). A closed place still
-	// carries comments and decisions, and a decision carries the visibility
-	// of the finding it was made about, so both follow.
+	// Disclosed, the whole record goes public (REQ-40). A closed occurrence
+	// still carries comments and decisions, and a decision occurrence carries
+	// the visibility of the finding it was recorded about, so both follow.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -54,22 +54,22 @@ func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
 		issue := f.embargoed(t, who)
 		f.dated(t, issue, time.Now().Add(-24*time.Hour))
 
-		var places []finding.Finding
-		if err := f.db.DB.NewSelect().Model(&places).
+		var occurrences []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&occurrences).
 			Where(`"vulnerability_id" = ?`, issue).Order("id").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if len(places) == 0 {
+		if len(occurrences) == 0 {
 			t.Fatal("the flaw sits nowhere")
 		}
-		// Closed, so the place disclosed is one no list of open work shows.
+		// Closed, so the occurrence disclosed is one no list of open work shows.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"closed_at" = ?`, time.Now().UTC()).
-			Where(`"id" = ?`, places[0].ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, occurrences[0].ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		f.decided(t, who.ID, issue, places[0].PlaceIdentity, "proposed", "1.0", "")
-		if _, err := f.db.DB.NewUpdate().TableExpr(`"decision"`).
+		f.decided(t, who.ID, issue, occurrences[0].OccurrenceIdentity, "proposed", "1.0", "")
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"visibility" = ?`, access.Private).
 			Where(`"vulnerability_id" = ?`, issue).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -84,8 +84,8 @@ func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
 			f.productID, issue, "Because."); err == nil {
 			t.Error("somebody holding only public triage disclosed an issue")
 		}
-		if n, d := f.undisclosed(t, issue); n != int64(len(places)) || d != 1 {
-			t.Fatalf("a refused disclosure changed something: %d findings, %d decisions undisclosed", n, d)
+		if n, d := f.undisclosed(t, issue); n != int64(len(occurrences)) || d != 1 {
+			t.Fatalf("a refused disclosure changed something: %d findings, %d decision occurrences undisclosed", n, d)
 		}
 
 		// The date has arrived, so it takes effect at once.
@@ -97,7 +97,7 @@ func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
 			t.Errorf("disclosing on the date recorded %+v, want a disclosure in force", done)
 		}
 		if n, d := f.undisclosed(t, issue); n != 0 || d != 0 {
-			t.Errorf("after disclosure %d findings and %d decisions are still undisclosed", n, d)
+			t.Errorf("after disclosure %d findings and %d decision occurrences are still undisclosed", n, d)
 		}
 
 		// One way: nothing is left to disclose or to move.
@@ -233,7 +233,7 @@ func TestADisclosedIssueLeavesNothingWaitingToBeMoved(t *testing.T) {
 
 func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T) {
 	// The unit is one issue in one product. The same issue embargoed in a
-	// second product keeps its findings, its decisions and its waiting
+	// second product keeps its findings, its decision occurrences and its waiting
 	// movements private when the first discloses it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -257,7 +257,7 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 			t.Fatal(err)
 		}
 		f.decision(t, decisionRow{
-			By: who.ID, Product: other, Issue: issue, Place: there.PlaceIdentity,
+			By: who.ID, Product: other, Issue: issue, Occurrence: there.OccurrenceIdentity,
 			Visibility: "private", State: "proposed",
 		})
 		both := access.NewPerson(who.ID, "both@example.com", false, map[int64][]access.Role{
@@ -282,11 +282,11 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 		if err != nil || private != 1 {
 			t.Errorf("the other product's finding is undisclosed %d times (%v), want once", private, err)
 		}
-		private, err = f.db.DB.NewSelect().TableExpr(`"decision"`).
+		private, err = f.db.DB.NewSelect().TableExpr(`"decision_occurrence"`).
 			Where(`"product_id" = ?`, other).
 			Where(`"visibility" = ?`, access.Private).Count(ctx)
 		if err != nil || private != 1 {
-			t.Errorf("the other product's decision is undisclosed %d times (%v), want once", private, err)
+			t.Errorf("the other product's decision occurrence is undisclosed %d times (%v), want once", private, err)
 		}
 		waiting, _, err := f.store.PendingPage(ctx, both, 50, 0)
 		if err != nil || len(waiting) != 1 || waiting[0].ProductID != other {
@@ -325,25 +325,26 @@ func TestADisclosureWaitingDoesNotHoldBackOneThatNeedsNobody(t *testing.T) {
 	})
 }
 
-func TestTheEndOfAnEmbargoIsReadFromTheOpenPlaces(t *testing.T) {
-	// A movement reads and moves the open places. A closed place keeps the
-	// date it closed with, and a date it carries that is later than the one
-	// the open places have been moved to is not the end of the embargo.
+func TestTheEndOfAnEmbargoIsReadFromTheOpenOccurrences(t *testing.T) {
+	// A movement reads and moves the open occurrences. A closed occurrence
+	// keeps the date it closed with, and a date it carries that is later than
+	// the one the open occurrences have been moved to is not the end of the
+	// embargo.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.embargoed(t, who)
-		var places []finding.Finding
-		if err := f.db.DB.NewSelect().Model(&places).
+		var occurrences []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&occurrences).
 			Where(`"vulnerability_id" = ?`, issue).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		closed := places[0]
+		closed := occurrences[0]
 		closed.ID = 0
-		// A place identity is a digest at the column's full width, so a
-		// second place is a different digest of that width.
-		closed.PlaceIdentity = strings.Repeat("f", len(closed.PlaceIdentity))
+		// An occurrence identity is a digest at the column's full width, so a
+		// second occurrence is a different digest of that width.
+		closed.OccurrenceIdentity = strings.Repeat("f", len(closed.OccurrenceIdentity))
 		now := time.Now().UTC()
 		later := now.Add(60 * 24 * time.Hour)
 		closed.DiscloseAt = &later
@@ -363,7 +364,7 @@ func TestTheEndOfAnEmbargoIsReadFromTheOpenPlaces(t *testing.T) {
 			t.Fatal(err)
 		}
 		if done.NeedsApproval {
-			t.Error("a closed place's later date sent a disclosure whose date has arrived to a queue")
+			t.Error("a closed occurrence's later date sent a disclosure whose date has arrived to a queue")
 		}
 	})
 }

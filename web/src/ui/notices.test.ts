@@ -21,14 +21,14 @@ describe("what a notification is called", () => {
     expect(label("obligation-passed")).toBe("window after an attack passed");
     expect(label("critical-on-release")).toBe("critical on a release");
     // Each staleness condition says what has stopped rather than what took
-    // place; "claim-waiting" is the word a machine matches on.
-    expect(label("claim-waiting")).toBe("waiting for a second person");
+    // place; "decision-waiting" is the word a machine matches on.
+    expect(label("decision-waiting")).toBe("waiting for a second person");
     expect(label("sent-back-waiting")).toBe("sent back and not revised");
     expect(label("deferral-ending")).toBe("deferral running out");
     expect(label("queue-untaken")).toBe("sitting in a team queue");
     expect(label("approval-undone")).toBe("agreement taken back");
-    expect(label("approval-withdrawn")).toBe("agreed claim changed");
-    expect(label("claim-lapsed")).toBe("stopped applying");
+    expect(label("approval-withdrawn")).toBe("agreed decision changed");
+    expect(label("decision-lapsed")).toBe("stopped applying");
     expect(label("merge-superseded")).toBe("superseded by a merge");
     // The kinds that have words only because the table is keyed on the
     // published union.

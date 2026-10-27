@@ -14,7 +14,7 @@ import (
 )
 
 func TestTheReviewQueueIsReadableAndNarrowed(t *testing.T) {
-	// The queue is the screen somebody works down. A claim waiting in one
+	// The queue is the screen somebody works down. A decision waiting in one
 	// product is on the queue of whoever may agree to it there, and absent
 	// from the queue of somebody who reads only another product.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -38,7 +38,7 @@ func TestTheReviewQueueIsReadableAndNarrowed(t *testing.T) {
 			return out.Total
 		}
 		if got := waiting("reviewer"); got != 1 {
-			t.Errorf("the one claim waiting is %d rows on the queue of somebody who may agree to it", got)
+			t.Errorf("the one decision waiting is %d rows on the queue of somebody who may agree to it", got)
 		}
 		if got := waiting("outsider"); got != 0 {
 			t.Errorf("somebody who reads only another product sees %d waiting here", got)
@@ -47,7 +47,7 @@ func TestTheReviewQueueIsReadableAndNarrowed(t *testing.T) {
 }
 
 func TestDecidingAboutSomethingNobodyScannedIsNotThere(t *testing.T) {
-	// A decision is about a finding. Naming a place freely would be choosing
+	// A decision is about a finding. Naming an occurrence freely would be choosing
 	// which decisions apply where, so the names are resolved against what was
 	// actually scanned.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -65,10 +65,10 @@ func TestDecidingIsRefusedToSomebodyWhoOnlyReads(t *testing.T) {
 	// same path, so the refusal is the role's rather than the finding's
 	// absence. The act a reader may not take answers as a finding not there.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		const body = `{"outcome":"wont-fix","reasoning":"Not worth it."}`
 		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999/occurrences/" +
-			place + "/decision"
+			occurrence + "/decision"
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPost, at, body), http.StatusNotFound)
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at, body); got.Code != http.StatusCreated {
 			t.Fatalf("a triager deciding the same finding answered %d: %s", got.Code, got.Body.String())
@@ -96,12 +96,12 @@ func TestARefusalOfTypedTextSaysWhereToLook(t *testing.T) {
 	// decision is not found — which it would have done just as well with the
 	// text check removed altogether.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
-		id, claim := r.DecidedAt(t, place)
+		occurrence := r.Scanned(t)
+		id, decision := r.DecidedAt(t, occurrence)
 
 		body := `{"reasoning":"This is fine.\n\nBut see ![proof](https://evil.example/x.png)"}`
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/decisions/%d/reasoning", claim), body)
+			fmt.Sprintf("/v1/decisions/%d/reasoning", decision), body)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("a remote image answered %d: %s", got.Code, got.Body.String())
 		}
@@ -142,7 +142,7 @@ func TestARefusalOfTypedTextSaysWhereToLook(t *testing.T) {
 	})
 }
 
-func TestAPipelineHasNoJudgment(t *testing.T) {
+func TestAPipelineHasNoDecision(t *testing.T) {
 	// A build server has no business deciding anything about what it uploaded.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.AsKey(t, http.MethodGet, "/v1/review-queue"); got != http.StatusForbidden {
@@ -201,9 +201,9 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 	// from one finding it would be a promise covering one row of what it
 	// is about.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
+			"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
 
 		// No date: refused, because there is nothing to gate against and
 		// nothing to lapse.
@@ -218,7 +218,7 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 				`"reasoning":"Taking the upstream commit as a distro patch."}`),
 			http.StatusUnprocessableEntity)
 		// The grain, not the word: an upgrade is right, and this is the wrong
-		// place for it.
+		// occurrence for it.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"upgrade-needed","committed_to":"`+httpapitest.AheadOfUs+`","upgrade_to":"3.9.0",`+
 				`"reasoning":"Moving to 3.9.0."}`),
@@ -238,7 +238,7 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 			t.Fatal(err)
 		}
 		if wrote.Outcome != "patch-needed" || wrote.CommittedTo != httpapitest.AheadOfUs {
-			t.Errorf("the claim reads back as %+v", wrote)
+			t.Errorf("the decision reads back as %+v", wrote)
 		}
 
 		// And it is findable as itself, which is what makes "what are we

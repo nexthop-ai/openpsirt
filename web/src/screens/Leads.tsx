@@ -164,11 +164,11 @@ export function Leads() {
                 {rows.map((row) => {
                   const to = leadAt(
                     { product, stream: row.stream, variant: row.variant },
-                    row.place,
+                    row.occurrence,
                   );
                   return (
                     <tr
-                      key={`${row.place}/${row.stream}/${row.variant}`}
+                      key={`${row.occurrence}/${row.stream}/${row.variant}`}
                       className="row opens"
                       onClick={opener(to)}
                     >

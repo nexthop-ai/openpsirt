@@ -7,7 +7,7 @@ package finding
 //
 // A different question from the list, and the one a person is looking at when
 // they decide: not "what is open here" but "what do I know about this". It
-// gathers what the scanners said, what was claimed before, where the component
+// gathers what the scanners said, what was decided before, where the component
 // sits and who is holding it — which is why it is long, and why it is not the
 // list's code.
 
@@ -83,7 +83,7 @@ type Evidence struct {
 	// the issue. A different fact from the one above: that is a feed's word
 	// about the world, and this is an incident here. It admits the finding to
 	// the line whatever the rating says, which is why it is read beside the
-	// places rather than left to the screen.
+	// occurrences rather than left to the screen.
 	ExploitedHere bool
 	// LikelihoodPercentilePPM is where that estimate stands among all of
 	// them, and the day it is about. The number alone is unreadable —
@@ -123,7 +123,7 @@ type Evidence struct {
 	FixState FixState
 	FixedIn  string
 	FixedAt  *time.Time
-	// ArrivedFrom is the version this place held before, where the version
+	// ArrivedFrom is the version this occurrence held before, where the version
 	// moved and the issue came with it. Its presence says somebody bumped this
 	// and the bump did not resolve it — which is aimed at whoever did the
 	// bump rather than at whoever triages.
@@ -144,13 +144,13 @@ type Evidence struct {
 	RoutedBy string
 	// Tags are the words somebody put on this, as they were typed.
 	Tags []string
-	// DueAt is the earliest deadline among these places, which is the one
+	// DueAt is the earliest deadline among these occurrences, which is the one
 	// that makes the whole finding late — and NoDeadline says why there is
 	// none where there is none. Blank, the screen would read as missing
 	// data on the one row somebody is deciding about.
 	DueAt      *time.Time
 	NoDeadline NoDeadline
-	// nothingToTake is whether upstream would close any of these places,
+	// nothingToTake is whether upstream would close any of these occurrences,
 	// worked out where both ends of the group are in hand. Unexported: it
 	// answers one question on the way to NoDeadline above and is not part of
 	// what a detail read reports.
@@ -158,16 +158,16 @@ type Evidence struct {
 	// unrated is a flaw recorded here with no severity in force, which has no
 	// clock until it has one.
 	unrated bool
-	// OpenedAt is when the earliest of these places first appeared here,
+	// OpenedAt is when the earliest of these occurrences first appeared here,
 	// and FoundBy what produced it: which scanner, at which version,
 	// against which vulnerability database.
 	//
-	// The run that answered is not the run that answers now, so this
-	// cannot be worked out again later — it is a fact about a moment, like the
-	// version a place held before it moved, which is what makes storing it the
+	// The run that answered is not the run that answers now, so this cannot be
+	// worked out again later — it is a fact about a moment, like the version an
+	// occurrence held before it moved, which is what makes storing it the
 	// permitted kind of derivation. Without it, "which scanner and which
-	// vulnerability database produced the finding you dismissed on 3 March"
-	// has no answer, and a feed that shipped bad data for a week leaves a
+	// vulnerability database produced the finding you dismissed on 3 March" has
+	// no answer, and a feed that shipped bad data for a week leaves a
 	// population of work nothing can identify.
 	OpenedAt time.Time
 	FoundBy  *Measured
@@ -182,20 +182,20 @@ type Evidence struct {
 	// anybody's project: it is the reason there is no fix rather than a claim
 	// that the project is dead.
 	NothingSince bool
-	// Places is where it sits here — the consumer that pulls the component in,
-	// and whether the build has already argued that place away.
-	Places []Sitting
-	// Claimed is what the build says about the places shown, one entry per
+	// Occurrences is where it sits here — the consumer that pulls the component
+	// in, and whether the build has already argued that occurrence away.
+	Occurrences []Sitting
+	// Claimed is what the build says about the occurrences shown, one entry per
 	// claim covering any of them.
 	Claimed []BuildClaim
 	// AssignedTo is who is dealing with this, by sign-in identity, or empty
 	// where nobody is. One name for the whole finding, because assignment is
-	// set for a group at once; where the places somehow disagree it is empty
+	// set for a group at once; where the occurrences somehow disagree it is empty
 	// rather than naming one of them.
 	AssignedTo string
 	// Matched says how the scanner reached this, and MatchedFrom where that
-	// match came from. One answer for every place, because they all come from
-	// one line of a scanner's report.
+	// match came from. One answer for every occurrence, because they all come
+	// from one line of a scanner's report.
 	//
 	// The source is here rather than on the issue because one issue reached
 	// through two ecosystems has two answers and the issue can hold one. An
@@ -203,7 +203,7 @@ type Evidence struct {
 	// like.
 	Matched     Matched
 	MatchedFrom string
-	// MatchedIn and MatchedRange are the evidence for the judgment Matched
+	// MatchedIn and MatchedRange are the evidence for the decision Matched
 	// asks for: which body of data answered, and the version range the match
 	// fired on. A range naming no packaging revision, read beside a version
 	// that has one, is the whole argument in a line.
@@ -211,23 +211,23 @@ type Evidence struct {
 	MatchedRange string
 }
 
-// placesOf folds the open rows of one finding into the places it sits at, one
-// entry per place, each with the way down to it.
+// occurrencesOf folds the open rows of one finding into the occurrences it sits
+// at, one entry per occurrence, each with the way down to it.
 //
-// A place is what a decision is keyed on, so two rows that share a key are one
-// thing to answer about and one row to read. Two rows do share one where an
-// inventory describes the same consumer twice — the same name and version as a
-// source package and as the distribution's package are two components by
-// content and one pair of names, which is the key — and usually only one of
-// the two is reachable from the root. Listing both drew one way down twice,
-// reported the second as though nothing placed the component, and stated a
-// scope one larger than the submit then recorded.
+// An occurrence is what a decision is keyed on, so two rows that share a key
+// are one thing to answer about and one row to read. Two rows do share one
+// where an inventory describes the same consumer twice — the same name and
+// version as a source package and as the distribution's package are two
+// components by content and one pair of names, which is the key — and usually
+// only one of the two is reachable from the root. Listing both drew one way
+// down twice, reported the second as though nothing placed the component, and
+// stated a scope one larger than the submit then recorded.
 //
 // No query in it, for the reason evidenceFrom has none.
-func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
+func occurrencesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 	shipped map[int64]graph.Step, scopes map[[2]int64]string) []Sitting {
 
-	places := make([]Sitting, 0, len(rows))
+	occurrences := make([]Sitting, 0, len(rows))
 	at := make(map[string]int, len(rows))
 	for _, row := range rows {
 		// Down to the consumer, then this component under it. Where the build
@@ -243,59 +243,59 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 		} else if down, ok := chains[row.ComponentID]; ok && len(down) > 0 {
 			walked = append([]graph.Step{}, down...)
 		}
-		if seen, ok := at[row.PlaceIdentity]; ok {
+		if seen, ok := at[row.OccurrenceIdentity]; ok {
 			// The way down of whichever of them the graph could walk, and the
 			// build's own argument only where it covers every row the key
 			// folds: an argument about one of two components is not an
-			// argument about the place.
-			if len(places[seen].Chain) == 0 {
-				places[seen].Chain = walked
+			// argument about the occurrence.
+			if len(occurrences[seen].Chain) == 0 {
+				occurrences[seen].Chain = walked
 			}
-			places[seen].Suppressed = places[seen].Suppressed && row.Suppressed
-			if places[seen].AnsweredBy != row.AnsweredBy || places[seen].AnsweredIn != row.AnsweredIn {
-				places[seen].AnsweredBy, places[seen].AnsweredIn = "", ""
+			occurrences[seen].Suppressed = occurrences[seen].Suppressed && row.Suppressed
+			if occurrences[seen].AnsweredBy != row.AnsweredBy || occurrences[seen].AnsweredIn != row.AnsweredIn {
+				occurrences[seen].AnsweredBy, occurrences[seen].AnsweredIn = "", ""
 			}
-			// A claim standing on either row stands at the place. A decision
-			// is keyed on the place and expires on the versions, and two rows
-			// of one place need not hold the same ones — the source package
-			// and the distribution's package of one name differ by a
-			// packaging revision — so a decision matches one row and not the
-			// other. Keeping the first row's answer dropped a claim somebody
-			// had just made, and offered the place again. Lowest identifier
-			// wins, so every engine answers alike.
-			if row.Decision != nil &&
-				(places[seen].Decision == nil || *row.Decision < *places[seen].Decision) {
-				places[seen].Decision, places[seen].Claim = row.Decision, row.Claim
+			// A decision standing on either row stands at the occurrence. A
+			// decision is keyed on the occurrence and expires on the versions,
+			// and two rows of one occurrence need not hold the same ones — the
+			// source package and the distribution's package of one name differ
+			// by a packaging revision — so a decision occurrence matches one
+			// row and not the other. Keeping the first row's answer dropped a
+			// decision somebody had just made, and offered the occurrence
+			// again. Lowest identifier wins, so every engine answers alike.
+			if row.DecisionOccurrence != nil &&
+				(occurrences[seen].DecisionOccurrence == nil || *row.DecisionOccurrence < *occurrences[seen].DecisionOccurrence) {
+				occurrences[seen].DecisionOccurrence, occurrences[seen].Decision = row.DecisionOccurrence, row.Decision
 			}
 			continue
 		}
-		// puller is what the producer called the edge into here. A
-		// place under the build itself is pulled in by nothing, which
+		// puller is what the producer called the edge into here. An
+		// occurrence under the build itself is pulled in by nothing, which
 		// is the zero key.
 		var puller int64
 		if row.ConsumerID != nil {
 			puller = *row.ConsumerID
 		}
-		at[row.PlaceIdentity] = len(places)
-		places = append(places, Sitting{
-			PlaceIdentity: row.PlaceIdentity,
-			Component:     row.Component, Consumer: row.Consumer,
-			Suppressed: row.Suppressed, Decision: row.Decision, Claim: row.Claim,
+		at[row.OccurrenceIdentity] = len(occurrences)
+		occurrences = append(occurrences, Sitting{
+			OccurrenceIdentity: row.OccurrenceIdentity,
+			Component:          row.Component, Consumer: row.Consumer,
+			Suppressed: row.Suppressed, DecisionOccurrence: row.DecisionOccurrence, Decision: row.Decision,
 			AnsweredBy: row.AnsweredBy, AnsweredIn: row.AnsweredIn,
 			Urgency: row.Urgency, Chain: walked,
 			DeclaredAs: scopes[[2]int64{row.ComponentID, puller}],
 		})
 	}
-	return places
+	return occurrences
 }
 
-// evidenceFrom is what a reader is shown about a finding, from the places it
+// evidenceFrom is what a reader is shown about a finding, from the occurrences it
 // sits at and the four things looked up about it.
 //
-// No query in it, which is the point: the two rules that are easy to get
-// wrong — any place answers about what the scanner matched, and disclosure is
-// asked of every place, because one undisclosed place among fifty makes the
-// whole of it undisclosed for anybody deciding what may be said — are
+// No query in it, which is the point: the two rules that are easy to get wrong
+// — any occurrence answers about what the scanner matched, and disclosure is
+// asked of every occurrence, because one undisclosed occurrence among fifty
+// makes the whole of it undisclosed for anybody deciding what may be said — are
 // checkable without a database.
 func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Component,
 	aliases []Alias, references []Reference, weaknesses []Weakness) *Evidence {
@@ -304,8 +304,8 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		Vulnerability: issue.Identifier, Severity: issue.Severity,
 		Assessed: issue.Rated,
 		Vector:   issue.Vector, Exploited: issue.Exploited,
-		// Off the places rather than off the issue: the record belongs to one
-		// product, and the issue is shared by every product that holds it.
+		// Off the occurrences rather than off the issue: the record belongs to
+		// one product, and the issue is shared by every product that holds it.
 		ExploitedHere: rows[0].ExploitedHere,
 		Description:   issue.Description, Advisory: issue.Advisory,
 		References: references,
@@ -313,10 +313,11 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		FixedAt:     rows[0].FixedAt,
 		ArrivedFrom: rows[0].ArrivedFrom,
 	}
-	// Upstream's answer, asked of every place rather than of the first. A
-	// detail read is one issue at one component across its places, and places
-	// that disagree have no single answer — which is what the mixed state is
-	// for, and what the filter selects while the row claimed a definite one.
+	// Upstream's answer, asked of every occurrence rather than of the first. A
+	// detail read is one issue at one component across its occurrences, and
+	// occurrences that disagree have no single answer — which is what the mixed
+	// state is for, and what the filter selects while the row claimed a
+	// definite one.
 	least, most := rows[0].FixState, rows[0].FixState
 	for _, row := range rows {
 		if row.FixState < least {
@@ -328,20 +329,21 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	}
 	evidence.FixState = agreedFixState(least, most)
 	evidence.FixedIn = agreedFixedIn(least, most, rows[0].FixedIn)
-	// An upstream release that closes any of these places. Asked of both
+	// An upstream release that closes any of these occurrences. Asked of both
 	// ends here rather than of the word above, because that word is "mixed"
-	// wherever the places disagree — which is not a state upstream is ever in,
-	// and reading it as one says a supported release is past its end of life.
+	// wherever the occurrences disagree — which is not a state upstream is ever
+	// in, and reading it as one says a supported release is past its end of
+	// life.
 	exploited := evidence.Exploited || evidence.ExploitedHere
 	evidence.nothingToTake = !Clocked(FixState(least), exploited) &&
 		!Clocked(FixState(most), exploited)
 	evidence.unrated = Kind(rows[0].Kind) == Entered && issue.InForce() == ""
-	// Any place answers. They all come from one line of a scanner's report,
-	// which the applier writes to every place of the group.
+	// Any occurrence answers. They all come from one line of a scanner's report,
+	// which the applier writes to every occurrence of the group.
 	evidence.Matched = Matched(rows[0].Matched)
 	evidence.Recorded = Kind(rows[0].Kind) == Entered
-	// Any place answers about the kind; disclosure is asked of all of them,
-	// because one undisclosed place among fifty makes the whole of it
+	// Any occurrence answers about the kind; disclosure is asked of all of them,
+	// because one undisclosed occurrence among fifty makes the whole of it
 	// undisclosed for anybody deciding what may be said. Anything not public
 	// is undisclosed for that purpose, internal material included.
 	for _, row := range rows {
@@ -427,22 +429,23 @@ func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]graph.St
 	return out, nil
 }
 
-// Sitting is one place a component occupies, as a finding presents it.
+// Sitting is one occurrence of a component, as a finding presents it.
 type Sitting struct {
-	// PlaceIdentity is what a decision is made against, and what a request
+	// OccurrenceIdentity is what a decision is made against, and what a request
 	// names when making one.
-	PlaceIdentity string
-	// Component is which package of the fold this place is. A fold covers
-	// every binary one source package was built at one version, so a place
+	OccurrenceIdentity string
+	// Component is which package of the fold this occurrence is. A fold covers
+	// every binary one source package was built at one version, so an occurrence
 	// named only by its consumer leaves a reader unable to tell one from
 	// another.
 	Component  string
 	Consumer   string
 	Suppressed bool
-	// AnsweredBy is the supplier whose statement answers this place on the
+	// AnsweredBy is the supplier whose statement answers this occurrence on the
 	// routes up the tree that run through their product, and AnsweredIn that
-	// product. The place stays open for the routes outside it. Empty where no
-	// statement answers it, and where the rows the place folds disagree.
+	// product. The occurrence stays open for the routes outside it. Empty where
+	// no statement answers it, and where the rows the occurrence folds
+	// disagree.
 	AnsweredBy string
 	AnsweredIn string
 	Urgency    int64
@@ -451,29 +454,30 @@ type Sitting struct {
 	// evidence and nothing reads it to decide anything — not the ranking, not
 	// a prefilled outcome, and nothing is hidden by it.
 	DeclaredAs string
-	// Decision is the claim already standing here, where one does. Once
-	// one judgment can cover a chosen subset of places, a finding half
-	// answered has to look different from one nobody has touched —
-	// otherwise the places left open are invisible and somebody answers
-	// them twice or not at all .
+	// DecisionOccurrence is the decision occurrence already standing here,
+	// where one does. Once one decision can cover a chosen subset of
+	// occurrences, a finding half answered has to look different from one
+	// nobody has touched — otherwise the occurrences left open are invisible
+	// and somebody answers them twice or not at all .
 	//
 	// Not the same as Suppressed, which is the build's own argument in its VEX
-	// documents: a different claim by a different author.
+	// documents: a different statement by a different author.
+	DecisionOccurrence *int64
+	// Decision is the decision that occurrence is one row of. A decision
+	// covering several occurrences can then name them rather than only count
+	// them: "one location" says how big a decision was and not which code it
+	// was about, and on a finding that is only partly decided that is the whole
+	// question.
 	Decision *int64
-	// Claim is the action that decision was one row of. A claim covering
-	// several places can then name them rather than only count them: "one
-	// location" says how big a judgment was and not which code it was about,
-	// and on a finding that is only partly decided that is the whole question.
-	Claim *int64
 	// Chain is the way down to here, the build first and this component
 	// last, with a version at every step.
 	//
 	// The direct consumer is what a decision is keyed on and it is not
 	// enough to *read*: where a component is reached several ways the
 	// consumer is often the same word twice, and two identical rows do not
-	// distinguish two places. The complete chain is carried on a finding for
+	// distinguish two occurrences. The complete chain is carried on a finding for
 	// that reason. It stays display-only — putting it back
-	// into identity is what the place identity was measured against and
+	// into identity is what the occurrence identity was measured against and
 	// rejected for, at 49,170 paths against 48 consumers.
 	//
 	// Empty where the build's inventory left this component unplaced,
@@ -482,60 +486,60 @@ type Sitting struct {
 	Chain []graph.Step
 }
 
-// evidenceRow is one open place of the fold a finding screen is about.
+// evidenceRow is one open occurrence of the fold a finding screen is about.
 //
 // Named rather than written inline because the assembly that reads it is a
-// function of its own: what a reader is shown is worked out from these rows
-// and four lookups, with no query in it, which is what makes the rules it
-// holds — any place answers about the match, and disclosure is asked of all of
+// function of its own: what a reader is shown is worked out from these rows and
+// four lookups, with no query in it, which is what makes the rules it holds —
+// any occurrence answers about the match, and disclosure is asked of all of
 // them — checkable without a database.
 type evidenceRow struct {
-	PlaceIdentity string     `bun:"place_identity"`
-	Consumer      string     `bun:"consumer"`
-	ConsumerID    *int64     `bun:"consumer_id"`
-	Component     string     `bun:"component"`
-	ComponentID   int64      `bun:"component_id"`
-	Decision      *int64     `bun:"decision"`
-	Claim         *int64     `bun:"claim"`
-	Suppressed    bool       `bun:"suppressed"`
-	ClaimedBy     *int64     `bun:"claimed_by"`
-	AnsweredBy    string     `bun:"answered_by"`
-	AnsweredIn    string     `bun:"answered_in"`
-	Urgency       int64      `bun:"urgency"`
-	ExploitedHere bool       `bun:"exploited_here"`
-	FixState      string     `bun:"fix_state"`
-	FixedIn       string     `bun:"fixed_in"`
-	FixedAt       *time.Time `bun:"fixed_at"`
-	Matched       string     `bun:"matched"`
-	Kind          string     `bun:"kind"`
-	MatchedFrom   string     `bun:"matched_from"`
-	MatchedIn     string     `bun:"matched_in"`
-	MatchedRange  string     `bun:"matched_range"`
-	ArrivedFrom   string     `bun:"arrived_from"`
-	Visibility    string     `bun:"visibility"`
-	DiscloseAt    *time.Time `bun:"disclose_at"`
-	OpenedAt      time.Time  `bun:"opened_at"`
-	OpenedRunID   *int64     `bun:"opened_run_id"`
-	DueAt         *time.Time `bun:"due_at"`
+	OccurrenceIdentity string     `bun:"occurrence_identity"`
+	Consumer           string     `bun:"consumer"`
+	ConsumerID         *int64     `bun:"consumer_id"`
+	Component          string     `bun:"component"`
+	ComponentID        int64      `bun:"component_id"`
+	DecisionOccurrence *int64     `bun:"decision"`
+	Decision           *int64     `bun:"claim"`
+	Suppressed         bool       `bun:"suppressed"`
+	ClaimedBy          *int64     `bun:"claimed_by"`
+	AnsweredBy         string     `bun:"answered_by"`
+	AnsweredIn         string     `bun:"answered_in"`
+	Urgency            int64      `bun:"urgency"`
+	ExploitedHere      bool       `bun:"exploited_here"`
+	FixState           string     `bun:"fix_state"`
+	FixedIn            string     `bun:"fixed_in"`
+	FixedAt            *time.Time `bun:"fixed_at"`
+	Matched            string     `bun:"matched"`
+	Kind               string     `bun:"kind"`
+	MatchedFrom        string     `bun:"matched_from"`
+	MatchedIn          string     `bun:"matched_in"`
+	MatchedRange       string     `bun:"matched_range"`
+	ArrivedFrom        string     `bun:"arrived_from"`
+	Visibility         string     `bun:"visibility"`
+	DiscloseAt         *time.Time `bun:"disclose_at"`
+	OpenedAt           time.Time  `bun:"opened_at"`
+	OpenedRunID        *int64     `bun:"opened_run_id"`
+	DueAt              *time.Time `bun:"due_at"`
 }
 
 // standingHere is the body of the subquery that picks the one decision
-// standing at a finding's place: the correction in force if there is one, and
-// otherwise the oldest claim keyed on the versions the place holds. The caller
-// supplies the product and reads one column off it.
+// occurrence standing at a finding's occurrence: the correction in force if
+// there is one, and otherwise the oldest decision keyed on the versions the
+// occurrence holds. The caller supplies the product and reads one column off it.
 //
-// A claim waiting for a second person is in the list, because the screen says
-// what has been claimed here as well as what governs. It does not outrank an
-// agreement: a correction nobody has agreed to governs nothing, and put first
-// it named a decision on the screen that every other reader of the same place
-// — what suppresses a finding, what a published document says — disagreed
-// with.
+// A decision waiting for a second person is in the list, because the screen
+// says what has been decided here as well as what governs. It does not outrank
+// an agreement: a correction nobody has agreed to governs nothing, and put
+// first it named a decision on the screen that every other reader of the same
+// occurrence — what suppresses a finding, what a published document says —
+// disagreed with.
 //
 // Ordered rather than aggregated, so that every column read through it names
 // the same row.
-var standingHere = `FROM ` + Decisions + `
-	JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
-	WHERE ` + DecisionAt("?") + `
+var standingHere = `FROM ` + DecisionOccurrences + `
+	JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
+	WHERE ` + DecisionOccurrenceAt("?") + `
 	  AND "de"."live_key" IS NOT NULL
 	  AND ` + KeyMatches + `
 	ORDER BY CASE WHEN "cl"."outcome" = '` + OutcomeMismatched + `'
@@ -566,16 +570,16 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		Where(kinds, kindArgs...).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		// The supplier's statement answering this place on some routes, and
+		// The supplier's statement answering this occurrence on some routes, and
 		// the product it answers through.
 		Join(`LEFT JOIN "vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
-		// The package of the fold this place is. A fold covers every binary
-		// one source package was built at one version, so a place named only
-		// by its consumer would leave a reader unable to tell curl's from
-		// libcurl4t64's.
+		// The package of the fold this occurrence is. A fold covers every
+		// binary one source package was built at one version, so an occurrence
+		// named only by its consumer would leave a reader unable to tell curl's
+		// from libcurl4t64's.
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
@@ -585,26 +589,27 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// neither, so somebody looking at the one row that matters had to go
 		// back to the list to find out when it was due.
 		ColumnExpr(`"f"."due_at" AS "due_at"`).
-		// A live claim standing at this place, whatever its state. Proposed
-		// and waiting counts: it is answered as far as the person looking at
-		// it is concerned, and showing it as untouched invites a second claim
-		// about the same code.
+		// A live decision standing at this occurrence, whatever its state.
+		// Proposed and waiting counts: it is answered as far as the person
+		// looking at it is concerned, and showing it as untouched invites a
+		// second decision about the same code.
 		//
-		// This product's, at the versions shipping here. A place identity
-		// carries no product, so without the first a claim in another product
+		// This product's, at the versions shipping here. An occurrence identity
+		// carries no product, so without the first a decision in another product
 		// that ships the same component reads as standing on this screen; and
-		// a live claim is about the versions it was keyed on, so without the
-		// second a claim about last release's version answers for this one.
+		// a live decision is about the versions it was keyed on, so without the
+		// second a decision about last release's version answers for this one.
 		//
-		// One row, chosen the same way in both columns. A claim that the
-		// match is wrong covers the place at whatever version it holds, so it
-		// can stand beside a claim keyed on this one — and there it is the
-		// answer, because a judgment about risk at a place the match does not
-		// describe is a judgment about something that is not there. Taken as
-		// two independent minimums the two columns could name different rows,
-		// which is a claim identifier that belongs to another decision.
+		// One row, chosen the same way in both columns. A decision that the
+		// match is wrong covers the occurrence at whatever version it holds, so
+		// it can stand beside a decision keyed on this one — and there it is
+		// the answer, because a decision about risk at an occurrence the match
+		// does not describe is a decision about something that is not there.
+		// Taken as two independent minimums the two columns could name
+		// different rows, which is a decision identifier that belongs to
+		// another occurrence.
 		ColumnExpr(`(SELECT "de"."id" `+standingHere+`) AS "decision"`, productID).
-		ColumnExpr(`(SELECT "de"."claim_id" `+standingHere+`) AS "claim"`, productID).
+		ColumnExpr(`(SELECT "de"."decision_id" `+standingHere+`) AS "claim"`, productID).
 		ColumnExpr(`CASE WHEN "f"."suppressed_by" IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
 		ColumnExpr(`"f"."claimed_by" AS "claimed_by"`).
 		ColumnExpr(`COALESCE("sb"."publisher", '') AS "answered_by"`).
@@ -620,15 +625,15 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`COALESCE("f"."matched_range", '') AS "matched_range"`).
 		ColumnExpr(`COALESCE("f"."arrived_from", '') AS "arrived_from"`).
 		ColumnExpr(`"f"."kind" AS "kind"`).
-		// The first appearance of this place here, and the run that put it
+		// The first appearance of this occurrence here, and the run that put it
 		// there . The run is the provenance of the finding, and it is
 		// the only thing that can answer which vulnerability database
 		// produced it.
 		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
 		ColumnExpr(`"f"."opened_run_id" AS "opened_run_id"`).
-		// The places one judgment covers, so the screen a judgment is made from
-		// shows the whole of what it would answer: a form that recorded twelve
-		// places having shown six is a form nobody can trust.
+		// The occurrences one decision covers, so the screen a decision is made
+		// from shows the whole of what it would answer: a form that recorded
+		// twelve occurrences having shown six is a form nobody can trust.
 		Apply(inFoldOf(targetID, vulnerabilityID, componentID, visible)).
 		OrderExpr(`"f"."urgency" DESC, "component", consumer`).
 		Scan(ctx, &rows)
@@ -708,14 +713,14 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
 	claimed := map[int64]bool{}
-	var claims []int64
+	var decisions []int64
 	for _, row := range rows {
 		if row.ClaimedBy != nil && !claimed[*row.ClaimedBy] {
 			claimed[*row.ClaimedBy] = true
-			claims = append(claims, *row.ClaimedBy)
+			decisions = append(decisions, *row.ClaimedBy)
 		}
 	}
-	if evidence.Claimed, err = claimedOn(ctx, s.db, claims); err != nil {
+	if evidence.Claimed, err = claimedOn(ctx, s.db, decisions); err != nil {
 		return nil, err
 	}
 	if evidence.Ratings, err = NewVulnerabilities(s.db).Ratings(ctx, vulnerabilityID); err != nil {
@@ -723,17 +728,17 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 
 	// opened is when this first appeared here and what produced it. The
-	// earliest place, because that is the age the deadline relates to, and
-	// the run that opened *that* place is the one that first said this.
+	// earliest occurrence, because that is the age the deadline relates to, and
+	// the run that opened *that* occurrence is the one that first said this.
 	var opened *int64
 	for _, row := range rows {
 		if evidence.OpenedAt.IsZero() || row.OpenedAt.Before(evidence.OpenedAt) {
 			evidence.OpenedAt = row.OpenedAt
 			opened = row.OpenedRunID
 		}
-		// The earliest deadline among the places, because that is the one that
-		// makes the whole finding late — the same rule the running-out list
-		// and the commitment gate hold.
+		// The earliest deadline among the occurrences, because that is the one
+		// that makes the whole finding late — the same rule the running-out
+		// list and the commitment gate hold.
 		if row.DueAt != nil && (evidence.DueAt == nil || row.DueAt.Before(*evidence.DueAt)) {
 			evidence.DueAt = row.DueAt
 		}
@@ -766,9 +771,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 			return nil, err
 		}
 	}
-	// The way down to each place, read in one pass. A place whose consumer is
-	// the build itself is asked about by the component, which lands on the
-	// same answer with one step in it.
+	// The way down to each occurrence, read in one pass. An occurrence whose
+	// consumer is the build itself is asked about by the component, which lands
+	// on the same answer with one step in it.
 	wanted := make([]int64, 0, 2*len(rows))
 	for _, row := range rows {
 		wanted = append(wanted, row.ComponentID)
@@ -780,7 +785,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	if err != nil {
 		return nil, err
 	}
-	// The last step of a way down is the package the place is, which now
+	// The last step of a way down is the package the occurrence is, which now
 	// varies within a fold: a chain ending in curl and one ending in
 	// libcurl4t64 are two ways to two different packages of one bump.
 	shipped, err := s.versionsOf(ctx, wanted)
@@ -801,15 +806,15 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, err
 	}
 
-	evidence.Places = placesOf(rows, chains, shipped, scopes)
+	evidence.Occurrences = occurrencesOf(rows, chains, shipped, scopes)
 
 	// The party dealing with it. Read here rather than left to a caller, so
 	// that the screen somebody reads a finding on is the screen they can hand
-	// it over from — being able to record a judgment about something and not
+	// it over from — being able to record a decision about something and not
 	// to say who is dealing with it is a strange half of the same job.
 	//
-	// One name for the whole finding, and empty where the places disagree: the
-	// assignment is set for a group at once, so a disagreement is a state
+	// One name for the whole finding, and empty where the occurrences disagree:
+	// the assignment is set for a group at once, so a disagreement is a state
 	// nobody chose and naming one of them would hide it.
 	held, err := s.heldBy(ctx, targetID, vulnerabilityID, componentID, visible)
 	if err != nil {
@@ -834,14 +839,15 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 }
 
 // heldBy is the sign-in identity of whoever is dealing with a finding, or
-// empty where nobody is or the places do not agree.
+// empty where nobody is or the occurrences do not agree.
 //
 // Over the fold, which is the unit the rows beside it use and the unit a
-// judgment covers. Over one component it answered about a third of what the
+// decision covers. Over one component it answered about a third of what the
 // screen was showing.
 //
-// Over the places the reader may read, which are the rows beside it: a holder
-// read off a place they may not read names who is working undisclosed work.
+// Over the occurrences the reader may read, which are the rows beside it: a
+// holder read off an occurrence they may not read names who is working
+// undisclosed work.
 func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, componentID int64,
 	visible []access.Visibility) (string, error) {
 	var holders []struct {
@@ -874,14 +880,14 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 // routedBy is the name of the rule that placed this finding, or empty where a
 // person did or nobody has.
 //
-// One name for the whole group, and empty where its places disagree: the same
-// rule the holder follows, because a group placed two ways is a state nobody
-// chose and naming one of them would hide it. The group is the fold, and
+// One name for the whole group, and empty where its occurrences disagree: the
+// same rule the holder follows, because a group placed two ways is a state
+// nobody chose and naming one of them would hide it. The group is the fold, and
 // routing places findings one at a time — so asked about one component this
 // reported no rule where a rule had placed part of the fold, and the whole
 // thing where the name given happened to be the part it placed.
 //
-// Over the places the reader may read, for the reason the holder is.
+// Over the occurrences the reader may read, for the reason the holder is.
 func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 	componentID int64, visible []access.Visibility) (string, error) {
 

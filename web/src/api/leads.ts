@@ -4,13 +4,13 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import { unwrap } from "./queries";
-import { useAfterClaim } from "./claims";
+import { useAfterDecision } from "./decisions";
 import type { Build } from "../app/routes";
 
 // Static analysis leads: the queue, one lead's evidence, and the product's
 // standing rules that dismiss leads.
 //
-// One module, because every act here moves more than one read: a judgment
+// One module, because every act here moves more than one read: a decision
 // about a lead moves the queue, the lead, the leads it is one flaw with and
 // the review queue, and a standing rule moves every lead it covers.
 
@@ -18,7 +18,7 @@ export type Lead = Body<"LeadRowBody">;
 export type Leads = Body<"LeadsOutputBody">;
 export type Evidence = Body<"LeadEvidenceBody">;
 export type LeadState = Evidence["state"];
-export type LeadPlace = Body<"LeadPlace">;
+export type LeadOccurrence = Body<"LeadOccurrence">;
 export type LeadOutcome = Body<"LeadDecisionBody">["outcome"];
 export type LeadReason = NonNullable<Body<"LeadDecisionBody">["reason"]>;
 export type LeadRule = Body<"LeadRuleBody">;
@@ -30,12 +30,12 @@ export const PAGE = 50;
 // Everything an act on a lead or a rule can move.
 function useAfterLead() {
   const queries = useQueryClient();
-  const claimed = useAfterClaim();
-  // The claim's own set carries the leads and the lead; a standing rule's
+  const decided = useAfterDecision();
+  // The decision's own set carries the leads and the lead; a standing rule's
   // coverage moves with either.
   return () => {
     void queries.invalidateQueries({ queryKey: ["lead-rules"] });
-    claimed();
+    decided();
   };
 }
 
@@ -245,7 +245,7 @@ export function useHandoffOffer(build: Build, place: string, wanted: boolean) {
   });
 }
 
-// Everything a hand-off or a move can move: the lead, the queue, the claims
+// Everything a hand-off or a move can move: the lead, the queue, the decisions
 // and a flaw that is now on the findings lists.
 function useAfterHandoff() {
   const queries = useQueryClient();

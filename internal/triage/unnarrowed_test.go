@@ -19,10 +19,10 @@ func TestTheDeploymentReadsEverythingAndActsOnNothing(t *testing.T) {
 	// decides nothing; only a reading rule takes the every-product shortcut.
 	everything := access.Everything("a background pass")
 	if where, _ := notApprovableWhere(everything, "de"); where != "1 = 1" {
-		t.Errorf("every decision reads as approvable by the deployment: %q", where)
+		t.Errorf("every decision occurrence reads as approvable by the deployment: %q", where)
 	}
 	if where, _ := notDecidableWhere(everything, "de"); where != "1 = 1" {
-		t.Errorf("every decision reads as decidable by the deployment: %q", where)
+		t.Errorf("every decision occurrence reads as decidable by the deployment: %q", where)
 	}
 	if !unnarrowedMay(everything, readable) {
 		t.Error("the deployment does not read everything")
@@ -43,7 +43,7 @@ func TestTheDeploymentIsOfferedNothingToApproveOrDecide(t *testing.T) {
 	everything := access.Everything("a background pass")
 	db := bun.NewDB(&sql.DB{}, sqlitedialect.New())
 	for name, narrowed := range map[string]*bun.SelectQuery{
-		"approve": approvableBy(db.NewSelect().TableExpr(`"decision" AS "de"`), everything, "de"),
+		"approve": approvableBy(db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`), everything, "de"),
 		"decide":  onlyDecidable(db.NewSelect().TableExpr(`"finding" AS "f"`), everything),
 	} {
 		if rendered := narrowed.String(); !strings.Contains(rendered, "1 = 0") {

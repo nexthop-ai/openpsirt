@@ -74,8 +74,8 @@ func TestTheFirstRunOnABranchFingerprintedAnewTakesItsParentsLeadOnTheUnprintedK
 			t.Errorf("receipt %+v; want a fingerprint change inheriting the lead strongly", r)
 		}
 		branch, cut := w.leads(t, w.Target.ID), w.leads(t, tag.ID)
-		if len(branch) != 1 || len(cut) != 1 || branch[0].PlaceIdentity != cut[0].PlaceIdentity {
-			t.Errorf("branch %+v, tag %+v; want one lead each at one place", branch, cut)
+		if len(branch) != 1 || len(cut) != 1 || branch[0].OccurrenceIdentity != cut[0].OccurrenceIdentity {
+			t.Errorf("branch %+v, tag %+v; want one lead each at one occurrence", branch, cut)
 		}
 	})
 }

@@ -17,7 +17,7 @@ func TestTheQueueCarriesWhatAnApproverNeedsToJudge(t *testing.T) {
 	// opening it is a list that gets approved without being read — which is
 	// the failure the queue exists to prevent, arriving by another route.
 	each(t, func(t *testing.T, f *fixture) {
-		f.claims(t, f.at())
+		f.decisions(t, f.at())
 
 		waiting, total, err := f.store.Queue(t.Context(), f.reviewer, triage.QueueFilter{}, 50, 0)
 		if err != nil {
@@ -30,21 +30,21 @@ func TestTheQueueCarriesWhatAnApproverNeedsToJudge(t *testing.T) {
 			t.Error("a row arrived with nothing to read")
 		}
 		if waiting[0].PreviouslyApproved {
-			t.Error("a fresh claim reads as one that was agreed to before")
+			t.Error("a fresh decision reads as one that was agreed to before")
 		}
 	})
 }
 
 func TestSomethingComingBackSaysSo(t *testing.T) {
-	// An approver meeting a claim again should know they are re-reading rather
+	// An approver meeting a decision again should know they are re-reading rather
 	// than seeing it for the first time.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		claimed := f.claims(t, f.at())
-		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); err != nil {
+		claimed := f.decisions(t, f.at())
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Revise(ctx, f.triager, claimed.ClaimID, "Different reasoning entirely."); err != nil {
+		if _, err := f.store.Revise(ctx, f.triager, claimed.DecisionID, "Different reasoning entirely."); err != nil {
 			t.Fatal(err)
 		}
 
@@ -56,7 +56,7 @@ func TestSomethingComingBackSaysSo(t *testing.T) {
 			t.Fatalf("%d waiting, want the revised one", len(waiting))
 		}
 		if !waiting[0].PreviouslyApproved {
-			t.Error("a claim that came back after being agreed to reads as fresh")
+			t.Error("a decision that came back after being agreed to reads as fresh")
 		}
 		if waiting[0].Reasoning != "Different reasoning entirely." {
 			t.Errorf("the queue shows %q, not what now stands", waiting[0].Reasoning)
@@ -68,7 +68,7 @@ func TestAQueueShowsOnlyWorkTheReaderCanDo(t *testing.T) {
 	// A work list containing work somebody cannot do teaches them to skip
 	// rows, which is the opposite of what a review queue is for.
 	each(t, func(t *testing.T, f *fixture) {
-		f.claims(t, f.at())
+		f.decisions(t, f.at())
 
 		waiting, total, err := f.store.Queue(t.Context(), f.onlooker, triage.QueueFilter{}, 50, 0)
 		if err != nil {
@@ -89,7 +89,7 @@ func TestAShortDeferralNeedsNobodyAndALongOneDoes(t *testing.T) {
 
 		soon := time.Now().UTC().Add(7 * 24 * time.Hour)
 		short := triage.Proposal{
-			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
 			Reasoning: "Not this sprint.", By: f.proposer,
 		}
 		needs, err := f.store.NeedsApproval(ctx, short, threshold)
@@ -124,7 +124,7 @@ func TestDeferringRepeatedlyStopsBeingShort(t *testing.T) {
 		asking := func(span time.Duration) triage.Proposal {
 			until := time.Now().UTC().Add(span)
 			return triage.Proposal{
-				Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
+				Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
 				Reasoning: "Still not this sprint.", By: f.proposer,
 			}
 		}
@@ -175,7 +175,7 @@ func TestHidingRiskNeedsAgreementAndPuttingItBackDoesNot(t *testing.T) {
 			{triage.WontFix, true},
 		} {
 			p := triage.Proposal{
-				Place: f.at(), Outcome: c.outcome,
+				Occurrence: f.at(), Outcome: c.outcome,
 				Reasoning: "x", By: f.proposer,
 			}
 			if c.outcome == triage.NotApplicable {
@@ -193,45 +193,45 @@ func TestHidingRiskNeedsAgreementAndPuttingItBackDoesNot(t *testing.T) {
 }
 
 func TestTheQueueLeavesOutWhatYouCannotApprove(t *testing.T) {
-	// Approving your own claim is refused, because a control one person
+	// Approving your own decision is refused, because a control one person
 	// completes alone is not one. A queue that lists them is a work list of
 	// things the reader cannot do, and a list like that teaches somebody to
 	// skip rows — which is the habit the queue exists to prevent.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.claims(t, f.at())
+		f.decisions(t, f.at())
 
 		// The proposer sees nothing waiting on them.
 		if _, total, err := f.store.Queue(ctx, f.triager, triage.QueueFilter{}, 50, 0); err != nil || total != 0 {
-			t.Errorf("the proposer was shown their own claim: %d (%v)", total, err)
+			t.Errorf("the proposer was shown their own decision: %d (%v)", total, err)
 		}
 		// Somebody else sees it, so the check above is not passing on an
 		// empty queue.
 		if _, total, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 50, 0); err != nil || total != 1 {
-			t.Errorf("a claim waiting for a second person was not shown to one: %d (%v)", total, err)
+			t.Errorf("a decision waiting for a second person was not shown to one: %d (%v)", total, err)
 		}
 	})
 }
 
-func TestYourOwnWaitingClaimsAreTheirOwnQuestion(t *testing.T) {
+func TestYourOwnWaitingDecisionsAreTheirOwnQuestion(t *testing.T) {
 	// "What is waiting on me" and "what did I propose that nobody has agreed
 	// to" are different questions, and somebody wants the second one to find
 	// what is stuck. One statement answers both, so the count and the page
 	// cannot disagree about which was asked.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.claims(t, f.at())
+		f.decisions(t, f.at())
 
 		mine, total, err := f.store.Queue(ctx, f.triager, triage.QueueFilter{Mine: true}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if total != 1 || len(mine) != 1 {
-			t.Fatalf("the proposer found %d of their own waiting claims, want 1", total)
+			t.Fatalf("the proposer found %d of their own waiting decisions, want 1", total)
 		}
 		// And somebody else's own list does not contain it.
 		if _, total, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{Mine: true}, 50, 0); err != nil || total != 0 {
-			t.Errorf("a claim appeared among somebody else's own: %d (%v)", total, err)
+			t.Errorf("a decision appeared among somebody else's own: %d (%v)", total, err)
 		}
 	})
 }
@@ -241,7 +241,7 @@ func TestYourOwnWaitingClaimsAreTheirOwnQuestion(t *testing.T) {
 //
 // Excluded outright, the threshold was defeated by withdrawing and deferring
 // again: each span alone stayed under the line, the running total reset to
-// zero every time, and a place stayed hidden indefinitely with no second
+// zero every time, and an occurrence stayed hidden indefinitely with no second
 // person ever seeing it. Withdrawing needs nobody, so the whole loop is one
 // person's.
 func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
@@ -253,7 +253,7 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 		// had run.
 		soon := time.Now().UTC().Add(29 * 24 * time.Hour)
 		first, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
 			Reasoning: "Not this sprint.", By: f.proposer,
 		})
 		if err != nil {
@@ -265,21 +265,21 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 		// Four weeks pass, moved here rather than waited for, and then it is
 		// taken back. Withdrawing needs nobody, so the whole loop is one
 		// person's.
-		if _, err := f.db.DB.NewUpdate().Table("decision").
+		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"proposed_at" = ?`, time.Now().UTC().Add(-28*24*time.Hour)).
-			Where(`"claim_id" = ?`, first.ClaimID).Exec(ctx); err != nil {
+			Where(`"decision_id" = ?`, first.DecisionID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, first.DecisionID); err != nil {
 			t.Fatal(err)
 		}
 
-		// The same place, put off again for another span under the line. The
+		// The same occurrence, put off again for another span under the line. The
 		// two together are past it, and the second is what a second person
 		// has to agree to.
 		again := time.Now().UTC().Add(29 * 24 * time.Hour)
 		needs, err := f.store.NeedsApproval(ctx, triage.Proposal{
-			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &again,
+			Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &again,
 			Reasoning: "Not this sprint either.", By: f.proposer,
 		}, threshold)
 		if err != nil {
@@ -292,14 +292,14 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 	})
 }
 
-// A claim's need for a second person is worked out where it is written.
+// A decision's need for a second person is worked out where it is written.
 //
 // A field on the proposal, answered before the transaction opens and taken on
-// trust, stores a claim as needing nobody under a policy that says it does
+// trust, stores a decision as needing nobody under a policy that says it does
 // wherever an administrator lowers the threshold between the answer and the
 // write — with nothing reporting it. A caller stating the flag at all is the
 // same shape as a binding deadline read outside the write.
-func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
+func TestTheGateIsWorkedOutAgainstThePolicyWhenTheDecisionLands(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// A deferral of ten days, and a deployment that gates anything past
@@ -313,7 +313,7 @@ func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
 		// Recorded as needing nobody, which is what a caller who read the
 		// old policy would have said.
 		made, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
+			Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
 			Reasoning: "Not this sprint.", By: f.proposer,
 			NeedsApproval: false,
 		})
@@ -331,42 +331,42 @@ func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
 }
 
 func TestHowLongEachPlaceWasPutOffIsReadTogether(t *testing.T) {
-	// A form deciding about several places says whether a deferral would stand
-	// on its own, and each place is measured against what it was put off for
-	// before — so every place's total is read, and a place never deferred has
+	// A form deciding about several occurrences says whether a deferral would stand
+	// on its own, and each occurrence is measured against what it was put off for
+	// before — so every occurrence's total is read, and an occurrence never deferred has
 	// none.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		until := time.Now().UTC().Add(20 * 24 * time.Hour)
 		at := f.at()
 		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: at, Outcome: triage.Deferred, DeferredUntil: &until,
+			Occurrence: at, Outcome: triage.Deferred, DeferredUntil: &until,
 			Reasoning: "Not this sprint.", By: f.proposer,
 		}); err != nil {
 			t.Fatal(err)
 		}
 
 		got, err := f.store.DeferredAt(ctx, f.triager, at.ProductID, at.VulnerabilityID,
-			[]string{at.PlaceIdentity, "a-place-nobody-deferred"})
+			[]string{at.OccurrenceIdentity, "a-place-nobody-deferred"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if days := got[at.PlaceIdentity].Hours() / 24; days < 19 || days > 21 {
-			t.Errorf("the deferred place reads %.1f days, want about twenty", days)
+		if days := got[at.OccurrenceIdentity].Hours() / 24; days < 19 || days > 21 {
+			t.Errorf("the deferred occurrence reads %.1f days, want about twenty", days)
 		}
 		if other := got["a-place-nobody-deferred"]; other != 0 {
-			t.Errorf("a place nobody deferred reads %s", other)
+			t.Errorf("an occurrence nobody deferred reads %s", other)
 		}
 
 		// Read as the person asking: somebody who reads nothing here is told
 		// nothing was put off.
 		stranger := access.Subject{Kind: access.Person, ID: -1}
 		theirs, err := f.store.DeferredAt(ctx, stranger, at.ProductID, at.VulnerabilityID,
-			[]string{at.PlaceIdentity})
+			[]string{at.OccurrenceIdentity})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if seen := theirs[at.PlaceIdentity]; seen != 0 {
+		if seen := theirs[at.OccurrenceIdentity]; seen != 0 {
 			t.Errorf("somebody who reads nothing was told %s put off", seen)
 		}
 	})
@@ -377,7 +377,7 @@ func TestHowLongEachPlaceWasPutOffIsReadTogether(t *testing.T) {
 func TestTheQueuesTotalAskedAloneIsThePagesTotal(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.claims(t, f.at())
+		f.decisions(t, f.at())
 
 		_, paged, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 50, 0)
 		if err != nil {
@@ -418,7 +418,7 @@ func TestAPartDayThresholdIsReadAsTheWholeDayTheFormIsTold(t *testing.T) {
 		}
 		until := time.Now().UTC().Add(18 * time.Hour)
 		needs, err := f.store.NeedsApproval(ctx, triage.Proposal{
-			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
+			Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
 			Reasoning: "Not today.", By: f.proposer,
 		}, threshold)
 		if err != nil {

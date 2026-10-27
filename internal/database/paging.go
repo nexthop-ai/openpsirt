@@ -49,7 +49,7 @@ var (
 	// deferrals somebody is about to review. Bigger, because the cost of a
 	// second round trip is paid by a machine.
 	InBulk = Page{Most: 500, ByDefault: 100}
-	// AWholeBuild is a register: every place in one build with what stands
+	// AWholeBuild is a register: every occurrence in one build with what stands
 	// there. It has no natural page, so the default is as large as the
 	// interface will render at once.
 	AWholeBuild = Page{Most: 500, ByDefault: 200}

@@ -105,7 +105,7 @@ export function Backlog() {
                 <i style={{ background: "var(--ok)" }} /> Resolved
               </span>
             </div>
-            <p className="hint">Counted as issues, not as places.</p>
+            <p className="hint">Counted as issues, not as occurrences.</p>
           </section>
 
           <section className="panel">

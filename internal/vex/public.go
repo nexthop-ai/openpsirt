@@ -25,7 +25,7 @@ const (
 	Affected    = "affected"
 )
 
-// The action an affected statement carries where the claim named none. The
+// The action an affected statement carries where the decision named none. The
 // formats ask for one, and these say what is true without promising anything:
 // a date this deployment is working to is its own plan rather than something a
 // reader may hold it to.
@@ -46,7 +46,7 @@ type Fact struct {
 	Component string
 	Purl      string
 	// Within is the package identifier of the component that pulls this one
-	// in, for a statement about one place of it. Empty for a statement about
+	// in, for a statement about one occurrence of it. Empty for a statement about
 	// the component wherever the build holds it.
 	Within string
 	Status string
@@ -58,7 +58,7 @@ type Fact struct {
 	Action        string
 	// Scope is whom the statement holds for.
 	Scope triage.Scope
-	// Since is when the statement was first true: when the claim was made,
+	// Since is when the statement was first true: when the decision was made,
 	// the patch seen, or the finding opened.
 	Since time.Time
 }
@@ -83,12 +83,12 @@ type Built struct {
 // issue that applies and stays stated outright. An issue nobody has decided
 // about gets no statement, so a scanner reports it as it would without this.
 //
-//   - Not affected and fixed come from the same approved claims and declared
+//   - Not affected and fixed come from the same approved decisions and declared
 //     patches the document of one build reads.
-//   - Affected is a component whose every open place stands under a claim in
+//   - Affected is a component whose every open occurrence stands under a decision in
 //     force that the issue applies, will be fixed, or will not.
 //
-// Nothing here states that an issue is under investigation. No claim records
+// Nothing here states that an issue is under investigation. No decision records
 // that somebody is looking at an issue, and a deferral says when somebody will
 // look again rather than that anybody is looking.
 //
@@ -132,7 +132,7 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	if err != nil {
 		return nil, err
 	}
-	placed, err := finding.CoveredAtPlaces(ctx, s.idb(), named.ProductID, targetID, visible, s.carrying())
+	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, targetID, visible, s.carrying())
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (s *Store) grouped(targetID int64, visible []access.Visibility) *bun.Select
 		Limit(int64(s.carrying() + 1))
 }
 
-// factOf is the fact an agreed claim states about one component, beneath one
+// factOf is the fact an agreed decision states about one component, beneath one
 // consumer where within names one.
 func factOf(issueID int64, issue string, aliases []string, component, purl, within,
 	outcome string, words finding.Stated) (Fact, error) {

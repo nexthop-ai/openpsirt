@@ -11,19 +11,19 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// decided is what one judgment reports having written.
+// decided is what one decision reports having written.
 type decided struct {
-	ClaimID  int64 `json:"claim_id"`
-	Recorded int   `json:"recorded"`
-	Also     []struct {
+	DecisionID int64 `json:"decision_id"`
+	Recorded   int   `json:"recorded"`
+	Also       []struct {
 		Stream   string `json:"stream"`
 		Variant  string `json:"variant"`
 		Recorded int    `json:"recorded"`
 	} `json:"also"`
 }
 
-func TestOneJudgmentAcrossBuildsIsWrittenWholeOrNotAtAll(t *testing.T) {
-	// Applied a build at a time, a judgment half-applies: a refusal
+func TestOneDecisionAcrossBuildsIsWrittenWholeOrNotAtAll(t *testing.T) {
+	// Applied a build at a time, a decision half-applies: a refusal
 	// part-way leaves it recorded in some releases and not others, as an
 	// act nobody performed and nobody can point at afterwards.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -44,11 +44,11 @@ func TestOneJudgmentAcrossBuildsIsWrittenWholeOrNotAtAll(t *testing.T) {
 
 		// The whole point: the build that would have succeeded holds nothing.
 		if state := r.StateOf(t, "broadcom"); state != "undecided" {
-			t.Errorf("a refused judgment left the first build %q, so it half-applied", state)
+			t.Errorf("a refused decision left the first build %q, so it half-applied", state)
 		}
 
-		// And the same judgment across two builds that are both there is one
-		// claim covering both.
+		// And one decision across two builds that are both there covers
+		// both.
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
 				`"also":[{"stream":"master","variant":"mellanox","version":"3.8.0"}]}`)
@@ -60,26 +60,26 @@ func TestOneJudgmentAcrossBuildsIsWrittenWholeOrNotAtAll(t *testing.T) {
 			t.Fatalf("decode: %v (%s)", err, got.Body.String())
 		}
 		if out.Recorded != 1 {
-			t.Errorf("the build in the path recorded %d, want its one place", out.Recorded)
+			t.Errorf("the build in the path recorded %d, want its one occurrence", out.Recorded)
 		}
 		if len(out.Also) != 1 || out.Also[0].Variant != "mellanox" || out.Also[0].Recorded != 1 {
-			t.Fatalf("the other build reported %+v, want one place in mellanox", out.Also)
+			t.Fatalf("the other build reported %+v, want one occurrence in mellanox", out.Also)
 		}
-		// One action, one claim, so an approver agrees to the judgment rather
+		// One action, one decision, so an approver agrees to the decision rather
 		// than to one release of it.
-		if out.ClaimID == 0 {
-			t.Error("a judgment across builds recorded no claim to agree to")
+		if out.DecisionID == 0 {
+			t.Error("a decision across builds recorded nothing to agree to")
 		}
 		for _, variant := range []string{"broadcom", "mellanox"} {
 			if state := r.StateOf(t, variant); state != "waiting" {
-				t.Errorf("%s stands at %q after the judgment, want waiting", variant, state)
+				t.Errorf("%s stands at %q after the decision, want waiting", variant, state)
 			}
 		}
 	})
 }
 
-func TestABuildNamedTwiceInOneJudgmentIsRefused(t *testing.T) {
-	// One judgment is recorded against a build once. Naming it twice is a
+func TestABuildNamedTwiceInOneDecisionIsRefused(t *testing.T) {
+	// One decision is recorded against a build once. Naming it twice is a
 	// mistake that would otherwise be reported as a conflict from the write,
 	// which says nothing about what the caller got wrong.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {

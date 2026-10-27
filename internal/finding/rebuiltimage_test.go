@@ -54,13 +54,13 @@ func TestARebuiltImageClosesNothingBeneathItAndKeepsItsDecisions(t *testing.T) {
 		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
-		place := f.placesOf(t, "CVE-2026-1")["docker-swss"]
-		if place.ID == 0 {
+		occurrence := f.occurrencesOf(t, "CVE-2026-1")["docker-swss"]
+		if occurrence.ID == 0 {
 			t.Fatal("libnl is not open beneath the image")
 		}
 		// Keyed as a proposal is: the image is the consumer, at the version
 		// its component carries, which is none.
-		f.decidedAt(t, f.somebodyElse(t), place, "approved", libnl.Version, "", "beneath-the-image")
+		f.decidedAt(t, f.somebodyElse(t), occurrence, "approved", libnl.Version, "", "beneath-the-image")
 		if got := f.agreedHere(t); got.Agreed != 1 {
 			t.Fatalf("before the rebuild: agreed %d, want 1", got.Agreed)
 		}
@@ -114,8 +114,8 @@ func TestAPackageMovingInsideARebuiltImageSupersedesItsFinding(t *testing.T) {
 		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
-		place := f.placesOf(t, "CVE-2026-1")["docker-swss"]
-		f.decidedAt(t, f.somebodyElse(t), place, "approved", libnl.Version, "", "beneath-the-image")
+		occurrence := f.occurrencesOf(t, "CVE-2026-1")["docker-swss"]
+		f.decidedAt(t, f.somebodyElse(t), occurrence, "approved", libnl.Version, "", "beneath-the-image")
 
 		f.shipped(t, inImage(swssImage("master.2-bbb"), libnlNew))
 		applied, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{found("CVE-2026-1", libnlNew)})

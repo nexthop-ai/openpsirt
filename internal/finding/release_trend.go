@@ -99,8 +99,8 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	}
 	// The distinct issues per release, then the band of each, counted after.
 	// The issues are reduced on the finding alone, before the issue or its
-	// rating is joined: a release holds each issue at many places, and
-	// joining first reads the issue's row once per place only to fold the
+	// rating is joined: a release holds each issue at many occurrences, and
+	// joining first reads the issue's row once per occurrence only to fold the
 	// copies away. Inside one product an issue has one band, so the pair
 	// is already distinct once it carries one.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)

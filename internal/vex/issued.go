@@ -37,7 +37,7 @@ var ErrMayNotPublish = fmt.Errorf(
 // Issuance is one time the document for a build went out.
 //
 // A fact about a moment rather than a derived value. What was published on a
-// date cannot be worked out again once a claim is withdrawn, a decision is
+// date cannot be worked out again once a decision is withdrawn, a decision is
 // revised or a scan closes a finding, so if the act is not written down when
 // it happens it is gone.
 //
@@ -92,7 +92,7 @@ type Issuance struct {
 //
 // Recording asks for the triage role on the product rather than the right to
 // read it. The document is this deployment's word to a customer, and the
-// second pair of eyes on each statement it carries was taken when the claim
+// second pair of eyes on each statement it carries was taken when the decision
 // was approved.
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
 	product, stream, variant string, kind Kind) (*Issuance, error) {

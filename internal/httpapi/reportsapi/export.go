@@ -81,7 +81,7 @@ func registerExport(api huma.API, in core.Deps) {
 			"reads, paged and written out as it goes.\n\n" +
 			"The line this deployment triages at is stated in the file.\n\n" +
 			"Below the findings come every open static analysis lead of the same branch or tag " +
-			"and variant, in the lead queue's order, where you read them, those a claim waits on " +
+			"and variant, in the lead queue's order, where you read them, those a decision waits on " +
 			"included and those open only in releases past their end of life left out: `lead` is " +
 			"true on those " +
 			"rows, and `path`, `line`, `function` and `message` say where each is and what the " +
@@ -267,7 +267,7 @@ func findingCells(g finding.Group) []string {
 
 // leadsListed is what a findings file says about its leads where it holds
 // them.
-const leadsListed = "every open lead, below the findings, those a claim waits on included and those open only in releases past their end of life left out"
+const leadsListed = "every open lead, below the findings, those a decision waits on included and those open only in releases past their end of life left out"
 
 // withLeads is the fact a findings file states about the leads it holds. A
 // lead carries no rating, component, upstream, decision or deadline, so a
@@ -286,8 +286,8 @@ func withLeads(by core.Narrowing, at core.AtOneBuild) core.Stated {
 // leadRows is the open leads of one product in a selection, as findings file
 // rows, with the product's name in front where the file spans products.
 //
-// The lead queue's read, under its visibility, with the leads a claim waits
-// on kept in. No row carries source text. A product whose leads the reader may not read is a part holding
+// The lead queue's read, under its visibility, with the leads a decision
+// waits on kept in. No row carries source text. A product whose leads the reader may not read is a part holding
 // no row.
 func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
 	return func(ctx context.Context, limit, offset int) ([][]string, error) {

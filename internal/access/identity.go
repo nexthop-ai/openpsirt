@@ -487,7 +487,7 @@ func (a Arrival) handle() string {
 // Deactivate records that somebody has left, and Reactivate that they are
 // back.
 //
-// Never a deletion. The record names them as the proposer of judgments and the
+// Never a deletion. The record names them as the proposer of decisions and the
 // approver of others, and an assignment may point at them; deleting the row
 // would either break those or rewrite what happened. So leaving is a date, and
 // every path in reads it (REQ-45).

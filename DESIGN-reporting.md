@@ -40,21 +40,22 @@ this document is its own.
 
 ## The counting unit
 
-Every rate and count is one issue at one component, never one place. The
-deadline is stored per place, but a place is not a piece of work: one flaw in
-one library that forty-five packages pull in is one decision. Counted per place
+Every rate and count is one issue at one component, never one occurrence. The
+deadline is stored per occurrence, but an occurrence is not a piece of work: one
+flaw in one library that forty-five packages pull in is one decision. Counted per
+occurrence
 it is forty-five late things beside one late thing on the findings list, both
 labeled the same, and on a real kernel the two numbers are about thirty-seven
 apart.
 
-Where a report groups places first, it states what a group means rather than
+Where a report groups occurrences first, it states what a group means rather than
 summing:
 
 | A group is | When |
 |---|---|
-| Closed | No place is still open |
-| Met | None of the closed places was late |
-| Deferred | *Every* open place is covered by a standing deferral. One covering some of a group leaves the rest running |
+| Closed | No occurrence is still open |
+| Met | None of the closed occurrences was late |
+| Deferred | *Every* open occurrence is covered by a standing deferral. One covering some of a group leaves the rest running |
 | Overdue | Anything open is past its date and uncovered |
 
 Five closure reasons are not resolutions, and a velocity figure counting them
@@ -66,13 +67,13 @@ measures churn:
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
 | `invalid` | A record taken back as a mistake was never present. The backlog trend leaves it out of every open set as well |
 | `unaffected` | The issue's CVE record states the release was never affected. Left out of every open set the same way |
-| `disclaimed` | A supplier states the product the place sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing in the build changed, so nothing was fixed, and the release is counted as having held the issue, whatever the statement says: the place is in the open sets up to its closure, and in the releases an issue was in (`DESIGN-findings.md` § Closure reasons) |
+| `disclaimed` | A supplier states the product the occurrence sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing in the build changed, so nothing was fixed, and the release is counted as having held the issue, whatever the statement says: the occurrence is in the open sets up to its closure, and in the releases an issue was in (`DESIGN-findings.md` § Closure reasons) |
 
 The other five — removed, upgraded, revised, patched, and a recorded flaw
 declared fixed — are counted.
 
-A place closed as `invalid`, `unaffected` or `disclaimed` is in no deadline
-judgment either, in the compliance rate or in the register's met column. Its
+An occurrence closed as `invalid`, `unaffected` or `disclaimed` is judged against
+no deadline either, in the compliance rate or in the register's met column. Its
 deadline was set while it was believed to be work, and closing it says it never
 was.
 
@@ -98,23 +99,24 @@ shape is then known and should not be reinvented under pressure — precompute a
 the grain access is granted at, one row per product per day, so a portfolio
 number stays the sum of what the reader may see.
 
-A count over findings reduces the places before it joins anything. The unit is
-an issue, or an issue at a component, and one issue sits at many places, so the
+A count over findings reduces the occurrences before it joins anything. The unit
+is an issue, or an issue at a component, and one issue sits at many occurrences,
+so the
 findings are grouped on their own columns first and the issue, its rating and
 the catalog's names are joined to the groups. Every narrowing — what the reader
-may see, the selection, the line — is a condition on a place and applies before
+may see, the selection, the line — is a condition on an occurrence and applies before
 the grouping.
 
-| Report | Grouped to | Measured on 367,577 open places, PostgreSQL on one CPU |
+| Report | Grouped to | Measured on 367,577 open occurrences, PostgreSQL on one CPU |
 |---|---|---|
 | Backlog trend | Issue, product, and the moments it opened and closed | 15,053 rows sent, against 367,577 joined first; the request 0.25 s against 1.58 s, across 1 ms and 100 Mbit |
 | What each release holds | Build, issue and component | 0.17 s, against 1.38 s joined first |
 | Release readiness, what a build holds | Issue and component | 0.09 s, against 0.33 s joined first |
 | Release over release | Release and issue | Nothing to measure: the data holds no tags |
-| Aging buckets | Issue and product, then issue, with a flag per bucket (§ Remediation metrics) | One statement, 0.9 s, against three per bucket taking 2.1 s together, with 133,000 decisions |
+| Aging buckets | Issue and product, then issue, with a flag per bucket (§ Remediation metrics) | One statement, 0.9 s, against three per bucket taking 2.1 s together, with 133,000 decision occurrences |
 
 A DISTINCT over the joined rows reaches the same answer and is slower on
-PostgreSQL, because the join still runs once per place.
+PostgreSQL, because the join still runs once per occurrence.
 
 ## The period a report covers
 
@@ -128,8 +130,8 @@ one report to another carries the same two parameters.
 |---|---|
 | A period is two dates; a rolling window is a number of days | A window ending today cannot say "last financial year", which is the number an auditor asks for, and dates alone make "how are we doing lately" a date somebody has to work out |
 | Only one of the two may be sent, and sending both is refused | A caller who sent both meant one of them, and answering about the other is a figure quoted for the wrong period — the failure a period control exists to fix |
-| The end is the day it stops, not a day inside it | The same rule the record of judgments already used, so the two cannot come to mean different things |
-| A screen's "To" is the last day in the period, and what it sends the server is the day after | A person picking March 31 for the end of a quarter means March 31 is in it. The report sheets and the record of judgments read "To" the same way, so a link between them carries the day the person picked, and each screen translates once where it reads the period from the address. Its files, its sections and its heading follow the same period |
+| The end is the day it stops, not a day inside it | The same rule the record of decisions already used, so the two cannot come to mean different things |
+| A screen's "To" is the last day in the period, and what it sends the server is the day after | A person picking March 31 for the end of a quarter means March 31 is in it. The report sheets and the record of decisions read "To" the same way, so a link between them carries the day the person picked, and each screen translates once where it reads the period from the address. Its files, its sections and its heading follow the same period |
 | A day that is not on the calendar is not a period's end | A parser rolls February 30 into March, and the day after that is a different period under a heading that names February |
 | A period that ends before it starts is refused, and so is one that holds no days | A report answering zero for either is indistinguishable from a quarter in which nothing happened. Two refusals, because the end is not itself in the period: naming one day twice asks for no days rather than for a day |
 | Every report says back the period it covered, with the end resolved | A figure read apart from its window is a number nobody can check, and a start with no end answered with nothing over figures that ran to now. An unstated *start* is the beginning and says so by being absent |
@@ -187,7 +189,7 @@ last release a customer actually has, which is rarely the previous one.
 | An entry that left says which run stopped reporting it | An unexplained closure is a fault, and the first question about one is which run. Told it is unexplained and given nowhere to look, a reader has the fault and no way to start on it. Absent where a person closed the finding, which is the other way one closes |
 | Each fixed entry states why | "Fixed by upgrading to 2.4" and "fixed by a carried patch" are different sentences, and the closure reason distinguishes them. `superseded` means the version moved and the issue came with it — before that reason existed, such a bump put one issue in both the fixed and the newly-present column of the same document |
 | A fixed entry states what it moved to | "The component was upgraded, 3.7.0 → 3.9.0". That pair is written when the scan closes the finding, because the component that carried the issue is gone from the inventory by then and anything asking later holds one version and not two |
-| Each still-present entry states whether somebody tried | It carries the version its place arrived from where the version moved since. On the still-present column only: a fixed entry's closure reason already says what happened, and a new one had nothing to bump |
+| Each still-present entry states whether somebody tried | It carries the version its occurrence arrived from where the version moved since. On the still-present column only: a fixed entry's closure reason already says what happened, and a new one had nothing to bump |
 | Explanations are read once for the whole list, not once per entry | A comparison against a release a customer has been on for a year has as many fixed entries as the note is long. The statement narrows by the issues and the components separately rather than by the pairs, because no engine here spells a comparison against a pair of columns the same way, so what comes back is a superset and the pairing is done on the way out |
 | Each entry is rated as its own product rates it | Read from the published rating alone, the document contradicts the findings list it was written from wherever a product has re-rated an issue — and this is the copy that leaves the building. The two builds can be in two products, so each half of the comparison is rated by its own |
 
@@ -204,7 +206,7 @@ It carries what was fixed and nothing else: not what is still present, not what
 newly appeared, and not a bump that carried the issue with it.
 
 A disposition belongs in a VEX document, which is machine-readable and is what a
-customer's scanner consumes. Carrying the same judgments in prose lets the two
+customer's scanner consumes. Carrying the same decisions in prose lets the two
 drift, and prose is the copy nobody regenerates. Publishing "we know this
 critical is present and we deferred it" is also a disclosure act rather than a
 template choice.
@@ -219,7 +221,7 @@ builds, and this is a document going to a customer.
 | Builds are named the way a customer knows them | From the catalog's display names. A heading reading "main container" puts internals on the first line of somebody else's document |
 | Fixes are grouped by what was done, not by the issue | One kernel upgrade closes 917 issues at once, and a bullet per issue states the same version pair 917 times in a document going to a customer — while the part a reader is looking for, which version to move to, is the part that repeats. The move is stated once and the issues it closed are listed under it |
 | A group is the component with its closure reason and its version pair | Two upgrades of one component in one comparison are two different answers to "what do I move to", and folding on the component alone states one of them over both |
-| A bullet carries the score, whether it is known exploited, and where it is written up | The name and the word do not say whether the upgrade is taken tonight or next month, and all three are already held. The address goes through the rule an address stored beside a claim does, because this document leaves the building and a scheme a reader's machine acts on is not something to hand them. It is written in angle brackets, where only an absolute address is a link and anything else opens markup, so it names `http`, `https` or `mailto` or is left out |
+| A bullet carries the score, whether it is known exploited, and where it is written up | The name and the word do not say whether the upgrade is taken tonight or next month, and all three are already held. The address goes through the rule an address stored beside a decision does, because this document leaves the building and a scheme a reader's machine acts on is not something to hand them. It is written in angle brackets, where only an absolute address is a link and anything else opens markup, so it names `http`, `https` or `mailto` or is left out |
 | Every name, version, identifier and severity word is escaped where it is written, and so are the build names and the scanner and database versions | Each was chosen by an upstream author, a scanner or whoever uploaded the build, and the note is rendered by a customer's viewer. Escaped, `[Download the fix](https://…)` as a component name is a name and never a link, an image, markup or a heading. Only a character that can open syntax where it sits is escaped, so `6.12.41-1` reads as written in the source too — `DESIGN-text.md` § Rendered and escaped text holds the rule |
 | The description is not in the bullet | One upgrade closes hundreds of issues and they are listed under it, so a sentence apiece is a document nobody reads to the end. The description is behind the link, which is what the link is for |
 | An empty section is not written | A heading with nothing under it is a question about whether something is missing |
@@ -241,7 +243,7 @@ automatically.
 | Stored at ingest, recomputed when the policy changes (REQ-33) | Computing it per request costs a pass over every open finding *per urgency band*, because each band allows a different number of days — measured at about eight seconds over 441,108 findings. Stored, it is an indexed range scan |
 | The clock runs on what nobody has answered | A dismissal takes a finding off it entirely; a deferral replaces the deadline with its own date. It stops only for a decision that *applies*: approved, or proposed where no second person is required, at the versions this build ships, and a deferral only until its date. A proposal still waiting for an approver stops nothing, and "who is holding what" counts overdue by the same condition, spelled once |
 | One range scan ordered on the stored deadline | Asked band by band instead — once per window, each with its own first-sighting cutoff, merged afterwards — because ordering by a deadline means date arithmetic, which has no portable spelling across the four engines. Taking the oldest findings and discarding whatever is not due loses an exploited finding first seen yesterday and due tomorrow to a low from two years ago that filled the buffer. A list ordered on a proxy for the answer is not the list it claims to be |
-| A person is named on a row only where every place has the same one | Reporting one of several would say a finding is being dealt with when most of it is not |
+| A person is named on a row only where every occurrence has the same one | Reporting one of several would say a finding is being dealt with when most of it is not |
 
 Urgency is stored at ingest for the same reason and carries the same staleness,
 but nobody edits the ranking and people do edit deadlines.
@@ -255,9 +257,9 @@ keeps its deadline; only open rows lose one at end-of-life or below the floor.
 | Rule | Reason |
 |---|---|
 | Deferred by decision is split from plainly late, giving three numbers rather than two | A rate counting an approved deferral as a failure punishes the deliberate act the deferral mechanism exists to make possible, and within a quarter people stop deferring and let work run late quietly instead |
-| Only a deferral in force counts as one — agreed, or short enough to stand on its own | A claim waiting for a second person is neither deferred nor an excuse for lateness, and treating it as both would let one person take their own late work off the report. The same test decides what the outcome filter answers for and when a deferral's end is announced |
-| A deferral counts until its date, and only at the versions it was made at | The test that takes a finding off the clock, narrowed to a deferral. A deferral past its date, or keyed on versions the place no longer holds, has stopped applying, so the finding is overdue rather than deferred — the same answer the running-out list and each person's overdue count give |
-| A product is required | A place identity carries no product, and a decision correlated without one would reach decisions made in every product. Every severity band comes back even where empty, because a rate table with rows missing reads as one that has been narrowed |
+| Only a deferral in force counts as one — agreed, or short enough to stand on its own | A decision waiting for a second person is neither deferred nor an excuse for lateness, and treating it as both would let one person take their own late work off the report. The same test decides what the outcome filter answers for and when a deferral's end is announced |
+| A deferral counts until its date, and only at the versions it was made at | The test that takes a finding off the clock, narrowed to a deferral. A deferral past its date, or keyed on versions the occurrence no longer holds, has stopped applying, so the finding is overdue rather than deferred — the same answer the running-out list and each person's overdue count give |
+| A product is required | An occurrence identity carries no product, and a decision correlated without one would reach decisions made in every product. Every severity band comes back even where empty, because a rate table with rows missing reads as one that has been narrowed |
 | The report says what carries no deadline | A rate about dates is silent about the populations that were never due: below the product's line, in a tag, in a release out of support, and with nothing upstream to take. The third has a report of its own and is linked from here |
 | Taking a population off the clock moves the rate, and upward | A row needs a deadline to be judged at all, so one losing its deadline leaves the numerator and the denominator together — and the rows leaving are disproportionately the late ones. The figure rises with no work done, which is a correction rather than an improvement, and anybody tracking it is told why. A rate over a period spanning such a change is computed from two rules, because only open rows are re-clocked |
 | Only the whole-of-it figure opens a list | The findings list reads a severity as that band or worse, so a link from one band's row would open more than the row counts — and a figure whose list holds something else is the failure a report is easiest to ship |
@@ -279,7 +281,7 @@ of a build pipeline.
 | The bound is the worst few, not a page | Against a blocker count in the thousands, twenty rows are an arbitrary page of the list rather than what the count is made of — and they made the panel three times the height of everything beside it, on the screen named after the comparison those others draw. The list the panel links to is where the whole of it is worked |
 | The component name gives before the panel does | It is the part of a row that varies, and a Debian kernel package is forty-four characters of it — so it shrinks and ends in an ellipsis with the whole of it on the title, rather than running out of a panel sized by the comparison beside it |
 | A row carries the version, because the group does | A group is keyed on the issue and the fold, and a fold is the source package at the version it was built at. Named by component alone, one issue at three versions of one component drew as three identical rows differing in a count that is not on the row |
-| Anything agreed to is absent from that list | Agreeing is the decision to ship with it, which is the opposite of a blocker. What is left is undecided, waiting on a second person, or standing on a judgment that lapsed |
+| Anything agreed to is absent from that list | Agreeing is the decision to ship with it, which is the opposite of a blocker. What is left is undecided, waiting on a second person, or standing on a decision that lapsed |
 | It is read through the findings list's own reader, with the same line | So the list it opens is the list it counts |
 | The link under the count opens the list without its own defaults | The list keeps planned work, tags and releases past end of life out unless asked, and the count takes none of those out. Opened with them it shows fewer rows than the number it sits under, and none at all on a branch past end of life |
 
@@ -311,16 +313,16 @@ to and a carry that happens silently is one nobody reviews.
 
 | Group | Treatment |
 |---|---|
-| Reaches the new line by matching | Counted, never offered. A decision is a claim about a combination of code, so these have already happened. A correction stands at any version, so it is counted here whatever version the new line holds |
-| Held a claim at a version this line does not have | Offered as a *proposal carrying the old reasoning*, never as a decision, because the version moved and the old conclusion is not a conclusion about the new code |
+| Reaches the new line by matching | Counted, never offered. A decision is a statement about a combination of code, so these have already happened. A correction stands at any version, so it is counted here whatever version the new line holds |
+| Held a decision at a version this line does not have | Offered as a *proposal carrying the old reasoning*, never as a standing decision, because the version moved and the old conclusion is not a conclusion about the new code |
 | Deferrals | Offered separately, never carried by default. "Not this sprint" was about that sprint |
-| Past its date at a place the line holds | Counted apart from what covers nothing, because the finding there is left with no answer. A carried judgment keeps its date, so a deferral or promise whose date has gone by cannot be carried |
+| Past its date at an occurrence the line holds | Counted apart from what covers nothing, because the finding there is left with no answer. A carried decision keeps its date, so a deferral or promise whose date has gone by cannot be carried |
 | Covers nothing here | Counted and left behind |
 
 | Rule | Reason |
 |---|---|
-| Which product this is about is read from the build, not from the caller | The first version selected by live key and matching place alone, and a place is a hash of component names carrying no product — so a shared distribution package matched across products, and the reasoning of undisclosed claims came back to anybody who could read one product |
-| Both upstream versions are compared, not just the component's | Comparing only one reports a build whose consumer has moved as already covered, when the claim does not reach it |
+| Which product this is about is read from the build, not from the caller | The first version selected by live key and matching occurrence alone, and an occurrence is a hash of component names carrying no product — so a shared distribution package matched across products, and the reasoning of undisclosed decisions came back to anybody who could read one product |
+| Both upstream versions are compared, not just the component's | Comparing only one reports a build whose consumer has moved as already covered, when the decision does not reach it |
 | A deferral states how long it has already run, across every line it has been carried through | Four consecutive carries of "not this release" are a year nobody decided on, and each looks reasonable alone. Withdrawn deferrals are not counted |
 
 ## Remediation metrics
@@ -333,16 +335,16 @@ A fix is counted in issues, the unit what opened is counted in.
 
 | Rule | Reason |
 |---|---|
-| An issue is fixed in the period its last place closed by a fix | An issue fixed at one place and open at another has not gone away. The grain is the issue across every place the reader may see, in every product |
-| An issue with any place open is not fixed in any period | The same rule from the other side |
-| A place closed for a reason that is not a fix is left out | Churn carried the issue to a place that is open, and a record taken back was never a place |
-| A fix is timed from the issue's earliest place opening to its last place closing | How long the issue was there, however far it fanned out |
+| An issue is fixed in the period its last occurrence closed by a fix | An issue fixed at one occurrence and open at another has not gone away. The grain is the issue across every occurrence the reader may see, in every product |
+| An issue with any occurrence open is not fixed in any period | The same rule from the other side |
+| An occurrence closed for a reason that is not a fix is left out | Churn carried the issue to an occurrence that is open, and a record taken back was never an occurrence |
+| A fix is timed from the issue's earliest occurrence opening to its last occurrence closing | How long the issue was there, however far it fanned out |
 | It is rated in the strictest band any of its products gives it | The reduction the aging buckets make, so an issue rated two ways in two products is one fix |
 
 The aging buckets are cut two ways. One number per bucket says a hundred
 things are over three months old, and neither whether any of them matters nor
 whether anybody has looked. So each bucket carries the same count by severity,
-and how many carry no standing judgment.
+and how many carry no standing decision.
 
 Each bucket names where it starts and where it ends, in days, and the last has
 no end. A link from a bucket asks the findings list for the same stretch —
@@ -357,17 +359,17 @@ a figure about a backlog the question is "has anybody said anything here".
 
 The buckets are counted in one pass over what is open:
 
-1. Each place is matched once against the decisions in force, built from the
-   decision side and joined on the finding.
-2. Each issue gets a flag per bucket for having a place there, a flag per bucket
-   for having an unanswered place there, and the strictest rating its products
-   give it among the places in that bucket. A rating that names no band ranks
+1. Each occurrence is matched once against the decision occurrences in force,
+   built from the decision side and joined on the finding.
+2. Each issue gets a flag per bucket for having an occurrence there, a flag per
+   bucket for having an unanswered occurrence there, and the strictest rating its
+   products give it among the occurrences in that bucket. A rating that names no band ranks
    below every band.
 3. The issues are counted by which flags and ratings they hold, which is a
    handful of rows however many issues there are.
 
-An issue with places in two buckets counts in both, and is undecided in a bucket
-only where a place in that bucket is unanswered.
+An issue with occurrences in two buckets counts in both, and is undecided in a
+bucket only where an occurrence in that bucket is unanswered.
 
 Subtracting two moments has no portable spelling, so this is one of the few
 places an engine is asked directly. It is confined to a single expression, and
@@ -377,7 +379,7 @@ decimal string.
 
 ## Effort by subject
 
-What the judgments in a period were about, most argued first: the component,
+What the decisions in a period were about, most argued first: the component,
 the product, how many arguments were made, how far they reached, how many
 people made them, and what came out of them.
 
@@ -387,11 +389,11 @@ a manager has to answer without any of the others.
 
 | Rule | Reason |
 |---|---|
-| Counted in claims, with the places beside them | A claim is one person's act. Counted by its rows, this would measure how far a component fans out through an image, and the component every image vendors would be the answer every quarter. Both, because ten claims over ten places and one claim over a thousand are different afternoons |
+| Counted in decisions, with the occurrences beside them | A decision is one person's act. Counted by its rows, this would measure how far a component fans out through an image, and the component every image vendors would be the answer every quarter. Both, because ten decisions over ten occurrences and one decision over a thousand are different afternoons |
 | What came out of them is part of the answer | Forty arguments that dismissed forty and forty that promised forty upgrades are different quarters, and a report carrying only the volume says they are the same |
-| What a judgment was about is reached through the findings at its place | A decision names a place rather than a component. A judgment about something since removed still names what it was about, which is what a report about where the time went has to keep |
-| Those findings are the judgment's own product's, and ones the reader may read | A place is a pair of names with no product in it, so it matches the same pair in every product, and a component name read off a finding the reader may not read is the disclosure |
-| Dated by when a judgment was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the record dates by |
+| What a decision was about is reached through the findings at its occurrences | Each of a decision's rows names an occurrence rather than a component. A decision about something since removed still names what it was about, which is what a report about where the time went has to keep |
+| Those findings are the decision's own product's, and ones the reader may read | An occurrence is a pair of names with no product in it, so it matches the same pair in every product, and a component name read off a finding the reader may not read is the disclosure |
+| Dated by when a decision was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the record dates by |
 | It takes the same period and the same scope the other reports do | One product or one team, so a manager reads their own quarter rather than the deployment's. The team is picked on the sheet, from the teams that exist |
 | It pages, and its total counts every row before the limit | A total taken off the page reads a list cut at the limit as complete, and with no offset the rows past the largest page could not be read at all |
 
@@ -413,26 +415,26 @@ had.
 |---|---|
 | The arithmetic is in Go rather than SQL | Subtracting two moments is spelled four ways across these engines, and so is a percentile |
 | Nearest rank is the first observation at or past that position | Three waits of one, two and thirty days have a median of two. Truncating instead of rounding up picks the one below, which for an odd count is not the middle and for a tail figure is not the tail |
-| A wait is measured from the finding the claim is about | A place is a pair of names with no product in it, so the same place sits in every product shipping that component. Matching on the place alone took the figure from another product's finding, and from findings the reader may not see |
-| Bounded, and it says so | At most the most recent few thousand claims in the window, with the answer stating how many and whether the ceiling was reached |
-| Throughput is per person, counted where the work happened | A claim belongs to the window it was proposed in, and an agreement to the window it was given in |
-| Throughput counts claims | Made, agreed to and withdrawn alike. A claim writes a row per place and is one piece of work, so counting rows mixes units and disagrees with a person's own record |
-| The waits and the send-backs count claims too | One wait per claim and severity band, from the earliest finding its places opened at and the moment it was first proposed. A send-back is one claim coming back, however many places it covers |
-| Send-backs are counted for the deployment, not per person | The record holds that a claim came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |
+| A wait is measured from the finding the decision is about | An occurrence is a pair of names with no product in it, so the same occurrence sits in every product shipping that component. Matching on the occurrence alone took the figure from another product's finding, and from findings the reader may not see |
+| Bounded, and it says so | At most the most recent few thousand decisions in the window, with the answer stating how many and whether the ceiling was reached |
+| Throughput is per person, counted where the work happened | A decision belongs to the window it was proposed in, and an agreement to the window it was given in |
+| Throughput counts decisions | Made, agreed to and withdrawn alike. A decision writes a row per occurrence and is one piece of work, so counting rows mixes units and disagrees with a person's own record |
+| The waits and the send-backs count decisions too | One wait per decision and severity band, from the earliest finding its occurrences opened at and the moment it was first proposed. A send-back is one decision coming back, however many occurrences it covers |
+| Send-backs are counted for the deployment, not per person | The record holds that a decision came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |
 | It narrows to one product, or to one team's people | Without a scope there are no per-team figures, so a manager asking how their own people are doing reads the deployment's numbers with their name on them |
-| A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A claim belongs to whoever argued it, which is the rule the record of judgments dates by — narrowed by the approver, a team's time to agree would be about claims its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
+| A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A decision belongs to whoever argued it, which is the rule the record of decisions dates by — narrowed by the approver, a team's time to agree would be about decisions its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
 | A team with nobody on it measures nothing | A narrowing that silently widens to the deployment is the one mistake a narrowing must not make |
 | Asked about a team, only an administrator is given the per-person rows | Rows narrowed to a team name its members, and membership is an administrator's to know (DESIGN-access § Teams). Anybody else is given the team's totals |
 
 ## Repeated deferrals
 
-Places deferred more than once, with how often and for how long in total. The
+Occurrences deferred more than once, with how often and for how long in total. The
 cumulative threshold refuses a *further* deferral past a point, one item at a
 time; what it cannot show is the shape across everything, and one item deferred
 three times is a judgment where forty of them is a policy nobody wrote down.
 
-Counted over the claims rather than the findings they cover: how often is how
-many claims put the place off, and how long is the time it was put off for,
+Counted over the decisions rather than the findings they cover: how often is how
+many decisions put the occurrence off, and how long is the time it was put off for,
 counted the way the deferral threshold counts it (`DESIGN-triage.md` § The
 deferral threshold). A withdrawn or lapsed deferral counts for the part that
 ran, and stretches that overlap count once.
@@ -461,18 +463,18 @@ gone.
 The complement of the audit list. The audit list states what was decided; the
 auditor's first question is what was **known**, decided or not.
 
-One row per issue and place in a named build, with its state, outcome,
+One row per issue and occurrence in a named build, with its state, outcome,
 justification, proposer, approvers, the dates each of those happened, its
 deadline, and whether the deadline was met.
 
 | Rule | Reason |
 |---|---|
-| One row per issue and place, whatever else is true of it | The agreement is read as a scalar rather than joined, because nothing makes an approval unique per decision — a second approver adds a row, and a join multiplied the finding. The page then held fewer rows than its total said, and because paging is by offset every page after that skipped one |
+| One row per issue and occurrence, whatever else is true of it | The agreement is read as a scalar rather than joined, because nothing makes an approval unique per decision — a second approver adds a row, and a join multiplied the finding. The page then held fewer rows than its total said, and because paging is by offset every page after that skipped one |
 | It states no triage line, because it applies none | Everything in the build is here, decided or not, which is the basis on which an auditor can rely on it. A file stating it has been taken above a line where it has not is worse than silence |
-| Everything is joined outward from the finding and joined left | A place nobody has decided about is the row this exists to show. Closed rows are included, and whether a deadline was met is answerable only for something that closed |
-| A judgment that lapsed is part of the record, and a superseded one is not | Who proposed and who approved a lapsed judgment is what a compliance reader comes for, and the findings list calls the same place lapsed |
-| A row reports the one decision on the record at its place: the live one covering the finding's versions, or where none does, the latest lapsed one | Decision rows are never deleted, so a place carries every withdrawn and lapsed judgment ever made at it, and one row per place is the rule above. A live decision covers a place at the versions it was keyed on and no other, which is the findings list's own test; a build shipping the place at other versions reads undecided on both surfaces. Where two live decisions cover one finding, a claim keyed on its versions and a correction covering the place at any version, the row names the one the finding's screen names: the correction in force, otherwise the older |
-| The row names what pulls the component in, beside the place identity | The identity is derived from content, so it correlates two rows and names no location. A register whose only answer to "where" is sixty-four hex characters is one nobody can read, and where is what an auditor is asking |
+| Everything is joined outward from the finding and joined left | An occurrence nobody has decided about is the row this exists to show. Closed rows are included, and whether a deadline was met is answerable only for something that closed |
+| A decision that lapsed is part of the record, and a superseded one is not | Who proposed and who approved a lapsed decision is what a compliance reader comes for, and the findings list calls the same occurrence lapsed |
+| A row reports the one decision on the record at its occurrence: the live one covering the finding's versions, or where none does, the latest lapsed one | Decision occurrence rows are never deleted, so an occurrence carries every withdrawn and lapsed decision ever made at it, and one row per occurrence is the rule above. A live decision covers an occurrence at the versions it was keyed on and no other, which is the findings list's own test; a build shipping the occurrence at other versions reads undecided on both surfaces. Where two live decisions cover one finding, one keyed on its versions and a correction covering the occurrence at any version, the row names the one the finding's screen names: the correction in force, otherwise the older |
+| The row names what pulls the component in, beside the occurrence identity | The identity is derived from content, so it correlates two rows and names no location. A register whose only answer to "where" is sixty-four hex characters is one nobody can read, and where is what an auditor is asking |
 | It narrows by closure reason as well | What the CVE records closed and what suppliers' statements closed are each listed on their own, which is how a wrong record or a wrong statement is found |
 | A row closed as unaffected carries the record's lines that closed it | The snapshot the run read is replaced by the next, and the lines are what a reader checks the closure against. A file carries them in one cell |
 | A row a supplier's statement answers carries the statement: who published it, the product it is about, the justification and the words | On a row closed as disclaimed it is what closed it; on an open row it answers the routes through the supplier's product, and the row stays open for the rest. A file carries it in one cell |
@@ -510,10 +512,10 @@ of its own, and the catalog reaches it through the release comparison entry.
 | Rule | Reason |
 |---|---|
 | A still-present row says how far it has been decided, what was decided and when it is due | A list of what is still there with no way to tell an approved not-applicable from something nobody has looked at is not a list anybody can sign. Those are opposite answers to the question a release sign-off asks |
-| A standing decision is one in force: agreed, or made by somebody whose claim needed nobody | The test the agreed count uses, so every place counted as agreed contributes its outcome, and a row never states one place's outcome over a place that stands on another |
-| The outcome is stated only where every standing decision over the row's places reaches the same one | A component argued away at one place and deferred at another is two claims, and stating either over the row would be a claim nobody made. The same rule the VEX document publishes under |
-| Agreement is about the outcome, and the reason is stated only where one claim answered the row | Two claims can argue a component away for different recognized reasons and still agree it does not apply; counted as disagreement, the column goes blank on a row every place of which has been argued away. Which of the two reasons it was is what the row cannot say |
-| The claims behind a row are told apart by their identifiers, never by their words | A justification is a long-text column on two of the four engines, which compare a bounded prefix for grouping. Told apart by the text, two engines could disagree about whether a row has one answer or two |
+| A standing decision is one in force: agreed, or made by somebody whose decision needed nobody | The test the agreed count uses, so every occurrence counted as agreed contributes its outcome, and a row never states one occurrence's outcome over an occurrence that stands on another |
+| The outcome is stated only where every standing decision over the row's occurrences reaches the same one | A component argued away at one occurrence and deferred at another is two decisions, and stating either over the row would be a decision nobody made. The same rule the VEX document publishes under |
+| Agreement is about the outcome, and the reason is stated only where one decision answered the row | Two decisions can argue a component away for different recognized reasons and still agree it does not apply; counted as disagreement, the column goes blank on a row every occurrence of which has been argued away. Which of the two reasons it was is what the row cannot say |
+| The decisions behind a row are told apart by their identifiers, never by their words | A justification is a long-text column on two of the four engines, which compare a bounded prefix for grouping. Told apart by the text, two engines could disagree about whether a row has one answer or two |
 | The state is counted the way the findings list counts it | One spelling of each of the four, so a row here and the same row on the list cannot say different things about how far it has been decided |
 | The column narrows to what nobody has agreed to | That is the coordinator's blocker list, and it is the one narrowing the sheet is read for |
 | It is read for the still-present entries alone | What was fixed needs no justification and what is newly present has not been looked at yet |
@@ -532,10 +534,10 @@ assembled differently every time.
 | Nothing of yours affected is a document, not a refusal | "Are you affected by this" could be answered yes and never no, and the second is the answer an inquiry is usually asking for |
 | An identifier nobody has seen and one that sits only in products you cannot read produce the same document | Told apart, the pair says which issues this deployment holds, one guess at a time |
 | The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The issue row is shared, and a recorded flaw writes its summary, minted name and addresses onto it. `DESIGN-findings.md` § Recorded words on a shared issue holds the rule every reader asks |
-| Every address in it goes through the rule an address stored beside a claim goes through, and names `http`, `https` or `mailto` | It is a document somebody forwards, and a scheme a reader's machine acts on is not something to hand them. Inside angle brackets anything but an absolute address opens markup, and a space, an ASCII control character or a bracket ends the address and makes the rest of the line markdown, so an address carrying one is left out |
+| Every address in it goes through the rule an address stored beside a decision goes through, and names `http`, `https` or `mailto` | It is a document somebody forwards, and a scheme a reader's machine acts on is not something to hand them. Inside angle brackets anything but an absolute address opens markup, and a space, an ASCII control character or a bracket ends the address and makes the rest of the line markdown, so an address carrying one is left out |
 | Everything else in it that did not pass the submission policy is escaped where it is written | The identifier, description, severity and aliases come from feeds, the component, version and fixed-in version from scan files, and product and person names are not markdown. A reasoning passed the policy when it was typed and is written as it was |
-| It is bounded, and says when the list is a page of a longer one | An issue at a widely vendored component carries hundreds of judgments, and what this is for is being read |
-| Over a page, it says how many judgments stand and how many are recorded | The list carries withdrawn and lapsed judgments too, and only a judgment in force stands |
+| It is bounded, and says when the list is a page of a longer one | An issue at a widely vendored component carries hundreds of decision occurrences, and what this is for is being read |
+| Over a page, it says how many decision occurrences stand and how many are recorded | The list carries withdrawn and lapsed ones too, and only a decision in force stands |
 | The issue screen's count of products is taken with its total, before the limit, over what the reader may see | A figure taken off a capped page answers a different question from the one it looks like |
 
 ## The exception report
@@ -581,7 +583,7 @@ report that exists to find it.
 | The product, the outcome and the state each take several answers | "Dismissed or deferred" and "waiting or sent back" are the questions somebody reading the record has, and one value cannot ask either; the parameter repeats and any of what is named matches. A product named that the reader may not see refuses the whole request rather than being dropped, because a report answering about two products when three were asked for reads as covering three |
 | It says "this should be empty" only where every outcome asked for is a dismissal, of a vulnerability or a lead | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
 | What was asked for is printed with every value | A sheet headed "dismissed — not applicable" over rows that also hold deferrals is a sheet nobody can check against anything |
-| The record narrows to one build, reached through the findings at each place | A decision names no build, deliberately — it is keyed on the product, the issue and the place, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the judgment, because a place identity carries none |
+| The record narrows to one build, reached through the findings at each occurrence | A decision names no build, deliberately — it is keyed on the product, the issue and the occurrence, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the decision, because an occurrence identity carries none |
 | A build is a product, a stream and a variant together, or none of them | Named alone, a stream would narrow to a stream of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
 | The file carries every agreement with its dates, beside who agrees now | What somebody agreed to and then stopped agreeing to is what an audit is looking for, and the file carried neither it nor any date. The two are different questions and a column mixing them is the one answer an auditor must not be given |
 
@@ -589,7 +591,7 @@ report that exists to find it.
 
 Dismissals are a reportable dataset in their own right. Answered two ways: the
 findings list filters on outcome and on whether a rating was changed, and the
-record screen lists every claim with its reasoning, its approvals, the dates
+record screen lists every decision with its reasoning, its approvals, the dates
 and how much it covers. Which of the five reasons applied is on the entry
 rather than a filter, because it is what an auditor reads on the entry they
 stopped at.
@@ -597,7 +599,7 @@ stopped at.
 A dismissal is any of four outcomes, and anything counting or listing them
 asks for all four:
 
-| Outcome | The claim |
+| Outcome | What it asserts |
 |---|---|
 | Not applicable | The vulnerable code is not reachable |
 | Wrong match | The scanner matched something that is not here |
@@ -608,21 +610,21 @@ What they have in common is that nothing was changed, which is why they are the
 four that need a second person. Asked of one, a program that dismisses
 everything as "will not fix" reads as a program that has argued nothing away.
 
-The record lists one entry per claim. Its file is one row per decision.
+The record lists one entry per decision. Its file is one row per occurrence.
 
 | Rule | |
 |---|---|
-| One entry per claim, ordered by its newest matching decision | A judgment covering forty places is one argument by one person. The group is derived when read (REQ-17) |
-| The total counts claims | The heading, the printed sheet and the pages count one thing |
-| A claim is listed where any of its decisions match the filters | Every filter keeps its meaning, the period and the build included |
-| Every count on an entry is of the decisions that match | Asked for what lapsed, a claim with one lapsed decision of forty reads as one decision, lapsed |
-| Every count is of decisions the reader may read, the total included | A count of undisclosed decisions is the disclosure (REQ-42, REQ-43) |
-| What an entry is about is named from its earliest matching decision | Beside how many issues, products, component names and places the matching decisions reach. Component names are counted through the findings the reader may read |
-| An entry's state is one word | The state its matching decisions share, or mixed, with the count in each state beside it |
-| An entry stands where every matching decision applies now | Otherwise it says how many do |
-| An entry links to its places on the findings list | Narrowed to the claim and the states the record asked for, across every release, planned or not. The claim page's own link asks the same |
-| The file is one row per decision, naming the place and the claim | An auditor reconciles a file against places, and the claim column groups the rows in a spreadsheet |
-| The per-decision list stays | The reports overview reads the newest dismissals from it, and an issue's document lists the decisions about that issue |
+| One entry per decision, ordered by its newest matching occurrence | A decision covering forty occurrences is one argument by one person. The group is derived when read (REQ-17) |
+| The total counts decisions | The heading, the printed sheet and the pages count one thing |
+| A decision is listed where any of its occurrences match the filters | Every filter keeps its meaning, the period and the build included |
+| Every count on an entry is of the occurrences that match | Asked for what lapsed, a decision with one lapsed occurrence of forty reads as one occurrence, lapsed |
+| Every count is of occurrences the reader may read, the total included | A count of undisclosed occurrences is the disclosure (REQ-42, REQ-43) |
+| What an entry is about is named from its earliest matching occurrence | Beside how many issues, products, component names and occurrences the matching ones reach. Component names are counted through the findings the reader may read |
+| An entry's state is one word | The state its matching occurrences share, or mixed, with the count in each state beside it |
+| An entry stands where every matching occurrence applies now | Otherwise it says how many do |
+| An entry links to its occurrences on the findings list | Narrowed to the decision and the states the record asked for, across every release, planned or not. The decision page's own link asks the same |
+| The file is one row per occurrence, naming the occurrence and the decision | An auditor reconciles a file against occurrences, and the decision column groups the rows in a spreadsheet |
+| The per-occurrence list stays | The reports overview reads the newest dismissals from it, and an issue's document lists the decision occurrences about that issue |
 
 What is being scanned, and when each build was last seen, is its own view. The
 shape is in `DESIGN-ingest.md`. A product silently dropping out of scanning is
@@ -745,12 +747,12 @@ Deadline compliance and the disposition register have sections above.
 
 | Page | What it answers |
 |---|---|
-| Program overview | What is being fixed against what is appearing, what is aging and whether anybody has looked at it, how long a claim waits to be decided and then agreed to, what keeps being put off, and what has been argued away. Its window is seven, thirty or ninety days or a period between two dates, and the printed header names which |
+| Program overview | What is being fixed against what is appearing, what is aging and whether anybody has looked at it, how long a finding waits for a decision and a decision waits to be agreed to, what keeps being put off, and what has been argued away. Its window is seven, thirty or ninety days or a period between two dates, and the printed header names which |
 | Scan coverage | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support or taken out of use is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. Each build is in one of five states: out of support, out of use, never scanned, quiet, or scanned. "Being scanned" counts the last of those among the builds in support and in use, on this page and on the front page alike. Gone quiet also counts a build never scanned that has been declared longer than the quiet span, and its tile says so. The front page names the three quietest and the Uploads screen answers for one product; this answers for the estate |
 | Releases out of support | The releases whose date has passed, and — asked for — the ones about to, how long ago or how long there is left, and how many issues are still open against each, ordered by what is open. Past end-of-life the deadline is removed from every open finding, so none of that pile is overdue, none is due soon, and none of it reaches a figure built on either. That is correct — no work will land there — and it is what makes asking the only way to see it. A date inherited from the product says so: a release following a date and one that stated the same date are different, and only the first moves when the product changes its mind |
 | Backlog over time | Whether the backlog is growing, and what kind of thing is making it grow: what arrived, what was answered and what stood open at the end of each step, each split by severity. Only the open count was split, and ten arriving against ten answered is a team keeping pace where both are low and a team losing ground where what arrives is critical and what leaves is not — which a line of totals draws as flat. A resolved issue is counted at the severity it held while it was open, because the step it left in no longer has one |
 | Approval quality | How much a second pair of eyes actually did. Its sections are below |
-| Effort by component | The subjects of the judgments in a period, most argued first, with what came out of them. Effort by subject, above, holds the rest |
+| Effort by component | The subjects of the decisions in a period, most argued first, with what came out of them. Effort by subject, above, holds the rest |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
 | Leads by analyzer | How many static analysis leads each analyzer series of one product holds in each state, across every build of the product. Each figure opens the lead list for its series and state. Read only by somebody holding `internal-read` on the product; anybody else is told leads are internal and is answered no count. `DESIGN-analysis.md` § Leads by series holds what is counted |
@@ -773,15 +775,15 @@ answer rather than as an absence.
 |---|---|
 | It asks for every outcome that hides risk and stores no date, over every kind | The four dismissals of a vulnerability or a flaw, and a lead dismissed or called no security issue. Each always needs a second person |
 | The outcomes are the ones the server publishes as that class | A list typed in the interface would leave out an outcome the server adds, while the report said none stood alone |
-| A claim about a lead is listed and counted only for somebody who reads internal material in its product | It is internal, and the record narrows every row and count by the reader (REQ-42, REQ-43) |
+| A decision about a lead is listed and counted only for somebody who reads internal material in its product | It is internal, and the record narrows every row and count by the reader (REQ-42, REQ-43) |
 
 The standing corrections are the record with its other filters set: the wrong
-matches that apply now. Every other judgment lapses when the code moves, so
+matches that apply now. Every other decision lapses when the code moves, so
 each comes back round to somebody; a correction does not, and the only way to
 read the set is to ask for it. `DESIGN-triage.md` § Corrections holds what one
 is.
 
-Applying now is not the same question as having been approved. A judgment is
+Applying now is not the same question as having been approved. A decision is
 approved and lapses afterwards when the code moves out from under it, so the
 state filter answers what was once agreed to.
 
@@ -797,11 +799,11 @@ reports is where the rule did not apply and where it applied in form only.
 | Risk standing on one person | Split in two, because the halves read oppositely. A dismissal here, of a vulnerability or a lead, is a control that did not hold. A short deferral, or an upgrade promised inside the deadline the work already had, is the exception working — deliberate, so that gating every routine act does not put ordinary triage through a queue nobody then reads. One at a time it is triage; the pattern across a program is what nothing else shows |
 | Proposer and approver pairs | Every pair, with the share of everything agreed to that ran between them. The share is the signal rather than the count: fifty of fifty-two and fifty of nine hundred are the same number and not the same situation |
 | Agreements given in bulk | An approver works at the unit the proposer acted at, so agreeing to a batch as one act is the control working. A batch of two hundred is still not a batch of two |
-| Agreed to before, covering more now | What was consented to, recorded at the moment of consent, against what the same claim reaches today. A claim reaches by matching, so a build appearing later is covered with nobody acting and nobody having agreed to the larger number |
+| Agreed to before, covering more now | What was consented to, recorded at the moment of consent, against what the same decision reaches today. A decision reaches by matching, so a build appearing later is covered with nobody acting and nobody having agreed to the larger number |
 | Standing from somebody who could not give it now | Correct behavior — an approval is a fact about a moment, and losing a role does not un-say what somebody said — and the first list asked for after a reorganization |
 
-Everything is dated by when a claim was proposed rather than when it was agreed
-to, for the reason the record is: a judgment belongs to when it was argued, and
+Everything is dated by when a decision was proposed rather than when it was agreed
+to, for the reason the record is: a decision belongs to when it was argued, and
 dating it by its agreement moves it out of that period whenever an approval
 comes late.
 
@@ -811,11 +813,11 @@ was capped.
 
 | Rule | |
 |---|---|
-| Every section counts claims about vulnerabilities, flaws and leads, each where the reader may read it | A claim about a lead is internal, so it reaches only somebody who reads internal material in its product, in the counts as in the rows |
-| Growth is capped after it is found, most grown first | Whether a claim grew is known only once what it covers now is counted, so every standing agreement is examined. Capped before that, the oldest claims fill the page and a claim that grew after them is in no answer |
-| Ties are broken by claim, then by approver | A claim with two standing agreements is two rows of equal growth, and a cap between them is decided by the record rather than by the engine |
-| What a claim covers now is what its live rows reach | A row withdrawn or lapsed covers nothing, so a build holding its place again is not growth |
-| What claims cover now is counted a bounded set of claims per statement | One statement per claim is ten thousand round trips on ten thousand claims |
+| Every section counts decisions about vulnerabilities, flaws and leads, each where the reader may read it | A decision about a lead is internal, so it reaches only somebody who reads internal material in its product, in the counts as in the rows |
+| Growth is capped after it is found, most grown first | Whether a decision grew is known only once what it covers now is counted, so every standing agreement is examined. Capped before that, the oldest decisions fill the page and a decision that grew after them is in no answer |
+| Ties are broken by decision, then by approver | A decision with two standing agreements is two rows of equal growth, and a cap between them is decided by the record rather than by the engine |
+| What a decision covers now is what its live rows reach | A row withdrawn or lapsed covers nothing, so a build holding its occurrence again is not growth |
+| What decisions cover now is counted a bounded set of decisions per statement | One statement per decision is ten thousand round trips on ten thousand decisions |
 
 ## Fix-bundle page cost
 
@@ -843,8 +845,8 @@ engine.
 ## Exports
 
 Any list that can be read can be exported, as CSV or JSON. What exports: the
-findings list, the cross-product findings list, the record of judgments, the
-review queue, what became of the reader's own claims, the by-component view, what is running out of time, scan coverage,
+findings list, the cross-product findings list, the record of decisions, the
+review queue, what became of the reader's own decisions, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, a comparison of two
 builds' inventories, the fix bundles, the upgrades one build is waiting on, the lead queue,
 what keeps being put off, the backlog over time, what has been changed
@@ -868,7 +870,7 @@ stops is one somebody reads as whole.
 | Every CSV record is the header's width, statements and markers included | CSV has no comment convention: the `#` opening those two is a data character, and a narrow record makes the document one a conformant reader refuses. Every test here had the field-count check turned off, which is the check that would have said so |
 | One document uses one key convention | The stated fact's key was written with underscores and every column name kept the spaces it is read with on paper, so the same file named its fields two ways |
 | A column of numbers says nothing where there is no number | An unscored finding written as a zero sorted with the genuinely 0.0-rated ones at the bottom of a release meeting's file, and every filter asking for a score below anything took it |
-| A streamed file holds its cursor ten minutes at most, and is cut there with the incomplete marker | A reader draining just fast enough to keep the write deadline moving otherwise holds a database connection for as long as the file takes at its pace: about 41 hours for a build of 249,288 places, against 1.9 seconds to read them. On SQLite that connection is the whole pool |
+| A streamed file holds its cursor ten minutes at most, and is cut there with the incomplete marker | A reader draining just fast enough to keep the write deadline moving otherwise holds a database connection for as long as the file takes at its pace: about 41 hours for a build of 249,288 occurrences, against 1.9 seconds to read them. On SQLite that connection is the whole pool |
 | Streamed files running at once are a fifth of the pool, at least one; one more is refused with 503 and a time to ask again | The rest of the pool stays with every other request |
 | A refusal is answered before the first byte | A stream's status is gone by the time the store can refuse, so a refusal arriving there could only be said in the file — which said the export stopped early, with a 200 in front of it |
 | The cross-product list states no single line | Each product applies its own |
@@ -880,12 +882,12 @@ stops is one somebody reads as whole.
 | The comparison is one file with a column naming which of the three parts a row belongs to | Three files are three things to keep together by hand. It is read whole rather than paged, because a comparison is a single answer computed from two builds at once |
 | The inventory comparison is read whole, like the findings comparison | It is one answer computed from two builds at once. A name held at several versions has them joined in one cell per side, so a row is still one name |
 | A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
-| The queue's file is one of its lists, the one the screen shows | The approvals leave out your own claims; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
+| The queue's file is one of its lists, the one the screen shows | The approvals leave out your own decisions; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
-| The record's file includes claims about leads | It writes what the record shows, under the same visibility (REQ-50) |
+| The record's file includes decisions about leads | It writes what the record shows, under the same visibility (REQ-50) |
 | The lead queue's file is the queue, under the queue's visibility | A row is a lead the reader reads whole, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
 | A findings list's file holds, below its findings, every open lead of the same selection, in the queue's order and under the queue's visibility (REQ-50) | The finding exports include every kind the reader reads (`DESIGN-kinds.md` § Consumers). Readers of disclosed or undisclosed work alone read no lead, and their files hold none |
-| The open leads a claim waits on are held, and the leads open only in releases past their end of life are not | The file's findings rows hold a finding a claim waits on, and the list leaves releases past their end of life out unless asked, which narrows the leads out |
+| The open leads a decision waits on are held, and the leads open only in releases past their end of life are not | The file's findings rows hold a finding a decision waits on, and the list leaves releases past their end of life out unless asked, which narrows the leads out |
 | The cross-product file holds each product's queue in turn, by product name | Each product's queue is its own read, under its own visibility |
 | A findings file narrowed by any filter but the order holds no lead, and states that it holds none | A lead carries no rating, component, upstream, decision or deadline, so every filter asks what a lead does not carry. A filter added to the list narrows the leads out without anything naming it |
 | Three filters keep the leads: the floor widened, work no promised upgrade covers, and branches in support | Every lead answers each the same way. The last is what the list reads when no release question is asked, and the screen writes all three into the address it exports |
@@ -905,7 +907,7 @@ reach the filesystem and restart the process.
 | The deferral threshold | How long something may be put off before a second person has to agree |
 | The session lifetime | Also the window in which somebody who moved out of a team still holds what the team gave them, through a browser and through a personal token alike |
 | The token ceiling | The longest a personal token may last |
-| The bulk action limit | How many reports one ruling may cover, places one answer about one issue may cover, and rows a screen acts on one request at a time |
+| The bulk action limit | How many reports one ruling may cover, occurrences one answer about one issue may cover, and rows a screen acts on one request at a time |
 | The reviewed issue limit | How many issues one answer about many issues may cover where a second person has to agree |
 | The re-confirmation issue limit | How many issues one re-confirmation may cover where nobody has to agree again |
 | The write ceiling | How many findings one answer about many issues, or one flaw recorded here, may write |
@@ -916,7 +918,7 @@ reach the filesystem and restart the process.
 | The two attachment bounds | The largest single file, and the deployment total |
 | Absent after | How long somebody may go without signing in before work they hold is raised |
 | The three disclosure periods | How long a finding stays undisclosed, how much that date may move in total before a second person agrees, and the lead time before it |
-| The four staleness periods | A claim waiting on a second person, one sent back, a deferral ending, and work in a team's queue |
+| The four staleness periods | A decision waiting on a second person, one sent back, a deferral ending, and work in a team's queue |
 
 The shipped numbers are a starting point rather than a recommendation. A deadline
 nobody agreed to produces an estate that is permanently late.

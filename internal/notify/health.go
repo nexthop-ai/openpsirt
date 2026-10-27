@@ -256,24 +256,24 @@ func (w *Watch) inForce(ctx context.Context, column string) (string, error) {
 // hold rather than about the deployment. What it produces carries a count and a
 // link and none of the rows.
 func (w *Watch) riskUnagreed(ctx context.Context) ([]Holds, error) {
-	claims, rows, err := triage.NewStore(w.db).HiddenWithNobodyAgreeing(ctx)
+	decisions, rows, err := triage.NewStore(w.db).HiddenWithNobodyAgreeing(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if claims == 0 {
+	if decisions == 0 {
 		return nil, nil
 	}
 	return []Holds{{
 		// One condition however many there are, because it is one control and
 		// one thing to go and look at. Keyed on neither the count nor the
-		// claims, so that it stays the same condition while it holds and is
+		// decisions, so that it stays the same condition while it holds and is
 		// not re-raised each time the number moves.
 		About: identify("risk-unagreed"),
 		Body: fmt.Sprintf("%s hides risk with nobody's agreement behind it, covering %s. "+
 			"Anything that hides something needed a second person, so this is a control "+
 			"that did not hold rather than work waiting to be done. Counted across every "+
 			"product and the whole record; what the report shows is what you may read.",
-			claimsSaid(claims), rowsSaid(rows)),
+			decisionsSaid(decisions), rowsSaid(rows)),
 		// The window the report opens on decides whether it can contain what
 		// this counted. It counts the whole record, and the sheet opens on a
 		// quarter — so an administrator was told a control had failed and
@@ -299,9 +299,9 @@ const everythingBack = "3650"
 // link opens holds what raised it.
 const pairsBack = "90"
 
-// pairsAtLeast is the fewest claims agreed in a product over that period for
+// pairsAtLeast is the fewest decisions agreed in a product over that period for
 // one pair's share of them to be raised. Below it a share is a handful of acts:
-// one agreed claim is a hundred percent, and each claim ageing out moves the
+// one agreed decision is a hundred percent, and each decision ageing out moves the
 // share across the threshold and back.
 const pairsAtLeast = 10
 
@@ -319,7 +319,7 @@ const pairsAtLeast = 10
 // agreeing is the other shape, and covers the whole record.
 //
 // Asked as the deployment and told to administrators, like the conditions
-// beside it. It names the two people, which is the fact; the claims are on the
+// beside it. It names the two people, which is the fact; the decisions are on the
 // report the link opens.
 func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	days, err := strconv.Atoi(pairsBack)
@@ -354,8 +354,8 @@ func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 		byID[product.ID] = product
 	}
 	// Who may approve, product by product: a triager may agree to somebody
-	// else's claim, and so may somebody holding the approver capability,
-	// either one only where they may read. Every claim counted here is about
+	// else's decision, and so may somebody holding the approver capability,
+	// either one only where they may read. Every decision counted here is about
 	// a vulnerability or a recorded flaw, so reading internal findings alone
 	// approves none of them.
 	reach := w.reach
@@ -386,19 +386,19 @@ func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 		if product.PairApprovers != nil && *product.PairApprovers > 0 {
 			wantApprovers = *product.PairApprovers
 		}
-		if able[one.ProductID] < wantApprovers || one.Claims < pairsAtLeast {
+		if able[one.ProductID] < wantApprovers || one.Decisions < pairsAtLeast {
 			continue
 		}
 		for _, pair := range one.Pairs {
 			// At or past the share, compared in whole numbers so that
 			// nothing is lost to a division. A share of a hundred is one
 			// pair giving every agreement.
-			if pair.Claims*100 < wantShare*one.Claims {
+			if pair.Decisions*100 < wantShare*one.Decisions {
 				continue
 			}
 			found = append(found, raised{
 				product: product, pair: pair,
-				percent: pair.Claims * 100 / one.Claims,
+				percent: pair.Decisions * 100 / one.Decisions,
 			})
 			named = append(named, pair.First, pair.Second)
 		}
@@ -419,7 +419,7 @@ func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 			// administrator, and how much work a product agreed to is not
 			// theirs to read unless they hold a role there.
 			Body: fmt.Sprintf("In %s, %s and %s agreed to each other's work on %d%% of the "+
-				"claims agreed to in the last %d days. The product has enough "+
+				"decisions agreed to in the last %d days. The product has enough "+
 				"people who may approve that one pair doing most of it is worth a look.",
 				each.product.DisplayName, people[each.pair.First], people[each.pair.Second],
 				each.percent, days),
@@ -430,24 +430,22 @@ func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	return out, nil
 }
 
-// claimsSaid and rowsSaid put a count into words, because "1 claims" on the one
+// decisionsSaid and rowsSaid put a count into words, because "1 decisions" on the one
 // case somebody hopes never to see reads as a tool nobody finished.
-func claimsSaid(n int) string {
+func decisionsSaid(n int) string {
 	if n == 1 {
-		return "One judgment"
-	}
-	return fmt.Sprintf("%d judgments", n)
-}
-
-// rowsSaid counts decisions rather than findings. The two were conflated here
-// and the pair this reports is named the other way where it is produced: how
-// many acts, and how many decisions those acts wrote. A kernel flaw at
-// forty-five places is forty-five rows and one thing on the findings list, and
-// `internal/finding/compliance.go` records the same conflation as a past
-// defect.
-func rowsSaid(n int) string {
-	if n == 1 {
-		return "one decision"
+		return "One decision"
 	}
 	return fmt.Sprintf("%d decisions", n)
+}
+
+// rowsSaid counts decision occurrences rather than findings. The pair this
+// reports is how many acts, and how many occurrences those acts wrote. A
+// kernel flaw at forty-five occurrences is forty-five rows and one thing on the
+// findings list.
+func rowsSaid(n int) string {
+	if n == 1 {
+		return "one occurrence"
+	}
+	return fmt.Sprintf("%d occurrences", n)
 }

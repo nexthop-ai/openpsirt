@@ -23,7 +23,7 @@ import (
 
 // The page a person reads.
 //
-// One row per issue and component, however many places it sits at, with the
+// One row per issue and component, however many occurrences it has, with the
 // numbers a reader is shown and the one word for how far it has been decided.
 // The page and its decorations are two statements — the first reads the
 // covering index and nothing else, the second asks only about the rows that
@@ -32,12 +32,13 @@ import (
 //
 // Its own test file is page_test.go.
 
-// Group is one issue in one component, with the places it occupies.
+// Group is one issue in one component, with the occurrences it has.
 //
-// This is the unit somebody decides about. The places are what the decision is
-// recorded against — one real image produced 335,021 findings and 305,487 of
-// them were a single kernel across the modules built against it, so a list of
-// places is six thousand screens of rows differing in a column nobody reads.
+// This is the unit somebody decides about. The occurrences are what the
+// decision is recorded against — one real image produced 335,021 findings and
+// 305,487 of them were a single kernel across the modules built against it, so
+// a list of occurrences is six thousand screens of rows differing in a column
+// nobody reads.
 type Group struct {
 	// Product and ProductName are filled only where the list spans
 	// products . Inside one product every row would repeat it, and a
@@ -76,32 +77,32 @@ type Group struct {
 	FixedIn   string
 	// Fold is what the row is about: the source package at the version it was
 	// built at, in the ecosystem and distribution it came from. It is what a
-	// judgment, an assignment and an upgrade all name.
+	// decision, an assignment and an upgrade all name.
 	Fold string
 	// Packages is how many binaries of the fold sit here, and Consumers how
 	// many things pull them in. These are the numbers a reader is shown,
 	// counted in the units they act in: deciding on this row decides about
 	// every package and every consumer under it, and a row that hid its size
-	// would invite a judgment made about one being applied to sixty unseen.
+	// would invite a decision made about one being applied to sixty unseen.
 	Packages  int
 	Consumers int
-	// Places is the number of findings under it: the unit the bulk cap is
+	// Occurrences is the number of findings under it: the unit the bulk cap is
 	// measured in and the unit the disposition register expands to, rather
 	// than a number a reader is asked to reconcile with the two above.
-	Places int
-	// Answered counts the places the build or a supplier has already argued
+	Occurrences int
+	// Answered counts the occurrences the build or a supplier has already argued
 	// about.
 	Answered int
 	// State is how far we have decided this group, in the same four words
 	// the state filter takes and by the same definition: undecided when no
-	// place has a decision of any kind, waiting when a claim stands proposed
-	// and nobody has agreed, agreed when every place is answered by a
-	// standing decision, lapsed when a decision here stopped applying and
-	// nothing replaced it. Empty where none of the four holds — some places
+	// occurrence has a decision of any kind, waiting when a decision stands
+	// proposed and nobody has agreed, agreed when every occurrence is answered
+	// by a standing decision, lapsed when a decision here stopped applying and
+	// nothing replaced it. Empty where none of the four holds — some occurrences
 	// approved and the rest never decided, with nothing waiting or lapsed.
-	State ClaimStanding
-	// SentBack says a live claim at one of the places is currently with its
-	// author, which is the row the proposer is looking for in the list.
+	State DecisionStanding
+	// SentBack says a live decision at one of the occurrences is currently with
+	// its author, which is the row the proposer is looking for in the list.
 	SentBack bool
 	// Undisclosed says nothing here has been announced, and DiscloseAt
 	// when the embargo ends. Everything about disclosure existed in the
@@ -111,12 +112,12 @@ type Group struct {
 	DiscloseAt  *time.Time
 	// Tags are the words somebody put on this, as they were typed.
 	Tags []string
-	// OpenedAt is when the earliest of these places opened here, which is
+	// OpenedAt is when the earliest of these occurrences opened here, which is
 	// the age a deadline relates to. Not the year in the identifier: an
 	// issue assigned in 2019 that first appeared in this product last week
 	// has been somebody's problem for a week.
 	OpenedAt time.Time
-	// DueAt is the earliest deadline across these places, and NoDeadline
+	// DueAt is the earliest deadline across these occurrences, and NoDeadline
 	// says why there is none where there is none. Every reason is
 	// deliberate, and a blank cell would mean any of them.
 	DueAt      *time.Time
@@ -160,7 +161,7 @@ type Group struct {
 	// about — and the steps between them rarely distinguish anything, so
 	// Middle counts them rather than naming them.
 	//
-	// A group covers every place the component sits at, and those places
+	// A group covers every occurrence the component has, and those occurrences
 	// can come down different ways. Chains says how many distinct ways
 	// there are, so a row can say "one of 4" rather than presenting one
 	// route as though it were the only one.
@@ -187,46 +188,46 @@ type Group struct {
 	// above that a path addresses them by.
 	StreamName, VariantName string
 	// Matched says how the scanner reached this. One answer for the whole
-	// group: every place of it comes from the same line of a report. Empty
+	// group: every occurrence of it comes from the same line of a report. Empty
 	// where the scanner said nothing.
 	Matched Matched `bun:"matched"`
 }
 
-// ClaimStanding is how far a group, or one place, has been decided: the word
-// the findings list, the register and every row that reports one say.
-type ClaimStanding string
+// DecisionStanding is how far a group, or one occurrence, has been decided: the
+// word the findings list, the register and every row that reports one say.
+type DecisionStanding string
 
 const (
-	// StandingUndecided is nothing standing: nobody decided, or every claim
+	// StandingUndecided is nothing standing: nobody decided, or every decision
 	// was withdrawn.
-	StandingUndecided ClaimStanding = "undecided"
-	// StandingWaiting is a claim waiting for a second person.
-	StandingWaiting ClaimStanding = "waiting"
-	// StandingAgreed is every place answered by a claim that stands.
-	StandingAgreed ClaimStanding = "agreed"
-	// StandingLapsed is a claim that stopped applying when the code moved,
+	StandingUndecided DecisionStanding = "undecided"
+	// StandingWaiting is a decision waiting for a second person.
+	StandingWaiting DecisionStanding = "waiting"
+	// StandingAgreed is every occurrence answered by a decision that stands.
+	StandingAgreed DecisionStanding = "agreed"
+	// StandingLapsed is a decision that stopped applying when the code moved,
 	// with nothing standing in its place.
-	StandingLapsed ClaimStanding = "lapsed"
+	StandingLapsed DecisionStanding = "lapsed"
 )
 
 // Unsettled reports whether a standing leaves work to do: anything but agreed.
-func (s ClaimStanding) Unsettled() bool { return s != StandingAgreed }
+func (s DecisionStanding) Unsettled() bool { return s != StandingAgreed }
 
-// ClaimStandings is every standing, in the order the list offers them.
-func ClaimStandings() []ClaimStanding {
-	return []ClaimStanding{StandingUndecided, StandingWaiting, StandingAgreed, StandingLapsed}
+// DecisionStandings is every standing, in the order the list offers them.
+func DecisionStandings() []DecisionStanding {
+	return []DecisionStanding{StandingUndecided, StandingWaiting, StandingAgreed, StandingLapsed}
 }
 
 // stateWord says how far a group has been decided, from the same counts the
-// state filter uses. The order is the filter's: a group every place of which
-// is answered is agreed whatever else its history holds; one with a claim
-// waiting is waiting; one where a decision lapsed and nothing stands is
-// lapsed; one nobody ever decided about is undecided. Some places approved
-// and the rest never decided, with nothing waiting or lapsed, is none of the
-// four, and says so by saying nothing.
-func stateWord(places, waiting, approved, lapsed int) ClaimStanding {
+// state filter uses. The order is the filter's: a group every occurrence of
+// which is answered is agreed whatever else its history holds; one with a
+// decision waiting is waiting; one where a decision lapsed and nothing stands
+// is lapsed; one nobody ever decided about is undecided. Some occurrences
+// approved and the rest never decided, with nothing waiting or lapsed, is none
+// of the four, and says so by saying nothing.
+func stateWord(occurrences, waiting, approved, lapsed int) DecisionStanding {
 	switch {
-	case places > 0 && approved == places:
+	case occurrences > 0 && approved == occurrences:
 		return StandingAgreed
 	case waiting > 0:
 		return StandingWaiting
@@ -234,10 +235,10 @@ func stateWord(places, waiting, approved, lapsed int) ClaimStanding {
 		return StandingLapsed
 	case waiting == 0 && approved == 0 && lapsed == 0:
 		// Nothing stands, rather than nothing was ever said — the same
-		// predicate the filter's own undecided uses. A place whose only claim
-		// was withdrawn has a claim row and nothing standing, and the row and
-		// the filter answer it from one rule, which is why no count of
-		// claims-of-any-kind is read here or taken from the statement.
+		// predicate the filter's own undecided uses. An occurrence whose only
+		// decision was withdrawn has a decision row and nothing standing, and
+		// the row and the filter answer it from one rule, which is why no count
+		// of decisions-of-any-kind is read here or taken from the statement.
 		return StandingUndecided
 	default:
 		return ""
@@ -269,7 +270,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	filter *Filter) (int64, []access.Visibility, []int64, error) {
 
 	if scope.ProductID == nil {
-		// Every list here correlates a decision by product and a place
+		// Every list here correlates a decision by product and an occurrence
 		// identity carries none, so a selection without one would reach
 		// decisions made in every product in the deployment.
 		return 0, nil, nil, refusal.Errorf("read findings: the selection names no product")
@@ -321,16 +322,16 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 }
 
 // Groups returns what is open in a selection, as the things somebody decides
-// about rather than as one row per place.
+// about rather than as one row per occurrence.
 //
-// The selection is not always one build. With the branch or the variant left
-// at "all" the page answers for every build under the product: a row is one
-// issue at one component still, and its places are counted across every build
+// The selection is not always one build. With the branch or the variant left at
+// "all" the page answers for every build under the product: a row is one issue
+// at one component still, and its occurrences are counted across every build
 // the group is in. What a row cannot carry there is the way down, because a
 // chain belongs to one build's graph — so those columns are filled only where
-// the selection is a single build, and across several the row names one of
-// them and says how many hold it instead. Naming one as though it were the
-// answer is the thing being avoided.
+// the selection is a single build, and across several the row names one of them
+// and says how many hold it instead. Naming one as though it were the answer is
+// the thing being avoided.
 func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope, limit, offset int,
 	filter Filter) ([]Group, int, error) {
 	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
@@ -410,7 +411,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	}
 
 	// Both ends of the way down to each row, in one pass over the page rather
-	// than a walk per row. A row whose places are pulled in directly by the
+	// than a walk per row. A row whose occurrences are pulled in directly by the
 	// build is asked about by the component itself, which lands on the same
 	// answer with one step in it.
 	oneBuild := len(targets) == 1
@@ -512,7 +513,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 
 	group := Group{
 		Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
-		Places: row.Places, Answered: row.Answered,
+		Occurrences: row.Occurrences, Answered: row.Answered,
 		Urgency: row.Urgency, Exploited: row.Exploited == 1,
 		ExploitedHere: row.ExploitedHere == 1,
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
@@ -521,7 +522,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		FixState:     agreedFixState(row.FixStateLeast, row.FixStateMost),
 		FixedIn:      agreedFixedIn(row.FixStateLeast, row.FixStateMost, row.FixedIn),
 		Matched:      Matched(row.Matched),
-		State:        stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
+		State:        stateWord(row.Occurrences, row.Waiting, row.Approved, row.Lapsed),
 		SentBack:     row.SentBack > 0,
 		OpenedAt:     row.OpenedAt, DueAt: row.DueAt,
 		Undisclosed: row.Undisclosed,
@@ -564,10 +565,10 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		case !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity):
 			group.NoDeadline = BelowTheLine
 		// Asked of both ends rather than of the word they agree on. A group
-		// whose places disagree reports "mixed", which is not a state upstream
-		// is ever in — and reading it as one tells a reader that a supported
-		// release is past its end of life, on the ordinary shape where a
-		// scanner says one thing in one build and another in the next.
+		// whose occurrences disagree reports "mixed", which is not a state
+		// upstream is ever in — and reading it as one tells a reader that a
+		// supported release is past its end of life, on the ordinary shape
+		// where a scanner says one thing in one build and another in the next.
 		case !Clocked(FixState(row.FixStateLeast), group.Exploited || group.ExploitedHere) &&
 			!Clocked(FixState(row.FixStateMost), group.Exploited || group.ExploitedHere):
 			group.NoDeadline = NothingToTake
@@ -578,7 +579,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 	return group
 }
 
-// build names one of the places a group sits, for a row that spans several.
+// build names one of the builds a group sits in, for a row that spans several.
 type build struct {
 	ID          int64  `bun:"id"`
 	Stream      string `bun:"stream"`
@@ -617,7 +618,7 @@ func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build,
 }
 
 // groupHead is one group of the findings list as the covering index knows it:
-// which issue in which component, at how many places, and the worst urgency
+// which issue in which component, at how many occurrences, and the worst urgency
 // among them. Everything the list is filtered, ordered and paged by.
 type groupHead struct {
 	VulnerabilityID int64 `bun:"vulnerability_id"`
@@ -629,14 +630,14 @@ type groupHead struct {
 	// so that everything read per row has a component to hang off. Which one
 	// it is decides nothing a reader sees.
 	ComponentID int64 `bun:"component_id"`
-	// Places is the number of findings under the row: the unit the cap is
+	// Occurrences is the number of findings under the row: the unit the cap is
 	// measured in and the unit the disposition register expands to.
 	//
 	// The packages and the consumers — the numbers a reader is
 	// shown — are counted in the second statement rather than here, over the
 	// page's groups alone rather than over every group the filter admits.
-	Places  int   `bun:"places"`
-	Urgency int64 `bun:"urgency"`
+	Occurrences int   `bun:"places"`
+	Urgency     int64 `bun:"urgency"`
 	// The two exploitation signals, each read from its own flag. The urgency
 	// cannot tell them apart — both lift it into a band above everything
 	// else — and a list that showed one where the other holds would be the
@@ -712,8 +713,9 @@ type decorated struct {
 	Scored        int        `bun:"scored"`
 	ScoreVersion  string     `bun:"score_version"`
 	FixStateLeast string     `bun:"fix_state_least"`
-	// Recorded is how many of the places are a flaw recorded here rather than
-	// scanned, which is the one kind a missing severity leaves off the clock.
+	// Recorded is how many of the occurrences are a flaw recorded here rather
+	// than scanned, which is the one kind a missing severity leaves off the
+	// clock.
 	Recorded     int    `bun:"recorded"`
 	FixStateMost string `bun:"fix_state_most"`
 	FixedIn      string `bun:"fixed_in"`
@@ -721,16 +723,16 @@ type decorated struct {
 	ConsumerID   *int64 `bun:"consumer_id"`
 	Consumers    int    `bun:"consumers"`
 	Direct       int    `bun:"direct"`
-	// Packages is how many binaries of the fold sit here and ConsumerPlaces
+	// Packages is how many binaries of the fold sit here and ConsumerOccurrences
 	// how many things pull them in — the two numbers a reader is shown.
-	Packages       int   `bun:"packages"`
-	ConsumerPlaces int   `bun:"consumer_places"`
-	Builds         int   `bun:"builds"`
-	TargetID       int64 `bun:"target_id"`
-	Waiting        int   `bun:"waiting_here"`
-	Approved       int   `bun:"approved_here"`
-	Lapsed         int   `bun:"lapsed_here"`
-	SentBack       int   `bun:"sent_back_here"`
+	Packages            int   `bun:"packages"`
+	ConsumerOccurrences int   `bun:"consumer_places"`
+	Builds              int   `bun:"builds"`
+	TargetID            int64 `bun:"target_id"`
+	Waiting             int   `bun:"waiting_here"`
+	Approved            int   `bun:"approved_here"`
+	Lapsed              int   `bun:"lapsed_here"`
+	SentBack            int   `bun:"sent_back_here"`
 }
 
 // heads reads one page of the findings list's groups, most urgent first, from
@@ -752,8 +754,8 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
-		ColumnExpr(overParts.places() + ` AS "places"`).
-		// The most urgent place this issue sits at. A group is one decision
+		ColumnExpr(overParts.occurrences() + ` AS "places"`).
+		// The most urgent occurrence this issue has. A group is one decision
 		// about one issue at one fold, so what should decide where that
 		// decision appears is the worst of what it covers.
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
@@ -764,15 +766,15 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	}
 	// The issue is joined only where the order needs it, and after the
 	// grouping: one row per issue and component, rather than a lookup behind
-	// every open place in the selection for a sort almost nobody asks for.
+	// every open occurrence in the selection for a sort almost nobody asks for.
 	if by, known := order[filter.SortBy]; known && by.issue {
 		grouped = grouped.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
 	}
 	page := paged(s.db, grouped, "vulnerability_id", "fold", "component_id", "places",
 		"urgency", "exploited", "exploited_here").
 		// Ordered by urgency unless somebody asked otherwise. Urgency
-		// rather than how widespread something is: sorting by place
-		// count puts whatever ships in the most places at the top,
+		// rather than how widespread something is: sorting by occurrence
+		// count puts whatever ships in the most occurrences at the top,
 		// which on a real image is the kernel — everywhere, and not
 		// therefore the thing to look at first. What somebody with an
 		// hour needs at the top is what is being exploited.
@@ -804,7 +806,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 //
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
-// judgment and routing them is one rule.
+// decision and routing them is one rule.
 func (s *Store) foldGroups(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
 	return filter.folded(s.db, openRows(s.db, targets, visible), issueAndComponent).
 		GroupExpr(GroupedOn)
@@ -858,7 +860,7 @@ func openRows(db bun.IDB, targets []int64, visible []access.Visibility) *bun.Sel
 //
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
-// judgment and routing them is one rule.
+// decision and routing them is one rule.
 func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
 	return openRows(db, targets, visible).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -868,11 +870,11 @@ func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.S
 // decorate reads what the page shows about each of its groups, in one
 // statement over the groups named and no other.
 //
-// Narrowed by the same conditions on a place as the groups were chosen by (see
-// Filter.ofPage), so every number here is over exactly the places the group was
-// counted over: a list
-// narrowed to what sits inside one container reports how many of *those*
-// places are answered, not how many places there are anywhere.
+// Narrowed by the same conditions on an occurrence as the groups were chosen by
+// (see Filter.ofPage), so every number here is over exactly the occurrences the
+// group was counted over: a list narrowed to what sits inside one container
+// reports how many of *those* occurrences are answered, not how many
+// occurrences there are anywhere.
 func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	visible []access.Visibility, heads []groupHead, filter Filter) (map[groupKey]decorated, error) {
 
@@ -889,9 +891,9 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 
 	// rows is how far each group has been decided, counted the way the
 	// state filter counts it, so the row and the filter cannot disagree.
-	// Four correlated counts over our decisions in this product at each
-	// place and at the versions the place holds, plus whether any live
-	// claim is with its author.
+	// Four correlated counts over our decision occurrences in this product at
+	// each occurrence and at the versions the occurrence holds, plus whether
+	// any live decision is with its author.
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var rows []decorated
 	q := s.db.NewSelect().
@@ -901,9 +903,9 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// unsorted.
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		// And for the versions a decision is keyed on. Two primary-key
-		// lookups per place on the page, so the correlated counts can ask
-		// whether a claim is about the versions shipping here rather than
-		// about the place at whatever versions it once held.
+		// lookups per occurrence on the page, so the correlated counts can ask
+		// whether a decision is about the versions shipping here rather than
+		// about the occurrence at whatever versions it once held.
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
@@ -919,13 +921,13 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// folds carries the same one and the aggregate is that value.
 		ColumnExpr(`MAX(COALESCE(`+ScoreVersionHere+`, '')) AS "score_version"`).
 		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
-		// The earliest opening among these places, and the earliest deadline
+		// The earliest opening among these occurrences, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not
 		// the year in the identifier.
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		// Anything here undisclosed, and the earliest embargo
-		// ends. One undisclosed place among fifty makes the group
+		// ends. One undisclosed occurrence among fifty makes the group
 		// undisclosed, which is what it is for anybody deciding what may be
 		// said about it.
 		//
@@ -935,30 +937,31 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// either, and counting is the same question asked portably.
 		ColumnExpr(access.AnyPrivateAs(`"f"."visibility"`, "undisclosed")).
 		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
-		// Both ends of what the places say, because a group whose places
-		// disagree is what FixMixed is for and a minimum alone cannot say it:
-		// the filter selected exactly that set and every row came back
-		// claiming one definite state, with a version taken from whichever of
-		// the disagreeing rows sorted first.
+		// Both ends of what the occurrences say, because a group whose
+		// occurrences disagree is what FixMixed is for and a minimum alone
+		// cannot say it: the filter selected exactly that set and every row
+		// came back claiming one definite state, with a version taken from
+		// whichever of the disagreeing rows sorted first.
 		ColumnExpr(`MIN("f"."fix_state") AS "fix_state_least"`).
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
-		// Any of them: a group is an issue at a component, every place of it
+		// Any of them: a group is an issue at a component, every occurrence of it
 		// comes from one line of a scanner's report, and the applier writes
 		// that line to all of them.
 		ColumnExpr(`MIN(COALESCE("f"."matched", '')) AS "matched"`).
 		// One of the ways down, and how many there are. MIN passes over the
-		// places the build pulls in directly, whose consumer is null, so those
-		// are counted separately rather than being read as "no route at all".
+		// occurrences the build pulls in directly, whose consumer is null, so
+		// those are counted separately rather than being read as "no route at
+		// all".
 		ColumnExpr(`MIN("f"."consumer_id") AS "consumer_id"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
 		// The other number a reader is shown, counted here rather than beside
 		// the window function that pages the list — see groupHead. The
 		// consumers are already counted just above, and a distinct count of
-		// place identities would not do: a place is a package under a
-		// consumer, so across a fold of three packages that is the place count
-		// with a different word on it.
+		// occurrence identities would not do: an occurrence is a package under
+		// a consumer, so across a fold of three packages that is the occurrence
+		// count with a different word on it.
 		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
 		ColumnExpr(`SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END) AS "direct"`).
 		// The number of builds in the selection holding this group, and one of
@@ -970,7 +973,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.
 	q = decisionCounts(q, "?", []any{productID},
-		claimWaiting, claimApproved, claimLapsed, claimSentBack).
+		decisionWaiting, decisionApproved, decisionLapsed, decisionSentBack).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).

@@ -28,9 +28,9 @@ const (
 	// ByDeadline is when it runs out. Findings with none sort last whichever
 	// direction is asked for: "no deadline" is not early and not late.
 	ByDeadline SortKey = "deadline"
-	// ByPlaces is how far it reaches, which is what says whether one judgment
-	// answers a lot or a little.
-	ByPlaces SortKey = "places"
+	// ByOccurrences is how far it reaches, which is what says whether one
+	// decision answers a lot or a little.
+	ByOccurrences SortKey = "occurrences"
 	// ByLikelihood is the published estimate that it will be exploited, which
 	// ranks above severity and is how a batch of "worth doing now" is built.
 	ByLikelihood SortKey = "epss"
@@ -48,12 +48,12 @@ var order = map[SortKey]struct {
 	issue  bool
 	column bool
 }{
-	ByUrgency:    {expr: "urgency", column: true},
-	ByAge:        {expr: `MIN("f"."opened_at")`},
-	ByDeadline:   {expr: `MIN("f"."due_at")`},
-	ByPlaces:     {expr: "places", column: true},
-	ByLikelihood: {expr: `MAX(COALESCE("v"."likelihood_ppm", 0))`, issue: true},
-	BySeverity:   {expr: `MAX(COALESCE("v"."score_centi", 0))`, issue: true},
+	ByUrgency:     {expr: "urgency", column: true},
+	ByAge:         {expr: `MIN("f"."opened_at")`},
+	ByDeadline:    {expr: `MIN("f"."due_at")`},
+	ByOccurrences: {expr: "places", column: true},
+	ByLikelihood:  {expr: `MAX(COALESCE("v"."likelihood_ppm", 0))`, issue: true},
+	BySeverity:    {expr: `MAX(COALESCE("v"."score_centi", 0))`, issue: true},
 }
 
 // orderedBy is the by-component view's order: what an asked-for key sorts by,
@@ -103,7 +103,7 @@ func directed(expr string, nothingLast, ascending bool) string {
 // The map above is keyed rather than ordered, which is why the ordering is
 // written once here instead of being read back out of it.
 func SortKeys() []SortKey {
-	return []SortKey{ByUrgency, ByAge, ByDeadline, ByPlaces, ByLikelihood, BySeverity}
+	return []SortKey{ByUrgency, ByAge, ByDeadline, ByOccurrences, ByLikelihood, BySeverity}
 }
 
 // pagedOrder is the ORDER BY a grouped page is read in through paged, and

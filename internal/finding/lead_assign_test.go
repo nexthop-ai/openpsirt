@@ -29,7 +29,7 @@ func TestALeadOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(ids) < 2 {
-			t.Fatalf("the build holds %d findings; want one at each of two places", len(ids))
+			t.Fatalf("the build holds %d findings; want one at each of two occurrences", len(ids))
 		}
 		for i, id := range ids {
 			visibility := access.Internal
@@ -38,7 +38,7 @@ func TestALeadOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 			}
 			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 				Set(`"kind" = ?`, "analysis").Set(`"visibility" = ?`, visibility).
-				Set(`"place_identity" = ?`, "lead-1").
+				Set(`"occurrence_identity" = ?`, "lead-1").
 				Where(`"id" = ?`, id).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}

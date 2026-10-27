@@ -134,12 +134,12 @@ export function Product() {
         <Link className="kpi" to={productFindingsAt(product, counted("&state=undecided"))}>
           <span className="l">Nobody has argued about</span>
           <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
-          <span className="d">no place has a decision of any kind</span>
+          <span className="d">no occurrence has a decision of any kind</span>
         </Link>
         <Link className="kpi" to={reviewQueueAt({ product })}>
           <span className="l">Waiting on a second person</span>
           <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
-          <span className="d">claims here that nobody has agreed to</span>
+          <span className="d">decisions here that nobody has agreed to</span>
         </Link>
       </div>
 
@@ -244,7 +244,7 @@ export function Product() {
           </Wide>
         )}
         <p className="hint" style={{ marginTop: 8 }}>
-          Issues at components. <b>Decided</b> means every place has a standing decision.
+          Issues at components. <b>Decided</b> means every occurrence has a standing decision.
         </p>
       </div>
     </div>

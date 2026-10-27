@@ -12,7 +12,7 @@ import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 import { fileAt as linkedFile } from "../api/links";
 import { own } from "../ui/own";
-import { claimAt } from "../app/routes";
+import { decisionAt } from "../app/routes";
 
 // A promise's state, said in words rather than left to a color.
 const STANDING: Record<Body<"PlannedBody">["state"], string> = {
@@ -113,13 +113,13 @@ export function Upgrades() {
                 return (
                   <tr key={row.fold} className="row">
                     <td>
-                      {/* The claim it was argued under, which is where the
+                      {/* The decision it was argued under, which is where the
                           reasoning, the approval and the conversation about
-                          the upgrade are. Not the decision it wrote: a
-                          decision is one claim about one issue at one place,
-                          so clicking one would answer about a single CVE. */}
-                      {row.claim_id ? (
-                        <Link to={claimAt(row.claim_id)} className="linkish id">
+                          the upgrade are. Not one row it wrote: a row is about
+                          one issue at one occurrence, so clicking one would
+                          answer about a single CVE. */}
+                      {row.decision_id ? (
+                        <Link to={decisionAt(row.decision_id)} className="linkish id">
                           {row.upstream}
                         </Link>
                       ) : (

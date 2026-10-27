@@ -13,7 +13,7 @@ import { Embargoes, Ratings } from "./QueuePending";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { UNOWNED_LIST, usePaging } from "./list";
-import { claimOf, useAfterClaim, type Claim } from "../api/claims";
+import { decisionOf, useAfterDecision, type Decision } from "../api/decisions";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Paged } from "../ui/Paged";
@@ -25,24 +25,24 @@ import { Card, Dated } from "./QueueCard";
 import { PAGE, useQueueReads } from "./useQueueReads";
 import { useQueueApproval } from "./useQueueApproval";
 
-// The review queue at the grain of a claim: one card per proposer's action,
-// however many records it wrote. Three lists, one per reason a claim waits:
+// The review queue at the grain of a decision: one card per proposer's action,
+// however many records it wrote. Three lists, one per reason a decision waits:
 // for approval, where approving, rejecting and undoing all work at the size of
-// the claim; a deferral whose date passed; and a promise whose date passed with
+// the decision; a deferral whose date passed; and a promise whose date passed with
 // the finding still open. The last two ask for a new decision rather than an
 // agreement, and each card offers only the acts that answer its reason.
 export function Queue() {
   const [params, setParams] = useSearchParams();
   const { offset, go } = usePaging();
-  // A claim somebody was sent to, by a notice or a link. Found on the page
+  // A decision somebody was sent to, by a notice or a link. Found on the page
   // and shown, or said to be missing — a link that lands on the queue with
   // nothing marked leaves somebody hunting through cards for the one meant.
-  const wanted = Number(params.get("claim") ?? 0);
-  // The claim beside its key, not the key alone. A selection survives paging,
+  const wanted = Number(params.get("decision") ?? 0);
+  // The decision beside its key, not the key alone. A selection survives paging,
   // because a row is selected by what it is rather than by where it sits, and
   // an approval acts on everything ticked, including what is ticked on another
   // page.
-  const [picked, setPicked] = useState<Map<string, Claim>>(new Map());
+  const [picked, setPicked] = useState<Map<string, Decision>>(new Map());
   // Moving to another tab: the tab's own words set or cleared, the page back
   // to its first, and the selection dropped, because it was made out of the
   // list being replaced.
@@ -64,12 +64,12 @@ export function Queue() {
     setJustDone,
     refused,
     setRefused,
-    approveClaim,
+    approveDecision,
     undo,
     approvePicked,
   } = useQueueApproval(picked, setPicked);
   const queries = useQueryClient();
-  const afterClaim = useAfterClaim();
+  const afterDecision = useAfterDecision();
   const {
     mine,
     reaffirm,
@@ -90,10 +90,11 @@ export function Queue() {
     setRatingAt,
   } = useQueueReads(params, offset);
 
-  const found = wanted > 0 && (queue.data?.items ?? []).some((row) => claimOf(row).id === wanted);
+  const found =
+    wanted > 0 && (queue.data?.items ?? []).some((row) => decisionOf(row).id === wanted);
   useEffect(() => {
     if (!found) return;
-    document.getElementById(`claim-${wanted}`)?.scrollIntoView({ block: "center" });
+    document.getElementById(`decision-${wanted}`)?.scrollIntoView({ block: "center" });
   }, [found, wanted]);
   // A section somebody was sent to by name — the ratings, the disclosure
   // dates, the rulings — brought into view once it is drawn. A link inside the
@@ -135,15 +136,15 @@ export function Queue() {
     }
   }
   const asked = exporting.toString();
-  // The file the tab on screen was taken from. Mine lists every claim its
+  // The file the tab on screen was taken from. Mine lists every decision its
   // reader proposed, whatever became of it, which the queue's own file does
   // not hold; it has a file of its own.
   const file = (format: "csv" | "json") =>
     mine
       ? fileAt("/v1/my-decisions.{format}", format)
       : fileAt("/v1/review-queue.{format}", format, { query: asked });
-  const claims = (queue.data?.items ?? []).map(claimOf);
-  const records = claims.reduce((sum, c) => sum + c.records, 0);
+  const decisions = (queue.data?.items ?? []).map(decisionOf);
+  const records = decisions.reduce((sum, c) => sum + c.records, 0);
   const words = wordsFor(reason);
   const approving = !aside && reason === "approval";
 
@@ -155,7 +156,7 @@ export function Queue() {
           {reaffirm ? (
             <>
               <Count of={lapsedMine}>{() => (lapsedMine.data?.total ?? 0).toLocaleString()}</Count>{" "}
-              lapsed claims of yours · the code moved or the issue was rated worse
+              lapsed decisions of yours · the code moved or the issue was rated worse
             </>
           ) : mine ? (
             <>
@@ -164,8 +165,8 @@ export function Queue() {
             </>
           ) : (
             <>
-              {(queue.data?.total ?? claims.length).toLocaleString()} {words.tab.toLowerCase()}
-              {records > claims.length && (
+              {(queue.data?.total ?? decisions.length).toLocaleString()} {words.tab.toLowerCase()}
+              {records > decisions.length && (
                 <> · {records.toLocaleString()} records between those shown</>
               )}{" "}
               {product ? (
@@ -181,7 +182,7 @@ export function Queue() {
             </>
           )}
         </p>
-        {/* The list on screen as a file. One row per claim, the way this
+        {/* The list on screen as a file. One row per decision, the way this
             screen counts them, because that is the unit somebody works
             through. There is no file of what is to re-affirm, so that tab
             offers none rather than another list under its heading. */}
@@ -256,7 +257,7 @@ export function Queue() {
           }}
         />
       )}
-      {/* The two lists that show everybody's claims, narrowed to the
+      {/* The two lists that show everybody's decisions, narrowed to the
           reader's own. The approvals never hold the reader's own. */}
       {!aside && !approving && (
         <label className="check" style={{ marginBottom: 10 }}>
@@ -277,7 +278,7 @@ export function Queue() {
 
       {wanted > 0 && !found && (
         <div className="alert" style={{ marginBottom: 10 }}>
-          <strong>Claim {wanted} is not waiting here.</strong>
+          <strong>Decision {wanted} is not waiting here.</strong>
           <span>
             It may have been decided, or it may sit on another page.{" "}
             <Link to={UNOWNED_LIST} className="linkish">
@@ -287,23 +288,23 @@ export function Queue() {
         </div>
       )}
 
-      {approving && claims.length > 0 && (
+      {approving && decisions.length > 0 && (
         <div className="batchbar">
           <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
             <input
               type="checkbox"
-              checked={claims.length > 0 && claims.every((c) => picked.has(c.key))}
+              checked={decisions.length > 0 && decisions.every((c) => picked.has(c.key))}
               onChange={(event) => {
                 // This page either way, so ticking and unticking are
                 // inverses and the rest of the selection stands.
                 const next = new Map(picked);
-                for (const claim of claims) {
-                  if (event.target.checked) next.set(claim.key, claim);
-                  else next.delete(claim.key);
+                for (const decision of decisions) {
+                  if (event.target.checked) next.set(decision.key, decision);
+                  else next.delete(decision.key);
                 }
                 setPicked(next);
               }}
-              aria-label="Select every claim shown"
+              aria-label="Select every decision shown"
             />
             <b>{picked.size === 0 ? "Nothing selected" : `${picked.size} selected`}</b>
           </label>
@@ -320,7 +321,7 @@ export function Queue() {
           />
           {/* Bounded by what this deployment allows in one act, and said
               rather than met one refusal at a time: approving is a request
-              per claim, and this selection deliberately survives paging, so
+              per decision, and this selection deliberately survives paging, so
               it can be arbitrarily large. */}
           {over && (
             <span className="alert" role="status">
@@ -330,7 +331,7 @@ export function Queue() {
           <button
             type="button"
             className="btn"
-            disabled={picked.size === 0 || approveClaim.isPending || over}
+            disabled={picked.size === 0 || approveDecision.isPending || over}
             onClick={() => void approvePicked()}
           >
             {picked.size === 0 ? "Approve selected" : `Approve ${picked.size} selected`}
@@ -341,12 +342,12 @@ export function Queue() {
       {refused > 0 && (
         <p className="alert" role="status">
           {refused === 1
-            ? "One claim could not be agreed to and is still selected."
-            : `${refused.toLocaleString()} claims could not be agreed to and are still selected.`}
+            ? "One decision could not be agreed to and is still selected."
+            : `${refused.toLocaleString()} decisions could not be agreed to and are still selected.`}
         </p>
       )}
-      {approveClaim.error != null && (
-        <Failed error={approveClaim.error} what="That could not be approved." />
+      {approveDecision.error != null && (
+        <Failed error={approveDecision.error} what="That could not be approved." />
       )}
       {undo.error != null && (
         <Failed error={undo.error} what="That agreement could not be taken back." />
@@ -360,7 +361,7 @@ export function Queue() {
       {justDone && (
         <div className="alert info" style={{ marginBottom: 12 }}>
           <strong>Agreed to under &ldquo;{justDone}&rdquo;</strong>
-          <span>Returns those claims to this queue. Each proposer is notified.</span>
+          <span>Returns those decisions to this queue. Each proposer is notified.</span>
           <button
             type="button"
             className="linkish"
@@ -381,31 +382,36 @@ export function Queue() {
           query={lapsedMine}
           onDone={() => {
             void queries.invalidateQueries({ queryKey: ["to-reaffirm"] });
-            afterClaim();
+            afterDecision();
           }}
         />
       ) : mine ? (
         <Became rows={became.data?.items ?? []} query={became} />
-      ) : claims.length === 0 ? (
+      ) : decisions.length === 0 ? (
         <Empty title="Nothing is waiting here." detail={words.empty} />
       ) : !approving ? (
         <div className="queue">
-          {claims.map((claim) => (
-            <Dated key={claim.key} claim={claim} reason={reason} marked={claim.id === wanted} />
+          {decisions.map((decision) => (
+            <Dated
+              key={decision.key}
+              decision={decision}
+              reason={reason}
+              marked={decision.id === wanted}
+            />
           ))}
         </div>
       ) : (
         <div className="queue">
-          {claims.map((claim) => (
+          {decisions.map((decision) => (
             <Card
-              key={claim.key}
-              claim={claim}
-              marked={claim.id === wanted}
-              picked={picked.has(claim.key)}
+              key={decision.key}
+              decision={decision}
+              marked={decision.id === wanted}
+              picked={picked.has(decision.key)}
               onPick={(on) => {
                 const next = new Map(picked);
-                if (on) next.set(claim.key, claim);
-                else next.delete(claim.key);
+                if (on) next.set(decision.key, decision);
+                else next.delete(decision.key);
                 setPicked(next);
               }}
             />
@@ -418,7 +424,7 @@ export function Queue() {
             ? (lapsedMine.data?.items?.length ?? 0)
             : mine
               ? (became.data?.items?.length ?? 0)
-              : claims.length
+              : decisions.length
         }
         total={reaffirm ? lapsedMine.data?.total : mine ? became.data?.total : queue.data?.total}
         offset={offset}
@@ -451,7 +457,7 @@ export function Queue() {
       <WaitingRulings product={product || undefined} />
 
       {/* An upstream's statement that depends on its own build waits for a
-          person the way a claim does, and this is where somebody finds it. */}
+          person the way a decision does, and this is where somebody finds it. */}
       <UpstreamOffers product={product || undefined} />
     </>
   );

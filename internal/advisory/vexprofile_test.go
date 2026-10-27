@@ -31,9 +31,9 @@ const (
 )
 
 var (
-	master  = "sonic:" + fixtures.BranchName + ":broadcom"
-	tagged  = "sonic:" + fixtures.TagName + ":broadcom"
-	onPlace = finding.PlaceIdentity(carrier.Name, "")
+	master       = "sonic:" + fixtures.BranchName + ":broadcom"
+	tagged       = "sonic:" + fixtures.TagName + ":broadcom"
+	onOccurrence = finding.OccurrenceIdentity(carrier.Name, "")
 )
 
 // issueOf is the issue a flaw was recorded as.
@@ -46,31 +46,31 @@ func (f *fixture) issueOf(t *testing.T, identifier string) int64 {
 	return id
 }
 
-// claimed has the first person claim something about the flaw at one place in
-// one build, made on that build, and answers the claim. Nobody has agreed to
+// claimed has the first person propose a decision about the flaw at one occurrence in
+// one build, made on that build, and answers the decision. Nobody has agreed to
 // it.
-func (f *fixture) claimed(t *testing.T, target int64, identifier, place string,
+func (f *fixture) claimed(t *testing.T, target int64, identifier, occurrence string,
 	outcome triage.Outcome, why triage.Justification, mitigation string) int64 {
 
 	t.Helper()
-	return f.claimedOn(t, target, []int64{target}, identifier, place, outcome, why, mitigation)
+	return f.claimedOn(t, target, []int64{target}, identifier, occurrence, outcome, why, mitigation)
 }
 
 // claimedOn is the same, recorded as made on the builds given: the one on
 // screen and those chosen beside it, or none.
 func (f *fixture) claimedOn(t *testing.T, target int64, madeOn []int64, identifier,
-	place string, outcome triage.Outcome, why triage.Justification, mitigation string) int64 {
+	occurrence string, outcome triage.Outcome, why triage.Justification, mitigation string) int64 {
 
 	t.Helper()
 	ctx := t.Context()
-	at, err := f.finds.PlaceFor(ctx, f.who, target, f.issueOf(t, identifier), place)
+	at, err := f.finds.OccurrenceFor(ctx, f.who, target, f.issueOf(t, identifier), occurrence)
 	if err != nil {
-		t.Fatalf("finding the place to decide about: %v", err)
+		t.Fatalf("finding the occurrence to decide about: %v", err)
 	}
-	decision, err := triage.NewStore(f.db.DB).Propose(ctx, f.who, triage.Proposal{
-		Place: triage.Place{
+	row, err := triage.NewStore(f.db.DB).Propose(ctx, f.who, triage.Proposal{
+		Occurrence: triage.Occurrence{
 			ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-			PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
+			OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
 			ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 			OnTag: at.OnTag,
 		},
@@ -78,40 +78,40 @@ func (f *fixture) claimedOn(t *testing.T, target int64, madeOn []int64, identifi
 		Reasoning: argued, By: f.who.ID, NeedsApproval: true, MadeOn: madeOn,
 	})
 	if err != nil {
-		t.Fatalf("claiming %s: %v", outcome, err)
+		t.Fatalf("proposing %s: %v", outcome, err)
 	}
-	return decision.ClaimID
+	return row.DecisionID
 }
 
-// agree has the second person agree to a claim.
-func (f *fixture) agree(t *testing.T, claim int64) {
+// agree has the second person agree to a decision.
+func (f *fixture) agree(t *testing.T, decision int64) {
 	t.Helper()
-	if _, err := triage.NewStore(f.db.DB).ApproveClaim(t.Context(), f.approver, claim,
+	if _, err := triage.NewStore(f.db.DB).ApproveDecision(t.Context(), f.approver, decision,
 		"", nil, ""); err != nil {
-		t.Fatalf("agreeing to the claim: %v", err)
+		t.Fatalf("agreeing to the decision: %v", err)
 	}
 }
 
-// dismissed is a claim that the flaw does not apply at its place, agreed to.
+// dismissed is a decision that the flaw does not apply at its occurrence, agreed to.
 func (f *fixture) dismissed(t *testing.T, target int64, identifier string) int64 {
 	t.Helper()
-	claim := f.claimed(t, target, identifier, onPlace, triage.NotApplicable,
+	decision := f.claimed(t, target, identifier, onOccurrence, triage.NotApplicable,
 		triage.MitigationsExist, stops)
-	f.agree(t, claim)
-	return claim
+	f.agree(t, decision)
+	return decision
 }
 
-// elsewhereIn files the same issue against a second place in a build, which a
-// decision about the first place does not reach.
+// elsewhereIn files the same issue against a second occurrence in a build, which a
+// decision about the first occurrence does not reach.
 func (f *fixture) elsewhereIn(t *testing.T, identifier string, target int64) {
 	t.Helper()
-	f.filed(t, identifier, target, finding.PlaceIdentity(carrier.Name, "the other consumer"),
+	f.filed(t, identifier, target, finding.OccurrenceIdentity(carrier.Name, "the other consumer"),
 		nil, "")
 }
 
-// filed writes one finding of the issue in a build at a place, closed for a
+// filed writes one finding of the issue in a build at an occurrence, closed for a
 // reason where one is given.
-func (f *fixture) filed(t *testing.T, identifier string, target int64, place string,
+func (f *fixture) filed(t *testing.T, identifier string, target int64, occurrence string,
 	closed *time.Time, because finding.Closure) {
 
 	t.Helper()
@@ -130,7 +130,7 @@ func (f *fixture) filed(t *testing.T, identifier string, target int64, place str
 	row := &finding.Finding{
 		TargetID: target, Kind: finding.Vulnerable, Visibility: access.Private,
 		VulnerabilityID: f.issueOf(t, identifier), ComponentID: componentID,
-		PlaceIdentity: place, OpenedAt: now,
+		OccurrenceIdentity: occurrence, OpenedAt: now,
 		ClosedAt: closed, ClosedBecause: because,
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -177,16 +177,16 @@ func (f *fixture) placedAt(t *testing.T, named, release string) advisory.Placed 
 	return advisory.Placed{}
 }
 
-func TestAReleaseEveryOpenPlaceOfWhichIsDismissedIsKnownNotAffected(t *testing.T) {
+func TestAReleaseEveryOpenOccurrenceOfWhichIsDismissedIsKnownNotAffected(t *testing.T) {
 	// The advisory says "known not affected, because…" of a release whose
-	// every open place stands under an approved, live claim that the flaw
+	// every open occurrence stands under an approved, live decision that the flaw
 	// does not apply, which is what the VEX document of one build already
 	// says of it. The reason is the flag a machine reads; the mitigation is
 	// the impact a person reads.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 		f.alsoIn(t, identifier, f.tagged)
-		// The tag holds the flaw at a second place nobody dismissed, so the
+		// The tag holds the flaw at a second occurrence nobody dismissed, so the
 		// document carries a release that stays affected beside the one that
 		// does not — which is what remediations and scores are asked of.
 		f.elsewhereIn(t, identifier, f.tagged)
@@ -267,9 +267,9 @@ func TestTheDecisionsReasoningNeverReachesTheDocument(t *testing.T) {
 	})
 }
 
-func TestAReleaseWithAPlaceNobodyDismissedStaysKnownAffected(t *testing.T) {
-	// One dismissal at one place does not speak for a release the flaw sits
-	// at another place in. The document has no finer grain than the release.
+func TestAReleaseWithAnOccurrenceNobodyDismissedStaysKnownAffected(t *testing.T) {
+	// One dismissal at one occurrence does not speak for a release the flaw sits
+	// at another occurrence in. The document has no finer grain than the release.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 		f.elsewhereIn(t, identifier, f.master)
@@ -288,11 +288,11 @@ func TestAReleaseWithAPlaceNobodyDismissedStaysKnownAffected(t *testing.T) {
 }
 
 func TestADismissalNobodyAgreedToOrThatWasWithdrawnLeavesTheReleaseAffected(t *testing.T) {
-	// A proposal is one person's opinion, and a withdrawn claim covers
+	// A proposal is one person's opinion, and a withdrawn decision covers
 	// nothing. Only an approved, live decision moves what a document says.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
-		claim := f.claimed(t, f.master, identifier, onPlace, triage.NotApplicable,
+		decision := f.claimed(t, f.master, identifier, onOccurrence, triage.NotApplicable,
 			triage.CodeNotPresent, "")
 		named := f.covering(t, [2]string{"sonic", identifier})
 
@@ -303,11 +303,11 @@ func TestADismissalNobodyAgreedToOrThatWasWithdrawnLeavesTheReleaseAffected(t *t
 		if got := status(); !slices.Equal(got.KnownAffected, []string{master}) {
 			t.Errorf("a proposal nobody agreed to moved the release: %+v", got)
 		}
-		f.agree(t, claim)
+		f.agree(t, decision)
 		if got := status(); !slices.Equal(got.KnownNotAffected, []string{master}) {
 			t.Errorf("an agreed dismissal left the release at %+v", got)
 		}
-		if _, err := triage.NewStore(f.db.DB).Withdraw(t.Context(), f.who, claim); err != nil {
+		if _, err := triage.NewStore(f.db.DB).Withdraw(t.Context(), f.who, decision); err != nil {
 			t.Fatal(err)
 		}
 		if got := status(); !slices.Equal(got.KnownAffected, []string{master}) {
@@ -316,24 +316,24 @@ func TestADismissalNobodyAgreedToOrThatWasWithdrawnLeavesTheReleaseAffected(t *t
 	})
 }
 
-func TestAnAlreadyFixedClaimStatesTheReleaseFixed(t *testing.T) {
-	// The claim that the fix is already in the release, agreed to, is what
+func TestAnAlreadyFixedDecisionStatesTheReleaseFixed(t *testing.T) {
+	// The decision that the fix is already in the release, agreed to, is what
 	// the VEX document of a build states as fixed. The advisory states the
 	// same of the release, and names it where it tells others to update.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 		f.alsoIn(t, identifier, f.tagged)
 		f.elsewhereIn(t, identifier, f.master)
-		// Only the tag's one place is claimed fixed, and the branch keeps a
-		// place the claim does not reach.
-		at, err := f.finds.PlaceFor(t.Context(), f.who, f.tagged, f.issueOf(t, identifier), onPlace)
+		// Only the tag's one occurrence is decided fixed, and the branch keeps a
+		// occurrence the decision does not reach.
+		at, err := f.finds.OccurrenceFor(t.Context(), f.who, f.tagged, f.issueOf(t, identifier), onOccurrence)
 		if err != nil {
 			t.Fatal(err)
 		}
-		decision, err := triage.NewStore(f.db.DB).Propose(t.Context(), f.who, triage.Proposal{
-			Place: triage.Place{
+		occurrence, err := triage.NewStore(f.db.DB).Propose(t.Context(), f.who, triage.Proposal{
+			Occurrence: triage.Occurrence{
 				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
+				OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
 				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 				OnTag: at.OnTag,
 			},
@@ -343,7 +343,7 @@ func TestAnAlreadyFixedClaimStatesTheReleaseFixed(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.agree(t, decision.ClaimID)
+		f.agree(t, occurrence.DecisionID)
 
 		one := f.generated(t, f.covering(t, [2]string{"sonic", identifier})).Vulnerabilities[0]
 		if !slices.Equal(one.Status.Fixed, []string{tagged}) ||
@@ -423,7 +423,7 @@ func TestASupersededClosureIsNeverReadAsAFix(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 		then := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
-		f.filed(t, identifier, f.tagged, onPlace, &then, finding.Superseded)
+		f.filed(t, identifier, f.tagged, onOccurrence, &then, finding.Superseded)
 		named := f.covering(t, [2]string{"sonic", identifier})
 
 		one := f.generated(t, named).Vulnerabilities[0]
@@ -431,13 +431,13 @@ func TestASupersededClosureIsNeverReadAsAFix(t *testing.T) {
 			t.Errorf("a release whose only closure is superseded reads %+v", one.Status)
 		}
 		// A scanner falling silent is not a fix either.
-		f.filed(t, identifier, f.tagged, onPlace, &then, finding.Unexplained)
+		f.filed(t, identifier, f.tagged, onOccurrence, &then, finding.Unexplained)
 		one = f.generated(t, named).Vulnerabilities[0]
 		if len(one.Status.Fixed) != 0 || !slices.Contains(one.Status.KnownAffected, tagged) {
 			t.Errorf("a release whose closures are superseded and unexplained reads %+v", one.Status)
 		}
 
-		f.filed(t, identifier, f.tagged, onPlace, &then, finding.Upgraded)
+		f.filed(t, identifier, f.tagged, onOccurrence, &then, finding.Upgraded)
 		one = f.generated(t, named).Vulnerabilities[0]
 		if !slices.Equal(one.Status.Fixed, []string{tagged}) {
 			t.Errorf("a release a later closure fixed reads %+v", one.Status)
@@ -529,7 +529,7 @@ func TestADecisionAgreedAfterTheAdvisoryMovesItsStatusAndTheAgreementStands(t *t
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		identifier := f.recorded(t, f.master)
-		claim := f.claimed(t, f.master, identifier, onPlace, triage.NotApplicable,
+		decision := f.claimed(t, f.master, identifier, onOccurrence, triage.NotApplicable,
 			triage.CodeNotInExecutePath, "")
 		named := f.covering(t, [2]string{"sonic", identifier})
 		f.agreed(t, named)
@@ -544,7 +544,7 @@ func TestADecisionAgreedAfterTheAdvisoryMovesItsStatusAndTheAgreementStands(t *t
 			t.Fatalf("before the decision the advisory reads as moved: %v %v", unmoved, err)
 		}
 
-		f.agree(t, claim)
+		f.agree(t, decision)
 
 		row := f.placedAt(t, named, master)
 		if !row.Changed || row.Status != advisory.KnownNotAffected {
@@ -566,7 +566,7 @@ func TestADecisionAgreedAfterTheAdvisoryMovesItsStatusAndTheAgreementStands(t *t
 
 func TestAReleaseADecisionReachesByLookupIsFlaggedAsMadeElsewhere(t *testing.T) {
 	// The same kernel at the same versions in two variants, with an option
-	// compiled out of one. Both hold the place when the decision is made on
+	// compiled out of one. Both hold the occurrence when the decision is made on
 	// master for broadcom, and it reaches mellanox because the versions
 	// match. What it was made on is what was recorded, so mellanox is
 	// flagged. The tag built for broadcom, reached by lookup too, is the same
@@ -608,9 +608,9 @@ func TestABuildChosenBesideTheOneOnScreenCountsAsMadeOn(t *testing.T) {
 		f.shipped(t, f.otherVariant)
 		identifier := f.recorded(t, f.master)
 		f.alsoIn(t, identifier, f.otherVariant)
-		claim := f.claimedOn(t, f.master, []int64{f.master, f.otherVariant}, identifier,
-			onPlace, triage.NotApplicable, triage.CodeNotPresent, "")
-		f.agree(t, claim)
+		decision := f.claimedOn(t, f.master, []int64{f.master, f.otherVariant}, identifier,
+			onOccurrence, triage.NotApplicable, triage.CodeNotPresent, "")
+		f.agree(t, decision)
 		named := f.covering(t, [2]string{"sonic", identifier})
 
 		row := f.placedAt(t, named, mellanox)
@@ -627,16 +627,16 @@ func TestABuildChosenBesideTheOneOnScreenCountsAsMadeOn(t *testing.T) {
 }
 
 func TestADecisionRecordingNoBuildSaysNothingAboutWhereItWasMade(t *testing.T) {
-	// A claim made where no build was in hand, and every claim an upgraded
+	// A decision made where no build was in hand, and every decision an upgraded
 	// deployment held, records none. Nothing is guessed, and nothing is
 	// flagged.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, f.otherVariant)
 		identifier := f.recorded(t, f.master)
 		f.alsoIn(t, identifier, f.otherVariant)
-		claim := f.claimedOn(t, f.master, nil, identifier, onPlace, triage.NotApplicable,
+		decision := f.claimedOn(t, f.master, nil, identifier, onOccurrence, triage.NotApplicable,
 			triage.CodeNotPresent, "")
-		f.agree(t, claim)
+		f.agree(t, decision)
 		named := f.covering(t, [2]string{"sonic", identifier})
 
 		for _, release := range []string{master, mellanox} {
@@ -661,15 +661,15 @@ func TestAReleaseNobodyWillFixIsToldSoAndNotToUpdate(t *testing.T) {
 		f.alsoIn(t, identifier, f.tagged)
 		f.alsoIn(t, identifier, f.older)
 		// The older tag is fixed, so the ordinary remediation has a release to
-		// name, and the tag holds a second place nobody decided, so it keeps
+		// name, and the tag holds a second occurrence nobody decided, so it keeps
 		// the ordinary remediation.
 		issue := f.issueOf(t, identifier)
 		if _, err := f.finds.Resolve(t.Context(), f.who, f.older, issue, "Patched."); err != nil {
 			t.Fatal(err)
 		}
 		f.elsewhereIn(t, identifier, f.tagged)
-		// One decision, which the tag's place at the same versions reaches too.
-		f.agree(t, f.claimed(t, f.master, identifier, onPlace, triage.WontFix, "", stops))
+		// One decision, which the tag's occurrence at the same versions reaches too.
+		f.agree(t, f.claimed(t, f.master, identifier, onOccurrence, triage.WontFix, "", stops))
 		doc := f.generated(t, f.covering(t, [2]string{"sonic", identifier}))
 		one := doc.Vulnerabilities[0]
 
@@ -709,7 +709,7 @@ func TestAReleaseNobodyWillFixWithNoMitigationStatesOnlyThat(t *testing.T) {
 	// the release still says no fix is planned.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
-		f.agree(t, f.claimed(t, f.master, identifier, onPlace, triage.WontFix, "", ""))
+		f.agree(t, f.claimed(t, f.master, identifier, onOccurrence, triage.WontFix, "", ""))
 		one := f.generated(t, f.covering(t, [2]string{"sonic", identifier})).Vulnerabilities[0]
 		if len(one.Remediations) != 1 || one.Remediations[0].Category != "no_fix_planned" ||
 			!slices.Equal(one.Remediations[0].ProductIDs, []string{master}) {
@@ -777,7 +777,7 @@ func TestAnAgreementGivenBeforeStatusesWereRecordedMarksNothingChanged(t *testin
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		identifier := f.recorded(t, f.master)
-		claim := f.claimed(t, f.master, identifier, onPlace, triage.NotApplicable,
+		decision := f.claimed(t, f.master, identifier, onOccurrence, triage.NotApplicable,
 			triage.CodeNotPresent, "")
 		named := f.covering(t, [2]string{"sonic", identifier})
 		f.agreed(t, named)
@@ -785,7 +785,7 @@ func TestAnAgreementGivenBeforeStatusesWereRecordedMarksNothingChanged(t *testin
 			Where("1 = 1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		f.agree(t, claim)
+		f.agree(t, decision)
 
 		row := f.placedAt(t, named, master)
 		if row.Status != advisory.KnownNotAffected {

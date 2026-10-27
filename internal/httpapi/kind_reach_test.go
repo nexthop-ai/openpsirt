@@ -16,7 +16,7 @@ import (
 // Each test here makes one row a finding of a kind the consumer under test does
 // not name, by rewriting its kind in place, and reads the consumer before and
 // after. The row keeps everything else that would carry it: its visibility,
-// its place, its issue and its versions, so only its kind keeps it out. The
+// its occurrence, its issue and its versions, so only its kind keeps it out. The
 // consumers that name the analysis kind, and the four pinned beside the
 // vulnerability lists, are in analysis_reach_test.go.
 
@@ -63,7 +63,7 @@ func TestAScansSweepClosesNoLead(t *testing.T) {
 func TestAVersionMovingLapsesNoDecisionAboutALead(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
-		claims := map[string]int64{}
+		decisions := map[string]int64{}
 		for _, issue := range []string{"CVE-2026-CURL1", "CVE-2026-CURL2"} {
 			decided := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 				"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/libcurl4t64/bulk-decision",
@@ -74,28 +74,28 @@ func TestAVersionMovingLapsesNoDecisionAboutALead(t *testing.T) {
 				t.Fatalf("deciding %s answered %d: %s", issue, decided.Code, decided.Body.String())
 			}
 			var made struct {
-				ClaimID int64 `json:"claim_id"`
+				DecisionID int64 `json:"decision_id"`
 			}
 			if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
 				t.Fatal(err)
 			}
-			r.Agreed(t, made.ClaimID)
-			claims[issue] = made.ClaimID
+			r.Agreed(t, made.DecisionID)
+			decisions[issue] = made.DecisionID
 		}
 		asKind(t, r, "CVE-2026-CURL1", "analysis", "public")
 		r.CurlMovedTo(t, "8.6.0")
-		lapsed := func(claim int64) int {
-			n, err := r.DB.DB.NewSelect().Table("decision").
-				Where(`"claim_id" = ?`, claim).Where(`"state" = ?`, "lapsed").Count(t.Context())
+		lapsed := func(decision int64) int {
+			n, err := r.DB.DB.NewSelect().Table("decision_occurrence").
+				Where(`"decision_id" = ?`, decision).Where(`"state" = ?`, "lapsed").Count(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
 			return int(n)
 		}
-		if got := lapsed(claims["CVE-2026-CURL2"]); got == 0 {
+		if got := lapsed(decisions["CVE-2026-CURL2"]); got == 0 {
 			t.Fatal("the decision over vulnerability findings did not lapse, so this checks nothing")
 		}
-		if got := lapsed(claims["CVE-2026-CURL1"]); got != 0 {
+		if got := lapsed(decisions["CVE-2026-CURL1"]); got != 0 {
 			t.Errorf("%d rows of the decision over leads lapsed; want none", got)
 		}
 	})
@@ -265,13 +265,13 @@ func TestAnAdvisoryNamesNoReleaseOfALead(t *testing.T) {
 }
 
 // The lead reads take the analysis kind alone. A finding holding everything a
-// lead holds — its analyzer's result, its sighting, its place and its
+// lead holds — its analyzer's result, its sighting, its occurrence and its
 // visibility — and filed as another kind answers the evidence, the fixed
 // closure and the lead queue as though nothing were there.
 func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+		occurrence := httpapitest.SeededLead(t, r)
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 		queued := func() int {
 			t.Helper()
 			total := 0
@@ -291,7 +291,7 @@ func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
 			t.Fatalf("the queue holds %d with one lead seeded, so this checks nothing", got)
 		}
 		for _, other := range []string{"vulnerability", "entered"} {
-			r.PatchedRows(t, `UPDATE "finding" SET "kind" = '`+other+`' WHERE "place_identity" = '`+place+`'`)
+			r.PatchedRows(t, `UPDATE "finding" SET "kind" = '`+other+`' WHERE "occurrence_identity" = '`+occurrence+`'`)
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
 				t.Errorf("the evidence of a finding of kind %s answered %d: %s", other, got.Code, got.Body)
 			}

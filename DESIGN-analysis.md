@@ -228,7 +228,7 @@ An applied run, in order:
 
 1. Matches each result to a lead the series holds open on the build (§ Matching).
 2. Files each rule as an issue of the rule kind, named `<tool>/<rule>` in lower-case tool name, and records the weaknesses its `external/cwe/cwe-N` tags name (`DESIGN-kinds.md` § Name resolution).
-3. Opens a lead for each result nothing matched, internal, at the place § Matching gives it and the component § Placement gives it.
+3. Opens a lead for each result nothing matched, internal, at the occurrence § Matching gives it and the component § Placement gives it.
 4. Replaces what the last run said about each lead it saw again: path, lines, columns, enclosing function, call chain, message, fingerprint, and the flow steps and related places.
 5. Records each lead as seen by this run. A comparable run records each open lead it did not see as not reproduced by it, where it is comparable to the run that last saw the lead, and a lead not reproduced that is seen again is counted as returned.
 6. Records the repositories the run says its checkout held.
@@ -279,16 +279,16 @@ compares the unprinted key after the whole key and before the function.
 
 A result no open lead on the build took is the same result as a lead the
 series holds elsewhere where one of these finds it. It opens at that lead's
-place, so a decision keyed on the place reaches it (REQ-25).
+occurrence, so a decision keyed on the occurrence reaches it (REQ-25).
 
 | Order | Where | How |
 |---|---|---|
 | 1 | The leads open on the build of the same variant in the stream this one was cut from, on the series' first run on the build | Every layer, and the unprinted key where the run is a fingerprint change against that build. A new branch inherits what the line it was cut from has decided |
-| 2 | A closed lead on this build | The whole key. The result is the same flaw found again, and opens a new lead at the closed one's place |
+| 2 | A closed lead on this build | The whole key. The result is the same flaw found again, and opens a new lead at the closed one's occurrence |
 | 3 | Any lead of the series on another build, open or closed | The whole key, the oldest lead first. A probable pairing with a lead this build never saw is a guess |
 
-A result found nowhere opens at a place derived from the series and its whole key, so
-the same result first seen on two builds at once is one place.
+A result found nowhere opens at an occurrence derived from the series and its whole key, so
+the same result first seen on two builds at once is one occurrence.
 
 ### Fingerprint change
 
@@ -313,7 +313,7 @@ inherits.
 
 ## Placement
 
-A lead is one component at one place (REQ-17).
+A lead is one component at one occurrence (REQ-17).
 
 | Rule | |
 |---|---|
@@ -404,24 +404,24 @@ and, for a lead no longer open, when it was first not seen, by which run, with
 the comparison above, and the run a person named as the build that fixed it.
 Beside each of the two builds it names the commit the lead's own repository was
 at: the run's repository holding the lead's path, or the top of the checkout
-where none does, and nothing where that is not a commit. It names the live claim at the lead, agreed to or waiting, where the
-reader may read one. The place identity addresses a lead because a rule's name holds a
+where none does, and nothing where that is not a commit. It names the live decision at the lead, agreed to or waiting, where the
+reader may read one. The occurrence identity addresses a lead because a rule's name holds a
 slash.
 
 | Rule | |
 |---|---|
 | The lead is read through the Evidence consumer, which includes the analysis kind alone (`DESIGN-kinds.md` § Consumers) | Nothing of a lead reaches a vulnerability consumer |
-| It is read in the data layer at the visibilities the subject reads in the product, and a lead nobody may read there answers as a place holding nothing (REQ-42, REQ-43) | A different answer would say a lead is there |
-| The open lead is answered, or the newest where none is open | A reappearance opens a new finding at the same place |
+| It is read in the data layer at the visibilities the subject reads in the product, and a lead nobody may read there answers as an occurrence holding nothing (REQ-42, REQ-43) | A different answer would say a lead is there |
+| The open lead is answered, or the newest where none is open | A reappearance opens a new finding at the same occurrence |
 | Every link is built when the evidence is read, from the newest run's repositories and the product's settings | A change to the hosts reaches every place at once |
 
 ## Lead triage
 
-A claim about a lead is a claim as `DESIGN-triage.md` describes one: one
+A decision about a lead is a decision as `DESIGN-triage.md` describes one: one
 argument, its rows, its reasoning and every revision of it, and a second
 person's approval of one revision (REQ-24, REQ-28). It is keyed on the
-product, the rule the lead is filed under, and the lead's place, with no
-versions, so one judgment covers the lead on every stream and variant it is
+product, the rule the lead is filed under, and the lead's occurrence, with no
+versions, so one decision covers the lead on every stream and variant it is
 seen on (REQ-25).
 
 `POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision` records one.
@@ -443,12 +443,12 @@ seen on (REQ-25).
 |---|---|
 | A lead takes the lead outcomes alone, and a vulnerability takes none of them | A lead is asked whether it is real; a vulnerability, how a known issue applies |
 | A dismissal states one of the four reasons | A dismissal nobody can review is one a second person cannot agree to |
-| A claim about a lead covers its place at any version | The place is the lead, carried by matching rather than by versions |
-| A claim about a lead is approved by somebody holding `approver` and `internal-read` on the product, and never by its author | The approval every claim has, at the visibility a lead has |
-| A fixed lead takes no claim | It opens again where it is seen again |
-| A lead paired only probably, on its function or its nearest line, lapses the claim dismissing it or calling it no security issue | The judgment was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one claim or many, as a lapsed claim is re-affirmed (`DESIGN-triage.md` § Re-affirmation) |
-| A claim confirming a lead stands through a probable pairing | It says the flaw is real, and a weaker pairing does not make it less so |
-| The lapse is written in the transaction that records the pairing | A pairing is never recorded with the claim on it left standing |
+| A decision about a lead covers its occurrence at any version | The occurrence is the lead, carried by matching rather than by versions |
+| A decision about a lead is approved by somebody holding `approver` and `internal-read` on the product, and never by its author | The approval every decision has, at the visibility a lead has |
+| A fixed lead takes no decision | It opens again where it is seen again |
+| A lead paired only probably, on its function or its nearest line, lapses the decision dismissing it or calling it no security issue | The decision was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one decision or many, as a lapsed decision is re-affirmed (`DESIGN-triage.md` § Re-affirmation) |
+| A decision confirming a lead stands through a probable pairing | It says the flaw is real, and a weaker pairing does not make it less so |
+| The lapse is written in the transaction that records the pairing | A pairing is never recorded with the decision on it left standing |
 
 ### Fixed leads
 
@@ -461,8 +461,8 @@ on one build, with what fixed it and the build that fixed it.
 | It closes the lead on the build named and nowhere else | Each build holding it is a statement of its own |
 | It names the run whose build fixed it: one of the lead's series on that build, applied and comparable, built at or after the first run that did not see the lead, and any other run is refused | A statement of a fix names the build it shipped in. The lead's evidence names the first run that did not see it, and once it is fixed, the run named |
 | It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`DESIGN-findings.md` § Recorded flaws) |
-| A lead seen again opens anew at the same place | The matching that finds a closed lead carries the result to its place (§ Carrying) |
-| A claim about a lead is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one claim's reads include it; the findings lists do not |
+| A lead seen again opens anew at the same occurrence | The matching that finds a closed lead carries the result to its occurrence (§ Carrying) |
+| A decision about a lead is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one decision's reads include it; the findings lists do not |
 
 ### Dismissal rules
 
@@ -499,30 +499,30 @@ and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 | An approval shown no lead is measured as though shown one | A rule approved before its analyzer rule reports anything is not outgrown by its first lead |
 | An outgrown rule is approved again at its new size, and a rule in force is refused | Approving again is how the approver reads what it now covers |
 | An outgrown rule keeps dismissing what it names | Withdrawn, every lead it covers would reach the queue at once, which is the noise the rule exists to hold |
-| A rule's coverage counts open leads by place, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |
+| A rule's coverage counts open leads by occurrence, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |
 | Coverage is worked out when it is read | A new lead under a rule in force never reaches the queue |
 | Proposal, approval and retirement are recorded in the administrative trail | As routing rules are |
 
 ### Lead states
 
 A lead's state is worked out when it is read, from its finding, its sighting
-and the claim standing at its place. The evidence of a lead carries it.
+and the decision standing at its occurrence. The evidence of a lead carries it.
 
 | State | When |
 |---|---|
 | Fixed | The finding is closed |
 | Handed off | It was recorded as a flaw (§ Hand-off) |
-| Dismissed, Not a security issue, Confirmed | A claim with that outcome stands at the place: approved, or waiting on nobody and not sent back |
-| Dismissed | No claim stands, and a standing rule in force or outgrown covers it (§ Dismissal rules) |
+| Dismissed, Not a security issue, Confirmed | A decision with that outcome stands at the occurrence: approved, or waiting on nobody and not sent back |
+| Dismissed | No decision stands, and a standing rule in force or outgrown covers it (§ Dismissal rules) |
 | Not reproduced | A comparable run did not see it |
 | Open | None of the above |
 
 | Rule | |
 |---|---|
-| A standing claim comes before a standing rule | A judgment about one lead is more specific than one about many |
-| A standing claim or rule comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
-| A claim waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
-| A handed-off lead leaves the queue and takes no claim | Its flaw is what is judged |
+| A standing decision comes before a standing rule | A decision about one lead is more specific than one about many |
+| A standing decision or rule comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
+| A decision waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
+| A handed-off lead leaves the queue and takes no decision | Its flaw is what is judged |
 
 ## Lead queue
 
@@ -545,13 +545,13 @@ one way to say a path does not matter is kept rather than two.
 
 | List | Holds |
 |---|---|
-| The queue, with no state named | Open leads with no claim waiting for a second person |
+| The queue, with no state named | Open leads with no decision waiting for a second person |
 | A state named | The leads in that state. Fixed is the leads closed on a build and not opened anew there |
 
 | Rule | |
 |---|---|
-| Every list counts the leads in the scope by state, the open leads a waiting claim leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves leads out says how many it left (REQ-30) |
-| A lead closed as fixed is listed and counted as fixed on its build until it opens anew there | A lead seen again opens at the same place (§ Fixed leads), and then it is what the newer finding says |
+| Every list counts the leads in the scope by state, the open leads a waiting decision leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves leads out says how many it left (REQ-30) |
+| A lead closed as fixed is listed and counted as fixed on its build until it opens anew there | A lead seen again opens at the same occurrence (§ Fixed leads), and then it is what the newer finding says |
 | A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
@@ -574,10 +574,10 @@ JSON, as `DESIGN-reporting.md` § Exports writes every file.
 | A row names who holds the lead as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`DESIGN-reporting.md` § Exports) |
 | A row says whether the lead is in third-party code, as the list does | Read from the newest run that saw the lead, as its evidence is (§ Third-party code) |
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
-| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out leads a waiting claim holds and leads past their end of life |
+| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out leads a waiting decision holds and leads past their end of life |
 | Narrowed to work nobody holds, the file says so beside what it lists | A file read later carries the narrowing it was written under |
 | A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
-| A findings list's file writes every open lead of its selection below its findings, through this read with the leads a claim waits on kept in (`DESIGN-reporting.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
+| A findings list's file writes every open lead of its selection below its findings, through this read with the leads a decision waits on kept in (`DESIGN-reporting.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
 
 ### Leads by series
 
@@ -587,7 +587,7 @@ series, by state. The reports catalog draws it as Leads by analyzer
 
 | Rule | |
 |---|---|
-| Every state is counted, zero included, beside how many open leads a waiting claim leaves out of the queue and how many dismissed leads a standing rule covers | The states are worked out for the queue already, so each costs nothing more |
+| Every state is counted, zero included, beside how many open leads a waiting decision leaves out of the queue and how many dismissed leads a standing rule covers | The states are worked out for the queue already, so each costs nothing more |
 | Each count is the total the list answers for that series and state | A figure and the list it opens count one population, under the same visibility |
 | Counted over every build of the product | A series is the product's. A stream or variant would list a series that never ran there with every count zero, which reads as an analyzer that found nothing |
 | A series holding no lead is listed with every count zero | An analyzer that runs and finds nothing is a fact about the product |
@@ -602,7 +602,7 @@ assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 
 | Rule | |
 |---|---|
-| It covers the lead on every build of the product it is open on | A lead is one place across the product's builds, as a claim about it is |
+| It covers the lead on every build of the product it is open on | A lead is one occurrence across the product's builds, as a decision about it is |
 | The assigner triages the lead at every visibility it is open at | Internal, where a lead not handed off is. Somebody who does not is answered as though the lead were not there |
 | Giving it to somebody else, or taking it from them, needs `assigner` as well | The assigner right a finding's assignment asks for |
 | A person is given it only where they read it at every visibility it is open at, and a team only where one member reads all of them | Holding a lead is not a way to read one. A lead collaborator reads the lead through their grant and is not given it |
@@ -686,8 +686,8 @@ at least one.
 | Whether another analyzer reports a lead is worked out over every lead on the build, whoever reads it | Where a lead sorts does not depend on who is looking |
 | The leads near a lead are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 leads of two analyzers' first runs on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
 | A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
-| A judgment about a lead is one claim over it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
-| A lead of the group already answered, waiting on a claim, under a standing rule, fixed, handed off, past its end of life (§ End of life), or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
+| A decision about a lead covers it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
+| A lead of the group already answered, waiting on a decision, under a standing rule, fixed, handed off, past its end of life (§ End of life), or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a decision reaches no lead its author cannot read (REQ-42) |
 | A lead possibly the same flaw is left out | It is judged on its own |
 
 ## Hand-off
@@ -702,13 +702,13 @@ hand-off is offered, and `POST` on the same address records it.
 
 | Rule | |
 |---|---|
-| Only a confirmed lead is handed off, and only once | Confirmation is the judgment that it is a flaw; a second flaw for one lead is one flaw recorded twice |
-| A hand-off links the lead and every lead its confirming claim covers that nobody handed off to the one flaw | One claim confirmed them as one flaw (§ Grouped leads). A lead of the group left behind holds a claim nothing may change, and no flaw |
+| Only a confirmed lead is handed off, and only once | Confirmation is the decision that it is a flaw; a second flaw for one lead is one flaw recorded twice |
+| A hand-off links the lead and every lead its confirming decision covers that nobody handed off to the one flaw | One decision confirmed them as one flaw (§ Grouped leads). A lead of the group left behind holds a decision nothing may change, and no flaw |
 | A hand-off is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal lead and writes the private flaw |
-| The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A lead is carried by its place rather than by versions |
+| The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A lead is carried by its occurrence rather than by versions |
 | The flaw and the link are written in one transaction, which reads again that the lead is confirmed and not handed off | A retry is asked the question again (REQ-71) |
-| A hand-off changes the stamp of the claim standing at the lead, matched on the stamp it read, as every write to a claim does (`DESIGN-database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the hand-off would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
-| A handed-off lead takes no claim, and no claim about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a claim out | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
+| A hand-off changes the stamp of the decision standing at the lead, matched on the stamp it read, as every write to a decision does (`DESIGN-database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the hand-off would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
+| A handed-off lead takes no decision, and no decision about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a decision out | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
 | A hand-off, a move, an undone move and an undone hand-off are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
 
 | The flaw records the lead it was recorded from, the component the offer ranked first, and the builds it proposed: every build the lead was seen in, and the builds holding the chosen component that the series never analyzed | `DESIGN-findings.md` § Recorded flaws. The record outlasts the link, so a flaw whose hand-off was undone still says where it came from |
@@ -725,7 +725,7 @@ hand-off is offered, and `POST` on the same address records it.
 | Prefix | The innermost repository the run names or third-party path it declared holding the file, or else the file's directory |
 | Third-party | Whether the file is under a path the run declared third-party, so the flaw is reported to the upstream (§ Third-party code) |
 | Together | How many other leads the hand-off links to the flaw with this one, and a move moves with it |
-| Disclosure | What moving the lead and the leads linked with it into the case discloses with the flaw: every note on a claim about them, by author, the paths and messages the analyzer wrote, and whether snippets are published (§ Keep or move) |
+| Disclosure | What moving the lead and the leads linked with it into the case discloses with the flaw: every note on a decision about them, by author, the paths and messages the analyzer wrote, and whether snippets are published (§ Keep or move) |
 
 | Rule | |
 |---|---|
@@ -741,27 +741,27 @@ takes a moved one back out.
 
 | | Kept | Moved |
 |---|---|---|
-| Visibility of the lead and the claims at its place | Internal | Internal |
-| An internal reader reads | The whole lead and its claims, and nothing of the case | The whole lead and its claims, and nothing of the case |
-| Somebody granted the lead reads | The whole lead without its claims, and its flaw | The whole lead without its claims, and its flaw |
-| A reader of undisclosed work reads | Nothing | The whole lead and its claims, and its flaw |
-| A reader on the flaw's case reads | Nothing, unless they were granted the lead | The whole lead and its claims, and its flaw |
-| When the flaw is disclosed | The lead stays internal | The lead and its claims go public with the flaw (REQ-40) |
+| Visibility of the lead and the decisions at its occurrence | Internal | Internal |
+| An internal reader reads | The whole lead and its decisions, and nothing of the case | The whole lead and its decisions, and nothing of the case |
+| Somebody granted the lead reads | The whole lead without its decisions, and its flaw | The whole lead without its decisions, and its flaw |
+| A reader of undisclosed work reads | Nothing | The whole lead and its decisions, and its flaw |
+| A reader on the flaw's case reads | Nothing, unless they were granted the lead | The whole lead and its decisions, and its flaw |
+| When the flaw is disclosed | The lead stays internal | The lead and its decisions go public with the flaw (REQ-40) |
 | A later sighting opens | Internal | Internal, read by both audiences |
 
 | Rule | |
 |---|---|
 | A move adds the flaw's readers to the lead's readers and takes nobody away | Somebody who read the lead once keeps reading it |
-| An undone move takes back only the readers the move added, from the lead and from the claims at its place | The lead's internal readers and its grants are as they were |
+| An undone move takes back only the readers the move added, from the lead and from the decisions at its occurrence | The lead's internal readers and its grants are as they were |
 | The flaw's readers read a moved lead wherever its internal readers do: its evidence, the queue and the counts beside it, its file and the findings file, the coverage of a standing rule, and its kin | One rule in the data layer, so no list answers differently from the page (REQ-42, REQ-43) |
 | Reading undisclosed work reads no internal lead the flaw does not hold | The addition is the moved leads of an undisclosed flaw, and nothing else of the product's internal work |
-| The flaw's readers read the claims at a moved lead's place while the flaw is undisclosed: the reasoning and its revisions, the approvals, the comments, one claim's page, and every list, count and export holding them | The audience that reads the lead's evidence reads the judgments about it, and those go public with the lead at disclosure |
-| The claims stay internal, and the addition is the internal claims at a moved lead's place and nothing else | A claim is filed under the analyzer's rule, and the flaw's readers read no other internal claim in the product |
-| Reading a claim at a moved lead is not arguing it | A comment and an approval each keep the claim's internal triage role, and a claim about a handed-off lead is neither revised nor withdrawn |
+| The flaw's readers read the decisions at a moved lead's occurrence while the flaw is undisclosed: the reasoning and its revisions, the approvals, the comments, one decision's page, and every list, count and export holding them | The audience that reads the lead's evidence reads the decisions about it, and those go public with the lead at disclosure |
+| The decisions stay internal, and the addition is the internal decisions at a moved lead's occurrence and nothing else | A decision is filed under the analyzer's rule, and the flaw's readers read no other internal decision in the product |
+| Reading a decision at a moved lead is not arguing it | A comment and an approval each keep the decision's internal triage role, and a decision about a handed-off lead is neither revised nor withdrawn |
 
 | Rule | |
 |---|---|
-| A move discloses, with the flaw, every revision of reasoning and every comment on a claim about the lead or the leads linked with it, every path they name and every message the analyzer wrote there | People writing in the record have to know that from the first word (REQ-40) |
+| A move discloses, with the flaw, every revision of reasoning and every comment on a decision about the lead or the leads linked with it, every path they name and every message the analyzer wrote there | People writing in the record have to know that from the first word (REQ-40) |
 | The offer shows that writing before the move, grouped by author, with the paths and messages, and says whether snippets are published and how many are stripped | The mover reads what goes public |
 | The writing in the offer is read at the visibilities the caller reads in the product | A hand-off takes both triage roles, and the read is narrowed in the data layer all the same (REQ-42) |
 | Disclosed means readable in the portal by everybody signed in with public access to the product | A lead is never in a published VEX or CSAF document, and the anonymous subject reads no lead |
@@ -783,7 +783,7 @@ takes a moved one back out.
 |---|---|
 | It takes every lead handed off as the flaw | The leads of one flaw are one case, as a move takes them |
 | It is refused with 409 once the flaw is disclosed, and asks for a reason | Disclosure is one way. Undoing takes the flaw out of every build, which a person explains |
-| Each lead is confirmed again: the link goes, the claim confirming it stands, and it returns to the queue's lists of held work with whoever held it | Undoing takes back the recording and leaves the judgment that it is real |
+| Each lead is confirmed again: the link goes, the decision confirming it stands, and it returns to the queue's lists of held work with whoever held it | Undoing takes back the recording and leaves the decision that it is real |
 | A moved lead is read by its internal readers alone again | A lead with no case to be in is the internal material it always was |
 | Every grant of the leads ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
 | The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a hand-off somebody undid should not have been recorded, and a hand-off made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
@@ -833,7 +833,7 @@ as any other is.
 | The innermost of the run's repositories and declared paths holding a file is its prefix | A repository nested in vendored code names its own component, as a repository nested in another does |
 | A declared path is recorded as a path from the top of the checkout | `./src/vendor`, `src//vendor/` and `/src/vendor` are `src/vendor`, and `..` climbs no higher than the top. A lead's path is compared in that form |
 | A declared path holds itself and every path under it, compared exactly | `src/vendor/zlib` holds `src/vendor/zlib/inflate.c` and not `src/vendor/zlibx/a.c`; paths are case-sensitive |
-| The declaration read is the newest run's to see the lead | The run's description of the checkout is the one the lead's place was read against, as its repositories are |
+| The declaration read is the newest run's to see the lead | The run's description of the checkout is the one the lead's path was read against, as its repositories are |
 | A run's list that does not read as a list of paths declares nothing | The upload writes a list of paths from the top of the checkout, and nothing else is a declaration |
 | The lead's evidence, its hand-off offer, its row in the queue and the queue's file say it is third-party | A person handing off the flaw reports it to the upstream it came from. Its advisory or VEX then reaches the product's builds through the supplier and upstream paths (`DESIGN-ingest.md` § Supplier advisories) |
 | A third-party lead is still handed off here | The flaw ships in the product's builds until the upstream's fix arrives, and recording it is what tracks that |
@@ -850,9 +850,9 @@ is in `DESIGN-data-model.md` § End of support.
 | The queue leaves out every sighting in a release past its end of life, and counts the open leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
 | A lead open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A lead closed or not reproduced on a supported release is still that release's to decide, and the queue holds open work |
 | A decision, a fixed closure, an assignment and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
-| A re-affirmation of a lapsed claim leaves such a lead out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes a decision. The list of what is yours to re-affirm counts the same places and leaves off a claim with none |
-| A judgment about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
-| A claim already standing at it is still agreed to or withdrawn | The claim is a judgment somebody made, and an approval is of what was read (REQ-28) |
+| A re-affirmation of a lapsed decision leaves such a lead out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes the decision at each occurrence again. The list of what is yours to re-affirm counts the same occurrences and leaves off a decision with none |
+| A decision about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
+| A decision already standing at it is still agreed to or withdrawn | The decision is one somebody made, and an approval is of what was read (REQ-28) |
 | A lead already handed off is still moved into or out of its flaw's case | The move is about the flaw, which is judged on its own builds |
 | Its evidence says it is past its end of life | The page offers none of the refused controls |
 | A retired branch, tag or variant takes no run (§ The upload), so it stops producing sightings, and its leads stay listed with the product | `DESIGN-data-model.md` § Catalog retirement. Retiring closes off what arrives, and keeps what was found |
@@ -866,7 +866,7 @@ is in `DESIGN-data-model.md` § End of support.
 | Status, failure | § Run application |
 | Comparable, and the reason where not | § Run parameters |
 | Tool and version | As recorded |
-| Counts | Opened, seen again, returned, not reproduced, left open as uncompared, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, and what was dropped, left out and discarded, each by reason |
+| Counts | Opened, seen again, returned, not reproduced, left open as uncompared, paired probably, carried from the branch a build was cut from, reopened at a closed lead's occurrence, and what was dropped, left out and discarded, each by reason |
 | Fingerprint change | Whether the run's fingerprints changed from the build's last (§ Fingerprint change) |
 | Sharp drop | Whether the run marked more not reproduced than the deployment expects of one run (§ Run application) |
 
@@ -1001,7 +1001,7 @@ it is about.
 
 | Part | State |
 |---|---|
-| Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
+| Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead decisions: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 
@@ -1010,11 +1010,11 @@ it is about.
 | Limit | Detail |
 |---|---|
 | A moved result with no fingerprint and no function is matched on its line alone | clang-tidy, and clang before 22, give rule, path, line and message. A line moved above such a result pairs it with the nearest lead of the same rule and message in the file, which is probable, and two such results moving past each other can swap |
-| A new variant inherits on the whole key alone | Carrying by every layer is from the stream a branch was cut from. A variant's first run of a series takes a sibling variant's places where the whole keys are equal |
-| A result whose whole key equals the one a moved lead was first seen with opens at that lead's place | Places are minted from the first key a series saw. Both are the same rule, path, fingerprint and message, which is one flaw reported twice |
+| A new variant inherits on the whole key alone | Carrying by every layer is from the stream a branch was cut from. A variant's first run of a series takes a sibling variant's occurrences where the whole keys are equal |
+| A result whose whole key equals the one a moved lead was first seen with opens at that lead's occurrence | Occurrences are minted from the first key a series saw. Both are the same rule, path, fingerprint and message, which is one flaw reported twice |
 | A run that ends unread counts nothing on its receipt | A run is read only once its build has an inventory, so one superseded or failed while it waits, or held in a shape the release applying it does not read, ends with a receipt naming no drop and no discard |
 | Coverity's native JSON is not read, so its SARIF is matched as plain SARIF | Coverity's `mergeKey` is in its JSON and is lost in its SARIF. A Coverity lead is matched on the key its SARIF states, as any plain SARIF is (§ Keys) |
-| Two identical results in one build share a place | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
+| Two identical results in one build share an occurrence | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |
 | A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its placed results |
 | The counts per run are measured against small trees | The largest real output measured is CodeQL's 226,586 bytes over a small C++ tree (§ Bounds). No producer's output for a tree the size of a product's own build was measured, so the results per run and the two memory figures rest on the 150,000-result measurement of what reading costs rather than on a producer. A deployment analyzing a large tree raises them, and the memory limit with the two that are memory figures |
@@ -1026,9 +1026,9 @@ it is about.
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | The client places a path naming no starting point against the directory it runs in, and the deployment against the working directory the output states | One output sent both ways is placed differently when the analyzer ran outside the directory the client runs in |
 | An internal reader reads a moved lead whole, and is not told its flaw | The flaw is undisclosed work. The lead's state reads handed off for both |
-| A grant of a moved lead reaches its evidence and not the claims at its place | The claims are widened for the flaw's two audiences, and a lead grant is a third reach of one place's findings |
-| A notice or a mention about a claim at a moved lead reaches its internal readers alone | A mention resolves names against the people who read the claim's visibility in its product, and that stays internal until disclosure. A reader of the flaw reads the claim and is not told of a note on it |
-| A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their claims to the new name |
+| A grant of a moved lead reaches its evidence and not the decisions at its occurrence | The decisions are widened for the flaw's two audiences, and a lead grant is a third reach of one occurrence's findings |
+| A notice or a mention about a decision at a moved lead reaches its internal readers alone | A mention resolves names against the people who read the decision's visibility in its product, and that stays internal until disclosure. A reader of the flaw reads the decision and is not told of a note on it |
+| A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their decisions to the new name |
 | Every lead of a series' first run is in the queue | A vulnerability scanner's first scan has no baseline either, and starting to analyze a codebase leaves what it already holds to be triaged and fixed. A codebase analyzed for the first time puts every result in front of a triager at once, and the order and the standing rules are what thin it |
 | An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |
 | A lead sorts after every finding in the lists of held work | They are ordered by urgency, and a lead carries none. The rail's Unassigned entry opens the findings list, which holds no lead (`DESIGN-kinds.md` § Consumers): an unassigned lead is listed by the unassigned list's read, and named unheld in the lead queue |

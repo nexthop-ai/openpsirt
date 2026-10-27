@@ -371,7 +371,7 @@ func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
 }
 
 // rulesWaiting is every standing rule on leads that nobody has approved, past
-// the period a claim may wait on a second person, against whoever may approve
+// the period a decision may wait on a second person, against whoever may approve
 // it.
 //
 // A proposed rule dismisses nothing, so every lead it names stays in the

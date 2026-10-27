@@ -159,8 +159,8 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		"Products":            func(string) string { return weblink.Products() },
 		"System":              func(string) string { return weblink.System() },
 		"ExploitedHere":       func(string) string { return weblink.ExploitedHere() },
-		"Claim":               func(string) string { return weblink.Claim(7) },
 		"Decision":            func(string) string { return weblink.Decision(7) },
+		"DecisionOccurrence":  func(string) string { return weblink.DecisionOccurrence(7) },
 		"Issue":               weblink.Issue,
 		"ProductFindings":     func(n string) string { return weblink.ProductFindings(n, n) },
 		"InboxWaiting":        weblink.InboxWaiting,
@@ -338,13 +338,13 @@ func TestAHandSpelledAddressIsFound(t *testing.T) {
 	}{
 		{`package x; var link = "/review-queue?mine=1"`, true},
 		{`package x; var link = "/products/" + product + "/findings"`, true},
-		{`package x; var link = fmt.Sprintf("/claims/%d", id)`, true},
+		{`package x; var link = fmt.Sprintf("/decisions/%d", id)`, true},
 		{`package x; var api = "/v1/products/{product}/findings"`, false},
 		{`package x; var api = "/findings/{vulnerability}/components/{component}"`, false},
 		{`package x; var api = "/v1/products/" + product + "/findings?" + q`, false},
 		{`package x; var link = base + "/products/" + product`, true},
 		{`package x; var file = "/etc/openpsirt"`, false},
-		{`package x; var link = weblink.Claim(id)`, false},
+		{`package x; var link = weblink.Decision(id)`, false},
 		{`package x; var front = link(baseURL, "/")`, true},
 		{`package x; var front = link(baseURL, weblink.Home())`, false},
 		{`package x; var parts = strings.Split(path, "/")`, false},
@@ -374,6 +374,12 @@ func TestNoAddressIsSpelledOutsideThisPackage(t *testing.T) {
 				// its own, read here as test files are not: the paths it
 				// sends are the API's, never an address into the interface.
 				if base := filepath.Base(path); base == "weblink" || base == "httpapitest" {
+					return filepath.SkipDir
+				}
+				// A migration rewrites the addresses an earlier release
+				// stored, which stay as that release spelled them whatever
+				// the route table says now.
+				if filepath.Base(path) == "migrations" {
 					return filepath.SkipDir
 				}
 				return nil

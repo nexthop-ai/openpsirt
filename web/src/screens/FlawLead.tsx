@@ -68,7 +68,7 @@ export function FlawLeadCard({
       <p>
         <Link
           className="mono"
-          to={leadAt({ product, stream: it.stream, variant: it.variant }, it.place)}
+          to={leadAt({ product, stream: it.stream, variant: it.variant }, it.occurrence)}
         >
           {it.rule} · {located(it.path, it.line)}
         </Link>{" "}

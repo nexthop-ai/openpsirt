@@ -11,71 +11,71 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// alreadyFixed is a claim that whoever packages the component has already
+// alreadyFixed is a decision that whoever packages the component has already
 // shipped the fix, which is the outcome a backported patch needs: it does not
 // move the upstream version, so nothing here can see it.
-func (f *fixture) alreadyFixed(t *testing.T, at triage.Place, version string) triage.Proposal {
+func (f *fixture) alreadyFixed(t *testing.T, at triage.Occurrence, version string) triage.Proposal {
 	t.Helper()
 	return triage.Proposal{
-		Place: at, Outcome: triage.AlreadyFixed,
+		Occurrence: at, Outcome: triage.AlreadyFixed,
 		FixedVersion: version,
 		Reasoning:    "Alpine backported this; the tracker names the release it landed in.",
 		By:           f.proposer, NeedsApproval: true,
 	}
 }
 
-func TestAClaimThatTheFixIsAlreadyHereNeedsTheVersionItArrivedIn(t *testing.T) {
-	// This outcome asserts a fact rather than a judgment: whoever packages the
+func TestADecisionThatTheFixIsAlreadyHereNeedsTheVersionItArrivedIn(t *testing.T) {
+	// This outcome asserts a fact rather than a decision: whoever packages the
 	// component either states the release the fix arrived in or does not.
-	// Without it the claim is "trust me", which is the one thing an outcome
+	// Without it the decision is "trust me", which is the one thing an outcome
 	// that hides risk on a matter of fact must not be able to say.
 	each(t, func(t *testing.T, f *fixture) {
 		_, err := f.store.Propose(t.Context(), f.triager, f.alreadyFixed(t, f.at(), ""))
 		if err == nil {
-			t.Fatal("a claim that the fix is already here was recorded with nothing to check it against")
+			t.Fatal("a decision that the fix is already here was recorded with nothing to check it against")
 		}
 		if !strings.Contains(err.Error(), "version") {
 			t.Errorf("the refusal does not say what is missing: %v", err)
 		}
 
-		decision, err := f.store.Propose(t.Context(), f.triager, f.alreadyFixed(t, f.at(), "1.37.0-r31"))
+		occurrence, err := f.store.Propose(t.Context(), f.triager, f.alreadyFixed(t, f.at(), "1.37.0-r31"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if decision.Claim.FixedVersion == nil || *decision.Claim.FixedVersion != "1.37.0-r31" {
-			t.Errorf("the version the fix arrived in was not kept: %v", decision.Claim.FixedVersion)
+		if occurrence.Decision.FixedVersion == nil || *occurrence.Decision.FixedVersion != "1.37.0-r31" {
+			t.Errorf("the version the fix arrived in was not kept: %v", occurrence.Decision.FixedVersion)
 		}
 	})
 }
 
-func TestOnlyThatClaimCarriesAVersionTheFixArrivedIn(t *testing.T) {
+func TestOnlyThatDecisionCarriesAVersionTheFixArrivedIn(t *testing.T) {
 	// The same rule the other outcome-specific fields hold to. A value that is
 	// meaningless where it sits is worse than an absent one: it reads as
 	// having been considered.
 	each(t, func(t *testing.T, f *fixture) {
 		for _, outcome := range []triage.Outcome{triage.Affected, triage.WontFix} {
 			_, err := f.store.Propose(t.Context(), f.triager, triage.Proposal{
-				Place: f.at(), Outcome: outcome,
+				Occurrence: f.at(), Outcome: outcome,
 				FixedVersion: "1.37.0-r31",
 				Reasoning:    "Recorded against the wrong outcome.",
 				By:           f.proposer, NeedsApproval: true,
 			})
 			if err == nil {
-				t.Errorf("%q was recorded claiming a fix has arrived", outcome)
+				t.Errorf("%q was recorded stating a fix has arrived", outcome)
 			}
 		}
 	})
 }
 
-func TestAClaimThatTheFixIsAlreadyHereAlwaysNeedsASecondPerson(t *testing.T) {
+func TestADecisionThatTheFixIsAlreadyHereAlwaysNeedsASecondPerson(t *testing.T) {
 	// It hides risk, so it is gated like every other suppression, and it gets
 	// no part of the exemption a short deferral has. That exemption exists
-	// because "not this sprint" is ordinary triage; this is a claim that
+	// because "not this sprint" is ordinary triage; this is a decision that
 	// something is over, and the finding stops being visible on one person's
 	// word if nobody checks it.
 	each(t, func(t *testing.T, f *fixture) {
 		if !triage.AlreadyFixed.HidesRisk() {
-			t.Fatal("a claim that the fix is already here leaves the issue in the working queue")
+			t.Fatal("a decision that the fix is already here leaves the issue in the working queue")
 		}
 		// A threshold generous enough to exempt any deferral, to show that
 		// what exempts one has no reach here.
@@ -90,14 +90,14 @@ func TestAClaimThatTheFixIsAlreadyHereAlwaysNeedsASecondPerson(t *testing.T) {
 	})
 }
 
-func TestAPackagingRevisionDoesNotLapseTheClaimAndAnUpstreamMoveDoes(t *testing.T) {
-	// The crux of the outcome. What it claims is that this packaging of
+func TestAPackagingRevisionDoesNotLapseTheDecisionAndAnUpstreamMoveDoes(t *testing.T) {
+	// The crux of the outcome. What it states is that this packaging of
 	// this upstream version carries the patch, so a later packaging
 	// revision of the same upstream version still does — the decision is
 	// keyed on the upstream version alone, which is what makes that true
 	// without anything comparing one revision against another.
 	//
-	// An upstream move is different code, and the claim says nothing about
+	// An upstream move is different code, and the decision says nothing about
 	// it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -105,15 +105,15 @@ func TestAPackagingRevisionDoesNotLapseTheClaimAndAnUpstreamMoveDoes(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 
-		// The same upstream version, packaged again. Nothing about the claim
+		// The same upstream version, packaged again. Nothing about the decision
 		// has stopped being true.
 		revised := f.at()
 		if standing, err := f.store.Applying(ctx, revised); err != nil || standing == nil {
-			t.Error("a packaging revision of the same upstream version lost the claim")
+			t.Error("a packaging revision of the same upstream version lost the decision")
 		}
 
 		// A different upstream version is different code.
@@ -124,15 +124,15 @@ func TestAPackagingRevisionDoesNotLapseTheClaimAndAnUpstreamMoveDoes(t *testing.
 			t.Fatal(err)
 		}
 		if standing != nil {
-			t.Error("the claim still stands over an upstream version it was never made about")
+			t.Error("the decision still stands over an upstream version it was never made about")
 		}
 	})
 }
 
-func TestReAffirmingCarriesEverythingTheClaimRestsOn(t *testing.T) {
-	// A re-affirmation says the same claim still holds, so a field the outcome
+func TestReAffirmingCarriesEverythingTheDecisionRestsOn(t *testing.T) {
+	// A re-affirmation says the same decision still holds, so a field the outcome
 	// requires is as required as it was the first time. Dropping one does not
-	// weaken the claim — it makes the re-affirmation refuse itself, for want
+	// weaken the decision — it makes the re-affirmation refuse itself, for want
 	// of a value nobody removed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -140,7 +140,7 @@ func TestReAffirmingCarriesEverythingTheClaimRestsOn(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 
@@ -148,15 +148,15 @@ func TestReAffirmingCarriesEverythingTheClaimRestsOn(t *testing.T) {
 		moved.ComponentUpstream = "1.38.0"
 		f.lapsed(t, claimed.ID)
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
-			PreviousID: claimed.ID, Place: moved,
+			PreviousID: claimed.ID, Occurrence: moved,
 			Reasoning: "Checked again: the newer package carries it too.",
 			By:        f.proposer,
 		})
 		if err != nil {
-			t.Fatalf("re-affirming a claim that the fix is already here: %v", err)
+			t.Fatalf("re-affirming a decision that the fix is already here: %v", err)
 		}
-		if again.Claim.FixedVersion == nil {
-			t.Fatal("the re-affirmed claim carries no version to check it against")
+		if again.Decision.FixedVersion == nil {
+			t.Fatal("the re-affirmed decision carries no version to check it against")
 		}
 	})
 }
@@ -169,7 +169,7 @@ func TestReAffirmingCarriesWhatStopsIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		claimed, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.NotApplicable,
+			Occurrence: f.at(), Outcome: triage.NotApplicable,
 			Justification: triage.MitigationsExist,
 			Mitigation:    "The management interface is not reachable from outside.",
 			Reasoning:     "Nothing routes to it.",
@@ -178,7 +178,7 @@ func TestReAffirmingCarriesWhatStopsIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 
@@ -186,7 +186,7 @@ func TestReAffirmingCarriesWhatStopsIt(t *testing.T) {
 		moved.ComponentUpstream = "1.2.4"
 		f.lapsed(t, claimed.ID)
 		if _, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
-			PreviousID: claimed.ID, Place: moved,
+			PreviousID: claimed.ID, Occurrence: moved,
 			Reasoning: "Still not reachable at the new version.",
 			By:        f.proposer,
 		}); err != nil {
@@ -219,7 +219,7 @@ func TestNothingWithADateMayBeSaidAboutATag(t *testing.T) {
 			{triage.PatchNeeded, func(p *triage.Proposal) { p.CommittedTo = &soon }},
 		} {
 			p := triage.Proposal{
-				Place: at, Outcome: c.outcome,
+				Occurrence: at, Outcome: c.outcome,
 				Reasoning: "Not this release.", By: f.proposer,
 			}
 			c.set(&p)
@@ -233,10 +233,10 @@ func TestNothingWithADateMayBeSaidAboutATag(t *testing.T) {
 		for _, outcome := range []triage.Outcome{
 			triage.Affected, triage.WontFix,
 		} {
-			place := at
-			place.PlaceIdentity = string(outcome)
+			occurrence := at
+			occurrence.OccurrenceIdentity = string(outcome)
 			if _, err := f.store.Propose(t.Context(), f.triager, triage.Proposal{
-				Place: place, Outcome: outcome,
+				Occurrence: occurrence, Outcome: outcome,
 				Reasoning: "What is true of this release.", By: f.proposer,
 			}); err != nil {
 				t.Errorf("%q was refused against a tag: %v", outcome, err)

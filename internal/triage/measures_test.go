@@ -25,7 +25,7 @@ func (f *fixture) opened(t *testing.T, findingID int64, when time.Time) {
 }
 
 func TestAWaitIsMeasuredFromTheFindingTheDecisionIsAbout(t *testing.T) {
-	// A place is a pair of names with no product in it, so the same place
+	// An occurrence is a pair of names with no product in it, so the same occurrence
 	// sits in every product shipping that component — and a finding this
 	// reader may not see sits at it too. Either one reaching the join makes
 	// the figure a disclosure as well as wrong.
@@ -37,7 +37,7 @@ func TestAWaitIsMeasuredFromTheFindingTheDecisionIsAbout(t *testing.T) {
 
 		mine := f.finds(t, ours, libfoo, "place-of-libfoo", access.Public)
 		f.opened(t, mine, now.Add(-48*time.Hour))
-		// Undisclosed, at the same place, in the same product. This reader
+		// Undisclosed, at the same occurrence, in the same product. This reader
 		// holds public triage and may not see it.
 		hidden := f.finds(t, ours, libfoo, "place-of-libfoo", access.Private)
 		f.opened(t, hidden, now.AddDate(0, 0, -10))
@@ -51,23 +51,23 @@ func TestAWaitIsMeasuredFromTheFindingTheDecisionIsAbout(t *testing.T) {
 			now.AddDate(0, 0, -30))
 
 		at := f.at()
-		at.PlaceIdentity = "place-of-libfoo"
+		at.OccurrenceIdentity = "place-of-libfoo"
 		at.ConsumerUpstream = ""
-		f.claims(t, at)
-		// A second claim about a place nothing was ever found at, which is
-		// what keeps the join outer: the claim still happened.
+		f.decisions(t, at)
+		// A second decision about an occurrence nothing was ever found at, which is
+		// what keeps the join outer: the decision still happened.
 		nowhere := f.at()
-		nowhere.PlaceIdentity = "place-of-nothing"
+		nowhere.OccurrenceIdentity = "place-of-nothing"
 		nowhere.ConsumerUpstream = ""
-		f.claims(t, nowhere)
+		f.decisions(t, nowhere)
 
 		measured, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{}, time.Time{}, time.Time{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if measured.Sampled != 2 {
-			t.Errorf("%d decisions measured, want both — a claim about a place with no "+
-				"finding is a claim that still happened", measured.Sampled)
+			t.Errorf("%d decisions measured, want both — a decision about an occurrence with no "+
+				"finding is a decision that still happened", measured.Sampled)
 		}
 		if len(measured.ToDecide) != 1 {
 			t.Fatalf("%d bands waited, want one", len(measured.ToDecide))
@@ -118,22 +118,22 @@ func TestAPercentileIsTheValueAtOrPastThatPosition(t *testing.T) {
 	}
 }
 
-func TestAClaimOverManyPlacesIsOneWaitAndOneSendBack(t *testing.T) {
-	// A claim writes a row per place and is agreed to, or sent back, once.
-	// Counted per row, one claim over three places is three waits and three
-	// send-backs, and a large claim fills the sample on its own.
+func TestADecisionOverManyOccurrencesIsOneWaitAndOneSendBack(t *testing.T) {
+	// A decision writes a row per occurrence and is agreed to, or sent back, once.
+	// Counted per row, one decision over three occurrences is three waits and three
+	// send-backs, and a large decision fills the sample on its own.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		wide := f.claimsMany(t, f.places("wide-a", "wide-b", "wide-c"))
-		if err := agreeTo(ctx, f.store, f.reviewer, wide[0].ClaimID, ""); err != nil {
+		wide := f.decisionsMany(t, f.occurrences("wide-a", "wide-b", "wide-c"))
+		if err := agreeTo(ctx, f.store, f.reviewer, wide[0].DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
-		narrow := f.claimsMany(t, f.places("narrow-a"))
-		if err := agreeTo(ctx, f.store, f.reviewer, narrow[0].ClaimID, ""); err != nil {
+		narrow := f.decisionsMany(t, f.occurrences("narrow-a"))
+		if err := agreeTo(ctx, f.store, f.reviewer, narrow[0].DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
-		returned := f.claimsMany(t, f.places("back-a", "back-b", "back-c"))
-		if _, err := f.store.SendBackClaim(ctx, f.reviewer, returned[0].ClaimID,
+		returned := f.decisionsMany(t, f.occurrences("back-a", "back-b", "back-c"))
+		if _, err := f.store.SendBackDecision(ctx, f.reviewer, returned[0].DecisionID,
 			"Say which build this was checked on."); err != nil {
 			t.Fatal(err)
 		}
@@ -143,17 +143,17 @@ func TestAClaimOverManyPlacesIsOneWaitAndOneSendBack(t *testing.T) {
 			t.Fatal(err)
 		}
 		if measured.Sampled != 3 {
-			t.Errorf("%d observations measured, want one per claim", measured.Sampled)
+			t.Errorf("%d observations measured, want one per decision", measured.Sampled)
 		}
 		agreed := 0
 		for _, band := range measured.ToAgree {
 			agreed += band.Count
 		}
 		if agreed != 2 {
-			t.Errorf("%d waits for a second person, want the two claims agreed to", agreed)
+			t.Errorf("%d waits for a second person, want the two decisions agreed to", agreed)
 		}
 		if measured.SentBack != 1 {
-			t.Errorf("%d claims sent back, want the one", measured.SentBack)
+			t.Errorf("%d decisions sent back, want the one", measured.SentBack)
 		}
 	})
 }

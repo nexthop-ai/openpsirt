@@ -81,10 +81,10 @@ type Justification string
 // Schema answers with the reasons the exchange format defines.
 func (Justification) Schema(huma.Registry) *huma.Schema { return words(triage.Justifications()) }
 
-// LeadOutcome is what a claim about a lead says it is.
+// LeadOutcome is what a decision about a lead says it is.
 type LeadOutcome string
 
-// Schema answers with the outcomes a claim about a lead records.
+// Schema answers with the outcomes a decision about a lead records.
 func (LeadOutcome) Schema(huma.Registry) *huma.Schema { return words(triage.LeadOutcomes()) }
 
 // LeadReason is the reason a lead was dismissed.
@@ -93,10 +93,10 @@ type LeadReason string
 // Schema answers with the reasons a lead is dismissed for.
 func (LeadReason) Schema(huma.Registry) *huma.Schema { return words(triage.LeadReasons()) }
 
-// StatementScope is whom a statement published from a claim holds for.
+// StatementScope is whom a statement published from a decision holds for.
 type StatementScope string
 
-// Schema answers with the scopes a claim may state.
+// Schema answers with the scopes a decision may state.
 func (StatementScope) Schema(huma.Registry) *huma.Schema { return words(triage.Scopes()) }
 
 // plainly is a repeatable query parameter's words as plain strings, which is
@@ -205,24 +205,25 @@ func (DispositionWaiting) Schema(huma.Registry) *huma.Schema {
 	return words(Which(finding.Dispositions(), finding.Disposition.NeedsSecondPerson))
 }
 
-// Happened is what became of a claim.
+// Happened is what became of a decision.
 type Happened string
 
-// Schema offers every word for what became of a claim.
+// Schema offers every word for what became of a decision.
 func (Happened) Schema(huma.Registry) *huma.Schema { return words(triage.WhatHappenedAll()) }
 
-// ClaimState is the state a decision row has reached.
-type ClaimState string
+// DecisionState is the state a decision occurrence has reached.
+type DecisionState string
 
-// Schema offers every state a decision row can reach.
-func (ClaimState) Schema(huma.Registry) *huma.Schema { return words(triage.States()) }
+// Schema offers every state a decision occurrence can reach.
+func (DecisionState) Schema(huma.Registry) *huma.Schema { return words(triage.States()) }
 
-// ClaimStates is the state a set of decision rows shares, or the word for rows
-// that do not share one.
-type ClaimStates string
+// DecisionStates is the state a set of decision occurrences shares, or the
+// word for occurrences that do not share one.
+type DecisionStates string
 
-// Schema offers every state a decision row can reach, and the word for several.
-func (ClaimStates) Schema(huma.Registry) *huma.Schema {
+// Schema offers every state a decision occurrence can reach, and the word for
+// several.
+func (DecisionStates) Schema(huma.Registry) *huma.Schema {
 	all := make([]string, 0, len(triage.States())+1)
 	for _, state := range triage.States() {
 		all = append(all, string(state))
@@ -230,46 +231,46 @@ func (ClaimStates) Schema(huma.Registry) *huma.Schema {
 	return words(append(all, triage.SeveralStates))
 }
 
-// ClaimStateLive is a state in which a row still holds its key.
-type ClaimStateLive string
+// DecisionStateLive is a state in which a row still holds its key.
+type DecisionStateLive string
 
 // Schema offers the states in which a row still holds its key.
-func (ClaimStateLive) Schema(huma.Registry) *huma.Schema {
+func (DecisionStateLive) Schema(huma.Registry) *huma.Schema {
 	return words(Which(triage.States(), triage.State.Live))
 }
 
-// ClaimStateEnded is a state in which a row has stopped applying.
-type ClaimStateEnded string
+// DecisionStateEnded is a state in which a row has stopped applying.
+type DecisionStateEnded string
 
 // Schema offers the states in which a row has stopped applying.
-func (ClaimStateEnded) Schema(huma.Registry) *huma.Schema {
+func (DecisionStateEnded) Schema(huma.Registry) *huma.Schema {
 	return words(Which(triage.States(), triage.State.Ended))
 }
 
-// QueueReason is why a claim waits in the review queue.
+// QueueReason is why a decision waits in the review queue.
 type QueueReason string
 
 // Schema offers every reason, in the order the queue offers them.
 func (QueueReason) Schema(huma.Registry) *huma.Schema { return words(triage.QueueReasons()) }
 
-// ClaimKind is what sort of action a claim was.
-type ClaimKind string
+// DecisionKind is what sort of action a decision was.
+type DecisionKind string
 
-// Schema offers every sort of action a claim can be.
-func (ClaimKind) Schema(huma.Registry) *huma.Schema { return words(triage.ClaimKinds()) }
+// Schema offers every sort of action a decision can be.
+func (DecisionKind) Schema(huma.Registry) *huma.Schema { return words(triage.DecisionKinds()) }
 
-// Standing is how far a group or a place has been decided.
+// Standing is how far a group or an occurrence has been decided.
 type Standing string
 
 // Schema offers every standing, in the order the list offers them.
-func (Standing) Schema(huma.Registry) *huma.Schema { return words(finding.ClaimStandings()) }
+func (Standing) Schema(huma.Registry) *huma.Schema { return words(finding.DecisionStandings()) }
 
 // StandingUnsettled is a standing that is not agreed.
 type StandingUnsettled string
 
 // Schema offers every standing but agreed.
 func (StandingUnsettled) Schema(huma.Registry) *huma.Schema {
-	return words(Which(finding.ClaimStandings(), finding.ClaimStanding.Unsettled))
+	return words(Which(finding.DecisionStandings(), finding.DecisionStanding.Unsettled))
 }
 
 // Band is one of the four rated words, worst first.

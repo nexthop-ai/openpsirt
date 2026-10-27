@@ -29,7 +29,7 @@ func TestReadinessSaysWhatIsBlocking(t *testing.T) {
 			Blocking []struct {
 				Vulnerability string `json:"vulnerability"`
 				State         string `json:"state"`
-				Places        int    `json:"places"`
+				Occurrences   int    `json:"occurrences"`
 			} `json:"blocking"`
 		} {
 			t.Helper()
@@ -38,7 +38,7 @@ func TestReadinessSaysWhatIsBlocking(t *testing.T) {
 				Blocking []struct {
 					Vulnerability string `json:"vulnerability"`
 					State         string `json:"state"`
-					Places        int    `json:"places"`
+					Occurrences   int    `json:"occurrences"`
 				} `json:"blocking"`
 			}
 			httpapitest.Read(t, r, "private-triage", at, &out)
@@ -50,15 +50,15 @@ func TestReadinessSaysWhatIsBlocking(t *testing.T) {
 			t.Fatalf("nothing is decided and the blocker list holds %d of %d",
 				len(first.Blocking), first.Blockers)
 		}
-		if first.Blocking[0].State != "undecided" || first.Blocking[0].Places == 0 {
+		if first.Blocking[0].State != "undecided" || first.Blocking[0].Occurrences == 0 {
 			t.Errorf("a blocker reads as %+v", first.Blocking[0])
 		}
 
 		// Agreeing to ship with something is the decision this list is about,
 		// so it leaves: a row somebody agreed to is not standing between the
 		// branch and the release.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 		after := ready(t)
 		if after.Blockers != 1 || len(after.Blocking) != 1 {
 			t.Fatalf("after agreeing to one, %d of %d block",

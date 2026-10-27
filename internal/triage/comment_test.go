@@ -20,7 +20,7 @@ func TestACommentNeverDisturbsAnApproval(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		claimed := f.agreed(t, f.at())
-		if _, err := f.store.Say(ctx, f.triager, claimed.ClaimID, "Re-checked against 1.2.4; still true."); err != nil {
+		if _, err := f.store.Say(ctx, f.triager, claimed.DecisionID, "Re-checked against 1.2.4; still true."); err != nil {
 			t.Fatal(err)
 		}
 
@@ -31,7 +31,7 @@ func TestACommentNeverDisturbsAnApproval(t *testing.T) {
 		if standing == nil || standing.State != triage.Approved {
 			t.Errorf("a comment disturbed the approval: %+v", standing)
 		}
-		approvals, err := f.store.Approvals(ctx, f.reviewer, claimed.ClaimID)
+		approvals, err := f.store.Approvals(ctx, f.reviewer, claimed.DecisionID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +47,7 @@ func TestOnlyTheAuthorMayChangeTheirOwnWords(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		claimed := f.agreed(t, f.at())
-		said, err := f.store.Say(ctx, f.triager, claimed.ClaimID, "First thought.")
+		said, err := f.store.Say(ctx, f.triager, claimed.DecisionID, "First thought.")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,7 +59,7 @@ func TestOnlyTheAuthorMayChangeTheirOwnWords(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		discussion, err := f.store.Discussion(ctx, f.triager, claimed.ClaimID)
+		discussion, err := f.store.Discussion(ctx, f.triager, claimed.DecisionID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,17 +85,17 @@ func TestTextOnADecisionGoesThroughTheSamePolicy(t *testing.T) {
 		const dangerous = "See ![this](https://evil.example/pixel.gif)"
 
 		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.WontFix,
+			Occurrence: f.at(), Outcome: triage.WontFix,
 			Reasoning: dangerous, By: f.proposer,
 		}); err == nil {
 			t.Error("a remote image was accepted as reasoning")
 		}
 
 		claimed := f.agreed(t, f.at())
-		if _, err := f.store.Revise(ctx, f.triager, claimed.ClaimID, dangerous); err == nil {
+		if _, err := f.store.Revise(ctx, f.triager, claimed.DecisionID, dangerous); err == nil {
 			t.Error("a remote image was accepted as a revision")
 		}
-		if _, err := f.store.Say(ctx, f.triager, claimed.ClaimID, dangerous); err == nil {
+		if _, err := f.store.Say(ctx, f.triager, claimed.DecisionID, dangerous); err == nil {
 			t.Error("a remote image was accepted as a comment")
 		}
 	})
@@ -111,10 +111,10 @@ func TestDiscussionIsReadWithoutTheRightToJoinIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		claimed := f.agreed(t, f.at())
-		if _, err := f.store.Say(ctx, f.onlooker, claimed.ClaimID, "Adding my thoughts."); err == nil {
+		if _, err := f.store.Say(ctx, f.onlooker, claimed.DecisionID, "Adding my thoughts."); err == nil {
 			t.Error("somebody holding only a read role commented")
 		}
-		if _, err := f.store.Discussion(ctx, f.onlooker, claimed.ClaimID); err != nil {
+		if _, err := f.store.Discussion(ctx, f.onlooker, claimed.DecisionID); err != nil {
 			t.Errorf("somebody who may read the finding could not read its discussion: %v", err)
 		}
 	})
@@ -133,7 +133,7 @@ func TestARewriteRefusedForOneReasonRatherThanTwo(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		claimed := f.agreed(t, f.at())
-		said, err := f.store.Say(ctx, f.triager, claimed.ClaimID, "Something worth knowing.")
+		said, err := f.store.Say(ctx, f.triager, claimed.DecisionID, "Something worth knowing.")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,13 +180,13 @@ func TestTextThePolicyAdmitsFitsTheColumn(t *testing.T) {
 		}
 
 		made, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.WontFix,
+			Occurrence: f.at(), Outcome: triage.WontFix,
 			Reasoning: reasoning, By: f.proposer,
 		})
 		if err != nil {
 			t.Fatalf("a field of exactly the admitted size could not be stored: %v", err)
 		}
-		kept, err := f.store.ReasoningFor(ctx, f.triager, []triage.Decision{*made})
+		kept, err := f.store.ReasoningFor(ctx, f.triager, []triage.DecisionOccurrence{*made})
 		if err != nil {
 			t.Fatal(err)
 		}

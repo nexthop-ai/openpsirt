@@ -19,10 +19,11 @@ import (
 //
 // Separate from any one act on an issue because several ask the same question
 // and each answered it differently before: a rating, a finding's detail, a
-// decision about a place, a disclosure date, a fix target, an assignment. What
-// they share is that the name in the path is a name somebody may have guessed,
-// and answering "that is not yours" differently from "there is no such thing"
-// turns any of those routes into a way to count what is being kept quiet.
+// decision about an occurrence, a disclosure date, a fix target, an assignment.
+// What they share is that the name in the path is a name somebody may have
+// guessed, and answering "that is not yours" differently from "there is no such
+// thing" turns any of those routes into a way to count what is being kept
+// quiet.
 //
 // All of them are asked of a named product, because every one of these acts is
 // about an issue somewhere rather than about an issue at large.
@@ -35,12 +36,12 @@ var ErrUnknownIssue = refusal.New("no issue is known by that name")
 // one product.
 //
 // The one question, because every act on an issue here is about it in a named
-// product: a rating, a finding's detail, a decision about a place, a
+// product: a rating, a finding's detail, a decision about an occurrence, a
 // disclosure date, a fix target, an assignment. A second form asking
 // "anywhere" reads "an issue is public knowledge" one product wider than it
 // needs to.
 //
-// The question every route shaped "this issue, at this place" has to ask
+// The question every route shaped "this issue, at this occurrence" has to ask
 // before it answers anything at all. Those routes resolve the issue name first
 // and check the finding's visibility afterwards, so a name somebody holds and
 // a name nobody holds came back differently — which is exactly what
@@ -55,13 +56,13 @@ var ErrUnknownIssue = refusal.New("no issue is known by that name")
 //
 // Read through the finding rather than the issue because visibility lives on
 // the finding: the same issue is undisclosed in one product and announced in
-// another, and what the reader may be told follows the place.
+// another, and what the reader may be told follows the occurrence.
 //
 // There is no exemption here for an issue that reaches nothing. A route about
-// a place has no answer to give when the issue is not at one, and the caller
-// was going to be refused anyway — the point here is that it is refused in the
-// same words as a name nobody has used. Recording a rating is the one act that
-// wants the exemption, and it asks for it separately (mayRateHere).
+// an occurrence has no answer to give when the issue is not at one, and the
+// caller was going to be refused anyway — the point here is that it is refused
+// in the same words as a name nobody has used. Recording a rating is the one
+// act that wants the exemption, and it asks for it separately (mayRateHere).
 func (s *Store) MayBeToldOfIn(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64) (bool, error) {
 

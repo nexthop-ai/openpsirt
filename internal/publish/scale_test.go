@@ -132,7 +132,7 @@ func TestMeasurePublishedDocumentsOfARealImage(t *testing.T) {
 			}
 			seen[one.Issue.Identifier+" "+one.Component.Name] = true
 			w.decide(w.Target, one.Issue.Identifier, one.Component,
-				claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 			decided++
 		}
 		w.publishes(w.Product, true)

@@ -27,6 +27,14 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 // The v0110 files beside this one hold v0.11.0's declaration of every table
 // this changes.
 //
+//   - The triage records take the names the interface gives them: a claim is
+//     a decision, a decision's row at one place is a decision occurrence, and
+//     a place is an occurrence. Renamed first, so everything after is
+//     written against the new names.
+//   - The stored words those renames reach follow them, in a step of their
+//     own after the renames: a bulk decision's kind, the kinds of
+//     notification a decision waiting or lapsed raises, the address a kept
+//     filter opens, and the bulk action limit's setting name.
 //   - An issue records what sort of issue it is: a published vulnerability, a
 //     flaw minted here, or an analyzer's rule.
 //   - The finding indexes a read answers from without the table carry the
@@ -42,8 +50,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - An analyzer's rule records the tool's own rating of its results and
 //     the weakness families it finds, and a result the last place it names.
 //   - A notification records whether what it withholds is internal work.
-//   - A claim has a stamp, in a table of its own, that a hand-off resting on
-//     it and the writes that could take that support away change.
+//   - A decision has a stamp, in a table of its own, that a hand-off resting
+//     on it and the writes that could take that support away change.
 //   - A product records each VEX document and supplier advisory that arrived
 //     for it: who sent it or which feed fetched it, when, and what became of
 //     it.
@@ -51,8 +59,14 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     notes, a log of correspondence with its reporter and a record of who
 //     held it, and the acknowledgement is the first message sent. A routing
 //     rule may place reports. The report beside a flaw recorded by hand
-//     carries the flaw's summary as its claim.
+//     carries the flaw's summary as its reported problem.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
+	if err := renameV0110(ctx, tx); err != nil {
+		return err
+	}
+	if err := valuesV0110(ctx, tx); err != nil {
+		return err
+	}
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err
@@ -63,7 +77,7 @@ func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
 		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createLeadV0110,
-		notificationInternalV0110, createClaimStampV0110, createDocumentUploadV0110,
+		notificationInternalV0110, createDecisionStampV0110, createDocumentUploadV0110,
 		reportCaseV0110, claimFromFlawV0110,
 	} {
 		if err := step(ctx, tx); err != nil {

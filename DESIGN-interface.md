@@ -33,7 +33,7 @@ end rather than left to be found by clicking.
 - [List navigation](#list-navigation)
 - [The dependency tree](#the-dependency-tree)
 - [The review queue](#the-review-queue)
-- [The claim page](#the-claim-page)
+- [The decision page](#the-decision-page)
 - [Assignments and routing rules](#assignments-and-routing-rules)
 - [Catalog and uploads](#catalog-and-uploads)
 - [Product and scan-run pages](#product-and-scan-run-pages)
@@ -141,7 +141,7 @@ the result differs from what is committed — the generated types say a list may
 | Rule | |
 |---|---|
 | A table of words over a word the server sends is keyed on the generated union | A word the server adds is then a compile error in the table until it has words, rather than the bare token on screen. A lint refuses a literal table in the screens declared or checked as keyed on any string, whole or partial; a table typed by an index signature is not caught. A table over an open set — a package kind, a keyboard key, this interface's own names — says why beside it |
-| A read is declared once and asked through its hook | One read declared at two sites is one cache entry under two sets of conditions, and an invalidation written against one key misses a read declared under another. The catalog's products, branches and variants, one release's variants, where an issue sits, a claim's approvals and revisions, what sits around a component, and the outbound destinations each have one definition, keyed so that what changes them reaches every screen showing them |
+| A read is declared once and asked through its hook | One read declared at two sites is one cache entry under two sets of conditions, and an invalidation written against one key misses a read declared under another. The catalog's products, branches and variants, one release's variants, where an issue sits, a decision's approvals and revisions, what sits around a component, and the outbound destinations each have one definition, keyed so that what changes them reaches every screen showing them |
 | A download or document link is built from the generated paths | A file, a document or an attachment is fetched by the browser rather than through the client, so its address is built by the one link builder over the generated paths: the path is a key of the document, each placeholder is required, named as the path names it and escaped as a segment, and a placeholder left without a value is refused rather than sent as its own name |
 
 The session is a cookie the browser holds and nothing in the application ever
@@ -184,7 +184,7 @@ what every other application on the same screen calls them.
 |---|---|
 | One plane | The canvas and the surface are the same color. A card, a table and a figure are set off by a hairline and nothing else; a shadow says there are two planes, and it is kept for what floats — a list of suggestions, the picker, a drawer |
 | Corners are small | Six pixels on a control and eight on a card. A tag takes four |
-| A label is sentence case | The label over a block, a column head, a field's name and a figure's caption are the words a person would use, in the muted tone and at the small step. Uppercase is kept for the two marks that are read as marks — known-exploited and a bulk claim |
+| A label is sentence case | The label over a block, a column head, a field's name and a figure's caption are the words a person would use, in the muted tone and at the small step. Uppercase is kept for the two marks that are read as marks — known-exploited and a bulk decision |
 | The primary button is ink | Black on the canvas in the light look, white on it in the dark look. The accent is for what opens something, so a button and a link never read as the same kind of thing. A secondary button is the same outline in two weights of text |
 | A pressed filter is ink too | A chip or a segment that is on is drawn in ink, and a filter in force above the list sits on the raised tone with its label quieter than its value. Neither borrows the accent, because a state and a link must not read alike on one toolbar |
 | Every state is ink or the raised tone | Picked, pressed, checked, selected, the page you are on, the component a path leads to, a setting that is set. The accent stays with links, focus rings, hover on what opens, and the row or option the keys are on. A web test fails on a style rule for a state that uses the accent |
@@ -224,8 +224,8 @@ take the word.
 | Rule | |
 |---|---|
 | A problem is never drawn in the done color | Green reads as good news, which is the one reading a failure must not get. A web test fails on a chip drawn as done whose words say something is wrong |
-| A claim is drawn in the color of what it does | Warm where it hides risk, which is every outcome but affected, and green where it does not. An outcome with no color of its own draws as the neutral base, the color of a claim that hides nothing; a web test fails on an outcome the client names that the stylesheet does not color |
-| A claim's card carries a stripe for where it stands, the same on the claim page and the finding screen | Pending while a second person is needed or the claim is still argued; in force once agreed, or while proposed where nothing waits on a second person; lapsed once it stopped applying. A withdrawn claim carries none: its proposer ended it, which is neither standing nor lapsing. The chip says whether a claim is finished, so a withdrawn or sent-back claim reads lapsed there; the stripe says whether it is in force, so a sent-back claim, still argued, reads pending. One mapping serves both screens |
+| A decision is drawn in the color of what it does | Warm where it hides risk, which is every outcome but affected, and green where it does not. An outcome with no color of its own draws as the neutral base, the color of a decision that hides nothing; a web test fails on an outcome the client names that the stylesheet does not color |
+| A decision's card carries a stripe for where it stands, the same on the decision page and the finding screen | Pending while a second person is needed or the decision is still argued; in force once agreed, or while proposed where nothing waits on a second person; lapsed once it stopped applying. A withdrawn decision carries none: its proposer ended it, which is neither standing nor lapsing. The chip says whether a decision is finished, so a withdrawn or sent-back decision reads lapsed there; the stripe says whether it is in force, so a sent-back decision, still argued, reads pending. One mapping serves both screens |
 
 ## The shell
 
@@ -284,8 +284,8 @@ product, so "this product, every branch, this variant" is a real question.
 Choosing "all" for the product leaves the two below it unselectable.
 
 A screen that needs a whole build cannot be given half a scope. Five exist for
-one build and no other — a finding, deciding a place, the dependency tree,
-deciding several together, and scans — because there is no dependency graph
+one build and no other — a finding, deciding an occurrence, the dependency tree,
+a bulk decision, and scans — because there is no dependency graph
 across branches and each is about a way down. On those the levels that would go
 to "all" are disabled and say why. A control that declines is less surprising
 than one that relocates you.
@@ -294,7 +294,7 @@ The findings list is not one of them. What the list is of is an issue at a
 component, and neither that nor any decision about it is keyed on a build
 (REQ-25). With a product picked and the branch or variant at "all", the list
 answers for every build in scope: a row is still one issue at one component, its
-places counted across every build, naming one of those builds and saying how
+occurrences counted across every build, naming one of those builds and saying how
 many hold it. The one thing it cannot draw there is the way down, because a
 chain belongs to one build's graph, so the Path column becomes the build the row
 names and the count of builds beside it.
@@ -331,7 +331,7 @@ trends, and the operational state at the foot. The trends answer a question
 asked occasionally, and they are also the slowest part of the page.
 
 The reader's own work leads, then the shape of the estate. Assigned to them,
-and claims of theirs an approver sent back; then open at or above the floor,
+and decisions of theirs an approver sent back; then open at or above the floor,
 exploited here where anything is, known exploited, pending their approval, and
 overdue. Led by the estate, home
 answers "how much is there" and never "what do I do next": the largest number
@@ -343,7 +343,7 @@ Open is the trend's latest point at every scope, which counts distinct issues �
 the findings list counts one row per issue and component, and a tile switching
 between the two as the picker moved would quote two figures for one word.
 
-What became of a claim is derived rather than stored, so there is no count
+What became of a decision is derived rather than stored, so there is no count
 to ask the server for: a page is read and what is on it is counted, and the
 tile says so where the page was cut. That is the treatment the deadline tiles
 beside it already get.
@@ -367,7 +367,7 @@ nothing, because the findings list holds what is open (`DESIGN-reporting.md`).
 
 ## The findings list
 
-One row per issue and fold, not per place and not per package. A real image
+One row per issue and fold, not per occurrence and not per package. A real image
 produced 281,890 individual findings that collapse to 6,775 rows.
 
 The fold is the source package at the version it was built at — curl,
@@ -377,8 +377,8 @@ instead, the same image gives 7,648 rows, a third of the difference being the
 same work said again.
 
 Each row says how many packages and how many consumers it covers, because one
-judgment covering sixty consumers is a different act from one covering one — and
-because those are the units somebody acts in. The place count is stored, sorted
+decision covering sixty consumers is a different act from one covering one — and
+because those are the units somebody acts in. The occurrence count is stored, sorted
 on, and shown as a title; it is what the ceiling on one action is measured against and what
 the disposition register expands to, rather than a figure a reader is asked to
 reconcile with the other two.
@@ -414,7 +414,7 @@ read 1,651,800 rows. Reading every edge of the build into memory instead —
 18,561 rows on a switch image — and walking them in Go is three to eighteen
 milliseconds, and scales with the graph rather than with the page.
 
-Where a row's places are reached different ways, the row says the pair it shows is
+Where a row's occurrences are reached different ways, the row says the pair it shows is
 one of several. Where the inventory placed the component nowhere, it says that
 rather than naming the product itself.
 
@@ -430,7 +430,7 @@ rather than naming the product itself.
 One CVE at three binaries is one piece of work, and the row says so. A third of
 the rows on a real image are the same issue at a sibling package: curl,
 `libcurl4t64` and `libcurl3t64` are one source package. Said on the row rather
-than folded away — the places are real, and a reader counting them should get
+than folded away — the occurrences are real, and a reader counting them should get
 the same number the list and the export do. So the row carries the source
 package and how many other rows on this page are the same issue at another of
 its binaries, with the way through to the component. **Counted over the page**,
@@ -514,8 +514,8 @@ Three filters need defining:
 | Filter | |
 |---|---|
 | **Package kind** | Read from the package identifier rather than stored beside it. It is also the closest the data comes to "userland and not the rest": a kernel and its modules are Debian packages and a statically linked service is Go, and somebody triaging one is usually not triaging the other. The kinds offered are the ones present in the scope on screen, as the server reports them under the same visibility as the list, each with how many rows it holds, so a kind the build ships is always offered and one it does not is never offered. Read when the panel opens, over the whole scope: the list's other filters do not narrow it, so a kind does not vanish because another filter is on. A kind already chosen and not present is offered too, without a count, so a kind in force can be seen and unticked. The interface holds a display name for the kinds whose word is not the one a reader looks for — Rust is `cargo` — and calls every other kind by its own word |
-| **What holds it** | The consumer a place records. What the build holds directly has no container to name, so it is asked for separately rather than by typing something |
-| **How far it has been decided** | A group covers places that can be in different states: undecided is no place decided, waiting is a claim standing proposed, agreed is every place answered, lapsed is a decision that stopped applying with nothing replacing it. *Partly answered* is deliberately not one of them — the row already says "12 places · 3 answered" |
+| **What holds it** | The consumer an occurrence records. What the build holds directly has no container to name, so it is asked for separately rather than by typing something |
+| **How far it has been decided** | A group covers occurrences that can be in different states: undecided is no occurrence decided, waiting is a decision standing proposed, agreed is every occurrence answered, lapsed is an occurrence whose decision stopped applying with nothing replacing it. *Partly answered* is deliberately not one of them — the row already says "12 occurrences · 3 answered" |
 
 ### Multi-value filters
 
@@ -545,10 +545,10 @@ is what has not been answered yet.
 
 | Rule | |
 |---|---|
-| Two filters are about a group rather than a row | The age is the *oldest* place, because a group open for a month with one place added yesterday has been somebody's problem for a month. What upstream did has to hold at every place, or a state known at one place and not another would drop the places that lack it and report a group smaller than it is |
-| A group whose places disagree has its own word | A package fixed in one variant and not in another is one row with two answers, and asked for any single state it matched none of them. "Mixed" is also the population worth looking at: a bump that has landed in one build and not the others is a pending upgrade somebody is halfway through |
-| Filtering by outcome asks what stands, not what was proposed | "What have we dismissed" is a question about this deployment's answer, and a claim still waiting for a second person is not an answer. Counting a proposal would let one person put their own unreviewed claim into the number the question was asked about |
-| "Assigned to me" means mine or a team I am on | Here as everywhere the phrase appears. A group whose places are held by different parties is neither mine nor anybody's |
+| Two filters are about a group rather than a row | The age is the *oldest* occurrence, because a group open for a month with one occurrence added yesterday has been somebody's problem for a month. What upstream did has to hold at every occurrence, or a state known at one occurrence and not another would drop the occurrences that lack it and report a group smaller than it is |
+| A group whose occurrences disagree has its own word | A package fixed in one variant and not in another is one row with two answers, and asked for any single state it matched none of them. "Mixed" is also the population worth looking at: a bump that has landed in one build and not the others is a pending upgrade somebody is halfway through |
+| Filtering by outcome asks what stands, not what was proposed | "What have we dismissed" is a question about this deployment's answer, and a decision still waiting for a second person is not an answer. Counting a proposal would let one person put their own unreviewed decision into the number the question was asked about |
+| "Assigned to me" means mine or a team I am on | Here as everywhere the phrase appears. A group whose occurrences are held by different parties is neither mine nor anybody's |
 | The by-component view asks the same question as the by-issue view | It was building its own query out of a hand-copied subset of nine filters, so switching views quietly widened the list back out by everything the subset left out — a deadline, an assignee, an outcome — while the chips above went on saying they were on |
 | A filter over a group is asked at the list's grain, one issue at one fold, in the by-component view and the fix bundles alike | Asked of a whole component, "exploited" holds for every issue of a component with one exploited issue and "has a fix" fails a component with one issue lacking one, so the counts differ from the list's. The list's groups are chosen first and joined in, and only the conditions on a row are asked of the component's rows. A filter with no condition over a group reads the covering index |
 
@@ -571,7 +571,7 @@ back in its own order rather than refusing.
 | **What came in overnight is a control, not a typed date** | The first question of a working day was a date box behind the filter panel. A chip writes the date a day back into the address — the date rather than the word, so a list somebody sends means the same thing when it is opened |
 | **An empty list says what emptied it and offers the way back** | A narrowed list matching nothing is a dead end: the controls that produced it are scrolled off above, and what is left on screen says so and offers nothing. It names how many filters are in force and carries a control that takes all of them off — and says "nothing is open here at all" where none was in force, which is a different answer |
 | **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the "Sorted by" control over the rows |
-| **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a claim requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
+| **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a decision requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
 | A screen that is waiting says so with a mark that moves | The word alone is one faint line on a page that is otherwise still, and a still page reads as a stopped one. The mark carries no text, so a screen reader hears the word once; the page-wide reduced-motion rule stops it, and a still ring beside the word is still a mark |
 | **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. Unmounting the whole screen — the search box, the chips, the count and the controls with it — blanks the thing being narrowed and takes the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
 | **The views are tabs above the filters, each carrying what it would show** | A view changes what a row is rather than which rows show, so it sits apart from the filters. Across every product there is one view, and no tabs.  The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-component and by-upgrade figures are asked with a limit of zero, which answers the total alone |
@@ -581,10 +581,10 @@ back in its own order rather than refusing.
 | The tie-break is always the same pair of identifiers | Two rows equal on the sorted column do not swap between pages and drop one while repeating another |
 | A page size of fifty, a hundred or two hundred, kept in the address | Fifty is 153 pages of one product's findings |
 | A row is selected by what it is, not by where it sits | The list is read again after every decision and on every page, so an index would select a different row each time. That also makes a selection survive paging, which is what "a filtered set" means when the filter matches more than a page |
-| **The row is carried with its key** | Acting on a selection then acts on what was selected rather than on the part of it the current page happens to hold. Holding keys alone, the queue counted every ticked claim in its button and approved only the ones on screen, dropping the rest with no message |
+| **The row is carried with its key** | Acting on a selection then acts on what was selected rather than on the part of it the current page happens to hold. Holding keys alone, the queue counted every ticked decision in its button and approved only the ones on screen, dropping the rest with no message |
 | **Changing the question clears the selection** | A selection is made out of a population, so replacing the population replaces what was selected. Kept across a filter change, the bar went on counting rows chosen under one question while none of them was listed — and acting wrote against all of them. Every change goes through the one function that holds the rule, including removing a single chip: today every chip only ever widens, so the rule held by a property of the chips rather than by construction |
-| **A figure about a selection counts what the selection holds** | The bulk-claim screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the ceiling is read against. The line under the list names whichever of the two limits the selection is past: issues, or findings written |
-| **The bulk-claim form asks before skipping what is decided** | A box, unticked, reading "Skip places already decided". Ticked, the result lists each place left out with a link to the decision standing there (`DESIGN-triage.md` § Decided places). Unticked, a decided place refuses the claim and the refusal names the decision |
+| **A figure about a selection counts what the selection holds** | The bulk decision screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the ceiling is read against. The line under the list names whichever of the two limits the selection is past: issues, or findings written |
+| **The bulk decision form asks before skipping what is decided** | A box, unticked, reading "Skip occurrences already decided". Ticked, the result lists each occurrence left out with a link to the decision standing there (`DESIGN-triage.md` § Decided occurrences). Unticked, a decided occurrence refuses the bulk decision and the refusal names the decision standing there |
 | **Approving a selection leaves ticked what was refused and what was ticked meanwhile** | The approvals run one at a time, and the selection can change while they do. What was acted on and agreed to goes; what was refused stays unless it was unticked while the loop ran; what was ticked while it ran stays |
 | **A list switched or narrowed starts at its own beginning** | A page into one list is past the end of a shorter one. Where an address still lands past the end, the pager is drawn rather than a statement that the list is empty |
 | **Select-all and deselect-all are inverses** | Ticking the header box took this page and unticking it took every page, so the two did different amounts of work in opposite directions |
@@ -595,7 +595,7 @@ back in its own order rather than refusing.
 | A component's name opens the component (reversed) | It narrowed the list, and the component itself sat behind a small "Open →" in the last column next to "Hide" — an act parked away from the thing it acts on, which is the shape the By fix view was deleted for. The name is the way to the thing; narrowing and hiding are the two small acts beside it, and they sit together. The same name on the finding screen opens the same screen, so one word means one thing everywhere it appears |
 
 Selection across rows is a prerequisite, not a convenience. Both bulk workflows
-— accepting a publisher's judgment, and declaring a bump — start by picking a
+— accepting a publisher's statement, and declaring a bump — start by picking a
 filtered set out of the list.
 
 ## Saved filters
@@ -609,10 +609,10 @@ something half-formed.
 | A saved filter keeps what the list is narrowed by, never where | One list per person, offered on every findings list, including the one across every product. The product, the branch, the variant, and anything naming one build or one run are the scope picker's, so they are left out of what is kept. Picking one applies it within the scope on screen: across every product from home, within one product where one is picked. A PSIRT working several products keeps a filter once |
 | The server and the interface leave out the same scope words | The server drops them when it stores a filter and the interface drops them when it compares an address with a kept query, byte for byte. One file in the repository's test data lists them, and a test on each side compares its own list with it, so a word dropped on one side only fails on the side that was not changed |
 | The scope left out is these words of the list's address | The branch and the variant; a subtree of one build and its version, ecosystem and namespace; what differs between the builds of a selection; what is spread over the variants of one branch; and the run that opened it. The grouping is left out with them, because the list across every product groups by issue alone. The server leaves them out of what it keeps, and the list leaves them out when it compares its address with what is kept |
-| The open filter is named in the address | Picking one writes its name as `rule`, the same word a finding reads the filter's name from, and the open marker, Forget and the prepared claim follow that name. Two filters can keep one query, and only the name tells them apart |
+| The open filter is named in the address | Picking one writes its name as `rule`, the same word a finding reads the filter's name from, and the open marker, Forget and the prepared decision follow that name. Two filters can keep one query, and only the name tells them apart |
 | Changing a filter on screen drops the name | The list is then no longer that saved filter. Paging, the page size, the branch and the variant leave it, because none of those is a filter |
 | An address without a name is matched by its query | An address typed, bookmarked or kept from before names no filter. The first kept one, by name, whose query is the address's reads as open |
-| A filter that keeps nothing is never open by its query | A filter saved or upgraded with nothing but scope keeps an empty query. Matched by query it reads as open on no list, so the claim it prepares fills no form until it is picked by name |
+| A filter that keeps nothing is never open by its query | A filter saved or upgraded with nothing but scope keeps an empty query. Matched by query it reads as open on no list, so the decision it prepares fills no form until it is picked by name |
 | Saving leaves the scope out and says so | Saved on one build, or with any of those words but the grouping in the address, the confirmation reads "Saved. Applies to whatever branch and variant you're viewing." Otherwise it reads "Saved." |
 | A name is one per person | Matched without regard to capitals, across every product |
 | What is kept is the list's own query string, not a column per filter | The filters belong to the list and they move; a table mirroring them would need a migration every time one was added while still being a second place where what a filter means is decided. A saved filter naming something the list no longer offers stops narrowing by it, which is a way back to a slightly wider list rather than a refusal to open one |
@@ -623,11 +623,11 @@ something half-formed.
 | Opening one replaces the filters on screen and keeps the scope | The saved filters win outright rather than merging. The scope and the grouping on screen stay. The page it happened to be on is dropped — a saved filter is a narrowing rather than a position in one |
 | The list is bounded by the per-person limit and says how many are kept in all | A limit lowered after filters were saved leaves somebody keeping more than it shows, and saving is refused until they are under it. The picker says how many it left out rather than reading as the whole of what they keep |
 
-A saved filter can prepare a claim, and proposes nothing (REQ-27). Where it
+A saved filter can prepare a decision, and proposes nothing (REQ-27). Where it
 carries an outcome and the words, picking it fills the decision form and says so
 above the list. Submitting is a person's act, and the record carries their name.
 It applies in every product, because the filter is one per person: a person
-still reviews and submits, a claim that hides risk still waits for a second
+still reviews and submits, a decision that hides risk still waits for a second
 person's approval, and the form names the filter that prepared it.
 
 What a filter prepares carries its own length rather than a date. A rule saved
@@ -636,11 +636,11 @@ it prepares is kept as a number of days and turned into a date when somebody
 opens the form. Kept as a date and never read, the prefill opened the form with
 the outcome chosen and no date, which cannot be submitted.
 
-The filter the address names is what prepares a claim, read off the address
+The filter the address names is what prepares a decision, read off the address
 rather than remembered from the act of picking. Narrowing further asks a
 different question and drops the name; coming back to the list finds it again. A rule
 that outlived the narrowing it was picked for would fill a form on a finding it
-never drew, with somebody's name about to go on the claim.
+never drew, with somebody's name about to go on the decision.
 
 What it prepares travels with every row, and with the walk from one finding to
 the next, because a list worked under a rule is worked under it to the end. The
@@ -650,7 +650,7 @@ somebody saved over. Emptying the form on one finding drops it there and nowhere
 else.
 
 A filter is personal, so a link somebody sends carries a name rather than a
-claim: it prepares whatever the person opening it has kept under that name, and
+decision: it prepares whatever the person opening it has kept under that name, and
 nothing at all where they have kept none.
 
 | Refusal | |
@@ -692,8 +692,8 @@ coordinator's. Keyed on the fold, so packages built from one source are one row.
 |---|---|
 | **No action column** | That is what the By fix view was deleted for. The package name opens the component, where the upgrade is planned; a source package that builds three binaries is one upgrade and three links |
 | Versions are listed, not ordered | This view does not rank them: an ordering exists per ecosystem rather than in general, and a list ordered for some packages and not others reads as one ordering somebody can trust. So one package appears once per version upstream released, and there is no nearest and no latest |
-| The filters it cannot apply are named on the screen | It takes six of the list's thirty-odd; the rest ask about a place, a deadline or an assignee, and an upgrade has none of those. Dropping them quietly widens the list back out while the chips go on saying they are on |
-| Nothing here counts places | An upgrade is a fold. What it says is the packages it moves, the issues it would close, and the builds that hold it |
+| The filters it cannot apply are named on the screen | It takes six of the list's thirty-odd; the rest ask about an occurrence, a deadline or an assignee, and an upgrade has none of those. Dropping them quietly widens the list back out while the chips go on saying they are on |
+| Nothing here counts occurrences | An upgrade is a fold. What it says is the packages it moves, the issues it would close, and the builds that hold it |
 | **The word on screen is "upgrade"** | It read "bump", which is not the word the decisions use. A vocabulary a screen and a document share reads as two things when it is spelled two ways, which is the rule the product name is already held to |
 
 ## The component screen
@@ -718,8 +718,8 @@ and the act hangs off it.
 | A count is the link to what it counts | The picked binary's "N open" opens the list for that binary, and each build's count opens that build's list |
 | Releases are picked inside the promise, ticked to the ones shipping this version | One bump moves every release at that version. Picked in a column of the table instead, the form appeared only once something was ticked, so the control was invisible until somebody guessed at it |
 | The version to move to is offered and never required | The list is what the scanner named; the server is what refuses one it has not heard of. So a version newer than anything reported can still be named, which is the case where an upgrade is ahead of the advisories |
-| Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a judgment. A form that cannot be filled in is one somebody fills in anyway |
-| The way to make that judgment is on this page | One judgment about many issues at one component is its own screen, and nothing in the application linked to it — it could be reached by typing the address. This page is where the question is asked: beside the count of what no version fixes, and as the action where nothing fixes anything at all |
+| Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a decision. A form that cannot be filled in is one somebody fills in anyway |
+| The way to make that decision is on this page | One decision about many issues at one component is its own screen, and nothing in the application linked to it — it could be reached by typing the address. This page is where the question is asked: beside the count of what no version fixes, and as the action where nothing fixes anything at all |
 | One page per source package | curl, libcurl4t64 and libcurl3t64 are one upgrade, and an upgrade is what the page is for. A binary whose inventory names no source package is its own source, and its page is the same shape with one binary |
 | A binary name and a source name open the same page | The address takes either, compared without regard to capitals. A link from the tree names the binary somebody was reading; a person asking about a kernel names the source |
 | The binaries are listed, and one is picked | The graph and the twelve weeks answer for the picked binary: what pulls a library in is not what pulls its command in. The one the address named is picked, then the one carrying most |
@@ -733,7 +733,7 @@ and the act hangs off it.
 | Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
 | Where it could go carries two counts | What a release fixed is how many of what is open name that exact version; what reaching it closes is that plus everything fixed before it. Sorted on the first, the version worth taking sinks: measured on the demo's kernel, the release that closes all 158 fixed 2 of its own and the one that fixed 49 leads |
 | Furthest along first where the versions can be ordered, unranked where they cannot | An ordering exists per ecosystem rather than in general, and one version a comparison refuses makes the whole list unrankable. Shown unranked the two counts are equal and the screen says so, rather than implying an order nothing established |
-| The second count is consumers, not places | One judgment covers the whole fold, and what varies underneath it is what pulls the package in. A place count is a unit nobody acts in; it is the row's title, being what the ceiling on one action is measured against |
+| The second count is consumers, not occurrences | One decision covers the whole fold, and what varies underneath it is what pulls the package in. An occurrence count is a unit nobody acts in; it is the row's title, being what the ceiling on one action is measured against |
 | It carries where the component sits in the graph | What pulls it in, what it pulls in, and twelve weeks of what opened and closed under it. Somebody arriving from the tree asked a question about the graph, and answering it on a page they have to leave to reach is the same page drawn twice |
 | Where to read about the package is built from its identifier | An identifier already names the ecosystem and the name within it, and each ecosystem has one address where a package is read about. Nothing is fetched and nothing is stored — the same way the issue records are worked out. An ecosystem with no address offers none rather than a guess, and a name is encoded into the path because it came out of a scan file |
 | The graph is answered for one build, picked from the rows above | An edge is a fact about one build: the same library is pulled in by different things in different builds. A link naming a build arrives on it, so the tree opens the component on the graph somebody was already looking at |
@@ -745,21 +745,21 @@ releases it is for, the version, the date, the reason, and who carries it.
 
 ### Component screen reads
 
-A kernel is most of a build: 322,616 open places across the bench image's two
+A kernel is most of a build: 322,616 open occurrences across the bench image's two
 builds. Every read behind the page's rows is shaped by that size.
 
 | Rule | |
 |---|---|
-| The source package's component rows are read first and named to every statement over the findings as values | Restricted through a join on the fold key, the places are estimated as an average component's: PostgreSQL estimates the kernel's 322,616 at 106, sorts them on disk, and probes for a decision once per place |
-| The counts, their rating bands, each binary's count, where it could go and what has been promised are one pass over the places | Each read the kernel's 322,616 places from the table on its own: the counts and bands 164 ms, each binary's count 47, where it could go 123 and what has been promised 152 as four statements, 243 ms as one |
-| The places are grouped three times: by issue and fix on each component, by issue in each source package, then by fix, rating band and source package | The fold key, the rating and the fix are worked out over 17,866 rows rather than 322,616, and 174 rows come back. Returned one row per issue and fix on each component instead, it is 13,938 rows to send and count in the application |
+| The source package's component rows are read first and named to every statement over the findings as values | Restricted through a join on the fold key, the occurrences are estimated as an average component's: PostgreSQL estimates the kernel's 322,616 at 106, sorts them on disk, and probes for a decision's row once per occurrence |
+| The counts, their rating bands, each binary's count, where it could go and what has been promised are one pass over the occurrences | Each read the kernel's 322,616 occurrences from the table on its own: the counts and bands 164 ms, each binary's count 47, where it could go 123 and what has been promised 152 as four statements, 243 ms as one |
+| The occurrences are grouped three times: by issue and fix on each component, by issue in each source package, then by fix, rating band and source package | The fold key, the rating and the fix are worked out over 17,866 rows rather than 322,616, and 174 rows come back. Returned one row per issue and fix on each component instead, it is 13,938 rows to send and count in the application |
 | The source package an issue belongs to is the component's position in the list already read | Joined to the component table for the fold key instead, the second grouping sorts 17,866 rows of 64-character keys: 204 ms against 175 ms |
 | An issue is counted under the one fix it names across the source package | What a release fixes and what reaching it closes are counts of issues, and an issue rated one way and fixed by one string lands in one row. An issue whose binaries name different fixes comes back on a row of its own, by identifier, and its fixes are read after, by issue |
-| Each binary's count is a column of the pass: whether each issue is on that binary, counted | There is one column per binary of the source package. Read in a statement of its own, it read the places again: 47 ms on PostgreSQL, and 219 ms on SQLite for the measurement fixture's kernel. Past 512 binaries it is read on its own, because PostgreSQL refuses a statement of more than 1,664 columns and MariaDB and SQLite fail not far above |
-| What has been promised is joined to each place as one number: the promise's rank above its claim's identifier | A promise naming a version ranks over one naming none, then one with a date over one without, then the later date; alike in all three, the later claim stands. The greatest number over a source package names that claim. The promises are one row per issue and place before the join, so a place two promises reach is one place |
+| Each binary's count is a column of the pass: whether each issue is on that binary, counted | There is one column per binary of the source package. Read in a statement of its own, it read the occurrences again: 47 ms on PostgreSQL, and 219 ms on SQLite for the measurement fixture's kernel. Past 512 binaries it is read on its own, because PostgreSQL refuses a statement of more than 1,664 columns and MariaDB and SQLite fail not far above |
+| What has been promised is joined to each occurrence as one number: the promise's rank above its decision's identifier | A promise naming a version ranks over one naming none, then one with a date over one without, then the later date; alike in all three, the later decision stands. The greatest number over a source package names that decision. The promises are one row per issue and occurrence before the join, so an occurrence two promises reach is one occurrence |
 | What has been promised is correlated by the product the scope names, bound once | Every build on the page is in that product |
-| A component's own open count in the tree groups to one row per issue before counting | Counted distinct, the places are sorted: over the bench kernel's build, 325,389 places, 103 ms counted distinct and 42 ms grouped first |
-| One step through the graph counts what is open on the neighbors it reaches, and what they pull in, named as values | The neighbors are read first. Counted for every component in the build and joined, the step above the bench kernel groups 325,389 places for 45 parents carrying none: 32 ms, against 3 ms for the two statements |
+| A component's own open count in the tree groups to one row per issue before counting | Counted distinct, the occurrences are sorted: over the bench kernel's build, 325,389 occurrences, 103 ms counted distinct and 42 ms grouped first |
+| One step through the graph counts what is open on the neighbors it reaches, and what they pull in, named as values | The neighbors are read first. Counted for every component in the build and joined, the step above the bench kernel groups 325,389 occurrences for 45 parents carrying none: 32 ms, against 3 ms for the two statements |
 | What is beneath each neighbor is the union, per neighbor, of the issues on the components it reaches, taken in the application | Each of the kernel's 45 parents reaches the kernel, so joined in the database the kernel's issues arrive once per parent: 302,269 rows sorted for 270 answers, 345 ms. The walk and the issues on what it reaches are 5,331 and 10,769 rows |
 | The issues on what the walk reaches are read for the components it reached, named as values | Walked a second time to restrict the findings, SQLite read every node in the database to match the walk's: 343 ms for the issues beneath the measurement kernel's 34 consumers, against 208 ms named as values. On the statistics a large scan leaves behind, the read took 4.2 s on PostgreSQL and 14.2 s on MariaDB, against 0.28 s and 0.14 s. The bench image's neighbors of its own root take 0.53 s against 0.77 s |
 | A neighbor reaching one component that carries anything takes that component's counts | No union is needed. 44 of the kernel's 45 parents reach the kernel and nothing else carrying an issue, and taking the union for each of them was 29 ms of the 182 ms the read took |
@@ -773,7 +773,7 @@ builds. Every read behind the page's rows is shaped by that size.
 | The whole screen: the component read, then where it sits and the twelve weeks side by side | 0.55 s | 1.9 s |
 | The same build's findings list, for comparison | 0.14 s | 0.37 s |
 
-On the measurement fixture's kernel of 204,000 places, with statistics settled,
+On the measurement fixture's kernel of 204,000 occurrences, with statistics settled,
 the component read takes 92 ms on PostgreSQL, 353 ms on SQLite, 479 ms on MySQL
 and 544 ms on MariaDB, against 110 ms to 144 ms for that build's findings list.
 The fixture's kernel names no fix. With a fix named on six issues in seven, the
@@ -789,7 +789,7 @@ The finding is the working screen after a decision as well as before it.
 |---|---|
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
 | **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, the actions that fit the state, and the comments on it at the foot of its card |
-| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+| **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the decision's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
 
 The dependency path shows the first six ways down, with a row beneath it.
 
@@ -797,27 +797,27 @@ The dependency path shows the first six ways down, with a row beneath it.
 |---|---|
 | The rest unfold from a secondary button that names what it adds | "Show 24 more", then "Show fewer". A total says how many there are, and what somebody deciding whether to click wants is how many they have not seen |
 | The link into the tree sits apart from it, at the row's far end | Two inline controls side by side read as one run of text. The row wraps at a phone's width rather than squeezing them together |
-| A place a supplier's statement answers on some routes says so at the end of its way down, naming the supplier's product, with the supplier on hover | The place is open and is not work, and a reader asks why. The routes outside the product are what is left to judge |
+| An occurrence a supplier's statement answers on some routes says so at the end of its way down, naming the supplier's product, with the supplier on hover | The occurrence is open and is not work, and a reader asks why. The routes outside the product are what is left to judge |
 
-The notes thread and the claim's comments are two threads (REQ-29). The
-comments sit on the decision's card they are about, and the notes in a card of
+The notes thread and the decision's comments are two threads (REQ-29). The
+comments sit on the card of the decision they are about, and the notes in a card of
 their own. Two editors in two cards, one above the other, read as one form.
 
 | | Shown | Says |
 |---|---|---|
 | Notes | Always | What it is about, in words: this issue in this product, every build of it, and no other product. Read beside a row that may be one of several the same issue sits on, so "not this component" is the part a reader has to be told |
-| Comments | Only where a claim exists, one thread on each decision's card | What was said about the argument somebody made, at this place |
+| Comments | Only where a decision exists, one thread on each decision's card | What was said about the argument somebody made, at this occurrence |
 
 The notes thread is the one somebody can write in before anybody has decided
-anything, which is why it is not gated on a claim. Nothing about writing one
+anything, which is why it is not gated on a decision. Nothing about writing one
 changes what ranks, a deadline, or what the product triages, and it says so
 beside the button.
 
 The identifier in the heading opens the issue screen. That screen answers
 "everywhere this issue sits", and without this the doors into it are an
 exact-match search, one report and one queue link — none of them reachable by
-the reader most likely to want it, who is already looking at one place the
-issue sits.
+the reader most likely to want it, who is already looking at one occurrence of the
+issue.
 
 The issue screen carries the same thread, a product at a time. That screen
 shows an issue wherever it sits, and a note belongs to one product — so one
@@ -859,8 +859,8 @@ not hold says so. A link not yet looked up carries nothing, because "not yet"
 is not a fact about the patch.
 
 What the build says is a card of its own, above what publishers say and shown
-whatever has been decided, because a mark the build put on a place stays on it.
-One entry per claim the build still makes covering a place shown: whose it is — the build, or the
+whatever has been decided, because a mark the build put on an occurrence stays on it.
+One entry per claim the build still makes covering an occurrence shown: whose it is — the build, or the
 publisher whose document named the build as its product — the status, the
 component and version it names, the product it names the component as shipping
 inside, the justification, and the build's words. Where the build says the flaw
@@ -884,12 +884,12 @@ version it named.
 Below the form they answer the objection that eleven links beside the action
 recreate the defect the side-by-side layout fixes. That holds for the whole
 block of them and not for the advisory somebody is about to judge from, which
-is consulted during the judgment rather than after it.
+is consulted during the decision rather than after it.
 
 What is neither evidence nor action — the timeline, the revisions, the
 comments, the holder, the assessment — stays below.
 
-Where a fix will land is not on this screen. It is settled by the judgment that
+Where a fix will land is not on this screen. It is settled by the decision that
 promises the work, and the releases it is for are named there. A pane of its
 own offers the same set with no version, no date and no reasoning attached,
 which is a plan nothing can chase. What became of it is read from the release
@@ -898,13 +898,13 @@ and from the build's list of what it is waiting on.
 A decision is made on the finding's own screen, and nowhere else (REQ-57,
 reversed). A decision form inside a row answers a run of similar findings
 without leaving the list, and carries none of what the finding puts beside a
-judgment — the references, the way down, what a VEX document said, the history,
+decision — the references, the way down, what a VEX document said, the history,
 the comments. The saving is navigation and the cost is the evidence.
 
 | Rule | |
 |---|---|
 | It says when it runs out and who has it | The list carries the deadline, the age and the owner, and the screen somebody decides on is the wrong place for none of them |
-| It says how many of its places have been decided (REQ-57) | A finding half answered has to look different from one nobody has touched. The count of what the build argued away through its own VEX documents cannot stand in for this: reading it as ours would credit somebody else's reasoning to us |
+| It says how many of its occurrences have been decided (REQ-57) | A finding half answered has to look different from one nobody has touched. The count of what the build argued away through its own VEX documents cannot stand in for this: reading it as ours would credit somebody else's reasoning to us |
 | It states how the match was made, and says where it came from | The list marks these, and the screen somebody decides on is where they matter more. Both answers are stated rather than only the weaker one, and nothing is said where the scanner said nothing — unknown is not unconfirmed |
 | Where to read about it is worked out from the identifiers, not only relayed (REQ-18) | The issue's own record, the record under each other name, the answer from the distribution that packages the component, and the package's own page. Derived at read time, kept apart from what the scanner supplied, and empty rather than approximate where a name resolves to no scheme this knows. The server derives them, so a machine client gets the same list; nothing is fetched |
 | Where it sits shows the chain, not the immediate parent | The same parent can be reached by several routes, and a screen naming only the nearest cannot tell them apart |
@@ -923,15 +923,15 @@ The three are distinct answers. Drawn alike, "nothing recorded what pulls this
 in" stands over records that name the consumer, and the third draws an empty
 name read off the end of a chain that is not there.
 
-One row per place, however many rows a finding holds there. `DESIGN-findings.md`
+One row per occurrence, however many rows a finding holds there. `DESIGN-findings.md`
 owns that rule.
 
 | Rule | |
 |---|---|
 | The refusal that offers the choices is not asked again | Asking again cannot change which components a build holds, and a retry holds the choices back behind another round trip |
 | A link that names a component ambiguously offers the choices rather than refusing | A name and a version together are not unique — a source repository and the package built from it can share both, and so can one package described under two namespaces. Each choice shows its ecosystem and namespace. Two lists are possible and are not interchangeable: the components this issue is open at, and every component of that name. Each says what is true of it |
-| A claim's scope names its locations rather than only counting them | "One location" says how large a judgment was and not which code it was about. Three at most, then how many more, because a kernel sits at sixty and the list would become the card |
-| An approved claim at the same component and consumer is offered to a new issue (REQ-28) | With its reasoning and "apply decision #N", which fills the form and records the new claim as an extension. It still needs a second person |
+| A decision's scope names its locations rather than only counting them | "One location" says how large a decision was and not which code it was about. Three at most, then how many more, because a kernel sits at sixty and the list would become the card |
+| An approved decision at the same component and consumer is offered to a new issue (REQ-28) | With its reasoning and "apply decision #N", which fills the form and records the new decision as an extension. It still needs a second person |
 | A comment can be rewritten by whoever wrote it, in place | The control is offered only to the author so nobody is invited into a refusal the server would give them anyway. The box opens on the text as stored rather than as a draft: a copy of something already stored would come back later as an unsent draft of somebody's own comment |
 | What belongs to one finding goes when the screen walks to the next | The screen is not remounted when only its address changes, so the confirmation of what was recorded, the decision being extended, the rating form and the exploited-here forms are put back on arriving at another finding |
 | The rating form opens on a rating it offers | The four bands. A published "negligible" or "none" opens it on medium, and nothing it offers is milder than either |
@@ -956,13 +956,13 @@ collects the answer it suggested.
 | Rule | |
 |---|---|
 | The deferral threshold is a number on the form, not a sentence about a threshold | Which side of it a date falls on decides whether a second person has to agree, and reading that off the response is reading it after the choice was made |
-| A deferral is forecast against what its places were put off for already | The server adds a deferral to everything the place was put off for before, so the finding carries each place's total and the form adds the largest of those it covers. Both halves are measured to the moment, in days and parts of a day, because the server compares durations: a date thirty days out, picked after midnight, is short of a thirty-day threshold. A total reaching the threshold exactly waits for a second person, as it does on the server |
+| A deferral is forecast against what its occurrences were put off for already | The server adds a deferral to everything the occurrence was put off for before, so the finding carries each occurrence's total and the form adds the largest of those it covers. Both halves are measured to the moment, in days and parts of a day, because the server compares durations: a date thirty days out, picked after midnight, is short of a thirty-day threshold. A total reaching the threshold exactly waits for a second person, as it does on the server |
 | A promise to act by a date is forecast against the earliest deadline it covers | By that deadline it stands on its own, and later it waits for a second person. It is not called a dismissal |
 | Ctrl+Enter asks what the button asks | Nothing is sent while a submission is in flight or the review sheet is open, so a second press does not post the decision twice |
 | It names the next missing answer, beside the button | A disabled button says something is missing and never what, and Ctrl+Enter does nothing until the same answer is given. One rule decides both the sentence and the refusal |
 | Ctrl+Enter submits, and the form says so | A shortcut nobody knows about is a shortcut nobody has, and the person it is for is making a hundred of these a day |
 | Ctrl+Enter submits only from inside the form | A comment thread can sit on the same screen, and the keys pressed in its box are that box's |
-| The last pair is offered, never applied | Retyping the outcome and the justification is the cost the review measured, but a judgment prefilled with the last one made is a record that can say what nobody meant. So it is a button that says what it will fill in, and the fill is somebody's own click. Per session, because a default that survives a night is a default nobody chose |
+| The last pair is offered, never applied | Retyping the outcome and the justification is the cost the review measured, but a decision prefilled with the last one made is a record that can say what nobody meant. So it is a button that says what it will fill in, and the fill is somebody's own click. Per session, because a default that survives a night is a default nobody chose |
 | A justification is shown with a label and a one-line meaning, never as its bare token (REQ-60) | An accuracy defect rather than a cosmetic one: the token somebody picks out of a list of five snake_case strings at the end of a long day is what ships to a customer, machine-readable, as our claim about their exposure. The stored token stays reachable, on the title, because it is what an approver is checking |
 | One list, and one way of rendering it | The vocabulary carries its own labels, the two forms that offer a choice read from it, and the six places that display a stored one go through a single renderer. Two screens had already started to diverge. A test asserts that every value the type allows is in the list and carries a label that is not its own token |
 | Whom the statement holds for is offered, unchosen | Unchosen, the reason decides, which is the ordinary case; the two choices are anyone shipping this version and this build only. The select's title says which reasons decide which. Not offered on a deferral, which the server refuses. Kept with the draft like the other choices |
@@ -977,7 +977,7 @@ What it reads back is "59 of 62, three left open under X".
 
 The filter narrows what the group checkbox acts on, not only what is drawn.
 Given the whole group while one row was shown, unticking a consumer excluded
-all forty under it — and this control is what decides what a claim covers. The
+all forty under it — and this control is what decides what a decision covers. The
 count beside the name is read off the same rows, so the number says what the
 click will do, and a consumer with nothing matching is not drawn at all.
 
@@ -989,18 +989,18 @@ versions, and any not offered.
 
 The builds at other versions are one list rather than one sheet each, ticked
 where the reasoning holds at that version too and unticked to start, because a
-tick is the claim. Two steps — where it applies, then confirm — with Enter to
+tick is the decision. Two steps — where it applies, then confirm — with Enter to
 advance, Escape to leave and the arrows to move. The last lists what will be
 written, and only then is anything sent.
 
 | Rule | |
 |---|---|
-| **A build is one entry, however many places reach it** | A judgment is about a group of places, and a build the claim already reaches is one thing to be told about. Answered per place, a kernel flaw at sixty places listed the same other build sixty times, once per consumer that pulls the package in — so what the sheet led with was a count of this build's own graph rather than of builds the judgment travels to. A build at *another* version is one entry per version, because each version is a separate judgment |
-| The decision here is recorded first, then each build applied, one at a time | With the places narrowed where any were excluded. A refusal on one is reported for that one and does not decide the rest |
-| The reach is answered whole rather than sampled | Where a judgment lands beyond this build is a question per place, and asking per place is a request each — so it asked about the first eight. That was a cost control that had become a rule about what a decision covers: what is offered is what gets written, so a build reachable only from the ninth place was never offered and nothing said so |
+| **A build is one entry, however many occurrences reach it** | A decision is about a group of occurrences, and a build the decision already reaches is one thing to be told about. Answered per occurrence, a kernel flaw at sixty occurrences listed the same other build sixty times, once per consumer that pulls the package in — so what the sheet led with was a count of this build's own graph rather than of builds the decision travels to. A build at *another* version is one entry per version, because each version is a separate decision |
+| The decision here is recorded first, then each build applied, one at a time | With the occurrences narrowed where any were excluded. A refusal on one is reported for that one and does not decide the rest |
+| The reach is answered whole rather than sampled | Where a decision lands beyond this build is a question per occurrence, and asking per occurrence is a request each — so it asked about the first eight. That was a cost control that had become a rule about what a decision covers: what is offered is what gets written, so a build reachable only from the ninth occurrence was never offered and nothing said so |
 | The review step is skipped where there is nothing to review | It ran even when the reach it exists to confirm is zero, and at around 150 decisions a day that is some 300 keystrokes spent confirming nothing |
 | What counts as nothing is one thing: no build holds this issue at another version | Builds already matching are named on the sheet rather than asked about, so their absence from a skipped sheet costs nothing — the confirmation that follows names them |
-| This build is counted in consumers, and what is written in places | Consumers are what the scope control beside the form narrows by, so the sheet states what it covers in them; how many records are written is a count of places. A build at another version is counted in places, because its consumers are not read |
+| This build is counted in consumers, and what is written in occurrences | Consumers are what the scope control beside the form narrows by, so the sheet states what it covers in them; how many records are written is a count of occurrences. A build at another version is counted in occurrences, because its consumers are not read |
 | An unread reach is not an empty one | A query still in flight, or one that failed, contributes no other versions, and treating that silence as "there are none" would submit past a question rather than skip one that was not there. The sheet is skipped only when every one of those reads succeeded |
 
 ## List navigation
@@ -1028,10 +1028,10 @@ after a scan, because they are derived from findings and findings move.
 Both numbers are distinct issues, per path. A node's own count is the distinct
 issues open against that component; the cumulative count is the distinct issues
 across it and everything under it, each component counted once however many ways
-it is reached. A finding is one issue at one place, and a library at thirty-six
-places with two issues is seventy-two rows — which is what a parent reads if it
+it is reached. A finding is one issue at one occurrence, and a library at thirty-six
+occurrences with two issues is seventy-two rows — which is what a parent reads if it
 counts findings, where somebody who drilled down one path is looking at one
-place and expects two. One recursive walk for the row's whole set of
+occurrence and expects two. One recursive walk for the row's whole set of
 children: 0.08 s for the root's thirty children on the full-size image, and
 0.19 s for the walk under 2,140 children of a real product of 12,147
 components. The walk answers which components each child reaches, a second
@@ -1072,7 +1072,7 @@ empty list is also what a clean subtree looks like.
 
 Searching the tree counts what the tree counts: distinct open issues the reader
 may read, per component, ordered by that count and then by name. A component at
-several places is one answer with one count.
+several occurrences is one answer with one count.
 
 | Rule | |
 |---|---|
@@ -1097,53 +1097,53 @@ engine, where a broad term was over half a minute on two.
 
 ## The review queue
 
-One card per claim (REQ-28): one proposer's action, however many decisions it
-wrote. The card carries the reasoning as it stands, how many records the claim
+One card per decision (REQ-28): one proposer's action, however many occurrences
+it covers. The card carries the reasoning as it stands, how many records the decision
 wrote, how many locations and builds it reaches, whether it was approved before
 and came back, and how long the finding has been put off.
 
 `DESIGN-triage.md` says what the queue holds and on what terms. The screen has
-a tab per list, and two about the reader's own claims:
+a tab per list, and two about the reader's own decisions:
 
 | Tab | Holds | A card offers |
 |---|---|---|
-| To approve | Claims waiting for a second person | Approve and Reject |
+| To approve | Decisions waiting for a second person | Approve and Reject |
 | Expired deferrals | Deferrals whose date has passed | Decide again |
 | Missed fix dates | Promised upgrades and patches whose date has passed | Change the version or the date, or decide again |
-| Mine, recent | What the reader proposed and what became of it | Reading, and the claim one link away |
-| To reaffirm | The reader's own lapsed claims | Reaffirm, one or many |
+| Mine, recent | What the reader proposed and what became of it | Reading, and the decision one link away |
+| To reaffirm | The reader's own lapsed decisions | Reaffirm, one or many |
 
 Every tab carries its count, read from its own list without the filters.
 
 | | |
 |---|---|
 | **A card names its reason** | The state mark on an expired deferral or a missed fix date says which, and the outcome is drawn as what was promised: "Upgrade to 3.0.15 by 2026-09-01", "Patch by 2026-09-01", "Deferred until 2026-09-01" |
-| A card says whom a stated scope holds for | Beside the outcome, where the claim states one: it is part of what the approver agrees to. Absent where the reason decides |
+| A card says whom a stated scope holds for | Beside the outcome, where the decision states one: it is part of what the approver agrees to. Absent where the reason decides |
 | **A card offers only the acts that answer its reason** | Approving is refused on anything but an approval, so the two dated lists carry no Approve, no selection and no batch |
-| **Deciding again opens the finding** | Where its decision form is. A claim over many issues opens the claim page instead |
+| **Deciding again opens the finding** | Where its decision form is. A decision over many issues opens the decision page instead |
 | **Changing a promise is done on the card** | The version for an upgrade, the date, and the reason, which is required. The confirmation stays on the card until put away, because the promise leaves the list once its date moves |
-| **The two dated lists narrow to the reader's own** | A Mine only box beside the filters, because both lists show everybody's claims |
-| **Approving and rejecting** | Work on the claim, and rejecting needs a reason. Selecting several and naming a batch approves them together, so they can be undone together |
-| **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M", both counted in issues. An extension says which claim it rests on |
-| **An outlier is one issue, set aside or held back at every place it sits** | One row stands for the issue, and ticking it takes every decision the claim holds about the issue, one per place. A part of the issue left in the claim is agreed to with it. The author holding rows back and the approver setting them aside take the same set |
-| **A To reaffirm tab lists the reader's own lapsed claims** | Work handed back, which the lapse message links to. One row per claim with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many places and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every claim shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like every other tab |
+| **The two dated lists narrow to the reader's own** | A Mine only box beside the filters, because both lists show everybody's decisions |
+| **Approving and rejecting** | Work on the decision, and rejecting needs a reason. Selecting several and naming a batch approves them together, so they can be undone together |
+| **A bulk decision draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M", both counted in issues. An extension says which decision it rests on |
+| **An outlier is one issue, set aside or held back at every occurrence** | One row stands for the issue, and ticking it takes every occurrence the decision holds for the issue. A part of the issue left in the decision is agreed to with it. The author holding rows back and the approver setting them aside take the same set |
+| **A To reaffirm tab lists the reader's own lapsed decisions** | Work handed back, which the lapse message links to. One row per decision with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many occurrences and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every decision shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like every other tab |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 | **Rulings on vulnerability reports waiting for approval sit underneath, with the rating and date-movement sections** | A ruling rejecting a report or declaring it out of scope waits for a second person, and this is where somebody goes to be one. Its own section, because a ruling is about claims somebody sent rather than about code. Listed across the products the reader may read reports in, and narrowed with the rest where the address names a product |
-| **What upstreams offer for review sits underneath, with the other sections** | One entry per statement and open finding it speaks about: the issue and component, which opens the finding, where the statement starts a claim; the build; what the upstream says; and the statement's mark, link and decline control. Across the products the reader reads, narrowed with the rest where the address names a product, and drawn only where something is offered (`DESIGN-upstream.md` § Offers for review) |
+| **What upstreams offer for review sits underneath, with the other sections** | One entry per statement and open finding it speaks about: the issue and component, which opens the finding, where the statement starts a decision; the build; what the upstream says; and the statement's mark, link and decline control. Across the products the reader reads, narrowed with the rest where the address names a product, and drawn only where something is offered (`DESIGN-upstream.md` § Offers for review) |
 | **A section named in the address is brought into view** | The ratings, the disclosure dates and the rulings each carry a name, and a link to one of them lands on it |
 
 The queue narrows to one product, which is what a figure on the home screen
 counts: the address carries the product it was counted for, and the line under
 the heading names it.
 
-A row of filters above the queue narrows it further: who proposed a claim, an
+A row of filters above the queue narrows it further: who proposed a decision, an
 age of seven, thirty or ninety days, a severity, an outcome and a release
 (`DESIGN-triage.md` § Queue filters). Each rides in the address, so a link
 somebody sends is the same list, and changing one clears the selection. The
 exports carry the same filters, so a file taken from a narrowed screen is the
 narrowed backlog, and carry the list and the Mine only box too. The filters sit
-on the three lists and not on the two tabs about the reader's own claims. Mine,
-recent exports every claim the reader proposed with what became of it, the list
+on the three lists and not on the two tabs about the reader's own decisions. Mine,
+recent exports every decision the reader proposed with what became of it, the list
 the tab draws; the queue's own file with Mine only set holds only what still
 waits. The To reaffirm tab has no file of its own, so it offers none.
 
@@ -1155,41 +1155,41 @@ approve a ruling — because those sit in the same queue. Rating downgrades and
 disclosure-date movements waiting on somebody are not in that count; they are
 their own sections of the queue.
 
-## The claim page
+## The decision page
 
-One claim, whole, and every act at that grain: revise, withdraw, comment,
+One decision, whole, and every act at that grain: revise, withdraw, comment,
 agree, send it back, hold rows back, and say where the work is happening.
-`DESIGN-triage.md` says what a claim is and what the read answers.
+`DESIGN-triage.md` says what a decision is and what the read answers.
 
 | Rule | |
 |---|---|
-| **Nothing on it acts on one decision** | A claim is one argument; an act on one of its rows is an act at a grain nobody decided in. The argument it shows names no row and carries no row state |
-| **The state is the claim's, in one word** | Waiting, sent back, approved, withdrawn, lapsed, agreement undone, or ended several ways. The same word the proposer's own list reads, so the two cannot disagree |
-| **Present reach is not counted in places** | What it covers is said in the units somebody acted in: one judgment at one fold, the packages that fold holds and the things that pull them in, and every build it reaches. The place count is a title on the coverage figure. A claim reaching nothing now reads "none" |
-| **What it covers is what it covers now** | A claim reaches by matching, so it grows as builds appear with nobody acting. What somebody agreed to covering is on the approval, in the revision history below |
-| **What stopped is labeled apart** | "Reach when withdrawn" and "Reach when it lapsed" sit beside the present reach, one each where the claim has such rows, as places and builds on the date they stopped. Places, because a row that stopped is keyed on its place and matches no version. A partly lapsed claim shows both the lapsed part and what is still in force |
-| **What stopped links to what sits there now** | Each part opens the findings list narrowed to those places and that state, across every release and planned or not, because the list's own defaults would hide a tag or an ended branch the claim covered. The narrowing is one chip that removes itself |
-| **A decision's address resolves here** | Notifications, the reports and the evidence list all name a decision by identifier, and the record names the claim itself. Each of those is somebody being sent to read what was decided, and what was decided belongs to the claim. The address is replaced rather than pushed, so going back does not land on it again |
-| **Reaffirming is not here** | It is a claim about one place in one build, and this screen is about an argument that may cover many. It happens on the finding, where the places are |
-| It says whom a published statement holds for | Beside the outcome, and marked as coming from the reason where the claim states none |
+| **Nothing on it acts on one occurrence** | A decision is one argument; an act on one of its rows is an act at a grain nobody decided in. The argument it shows names no row and carries no row state |
+| **The state is the decision's, in one word** | Waiting, sent back, approved, withdrawn, lapsed, agreement undone, or ended several ways. The same word the proposer's own list reads, so the two cannot disagree |
+| **Present reach is not counted in occurrences** | What it covers is said in the units somebody acted in: one decision at one fold, the packages that fold holds and the things that pull them in, and every build it reaches. The occurrence count is a title on the coverage figure. A decision reaching nothing now reads "none" |
+| **What it covers is what it covers now** | A decision reaches by matching, so it grows as builds appear with nobody acting. What somebody agreed to covering is on the approval, in the revision history below |
+| **What stopped is labeled apart** | "Reach when withdrawn" and "Reach when it lapsed" sit beside the present reach, one each where the decision has such rows, as occurrences and builds on the date they stopped. Occurrences, because a row that stopped is keyed on its occurrence and matches no version. A partly lapsed decision shows both the lapsed part and what is still in force |
+| **What stopped links to what sits there now** | Each part opens the findings list narrowed to those occurrences and that state, across every release and planned or not, because the list's own defaults would hide a tag or an ended branch the decision covered. The narrowing is one chip that removes itself |
+| **An occurrence's address resolves here** | Notifications, the reports and the evidence list all name a decision occurrence by identifier, and the record names the decision itself. Each of those is somebody being sent to read what was decided, and what was decided belongs to the decision. The address is replaced rather than pushed, so going back does not land on it again |
+| **Reaffirming is not here** | It is a decision about one occurrence in one build, and this screen is about an argument that may cover many. It happens on the finding, where the occurrences are |
+| It says whom a published statement holds for | Beside the outcome, and marked as coming from the reason where the decision states none |
 
 Which acts are offered follows the act-and-needs table in `DESIGN-triage.md`,
 rather than being restated here: offering a button that would refuse somebody
 is worse than offering nothing, and a second copy of the rule is a copy that
 disagrees. A copy saying revising and withdrawing are the author's, where the
 rule and the code both ask for triage on the product at the finding's
-visibility, leaves a triager reading a colleague's stale claim no way to revise
+visibility, leaves a triager reading a colleague's stale decision no way to revise
 it on this screen and every way to do it from the finding.
 
 The one thing drawn narrower than the rule is holding rows back, which is
-offered only on a bulk claim that still has outliers, because it is the
+offered only on a bulk decision that still has outliers, because it is the
 author's side of the choice an approver already has.
 
 A screen asks what it may do rather than working it out from roles. That is
 what the capability answer is for, and it is only usable as a gate while it
 means what the operation accepts: reported from the approver capability alone
 while the operation accepts a triager too, a two-person team where neither
-holds the capability — the ordinary shape of a small team — is shown a claim,
+holds the capability — the ordinary shape of a small team — is shown a decision,
 its reasoning and its history with no way to answer it.
 
 ## Assignments and routing rules
@@ -1240,7 +1240,7 @@ would be a reply about something that has not happened yet.
 The finding says which rule placed it, on the same card that says who is dealing
 with it, along with what somebody needs to know next: taking it is picking up
 work nobody holds, and the rule will not take it back. Both are read off the
-places the reader may read, the places the card shows: read off one they may
+occurrences the reader may read, the occurrences the card shows: read off one they may
 not, the holder names who is working undisclosed work.
 
 ## Catalog and uploads
@@ -1352,7 +1352,7 @@ something is going.
 
 | Rule | |
 |---|---|
-| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves. The claims waiting on a second person open the review queue narrowed to the product. On home, the findings with a lapsed decision open the findings list narrowed to lapsed, and the expired deferrals open that list of the review queue, each counted from the list it opens |
+| Every number opens the list that produced it | A figure somebody cannot follow is one they stop trusting, and then they count it themselves. The decisions waiting on a second person open the review queue narrowed to the product. On home, the findings with a lapsed decision open the findings list narrowed to lapsed, and the expired deferrals open that list of the review queue, each counted from the list it opens |
 | Counted as issues at components | The unit the findings list counts, so the page and the list it opens agree. Counting rows would report how much the dependency graph shares |
 | The product's totals are not the sum of its builds | A library carrying one issue in two builds is one thing to decide about and two build rows. The totals are counted again over the product — a sum put 15,231 at the top of a page whose own list said 7,629 |
 | "Undecided" and "agreed" are the findings list's own words | By the same definition and from the same expression. Two screens with two definitions of "decided" is how they come to disagree in front of somebody |
@@ -1457,9 +1457,9 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | A duplicate asks for the issue, and says a closed one is rejected instead | The server refuses a duplicate of an issue not open here; the hint says what to do before the refusal does |
 | A duplicate that starts a disclosure date says so under the issue: "This starts a disclosure date of *date* on *flaw*.", with "once somebody else agrees" where it brings a date in past the threshold | Asked of the server once typing pauses, so a partial identifier is not a lookup. Nothing is shown where the ruling would start none, which is also what an issue not found reads as |
 | Approve is not offered to the ruling's own proposer | The server tells them apart and says so on the ruling. Withdrawing is offered to whoever works reports, and reads "Withdraw" to the proposer, "Send back" to anybody else while it waits, and "Undo" once it is in force — one act under three names, each the word for that moment |
-| A report's page holds the claim, who holds it, the correspondence, the notes, the files, the judgment and the history | In that order. The heading carries the reference and the title. While nothing answers the report, the judgment offers recording it as a new flaw first, as a button, then accepting it as an issue a scan reported, then a ruling; the ruling itself once one does. A new flaw is what a real claim usually is |
+| A report's page holds the reported problem, who holds it, the correspondence, the notes, the files, the judgment and the history | In that order. The heading carries the reference and the title. While nothing answers the report, the judgment offers recording it as a new flaw first, as a button, then accepting it as an issue a scan reported, then a ruling; the ruling itself once one does. A new flaw is what a real claim usually is |
 | A report found here says so, and is never shown as unanswered | Its From column reads "found here". Nobody outside sent it, so it draws no correspondence card |
-| The claim card offers Edit while the report is open | The form holds the title, the claim and what is known of the reporter, and says the earlier version is kept. Not offered once judged or under a waiting ruling, where the server refuses |
+| The reported problem card offers Edit while the report is open | The form holds the title, the claim and what is known of the reporter, and says the earlier version is kept. Not offered once judged or under a waiting ruling, where the server refuses |
 | An edited claim shows the original beneath it | The version recorded, with who replaced it and when. The versions between are behind a toggle naming how many there are |
 | The holder card is the holder picker, offered to somebody who works reports while the report is open | The picker a finding's page draws, asked for readers of undisclosed work. A team's queue says so. Once judged it names the last holder and offers nothing |
 | The correspondence card says whether the reporter was answered, and lists every message | "Not answered." with the line that the first message sent is the acknowledgement, until one is recorded; "Acknowledged" with its day and who recorded it after. Each message reads Sent or Received with its day and who logged it |
@@ -1470,9 +1470,9 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | Files are attached from the report's page and held at once | A file attached into the text of a message, a note or the claim is held on the report the same way, and listed with the rest |
 | The reporter card on an issue carries its report's correspondence and notes, and links the report | Read under the report rule, so absent for somebody who may not read reports. Writing to either is offered where the reader works reports |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
-| The record draws one card per claim | The issue, the outcome, the state in one word, what it is about or how many components, and how many places it covers, with the states counted where they differ. The issue opens the claim page, and "Findings there now" opens the findings list narrowed to the claim and the states asked for. `DESIGN-reporting.md` § Dismissals and scan coverage holds what is counted |
-| Rulings sit beside the record, over its products and period | A ruling is a judgment somebody could be asked to account for, and an auditor asks about a period. Beside the judgments rather than among them: a ruling is about a claim rather than a finding and takes none of their filters. Printed with them, without the controls |
-| The change history sits below the record, over its period, and narrows to one kind of change | The judgment filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
+| The record draws one card per decision | The issue, the outcome, the state in one word, what it is about or how many components, and how many occurrences it covers, with the states counted where they differ. The issue opens the decision page, and "Findings there now" opens the findings list narrowed to the decision and the states asked for. `DESIGN-reporting.md` § Dismissals and scan coverage holds what is counted |
+| Rulings sit beside the record, over its products and period | A ruling is a decision somebody could be asked to account for, and an auditor asks about a period. Beside the triage decisions rather than among them: a ruling is about a report rather than a finding and takes none of their filters. Printed with them, without the controls |
+| The change history sits below the record, over its period, and narrows to one kind of change | The decision filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
 
 ## Static analysis leads
 
@@ -1490,9 +1490,9 @@ the screens draw them.
 | The branch and variant are in the address | A link from a build's screens narrows the queue to it. A product picked in the scope bar keeps the screen and drops them, because a branch is one product's |
 | A lead's page holds the result, the path, the related places, the leads that are the same flaw, and the decision | In that order. Each place is the file and line, linked to the repository where the address passes the link check, with what the analyzer said there and the code it captured |
 | The leads that are the same flaw and those that possibly are are two lists | One decision covers the first and never the second, and the first list says so on hover |
-| The decision card names the claim standing at the lead, or offers the form | A lead under a claim takes no second one, so the form is not offered beside it. The claim opens on the claim page, which is where it is agreed to |
-| The claim page offers Agree on a claim about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A claim says it is internal, and the screen asks the reader's reach there, as the server does |
-| On a claim about internal material the claim page offers the comment box to somebody who triages or approves internal work, and the control linking where it is worked on, Revise reasoning and Withdraw to somebody who triages it | The flaw's readers read a moved lead's claims and take no part in them. The server refuses both to anybody else |
+| The decision card names the decision standing at the lead, or offers the form | A lead under a decision takes no second one, so the form is not offered beside it. The decision opens on the decision page, which is where it is agreed to |
+| The decision page offers Agree on a decision about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A decision says it is internal, and the screen asks the reader's reach there, as the server does |
+| On a decision about internal material the decision page offers the comment box to somebody who triages or approves internal work, and the control linking where it is worked on, Revise reasoning and Withdraw to somebody who triages it | The flaw's readers read a moved lead's decisions and take no part in them. The server refuses both to anybody else |
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
 | A lead not reproduced offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it, and names the build of the first run that did not see it. A fixed lead names the build it was fixed in |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
@@ -1524,10 +1524,10 @@ running out with every movement of an embargo on it, disclosure included.
 | Rule | |
 |---|---|
 | A finding says whether it is disclosed, wherever it is shown (REQ-40) | Somebody holding private reading could not tell which rows they must not talk about, which makes the embargo a property of the database rather than of anybody's behavior. An undisclosed recorded flaw drew as "Unrated · Undecided · 1 location", which is what any other row draws |
-| A group is undisclosed when *any* of its places is | One embargoed place among fifty makes the whole of it embargoed for anybody deciding what may be said about it, and the earliest date is the one that matters. Both read as aggregates rather than off whichever row sorted first — counted, because a maximum of the visibility word answers "public" for exactly the mixed group the question is about, and the list then drew no marker on a row holding an undisclosed place |
+| A group is undisclosed when *any* of its occurrences is | One embargoed occurrence among fifty makes the whole of it embargoed for anybody deciding what may be said about it, and the earliest date is the one that matters. Both read as aggregates rather than off whichever row sorted first — counted, because a maximum of the visibility word answers "public" for exactly the mixed group the question is about, and the list then drew no marker on a row holding an undisclosed occurrence |
 | The standing notice is unmissable on the finding page (REQ-40) | A notice somebody has to look for is one that has not been given. It sits above everything, on the screen where a person is about to write something down, and it names the places a disclosure actually happens: a ticket, a commit message, a chat. The row's chip is the secondary signal |
 | A screen lists what is approaching disclosure (REQ-38) | Soonest first with what is past due at the top, and a date moved from it. That list is itself a disclosure and is narrowed the way `DESIGN-access.md` describes — a product somebody may not read undisclosed work in contributes nothing to it, not even a count |
-| A row on that screen is one issue in one product | The unit an embargo is moved and disclosed in. Its Where names the product, the components and every build in scope that carries it, the variant said once where the builds share it, and Locations totals the findings across those builds. The issue links to the issue's own page, which lists every build. The row, its open form and the answer to an act are keyed on the product and the issue together |
+| A row on that screen is one issue in one product | The unit an embargo is moved and disclosed in. Its Where names the product, the components and every build in scope that carries it, the variant said once where the builds share it, and Occurrences totals the findings across those builds. The issue links to the issue's own page, which lists every build. The row, its open form and the answer to an act are keyed on the product and the issue together |
 | The screen answers for the scope picked | The picker's product, branch and variant are sent with the request, and the subtitle names them, or says every product where none is picked |
 | The screen offers "Record a reported flaw" | Reporting a flaw sent in from outside starts a date, as a claim from outside ruled a duplicate of a flaw found here does, so the screen links to that form with the source answered. Offered to whoever may record an undisclosed flaw in the scope's product, or in any product where none is picked. It is not labelled as starting a disclosure, because Disclose on this screen makes an issue public |
 | The empty screen says what puts a flaw on it | A flaw gets a date when it is sent in from outside or when a report from outside is ruled its duplicate, in the same words the form uses |
@@ -1642,10 +1642,10 @@ the part of a decision that matters most.
 | Storage a browser refuses is not a failure | The draft is a convenience; the text in front of somebody is the real thing, so every read and write of it tolerates being turned down |
 | Signing out clears every draft the browser holds | Every writer's, not only the one signing out: a draft left by an earlier session is the one nobody would think to clear, and drafts hold triage text with private findings among it. Cleared *before* the request that ends the session: a sign-out that could not reach the server is the case where clearing matters most |
 | A draft is kept under the identity that wrote it, **encoded** | Which covers the sign-out that never happened: a session can expire quietly, and the next person to sign in on that browser must not be handed somebody else's reasoning. Text typed before anybody is recognized is not kept at all. The identity is encoded into the key, because nothing refuses a colon in one and the separator is a colon — so `alice` read `alice:b`'s drafts as her own and the sweep left them in the browser |
-| **A draft key names everything the text is about** | The build and the version included. A build ships one name at more than one version often enough that leaving the version out shares a draft between two of them, and they are different code at a different number of places |
+| **A draft key names everything the text is about** | The build and the version included. A build ships one name at more than one version often enough that leaving the version out shares a draft between two of them, and they are different code at a different number of occurrences |
 | A sign-out the server did not complete stays on the page and offers it again | The server clears the cookie only when it ends the session, so leaving on a refusal or a lost request hands a live session to the next person on the browser. The drafts are cleared either way. A refusal for want of any session is read as signed out, because nothing is left to end |
-| **Signing out also clears what the tab remembers** | The scope somebody picked and the last judgment they recorded. Sign-out is a same-tab navigation, so the session store survives it by construction: the next person was handed the previous person's product in the scope bar — a name they may hold no grant on — and their last outcome in the decision form. The look and the rail stay, because a preference surviving a sign-out is what a preference is |
-| **Somebody else signing in clears it too** | The tab records whose its session state is. A lapsed session is resumed by signing in again in the same tab, which is not a sign-out, so a different person arriving clears the scope, the last judgment and the list positions before anything reads them. State with no owner recorded beside it is cleared when the first person is recognized in the tab. Until the session is known, state recorded for a person is not read back at all |
+| **Signing out also clears what the tab remembers** | The scope somebody picked and the last decision they recorded. Sign-out is a same-tab navigation, so the session store survives it by construction: the next person was handed the previous person's product in the scope bar — a name they may hold no grant on — and their last outcome in the decision form. The look and the rail stay, because a preference surviving a sign-out is what a preference is |
+| **Somebody else signing in clears it too** | The tab records whose its session state is. A lapsed session is resumed by signing in again in the same tab, which is not a sign-out, so a different person arriving clears the scope, the last decision and the list positions before anything reads them. State with no owner recorded beside it is cleared when the first person is recognized in the tab. Until the session is known, state recorded for a person is not read back at all |
 | Where a draft lives, and under whose name, is decided in one place | A control spelled at each of six call sites is a control that is missing at the seventh |
 | **A draft keeps the answer as well as the prose** | The outcome, the justification, the date, the fixed version. A draft that kept three paragraphs and lost what they argued for came back as text somebody had to read to find out what they had meant — and the prose is about the answer |
 | A revision opens on its draft where one was left | The editor restores only into an empty field, so a revision opening on the standing text would write that over the draft |
@@ -1676,17 +1676,17 @@ confirmation is never a toast and nothing navigates away.
 |---|---|---|
 | Deciding on the finding screen | Directly above the decision card it produced, brought into view once the card is drawn | The next finding in the list, and the decision's own page where it waits |
 | Deciding from a row's preview on the findings list | Where the row was: under it while it is listed, in its place once the list read again does not hold it, and at the end of the page, or over the empty list, where neither it nor the row after it is listed. The cursor moves to the row that followed it | The decision's own page where it waits |
-| Deciding several issues together | Above the submit button | The decision's own page |
+| A bulk decision | Above the submit button | The decision's own page |
 | Promising an upgrade on the component screen | In place of the form | The decision's own page where it waits; each build's pending upgrades for three builds or fewer, and above three one link to the release they share, or to the product's releases where they span several |
 | Moving a disclosure date or disclosing | On the row or in the notice the act was taken from, and above the list where the act took the row off it | The review queue's disclosure dates where it waits |
 | Rating an issue | On the rating line the form opened from | The review queue's ratings where it waits |
-| Reaffirming | On the card or the tab it was done from | The re-made claim's own page where it waits; from the tab, each waiting claim's page for three or fewer, and Mine, recent above three |
+| Reaffirming | On the card or the tab it was done from | The re-made decision's own page where it waits; from the tab, each waiting decision's page for three or fewer, and Mine, recent above three |
 | Changing a missed promise | On its queue card | The decision's own page |
 
 | Rule | |
 |---|---|
-| Waiting for a second person is said only where one is needed | A claim in force at once reads as in force |
-| A decision's own page is the claim page | A decision's address resolves to the claim it is one row of |
+| Waiting for a second person is said only where one is needed | A decision in force at once reads as in force |
+| An occurrence's address opens the decision page | A decision occurrence's address resolves to the decision it is one row of |
 | The finding screen's confirmation follows the card | Submitting hides the form and the publisher statements, and the page shortens by about 900 pixels under whoever pressed the button. A confirmation at the head of the screen lands out of view |
 
 ## Reachable from a keyboard
@@ -1784,7 +1784,7 @@ to; on an undisclosed finding the mention itself says a finding exists.
 | What is being typed after an `@` is read from the text before the cursor | Rather than tracked as state, so it stays right however somebody edits |
 | What is typed is sent, and the server narrows | The server holds the whole list and matches display names as well as identities. A page of the first few people filtered here leaves out whoever is past it |
 | The pickers that say who is dealing with a finding ask the same endpoint (REQ-34) | They asked for the list of people, which is administration, so for every triager in the deployment both selects were empty. Asking who may *read* it rather than who *exists* also narrows the offer to people who can open what they are handed |
-| A box people type an `@` into offers names, at the visibility of what is being discussed | The comment box is where mentions get written and it offered nobody, while the line under it explained afterwards that the name had reached nobody. A claim is asked at the visibility of its most careful row, and a claim about a lead at internal, the visibility its rows hold until its flaw is disclosed |
+| A box people type an `@` into offers names, at the visibility of what is being discussed | The comment box is where mentions get written and it offered nobody, while the line under it explained afterwards that the name had reached nobody. A decision is asked at the visibility of its most careful row, and a decision about a lead at internal, the visibility its rows hold until its flaw is disclosed |
 | The one box that offers nothing is the bulk form, and it is the one that cannot ask | Deciding many findings at once carries no visibility on the wire, so the question has no answer to send. Asking as though the set were public would offer people who cannot open half of it |
 
 Both people pickers are typed against the list rather than scrolled. Adding
@@ -1844,7 +1844,7 @@ other, and two that could not be asked at all.
 | Section | What it answers |
 |---|---|
 | Grants in force | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
-| Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the approval quality report asks across a program, asked about one person. Counted over every product, so it is sent to an administrator and absent for an auditor, whose grant reaches no product's decisions; the section is drawn only where it is sent |
+| Their part in the record | How many decisions they argued, how many they agreed to that still stand, and how many agreements they took back. What the approval quality report asks across a program, asked about one person. Counted over every product, so it is sent to an administrator and absent for an auditor, whose grant reaches no product's decisions; the section is drawn only where it is sent |
 | Roles granted and withdrawn | Every change against them, newest first, with who made it. Absent before means nobody had set it; absent after means it was withdrawn, and a blank cannot tell the two apart |
 | Notifications sent | Everything sent to them, acknowledged and cleared included |
 
@@ -2021,13 +2021,14 @@ title beside it disagreed by thousands and both were right.
 | Word | Means |
 |---|---|
 | **Issue** | The vulnerability itself, one identity across its aliases |
-| **Finding** | One component at one place in one build |
-| **Group** | One issue at one component across every place it sits at — the row the findings list returns |
+| **Occurrence** | One way a component enters one build |
+| **Finding** | One issue at one occurrence |
+| **Group** | One issue at one component across every occurrence of it — the row the findings list returns |
 
 Home's open figure, the trend and the severity ring count issues and are labeled
 "issues". The findings list and the rail's counts are groups, so the same issue at
 three versions of one library is three rows there. "CVE" is not used as a label,
-because not every issue carries one. The list says "N places" on each row rather
+because not every issue carries one. The list says "N occurrences" on each row rather
 than calling the row a finding. The rail has room for a number and not for a
 noun, so a badge carries its unit on the title and on what a screen reader is
 given.
@@ -2141,7 +2142,7 @@ scroll sideways. That is why the tables here are written rather than installed.
 | Every table that is wider than its box says so, at every width | A table scrolling sideways inside its own frame with nothing saying so reads as a page cut off rather than as a table with more in it. Said above the table and pinned so it stays visible while the table moves, and the clipped edge is shaded so the overflow shows before the note is read. **Only the ones that are wider**: a stylesheet cannot ask, so the table measures itself and says which it is — a note about scrolling over a two-column table that fits teaches people to stop reading the notes |
 | A table that scrolls takes a tab stop | The arrow keys move a box only once it has focus, and a box only a pointer can scroll is a table a keyboard cannot read to the end of. The stop is there only while there is somewhere to scroll to |
 | Headings and field labels are noun phrases (REQ-60) | The name of the thing, the way a settings screen anywhere else names one. Written as descriptions — "When somebody counts as absent" — they make somebody scanning for the one they came to change read thirty sentences instead of thirty names. The explanation stays underneath. Three had no name at all, falling through to the last segment of a configuration key: a card headed "After" |
-| Labels use the conventional word (REQ-60) | Reject, Trend, Assignments, Unassigned, Justification, Path, EPSS, Locations, Access, Lapsed decisions, Submit. A caption on a screen is a sentence at most |
+| Labels use the conventional word (REQ-60) | Reject, Trend, Assignments, Unassigned, Justification, Path, EPSS, Occurrences, Access, Lapsed decisions, Submit. A caption on a screen is a sentence at most |
 | A form field is not a credential | Every text and number box says so in the four attributes the password managers actually read. They guess from shape and proximity, so a short box beside another short box is offered a saved login. `autocomplete` alone does not do it: browsers ignore it for saved logins by design. Nothing here is exempt, because nothing here is a credential — this deployment never holds a password |
 | A control carries no prose, and names itself | Saying a field is not a credential is not enough where the field's own words read as one. A manager reads whatever text it can reach through a control, and three settings were offered a saved login with all four attributes set: their explanation sat on the control as a tooltip, and it said sign-in, account and date. So the explanation sits on the label, where a person hovering still finds it, and each control is named for what it holds rather than left for a manager to name from its surroundings |
 | Two rows are only ambiguous when both ends match (REQ-57) | The same subproject reaching the same component twice by different routes. Rare, and visible when it happens: expanding the row, or the tree, resolves it. Nothing is invented to disambiguate a case the reader can see |
@@ -2149,7 +2150,7 @@ scroll sideways. That is why the tables here are written rather than installed.
 | **What sits over the page is positioned against the viewport** | The nearest positioned ancestor is the frame, which grows with the content — so on a tall page the drawer's height became the whole document: Close at the top of it, submit at the bottom, and neither on screen. A floating action that is not fixed does not float |
 | The way back in after a session ends is the top step of the scale | Drawn under an open sheet or beside the phone rail on one step, its sign-in controls are covered and a click lands on what is over them |
 | **Stacking is a named scale, not hand-picked numbers** | They were spread across the stylesheets with nothing to read to decide the next one, and two unrelated overlays claimed the same step: the drawer and the rail's scrim resolve in one context, so the drawer won on document order and the rail's click-to-dismiss stopped working wherever they overlapped |
-| **A closed vocabulary the server owns is rendered from the generated client** | They were hand-kept tables here, and every one had a member it could not label: an outcome drew an empty cell wherever it was the whole of it, register states printed as wire tokens, and a narrowing over the claim kinds could not fail because its comparisons exhausted every value but one |
+| **A closed vocabulary the server owns is rendered from the generated client** | They were hand-kept tables here, and every one had a member it could not label: an outcome drew an empty cell wherever it was the whole of it, register states printed as wire tokens, and a narrowing over the decision kinds could not fail because its comparisons exhausted every value but one |
 | **An outcome's class is what the server publishes** | The answer describing the caller, read once at start, carries every outcome with what it claims: that it hides risk, that it carries a date, that it states a reason, and that it is a dismissal. The reports asking for dismissals, the audit record's filter and its labels, and every form asking for a reason read it, so an outcome the server moves to another class moves here too. The decision form's hint about a second person reads it as well: an outcome hiding no risk needs nobody, and one hiding risk with no date always waits for a second person. Of the dated ones, the hint tells a deferral from a promise by name, because the two differ in what their date is measured against and that is not one of the published properties. Nothing is classed before the answer arrives, and a report asking for dismissals waits for it |
 | **A count is never shown before it is known** | While its read is in flight a count is a faint placeholder, never a digit; a failed read is a dash with the reason on hover; only an answered read shows the figure. A zero drawn while loading is a confident answer to a question not yet asked. An empty state such as "Nothing is pending" is drawn only once every read it depends on has answered. One shared renderer does all three, and a web test holds it to them |
 | **A word the table does not know is shown as it arrived** | A server that grows a vocabulary before the interface does should leave somebody reading something unfamiliar rather than a blank |
@@ -2203,7 +2204,7 @@ than inherited.
 |---|---|
 | A known-exploited tile at every scope | It needs a product: nothing counts exploited findings without one to narrow inside, and a tile that guessed would be worse than one that is not there |
 | A finding sample carrying builds already past the fix, shown and not offered | The reach endpoint does not say whether a build's version sits past the fixing version — there is no version ordering here — so every build at another version is offered and the "not offered" card is empty |
-| Reaffirms a lapsed decision inline on the queue card | A lapsed decision is on no queue card. Reaffirming one place is a claim about one place in one build, so that happens on the finding. Whole claims are reaffirmed from the To reaffirm tab |
+| Reaffirms a lapsed occurrence inline on the queue card | A lapsed occurrence is on no queue card. Reaffirming one occurrence is a decision about one occurrence in one build, so that happens on the finding. Whole decisions are reaffirmed from the To reaffirm tab |
 | Variants and branches screens carry a product select of their own | The scope picker is that control, and the screens follow it |
 | The queue card draws "matching automatically" and "ticked deliberately" apart | The record does not keep which builds were reached by lookup and which by an applied decision, and the number an approval keeps is one |
 | The users table lists user, identity, last sign-in, roles and assigned | User, identity, roles and a grant control on the row. Granting is what an administrator opens the screen to do; last sign-in and assigned work are read from the person's own row |
@@ -2245,7 +2246,7 @@ harness are outside the measure, because neither is a behavior of the interface.
 
 | | |
 |---|---|
-| **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
+| **A decision scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 
 ## Gaps the checks left
@@ -2273,11 +2274,11 @@ the one that made it too long.
 | **The list screen gives up the parts that take rows and draw them** | Expanded in place, by component, by bump, the pager, and the table itself. What is left holds the filters, the page and the question being asked — the table takes what it draws and holds none of it, which is what stops the path's product being read on the list that spans every product, where there is none |
 | **What is selected is a hook, not several pieces of state in a render function** | The rule that a changed question clears the selection was written at some call sites and missing at others, and it held only by a property of another file: every chip either drops its key or puts the wider default back, so removing one only ever widens. Inside the hook there is no call site left that could bypass it |
 | **What an address means lives beside the list rather than inside the screen** | Setting one filter, setting several values of one, and hiding a component are pure functions of the parameters. Two screens spelled the build prefix by hand and the finding address twice, and the copies dropped the parameter the finding reads to walk the list it came from |
-| **The queue screen splits by which queue** | Five lists lived there. What became of what you proposed is a whole tab with its own endpoint, sharing nothing with the claims but the offset in the address; a disclosure-date movement and a severity rating are two things waiting for a second person that are not claims, and share neither the card nor the selection nor the batch. What is left is the claims, one list per reason a claim waits, drawn from one card for approvals and one for the two dated lists |
+| **The queue screen splits by which queue** | Five lists lived there. What became of what you proposed is a whole tab with its own endpoint, sharing nothing with the decisions but the offset in the address; a disclosure-date movement and a severity rating are two things waiting for a second person that are not triage decisions, and share neither the card nor the selection nor the batch. What is left is the decisions, one list per reason a decision waits, drawn from one card for approvals and one for the two dated lists |
 | **The dependency tree gives up the panel** | Walking the graph and asking what is known about one node are two questions, and the second took a third of the page while the first was on screen |
 | **The finding screen gives up the one form among its readings** | Rating the issue is a claim about the issue in this product, made from a screen that is otherwise four readings of what the record already says |
-| **The notes thread is on the screen whether or not a claim exists** | It is the one somebody can write in before anybody has decided anything, which is what it is for; the claim's own thread stays gated on a claim. It says in words that it is about this issue in this product, because it is read beside a row that may be one of eleven the same issue sits on — not about this component, and not about other products |
-| **A thread is one component, and the endpoint is what a caller keeps** | The comments on a claim and the notes on an issue are the same conversation: the avatar, the timestamp, the edited mark, the earlier versions behind it, the editor in place and the draft. Written twice they had already begun to diverge, and the timestamp was formatted separately in each copy — so a fix to it would land in whichever file the author had open. What one piece is called and what adding one does not do stay each caller's, so the two are worded apart deliberately rather than together by accident |
+| **The notes thread is on the screen whether or not a decision exists** | It is the one somebody can write in before anybody has decided anything, which is what it is for; the decision's own thread stays gated on a decision. It says in words that it is about this issue in this product, because it is read beside a row that may be one of eleven the same issue sits on — not about this component, and not about other products |
+| **A thread is one component, and the endpoint is what a caller keeps** | The comments on a decision and the notes on an issue are the same conversation: the avatar, the timestamp, the edited mark, the earlier versions behind it, the editor in place and the draft. Written twice they had already begun to diverge, and the timestamp was formatted separately in each copy — so a fix to it would land in whichever file the author had open. What one piece is called and what adding one does not do stay each caller's, so the two are worded apart deliberately rather than together by accident |
 | **The stylesheet splits by position, not by theme** | Order is the mechanism — the last rule wins — so grouping rules by what they are about would silently reorder the cascade. The files are the sections in the order they were already in, with one deliberate exception: the tokens, the frame, what every screen is built from, the charts, what sits over the page, the shapes belonging to one screen, what a narrow screen changes, and what prints |
 | **What a narrow screen changes holds only that** | The base element rules and the exploited tint sit with the tokens, the rail's and the top bar's pieces with the frame, the chart focus ring with the charts, the tab bar's links beside the tab bar, and the remaining components with the parts. Each is earlier in the cascade than the narrow file, so every pair of rules whose order that reversed was checked for an element both reach at equal specificity with a property in common, and none draws differently |
 | **What prints moves to the end, and that is a change** | It sat in the middle of the component file, so a per-screen rule of equal specificity written later won over it. Imported last it wins, which is what a print rule is for and what the file's own name now says. Everything else keeps the position it had, checked selector by selector; this one is the exception and is stated rather than folded into "same order" |
@@ -2292,7 +2293,7 @@ the one that made it too long.
 | | |
 |---|---|
 | No component library | The interface is built from the mockup's tokens and from components written here |
-| The component screen's read has a floor of one pass over a source package's places | The fix, the deadline and the place of each are read from the table, because no index carries them: for the bench kernel, reading 322,616 places is 100 ms of the pass's 243 ms on PostgreSQL. The build's findings list groups the same places from the grouping index alone. Below that floor, what is open would have to be kept per issue and component and rewritten as findings move, which is a stored total |
+| The component screen's read has a floor of one pass over a source package's occurrences | The fix, the deadline and the occurrence of each are read from the table, because no index carries them: for the bench kernel, reading 322,616 occurrences is 100 ms of the pass's 243 ms on PostgreSQL. The build's findings list groups the same occurrences from the grouping index alone. Below that floor, what is open would have to be kept per issue and component and rewritten as findings move, which is a stored total |
 | Sibling components are not folded on the dependency tree | On a real image folding removes 281 of 36,991 child rows and shrinks the largest level from 4,867 rows to 4,679, which stays too large to browse |
 | Color and the brand mark resolve through tokens in one place | How an operator overrides them is deliberately unsettled — that gets decided against real screens — but keeping the whole palette in one stylesheet means the answer will be a stylesheet rather than a hunt through components |
 | Dependencies are pinned exactly, not by range | A range resolves at build time and CI stops being reproducible; a caret in a manifest does exactly that. `npm ci` installs the lockfile |

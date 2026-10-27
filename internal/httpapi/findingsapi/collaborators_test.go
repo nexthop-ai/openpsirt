@@ -86,11 +86,11 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 			t.Fatalf("a collaborator could not argue about the case: %d %s",
 				made.Code, made.Body.String())
 		}
-		var claim struct {
-			ClaimID int64   `json:"claim_id"`
-			IDs     []int64 `json:"ids"`
+		var decision struct {
+			DecisionID int64   `json:"decision_id"`
+			IDs        []int64 `json:"ids"`
 		}
-		if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+		if err := json.Unmarshal(made.Body.Bytes(), &decision); err != nil {
 			t.Fatal(err)
 		}
 
@@ -103,7 +103,7 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 			t.Fatalf("bringing a second person in answered %d", got.Code)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", claim.ClaimID), `{}`), http.StatusNotFound)
+			fmt.Sprintf("/v1/decisions/%d/approval", decision.DecisionID), `{}`), http.StatusNotFound)
 
 		// Being brought in is said at once, and says which issue: this is the
 		// one message that names an undisclosed finding on purpose, and it
@@ -145,14 +145,14 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 	// The grant is the pair of a product and an issue, and the list
 	// narrowing asks it — so a collaborator's own case appeared among the
-	// decisions and every route reading one of them by identifier refused
+	// decision occurrences and every route reading one of them by identifier refused
 	// it. Listed and then not there reads as a fault rather than as a
 	// rule, and a grant whose rows cannot be opened is a grant with no
 	// content.
 	//
 	// Arguing and agreeing are unchanged: a collaborator may argue about
 	// the issue they were brought in on and may not agree to anybody's
-	// claim about it.
+	// decision about it.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		embargoed := r.Embargoed(t)
@@ -164,7 +164,7 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 				got.Code, got.Body.String())
 		}
 
-		// The person who reads the case makes the claim, so what is being
+		// The person who reads the case makes the decision, so what is being
 		// measured is reading somebody else's decision rather than their own.
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/"+
@@ -172,24 +172,24 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
 		}
-		var claim struct {
+		var decision struct {
 			IDs []int64 `json:"ids"`
 		}
-		if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+		if err := json.Unmarshal(made.Body.Bytes(), &decision); err != nil {
 			t.Fatal(err)
 		}
 
 		var listed struct {
 			Items []struct {
-				Decision struct {
+				DecisionOccurrence struct {
 					ID int64 `json:"id"`
-				} `json:"decision"`
+				} `json:"decision_occurrence"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences", &listed)
 		var found bool
 		for _, one := range listed.Items {
-			if one.Decision.ID == claim.IDs[0] {
+			if one.DecisionOccurrence.ID == decision.IDs[0] {
 				found = true
 			}
 		}
@@ -197,9 +197,9 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 			t.Fatalf("the collaborator's own case is not in the list, so this proves nothing")
 		}
 
-		at := fmt.Sprintf("/v1/decision-occurrences/%d", claim.IDs[0])
+		at := fmt.Sprintf("/v1/decision-occurrences/%d", decision.IDs[0])
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
-			t.Errorf("a decision listed to this collaborator answered %d when opened: %s",
+			t.Errorf("a decision occurrence listed to this collaborator answered %d when opened: %s",
 				got.Code, got.Body.String())
 		}
 	})
@@ -300,7 +300,7 @@ func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testin
 	// identifier. The finding detail is a fourth, through the graph.
 	//
 	// graph.visibleIn asks Sees and Reads product-wide with no case arm, and
-	// Detail calls Chains to build the way down to each place. A collaborator
+	// Detail calls Chains to build the way down to each occurrence. A collaborator
 	// holding no role on the product is then refused the path to the component
 	// their own case sits in, and the route answers "no open finding is
 	// recorded there".
@@ -321,18 +321,18 @@ func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testin
 
 		var detail struct {
 			Vulnerability string `json:"vulnerability"`
-			Places        []struct {
-				Place string `json:"place"`
-				Down  []struct {
+			Occurrences   []struct {
+				Occurrence string `json:"occurrence"`
+				Down       []struct {
 					Name string `json:"name"`
 				} `json:"down"`
-			} `json:"places"`
+			} `json:"occurrences"`
 		}
 		httpapitest.Read(t, r, "outsider", httpapitest.FindingAt(embargoed), &detail)
 		if detail.Vulnerability != embargoed {
 			t.Fatalf("the detail is about %q, want their case", detail.Vulnerability)
 		}
-		if len(detail.Places) == 0 {
+		if len(detail.Occurrences) == 0 {
 			t.Error("the finding says it sits nowhere")
 		}
 
@@ -561,7 +561,7 @@ func TestACollaboratorIsToldNothingOfWhatWasFiledAgainstABuild(t *testing.T) {
 }
 
 func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
-	// The grant reaches one issue: its files and the claims about it, read and
+	// The grant reaches one issue: its files and the decisions about it, read and
 	// written, and nothing of a second undisclosed issue in the same product.
 	// Two collaborators: one holding nothing on the product, for the files,
 	// and one triaging its disclosed work, because arguing is a route only
@@ -617,7 +617,7 @@ func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
 			return rec
 		}
 
-		// Their own case: files, and a claim they argue, revise and comment on.
+		// Their own case: files, and a decision they argue, revise and comment on.
 		if got := attach(theirs); got.Code != http.StatusCreated {
 			t.Errorf("attaching to their own case answered %d: %s", got.Code, got.Body.String())
 		}
@@ -629,16 +629,16 @@ func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
 			fmt.Sprintf("/v1/decisions/%d/reasoning", mine),
 			`{"reasoning":"The socket is not built into this image."}`); got.Code != http.StatusOK {
-			t.Errorf("revising their own claim on their case answered %d: %s", got.Code, got.Body.String())
+			t.Errorf("revising their own decision on their case answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/comments", mine),
 			`{"body":"Checked the build configuration."}`); got.Code != http.StatusCreated {
-			t.Errorf("commenting on a claim about their case answered %d: %s", got.Code, got.Body.String())
+			t.Errorf("commenting on a decision about their case answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
 			fmt.Sprintf("/v1/decisions/%d", mine), ""); got.Code != http.StatusOK {
-			t.Errorf("reading a claim about their case answered %d: %s", got.Code, got.Body.String())
+			t.Errorf("reading a decision about their case answered %d: %s", got.Code, got.Body.String())
 		}
 
 		// The other undisclosed issue: every route answers as one that is not

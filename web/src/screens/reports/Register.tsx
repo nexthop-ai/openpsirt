@@ -32,9 +32,9 @@ const PAGE = 200;
 // a register of what is still open answers a different question from the one it
 // would appear to answer.
 //
-// One row per issue and place, unfolded. Every other list here groups, because
-// a person reading a list wants the judgment rather than the repetition; a
-// register is read against what shipped, and what shipped is places.
+// One row per issue and occurrence, unfolded. Every other list here groups, because
+// a person reading a list wants the decision rather than the repetition; a
+// register is read against what shipped, and what shipped is occurrences.
 //
 // It states no triage line because it applies none. Everything in the build
 // is here whatever the deployment considers worth triaging, which is the basis
@@ -196,7 +196,7 @@ export function Register() {
             )}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            One row per issue and place, open or closed, <b>no triage line</b>.{" "}
+            One row per issue and occurrence, open or closed, <b>no triage line</b>.{" "}
             <a href={fileAt(where, "csv", asked)}>CSV</a> ·{" "}
             <a href={fileAt(where, "json", asked)}>JSON</a>
           </p>
@@ -220,7 +220,7 @@ export function Register() {
                       <th>Component</th>
                       <th>Pulled in by</th>
                       <th>State</th>
-                      <th>Claimed</th>
+                      <th>Outcome</th>
                       <th>Proposed</th>
                       <th>Agreed</th>
                       <th>Due</th>
@@ -230,7 +230,7 @@ export function Register() {
                   </thead>
                   <tbody>
                     {rows.map((row) => (
-                      <tr key={`${row.vulnerability} ${row.place}`} className="row">
+                      <tr key={`${row.vulnerability} ${row.occurrence}`} className="row">
                         <td>
                           <Severity word={row.severity} />{" "}
                           <span className="id">{row.vulnerability}</span>
@@ -238,7 +238,7 @@ export function Register() {
                         <td className="id">
                           {row.component} <span className="hint">{row.version}</span>
                         </td>
-                        {/* The name, not the identity. A place identity is
+                        {/* The name, not the identity. An occurrence identity is
                             derived from content, so it correlates two rows and
                             tells nobody where anything is — a column of
                             sixty-four hex characters is noise on a page
@@ -279,7 +279,7 @@ export function Register() {
                             <>
                               <span className="id">{row.approved_by}</span>{" "}
                               <span className="hint">{on(row.approved_at)}</span>
-                              {/* Given for the claim this one re-affirms, so
+                              {/* Given for the decision this one re-affirms, so
                                   the name above read those words. */}
                               {row.agreement_carried && <span className="hint"> · carried</span>}
                             </>
@@ -425,7 +425,7 @@ function MeasuredWith({
   );
 }
 
-// The decision standing at one place, in the words and colors every screen
+// The decision standing at one occurrence, in the words and colors every screen
 // draws a state with. A register is read by somebody checking the record
 // against what shipped, so a column of wire tokens is the tool showing its
 // storage rather than answering; a state the table does not know is still

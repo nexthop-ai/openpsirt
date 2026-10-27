@@ -899,25 +899,26 @@ var tables = []string{
 	// Before person and product, both of which it points at.
 	"saved_filter",
 	// Before the comment it belongs to.
-	"claim_comment_revision",
-	"claim_comment",
+	"decision_comment_revision",
+	"decision_comment",
 	"vulnerability_reference",
 	// Points at itself, which no position in this list can answer: a carried
 	// agreement names the one it came from. The key is declared to null
 	// rather than to block, so emptying the table needs no ordering.
-	"claim_approval",
-	// Before decision and vulnerability_merge, both of which it points at.
-	"decision_superseded",
-	"decision",
-	// After the rows that point at it, and before the claim it hangs off.
-	"claim_revision",
-	// Before claim and target, both of which it points at.
-	"claim_build",
-	// Before claim, which it points at.
-	"claim_stamp",
+	"decision_approval",
+	// Before decision_occurrence and vulnerability_merge, both of which it
+	// points at.
+	"decision_occurrence_superseded",
+	"decision_occurrence",
+	// After the rows that point at it, and before the decision it hangs off.
+	"decision_revision",
+	// Before decision and target, both of which it points at.
+	"decision_build",
+	// Before decision, which it points at.
+	"decision_stamp",
 	// Before person, which it points at, and after everything above, which
 	// points at it.
-	"claim",
+	"decision",
 	// Before the note it belongs to.
 	"issue_note_revision",
 	// Before person, product and vulnerability, all of which it points at.
@@ -1040,7 +1041,7 @@ var tables = []string{
 	// foreign key.
 	"statement_text",
 	// Before scan_run and vulnerability, both of which it points at, and
-	// after decision_superseded, which points at it.
+	// after decision_occurrence_superseded, which points at it.
 	"vulnerability_merge",
 	"scan_run",
 	"vulnerability_alias",
@@ -1145,11 +1146,11 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 				return fmt.Errorf("detach stream parents: %w", err)
 			}
 		}
-		// A claim points at the claim it was derived from, which is the same
-		// shape and the same two engines.
-		if occupied["claim"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "claim" SET "derived_from" = NULL`); err != nil {
-				return fmt.Errorf("detach derived claims: %w", err)
+		// A decision points at the decision it was derived from, which is the
+		// same shape and the same two engines.
+		if occupied["decision"] {
+			if _, err := tx.ExecContext(ctx, `UPDATE "decision" SET "derived_from" = NULL`); err != nil {
+				return fmt.Errorf("detach derived decisions: %w", err)
 			}
 		}
 		// A window points at the window it counts from, the same shape again.

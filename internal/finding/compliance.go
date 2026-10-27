@@ -59,9 +59,9 @@ type Rate struct {
 func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	scope Scope, since, until time.Time) ([]Rate, error) {
 
-	// A product is required, for the reason every list here requires one: a
-	// place identity carries no product, so a decision correlated without one
-	// would reach decisions made in every product in the deployment.
+	// A product is required, for the reason every list here requires one: an
+	// occurrence identity carries no product, so a decision correlated without
+	// one would reach decisions made in every product in the deployment.
 	productID, visible, targets, err := s.inScope(ctx, subject, scope, &Filter{})
 	if err != nil {
 		return nil, err
@@ -92,22 +92,22 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	if !until.IsZero() {
 		within, bounds = within+` AND "f"."closed_at" < ?`, append(bounds, until)
 	}
-	// A standing deferral at the place, asked as a correlated existence test
-	// rather than a join, so a place with two of them counts once. It is the
-	// test that takes a finding off the clock, narrowed to a deferral: one
-	// past its date, or keyed on versions the place no longer holds, stands
-	// for nothing.
+	// A standing deferral at the occurrence, asked as a correlated existence
+	// test rather than a join, so an occurrence with two of them counts once.
+	// It is the test that takes a finding off the clock, narrowed to a
+	// deferral: one past its date, or keyed on versions the occurrence no
+	// longer holds, stands for nothing.
 	//
-	// Correlated by product as well as by place, because a place identity
-	// carries none — without it a deferral made in another product that ships
-	// the same component would answer here.
+	// Correlated by product as well as by occurrence, because an occurrence
+	// identity carries none — without it a deferral made in another product
+	// that ships the same component would answer here.
 	deferred, covering := StandingDeferral("?", now)
 	// The product, then whatever the standing test binds, in that order.
 	covers := append([]any{productID}, covering...)
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	// Grouped to the unit every other screen counts in — one issue at one
 	// component — rather than to the row. Counted per row, a kernel flaw at
-	// forty-five places was forty-five late things and one late thing on the
+	// forty-five occurrences was forty-five late things and one late thing on the
 	// findings list beside it, and the two numbers carry the same name. The
 	// rate is a claim about how much work met its deadline, and the unit of
 	// work is what somebody decides about.
@@ -138,9 +138,9 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		GroupExpr(rating.BandExpr + `, "f"."vulnerability_id", "f"."component_id"`)
 
 	// Each of the four, read about a group rather than about a row.
-	// Closed when no place is still open and at least one of them carried a
+	// Closed when no occurrence is still open and at least one of them carried a
 	// deadline to be judged against; met when none of those was late;
-	// deferred when every open place is covered by one, because a deferral
+	// deferred when every open occurrence is covered by one, because a deferral
 	// over some of a group leaves the rest running; overdue when anything
 	// open is past its date and not covered.
 	err = s.db.NewSelect().

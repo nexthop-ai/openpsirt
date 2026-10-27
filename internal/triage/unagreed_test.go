@@ -27,19 +27,19 @@ func TestWhatHidesRiskWithNobodyAgreeingIsCountedAndTheRestIsNot(t *testing.T) {
 		// one.
 		putOff time.Duration
 	}{
-		// The three that claim no further work is needed. Each requires a
+		// The three that say no further work is needed. Each requires a
 		// second person, so each standing alone is a control that did not hold.
 		{"not applicable, nobody agreeing", triage.NotApplicable, nobody, true, 0},
 		{"will not fix, nobody agreeing", triage.WontFix, nobody, true, 0},
 		{"already fixed, nobody agreeing", triage.AlreadyFixed, nobody, true, 0},
-		// The same claim with somebody else's agreement is the rule working,
+		// The same decision with somebody else's agreement is the rule working,
 		// which is the arm that says this counts the right thing rather than
 		// everything.
 		{"not applicable, agreed by a second person", triage.NotApplicable, aSecondPerson, false, 0},
 		// An agreement from the proposer is not a second person. It is the
 		// shape the write path refuses and the one this exists to catch.
 		{"not applicable, agreed by its own proposer", triage.NotApplicable, itsOwnProposer, true, 0},
-		// An agreement taken back leaves nothing standing behind the claim,
+		// An agreement taken back leaves nothing standing behind the decision,
 		// which is the whole point of withdrawing one.
 		{"not applicable, agreed and then withdrawn", triage.NotApplicable, thenWithdrawn, true, 0},
 		// Hides risk and is approved conditionally, on where its date sits
@@ -49,7 +49,7 @@ func TestWhatHidesRiskWithNobodyAgreeingIsCountedAndTheRestIsNot(t *testing.T) {
 		// built for.
 		{"a short deferral, nobody agreeing", triage.Deferred, nobody, false,
 			20 * 24 * time.Hour},
-		// The same claim put off far enough that the gate asked for a second
+		// The same decision put off far enough that the gate asked for a second
 		// person. It got one and then it was taken back, so a decision that
 		// needed agreement is standing with none — which is the same write
 		// path got around that the three above are, and was missed entirely
@@ -82,7 +82,7 @@ func TestWhatHidesRiskWithNobodyAgreeingIsCountedAndTheRestIsNot(t *testing.T) {
 
 				f.unagreed(t, one.outcome, one.agree, one.putOff)
 
-				claims, rows, err := f.store.HiddenWithNobodyAgreeing(t.Context())
+				decisions, rows, err := f.store.HiddenWithNobodyAgreeing(t.Context())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -90,16 +90,16 @@ func TestWhatHidesRiskWithNobodyAgreeingIsCountedAndTheRestIsNot(t *testing.T) {
 				if one.counts {
 					want = 1
 				}
-				if claims != want || rows != want {
-					t.Errorf("counted %d claims over %d rows, want %d of each",
-						claims, rows, want)
+				if decisions != want || rows != want {
+					t.Errorf("counted %d decisions over %d rows, want %d of each",
+						decisions, rows, want)
 				}
 			})
 		})
 	}
 }
 
-// agreement is what stands behind a claim, for the table above.
+// agreement is what stands behind a decision, for the table above.
 type agreement int
 
 const (
@@ -110,10 +110,10 @@ const (
 	stillWaiting
 )
 
-// unagreed records one claim of this outcome and puts the stated agreement
+// unagreed records one decision of this outcome and puts the stated agreement
 // behind it.
 //
-// The claim goes through the store, because what is being asked about is a real
+// The decision goes through the store, because what is being asked about is a real
 // decision in force. The agreement goes to the table directly where it is one
 // the store would refuse, which is exactly the row this has to see through.
 func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreement,
@@ -122,7 +122,7 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 	t.Helper()
 	ctx := t.Context()
 	proposal := triage.Proposal{
-		Place: f.at(), Outcome: outcome, By: f.proposer,
+		Occurrence: f.at(), Outcome: outcome, By: f.proposer,
 		Reasoning:     "The parser is never reached: we only call the encoder.",
 		NeedsApproval: outcome.HidesRisk(),
 	}
@@ -135,7 +135,7 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 	case triage.AlreadyFixed:
 		proposal.FixedVersion = "1.2.4"
 	}
-	decision, err := f.store.Propose(ctx, f.triager, proposal)
+	occurrence, err := f.store.Propose(ctx, f.triager, proposal)
 	if err != nil {
 		t.Fatalf("propose %s: %v", outcome, err)
 	}
@@ -145,8 +145,8 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 	// gate's own verdict, which would be worth nothing if a caller could
 	// assert it.
 	var gated bool
-	if err := f.db.DB.NewSelect().TableExpr(`"decision"`).
-		ColumnExpr(`"needs_approval"`).Where(`"claim_id" = ?`, decision.ClaimID).
+	if err := f.db.DB.NewSelect().TableExpr(`"decision_occurrence"`).
+		ColumnExpr(`"needs_approval"`).Where(`"decision_id" = ?`, occurrence.DecisionID).
 		Limit(1).Scan(ctx, &gated); err != nil {
 		t.Fatalf("read whether the gate asked for a second person: %v", err)
 	}
@@ -164,7 +164,7 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 				approver = f.proposer
 			}
 			approval := &triage.Approval{
-				ClaimID: decision.ClaimID, RevisionID: revisionOf(t, f, decision.ClaimID),
+				DecisionID: occurrence.DecisionID, RevisionID: revisionOf(t, f, occurrence.DecisionID),
 				ApprovedBy: approver, ApprovedAt: now,
 			}
 			if behind == thenWithdrawn {
@@ -177,21 +177,21 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 		// Standing, whatever is or is not behind it. That is the state this
 		// asks about: a decision in force suppresses a finding, and one still
 		// waiting suppresses nothing.
-		if _, err := f.db.DB.NewUpdate().Table("decision").
+		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"state" = ?`, triage.Approved).
-			Where(`"claim_id" = ?`, decision.ClaimID).Exec(ctx); err != nil {
+			Where(`"decision_id" = ?`, occurrence.DecisionID).Exec(ctx); err != nil {
 			t.Fatalf("stand the decision: %v", err)
 		}
 	}
 }
 
-// revisionOf is the revision a claim's reasoning currently stands at, which an
+// revisionOf is the revision a decision's reasoning currently stands at, which an
 // agreement points at.
-func revisionOf(t *testing.T, f *fixture, claimID int64) int64 {
+func revisionOf(t *testing.T, f *fixture, decisionID int64) int64 {
 	t.Helper()
 	var revision int64
-	if err := f.db.DB.NewSelect().TableExpr(`"claim"`).
-		ColumnExpr(`"revision_id"`).Where(`"id" = ?`, claimID).
+	if err := f.db.DB.NewSelect().TableExpr(`"decision"`).
+		ColumnExpr(`"revision_id"`).Where(`"id" = ?`, decisionID).
 		Scan(t.Context(), &revision); err != nil {
 		t.Fatalf("read which revision stands: %v", err)
 	}

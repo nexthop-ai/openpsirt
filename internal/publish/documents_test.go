@@ -49,9 +49,9 @@ func TestAStatementHoldingForAnybodyNamesTheComponentAlone(t *testing.T) {
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.decide(w.Target, "CVE-2026-1002", libnl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 		w.publishes(w.Product, true)
 		w.write()
 
@@ -128,18 +128,18 @@ func buildLeaf(doc *advisory.Document) *advisory.Named {
 	return nil
 }
 
-// Whom a statement holds for is what the claim states where it states it,
+// Whom a statement holds for is what the decision states where it states it,
 // either way.
-func TestAClaimStatesWhomItsStatementHoldsFor(t *testing.T) {
+func TestADecisionStatesWhomItsStatementHoldsFor(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
-		// The reason says anybody, and the claim says this build only.
-		w.decide(w.Target, "CVE-2026-1001", openssl, claim{outcome: triage.NotApplicable,
+		// The reason says anybody, and the decision says this build only.
+		w.decide(w.Target, "CVE-2026-1001", openssl, decision{outcome: triage.NotApplicable,
 			justification: triage.CodeNotPresent, scope: triage.BuildSpecific})
-		// The reason says this build, and the claim says anybody.
-		w.decide(w.Target, "CVE-2026-1002", libnl, claim{outcome: triage.NotApplicable,
+		// The reason says this build, and the decision says anybody.
+		w.decide(w.Target, "CVE-2026-1002", libnl, decision{outcome: triage.NotApplicable,
 			justification: triage.CodeNotInExecutePath, scope: triage.Portable})
 		w.publishes(w.Product, true)
 		w.write()
@@ -147,11 +147,11 @@ func TestAClaimStatesWhomItsStatementHoldsFor(t *testing.T) {
 		narrowed := w.csafAbout(w.Product, "CVE-2026-1001")
 		part := openssl.Purl + "|" + buildID(fixture.BranchName, fixture.CustomerVariant)
 		if got := narrowed.Vulnerabilities[0].Status.KnownNotAffected; !slices.Equal(got, []string{part}) {
-			t.Errorf("known not affected %v, want %s: the claim said this build only", got, part)
+			t.Errorf("known not affected %v, want %s: the decision said this build only", got, part)
 		}
 		widened := w.csafAbout(w.Product, "CVE-2026-1002")
 		if got := widened.Vulnerabilities[0].Status.KnownNotAffected; !slices.Equal(got, []string{libnl.Purl}) {
-			t.Errorf("known not affected %v, want %s: the claim said anybody", got, libnl.Purl)
+			t.Errorf("known not affected %v, want %s: the decision said anybody", got, libnl.Purl)
 		}
 	})
 }
@@ -163,16 +163,16 @@ func TestAStatementTheBuildsDisagreeOnIsStatedPerBuild(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		// The lab build ships the same openssl beneath swss, a place the
-		// claim below does not reach.
+		// The lab build ships the same openssl beneath swss, an occurrence the
+		// decision below does not reach.
 		lab := w.TargetFor(w.Branch, w.Internal)
 		labRoot := graph.Described{Purl: "pkg:generic/sonic@lab.7", Name: "sonic", Version: "lab.7"}
 		w.ship(lab, labRoot, edge{labRoot, swss}, edge{swss, openssl})
 		w.report(w.Target, reported{"CVE-2026-1001", openssl})
 		w.report(lab, reported{"CVE-2026-1001", openssl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
-		w.decide(lab, "CVE-2026-1001", openssl, claim{outcome: triage.Affected})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.decide(lab, "CVE-2026-1001", openssl, decision{outcome: triage.Affected})
 		w.publishes(w.Product, true)
 		w.write()
 
@@ -205,14 +205,14 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 			reported{"CVE-2026-1004", libnl}, reported{"CVE-2026-1005", openssl},
 			reported{"CVE-2026-1006", libnl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
-		w.decide(w.Target, "CVE-2026-1004", libnl, claim{outcome: triage.Affected})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.decide(w.Target, "CVE-2026-1004", libnl, decision{outcome: triage.Affected})
 		// A dismissal nobody has agreed to yet, and a deferral: neither is a
 		// decision that the issue applies, and neither is published.
-		w.decide(w.Target, "CVE-2026-1005", openssl, claim{outcome: triage.NotApplicable,
+		w.decide(w.Target, "CVE-2026-1005", openssl, decision{outcome: triage.NotApplicable,
 			justification: triage.CodeNotPresent, waiting: true})
 		later := time.Now().UTC().Add(30 * 24 * time.Hour).Truncate(24 * time.Hour)
-		w.decide(w.Target, "CVE-2026-1006", libnl, claim{outcome: triage.Deferred, deferredUntil: &later})
+		w.decide(w.Target, "CVE-2026-1006", libnl, decision{outcome: triage.Deferred, deferredUntil: &later})
 		w.publishes(w.Product, true)
 		w.write()
 
@@ -284,7 +284,7 @@ func TestADocumentIsRevisedOnlyWhenItsAnswerMoves(t *testing.T) {
 		// The build's own reason, so the document names each build it holds
 		// for.
 		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 		w.publishes(w.Product, true)
 		first := w.write()
 		if first.Revised == 0 {
@@ -296,8 +296,8 @@ func TestADocumentIsRevisedOnlyWhenItsAnswerMoves(t *testing.T) {
 				again.Revised, again.Withdrawn)
 		}
 
-		// The lab build ships the same openssl at the same place, and the
-		// claim reaches it: the document now speaks for a second build.
+		// The lab build ships the same openssl at the same occurrence, and the
+		// decision reaches it: the document now speaks for a second build.
 		lab := w.TargetFor(w.Branch, w.Internal)
 		labRoot := graph.Described{Purl: "pkg:generic/sonic@lab.7", Name: "sonic", Version: "lab.7"}
 		w.ship(lab, labRoot, edge{labRoot, openssl})
@@ -331,7 +331,7 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
 		w.decide(w.Target, "CVE-2026-1002", libnl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()
 		before := w.csafAbout(w.Product, "CVE-2026-1002")
@@ -380,7 +380,7 @@ func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
 			w.ship(target, root, edge{root, openssl})
 			w.report(target, reported{"CVE-2026-1001", openssl})
 			w.decide(target, "CVE-2026-1001", openssl,
-				claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 			w.publishes(product, true)
 			targets = append(targets, target)
 		}
@@ -440,7 +440,7 @@ func TestMovingTheAddressRevisesEveryDocument(t *testing.T) {
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()
 		moved := publish.NewPass(w.DB.DB, publish.NewGenerator(w.DB.DB, who, "https://elsewhere.example.test"),

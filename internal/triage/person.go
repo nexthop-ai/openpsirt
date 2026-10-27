@@ -19,9 +19,9 @@ import (
 // and the lists behind each number are the record's own screens, narrowed the
 // way that screen narrows.
 type Record struct {
-	// Proposed is how many claims they argued.
+	// Proposed is how many decisions they argued.
 	Proposed int
-	// Approved is how many claims they agreed to that still stand, and
+	// Approved is how many decisions they agreed to that still stand, and
 	// Withdrawn how many they agreed to and later took back. Two numbers
 	// rather than one: an agreement taken back is not somebody who agrees,
 	// and the record's own file already says so.
@@ -52,7 +52,7 @@ func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID i
 	}
 	var out Record
 
-	proposed, err := s.db.NewSelect().Model((*Claim)(nil)).
+	proposed, err := s.db.NewSelect().Model((*Decision)(nil)).
 		Where(`"proposed_by" = ?`, personID).Count(ctx)
 	if err != nil {
 		return Record{}, fmt.Errorf("count what they proposed: %w", err)
@@ -60,7 +60,7 @@ func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID i
 	out.Proposed = int(proposed)
 	if proposed > 0 {
 		var at time.Time
-		if err := s.db.NewSelect().Model((*Claim)(nil)).
+		if err := s.db.NewSelect().Model((*Decision)(nil)).
 			ColumnExpr(`MAX("proposed_at")`).
 			Where(`"proposed_by" = ?`, personID).Scan(ctx, &at); err != nil {
 			return Record{}, fmt.Errorf("read when they last proposed: %w", err)

@@ -3,9 +3,9 @@
 
 // The record of the flaw, as against what anybody has said about it.
 //
-// The component's place, upstream's releases, the route the scanner
+// The component's occurrence, upstream's releases, the route the scanner
 // matched it, what the published references say, and who reported it. None of
-// it is a judgment; all of it is what somebody reads before making one.
+// it is a decision; all of it is what somebody reads before making one.
 
 import { Fragment, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -21,7 +21,13 @@ import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
 import { Correspondence, ReportNotes } from "./InboxReport";
-import { decisionAt, inboxReportAt, refiled, dependenciesAt, type Build } from "../app/routes";
+import {
+  decisionOccurrenceAt,
+  inboxReportAt,
+  refiled,
+  dependenciesAt,
+  type Build,
+} from "../app/routes";
 
 // Away is an address somebody else supplied, shown as a link only where it is
 // one this deployment is willing to send a reader to.
@@ -42,34 +48,34 @@ function Away({ url }: { url?: string }) {
   );
 }
 
-export function Places({
-  places,
+export function Occurrences({
+  occurrences,
   build,
   version,
 }: {
-  places: Sitting[];
+  occurrences: Sitting[];
   build: Build;
   // The versions shipped here, for a way down the graph could not walk: the
-  // chain carries a version at every step and a place without one carries none.
+  // chain carries a version at every step and an occurrence without one carries none.
   version?: string;
 }) {
   const [all, setAll] = useState(false);
-  if (places.length === 0) return null;
-  const shown = all ? places : places.slice(0, CHAINS);
-  const more = moreWays(places.length, all);
+  if (occurrences.length === 0) return null;
+  const shown = all ? occurrences : occurrences.slice(0, CHAINS);
+  const more = moreWays(occurrences.length, all);
   return (
     <div className="pathblock">
       <h3>Dependency path</h3>
       <div className="tree">
-        {shown.map((place, i) => {
-          const { steps, rootless } = wayDown(place, version);
+        {shown.map((occurrence, i) => {
+          const { steps, rootless } = wayDown(occurrence, version);
           return (
-            <Fragment key={`${place.place} ${i}`}>
+            <Fragment key={`${occurrence.occurrence} ${i}`}>
               {steps.map((step, depth) => {
                 const last = depth === steps.length - 1;
                 return (
                   <div
-                    key={`${place.place} ${i} ${depth}`}
+                    key={`${occurrence.occurrence} ${i} ${depth}`}
                     className={`node${last ? " here" : ""}`}
                     style={{ paddingLeft: depth * 18 }}
                   >
@@ -85,24 +91,27 @@ export function Places({
                         rank, does not prefill an outcome, and hides nothing.
                         "Build-time only" is the largest deferral class a
                         vendor has, and it is a person's to make. */}
-                    {last && place.declared_as && (
+                    {last && occurrence.declared_as && (
                       <span className="state" title="The producer's own name for this dependency">
-                        producer said {place.declared_as}
+                        producer said {occurrence.declared_as}
                       </span>
                     )}
-                    {last && place.suppressed && (
+                    {last && occurrence.suppressed && (
                       <span className="state open">suppressed by the build</span>
                     )}
-                    {last && place.answered_by && (
+                    {last && occurrence.answered_by && (
                       <span
                         className="state open"
-                        title={`${place.answered_by} says ${place.answered_in} is not affected. Routes outside it are still open.`}
+                        title={`${occurrence.answered_by} says ${occurrence.answered_in} is not affected. Routes outside it are still open.`}
                       >
-                        answered inside {place.answered_in}
+                        answered inside {occurrence.answered_in}
                       </span>
                     )}
-                    {last && place.decision != null && (
-                      <Link to={decisionAt(place.decision)} className="linkish">
+                    {last && occurrence.decision_occurrence != null && (
+                      <Link
+                        to={decisionOccurrenceAt(occurrence.decision_occurrence)}
+                        className="linkish"
+                      >
                         decided
                       </Link>
                     )}
@@ -123,11 +132,11 @@ export function Places({
             each step on the way down and lands on the component, so arriving
             from a finding shows where it sits rather than the root.
 
-            From a place the graph could be walked to, whichever of them that
-            is. A chain is what the tree opens along, and the first place is
+            From an occurrence the graph could be walked to, whichever of them that
+            is. A chain is what the tree opens along, and the first occurrence is
             not always one that has a route up; the tree handed only a name
             has nothing to open on the way down to it. */}
-        <Link to={dependenciesAt(build, intoTheTree(places))} className="linkish">
+        <Link to={dependenciesAt(build, intoTheTree(occurrences))} className="linkish">
           View in dependency tree →
         </Link>
       </div>
@@ -246,7 +255,7 @@ function OnBranches({
 //
 // The findings list marks these and the screen somebody decides on did not,
 // which is the wrong way round: the list is where they are noticed and this is
-// where the judgment is made. Nothing is said where the scanner said nothing,
+// where the decision is made. Nothing is said where the scanner said nothing,
 // because unknown is not unconfirmed.
 export function MatchMethod({
   matched,
@@ -275,7 +284,7 @@ export function MatchMethod({
           <b>Confirmed by a packager.</b>
         </p>
       )}
-      {/* The evidence for the judgment above rather than a second way of
+      {/* The evidence for the decision above rather than a second way of
           making it: the range fired on, read beside the version that ships.
           Where the range names no packaging revision and the version has one,
           the argument is complete in a line and needs no explaining. */}
@@ -299,7 +308,7 @@ export function MatchMethod({
   );
 }
 
-// The places to read about this, worked out from the names held here rather
+// The occurrences to read about this, worked out from the names held here rather
 // than handed over by a scanner.
 //
 // A scanner points at whatever its data carried, which for a package matched
@@ -402,7 +411,7 @@ export function Reporter({
         // statuses mean opposite things: the endpoint answers 404 for "no
         // report is the record of this issue" and 403 for "you do not hold
         // triage here" — so folding them tells a case collaborator nobody
-        // reported it, which is a false claim about a security record rather
+        // reported it, which is a false statement about a security record rather
         // than a quiet card.
         <Failed error={told.error} what="The reporter could not be read." />
       ) : !report ? (
@@ -502,7 +511,7 @@ export function Reporter({
 //
 // Inside the reporter card where the flaw was recorded here, and a card of its
 // own on an issue a scanner found, which has no reporter card and is the usual
-// thing a claim duplicates.
+// thing a decision duplicates.
 export function Duplicates({
   product,
   vulnerability,

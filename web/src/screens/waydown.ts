@@ -4,14 +4,14 @@
 import type { Sitting } from "../ui/Covering";
 import { STEP, keyOf } from "./treeshape";
 
-// The way down to one place, as the rows a reader sees.
+// The way down to one occurrence, as the rows a reader sees.
 //
-// Three situations, and they are not one. A place the graph could be walked to
-// carries the whole chain, the build first. A place whose consumer is recorded
+// Three situations, and they are not one. An occurrence the graph could be walked to
+// carries the whole chain, the build first. An occurrence whose consumer is recorded
 // but whose route up is not — an inventory describing something under a
 // component that nothing reaches from the root — is still one hop: this
 // component under that consumer, which is what a decision is keyed on. Only a
-// place with neither is unplaced, and only there does the screen say nothing
+// occurrence with neither is unplaced, and only there does the screen say nothing
 // recorded what pulls it in.
 //
 // Drawn as unplaced, the second says something false about a record that has
@@ -28,11 +28,11 @@ type WayDown = {
 };
 
 // The version is the one that ships here, which the chain carries at every
-// step and a place with no chain does not carry at all. Handed in, so a way
+// step and an occurrence with no chain does not carry at all. Handed in, so a way
 // down of one hop names the same thing its siblings do rather than a bare
 // name.
-export function wayDown(place: Sitting, version?: string): WayDown {
-  const chain = place.chain ?? [];
+export function wayDown(occurrence: Sitting, version?: string): WayDown {
+  const chain = occurrence.chain ?? [];
   if (chain.length > 0) {
     return {
       // All four, because the tree names a row by all four and opens the
@@ -46,25 +46,25 @@ export function wayDown(place: Sitting, version?: string): WayDown {
       rootless: false,
     };
   }
-  const here: Step = { component: place.component ?? "", version: version || undefined };
-  if (place.consumer) {
-    return { steps: [{ component: place.consumer }, here], rootless: true };
+  const here: Step = { component: occurrence.component ?? "", version: version || undefined };
+  if (occurrence.consumer) {
+    return { steps: [{ component: occurrence.consumer }, here], rootless: true };
   }
   return { steps: [here], rootless: true };
 }
 
-// The place the dependency tree opens from a finding: the place the graph
+// The occurrence the dependency tree opens from a finding: the occurrence the graph
 // could be walked to, whichever of them that is, as the query the tree takes.
 //
-// The tree opens along a chain, expanding each step. Handed a place with no
+// The tree opens along a chain, expanding each step. Handed an occurrence with no
 // route up, it has a name to land on and nothing to walk, so it opens at the
-// root with the component nowhere in sight. Where no place has one, the
+// root with the component nowhere in sight. Where no occurrence has one, the
 // component alone is the honest answer: the tree says what it can find.
-export function intoTheTree(places: Sitting[]): string {
-  const walked = places.find((place) => (place.chain ?? []).length > 0);
+export function intoTheTree(occurrences: Sitting[]): string {
+  const walked = occurrences.find((occurrence) => (occurrence.chain ?? []).length > 0);
   const query = new URLSearchParams();
   if (!walked) {
-    query.set("at", places[0]?.component ?? "");
+    query.set("at", occurrences[0]?.component ?? "");
     return query.toString();
   }
   const steps = wayDown(walked).steps;

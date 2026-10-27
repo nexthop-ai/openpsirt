@@ -12,15 +12,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-func TestABulkClaimSkippingDecidedPlacesSaysWhichItLeftOut(t *testing.T) {
-	// The response is where the claimant learns the claim is smaller than the
-	// selection, so each skipped place comes back by the issue's name with
-	// the decision standing there.
+func TestABulkDecisionSkippingDecidedOccurrencesSaysWhichItLeftOut(t *testing.T) {
+	// The response is where the proposer learns the decision is smaller than
+	// the selection, so each skipped occurrence comes back by the issue's name
+	// with the decision standing there.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/components/linux-image/bulk-decision"
-		claim := func(issues, extra string) *struct {
+		decision := func(issues, extra string) *struct {
 			code int
 			body string
 		} {
@@ -33,24 +33,24 @@ func TestABulkClaimSkippingDecidedPlacesSaysWhichItLeftOut(t *testing.T) {
 				body string
 			}{got.Code, got.Body.String()}
 		}
-		if got := claim(`"CVE-2026-1000"`, ""); got.code != http.StatusCreated {
-			t.Fatalf("the first claim answered %d: %s", got.code, got.body)
+		if got := decision(`"CVE-2026-1000"`, ""); got.code != http.StatusCreated {
+			t.Fatalf("the first decision answered %d: %s", got.code, got.body)
 		}
-		if got := claim(`"CVE-2026-9999","CVE-2026-1000"`, ""); got.code !=
+		if got := decision(`"CVE-2026-9999","CVE-2026-1000"`, ""); got.code !=
 			http.StatusUnprocessableEntity {
-			t.Fatalf("a selection covering a decided place answered %d: %s", got.code, got.body)
+			t.Fatalf("a selection covering a decided occurrence answered %d: %s", got.code, got.body)
 		}
 
-		got := claim(`"CVE-2026-9999","CVE-2026-1000"`, `,"skip_decided":true`)
+		got := decision(`"CVE-2026-9999","CVE-2026-1000"`, `,"skip_decided":true`)
 		if got.code != http.StatusCreated {
 			t.Fatalf("skipping answered %d: %s", got.code, got.body)
 		}
 		var made struct {
 			Recorded int `json:"recorded"`
 			Skipped  []struct {
-				Vulnerability string `json:"vulnerability"`
-				Decision      int64  `json:"decision"`
-				State         string `json:"state"`
+				Vulnerability      string `json:"vulnerability"`
+				DecisionOccurrence int64  `json:"decision_occurrence"`
+				State              string `json:"state"`
 			} `json:"skipped"`
 		}
 		if err := json.Unmarshal([]byte(got.body), &made); err != nil {
@@ -58,13 +58,13 @@ func TestABulkClaimSkippingDecidedPlacesSaysWhichItLeftOut(t *testing.T) {
 		}
 		if made.Recorded != 1 || len(made.Skipped) != 1 ||
 			made.Skipped[0].Vulnerability != "CVE-2026-1000" ||
-			made.Skipped[0].Decision == 0 || made.Skipped[0].State != "proposed" {
-			t.Errorf("the claim reads %+v, want one recorded and CVE-2026-1000 skipped", made)
+			made.Skipped[0].DecisionOccurrence == 0 || made.Skipped[0].State != "proposed" {
+			t.Errorf("the decision reads %+v, want one recorded and CVE-2026-1000 skipped", made)
 		}
 
-		if got := claim(`"CVE-2026-9999","CVE-2026-1000"`, `,"skip_decided":true`); got.code !=
+		if got := decision(`"CVE-2026-9999","CVE-2026-1000"`, `,"skip_decided":true`); got.code !=
 			http.StatusUnprocessableEntity {
-			t.Errorf("a selection with nothing left to claim answered %d: %s", got.code, got.body)
+			t.Errorf("a selection with nothing left to decide answered %d: %s", got.code, got.body)
 		}
 	})
 }
@@ -72,7 +72,7 @@ func TestABulkClaimSkippingDecidedPlacesSaysWhichItLeftOut(t *testing.T) {
 func TestABulkAnswerIsBoundedByTheIssuesItAsksAReviewerToRead(t *testing.T) {
 	// A reviewer reads issues, so a new answer about many of them is counted
 	// in issues. Two issues against a limit of one is refused whatever the
-	// place ceiling, and passes once the limit is two.
+	// occurrence ceiling, and passes once the limit is two.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
@@ -130,8 +130,8 @@ func TestABulkDeferralRecordsTheDateItRunsTo(t *testing.T) {
 			t.Fatalf("a bulk deferral answered %d: %s", code, body)
 		}
 		var made struct {
-			ClaimID  int64 `json:"claim_id"`
-			Recorded int   `json:"recorded"`
+			DecisionID int64 `json:"decision_id"`
+			Recorded   int   `json:"recorded"`
 		}
 		if err := json.Unmarshal([]byte(body), &made); err != nil {
 			t.Fatal(err)
@@ -139,15 +139,15 @@ func TestABulkDeferralRecordsTheDateItRunsTo(t *testing.T) {
 		if made.Recorded != 2 {
 			t.Errorf("a deferral of two issues recorded %d", made.Recorded)
 		}
-		var claim struct {
+		var decision struct {
 			Argument struct {
 				Outcome       string `json:"outcome"`
 				DeferredUntil string `json:"deferred_until"`
 			} `json:"argument"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/decisions/"+httpapitest.Itoa(made.ClaimID), &claim)
-		if claim.Argument.Outcome != "deferred" || claim.Argument.DeferredUntil != httpapitest.AheadOfUs {
-			t.Errorf("the claim reads %+v, want deferred until %s", claim.Argument, httpapitest.AheadOfUs)
+		httpapitest.Read(t, r, "triager", "/v1/decisions/"+httpapitest.Itoa(made.DecisionID), &decision)
+		if decision.Argument.Outcome != "deferred" || decision.Argument.DeferredUntil != httpapitest.AheadOfUs {
+			t.Errorf("the decision reads %+v, want deferred until %s", decision.Argument, httpapitest.AheadOfUs)
 		}
 	})
 }

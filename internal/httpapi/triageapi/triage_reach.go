@@ -13,18 +13,18 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
-// The reach of a judgment made here, beyond this build.
+// The reach of a decision made here, beyond this build.
 //
-// Two operations and the shape they answer with. A judgment is keyed on
+// Two operations and the shape they answer with. A decision is keyed on
 // content rather than on a location, so what it covers beyond the build
 // somebody is looking at is a question with an answer — and the answer has to
-// be shown before the judgment is made, not discovered afterwards.
+// be shown before the decision is made, not discovered afterwards.
 
-// ReachBody is how far a judgment made here would travel.
+// ReachBody is how far a decision made here would travel.
 type ReachBody struct {
-	Here      int         `json:"here" doc:"Places in this build the judgment covers"`
+	Here      int         `json:"here" doc:"Occurrences in this build the decision covers"`
 	Automatic []MatchBody `json:"automatic" doc:"Other builds it reaches by matching. Nothing to agree to"`
-	Differing []MatchBody `json:"differing" doc:"The same issue at the same place held at another version — in this build or in another. Each is a separate judgment, because the code differs"`
+	Differing []MatchBody `json:"differing" doc:"The same issue at the same occurrence held at another version — in this build or in another. Each is a separate decision, because the code differs"`
 }
 
 func reachBody(r finding.Reach) ReachBody {
@@ -35,14 +35,14 @@ func reachBody(r finding.Reach) ReachBody {
 	}
 	for _, m := range r.Automatic {
 		body.Automatic = append(body.Automatic, MatchBody{
-			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Places: m.Places, Here: m.Here,
+			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
 			StreamName:  m.StreamName,
 			VariantName: m.VariantName,
 		})
 	}
 	for _, m := range r.Differing {
 		body.Differing = append(body.Differing, MatchBody{
-			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Places: m.Places, Here: m.Here,
+			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
 			StreamName:  m.StreamName,
 			VariantName: m.VariantName,
 		})
@@ -50,7 +50,7 @@ func reachBody(r finding.Reach) ReachBody {
 	return body
 }
 
-// MatchBody is the same issue at the same place in another build.
+// MatchBody is the same issue at the same occurrence in another build.
 type MatchBody struct {
 	Stream      string `json:"stream"`
 	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
@@ -60,8 +60,8 @@ type MatchBody struct {
 	// question. With a match, the decision already reaches there and nobody is
 	// asked. It is the version the decision route resolves a name by, so a
 	// caller applying the decision there passes it back as ?version=.
-	Version string `json:"version,omitempty" doc:"The version that build ships under this name — pass it as ?version= when applying a decision there"`
-	Places  int    `json:"places" doc:"The number of places it sits at there"`
+	Version     string `json:"version,omitempty" doc:"The version that build ships under this name — pass it as ?version= when applying a decision there"`
+	Occurrences int    `json:"occurrences" doc:"The number of occurrences it sits at there"`
 	// Here says this is another version in the build being decided in, rather
 	// than in another release or variant. A build commonly ships one name at
 	// several versions, and those sit beside the one in hand.
@@ -71,20 +71,20 @@ type MatchBody struct {
 func registerElsewhere(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-decision-reach", Method: http.MethodGet,
-		Path:    placePathPrefix + "/reach",
+		Path:    occurrencePathPrefix + "/reach",
 		Summary: "Show how far a decision here would reach",
-		Description: "Returns the three parts of what a judgment made here covers.\n\n" +
-			"`here` is how many places in this build. `automatic` are other builds it reaches " +
+		Description: "Returns the three parts of what a decision made here covers.\n\n" +
+			"`here` is how many occurrences in this build. `automatic` are other builds it reaches " +
 			"without anybody doing anything, because their upstream versions and chains already " +
-			"match — a decision is a claim about a combination of code, not about a release. " +
-			"`differing` hold the same issue at the same place at another version, so each is a " +
-			"separate judgment.\n\n" +
+			"match — a decision is a statement about a combination of code, not about a release. " +
+			"`differing` hold the same issue at the same occurrence at another version, so each is a " +
+			"separate decision.\n\n" +
 			"Only `differing` is a choice. The first two follow from the matching rules and are " +
 			"there to be told, not agreed to — and showing them as one number is how a decision " +
 			"comes to reach builds the person making it never knew about.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		PlacePath
+		OccurrencePath
 	}) (*struct{ Body ReachBody }, error) {
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {
@@ -96,7 +96,7 @@ func registerElsewhere(api huma.API, in core.Deps) {
 		// the second differently — so the request would authorize against one
 		// answer and report against another.
 		at, here, err := decidingAbout(ctx, in, subject, input.Product, input.Stream,
-			input.Variant, input.Vulnerability, input.Place)
+			input.Variant, input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err
 		}
@@ -115,15 +115,15 @@ func registerReachAcross(api huma.API, in core.Deps) {
 		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 			"/findings/{issue}/components/{component}/reach",
 		Summary: "Show how far a decision about this finding would reach",
-		Description: "The same three parts the per-place answer gives, for every place " +
+		Description: "The same three parts the per-occurrence answer gives, for every occurrence " +
 			"the finding sits at, merged.\n\n" +
-			"A judgment is made about an issue in a component, which is a group of places " +
-			"rather than one — a kernel flaw sits at sixty. Asking per place is a request " +
+			"A decision is made about an issue in a component, which is a group of occurrences " +
+			"rather than one — a kernel flaw sits at sixty. Asking per occurrence is a request " +
 			"each, so a screen doing that samples, and a sample decides which other builds " +
-			"it can offer to include: one reachable only from a place the sample missed is " +
-			"never offered and the judgment does not travel there.\n\n" +
-			"A build reached from two places of the finding is one thing to agree to, and " +
-			"carries the places of both.",
+			"it can offer to include: one reachable only from an occurrence the sample missed is " +
+			"never offered and the decision does not travel there.\n\n" +
+			"A build reached from two occurrences of the finding is one thing to agree to, and " +
+			"carries the occurrences of both.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
@@ -142,14 +142,14 @@ func registerReachAcross(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		places, err := finding.NewStore(in.DB.DB).PlacesFor(ctx, subject, target, issue, at)
+		occurrences, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, target, issue, at)
 		if err != nil {
-			return nil, core.Absent(in.Logger, err, "those places could not be looked up", core.NoSuchFinding)
+			return nil, core.Absent(in.Logger, err, "those occurrences could not be looked up", core.NoSuchFinding)
 		}
-		if len(places) == 0 {
+		if len(occurrences) == 0 {
 			return nil, core.NoSuchFinding()
 		}
-		reach, err := finding.NewStore(in.DB.DB).ReachingAcross(ctx, subject, places, target)
+		reach, err := finding.NewStore(in.DB.DB).ReachingAcross(ctx, subject, occurrences, target)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "cannot look for the same issue elsewhere", err)
 		}

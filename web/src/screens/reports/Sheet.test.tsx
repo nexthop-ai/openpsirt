@@ -39,8 +39,8 @@ describe("a printed sheet's header", () => {
     const row = {
       product: "sonic",
       component: "openssl",
-      claims: 1,
       decisions: 1,
+      occurrences: 1,
       people: 1,
       promised: 0,
       dismissed: 0,

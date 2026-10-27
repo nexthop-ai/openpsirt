@@ -16,12 +16,13 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// liveDecision is a decision that still holds its key, as a merge settles it.
+// liveDecision is a decision occurrence that still holds its key, as a merge
+// settles it.
 type liveDecision struct {
 	ID              int64     `bun:"id"`
 	ProductID       int64     `bun:"product_id"`
 	VulnerabilityID int64     `bun:"vulnerability_id"`
-	Place           string    `bun:"place_identity"`
+	Occurrence      string    `bun:"occurrence_identity"`
 	Component       *string   `bun:"component_upstream_version"`
 	Consumer        *string   `bun:"consumer_upstream_version"`
 	State           string    `bun:"state"`
@@ -29,7 +30,8 @@ type liveDecision struct {
 	Outcome         string    `bun:"outcome"`
 }
 
-// anyVersion is whether the claim stands at whatever versions the place holds.
+// anyVersion is whether the decision stands at whatever versions the occurrence
+// holds.
 func (d liveDecision) anyVersion() bool { return slices.Contains(AnyVersionOutcomes(), d.Outcome) }
 
 // outranks is whether one decision has more standing than another: approved
@@ -44,42 +46,42 @@ func (d liveDecision) outranks(other liveDecision) bool {
 	return d.ID > other.ID
 }
 
-// SupersededDecision is a live decision a merge took out of force because another
-// live decision stood at the same place under the other name.
-type SupersededDecision struct {
-	bun.BaseModel `bun:"table:decision_superseded,alias:ds"`
+// SupersededOccurrence is a live decision a merge took out of force because
+// another live decision stood at the same occurrence under the other name.
+type SupersededOccurrence struct {
+	bun.BaseModel `bun:"table:decision_occurrence_superseded,alias:ds"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
-	// DecisionID is the decision that lapsed and StandingID the one that stands
-	// in its place.
-	DecisionID int64 `bun:"decision_id,notnull"`
-	StandingID int64 `bun:"standing_id,notnull"`
-	MergeID    int64 `bun:"merge_id,notnull"`
+	// DecisionOccurrenceID is the decision occurrence that lapsed and StandingID the one
+	// that stands in its place.
+	DecisionOccurrenceID int64 `bun:"decision_occurrence_id,notnull"`
+	StandingID           int64 `bun:"standing_id,notnull"`
+	MergeID              int64 `bun:"merge_id,notnull"`
 	// Disagreed is whether the two said different things. A disagreement is
 	// told to the product's triagers.
 	Disagreed bool `bun:"disagreed,notnull"`
 }
 
-// Displaced is one judgment a merge took out of force because another stood
+// Displaced is one record a merge took out of force because another stood
 // in its place in the same product and said something different. The
 // product's triagers are told.
 type Displaced struct {
 	Kind      DisplacedKind
 	ProductID int64
-	// RecordID is the judgment that stopped standing and StandingID the one that
+	// RecordID is the record that stopped standing and StandingID the one that
 	// stands in its place, both of Kind.
 	RecordID   int64
 	StandingID int64
 	MergeID    int64
 }
 
-// DisplacedKind is which sort of judgment a merge displaced.
+// DisplacedKind is which sort of record a merge displaced.
 type DisplacedKind string
 
-// The judgments a merge settles by standing.
+// The records a merge settles by standing.
 const (
-	// DisplacedDecision is a live decision at one place.
-	DisplacedDecision DisplacedKind = "decision"
+	// DisplacedDecisionOccurrence is a live decision at one occurrence.
+	DisplacedDecisionOccurrence DisplacedKind = "decision"
 	// DisplacedRating is a rating claim in one product.
 	DisplacedRating DisplacedKind = "rating"
 	// DisplacedAttack is a record of the product being exploited through the
@@ -87,29 +89,30 @@ const (
 	DisplacedAttack DisplacedKind = "exploited-here"
 )
 
-// settleDecisions leaves one live decision at each place of the merged issue,
-// and holds every live decision under the key of the issue it is read as.
+// settleDecisions leaves one live decision at each occurrence of the merged
+// issue, and holds every live decision under the key of the issue it is read
+// as.
 //
-// Decisions at different places are untouched: they combine. Where one
-// product and place held a live decision under each name, about the same
+// Decisions at different occurrences are untouched: they combine. Where one
+// product and occurrence held a live decision under each name, about the same
 // versions or with either standing at any version, the one with more standing
 // stays and the other lapses, with a record naming the merge and the decision
 // that stands in its place. The lapse is the one a moved version makes, and
 // nothing else about the decision changes.
 //
-// A live decision then holds its key under the issue it is read as, because
-// the key is what makes one live decision per place a rule the database keeps.
-// Left under the name it was filed under, a new claim about the same place
-// under the issue that stands would find nothing in its way.
+// A live decision then holds its key under the issue it is read as, because the
+// key is what makes one live decision per occurrence a rule the database keeps.
+// Left under the name it was filed under, a new decision about the same
+// occurrence under the issue that stands would find nothing in its way.
 func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int64, now time.Time) error {
 	var live []liveDecision
 	if err := v.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		ColumnExpr(`"de"."id", "de"."product_id", "de"."vulnerability_id", "de"."place_identity"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		ColumnExpr(`"de"."id", "de"."product_id", "de"."vulnerability_id", "de"."occurrence_identity"`).
 		ColumnExpr(`"de"."component_upstream_version", "de"."consumer_upstream_version"`).
 		ColumnExpr(`"de"."state", "de"."proposed_at", "cl"."outcome"`).
-		Where(FiledUnder(filed.DecisionIssue), kept).
+		Where(FiledUnder(filed.DecisionOccurrenceIssue), kept).
 		Where(`"de"."live_key" IS NOT NULL`).
 		OrderExpr(`"de"."id"`).
 		Scan(ctx, &live); err != nil {
@@ -117,21 +120,21 @@ func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int
 	}
 
 	type at struct {
-		product int64
-		place   string
+		product    int64
+		occurrence string
 	}
-	byPlace := map[at][]liveDecision{}
+	byOccurrence := map[at][]liveDecision{}
 	var order []at
 	for _, d := range live {
-		key := at{d.ProductID, d.Place}
-		if _, seen := byPlace[key]; !seen {
+		key := at{d.ProductID, d.Occurrence}
+		if _, seen := byOccurrence[key]; !seen {
 			order = append(order, key)
 		}
-		byPlace[key] = append(byPlace[key], d)
+		byOccurrence[key] = append(byOccurrence[key], d)
 	}
 	lapsed := map[int64]bool{}
 	for _, key := range order {
-		for _, set := range colliding(byPlace[key]) {
+		for _, set := range colliding(byOccurrence[key]) {
 			if err := v.supersede(ctx, set, mergeID, now, lapsed); err != nil {
 				return err
 			}
@@ -142,25 +145,25 @@ func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int
 		if lapsed[d.ID] || d.VulnerabilityID == kept {
 			continue
 		}
-		key := LiveKey(d.ProductID, kept, d.Place, orBlank(d.Component), orBlank(d.Consumer),
+		key := LiveKey(d.ProductID, kept, d.Occurrence, orBlank(d.Component), orBlank(d.Consumer),
 			d.anyVersion())
-		if _, err := v.db.NewUpdate().TableExpr(`"decision"`).
+		if _, err := v.db.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"live_key" = ?`, key).
 			Where(`"id" = ?`, d.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("hold decision %d under the issue it is read as: %w", d.ID, err)
+			return fmt.Errorf("hold decision occurrence %d under the issue it is read as: %w", d.ID, err)
 		}
 	}
 	return nil
 }
 
-// colliding is the sets of live decisions at one place that hold one key
+// colliding is the sets of live decisions at one occurrence that hold one key
 // under more than one name, which is what one issue holds one of.
 //
 // A decision standing at any version collides with another standing at any
-// version. The rest collide where their versions agree. A claim at any version
-// and a claim about particular versions stand side by side under one issue, so
-// they stand side by side after a merge: the first is about identity and does
-// not lapse to a claim about a version (REQ-25).
+// version. The rest collide where their versions agree. A decision at any
+// version and a decision about particular versions stand side by side under one
+// issue, so they stand side by side after a merge: the first is about identity
+// and does not lapse to a decision about a version (REQ-25).
 func colliding(here []liveDecision) [][]liveDecision {
 	type held struct {
 		anyVersion          bool
@@ -208,24 +211,24 @@ func (v *Vulnerabilities) supersede(ctx context.Context, set []liveDecision, mer
 		if d.ID == winner.ID {
 			continue
 		}
-		if _, err := v.db.NewUpdate().TableExpr(`"decision"`).
+		if _, err := v.db.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"state" = ?`, "lapsed").
 			Set(`"ended_at" = ?`, now).
 			Set(`"live_key" = NULL`).
 			Where(`"id" = ?`, d.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("lapse decision %d, which a merge superseded: %w", d.ID, err)
+			return fmt.Errorf("lapse decision occurrence %d, which a merge superseded: %w", d.ID, err)
 		}
-		record := &SupersededDecision{
-			DecisionID: d.ID, StandingID: winner.ID, MergeID: mergeID,
+		record := &SupersededOccurrence{
+			DecisionOccurrenceID: d.ID, StandingID: winner.ID, MergeID: mergeID,
 			Disagreed: d.Outcome != winner.Outcome,
 		}
 		if _, err := v.db.NewInsert().Model(record).Exec(ctx); err != nil {
-			return fmt.Errorf("record why decision %d lapsed: %w", d.ID, err)
+			return fmt.Errorf("record why decision occurrence %d lapsed: %w", d.ID, err)
 		}
 		lapsed[d.ID] = true
 		if record.Disagreed {
 			v.displaced = append(v.displaced, Displaced{
-				Kind: DisplacedDecision, ProductID: d.ProductID,
+				Kind: DisplacedDecisionOccurrence, ProductID: d.ProductID,
 				RecordID: d.ID, StandingID: winner.ID, MergeID: mergeID,
 			})
 		}
@@ -380,14 +383,14 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 	return nil
 }
 
-// superseding is what a judgment a merge displaced records: the name of the
+// superseding is what a record a merge displaced carries: the name of the
 // issue that stands, and the reason it stopped standing.
 type superseding struct {
 	kept    string
 	because string
 }
 
-// supersededBecause is what a judgment a merge displaced records as the reason
+// supersededBecause is what a record a merge displaced carries as the reason
 // it stopped standing.
 func (v *Vulnerabilities) supersededBecause(ctx context.Context, kept int64,
 	absorbed Vulnerability) (superseding, error) {
@@ -404,7 +407,7 @@ func (v *Vulnerabilities) supersededBecause(ctx context.Context, kept int64,
 }
 
 // trailSuperseded records in the administration trail that a merge took one
-// judgment in a product out of force, against the merge rather than a person.
+// record in a product out of force, against the merge rather than a person.
 func (v *Vulnerabilities) trailSuperseded(ctx context.Context, why superseding,
 	productID int64, was string) error {
 
@@ -413,7 +416,7 @@ func (v *Vulnerabilities) trailSuperseded(ctx context.Context, why superseding,
 		ColumnExpr(`"p"."name"`).
 		Where(`"p"."id" = ?`, productID).
 		Scan(ctx, &product); err != nil {
-		return fmt.Errorf("read which product a merge superseded a judgment in: %w", err)
+		return fmt.Errorf("read which product a merge superseded a record in: %w", err)
 	}
 	return trail.NewStore(v.db).RecordByMerge(ctx, trail.Merge, trail.OnProduct(why.kept, product),
 		trail.Said(was, true), trail.Said(why.because, true))

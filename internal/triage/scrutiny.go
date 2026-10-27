@@ -26,13 +26,13 @@ import (
 // where it applied in form only — which is what an auditor is asking about
 // when they ask whether approvals mean anything here.
 type Scrutiny struct {
-	// Alone is risk standing with nobody's agreement, by what was claimed.
+	// Alone is risk standing with nobody's agreement, by what was decided.
 	Alone []Unagreed
-	// Bulk is agreements given as one act over many claims.
+	// Bulk is agreements given as one act over many decisions.
 	Bulk []BulkApproval
 	// Pairs is the same two people, over and over.
 	Pairs []Pairing
-	// Agreed is every decision a standing agreement covers, over every pair
+	// Agreed is every row a standing agreement covers, over every pair
 	// rather than the ones Pairs was cut to. A share is taken of it, and a
 	// share of the pairs shown overstates each of them once the list is cut.
 	Agreed int
@@ -52,37 +52,37 @@ type Scrutiny struct {
 	Capped bool
 }
 
-// Unagreed is risk hidden with no second person, grouped by what was claimed.
+// Unagreed is risk hidden with no second person, grouped by what was decided.
 type Unagreed struct {
 	Outcome Outcome
-	// Claims and Rows are the same population in the two units: how many acts,
-	// and how many decisions those acts wrote.
-	Claims int
-	Rows   int
+	// Decisions and Rows are the same population in the two units: how many acts,
+	// and how many rows those acts wrote.
+	Decisions int
+	Rows      int
 }
 
-// BulkApproval is one act of agreement covering many claims.
+// BulkApproval is one act of agreement covering many decisions.
 type BulkApproval struct {
 	Batch      string
 	ApprovedBy string
 	ApprovedAt time.Time
-	Claims     int
+	Decisions  int
 	Rows       int
 }
 
 // Pairing is one proposer and one approver, and how much has passed between
 // them.
 type Pairing struct {
-	Proposer string
-	Approver string
-	Claims   int
-	Rows     int
+	Proposer  string
+	Approver  string
+	Decisions int
+	Rows      int
 }
 
 // LapsedApproval is an agreement still standing from somebody who has since
 // lost the right to give one.
 type LapsedApproval struct {
-	ClaimID    int64
+	DecisionID int64
 	ApprovedBy string
 	ApprovedAt time.Time
 	Product    string
@@ -90,14 +90,14 @@ type LapsedApproval struct {
 	Rows       int
 }
 
-// Grown is a claim covering more now than when somebody agreed to it.
+// Grown is a decision covering more now than when somebody agreed to it.
 type Grown struct {
-	ClaimID    int64
+	DecisionID int64
 	ApprovedBy string
 	ApprovedAt time.Time
 	Outcome    Outcome
 	// Covered is what the approver was agreeing to, recorded then. CoversNow
-	// is what the same claim reaches today, having reached it by matching
+	// is what the same decision reaches today, having reached it by matching
 	// rather than by anybody acting.
 	Covered   int
 	CoversNow int
@@ -121,8 +121,8 @@ func hidingNothing() []Outcome {
 // record's own question is: no approval row from anybody other than the
 // proposer, and none that has been taken back. A flag would report what
 // something asserted about itself.
-const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
-	` WHERE "ex"."claim_id" = "de"."claim_id" AND "ex"."withdrawn_at" IS NULL` +
+const standingAlone = `NOT EXISTS (SELECT 1 FROM "decision_approval" AS "ex"` +
+	` WHERE "ex"."decision_id" = "de"."decision_id" AND "ex"."withdrawn_at" IS NULL` +
 	` AND "ex"."approved_by" <> "de"."proposed_by")`
 
 // Scrutinize reports how the second-person rule is holding.
@@ -135,7 +135,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 
 	// Every section's answer is bounded. The growth section reads every
 	// standing agreement to find which grew, in bounded statements, because
-	// growth is only known once what each claim covers now is counted.
+	// growth is only known once what each decision covers now is counted.
 	limit = database.AList.Of(limit)
 	out := &Scrutiny{}
 	// One more than the ceiling, so that reaching it is distinguishable from
@@ -147,8 +147,8 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		if len(productIDs) > 0 {
 			q = q.Where(`"de"."product_id" IN (?)`, bun.List(productIDs))
 		}
-		// Dated by when the claim was proposed, which is what every section
-		// here is about: a judgment belongs to when it was argued, and dating
+		// Dated by when the decision was proposed, which is what every section
+		// here is about: a decision belongs to when it was argued, and dating
 		// it by its agreement would move it out of the period whenever an
 		// approval came late — the ordinary case.
 		if !since.IsZero() {
@@ -162,20 +162,20 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 
 	standing, held := finding.InForce()
 
-	// alone is what stands with one signature on it, by what was claimed.
+	// alone is what stands with one signature on it, by what was decided.
 	// Grouped by outcome because the answer is different for each: a short
 	// deferral standing alone is the exception working, and a dismissal
 	// standing alone is a control that failed.
 	var alone []struct {
-		Outcome string `bun:"outcome"`
-		Claims  int    `bun:"claims"`
-		Rows    int    `bun:"written"`
+		Outcome   string `bun:"outcome"`
+		Decisions int    `bun:"claims"`
+		Rows      int    `bun:"written"`
 	}
 	err := narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where(`"cl"."outcome" NOT IN (?)`, bun.List(hidingNothing())).
 		Where(standing, held...).
@@ -190,7 +190,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	}
 	for _, row := range alone {
 		out.Alone = append(out.Alone, Unagreed{
-			Outcome: Outcome(row.Outcome), Claims: row.Claims, Rows: row.Rows,
+			Outcome: Outcome(row.Outcome), Decisions: row.Decisions, Rows: row.Rows,
 		})
 	}
 
@@ -201,17 +201,17 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Batch      string    `bun:"batch"`
 		Identity   string    `bun:"identity"`
 		ApprovedAt time.Time `bun:"approved_at"`
-		Claims     int       `bun:"claims"`
+		Decisions  int       `bun:"claims"`
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
 		ColumnExpr(`"ap"."batch" AS "batch"`).
 		ColumnExpr(`"pe"."identity" AS "identity"`).
 		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where(`"ap"."batch" IS NOT NULL`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
@@ -227,7 +227,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	for _, row := range bulk {
 		out.Bulk = append(out.Bulk, BulkApproval{
 			Batch: row.Batch, ApprovedBy: row.Identity, ApprovedAt: row.ApprovedAt,
-			Claims: row.Claims, Rows: row.Rows,
+			Decisions: row.Decisions, Rows: row.Rows,
 		})
 	}
 
@@ -235,19 +235,19 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// people covering everything between them is a control that exists on
 	// paper.
 	var pairs []struct {
-		Proposer string `bun:"proposer"`
-		Approver string `bun:"approver"`
-		Claims   int    `bun:"claims"`
-		Rows     int    `bun:"written"`
+		Proposer  string `bun:"proposer"`
+		Approver  string `bun:"approver"`
+		Decisions int    `bun:"claims"`
+		Rows      int    `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pr" ON "pr"."id" = "de"."proposed_by"`).
 		Join(`JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`).
 		ColumnExpr(`"pr"."identity" AS "proposer"`).
 		ColumnExpr(`"ape"."identity" AS "approver"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		GroupExpr(`"pr"."identity", "ape"."identity"`).
@@ -262,8 +262,8 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// The whole the shares are taken of: the same rows the pairs count,
 	// ungrouped and uncut.
 	agreed, err := narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pr" ON "pr"."id" = "de"."proposed_by"`).
 		Join(`JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`).
 		Where(`"ap"."withdrawn_at" IS NULL`)).Count(ctx)
@@ -274,7 +274,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	for _, row := range pairs {
 		out.Pairs = append(out.Pairs, Pairing{
 			Proposer: row.Proposer, Approver: row.Approver,
-			Claims: row.Claims, Rows: row.Rows,
+			Decisions: row.Decisions, Rows: row.Rows,
 		})
 	}
 
@@ -283,7 +283,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// stands — and it is still the first thing an auditor asks after a
 	// reorganization.
 	var lapsed []struct {
-		ClaimID    int64     `bun:"claim_id"`
+		DecisionID int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
 		ApprovedAt time.Time `bun:"approved_at"`
 		Product    string    `bun:"product"`
@@ -291,12 +291,12 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
 		Join(`JOIN "product" AS "pd" ON "pd"."id" = "de"."product_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"pe"."identity" AS "identity"`).
 		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
 		ColumnExpr(`"pd"."name" AS "product"`).
@@ -323,7 +323,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// named in configuration.
 		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
 			` WHERE "ad"."id" = "ap"."approved_by" AND ("ad"."is_admin" = ? OR "ad"."is_bootstrap" = ?))`, true, true).
-		GroupExpr(`"de"."claim_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
+		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(int64(room))).Scan(ctx, &lapsed)
 	if err != nil {
@@ -334,33 +334,33 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	}
 	for _, row := range lapsed {
 		out.Lapsed = append(out.Lapsed, LapsedApproval{
-			ClaimID: row.ClaimID, ApprovedBy: row.Identity, ApprovedAt: row.ApprovedAt,
+			DecisionID: row.DecisionID, ApprovedBy: row.Identity, ApprovedAt: row.ApprovedAt,
 			Product: row.Product, Outcome: Outcome(row.Outcome), Rows: row.Rows,
 		})
 	}
 
-	// grew is what somebody agreed to, against what the same claim reaches
-	// now. A claim reaches by matching, so a build appearing afterwards is
+	// grew is what somebody agreed to, against what the same decision reaches
+	// now. A decision reaches by matching, so a build appearing afterwards is
 	// covered with nobody acting — and nobody having agreed to the larger
 	// number.
 	var grew []struct {
-		ClaimID    int64     `bun:"claim_id"`
+		DecisionID int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
 		ApprovedAt time.Time `bun:"approved_at"`
 		Outcome    string    `bun:"outcome"`
 		Covered    int       `bun:"covered"`
 	}
 	// Every standing agreement is a candidate, and growth is only known once
-	// what each claim covers now is counted, so the whole set is examined
-	// before any of it is cut: the most grown first, then by claim, and the
-	// cap applied to that. Capped taken off the oldest claims would leave a
-	// claim that grew after them out of every answer.
+	// what each decision covers now is counted, so the whole set is examined
+	// before any of it is cut: the most grown first, then by decision, and the
+	// cap applied to that. Capped taken off the oldest decisions would leave a
+	// decision that grew after them out of every answer.
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"pe"."identity" AS "identity"`).
 		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
@@ -368,24 +368,24 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		Where(`"ap"."covered" IS NOT NULL`).
 		Where(standing, held...).
-		GroupExpr(`"de"."claim_id", "pe"."identity", "cl"."outcome"`).
-		OrderExpr(`"de"."claim_id", "pe"."identity"`)).Scan(ctx, &grew)
+		GroupExpr(`"de"."decision_id", "pe"."identity", "cl"."outcome"`).
+		OrderExpr(`"de"."decision_id", "pe"."identity"`)).Scan(ctx, &grew)
 	if err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
 	// Each one's present reach, asked the way a finding asks whether a
-	// decision applies to it, a bounded set of claims per statement.
-	claims := make([]int64, 0, len(grew))
+	// decision applies to it, a bounded set of decisions per statement.
+	decisions := make([]int64, 0, len(grew))
 	seen := map[int64]bool{}
 	for _, row := range grew {
-		if !seen[row.ClaimID] {
-			seen[row.ClaimID] = true
-			claims = append(claims, row.ClaimID)
+		if !seen[row.DecisionID] {
+			seen[row.DecisionID] = true
+			decisions = append(decisions, row.DecisionID)
 		}
 	}
-	now := make(map[int64]int, len(claims))
-	for start := 0; start < len(claims); start += database.InBulk.Most {
-		some, err := s.coveringEach(ctx, subject, claims[start:min(start+database.InBulk.Most, len(claims))])
+	now := make(map[int64]int, len(decisions))
+	for start := 0; start < len(decisions); start += database.InBulk.Most {
+		some, err := s.coveringEach(ctx, subject, decisions[start:min(start+database.InBulk.Most, len(decisions))])
 		if err != nil {
 			return nil, err
 		}
@@ -394,13 +394,13 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		}
 	}
 	for _, row := range grew {
-		if now[row.ClaimID] <= row.Covered {
+		if now[row.DecisionID] <= row.Covered {
 			continue
 		}
 		out.Grew = append(out.Grew, Grown{
-			ClaimID: row.ClaimID, ApprovedBy: row.Identity, ApprovedAt: row.ApprovedAt,
+			DecisionID: row.DecisionID, ApprovedBy: row.Identity, ApprovedAt: row.ApprovedAt,
 			Outcome: Outcome(row.Outcome), Covered: row.Covered,
-			CoversNow: now[row.ClaimID],
+			CoversNow: now[row.DecisionID],
 		})
 	}
 	sort.SliceStable(out.Grew, func(i, j int) bool {
@@ -408,10 +408,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		if a.CoversNow-a.Covered != b.CoversNow-b.Covered {
 			return a.CoversNow-a.Covered > b.CoversNow-b.Covered
 		}
-		if a.ClaimID != b.ClaimID {
-			return a.ClaimID < b.ClaimID
+		if a.DecisionID != b.DecisionID {
+			return a.DecisionID < b.DecisionID
 		}
-		// A claim with two standing agreements is two rows of equal growth.
+		// A decision with two standing agreements is two rows of equal growth.
 		return a.ApprovedBy < b.ApprovedBy
 	})
 	if len(out.Grew) > limit {
@@ -421,44 +421,44 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	return out, nil
 }
 
-// coveringEach counts what each of these claims covers right now.
+// coveringEach counts what each of these decisions covers right now.
 //
 // One statement for the page, narrowed per product at the visibility the
 // reader holds in each.
 func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
-	claims []int64) (map[int64]int, error) {
+	decisions []int64) (map[int64]int, error) {
 
 	covered := map[int64]int{}
-	if len(claims) == 0 {
+	if len(decisions) == 0 {
 		return covered, nil
 	}
 	var ids []int64
 	if err := readableBy(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		ColumnExpr(`"de"."id"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
-		// Live rows only, as a claim's reach is counted: a row withdrawn or
+		Where(`"de"."decision_id" IN (?)`, bun.List(decisions)).
+		// Live rows only, as a decision's reach is counted: a row withdrawn or
 		// lapsed covers nothing, however well its versions still match.
 		Where(`"de"."live_key" IS NOT NULL`), subject, "de").
 		Scan(ctx, &ids); err != nil {
-		return nil, fmt.Errorf("read which rows these claims wrote: %w", err)
+		return nil, fmt.Errorf("read which rows these decisions wrote: %w", err)
 	}
 	if len(ids) == 0 {
 		return covered, nil
 	}
 	var rows []struct {
-		ClaimID int64 `bun:"claim_id"`
-		Covers  int   `bun:"covers"`
+		DecisionID int64 `bun:"decision_id"`
+		Covers     int   `bun:"covers"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(finding.Decisions).
-		Join(`JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")).
+		TableExpr(finding.DecisionOccurrences).
+		Join(`JOIN "finding" AS "f" ON `+finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`COUNT(*) AS "covers"`).
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -467,24 +467,24 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Apply(ofKinds(kind.Decisions, "f")).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		GroupExpr(`"de"."claim_id"`).
+		GroupExpr(`"de"."decision_id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("count what these cover: %w", err)
 	}
 	for _, row := range rows {
-		covered[row.ClaimID] = row.Covers
+		covered[row.DecisionID] = row.Covers
 	}
 	return covered, nil
 }
 
-// HiddenWithNobodyAgreeing counts the claims that hide risk with no second
-// person behind them, and the decisions they wrote.
+// HiddenWithNobodyAgreeing counts the decisions that hide risk with no second
+// person behind them, and the rows they wrote.
 //
 // This should answer zero, and a number is a control that did not hold. The
-// outcomes that claim something needs no further work — it does not apply, the
+// outcomes that say something needs no further work — it does not apply, the
 // match is wrong, it will not be fixed, the fix is already here — each require
-// a second person, so a claim of one of them standing alone is not a backlog
+// a second person, so a decision of one of them standing alone is not a backlog
 // item. It is
 // the write path having been got around, and it is the one failure the record
 // cannot find on its own afterwards.
@@ -493,7 +493,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // caught them. Both hide risk and both are approved conditionally, on where
 // the date sits against the deadline already set — so a short deferral
 // standing alone is the rule working rather than failing. What tells the two
-// apart is the gate's own verdict, written onto the decision as it was
+// apart is the gate's own verdict, written onto the row as it was
 // proposed: a deferral past the threshold needed a second person as surely as
 // a dismissal did, and left standing with nobody agreeing it is the same write
 // path got around. The outcome alone does not tell them apart.
@@ -516,16 +516,16 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // which is also why no subject is taken: administering grants no reading, so a
 // narrowed count would answer about whichever products an administrator
 // happened to hold.
-func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int, err error) {
+func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (decisions, rows int, err error) {
 	standing, held := finding.InForce()
 	var counted struct {
-		Claims int `bun:"claims"`
-		Rows   int `bun:"written"`
+		Decisions int `bun:"claims"`
+		Rows      int `bun:"written"`
 	}
 	err = s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr(`"cl"."outcome" IN (?)`, bun.List(closingUnconditionally())).
@@ -537,7 +537,7 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int,
 	if err != nil {
 		return 0, 0, fmt.Errorf("count what hides risk with nobody agreeing: %w", err)
 	}
-	return counted.Claims, counted.Rows, nil
+	return counted.Decisions, counted.Rows, nil
 }
 
 // closingUnconditionally is what the condition counts whatever the gate's

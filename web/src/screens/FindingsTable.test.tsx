@@ -54,7 +54,7 @@ const decided = (key: string, next: string | null): Decided => ({
   next,
   issue: "CVE-2026-1",
   recorded: {
-    claimId: 7,
+    decisionId: 7,
     recorded: 1,
     covered: 1,
     left: 0,

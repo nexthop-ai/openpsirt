@@ -155,7 +155,7 @@ var (
 	// ErrDuplicateOfClosed is a duplicate of work that is no longer open. It
 	// would bury the report, because nothing is left to work on.
 	ErrDuplicateOfClosed = refusal.New("that issue is closed, dismissed or suppressed at " +
-		"every place here, so a duplicate of it leaves nothing to work on; reject it " +
+		"every occurrence here, so a duplicate of it leaves nothing to work on; reject it " +
 		"instead, which a second person agrees to")
 	ErrTooManyReports = refusal.New("that would rule on more reports than one action may")
 	ErrNoSuchRuling   = refusal.New("no ruling here goes by that number")
@@ -224,7 +224,7 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		now := s.now().UTC().Truncate(time.Microsecond)
 		cap, err := setting.NewStore(tx).Count(ctx,
-			setting.TogetherCap, setting.DefaultTogetherCap)
+			setting.BulkDecisionCap, setting.DefaultBulkDecisionCap)
 		if err != nil {
 			return fmt.Errorf("read how much one action may write: %w", err)
 		}
@@ -358,7 +358,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 	}
 	// Open is work somebody still has in front of them: not closed, not
 	// argued away by the build, and not dismissed by a decision in force at
-	// that place. A dismissal and a suppression leave the row open and close
+	// that occurrence. A dismissal and a suppression leave the row open and close
 	// the question, so a duplicate of one sends the new claim somewhere
 	// nobody is looking. A deferral or a promised upgrade leaves work that
 	// comes back, so those count as open.
@@ -376,9 +376,9 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
 		Where(NotArguedAway).
-		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+`
-			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
-			WHERE `+DecisionAt(`"st"."product_id"`)+`
+		Where(`NOT EXISTS (SELECT 1 FROM `+DecisionOccurrences+`
+			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
+			WHERE `+DecisionOccurrenceAt(`"st"."product_id"`)+`
 			  AND "de"."live_key" IS NOT NULL
 			  AND `+KeyMatches+`
 			  AND `+standing+`
@@ -393,10 +393,10 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 	return nil
 }
 
-// Dismissing is the outcomes that close the question at a place: it does not
-// apply, the match is wrong, it will not be fixed, the fix is already here.
-// The triage package owns the outcomes and a test there holds this list to
-// its own.
+// Dismissing is the outcomes that close the question at an occurrence: it does
+// not apply, the match is wrong, it will not be fixed, the fix is already here.
+// The triage package owns the outcomes and a test there holds this list to its
+// own.
 var Dismissing = []string{OutcomeNotApplicable, OutcomeMismatched, OutcomeWontFix, OutcomeAlreadyFixed}
 
 // distinctReferences folds and de-duplicates the names given, in a stable

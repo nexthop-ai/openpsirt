@@ -26,7 +26,7 @@ type Collaborator = Body<"CollaboratorBody">;
 //
 // Being on a case is not reading the product. A collaborator sees this
 // issue wherever it sits here and nothing else, may argue about it, and may
-// not agree to anybody's claim — which is said on the card rather than
+// not agree to anybody's decision — which is said on the card rather than
 // discovered when a button refuses, because it is the reason the grant is
 // safe to give.
 //
@@ -44,7 +44,7 @@ export function Collaborators({
     <People
       product={product}
       scope={[product, vulnerability]}
-      grants="Grants read and comment on this issue only. Cannot agree to claims."
+      grants="Grants read and comment on this issue only. Cannot agree to decisions."
       list={async () =>
         unwrap(
           await api.GET("/v1/products/{product}/issues/{issue}/collaborators", {
@@ -316,7 +316,7 @@ export function Resolve({
     <div className="card">
       <h3>Fixed here</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        Scans never found this, so only you can close it. Closes every place here, and
+        Scans never found this, so only you can close it. Closes every occurrence here, and
         <b>nothing reopens it</b>.
       </p>
       {close.error != null && <Failed error={close.error} what="That could not be closed." />}

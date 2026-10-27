@@ -18,9 +18,9 @@ import (
 // reason decides. A scope on a deferral is refused.
 func TestADecisionSaysWhomItsPublishedStatementHoldsFor(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
+			"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
@@ -41,14 +41,14 @@ func TestADecisionSaysWhomItsPublishedStatementHoldsFor(t *testing.T) {
 				made.Scope, made.HoldsFor)
 		}
 		var detail struct {
-			Decision struct {
+			DecisionOccurrence struct {
 				Scope    string `json:"scope"`
 				HoldsFor string `json:"holds_for"`
-			} `json:"decision"`
+			} `json:"decision_occurrence"`
 		}
 		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", made.ID), &detail)
-		if detail.Decision.Scope != "portable" || detail.Decision.HoldsFor != "portable" {
-			t.Errorf("read back as scope %q holding for %q", detail.Decision.Scope, detail.Decision.HoldsFor)
+		if detail.DecisionOccurrence.Scope != "portable" || detail.DecisionOccurrence.HoldsFor != "portable" {
+			t.Errorf("read back as scope %q holding for %q", detail.DecisionOccurrence.Scope, detail.DecisionOccurrence.HoldsFor)
 		}
 
 		other := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,

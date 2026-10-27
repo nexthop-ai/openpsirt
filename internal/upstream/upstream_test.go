@@ -81,19 +81,19 @@ func TestAForkTakesWhatItsUpstreamSaysForAnybody(t *testing.T) {
 }
 
 // A statement holding for anybody only narrows. Where somebody here decided
-// about a place, whatever they decided, it closes nothing there; and nothing
+// about an occurrence, whatever they decided, it closes nothing there; and nothing
 // the upstream says opens a finding.
 func TestALocalDecisionStandsOverAnUpstreamsWord(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		// Not applicable, for a reason of the fork's own: the upstream would
-		// close the place, and the decision here is the one that stands.
-		w.claim(w.forkBuild, portable, openssl.Name, triage.NotApplicable, triage.CodeNotInExecutePath)
+		// close the occurrence, and the decision here is the one that stands.
+		w.decision(w.forkBuild, portable, openssl.Name, triage.NotApplicable, triage.CodeNotInExecutePath)
 		w.trust()
 		w.read()
 		w.rescan()
 		if got := w.state(w.forkBuild, portable, openssl); !got.open {
-			t.Errorf("the upstream closed a place somebody here said is affected: %+v", got)
+			t.Errorf("the upstream closed an occurrence somebody here said is affected: %+v", got)
 		}
 	})
 }
@@ -536,19 +536,19 @@ func TestAListingWithAnEntryThatCannotBeReadWithdrawsNothing(t *testing.T) {
 	})
 }
 
-// A claim here that the match is wrong stands at whatever version the place
+// A decision here that the match is wrong stands at whatever version the occurrence
 // holds, so an upstream's word closes nothing there when the version moves
 // to the one it speaks about.
-func TestAWrongMatchClaimStandsOverAnUpstreamAtAnyVersion(t *testing.T) {
+func TestAWrongMatchDecisionStandsOverAnUpstreamAtAnyVersion(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
-		w.claim(w.forkLater, portable, opensslNext.Name, triage.Mismatched, triage.ComponentNotPresent)
+		w.decision(w.forkLater, portable, opensslNext.Name, triage.Mismatched, triage.ComponentNotPresent)
 		w.trust()
 		w.read()
 		w.ship(w.forkLater, forkNext, forkNext, openssl, forkNext, swss, swss, libnl)
 		w.report(w.forkLater, portable, openssl, ownBuild, libnl)
 		if got := w.state(w.forkLater, portable, openssl); !got.open {
-			t.Errorf("the upstream closed a place somebody here said is a wrong match: %+v", got)
+			t.Errorf("the upstream closed an occurrence somebody here said is a wrong match: %+v", got)
 		}
 	})
 }
@@ -593,7 +593,7 @@ func TestStoppingTrustingAnUpstreamIsSaidAsThatToADecisionCitingIt(t *testing.T)
 		if err := w.Access.GrantRole(t.Context(), w.proposer.ID, w.fork.ID, access.PublicTriage); err != nil {
 			t.Fatal(err)
 		}
-		w.claimCiting(w.forkBuild, ownBuild, libnl.Name, triage.NotApplicable,
+		w.decisionCiting(w.forkBuild, ownBuild, libnl.Name, triage.NotApplicable,
 			triage.CodeNotInExecutePath, &review.ID)
 		said := func() []string {
 			t.Helper()

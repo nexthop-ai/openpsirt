@@ -5,6 +5,7 @@ package migrations
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/uptrace/bun"
@@ -87,11 +88,17 @@ func StopV090AfterDropping(ctx context.Context, db *database.DB, tables ...strin
 func StatementsV0110(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	out := map[string][]string{
-		"vulnerability": vulnerabilityV0110(t),
-		"finding":       findingV0110(t),
-		"graph_node":    graphNodeV0110(t),
-		"notification":  notificationV0110(t),
-		"claim_stamp":   claimStampV0110(t),
+		"vulnerability":  vulnerabilityV0110(t),
+		"finding":        findingV0110(t),
+		"graph_node":     graphNodeV0110(t),
+		"notification":   notificationV0110(t),
+		"decision_stamp": decisionStampV0110(t),
+	}
+	for _, table := range []string{"upgrade"} {
+		out[table] = declaredV0110(t, table)
+	}
+	for _, r := range tablesRenamedV0110 {
+		out[r.to] = declaredV0110(t, r.to)
 	}
 	for table, declared := range map[string][]string{
 		"series": seriesV0110(t), "series_run": seriesV0110(t), "series_document": seriesV0110(t),
@@ -143,3 +150,38 @@ func StopV0110AfterAcknowledgements(ctx context.Context, db *database.DB) error 
 		return acknowledgedAsSentV0110(ctx, tx)
 	})
 }
+
+// StopV0110RenamingAfter runs the v0.11.0 upgrade and stops it once the first
+// statement renaming the named table, column, index or constraint has run: a
+// start that stopped there. It reports whether it stopped, which it does not
+// on an engine where nothing renames that name.
+func StopV0110RenamingAfter(ctx context.Context, db *database.DB, name string) (bool, error) {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	err := inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		return renameV0110Stopping(ctx, tx, name)
+	})
+	if errors.Is(err, errRenameStopped) {
+		return true, nil
+	}
+	return false, err
+}
+
+// StopV0110RewritingAfter runs the v0.11.0 renames and the stored words after
+// them, and stops once the named step of the words has run: a start that
+// stopped there. It reports whether it stopped.
+func StopV0110RewritingAfter(ctx context.Context, db *database.DB, step string) (bool, error) {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	err := inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		if err := renameV0110(ctx, tx); err != nil {
+			return err
+		}
+		return valuesV0110Stopping(ctx, tx, step)
+	})
+	if errors.Is(err, errValuesStopped) {
+		return true, nil
+	}
+	return false, err
+}
+
+// SavedQueryV0110 is a kept filter's query string in v0.11.0's words.
+func SavedQueryV0110(query string) string { return savedQueryV0110(query) }

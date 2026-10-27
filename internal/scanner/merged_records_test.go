@@ -41,14 +41,14 @@ func TestADecisionMergedTwiceAppliesAtTheIssueThatStands(t *testing.T) {
 	// Two advisories merge, and the issue they became later merges into the
 	// national identifier. Every row read as the first merge's issue is read
 	// as the one that stands, so a decision under either advisory still
-	// answers its place.
+	// answers its occurrence.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
 		f.reporting(t, named(advisory, libnl), named(otherAdvisory, swss))
 		proposer, approver := f.triagers(t)
-		onLibnl := f.claims(t, proposer, approver, f.placeOf(t, proposer, advisory, "libnl-3-200"),
+		onLibnl := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, advisory, "libnl-3-200"),
 			triage.NotApplicable, true)
-		onSwss := f.claims(t, proposer, approver, f.placeOf(t, proposer, otherAdvisory, "libswsscommon"),
+		onSwss := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, otherAdvisory, "libswsscommon"),
 			triage.NotApplicable, true)
 
 		f.reporting(t, named(advisory, libnl), named(otherAdvisory, swss, advisory))
@@ -59,7 +59,7 @@ func TestADecisionMergedTwiceAppliesAtTheIssueThatStands(t *testing.T) {
 		for component, want := range map[string]int64{
 			"libnl-3-200": onLibnl.ID, "libswsscommon": onSwss.ID,
 		} {
-			standing, err := store.Applying(ctx, f.placeOf(t, proposer, national, component))
+			standing, err := store.Applying(ctx, f.occurrenceOf(t, proposer, national, component))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -73,7 +73,7 @@ func TestADecisionMergedTwiceAppliesAtTheIssueThatStands(t *testing.T) {
 
 func TestADecisionUnderAMergedNameIsReaffirmedAgainstTheRatingThatStands(t *testing.T) {
 	// A dismissal agreed under the advisory name lapses when the product
-	// rates the merged issue worse. Its proposer re-makes it at the place as
+	// rates the merged issue worse. Its proposer re-makes it at the occurrence as
 	// it reads now, and because the issue is worse than when it was agreed
 	// to, it waits for a second person again.
 	eachRun(t, func(t *testing.T, f *runFixture) {
@@ -84,14 +84,14 @@ func TestADecisionUnderAMergedNameIsReaffirmedAgainstTheRatingThatStands(t *test
 		// rise.
 		decisions := triage.NewStore(f.db.DB)
 		agreed, err := decisions.Propose(ctx, proposer, triage.Proposal{
-			Place: f.placeOf(t, proposer, advisory, "libswsscommon"), Outcome: triage.WontFix,
+			Occurrence: f.occurrenceOf(t, proposer, advisory, "libswsscommon"), Outcome: triage.WontFix,
 			Reasoning: "Not worth fixing in this release.", By: proposer.ID,
 			NeedsApproval: true, SeverityCenti: finding.SeverityScore("high"),
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := decisions.ApproveClaim(ctx, approver, agreed.ClaimID, "", nil, ""); err != nil {
+		if _, err := decisions.ApproveDecision(ctx, approver, agreed.DecisionID, "", nil, ""); err != nil {
 			t.Fatal(err)
 		}
 
@@ -114,7 +114,7 @@ func TestADecisionUnderAMergedNameIsReaffirmedAgainstTheRatingThatStands(t *test
 
 		remade, err := decisions.Reaffirm(ctx, proposer, triage.Reaffirmation{
 			PreviousID: agreed.ID,
-			Place:      f.placeOf(t, proposer, national, "libswsscommon"),
+			Occurrence: f.occurrenceOf(t, proposer, national, "libswsscommon"),
 			Reasoning:  "Still not worth fixing in this release.",
 			By:         proposer.ID,
 		})

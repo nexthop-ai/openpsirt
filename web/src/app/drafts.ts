@@ -275,7 +275,7 @@ export function forget(about: string | undefined) {
     window.localStorage.removeItem(key);
     // Both halves, because the answer is the same draft. Cleared apart, an
     // accepted decision left its outcome behind to be offered against the
-    // next thing decided at the same place.
+    // next thing decided at the same occurrence.
     const answer = keyFor(answerAbout(about));
     if (answer) window.localStorage.removeItem(answer);
   } catch {

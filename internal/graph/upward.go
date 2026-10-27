@@ -141,7 +141,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 	chains := climbed.unwind()
 
 	// Merged by path rather than by component, because a tree is paths: the
-	// same library under two containers is two places somebody is looking at,
+	// same library under two containers is two occurrences somebody is looking at,
 	// and the shortest way down is the one each chain already carries.
 	root := &node{}
 	unplaced := make([]Upward, 0)

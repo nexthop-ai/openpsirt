@@ -19,39 +19,39 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// confirmedLead is the seeded lead confirmed, with its place, the claim
-// confirming it and the seeded build.
+// confirmedLead is the seeded lead confirmed, with its occurrence, the
+// decision confirming it and the seeded build.
 func confirmedLead(t *testing.T, r *httpapitest.Reach) (string, int64, int64) {
 	t.Helper()
-	place := httpapitest.SeededLead(t, r)
-	if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+	occurrence := httpapitest.SeededLead(t, r)
+	if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrence)+"/decision",
 		`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 		t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 	}
-	var claim int64
-	if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
-		Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+	var decision int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."decision_id"`).
+		Where(`"de"."occurrence_identity" = ?`, occurrence).Limit(1).Scan(t.Context(), &decision); err != nil {
 		t.Fatal(err)
 	}
-	return place, claim, r.TargetOf(t, httpapitest.SeededBuild)
+	return occurrence, decision, r.TargetOf(t, httpapitest.SeededBuild)
 }
 
-// claimStamp is the stamp a claim holds, zero where it has no row.
-func claimStamp(t *testing.T, r *httpapitest.Reach, claim int64) int {
+// decisionStamp is the stamp a decision holds, zero where it has no row.
+func decisionStamp(t *testing.T, r *httpapitest.Reach, decision int64) int {
 	t.Helper()
 	var stamp int
-	if err := r.DB.DB.NewSelect().TableExpr(`"claim_stamp" AS "cs"`).
-		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."claim_id" = ?`, claim).Scan(t.Context(), &stamp); err != nil {
+	if err := r.DB.DB.NewSelect().TableExpr(`"decision_stamp" AS "cs"`).
+		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."decision_id" = ?`, decision).Scan(t.Context(), &stamp); err != nil {
 		t.Fatal(err)
 	}
 	return stamp
 }
 
-// handedOff reports whether the lead at a place was handed off.
-func handedOff(t *testing.T, r *httpapitest.Reach, place string) bool {
+// handedOff reports whether the lead at an occurrence was handed off.
+func handedOff(t *testing.T, r *httpapitest.Reach, occurrence string) bool {
 	t.Helper()
 	n, err := r.DB.DB.NewSelect().TableExpr(`"lead_handoff" AS "lh"`).
-		Where(`"lh"."place_identity" = ?`, place).Count(t.Context())
+		Where(`"lh"."occurrence_identity" = ?`, occurrence).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,28 +59,28 @@ func handedOff(t *testing.T, r *httpapitest.Reach, place string) bool {
 }
 
 // handing is a hand-off of the seeded lead against the seeded build.
-func handing(t *testing.T, r *httpapitest.Reach, place string, target int64) analysis.Handing {
+func handing(t *testing.T, r *httpapitest.Reach, occurrence string, target int64) analysis.Handing {
 	t.Helper()
 	located, err := catalog.NewStore(r.DB.DB).Locate(t.Context(), "mine", "master", "broadcom")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return analysis.Handing{ProductID: located.ProductID, PlaceIdentity: place,
+	return analysis.Handing{ProductID: located.ProductID, OccurrenceIdentity: occurrence,
 		Flaw: finding.Entering{TargetIDs: []int64{target}, Summary: "p leaks"}}
 }
 
-// A hand-off changes the stamp of the claim it rests on, as every write to
-// the claim does, so the two cannot both commit.
-func TestAHandOffRestampsTheClaimItRestsOn(t *testing.T) {
+// A hand-off changes the stamp of the decision it rests on, as every write
+// to the decision does, so the two cannot both commit.
+func TestAHandOffRestampsTheDecisionItRestsOn(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, claim, _ := confirmedLead(t, r)
-		before := claimStamp(t, r, claim)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
+		occurrence, decision, _ := confirmedLead(t, r)
+		before := decisionStamp(t, r, decision)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
-		if got := claimStamp(t, r, claim); got == before {
-			t.Errorf("the confirming claim's stamp is %d after the hand-off; want it changed", got)
+		if got := decisionStamp(t, r, decision); got == before {
+			t.Errorf("the confirming decision's stamp is %d after the hand-off; want it changed", got)
 		}
 	})
 }
@@ -90,10 +90,10 @@ func TestAHandOffRestampsTheClaimItRestsOn(t *testing.T) {
 // is asked again, finds the lead unconfirmed, and is refused.
 func TestAHandOffLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, claim, target := confirmedLead(t, r)
-		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "claim", "claim_stamp", 3*time.Second, func() error {
+		occurrence, decision, target := confirmedLead(t, r)
+		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "decision", "decision_stamp", 3*time.Second, func() error {
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete,
-				fmt.Sprintf("/v1/decisions/%d", claim), ""); got.Code != http.StatusNoContent {
+				fmt.Sprintf("/v1/decisions/%d", decision), ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("the withdrawal answered %d: %s", got.Code, got.Body)
 			}
 			return nil
@@ -102,14 +102,14 @@ func TestAHandOffLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = analysis.HandOff(t.Context(), hooked, subject, handing(t, r, place, target))
+		_, err = analysis.HandOff(t.Context(), hooked, subject, handing(t, r, occurrence, target))
 		if rivalErr := rival(); rivalErr != nil {
 			t.Fatal(rivalErr)
 		}
 		if !errors.Is(err, analysis.ErrNotConfirmed) {
 			t.Errorf("the hand-off answered %v; want it refused, the confirmation withdrawn", err)
 		}
-		if handedOff(t, r, place) {
+		if handedOff(t, r, occurrence) {
 			t.Error("the lead was handed off on a confirmation withdrawn beside it")
 		}
 	})
@@ -120,9 +120,9 @@ func TestAHandOffLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T) {
 // flaw: the withdrawal is asked again, finds the hand-off, and is refused.
 func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, claim, _ := confirmedLead(t, r)
-		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "claim_stamp", 3*time.Second, func() error {
-			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
+		occurrence, decision, _ := confirmedLead(t, r)
+		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "decision_stamp", 3*time.Second, func() error {
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/flaw",
 				`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 				return fmt.Errorf("the hand-off answered %d: %s", got.Code, got.Body)
 			}
@@ -132,19 +132,19 @@ func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = triage.NewStore(hooked).Withdraw(t.Context(), subject, claim)
+		_, err = triage.NewStore(hooked).Withdraw(t.Context(), subject, decision)
 		if rivalErr := rival(); rivalErr != nil {
 			t.Fatal(rivalErr)
 		}
 		if !errors.Is(err, triage.ErrLeadHandedOff) {
 			t.Errorf("the withdrawal answered %v; want it refused, the lead handed off", err)
 		}
-		if !handedOff(t, r, place) {
+		if !handedOff(t, r, occurrence) {
 			t.Fatal("the hand-off did not land, so this checks nothing")
 		}
 		var live int
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`COUNT(*)`).
-			Where(`"de"."claim_id" = ?`, claim).Where(`"de"."live_key" IS NOT NULL`).
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`COUNT(*)`).
+			Where(`"de"."decision_id" = ?`, decision).Where(`"de"."live_key" IS NOT NULL`).
 			Scan(t.Context(), &live); err != nil {
 			t.Fatal(err)
 		}
@@ -159,10 +159,10 @@ func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 // again, finds the lead kept, and leaves it where it is.
 func TestAnUndoneMoveLandingWhileADisclosureAppliesKeepsTheLeadInternal(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, true)
 		movement := askToDisclose(t, r, flaw)
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "lead_handoff", 3*time.Second, func() error {
-			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("undoing the move answered %d: %s", got.Code, got.Body)
 			}
 			return nil
@@ -180,18 +180,18 @@ func TestAnUndoneMoveLandingWhileADisclosureAppliesKeepsTheLeadInternal(t *testi
 		}
 		var held []string
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
-			Where(`"f"."place_identity" = ?`, place).Scan(t.Context(), &held); err != nil {
+			Where(`"f"."occurrence_identity" = ?`, occurrence).Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
-		var claims []string
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."visibility"`).
-			Where(`"de"."place_identity" = ?`, place).Scan(t.Context(), &claims); err != nil {
+		var decisions []string
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."visibility"`).
+			Where(`"de"."occurrence_identity" = ?`, occurrence).Scan(t.Context(), &decisions); err != nil {
 			t.Fatal(err)
 		}
-		if len(held) == 0 || len(claims) == 0 || slices.ContainsFunc(append(held, claims...), func(v string) bool { return v != "internal" }) {
-			t.Errorf("the lead's findings are %v and its claims %v; want both internal, the lead taken out of the case", held, claims)
+		if len(held) == 0 || len(decisions) == 0 || slices.ContainsFunc(append(held, decisions...), func(v string) bool { return v != "internal" }) {
+			t.Errorf("the lead's findings are %v and its decisions %v; want both internal, the lead taken out of the case", held, decisions)
 		}
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, leadAt(place), ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 	})
 }

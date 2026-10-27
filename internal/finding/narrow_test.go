@@ -67,10 +67,10 @@ func TestNarrowingByPackageKind(t *testing.T) {
 }
 
 func TestNarrowingByWhatHoldsIt(t *testing.T) {
-	// A place records what pulls a component in, so "what is inside this
+	// An occurrence records what pulls a component in, so "what is inside this
 	// container" is a question about consumers — and what the build holds
-	// directly is the places that have none. The two together are every place,
-	// which is what makes them worth asserting against each other.
+	// directly is the occurrences that have none. The two together are every
+	// occurrence, which is what makes them worth asserting against each other.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
@@ -116,7 +116,7 @@ func TestNarrowingByWhatHoldsIt(t *testing.T) {
 		}
 
 		// The build's direct holdings are the other half. Together they are
-		// every place, which is the assertion worth making: a filter that
+		// every occurrence, which is the assertion worth making: a filter that
 		// quietly kept nothing would satisfy either half alone.
 		_, direct, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
 			finding.Filter{UnderTheBuild: true})
@@ -129,17 +129,17 @@ func TestNarrowingByWhatHoldsIt(t *testing.T) {
 	})
 }
 
-func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
-	// A place identity is a hash of a consumer and a component and carries no
-	// product, and an issue is one row for the whole deployment — so anything
-	// correlating a place to a decision without naming the product matches
-	// every product there is.
+func TestADecisionInAnotherProductDoesNotDecideThisOne(t *testing.T) {
+	// An occurrence identity is a hash of a consumer and a component and
+	// carries no product, and an issue is one row for the whole deployment — so
+	// anything correlating an occurrence to a decision without naming the
+	// product matches every product there is.
 	//
-	// That is two failures at once. A reader is told a claim is pending in a
+	// That is two failures at once. A reader is told a decision is pending in a
 	// product they may not be able to see, and their own screen says "waiting"
 	// when nothing here is waiting. This writes a real decision in a real
-	// second product, at the same place and about the same issue, and asserts
-	// it moves nothing here.
+	// second product, at the same occurrence and about the same issue, and
+	// asserts it moves nothing here.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -161,30 +161,30 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// The place a component sitting directly under the build hashes to,
+		// The occurrence a component sitting directly under the build hashes to,
 		// which is the same string in every product — that being the point.
 		// Live, and keyed on the version shipping here, so that the product
-		// is the only thing keeping it from standing: a claim that failed to
+		// is the only thing keeping it from standing: a decision that failed to
 		// match on its versions would leave a missing product condition
 		// unexercised.
-		place := finding.PlaceIdentity(swss.Name, "")
+		occurrence := finding.OccurrenceIdentity(swss.Name, "")
 		// A row this test cannot write fails it rather than skipping, which
 		// would make it green in exactly the case where it proves nothing.
 		f.decision(t, decisionRow{
-			By: somebody, Product: elsewhere.ID, Issue: issueID, Place: place,
+			By: somebody, Product: elsewhere.ID, Issue: issueID, Occurrence: occurrence,
 			State: "proposed", Component: ptr(swss.Version), Key: "elsewhere-live-key",
 		})
 
 		_, waiting, err := f.store.Groups(ctx, who, f.scope, 50, 0,
-			finding.Filter{States: []finding.ClaimStanding{"waiting"}})
+			finding.Filter{States: []finding.DecisionStanding{"waiting"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if waiting != 0 {
-			t.Errorf("a claim in another product made %d rows here read as waiting", waiting)
+			t.Errorf("a decision in another product made %d rows here read as waiting", waiting)
 		}
 		_, undecided, err := f.store.Groups(ctx, who, f.scope, 50, 0,
-			finding.Filter{States: []finding.ClaimStanding{"undecided"}})
+			finding.Filter{States: []finding.DecisionStanding{"undecided"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 				undecided)
 		}
 
-		// Nobody here claimed anything lately, so asking for what was claimed
+		// Nobody here decided anything lately, so asking for what was decided
 		// since yesterday finds nothing — in this product's list and in the
 		// list across products, where the product is the row's own.
 		yesterday := time.Now().UTC().Add(-24 * time.Hour)
@@ -203,7 +203,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 			t.Fatal(err)
 		}
 		if claimed != 0 {
-			t.Errorf("a claim in another product made %d rows here read as recently claimed", claimed)
+			t.Errorf("a decision in another product made %d rows here read as recently decided", claimed)
 		}
 		_, claimed, err = f.store.Anywhere(ctx, who, 50, 0,
 			finding.Filter{ProposedAfter: &yesterday})
@@ -211,31 +211,31 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 			t.Fatal(err)
 		}
 		if claimed != 0 {
-			t.Errorf("a claim in another product made %d rows across products read as recently claimed",
+			t.Errorf("a decision in another product made %d rows across products read as recently decided",
 				claimed)
 		}
 
 		// And the finding's own screen, which names the decision standing at
-		// each place, names nothing: it showed the other product's claim as
-		// standing here, an identifier the reader could not open.
+		// each occurrence, names nothing: it showed the other product's
+		// decision as standing here, an identifier the reader could not open.
 		open := f.open(t)
 		evidence, err := f.store.Detail(ctx, who, f.target, open[0].VulnerabilityID, open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, sitting := range evidence.Places {
-			if sitting.Decision != nil {
-				t.Errorf("a claim in another product reads as decision %d standing here",
-					*sitting.Decision)
+		for _, sitting := range evidence.Occurrences {
+			if sitting.DecisionOccurrence != nil {
+				t.Errorf("a decision in another product reads as decision occurrence %d standing here",
+					*sitting.DecisionOccurrence)
 			}
 		}
 	})
 }
 
-func TestALapsedPlaceDecidedAgainReadsAsWaiting(t *testing.T) {
+func TestALapsedOccurrenceDecidedAgainReadsAsWaiting(t *testing.T) {
 	// Lapsed means a decision here stopped applying and nothing replaced it.
-	// Once somebody makes the claim again, the place is waiting — which is
-	// what the row said, while the filter still listed it under lapsed: it
+	// Once somebody makes the decision again, the occurrence is waiting — which
+	// is what the row said, while the filter still listed it under lapsed: it
 	// asked only that something had lapsed and nothing was approved. A filter
 	// has to find a row by the word the row reads.
 	each(t, func(t *testing.T, f *fixture) {
@@ -244,25 +244,25 @@ func TestALapsedPlaceDecidedAgainReadsAsWaiting(t *testing.T) {
 		f.applied(t, found("CVE-2026-1", swss))
 		who := f.holding(t, access.PublicTriage)
 		somebody := f.somebodyElse(t)
-		place := finding.PlaceIdentity(swss.Name, "")
-		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), place, "lapsed", "0.9.0", "")
-		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), place, "proposed", swss.Version, "again")
+		occurrence := finding.OccurrenceIdentity(swss.Name, "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), occurrence, "lapsed", "0.9.0", "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), occurrence, "proposed", swss.Version, "again")
 
 		groups, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(groups) != 1 || groups[0].State != "waiting" {
-			t.Fatalf("a lapsed place claimed again reads as %+v, want one row waiting", groups)
+			t.Fatalf("a lapsed occurrence decided again reads as %+v, want one row waiting", groups)
 		}
-		_, lapsed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.ClaimStanding{"lapsed"}})
+		_, lapsed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.DecisionStanding{"lapsed"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if lapsed != 0 {
 			t.Errorf("lapsed kept %d rows that read as waiting", lapsed)
 		}
-		_, waiting, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.ClaimStanding{"waiting"}})
+		_, waiting, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.DecisionStanding{"waiting"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -273,12 +273,12 @@ func TestALapsedPlaceDecidedAgainReadsAsWaiting(t *testing.T) {
 }
 
 func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
-	// A decision is a claim about a place at the versions it was keyed on,
+	// A decision covers an occurrence at the versions it was keyed on,
 	// and it lapses by those versions moving. Two builds of one product can
-	// ship the same place at different versions, and the one that moved is
+	// ship the same occurrence at different versions, and the one that moved is
 	// exactly the one the decision no longer covers — everything that asks
 	// whether a decision applies says so, and the list's state, its filter and
-	// the finding's screen were matching by place alone and saying "agreed".
+	// the finding's screen were matching by occurrence alone and saying "agreed".
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		directly := func(library graph.Described) graph.Snapshot {
@@ -300,7 +300,7 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 		somebody := f.somebodyElse(t)
 		// Approved against the older version, in the build that ships it.
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
-			finding.PlaceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
+			finding.OccurrenceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
 
 		reads := func(target int64, want string) {
 			t.Helper()
@@ -311,7 +311,7 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			if len(groups) != 1 || string(groups[0].State) != want {
 				t.Errorf("build %d reads as %+v, want one row %q", target, groups, want)
 			}
-			_, agreed, err := f.store.Groups(ctx, who, f.scopeOf(t, target), 50, 0, finding.Filter{States: []finding.ClaimStanding{"agreed"}})
+			_, agreed, err := f.store.Groups(ctx, who, f.scopeOf(t, target), 50, 0, finding.Filter{States: []finding.DecisionStanding{"agreed"}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -330,12 +330,12 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(evidence.Places) != 1 {
-				t.Fatalf("build %d sits at %d places, want 1", target, len(evidence.Places))
+			if len(evidence.Occurrences) != 1 {
+				t.Fatalf("build %d sits at %d occurrences, want 1", target, len(evidence.Occurrences))
 			}
 			n := 0
-			for _, sitting := range evidence.Places {
-				if sitting.Decision != nil {
+			for _, sitting := range evidence.Occurrences {
+				if sitting.DecisionOccurrence != nil {
 					n++
 				}
 			}
@@ -344,23 +344,23 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 
 		reads(f.target, "agreed")
 		if n := decided(f.target); n != 1 {
-			t.Errorf("the build the decision was made against shows %d of 1 places decided", n)
+			t.Errorf("the build the decision was made against shows %d of 1 occurrences decided", n)
 		}
 		reads(other, "undecided")
 		if n := decided(other); n != 0 {
-			t.Errorf("the build that moved on shows %d of 1 places decided, want 0", n)
+			t.Errorf("the build that moved on shows %d of 1 occurrences decided, want 0", n)
 		}
 	})
 }
 
-// decided writes one decision of this product at a place, keyed on a
+// decided writes one decision occurrence of this product, keyed on a
 // component version, as the triage store would have written it. Live where
-// the state is one a live claim can hold; a lapsed or withdrawn row holds no
+// the state is one a live decision can hold; a lapsed or withdrawn row holds no
 // key, which is what says it no longer applies.
-func (f *fixture) decided(t *testing.T, by, issueID int64, place, state, componentVersion, key string) {
+func (f *fixture) decided(t *testing.T, by, issueID int64, occurrence, state, componentVersion, key string) {
 	t.Helper()
 	f.decision(t, decisionRow{
-		By: by, Issue: issueID, Place: place, State: state,
+		By: by, Issue: issueID, Occurrence: occurrence, State: state,
 		Component: &componentVersion, Key: key,
 	})
 }
@@ -370,9 +370,9 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 	//
 	// Nothing-is-decided is a fixture where "correct" and "always false" look
 	// identical, so three of the four states were pinned by a condition that
-	// could have been anything. This records a claim at a place and walks it:
-	// proposed reads as waiting, approved and live reads as agreed, and a
-	// claim that stopped applying reads as lapsed and not as agreed.
+	// could have been anything. This records a decision at an occurrence and
+	// walks it: proposed reads as waiting, approved and live reads as agreed,
+	// and a decision that stopped applying reads as lapsed and not as agreed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -386,18 +386,18 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 			Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)
 		}
-		place := finding.PlaceIdentity(swss.Name, "")
+		occurrence := finding.OccurrenceIdentity(swss.Name, "")
 
 		record := func(state string, live bool) {
 			t.Helper()
-			if _, err := f.db.DB.NewDelete().Table("decision").
+			if _, err := f.db.DB.NewDelete().Table("decision_occurrence").
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			row := decisionRow{By: somebody, Issue: issueID, Place: place, State: state}
+			row := decisionRow{By: somebody, Issue: issueID, Occurrence: occurrence, State: state}
 			if live {
-				// The test for a claim standing here: a key, and the
-				// version the claim was made against being the one shipping.
+				// The test for a decision standing here: a key, and the
+				// version the decision was made against being the one shipping.
 				row.Key = state + "-live-key"
 				row.Component = ptr(swss.Version)
 			}
@@ -405,7 +405,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 		count := func(state string) int {
 			t.Helper()
-			_, n, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.ClaimStanding{finding.ClaimStanding(state)}})
+			_, n, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{States: []finding.DecisionStanding{finding.DecisionStanding(state)}})
 			if err != nil {
 				t.Fatalf("%s: %v", state, err)
 			}
@@ -429,7 +429,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		said("undecided")
 		// A proposed row that holds no key covers nothing: a proposal is live
 		// until it is withdrawn or lapses, and both release the key. So the
-		// place stands undecided — and the row and the filter say the same
+		// occurrence stands undecided — and the row and the filter say the same
 		// thing about it, which is what they exist to do. A row drawing no
 		// word at all while the filter puts the group in the undecided
 		// bucket leaves a reader looking at a list whose own state column
@@ -437,46 +437,46 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		record("proposed", false)
 		said("undecided")
 		if n := count("undecided"); n != 1 {
-			t.Errorf("a claim that holds nothing: undecided kept %d, want 1", n)
+			t.Errorf("a decision that holds nothing: undecided kept %d, want 1", n)
 		}
 		if n := count("waiting"); n != 0 {
-			t.Errorf("a claim that holds nothing is not waiting, yet waiting kept %d", n)
+			t.Errorf("a decision that holds nothing is not waiting, yet waiting kept %d", n)
 		}
 		record("proposed", true)
 		said("waiting")
 		if n := count("waiting"); n != 1 {
-			t.Errorf("a proposed claim: waiting kept %d, want 1", n)
+			t.Errorf("a proposed decision: waiting kept %d, want 1", n)
 		}
 		if n := count("undecided"); n != 0 {
-			t.Errorf("a proposed claim: undecided kept %d, want 0", n)
+			t.Errorf("a proposed decision: undecided kept %d, want 0", n)
 		}
 		if n := count("agreed"); n != 0 {
-			t.Errorf("a proposed claim is not agreed, yet agreed kept %d", n)
+			t.Errorf("a proposed decision is not agreed, yet agreed kept %d", n)
 		}
 
 		record("approved", true)
 		said("agreed")
 		if n := count("agreed"); n != 1 {
-			t.Errorf("an approved live claim: agreed kept %d, want 1", n)
+			t.Errorf("an approved live decision: agreed kept %d, want 1", n)
 		}
 		if n := count("waiting"); n != 0 {
-			t.Errorf("an approved claim is not waiting, yet waiting kept %d", n)
+			t.Errorf("an approved decision is not waiting, yet waiting kept %d", n)
 		}
 
 		record("lapsed", false)
 		said("lapsed")
 		if n := count("lapsed"); n != 1 {
-			t.Errorf("a lapsed claim: lapsed kept %d, want 1", n)
+			t.Errorf("a lapsed decision: lapsed kept %d, want 1", n)
 		}
 		if n := count("agreed"); n != 0 {
-			t.Errorf("a lapsed claim is not agreed, yet agreed kept %d", n)
+			t.Errorf("a lapsed decision is not agreed, yet agreed kept %d", n)
 		}
 
 		// An approval that has stopped standing is not an agreement. The
-		// claim was agreed to and then withdrawn, which releases the key, and
+		// decision was agreed to and then withdrawn, which releases the key, and
 		// the row keeps its word: without the live key on the count a
-		// judgment taken back eighteen months ago goes on answering for its
-		// place, and the row and the filter answer it the same way because
+		// decision taken back eighteen months ago goes on answering for its
+		// occurrence, and the row and the filter answer it the same way because
 		// they are counting through one condition.
 		record("approved", false)
 		said("undecided")
@@ -484,18 +484,18 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 			t.Errorf("an approval that no longer stands read as agreed: %d", n)
 		}
 
-		// And a claim that was withdrawn long ago answers for nothing: it is
-		// not live, so the place is undecided again.
+		// And a decision that was withdrawn long ago answers for nothing: it is
+		// not live, so the occurrence is undecided again.
 		record("withdrawn", false)
 		if n := count("agreed"); n != 0 {
-			t.Errorf("a withdrawn claim read as agreed: %d", n)
+			t.Errorf("a withdrawn decision read as agreed: %d", n)
 		}
 	})
 }
 
 func TestNarrowingByHowFarDecided(t *testing.T) {
-	// A group covers every place an issue sits at in one component, so its
-	// state is a statement about all of them: undecided means no place has a
+	// A group covers every occurrence an issue sits at in one component, so its
+	// state is a statement about all of them: undecided means no occurrence has a
 	// decision, not that one of them does not.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
@@ -515,7 +515,7 @@ func TestNarrowingByHowFarDecided(t *testing.T) {
 		// answered. Both asserted: "undecided keeps everything" alone is what
 		// a clause that never runs also looks like.
 		_, undecided, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{States: []finding.ClaimStanding{"undecided"}})
+			finding.Filter{States: []finding.DecisionStanding{"undecided"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -525,7 +525,7 @@ func TestNarrowingByHowFarDecided(t *testing.T) {
 		}
 		for _, state := range []string{"agreed", "waiting", "lapsed"} {
 			_, n, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-				finding.Filter{States: []finding.ClaimStanding{finding.ClaimStanding(state)}})
+				finding.Filter{States: []finding.DecisionStanding{finding.DecisionStanding(state)}})
 			if err != nil {
 				t.Fatalf("%s: %v", state, err)
 			}
@@ -536,20 +536,21 @@ func TestNarrowingByHowFarDecided(t *testing.T) {
 	})
 }
 
-// claimBy records the action a directly written decision belongs to. Every
-// decision is one row of a claim, and a row written without one is refused.
+// decisionBy records the decision a directly written occurrence row belongs to.
+// Every occurrence row belongs to a decision, and a row written without one is
+// refused.
 //
-// The outcome is the claim's, not the row's: one act is one argument. What
-// these tests vary is where a judgment lands and what state it is in, so the
+// The outcome is the decision's, not the row's: one act is one argument. What
+// these tests vary is where a decision lands and what state it is in, so the
 // argument itself is the same dismissal every time.
-func claimBy(t *testing.T, db *database.DB, personID int64) int64 {
+func decisionBy(t *testing.T, db *database.DB, personID int64) int64 {
 	t.Helper()
-	return claimSaying(t, db, personID, "not-applicable")
+	return decisionSaying(t, db, personID, "not-applicable")
 }
 
-// claimSaying records a claim with one outcome, for a test that turns on which
-// judgment was made rather than on where it landed.
-func claimSaying(t *testing.T, db *database.DB, personID int64, outcome string) int64 {
+// decisionSaying records a decision with one outcome, for a test that turns on
+// which decision was made rather than on where it landed.
+func decisionSaying(t *testing.T, db *database.DB, personID int64, outcome string) int64 {
 	t.Helper()
 	ctx := context.Background()
 	if _, err := db.DB.NewInsert().
@@ -557,12 +558,12 @@ func claimSaying(t *testing.T, db *database.DB, personID int64, outcome string) 
 			"kind": "finding", "proposed_by": personID, "proposed_at": time.Now().UTC(),
 			"outcome": outcome,
 		}).
-		TableExpr("\"claim\"").Exec(ctx); err != nil {
-		t.Fatalf("record a claim: %v", err)
+		TableExpr("\"decision\"").Exec(ctx); err != nil {
+		t.Fatalf("record a decision: %v", err)
 	}
 	var id int64
-	if err := db.DB.NewSelect().TableExpr("\"claim\"").ColumnExpr(`MAX("id")`).Scan(ctx, &id); err != nil {
-		t.Fatalf("read the claim back: %v", err)
+	if err := db.DB.NewSelect().TableExpr("\"decision\"").ColumnExpr(`MAX("id")`).Scan(ctx, &id); err != nil {
+		t.Fatalf("read the decision back: %v", err)
 	}
 	return id
 }
@@ -755,7 +756,7 @@ func TestSeveralStatesAreAskedForTogether(t *testing.T) {
 		)
 		who := f.holding(t, access.PublicTriage)
 
-		count := func(t *testing.T, states ...finding.ClaimStanding) int {
+		count := func(t *testing.T, states ...finding.DecisionStanding) int {
 			t.Helper()
 			_, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0,
 				finding.Filter{States: states})
@@ -906,8 +907,8 @@ func TestTheBundleAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) 
 //
 // The filter had written its own condition without the product and without
 // the version match, so it kept a group whose own sent-back count was zero:
-// matched by a claim returned in a different product, or by one keyed on a
-// version the place stopped holding. A reader asking for what is waiting on
+// matched by a decision returned in a different product, or by one keyed on a
+// version the occurrence stopped holding. A reader asking for what is waiting on
 // them got rows whose state column said nothing was.
 func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
@@ -917,16 +918,16 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		somebody := f.somebodyElse(t)
 		issueID := f.issueID(t, "CVE-2026-1")
-		place := finding.PlaceIdentity(swss.Name, "")
+		occurrence := finding.OccurrenceIdentity(swss.Name, "")
 
 		sentBack := func(productID int64, version string) {
 			t.Helper()
-			if _, err := f.db.DB.NewDelete().Table("decision").
+			if _, err := f.db.DB.NewDelete().Table("decision_occurrence").
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			f.decision(t, decisionRow{
-				By: somebody, Product: productID, Issue: issueID, Place: place,
+				By: somebody, Product: productID, Issue: issueID, Occurrence: occurrence,
 				State: "proposed", Component: &version, Key: "the-live-key",
 				SentBack: ptr(time.Now().UTC()),
 			})
@@ -961,15 +962,15 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 		}
 
 		sentBack(f.productID, swss.Version)
-		asked("a claim sent back here, at the version shipping here", 1)
+		asked("a decision sent back here, at the version shipping here", 1)
 		sentBack(f.productID, "0.9.0")
-		asked("a claim sent back about a version this place stopped holding", 0)
+		asked("a decision sent back about a version this occurrence stopped holding", 0)
 		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")
 		if err != nil {
 			t.Fatal(err)
 		}
 		sentBack(elsewhere.ID, swss.Version)
-		asked("a claim sent back in another product", 0)
+		asked("a decision sent back in another product", 0)
 	})
 }
 
@@ -1020,10 +1021,10 @@ func TestANarrowingThatCannotBeAppliedAnswersNothingRatherThanEverything(t *test
 	})
 }
 
-// A claim's places open the list: every place one of its rows sits at, or
-// only the places where its row is in the states asked for. A row of the
-// same claim in another product is not a place of this product.
-func TestAClaimNarrowsTheListToThePlacesItWroteAt(t *testing.T) {
+// A decision's occurrences open the list: every occurrence one of its rows sits
+// at, or only the occurrences where its row is in the states asked for. A row
+// of the same decision in another product is not an occurrence of this product.
+func TestADecisionNarrowsTheListToTheOccurrencesItWroteAt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -1034,17 +1035,17 @@ func TestAClaimNarrowsTheListToThePlacesItWroteAt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		claim, other := claimBy(t, f.db, somebody), claimBy(t, f.db, somebody)
-		wrote := func(claimID, productID int64, issue string, at graph.Described, state string) {
+		decision, other := decisionBy(t, f.db, somebody), decisionBy(t, f.db, somebody)
+		wrote := func(decisionID, productID int64, issue string, at graph.Described, state string) {
 			t.Helper()
 			f.decision(t, decisionRow{
-				By: somebody, Claim: claimID, Product: productID,
-				Issue: f.issueID(t, issue), Place: finding.PlaceIdentity(at.Name, ""),
+				By: somebody, Decision: decisionID, Product: productID,
+				Issue: f.issueID(t, issue), Occurrence: finding.OccurrenceIdentity(at.Name, ""),
 				State: state, Ended: ptr(time.Now().UTC()),
 			})
 		}
-		wrote(claim, f.productID, "CVE-2026-1", swss, "withdrawn")
-		wrote(claim, f.productID, "CVE-2026-2", teamd, "lapsed")
+		wrote(decision, f.productID, "CVE-2026-1", swss, "withdrawn")
+		wrote(decision, f.productID, "CVE-2026-2", teamd, "lapsed")
 		wrote(other, elsewhere.ID, "CVE-2026-1", swss, "withdrawn")
 
 		for _, c := range []struct {
@@ -1052,12 +1053,12 @@ func TestAClaimNarrowsTheListToThePlacesItWroteAt(t *testing.T) {
 			filter  finding.Filter
 			want    int
 		}{
-			{"every place the claim wrote at", finding.Filter{Claim: claim}, 2},
-			{"the places where it was withdrawn",
-				finding.Filter{Claim: claim, ClaimStates: []string{"withdrawn"}}, 1},
-			{"the places where it lapsed",
-				finding.Filter{Claim: claim, ClaimStates: []string{"lapsed"}}, 1},
-			{"a claim whose only row is in another product", finding.Filter{Claim: other}, 0},
+			{"every occurrence the decision wrote at", finding.Filter{Decision: decision}, 2},
+			{"the occurrences where it was withdrawn",
+				finding.Filter{Decision: decision, DecisionStates: []string{"withdrawn"}}, 1},
+			{"the occurrences where it lapsed",
+				finding.Filter{Decision: decision, DecisionStates: []string{"lapsed"}}, 1},
+			{"a decision whose only row is in another product", finding.Filter{Decision: other}, 0},
 		} {
 			_, kept, err := f.store.Groups(ctx, who, f.scope, 50, 0, c.filter)
 			if err != nil {

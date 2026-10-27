@@ -18,8 +18,8 @@ import (
 // somewhere the row is not. The two copies were the same lines in two files,
 // differing only in what they then narrowed by.
 //
-// The consumer is joined optionally, because whether a decision still covers a
-// place is keyed on both upstream versions and one of them is the consumer's —
+// The consumer is joined optionally, because whether a decision still covers an
+// occurrence is keyed on both upstream versions and one of them is the consumer's —
 // so the condition that asks about decisions needs it and the one that does
 // not, does not.
 //

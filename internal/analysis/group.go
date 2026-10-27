@@ -60,10 +60,10 @@ var corroborated = `EXISTS (SELECT 1 FROM "analysis_result" AS "ag"
 // Kin is another lead on a lead's build that is the same flaw, or possibly
 // is.
 type Kin struct {
-	Place string
-	Rule  string
-	Path  string
-	Line  *int
+	Occurrence string
+	Rule       string
+	Path       string
+	Line       *int
 	// Same is whether it is the same flaw rather than possibly so.
 	Same bool
 }
@@ -81,18 +81,18 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	}
 	reach := finding.LeadReach(subject, productID)
 	var rows []struct {
-		Place string `bun:"place_identity"`
-		Rule  string `bun:"rule"`
-		Path  string `bun:"last_path"`
-		Line  *int   `bun:"last_line"`
-		Same  int    `bun:"same"`
+		Occurrence string `bun:"occurrence_identity"`
+		Rule       string `bun:"rule"`
+		Path       string `bun:"last_path"`
+		Line       *int   `bun:"last_line"`
+		Same       int    `bun:"same"`
 	}
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "finding" AS "g" ON "g"."target_id" = "f"."target_id"`).
 		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "g"."vulnerability_id"`).
-		ColumnExpr(`"g"."place_identity", "vu"."identifier" AS "rule", "ag"."last_path", "ag"."last_line"`).
+		ColumnExpr(`"g"."occurrence_identity", "vu"."identifier" AS "rule", "ag"."last_path", "ag"."last_line"`).
 		ColumnExpr(`CASE WHEN "ag"."last_line" BETWEEN "ar"."last_line" - ? AND "ar"."last_line" + ? `+
 			`THEN 1 ELSE 0 END AS "same"`, groupLines, groupLines).
 		Where(`"f"."id" = ?`, leadID).
@@ -101,27 +101,27 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 		// beside the product's own visibilities, as the queue reads it.
 		Where(`("g"."visibility" IN (?) OR EXISTS (SELECT 1 FROM "finding" AS "f" WHERE "f"."id" = "g"."id" AND `+
 			reach.Included+`))`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
-		OrderExpr(`"same" DESC, "ag"."last_line" ASC, "g"."place_identity" ASC`).
+		OrderExpr(`"same" DESC, "ag"."last_line" ASC, "g"."occurrence_identity" ASC`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the leads lead %d may be one flaw with: %w", leadID, err)
 	}
 	out := make([]Kin, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, Kin{Place: r.Place, Rule: r.Rule, Path: r.Path, Line: r.Line, Same: r.Same == 1})
+		out = append(out, Kin{Occurrence: r.Occurrence, Rule: r.Rule, Path: r.Path, Line: r.Line, Same: r.Same == 1})
 	}
 	return out, nil
 }
 
-// Member is a lead one judgment about another lead also answers.
+// Member is a lead one decision about another lead also answers.
 type Member struct {
 	VulnerabilityID int64             `bun:"vulnerability_id"`
-	Place           string            `bun:"place_identity"`
+	Occurrence      string            `bun:"occurrence_identity"`
 	Visibility      access.Visibility `bun:"visibility"`
 }
 
 // Unanswered is the leads on a lead's build that are the same flaw as it and
 // that nothing answers yet, where the subject may read them: open, under no
-// live claim, waiting or not, covered by no standing rule, not handed off, and
+// live decision, waiting or not, covered by no standing rule, not handed off, and
 // seen in a release still in support. A lead already answered keeps its own
 // answer, and a lead past its end of life is kept as it stands.
 func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Member, error) {
@@ -134,19 +134,19 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		return nil, err
 	}
 	// The lead asked about is under "g" and each of its kin under "f", so
-	// that the claim and the rule are asked of the kin. Which leads are one
+	// that the decision and the rule are asked of the kin. Which leads are one
 	// flaw does not depend on which of the two is asked about.
 	var out []Member
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "finding" AS "g" ON "g"."id" = ?`, leadID).
 		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
-		ColumnExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility"`).
+		ColumnExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility"`).
 		Where(nearby(groupLines)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dc"
-			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionFiledAt("dc", "f")+`)`,
+		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
+			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionOccurrenceFiledAt("dc", "f")+`)`,
 			productID).
 		Where(`NOT `+ruled, productID).
 		Where(`NOT `+handedOff, productID).
@@ -162,12 +162,12 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 			return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fs"
 				JOIN "target" AS "ts" ON "ts"."id" = "fs"."target_id"
 				JOIN "stream" AS "ss" ON "ss"."id" = "ts"."stream_id"
-				WHERE "ss"."product_id" = ? AND "fs"."place_identity" = "f"."place_identity"
+				WHERE "ss"."product_id" = ? AND "fs"."occurrence_identity" = "f"."occurrence_identity"
 				  AND `+kinds+` AND "ts"."stream_id" NOT IN (?))`, args...)
 		}).
-		OrderExpr(`"f"."place_identity" ASC`).
+		OrderExpr(`"f"."occurrence_identity" ASC`).
 		Scan(ctx, &out); err != nil {
-		return nil, fmt.Errorf("read the leads one judgment about lead %d answers: %w", leadID, err)
+		return nil, fmt.Errorf("read the leads one decision about lead %d answers: %w", leadID, err)
 	}
 	return out, nil
 }

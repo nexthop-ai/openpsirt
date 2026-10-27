@@ -47,7 +47,7 @@ document is wrong the first time somebody is in a hurry — silently.
 | Rule | |
 |---|---|
 | A closed vocabulary is the domain's list, not a literal beside the route | Retyped at the route, a word added to the domain is accepted by the store and refused by every route that takes it, and each retyping is free to carry a different membership. The list comes from the package that owns the vocabulary, so the document and the store cannot disagree about what a word is |
-| A subset is a named rule in the domain package | Some routes take fewer words than the vocabulary has: one decision at a time offers what a person may propose there, and a bulk claim offers less again. Shortening the list at the route makes what is left out an accident; naming the subset where the vocabulary lives makes it a statement, with the reason beside it |
+| A subset is a named rule in the domain package | Some routes take fewer words than the vocabulary has: a single decision offers what a person may propose there, and a bulk decision offers less again. Shortening the list at the route makes what is left out an accident; naming the subset where the vocabulary lives makes it a statement, with the reason beside it |
 | Every word of a held vocabulary is checked against the list that owns it | A test walks the document the server builds from its own registrations. Asked of a hand-kept list it would only check that two copies match; asked of the domain it checks that the document is true |
 | Every enum in the document is held to a list | The walk fails an enum that is none of the lists the owning packages state, in their order, so a reordered or shortened copy fails and so does a new literal. Each is offered through a vocabulary type that builds its schema from its package's list. The few enums no domain package owns are named in the test as a format's or a route's own words: export formats, a register's two sides, a CVE record's statuses, a commit lookup's answer, an upload's answer and a subject's kind. An entry no enum offers fails too |
 | Every list names every constant of its type | A route offers the list, so a constant the store writes and the list leaves out is a word the route refuses. A test reads each listed type's constants from its package's source and fails one the list leaves out and a word no constant declares. A constant that is not a word a route offers, such as no narrowing at all, is named in the test as set apart |
@@ -104,7 +104,7 @@ description, which is the one thing a reader of these asks for first.
 | 400 | A query parameter the operation does not take, or a NUL character in typed input. The refusal names the input |
 | 403 | An act the caller may not do, on a product they can see: an issue act or a routing rule without the role it asks for |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
-| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was being generated, a retirement of something already retired, a name another row already holds |
+| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the decision, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was being generated, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written: a promise naming a release past end-of-life, for one |
 
 Not found and not yours are one answer. A product somebody holds nothing on is
@@ -356,7 +356,7 @@ sits at, with how far it has been decided in each.
 
 | Rule | Reason |
 |---|---|
-| One row per build and component, not per place | The same component in two builds is two things shipped; sixty places of it in one build is one piece of work with a count |
+| One row per build and component, not per occurrence | The same component in two builds is two things shipped; sixty occurrences of it in one build is one piece of work with a count |
 | How far it is decided uses the findings list's own expression | Two screens with two definitions of "decided" come to disagree in front of somebody |
 | No new visibility rule, but the narrowing is in the query | A page spanning products is where filtering afterwards gets forgotten, and the count leaks even when no row is shown |
 | The search box lands here, with no product picked | An issue by name spans products by construction. Which of the two searches it is is decided by asking the server, not by the shape of the text |
@@ -460,7 +460,7 @@ on a product needs the product resolved and stays in the handler.
 The privileges page keeps only what a per-endpoint line cannot carry: what each
 role means, how roles are granted, what a declaration is and is not, and that
 seeing is never changing. Two rules in it are not roles and cannot be granted:
-visibility narrows every answer, and the proposer of a claim may never approve
+visibility narrows every answer, and the proposer of a decision may never approve
 it.
 
 ## Representation
@@ -522,7 +522,7 @@ or team a row is about, are named the same way.
 | A label beside a person or a team is absent where it would repeat the name; a label beside a product, branch or tag, or variant falls back to the name | Absent beside a person reads as "the same". A build is named on every list alike |
 | Not every field carries a label | The lists a person reads by name carry one. Adding a label beside a name is additive, so the rest gain one as a screen needs it |
 | The holder of work is a person's identity or a team's name, beside `person_name` | The holder's own list resolves it, and a team's label matches no team |
-| A file carries a label as a column beside the name | The administration trail names the person, the running-out file the product, the build and the holder, the repeated-deferral and audit files the product, the review-queue file the product and the proposer, and the file of the reader's own claims the product, the branch or tag and the variant, the way their lists do |
+| A file carries a label as a column beside the name | The administration trail names the person, the running-out file the product, the build and the holder, the repeated-deferral and audit files the product, the review-queue file the product and the proposer, and the file of the reader's own decisions the product, the branch or tag and the variant, the way their lists do |
 
 ## File organization
 
@@ -535,7 +535,7 @@ route, sign-in and the served interface, and registers each area in turn.
 | Inventories arriving | Uploads, their receipts, the documents a build sent, one scanner run |
 | Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
 | Handing work out | Assignment, routing rules, teams, tags, bulk acts, fix bundles, planned upgrades, one component |
-| Claims and decisions | The review queue, proposing, approving, re-affirmation, comments, exploitation here, obligation windows, assessments, scrutiny, readiness |
+| Decisions | The review queue, proposing, approving, re-affirmation, comments, exploitation here, obligation windows, assessments, scrutiny, readiness |
 | Reports | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
 | Advisories | Advisories, VEX, supplier imports, the suppliers read on a schedule, outbound destinations |
 | Administration | The catalog, people and their roles, role bindings, keys, tokens, settings, the trail, work set aside, saved filters, notifications, the caller's own session |
@@ -581,5 +581,5 @@ Recorded because the conclusion is the deliverable.
 | Names in paths, identifiers in bodies | A product, stream and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
 | A removal takes something out of use rather than out of the database | A team, a routing rule, an outbound destination and a variant are each reached by `DELETE` and each keep their row. What they hold is named by findings, decisions and documents that went to customers, so removing the row would take those with it |
 | An amendment leaves out what it does not change, and naming nothing is refused | Absent and cleared are different requests wherever a field has a default, and a request that asks for nothing answered as done would say something happened |
-| A place in a path is the identity the findings list gave out | A caller free to compose one would be choosing which decisions apply where |
+| An occurrence in a path is the identity the findings list gave out | A caller free to compose one would be choosing which decisions apply where |
 | Comment density in this layer is low by design | It is a registration and a mapping: the operation is declared, a store is called, its answer becomes a body. What is worth explaining about a rule belongs where the rule is enforced |

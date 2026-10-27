@@ -24,8 +24,8 @@ type BuildStandingBody struct {
 	Open       int           `json:"open" doc:"Issues at components, the unit every count here uses"`
 	Overdue    int           `json:"overdue,omitempty" doc:"The number past a deadline"`
 	Exploited  int           `json:"exploited,omitempty" doc:"The number somebody is known to be exploiting"`
-	Undecided  int           `json:"undecided,omitempty" doc:"The number nobody has claimed anything about"`
-	Agreed     int           `json:"agreed,omitempty" doc:"The number answered at every place by a standing decision"`
+	Undecided  int           `json:"undecided,omitempty" doc:"The number nobody has proposed anything about"`
+	Agreed     int           `json:"agreed,omitempty" doc:"The number answered at every occurrence by a standing decision"`
 	// LastScanAt is when a scan last arrived here, and Retired says the
 	// release is out of support — so a build that stopped being scanned
 	// because it stopped being supported reads as expected rather than as
@@ -62,10 +62,10 @@ type OverviewOutput struct {
 		Open      int `json:"open"`
 		Overdue   int `json:"overdue"`
 		Undecided int `json:"undecided"`
-		// Waiting is how many claims about this product are waiting for a
+		// Waiting is how many decisions about this product are waiting for a
 		// second person. Somebody asking how a product is doing is asking
 		// partly whether the work is stuck on somebody else.
-		Waiting int `json:"waiting" doc:"Claims about this product waiting for a second person"`
+		Waiting int `json:"waiting" doc:"Decisions about this product waiting for a second person"`
 	}
 }
 
@@ -82,11 +82,11 @@ func registerOverview(api huma.API, in core.Deps) {
 		Path:    "/v1/products/{product}/overview",
 		Summary: "Show how one product is doing",
 		Description: "One product, with each of its builds: what is open, how much is overdue, " +
-			"how much is exploited, how much nobody has claimed anything about, how much is " +
-			"answered at every place, and when a scan last arrived.\n\n" +
+			"how much is exploited, how much nobody has proposed anything about, how much is " +
+			"answered at every occurrence, and when a scan last arrived.\n\n" +
 			"Counted as issues at components, the unit every other count here uses.\n\n" +
 			"\"Undecided\" and \"agreed\" mean what they mean on the findings list: " +
-			"undecided means no place has a decision, agreed means every place is answered by " +
+			"undecided means no occurrence has a decision, agreed means every occurrence is answered by " +
 			"one that stands.\n\n" +
 			"A build whose release is out of support says so rather than reading as one that " +
 			"stopped being scanned: those are different facts and only one of them is a fault.",
@@ -179,7 +179,7 @@ func registerOverview(api huma.API, in core.Deps) {
 		out.Body.Overdue = whole.Overdue
 		out.Body.Undecided = whole.Undecided
 
-		// The claims waiting for a second person here. Read through the same
+		// The decisions waiting for a second person here. Read through the same
 		// queue the review screen reads, narrowed to this product, so the
 		// number and the screen it links to are the same answer.
 		waiting, err := triage.NewStore(in.DB.DB).WaitingIn(ctx, subject, named.ID)

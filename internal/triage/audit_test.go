@@ -12,18 +12,18 @@ import (
 )
 
 func TestTheRecordCarriesWhoProposedAndWhoAgreed(t *testing.T) {
-	// The things an auditor asks for: the judgment, the words it rests on, and
+	// The things an auditor asks for: the decision, the words it rests on, and
 	// two different people with the date each of them acted. Assembled for a
-	// page rather than looked up one decision at a time, because the question
+	// page rather than looked up one decision occurrence at a time, because the question
 	// is about a period rather than about a row.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		// A finding at the place, because a decision stores a hash of names
+		// A finding at the occurrence, because a row stores a hash of names
 		// rather than the names — what it was about is recovered from a
 		// finding sitting there.
 		at := f.at()
 		in := f.build(t, f.product, "for-the-record")
-		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), at.PlaceIdentity, access.Public)
+		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), at.OccurrenceIdentity, access.Public)
 		claimed := f.agreed(t, at)
 
 		rows, total, err := f.store.Audit(ctx, f.reviewer, triage.Filter{},
@@ -32,14 +32,14 @@ func TestTheRecordCarriesWhoProposedAndWhoAgreed(t *testing.T) {
 			t.Fatal(err)
 		}
 		if total != 1 || len(rows) != 1 {
-			t.Fatalf("the record holds %d judgments, want the one that was made", total)
+			t.Fatalf("the record holds %d decisions, want the one that was made", total)
 		}
 		row := rows[0]
 		if row.ID != claimed.ID {
-			t.Errorf("the record names decision %d, want %d", row.ID, claimed.ID)
+			t.Errorf("the record names decision occurrence %d, want %d", row.ID, claimed.ID)
 		}
 		if row.Reasoning == "" {
-			t.Error("a judgment in the record carries no reasoning, which is the thing being audited")
+			t.Error("a decision in the record carries no reasoning, which is the thing being audited")
 		}
 		if row.ProposedByName == "" || row.ProposedAt.IsZero() {
 			t.Errorf("no record of who proposed it or when: %+v", row)
@@ -57,15 +57,15 @@ func TestTheRecordCarriesWhoProposedAndWhoAgreed(t *testing.T) {
 		// that exists. A report that said the rule held because the rule
 		// exists would be reporting on itself.
 		if !row.BySomebodyElse() {
-			t.Error("a judgment two people made does not read as one")
+			t.Error("a decision two people made does not read as one")
 		}
 		if !row.Standing() {
-			t.Error("an agreed judgment does not read as standing")
+			t.Error("an agreed decision does not read as standing")
 		}
-		// And what it was about, named from the finding at the place: a
-		// decision stores a hash of names rather than the names.
+		// And what it was about, named from the finding at the occurrence: a
+		// row stores a hash of names rather than the names.
 		if row.Issue == "" || row.Component == "" || row.Product == "" {
-			t.Errorf("the record does not say what the judgment was about: %+v", row)
+			t.Errorf("the record does not say what the decision was about: %+v", row)
 		}
 	})
 }
@@ -79,7 +79,7 @@ func TestTheRecordKeepsAnAgreementThatWasTakenBack(t *testing.T) {
 		claimed := f.agreed(t, f.at())
 
 		// Editing the words withdraws the agreement given for them.
-		if _, err := f.store.Revise(ctx, f.triager, claimed.ClaimID,
+		if _, err := f.store.Revise(ctx, f.triager, claimed.DecisionID,
 			"On reflection, the parser is reachable after all."); err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func TestTheRecordKeepsAnAgreementThatWasTakenBack(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
-			t.Fatalf("the record holds %d judgments", len(rows))
+			t.Fatalf("the record holds %d decisions", len(rows))
 		}
 		row := rows[0]
 		if len(row.Approvals) != 1 {
@@ -101,7 +101,7 @@ func TestTheRecordKeepsAnAgreementThatWasTakenBack(t *testing.T) {
 		}
 		// And it no longer counts toward the control.
 		if row.BySomebodyElse() {
-			t.Error("a judgment whose only agreement was withdrawn still reads as two people's")
+			t.Error("a decision whose only agreement was withdrawn still reads as two people's")
 		}
 		// The words shown are the words in force, so what is read and what was
 		// agreed to cannot drift apart.
@@ -112,7 +112,7 @@ func TestTheRecordKeepsAnAgreementThatWasTakenBack(t *testing.T) {
 }
 
 func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
-	// Filtered for judgments one person made, the answer is large and
+	// Filtered for decisions one person made, the answer is large and
 	// entirely legitimate: an outcome that hides nothing needs no second
 	// person. Read as "the exceptions", the filter proves the opposite of
 	// what its name suggests.
@@ -129,11 +129,11 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 		ctx := t.Context()
 		at := f.at()
 		in := f.build(t, f.product, "for-the-record")
-		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), at.PlaceIdentity, access.Public)
+		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), at.OccurrenceIdentity, access.Public)
 
 		// A dismissal nobody has agreed to yet. It is a proposal rather than a
-		// standing judgment, and that is exactly the state the report is for.
-		claimed := f.claims(t, at)
+		// standing decision, and that is exactly the state the report is for.
+		claimed := f.decisions(t, at)
 
 		alone := triage.Filter{Alone: true, Outcomes: []triage.Outcome{triage.NotApplicable}}
 		rows, total, err := f.store.Audit(ctx, f.reviewer, alone, time.Time{}, time.Time{}, 50, 0)
@@ -145,7 +145,7 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 		}
 
 		// Agreed to by somebody else, and it leaves.
-		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		_, total, err = f.store.Audit(ctx, f.reviewer, alone, time.Time{}, time.Time{}, 50, 0)
@@ -161,7 +161,7 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 		// flag set once. Revising the words withdraws the agreement
 		// given for them, so this is the ordinary way it happens
 		// rather than a contrivance.
-		if _, err := f.store.Revise(ctx, f.triager, claimed.ClaimID,
+		if _, err := f.store.Revise(ctx, f.triager, claimed.DecisionID,
 			"On reading it again, the encoder does reach the parser."); err != nil {
 			t.Fatal(err)
 		}
@@ -170,7 +170,7 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 			t.Fatal(err)
 		}
 		if total != 1 {
-			t.Errorf("a withdrawn agreement left the judgment out of the exception report")
+			t.Errorf("a withdrawn agreement left the decision out of the exception report")
 		}
 
 		// And an agreement from the proposer is not a second person, which is
@@ -182,14 +182,14 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 		var revision struct {
 			ID int64 `bun:"id"`
 		}
-		if err := f.db.DB.NewSelect().TableExpr(`"claim_revision" AS "dr"`).
-			ColumnExpr(`"dr"."id" AS "id"`).Where(`"dr"."claim_id" = ?`, claimed.ClaimID).
+		if err := f.db.DB.NewSelect().TableExpr(`"decision_revision" AS "dr"`).
+			ColumnExpr(`"dr"."id" AS "id"`).Where(`"dr"."decision_id" = ?`, claimed.DecisionID).
 			Order("dr.id DESC").Limit(1).Scan(ctx, &revision); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.db.DB.NewInsert().TableExpr(`"claim_approval"`).
+		if _, err := f.db.DB.NewInsert().TableExpr(`"decision_approval"`).
 			Model(&map[string]any{
-				"claim_id":    claimed.ClaimID,
+				"decision_id": claimed.DecisionID,
 				"revision_id": revision.ID,
 				"approved_by": f.proposer,
 				"approved_at": time.Now().UTC().Truncate(time.Microsecond),
@@ -213,7 +213,7 @@ func TestTheRecordIsFoundByWhoActedAndWhatItWasAbout(t *testing.T) {
 		ctx := t.Context()
 		at := f.at()
 		in := f.build(t, f.product, "for-the-record")
-		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), at.PlaceIdentity, access.Public)
+		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), at.OccurrenceIdentity, access.Public)
 		f.agreed(t, at)
 
 		counted := func(filter triage.Filter) int {
@@ -260,14 +260,14 @@ func TestTheRecordNarrowsToSeveralOutcomesAndStatesAtOnce(t *testing.T) {
 		// something it excludes.
 		dismissed := f.at()
 		in := f.build(t, f.product, "for-the-record")
-		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), dismissed.PlaceIdentity, access.Public)
+		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), dismissed.OccurrenceIdentity, access.Public)
 		f.agreed(t, dismissed)
 
 		deferred := f.at()
-		deferred.PlaceIdentity = "place-of-libfoo-under-libbaz"
-		f.finds(t, in, f.component(t, "libbaz", "4.5.6"), deferred.PlaceIdentity, access.Public)
+		deferred.OccurrenceIdentity = "place-of-libfoo-under-libbaz"
+		f.finds(t, in, f.component(t, "libbaz", "4.5.6"), deferred.OccurrenceIdentity, access.Public)
 		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: deferred, Outcome: triage.Deferred, DeferredUntil: &soon,
+			Occurrence: deferred, Outcome: triage.Deferred, DeferredUntil: &soon,
 			Reasoning: "Not this sprint.", By: f.proposer, NeedsApproval: false,
 		}); err != nil {
 			t.Fatal(err)
@@ -324,7 +324,7 @@ func TestTheRecordIsNarrowedToWhatTheReaderMaySee(t *testing.T) {
 		hidden.Visibility = access.Private
 		insider := f.privately(t)
 		if _, err := f.store.Propose(ctx, insider, triage.Proposal{
-			Place: hidden, Outcome: triage.NotApplicable,
+			Occurrence: hidden, Outcome: triage.NotApplicable,
 			Justification: triage.CodeNotInExecutePath,
 			Reasoning:     "The parser is never reached.",
 			By:            insider.ID, NeedsApproval: true,
@@ -335,46 +335,46 @@ func TestTheRecordIsNarrowedToWhatTheReaderMaySee(t *testing.T) {
 		// A public reader is shown nothing about it.
 		if _, total, err := f.store.Audit(ctx, f.reviewer, triage.Filter{},
 			time.Time{}, time.Time{}, 50, 0); err != nil || total != 0 {
-			t.Errorf("an undisclosed judgment was in a public reader's record: %d (%v)", total, err)
+			t.Errorf("an undisclosed decision was in a public reader's record: %d (%v)", total, err)
 		}
 		// And somebody who may see it does, so the check above is not passing
 		// on a record that shows nothing to anybody.
 		if _, total, err := f.store.Audit(ctx, insider, triage.Filter{},
 			time.Time{}, time.Time{}, 50, 0); err != nil || total != 1 {
-			t.Errorf("somebody who may read it was shown %d judgments (%v)", total, err)
+			t.Errorf("somebody who may read it was shown %d decisions (%v)", total, err)
 		}
 	})
 }
 
-func TestTheRecordIsBoundedByWhenAJudgmentWasProposed(t *testing.T) {
-	// The period is the proposal's date, not the approval's: a judgment
+func TestTheRecordIsBoundedByWhenADecisionWasProposed(t *testing.T) {
+	// The period is the proposal's date, not the approval's: a decision
 	// belongs to when it was argued, and dating it by its agreement would move
 	// it out of the period it was made in whenever an approval came late,
 	// which is the ordinary case.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		claimed := f.claims(t, f.at())
+		claimed := f.decisions(t, f.at())
 
 		before := claimed.ProposedAt.Add(-time.Hour)
 		after := claimed.ProposedAt.Add(time.Hour)
 
 		if _, total, err := f.store.Audit(ctx, f.reviewer, triage.Filter{},
 			before, after, 50, 0); err != nil || total != 1 {
-			t.Errorf("a judgment inside the period was not in the record: %d (%v)", total, err)
+			t.Errorf("a decision inside the period was not in the record: %d (%v)", total, err)
 		}
 		if _, total, err := f.store.Audit(ctx, f.reviewer, triage.Filter{},
 			after, time.Time{}, 50, 0); err != nil || total != 0 {
-			t.Errorf("a judgment proposed before the period was in it: %d (%v)", total, err)
+			t.Errorf("a decision proposed before the period was in it: %d (%v)", total, err)
 		}
 		if _, total, err := f.store.Audit(ctx, f.reviewer, triage.Filter{},
 			time.Time{}, before, 50, 0); err != nil || total != 0 {
-			t.Errorf("a judgment proposed after the period was in it: %d (%v)", total, err)
+			t.Errorf("a decision proposed after the period was in it: %d (%v)", total, err)
 		}
 	})
 }
 
 func TestTheRecordNamesOneFindingRatherThanTheLeastOfEach(t *testing.T) {
-	// A decision is keyed on a place, and a place sits in more than one build:
+	// A decision is keyed on an occurrence, and an occurrence sits in more than one build:
 	// the same pair of names at two components is the ordinary shape of a
 	// version bump. A minimum per column over that set is five independent
 	// answers, so the row named a component, a version and a consumer that no
@@ -386,8 +386,8 @@ func TestTheRecordNamesOneFindingRatherThanTheLeastOfEach(t *testing.T) {
 		second := f.build(t, f.product, "2026.06")
 		// The earliest row is libfoo; the alphabetically-least component name
 		// and the least version belong to the other one.
-		f.finds(t, first, f.component(t, "libfoo", "9.9.9"), at.PlaceIdentity, access.Public)
-		f.finds(t, second, f.component(t, "libbar", "1.0.0"), at.PlaceIdentity, access.Public)
+		f.finds(t, first, f.component(t, "libfoo", "9.9.9"), at.OccurrenceIdentity, access.Public)
+		f.finds(t, second, f.component(t, "libbar", "1.0.0"), at.OccurrenceIdentity, access.Public)
 		f.agreed(t, at)
 
 		rows, _, err := f.store.Audit(ctx, f.reviewer, triage.Filter{},
@@ -396,7 +396,7 @@ func TestTheRecordNamesOneFindingRatherThanTheLeastOfEach(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
-			t.Fatalf("the record holds %d judgments, want the one", len(rows))
+			t.Fatalf("the record holds %d decisions, want the one", len(rows))
 		}
 		if rows[0].Component != "libfoo" || rows[0].Version != "9.9.9" {
 			t.Errorf("the record says %q at %q, which is not a pair any finding had",
@@ -419,27 +419,27 @@ func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T
 
 		// A deferral is written with a date still to come — one already gone
 		// is refused — and the date then arrives.
-		ranOut := func(t *testing.T, identity string) *triage.Decision {
+		ranOut := func(t *testing.T, identity string) *triage.DecisionOccurrence {
 			t.Helper()
 			at := f.at()
-			at.PlaceIdentity = identity
+			at.OccurrenceIdentity = identity
 			made, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-				Place: at, Outcome: triage.Deferred, DeferredUntil: &soon,
+				Occurrence: at, Outcome: triage.Deferred, DeferredUntil: &soon,
 				Reasoning: "Not this sprint.", By: f.proposer,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.db.DB.NewUpdate().Table("claim").
+			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"deferred_until" = ?`, past).
-				Where(`"id" = ?`, made.ClaimID).Exec(ctx); err != nil {
+				Where(`"id" = ?`, made.DecisionID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			return made
 		}
 		lapse := func(t *testing.T, id int64) {
 			t.Helper()
-			if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
+			if _, err := f.db.DB.NewUpdate().Model((*triage.DecisionOccurrence)(nil)).
 				Set(`"state" = ?`, triage.LapsedState).
 				Where(`"id" = ?`, id).Exec(ctx); err != nil {
 				t.Fatal(err)
@@ -451,13 +451,13 @@ func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T
 		lapse(t, both.ID)
 		ranOut(t, "deferred-and-ran-out")
 		onlyLapsed := f.at()
-		onlyLapsed.PlaceIdentity = "moved-out-from-under"
-		lapse(t, f.claims(t, onlyLapsed).ID)
+		onlyLapsed.OccurrenceIdentity = "moved-out-from-under"
+		lapse(t, f.decisions(t, onlyLapsed).ID)
 		// And one that still stands, so that answering with everything is a
 		// different answer from answering with what has stopped.
 		stillStands := f.at()
-		stillStands.PlaceIdentity = "still-true"
-		f.claims(t, stillStands)
+		stillStands.OccurrenceIdentity = "still-true"
+		f.decisions(t, stillStands)
 
 		count := func(t *testing.T, filter triage.Filter) int {
 			t.Helper()
@@ -489,7 +489,7 @@ func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T
 		seen := map[int64]bool{}
 		for _, row := range rows {
 			if seen[row.ID] {
-				t.Errorf("decision %d is listed twice", row.ID)
+				t.Errorf("decision occurrence %d is listed twice", row.ID)
 			}
 			seen[row.ID] = true
 		}

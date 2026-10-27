@@ -13,17 +13,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// Who holds a group, read with the list's first level, and the decided places
-// counted beside it over the places that carry them.
+// Who holds a group, read with the list's first level, and the decided
+// occurrences counted beside it over the occurrences that carry them.
 
 // listedAs is each group one filter lists inside one product and across
-// products, as the issue and its places, in the order the page holds them.
+// products, as the issue and its occurrences, in the order the page holds them.
 func (f *fixture) listedAs(t *testing.T, who access.Subject, filter finding.Filter) ([]string, []string) {
 	t.Helper()
 	said := func(groups []finding.Group) []string {
 		out := make([]string, 0, len(groups))
 		for _, group := range groups {
-			out = append(out, fmt.Sprintf("%s at %d", group.Vulnerability, group.Places))
+			out = append(out, fmt.Sprintf("%s at %d", group.Vulnerability, group.Occurrences))
 		}
 		return out
 	}
@@ -38,14 +38,14 @@ func (f *fixture) listedAs(t *testing.T, who access.Subject, filter finding.Filt
 	return said(here), said(across)
 }
 
-func TestWhoHoldsAFoldIsAskedOfEveryHeldPlaceAndCountsEachPlaceOnce(t *testing.T) {
-	// One issue at both packages of a fold and a second at one of them. Held
-	// at one package only, the fold's issue is neither nobody's nor
-	// somebody's; held at both by this reader it is theirs, at its two places
-	// and not four; held at the second package by somebody numbered either
-	// side of the reader it is somebody's and not theirs. Asked with a state
-	// as well, the decided places stack beside the partial groups and the
-	// answers do not move.
+func TestWhoHoldsAFoldIsAskedOfEveryHeldOccurrenceAndCountsEachOccurrenceOnce(t *testing.T) {
+	// One issue at both packages of a fold and a second at one of them. Held at
+	// one package only, the fold's issue is neither nobody's nor somebody's;
+	// held at both by this reader it is theirs, at its two occurrences and not
+	// four; held at the second package by somebody numbered either side of the
+	// reader it is somebody's and not theirs. Asked with a state as well, the
+	// decided occurrences stack beside the partial groups and the answers do
+	// not move.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib := graph.Described{
@@ -94,7 +94,7 @@ func TestWhoHoldsAFoldIsAskedOfEveryHeldPlaceAndCountsEachPlaceOnce(t *testing.T
 		}
 		check := func(when string, want map[string][]string) {
 			t.Helper()
-			for _, state := range [][]finding.ClaimStanding{nil, {finding.StandingUndecided}} {
+			for _, state := range [][]finding.DecisionStanding{nil, {finding.StandingUndecided}} {
 				for word, groups := range want {
 					filter := finding.Filter{Assigned: []string{word}, States: state}
 					here, across := f.listedAs(t, who, filter)
@@ -129,10 +129,10 @@ func TestWhoHoldsAFoldIsAskedOfEveryHeldPlaceAndCountsEachPlaceOnce(t *testing.T
 	})
 }
 
-func TestUndecidedReadsTheDecidedPlacesOfEveryIssueADecisionMarks(t *testing.T) {
+func TestUndecidedReadsTheDecidedOccurrencesOfEveryIssueADecisionMarks(t *testing.T) {
 	// A group can be undecided with no decision anywhere, so the decided
-	// places are read only among the issues of the decisions that can mark a
-	// place. A lapsed decision holds no key, and a decision filed under an
+	// occurrences are read only among the issues of the decision rows that can
+	// mark an occurrence. A lapsed row holds no key, and a row filed under an
 	// issue that later merged into the finding's names the issue the merge
 	// kept. Each still takes its group out of what is undecided; a withdrawn
 	// one marks nothing and leaves its group there.
@@ -154,16 +154,16 @@ func TestUndecidedReadsTheDecidedPlacesOfEveryIssueADecisionMarks(t *testing.T) 
 			t.Fatal(err)
 		}
 		by := f.somebodyElse(t)
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-LAPSED")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
-		merged := f.placesOf(t, "CVE-2026-MERGED")[swss.Name]
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-LAPSED")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
+		merged := f.occurrencesOf(t, "CVE-2026-MERGED")[swss.Name]
 		merged.VulnerabilityID = absorbed
 		f.decidedAt(t, by, merged, "approved", libnl.Version, swss.Version, "merged")
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-WITHDRAWN")[swss.Name], "withdrawn",
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-WITHDRAWN")[swss.Name], "withdrawn",
 			libnl.Version, swss.Version, "")
 		who := f.holding(t, access.PublicTriage)
 
 		want := []string{"CVE-2026-OPEN at 1", "CVE-2026-WITHDRAWN at 1"}
-		undecided := []finding.ClaimStanding{finding.StandingUndecided}
+		undecided := []finding.DecisionStanding{finding.StandingUndecided}
 		for name, filter := range map[string]finding.Filter{
 			"undecided":               {States: undecided},
 			"undecided and nobody's":  {States: undecided, Assigned: []string{"nobody"}},

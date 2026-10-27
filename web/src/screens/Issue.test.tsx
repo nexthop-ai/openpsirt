@@ -26,7 +26,7 @@ const ROWS = [
     variant: "arm",
     component: "zlib",
     version: "1.2",
-    places: 3,
+    occurrences: 3,
     state: "agreed",
     due: "2026-02-01",
     fixed_in: "1.3",
@@ -37,7 +37,7 @@ const ROWS = [
     variant: "arm",
     component: "zlib",
     version: "1.1",
-    places: 1,
+    occurrences: 1,
     undisclosed: true,
   },
 ];

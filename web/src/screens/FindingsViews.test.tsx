@@ -59,7 +59,7 @@ describe("the open findings by component", () => {
                   component: "zlib",
                   version: "1.2",
                   issues: 4,
-                  places: 9,
+                  occurrences: 9,
                   worst: "critical",
                   by_severity: { critical: 1, high: 3 },
                   exploited: true,
@@ -194,16 +194,16 @@ describe("the pager", () => {
 });
 
 describe("a finding peeked at from the list", () => {
-  it("says what pulls in each place and which are decided", async () => {
+  it("says what pulls in each occurrence and which are decided", async () => {
     serve((path) =>
       path.endsWith("/components/{component}")
         ? {
             data: {
               description: "A flaw in the parser.",
-              places: [
-                { place: "a", consumer: "sonic-swss" },
-                { place: "b", chain: [{ component: "libnl" }], decision: 3 },
-                { place: "c" },
+              occurrences: [
+                { occurrence: "a", consumer: "sonic-swss" },
+                { occurrence: "b", chain: [{ component: "libnl" }], decision_occurrence: 3 },
+                { occurrence: "c" },
               ],
             },
           }

@@ -18,16 +18,16 @@ import (
 // ask the store directly: a check that only a handler makes is a check the
 // next handler forgets.
 
-// openPlaces is how many places the findings list shows open in the
+// openOccurrences is how many occurrences the findings list shows open in the
 // fixture's build to who.
-func (f *fixture) openPlaces(t *testing.T, who access.Subject) (int, error) {
+func (f *fixture) openOccurrences(t *testing.T, who access.Subject) (int, error) {
 	t.Helper()
 	groups, _, err := f.store.Groups(t.Context(), who, f.scope, 100, 0, finding.Filter{})
-	places := 0
+	occurrences := 0
 	for _, g := range groups {
-		places += g.Places
+		occurrences += g.Occurrences
 	}
-	return places, err
+	return occurrences, err
 }
 
 func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
@@ -76,16 +76,16 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 			{"an administrator granted private reading", f.admin(t, access.PublicRead, access.PrivateRead), 2, false},
 			{"a pipeline", access.NewPipeline(1, "nightly", access.Scope{ProductID: f.productID}), 0, true},
 		} {
-			places, err := f.openPlaces(t, c.who)
+			occurrences, err := f.openOccurrences(t, c.who)
 			switch {
 			case c.denied && !errors.Is(err, access.ErrDenied):
-				t.Errorf("%s was not refused: %d places, %v", c.what, places, err)
+				t.Errorf("%s was not refused: %d occurrences, %v", c.what, occurrences, err)
 			case c.denied:
 				continue
 			case err != nil:
 				t.Errorf("%s: %v", c.what, err)
-			case places != c.want:
-				t.Errorf("%s read %d places, want %d", c.what, places, c.want)
+			case occurrences != c.want:
+				t.Errorf("%s read %d occurrences, want %d", c.what, occurrences, c.want)
 			}
 		}
 	})
@@ -102,7 +102,7 @@ func TestFindingsInAProductSomebodyHoldsNothingOnAreRefused(t *testing.T) {
 		elsewhere := access.NewPerson(1, "elsewhere", false,
 			map[int64][]access.Role{f.productID + 999: {access.PrivateRead}}, 0)
 
-		if _, err := f.openPlaces(t, elsewhere); !errors.Is(err, access.ErrDenied) {
+		if _, err := f.openOccurrences(t, elsewhere); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("reading another product's findings: %v", err)
 		}
 	})
@@ -122,9 +122,9 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 		// never had a positive case, and the test could only fail by returning
 		// something it should not — never by returning the wrong number.
 		//
-		// Every place of that issue, not one row: an issue sits at several
-		// places, and hiding one leaves it visible through another, which is
-		// correct and is what this counts.
+		// Every occurrence of that issue, not one row: an issue sits at several
+		// occurrences, and hiding one leaves it visible through another, which
+		// is correct and is what this counts.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"visibility" = ?`, access.Private).
 			Where(`"vulnerability_id" = ?`, f.issueID(t, "CVE-2026-1")).
@@ -238,7 +238,7 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 				ask  func(access.Subject) error
 			}{
 				{"what is open", func(s access.Subject) error {
-					_, err := f.openPlaces(t, s)
+					_, err := f.openOccurrences(t, s)
 					return err
 				}},
 				{"what each run changed", func(s access.Subject) error {

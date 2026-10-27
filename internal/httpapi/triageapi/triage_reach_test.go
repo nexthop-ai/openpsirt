@@ -13,7 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// A judgment's reach, asked of the two operations that answer it and
+// A decision's reach, asked of the two operations that answer it and
 // of the one that writes across builds.
 
 func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
@@ -26,7 +26,7 @@ func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
 	// interface had nothing to pass when it applied the decision there — a
 	// build shipping the name at four versions refused the request.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		r.ScannedAlso(t, "arista", "3.7.0")
 		r.ScannedAlso(t, "mellanox", "3.8.0")
 		var reached struct {
@@ -40,7 +40,7 @@ func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
 			} `json:"differing"`
 		}
 		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/%s/reach", place), &reached)
+			"/findings/CVE-2026-9999/occurrences/%s/reach", occurrence), &reached)
 		if len(reached.Automatic) != 1 || reached.Automatic[0].Variant != "arista" {
 			t.Errorf("the build at the same version should be reached by lookup: %+v", reached)
 		}
@@ -62,7 +62,7 @@ func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
 }
 
 func TestAnOutcomeIsOfferedOnlyWhereItsEvidenceCanBeSent(t *testing.T) {
-	// already-fixed carries the packager's version, which the claim is
+	// already-fixed carries the packager's version, which the decision is
 	// refused without. The finding-level route offered the outcome in its
 	// enum and had nowhere in the body to put that version, so every
 	// request choosing it was refused — an outcome listed and unreachable,
@@ -77,11 +77,11 @@ func TestAnOutcomeIsOfferedOnlyWhereItsEvidenceCanBeSent(t *testing.T) {
 			`{"outcome":"already-fixed","fixed_version":"3.7.0-r4",`+
 				`"reasoning":"Alpine backported it in r4, which is what we ship."}`)
 		if got.Code != http.StatusCreated {
-			t.Fatalf("recording an already-fixed claim answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("recording an already-fixed decision answered %d: %s", got.Code, got.Body.String())
 		}
 
 		// And the evidence is still required: the outcome without it is a
-		// claim nobody can check.
+		// decision nobody can check.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
 			`{"outcome":"already-fixed","reasoning":"Trust me."}`),
 			http.StatusUnprocessableEntity)
@@ -90,20 +90,20 @@ func TestAnOutcomeIsOfferedOnlyWhereItsEvidenceCanBeSent(t *testing.T) {
 
 func TestReachingAnotherBuildCoversOnlyWhatIsLeftThere(t *testing.T) {
 	// A build at the same versions is already reached by lookup, so a second
-	// claim about its places is refused — and the guided review, which posts
-	// to each build it applies to, has no way to know which places those are.
+	// decision about its occurrences is refused — and the guided review, which posts
+	// to each build it applies to, has no way to know which occurrences those are.
 	// Asked to decide only what remains, the route records nothing there and
 	// says so, rather than refusing.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		r.ScannedAlso(t, "arista", "3.7.0")
-		r.Decided(t, place)
+		r.Decided(t, occurrence)
 		body := `{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",` +
 			`"reasoning":"The parser is never reached there either."`
 		path := "/v1/products/mine/branches-and-tags/master/variants/arista/findings/CVE-2026-9999" +
 			"/components/libnl-3-200/decision?version=3.7.0"
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path, body+`}`); got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("a second claim about a place already reached answered %d, want 422: %s",
+			t.Errorf("a second decision about an occurrence already reached answered %d, want 422: %s",
 				got.Code, got.Body.String())
 		}
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path, body+`,"remaining":true}`)
@@ -125,12 +125,12 @@ func TestReachingAnotherBuildCoversOnlyWhatIsLeftThere(t *testing.T) {
 }
 
 func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
-	// Presenting it as one number is what turns a considered judgment into a
+	// Presenting it as one number is what turns a considered decision into a
 	// reflex, and it is how a decision comes to reach builds the person making
 	// it never knew about. The first two parts are consequences of the
 	// matching rules and are not choices; only the third is.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		var reached struct {
 			Here      int `json:"here"`
 			Automatic []struct {
@@ -142,10 +142,10 @@ func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
 			} `json:"differing"`
 		}
 		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/%s/reach", place), &reached)
+			"/findings/CVE-2026-9999/occurrences/%s/reach", occurrence), &reached)
 
 		if reached.Here != 1 {
-			t.Errorf("the judgment covers %d places here, want 1", reached.Here)
+			t.Errorf("the decision covers %d occurrences here, want 1", reached.Here)
 		}
 		// One build in this deployment, so nothing else to reach either way —
 		// what matters is that both lists come back rather than being absent.
@@ -155,17 +155,17 @@ func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
 	})
 }
 
-func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
-	// The whole reason this operation exists beside the per-place one. A
-	// judgment is about an issue in a component, which is a group of places
-	// rather than one — a kernel flaw sits at sixty — and asking per place is
+func TestTheMergedReachAnswersEveryOccurrenceRatherThanASample(t *testing.T) {
+	// The whole reason this operation exists beside the per-occurrence one. A
+	// decision is about an issue in a component, which is a group of occurrences
+	// rather than one — a kernel flaw sits at sixty — and asking per occurrence is
 	// a request each, so the screen sampled the first few and merged what came
-	// back. A build reachable only from a place the sample missed was never
-	// offered, and the judgment silently did not travel there.
+	// back. A build reachable only from an occurrence the sample missed was never
+	// offered, and the decision silently did not travel there.
 	//
 	// This route is the merged answer's only caller, and the merged answer is
-	// the only producer of the set of other builds a judgment is offered
-	// against. Without a test here, a judgment travelling to the wrong builds
+	// the only producer of the set of other builds a decision is offered
+	// against. Without a test here, a decision travelling to the wrong builds
 	// — or to none — looks exactly like one that travelled correctly.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
@@ -177,14 +177,14 @@ func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
 
 		var reached struct {
 			Automatic []struct {
-				Variant string `json:"variant"`
-				Version string `json:"version"`
-				Places  int    `json:"places"`
+				Variant     string `json:"variant"`
+				Version     string `json:"version"`
+				Occurrences int    `json:"occurrences"`
 			} `json:"automatic"`
 			Differing []struct {
-				Variant string `json:"variant"`
-				Version string `json:"version"`
-				Places  int    `json:"places"`
+				Variant     string `json:"variant"`
+				Version     string `json:"version"`
+				Occurrences int    `json:"occurrences"`
 			} `json:"differing"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
@@ -199,11 +199,11 @@ func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
 			t.Errorf("the build at another version has to be agreed to and was "+
 				"answered as %+v", reached.Differing)
 		}
-		// A build reached from two places of one finding is one thing to tick
-		// and carries the places of both, which is what merging means here.
+		// A build reached from two occurrences of one finding is one thing to tick
+		// and carries the occurrences of both, which is what merging means here.
 		for _, each := range append(reached.Automatic, reached.Differing...) {
-			if each.Places < 1 {
-				t.Errorf("%s is offered and names no place it was reached from", each.Variant)
+			if each.Occurrences < 1 {
+				t.Errorf("%s is offered and names no occurrence it was reached from", each.Variant)
 			}
 		}
 	})
@@ -211,7 +211,7 @@ func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
 
 func TestTheMergedReachAnswersNothingToSomebodyWhoMayNotSeeTheProduct(t *testing.T) {
 	// Every query carries a subject, and this one produces the list of other
-	// builds a judgment is written into. An answer that named a build somebody
+	// builds a decision is written into. An answer that named a build somebody
 	// may not see would be a directory of what exists, and ticking it would
 	// write a decision where they hold nothing.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -232,14 +232,14 @@ func TestACollaboratorIsToldHowFarTheirOwnDecisionWouldReach(t *testing.T) {
 	// every other read of one finding asks about the issue. A collaborator
 	// holds nothing on the product and holds exactly the case, so the product
 	// question refused them — and the route answers a refusal from the store
-	// as a fault, so the two screens offering to carry a judgment across
+	// as a fault, so the two screens offering to carry a decision across
 	// builds answered with a fault for the one person whose only finding they
 	// are about.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		build := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999"
 		paths := []string{
-			build + "/occurrences/" + place + "/reach",
+			build + "/occurrences/" + occurrence + "/reach",
 			build + "/components/libnl-3-200/reach",
 		}
 

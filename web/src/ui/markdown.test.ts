@@ -298,7 +298,7 @@ describe("identifiers people paste", () => {
 describe("an issue reference", () => {
   // REQ-65's internal half. Text could link out to anywhere and to a file held
   // here, and could not say "the same root cause as this issue, wherever we
-  // have it" — which is the thing somebody writes on a claim.
+  // have it" — which is the thing somebody writes on a decision.
   it("becomes this deployment's address for that issue", () => {
     const html = render("[the same root cause](issue:CVE-2026-1234)");
     expect(html).toContain('href="/issues/CVE-2026-1234"');

@@ -175,7 +175,7 @@ export function Person() {
           <ul className="files catalog">
             <li>
               <div>
-                <b>{record.proposed.toLocaleString()}</b> claims argued
+                <b>{record.proposed.toLocaleString()}</b> decisions argued
               </div>
               <div className="hint">
                 {record.last_proposed_at ? `Last on ${stamp(record.last_proposed_at)}` : "Never"}
@@ -183,7 +183,7 @@ export function Person() {
             </li>
             <li>
               <div>
-                <b>{record.approved.toLocaleString()}</b> claims agreed to, still standing
+                <b>{record.approved.toLocaleString()}</b> decisions agreed to, still standing
               </div>
               <div className="hint">
                 {record.last_approved_at ? `Last on ${stamp(record.last_approved_at)}` : "Never"}

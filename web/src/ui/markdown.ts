@@ -151,8 +151,8 @@ const IDENTIFIERS: { pattern: RegExp; where: (id: string) => string }[] = [
 const ATTACHMENT = /^attachment:([0-9a-f]{32})$/;
 
 // One vulnerability, wherever this deployment has it, as the text refers to
-// it: an identifier and never an address. A finding is an issue at a place in
-// a build, and "the same root cause as CVE-2026-1234" does not mean a place —
+// it: an identifier and never an address. A finding is an issue at an occurrence in
+// a build, and "the same root cause as CVE-2026-1234" does not mean an occurrence —
 // it means the issue, and the issue has an address of its own.
 //
 // The shape matches what the submission check accepts, so a reference accepted

@@ -177,8 +177,8 @@ func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64
 }
 
 // open records each result new to this build as a finding, with what the run
-// said about it. A result the series holds elsewhere takes that lead's place,
-// so a decision on it reaches this build too; any other opens at a place its
+// said about it. A result the series holds elsewhere takes that lead's occurrence,
+// so a decision on it reaches this build too; any other opens at an occurrence its
 // series and key name. It returns the findings.
 func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, productID, seriesID int64, fresh []Keyed,
 	rules map[string]int64, from map[int]carried, components map[string]int64, root int64) (
@@ -188,7 +188,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 		return nil, nil
 	}
 	now := a.now().Truncate(time.Microsecond)
-	places := freshPlaces(seriesID, fresh, from)
+	occurrences := freshOccurrences(seriesID, fresh, from)
 	for i := range fresh {
 		if c, ok := from[i]; ok {
 			fresh[i].On = c.on
@@ -196,7 +196,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 	}
 	// A handed-off lead opens at the visibility its hand-off holds, so the
 	// next run's sighting is not a new internal lead.
-	handed, err := handedVisibility(ctx, db, productID, places)
+	handed, err := handedVisibility(ctx, db, productID, occurrences)
 	if err != nil {
 		return nil, err
 	}
@@ -207,12 +207,12 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 			component = id
 		}
 		visibility := OpensAt
-		if v, ok := handed[places[i]]; ok {
+		if v, ok := handed[occurrences[i]]; ok {
 			visibility = v
 		}
 		rows[i] = finding.Finding{
 			TargetID: run.TargetID, Kind: kind.Analysis, VulnerabilityID: rules[k.Rule],
-			Visibility: visibility, ComponentID: component, PlaceIdentity: places[i],
+			Visibility: visibility, ComponentID: component, OccurrenceIdentity: occurrences[i],
 			OpenedAt: now,
 		}
 	}
@@ -231,17 +231,17 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 	return ids, nil
 }
 
-// freshPlaces is the place each result new to this build opens at: the lead's
+// freshOccurrences is the occurrence each result new to this build opens at: the lead's
 // it was carried from, or the one its series and key name.
-func freshPlaces(seriesID int64, fresh []Keyed, from map[int]carried) []string {
-	places := make([]string, len(fresh))
+func freshOccurrences(seriesID int64, fresh []Keyed, from map[int]carried) []string {
+	occurrences := make([]string, len(fresh))
 	for i, k := range fresh {
-		places[i] = identity(seriesID, k.Key)
+		occurrences[i] = identity(seriesID, k.Key)
 		if c, ok := from[i]; ok {
-			places[i] = c.place
+			occurrences[i] = c.occurrence
 		}
 	}
-	return places
+	return occurrences
 }
 
 // describeAgain records what this run said about the findings it saw again,
@@ -323,24 +323,24 @@ func stated(n int) *int {
 	return &n
 }
 
-// handedVisibility is the visibility each handed-off lead among these places
+// handedVisibility is the visibility each handed-off lead among these occurrences
 // holds in a product.
-func handedVisibility(ctx context.Context, db bun.IDB, productID int64, places []string) (
+func handedVisibility(ctx context.Context, db bun.IDB, productID int64, occurrences []string) (
 	map[string]access.Visibility, error) {
 
 	out := map[string]access.Visibility{}
-	for start := 0; start < len(places); start += database.BatchSize {
-		batch := places[start:min(start+database.BatchSize, len(places))]
+	for start := 0; start < len(occurrences); start += database.BatchSize {
+		batch := occurrences[start:min(start+database.BatchSize, len(occurrences))]
 		var rows []finding.Handoff
 		if err := db.NewSelect().Model(&rows).
-			Column("lh.place_identity", "lh.visibility").
+			Column("lh.occurrence_identity", "lh.visibility").
 			Where(`"lh"."product_id" = ?`, productID).
-			Where(`"lh"."place_identity" IN (?)`, bun.List(batch)).
+			Where(`"lh"."occurrence_identity" IN (?)`, bun.List(batch)).
 			Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read which of the leads were handed off: %w", err)
 		}
 		for _, r := range rows {
-			out[r.PlaceIdentity] = r.Visibility
+			out[r.OccurrenceIdentity] = r.Visibility
 		}
 	}
 	return out, nil

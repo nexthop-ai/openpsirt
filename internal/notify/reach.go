@@ -22,7 +22,7 @@ import (
 // conditions ask of it.
 //
 // Approving and reading are separate: Approver is a capability bounded by what
-// the person may read, so a claim waiting goes to somebody who holds both and
+// the person may read, so a decision waiting goes to somebody who holds both and
 // to nobody who holds one.
 //
 // Reading and triaging are kept apart rather than folded into one pair,
@@ -32,8 +32,8 @@ import (
 //
 // A condition about findings asks of two classes of row: disclosed, and
 // withheld, which is every other visibility. A withheld row is told to
-// whoever reads or triages private work. A condition about claims asks of
-// three, because a claim on a lead is internal work, which a reader of
+// whoever reads or triages private work. A condition about decisions asks of
+// three, because a decision on a lead is internal work, which a reader of
 // undisclosed work does not read (rows).
 type acts struct {
 	approves                                                 bool
@@ -51,10 +51,10 @@ func (a acts) reads(private bool) bool {
 	return a.readsPublic
 }
 
-// rows is how many rows of a claim sit at each visibility.
+// rows is how many rows of a decision sit at each visibility.
 type rows struct{ public, private, internal int }
 
-// rowsOf splits a count of a claim's rows by the withheld and internal rows
+// rowsOf splits a count of a decision's rows by the withheld and internal rows
 // among them.
 func rowsOf(all, withheld, internal int) rows {
 	return rows{public: all - withheld, private: withheld - internal, internal: internal}
@@ -66,7 +66,7 @@ func (r rows) told() (private, internal bool) {
 }
 
 // readsAll is whether they read every row of something spanning
-// visibilities: a claim may mix disclosed and undisclosed places, and a
+// visibilities: a decision may mix disclosed and undisclosed occurrences, and a
 // condition about it is sent to somebody who reads every one of them.
 func (a acts) readsAll(r rows) bool {
 	return (r.public == 0 || a.readsPublic) && (r.private == 0 || a.readsPrivate) &&

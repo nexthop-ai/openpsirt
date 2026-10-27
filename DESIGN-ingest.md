@@ -70,8 +70,8 @@ ran it, so a producer's own findings would carry their provenance. The upload
 takes an inventory and suppressions and nothing else, the reader skips a
 `vulnerabilities` array, and every run is recorded as ours.
 
-Fanning one reported issue out across the places it occupies is this
-deployment's work. A vulnerability report says "this package at this version"
+Fanning one reported issue out across every occurrence of its component is
+this deployment's work. A vulnerability report says "this package at this version"
 and stops; it never saw the graph. That step is where one line in a report
 becomes the number of decisions a person has to make.
 
@@ -403,8 +403,8 @@ edges carrying what the producer called them; only `TEST_DEPENDENCY_OF` places
 nothing, which is the exception the third version's `test` scope gets too. What
 the word means, and what nothing may read into it, is in `DESIGN-findings.md`.
 
-A component reached only by one of those four has a consumer, so its place
-identity is the one a consumer gives it and a decision keyed on the component
+A component reached only by one of those four has a consumer, so its
+occurrence identity is the one a consumer gives it and a decision keyed on the component
 alone does not cover it. A database that took SPDX 2 inventories under an
 earlier build is recreated rather than migrated, here as everywhere below 1.0
 (REQ-76), so recreation is the
@@ -665,14 +665,14 @@ its own name or in a header saying what it fixes.
 | A source tree is named either way it can be named | As a bare name where the document carried no package identifier, and as a package identifier of the generic type where it carried one. The two are the same claim and are matched the same |
 | A generic identifier names its package by the last segment | A namespace before it is compared only where the component is itself a generic identifier carrying one. A distribution's namespace names the distribution rather than the source tree, and a component with no namespace says nothing either way |
 | A source tree named with a version is matched on it, against the component's own version and against what it was built from | A stated version is a version the build stated. Read as covering every version, a claim about one release suppresses a live finding on another |
-| A claim is matched at every place its component sits, within the product it names | The fan-out is ours either way. The next table holds what the product changes |
+| A claim is matched at every occurrence of its component, within the product it names | The fan-out is ours either way. The next table holds what the product changes |
 
 A claim is placed by the product it names its subject as shipping inside.
 
 | The product is | The claim applies |
 |---|---|
 | Named by nothing, or the build's root, or nothing the build ships | Across the whole build. A root is stored by its name alone, so it is never a component the claim is placed beneath |
-| A component of the build, at the version the claim names | At a place where every route up the tree runs through that component, at any depth, and never on the component itself. A place reached through the product and outside it is not answered: the build spoke about what it shipped inside the product |
+| A component of the build, at the version the claim names | At an occurrence where every route up the tree runs through that component, at any depth, and never on the component itself. An occurrence reached through the product and outside it is not answered: the build spoke about what it shipped inside the product |
 | A component of the build at another version, or named at no version | Nowhere, and the claim is counted as reaching nothing. A claim about one release of a product says nothing about another |
 
 A claim stores the product with the subject: its package identifier, its name
@@ -888,7 +888,7 @@ became of it, a scanner that falls over once poisons every receipt already
 waiting on it, permanently.
 
 What each run changed is counted when asked for rather than stored, from the
-runs the findings already point at, as issues at components rather than places.
+runs the findings already point at, as issues at components rather than occurrences.
 The count is attributed to the newest upload that run covered and omitted from
 the rest, because one fact repeated down three rows reads as three changes. Only
 an upload that was read counts as covered, by arrival order: one that failed or
@@ -1102,8 +1102,8 @@ which file they wrote it in.
 
 What is done with the statements is not an ingest question. A statement whose
 product is a build's root is that build's own claim (REQ-11), a supplier's
-statement about its own product closes the finding at the places that product
-occupies (REQ-31), and every other statement is evidence and a prefill.
+statement about its own product closes the finding at every occurrence inside that
+product (REQ-31), and every other statement is evidence and a prefill.
 `DESIGN-triage.md` § Evidence from publishers holds the three.
 
 ## Supplier advisories
@@ -1111,7 +1111,7 @@ occupies (REQ-31), and every other statement is evidence and a prefill.
 A supplier's CSAF security advisory arrives by administrator upload, on a path
 of its own, and lands where a VEX document lands (REQ-31): evidence and a
 prefill, and where it states the publisher's own product is not affected, a
-closure at the places that product occupies. It is a document about the
+closure at every occurrence inside that product. It is a document about the
 publisher's own flaws, and the products it names are components this product
 ships.
 
@@ -1265,8 +1265,8 @@ SUSE describes itself on `www.suse.com` and serves its directory from
 What it reads lands where an upload lands. A supplier's statement that its own
 product is not affected closes the finding inside that product at the next
 scan (REQ-31), and everything else is evidence beside a finding and a prefill
-for a decision, never a judgment of ours. The configuration that admitted the
-publisher is the decision behind either.
+for a decision, never a decision itself. The configuration that admitted the
+publisher is the choice behind either.
 
 ## The offline scanner database
 

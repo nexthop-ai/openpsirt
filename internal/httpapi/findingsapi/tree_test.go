@@ -17,10 +17,10 @@ import (
 )
 
 func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
-	// A library at two places with two issues reads four under every parent
-	// where the count is per finding, because a finding is one issue at one
-	// place. Somebody who drilled down one path is looking at one place and
-	// expects two — and the list the number opens has to show the same.
+	// A library at two occurrences with two issues reads four under every
+	// parent where the count is per finding, because a finding is one issue
+	// at one occurrence. Somebody who drilled down one path is looking at one
+	// occurrence and expects two — and the list the number opens has to show the same.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedShared(t)
 		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"

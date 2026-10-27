@@ -55,8 +55,8 @@ func (f *fixture) duplicate(t *testing.T, who access.Subject, issue int64,
 	return ruling
 }
 
-// flawEnds is where the embargo ends on every open place of an issue, failing
-// where two places disagree.
+// flawEnds is where the embargo ends on every open occurrence of an issue,
+// failing where two occurrences disagree.
 func (f *fixture) flawEnds(t *testing.T, issue int64) *time.Time {
 	t.Helper()
 	var rows []finding.Finding
@@ -67,11 +67,11 @@ func (f *fixture) flawEnds(t *testing.T, issue int64) *time.Time {
 		t.Fatal(err)
 	}
 	if len(rows) == 0 {
-		t.Fatal("the issue has no open place")
+		t.Fatal("the issue has no open occurrence")
 	}
 	for _, row := range rows[1:] {
 		if !sameInstant(row.DiscloseAt, rows[0].DiscloseAt) {
-			t.Fatalf("two places end on %v and %v", rows[0].DiscloseAt, row.DiscloseAt)
+			t.Fatalf("two occurrences end on %v and %v", rows[0].DiscloseAt, row.DiscloseAt)
 		}
 	}
 	return rows[0].DiscloseAt
@@ -330,7 +330,8 @@ func TestWithdrawingADuplicateKeepsADateAPersonSetSince(t *testing.T) {
 
 func TestADuplicateOfAScannedIssueStartsNoDate(t *testing.T) {
 	// A scanned issue is published by whoever published its advisory, so no
-	// reporter is counting down to it here, even at a place held undisclosed.
+	// reporter is counting down to it here, even at an occurrence held
+	// undisclosed.
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.anIssueHereShipped(t, who)
