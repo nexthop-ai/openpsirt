@@ -401,7 +401,7 @@ The scoped SPDX 2 relationships place their target. `BUILD_DEPENDENCY_OF`,
 `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF` are
 edges carrying what the producer called them; only `TEST_DEPENDENCY_OF` places
 nothing, which is the exception the third version's `test` scope gets too. What
-the word means, and what nothing may read into it, is in `design-docs/findings.md`.
+the word means, and what nothing may read into it, is in `design-docs/findings-components.md` § Declared dependency scope.
 
 A component reached only by one of those four has a consumer, so its
 occurrence identity is the one a consumer gives it and a decision keyed on the component
@@ -1287,7 +1287,7 @@ discovers broken.
 
 What a scan narrows its matches with is a snapshot of CVE records, kept on disk
 beside the scanner's data and read whole (REQ-12, REQ-31).
-`design-docs/findings.md` § CVE record ranges holds what a scan does with it.
+`design-docs/findings-closure.md` § CVE record ranges holds what a scan does with it.
 
 | Source | |
 |---|---|

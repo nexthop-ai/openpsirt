@@ -111,7 +111,7 @@ The owner has chosen to wait on each of these.
 | Today | When patch branches are on, OpenPSIRT clones every repository a patch link names, commits only, and asks git which branches contain each linked commit. The branch names label the link |
 | Problem | A GitHub repository linked by one or two commits is still cloned in full and kept on disk to answer one question |
 | Work | For GitHub and GitLab repositories with few linked commits, ask the host's API which branches hold each commit and skip the clone. Keep cloning for other hosts and heavily linked repositories |
-| Waits on | The owner. `design-docs/findings.md` states that a code host's API is never asked, because the same answer from two routes is two things to keep right, so building this reverses a written rule. It also needs API tokens and handling of rate limits |
+| Waits on | The owner. `design-docs/findings-patch-branches.md` states that a code host's API is never asked, because the same answer from two routes is two things to keep right, so building this reverses a written rule. It also needs API tokens and handling of rate limits |
 
 ### TODO-11 Repository mirrors
 

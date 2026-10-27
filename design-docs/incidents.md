@@ -47,7 +47,7 @@ Satisfies REQ-32 and REQ-77.
 | A feed's exploitation flag is evidence that an issue deserves attention | It is a statement about the world, and says nothing about whether this deployment's product was the thing exploited |
 | The first and the third are kept apart in name as well as in meaning | Both are called exploited, both press for action, and one of them arrives automatically. Reading the first as the third is the failure this area exists to prevent |
 | On screen the third is the filled badge, "Incident", and the first the outline, "Known exploited" | The rarer, attested fact is the louder one. `design-docs/interface.md` § The ordering signals holds the rest |
-| Each is a column of its own on a finding | `design-docs/findings.md` § Urgency has why the stored order cannot tell them apart |
+| Each is a column of its own on a finding | `design-docs/findings-severity.md` § Urgency has why the stored order cannot tell them apart |
 
 ## Stored facts
 
@@ -57,12 +57,12 @@ asks, which is why they are stored rather than worked out again.
 | | |
 |---|---|
 | That this product was exploited through an issue, here | Person-recorded, append-only, on any finding regardless of kind. An inherited flaw used against our product is the case, and it needs no flaw of our own |
-| An attack through no issue anybody has published | Recorded as a flaw found here, carried by the build itself, and the record kept against that flaw. A compromised build or update channel is the case: the flaw sits at the build's root, one occurrence across every variant (`design-docs/findings.md` § Recorded flaws), so the record needs no kind of its own |
+| An attack through no issue anybody has published | Recorded as a flaw found here, carried by the build itself, and the record kept against that flaw. A compromised build or update channel is the case: the flaw sits at the build's root, one occurrence across every variant (`design-docs/findings-flaws.md` § Recorded flaws), so the record needs no kind of its own |
 | The moment it became known | What a window counts from, directly or through the notices given after it. Stated rather than taken from the clock, because somebody learns of an attack before they reach a screen |
 | The grounds | What is being asserted and how it is known. Nothing re-checks the record, so this is the whole of what a later reader has |
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out. § Notices outside |
 | The releases that carry the fix | Person-stated, each a tag of the product, added as each is cut and withdrawn where named in error. § Fix releases |
-| Clearing an incident | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `design-docs/findings.md` § Merged issues holds the rule |
+| Clearing an incident | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `design-docs/findings-issues.md` § Merged issues holds the rule |
 
 The record is against an issue and one product, the shape an assessment has. An
 occurrence would be wrong twice over: the attack is a fact about the product rather
@@ -95,7 +95,7 @@ asymmetry produces.
 ## Order
 
 A record puts this product's open findings of the issue above everything a feed
-can say about it (REQ-32). `design-docs/findings.md` § Urgency holds the packing,
+can say about it (REQ-32). `design-docs/findings-severity.md` § Urgency holds the packing,
 the other four signals, and what the record does to the minimum severity and the
 deadline.
 
@@ -230,7 +230,7 @@ against an incident holds the rules.
 | | |
 |---|---|
 | No bulk dismissal and no bulk deferral | `design-docs/triage.md` § Decisions against an incident |
-| No vanishing under a minimum severity | The record puts its findings in a band above everything a feed can say, and the minimum severity admits either exploitation signal. `design-docs/findings.md` § Urgency |
+| No vanishing under a minimum severity | The record puts its findings in a band above everything a feed can say, and the minimum severity admits either exploitation signal. `design-docs/findings-severity.md` § Urgency |
 | No bulk clearing | A record is cleared one at a time, with a reason and a name |
 | The list a bulk decision is picked from marks an attacked issue | A selection reaching one is refused whole, so the list says which issue that is before anything is sent |
 

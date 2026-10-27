@@ -21,7 +21,7 @@ var (
 	// A design document named by path, with the section it points at where
 	// one follows. The heading is taken as the rest of the text and matched
 	// by prefix, because nothing marks where a heading written in prose ends.
-	designReference = regexp.MustCompile("design-docs/([a-z0-9-]+)\\.md`?\\]?(?:[ \t]*§[ \t]*([^\n]*))?")
+	designReference = regexp.MustCompile("design-docs/([a-z0-9-]+)\\.md`?\\]?(?:[ \t]*(?:\n[ \t]*(?://+|#+|\\*|--|;+)?[ \t]*)?§[ \t]*([^\n]*))?")
 	// A comment's marker at the start of a continued line, removed so a
 	// heading wrapped across two comment lines reads as one.
 	continuation = regexp.MustCompile(`\n[ \t]*(?://+|#+|\*|--|;+)?[ \t]*`)
@@ -133,6 +133,7 @@ func TestAReferenceThatReachesNothingIsReported(t *testing.T) {
 		"a file alone":           "see " + dd + "a.md.",
 		"a heading in backticks": "(`" + dd + "a.md` § Reads a write depends on). More",
 		"a heading wrapped":      "// (`" + dd + "a.md` § Reads a\n// write depends on). The",
+		"a section mark wrapped": "(`" + dd + "a.md`\n§ Limits holds it)",
 		"a link around it":       "[" + dd + "a.md § Limits](" + dd + "a.md#limits)",
 	} {
 		if problems, _ := referenceProblems(map[string]string{"x.go": body}, headings); len(problems) != 0 {
@@ -144,6 +145,7 @@ func TestAReferenceThatReachesNothingIsReported(t *testing.T) {
 		"a heading not there":       dd + "a.md § Writes",
 		"a heading cut short":       dd + "a.md § Reads a write",
 		"a heading run into a word": dd + "a.md § Limitsless",
+		"a section mark wrapped":    "`" + dd + "a.md`\n// § Writes",
 	} {
 		if problems, _ := referenceProblems(map[string]string{"x.go": body}, headings); len(problems) == 0 {
 			t.Errorf("%s was not reported", what)

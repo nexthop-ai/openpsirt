@@ -59,9 +59,9 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/sourcelink/` | What a product says about its repositories, and the source addresses built from it. See `design-docs/analysis.md` |
 | `internal/uploadclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `design-docs/analysis.md` § Upload client |
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `design-docs/data-model.md`, `design-docs/findings.md` |
-| `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `design-docs/findings.md` § Merged issues |
-| `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `design-docs/findings.md` |
-| `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector, and the band a score falls in. A computation with no database, which findings, advisories and the API each call. See `design-docs/findings.md` |
+| `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `design-docs/findings-issues.md` § Merged issues |
+| `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `design-docs/findings-severity.md` |
+| `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector, and the band a score falls in. A computation with no database, which findings, advisories and the API each call. See `design-docs/findings-severity.md` |
 | `internal/triage/`, `internal/advisory/` | Decisions, approvals, and the CSAF document. See `design-docs/triage.md` |
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `design-docs/access.md` |
 | `internal/notify/` | Notifications. See `design-docs/notifications.md` |
@@ -79,8 +79,8 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/signing/` | Signing what is published with the key an operator supplied. See `design-docs/publishing.md` |
 | `internal/supplier/` | The publishers whose advisories are read on a schedule, and what a pass over one takes. See `design-docs/ingest.md` |
 | `internal/upstream/` | The upstream a product trusts, and the pass that reads its VEX documents. See `design-docs/upstream.md` |
-| `internal/cverecord/` | The CVE record snapshot: fetching it, reading it, and what a record says about a component's version. See `design-docs/findings.md` § CVE record ranges and `design-docs/ingest.md` § CVE records |
-| `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `design-docs/findings.md` |
+| `internal/cverecord/` | The CVE record snapshot: fetching it, reading it, and what a record says about a component's version. See `design-docs/findings-closure.md` § CVE record ranges and `design-docs/ingest.md` § CVE records |
+| `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `design-docs/findings-patch-branches.md` |
 | `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `design-docs/remediation.md` |
 | `internal/outward/` | The one HTTP client this process reaches the internet with. See `design-docs/access.md` |
 | `internal/typedname/` | The one form a name somebody typed is stored and matched in, for every store that keys a row on one. See `design-docs/data-model.md` |

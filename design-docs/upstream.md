@@ -10,7 +10,7 @@ Satisfies REQ-31, REQ-42, REQ-68, REQ-69, REQ-71, REQ-84.
 Neighboring pieces: what this deployment publishes, and how it says whom a
 statement holds for, is in `design-docs/publishing.md`; the evidence layer every
 third party's statement lands in is in `design-docs/triage.md` § Evidence from
-publishers; the closure a statement makes is in `design-docs/findings.md` § Closure
+publishers; the closure a statement makes is in `design-docs/findings-closure.md` § Closure
 reasons; the outbound client is in `design-docs/access.md`.
 
 ## Contents

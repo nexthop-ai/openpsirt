@@ -77,7 +77,7 @@ Asking only the second collapses "no undisclosed findings in this product" and
 another product reads as public here. Any reader of any product could then
 confirm whether a name exists anywhere in the deployment, one request at a time.
 
-For a file on a report, the report's own answer, which `design-docs/findings.md`
+For a file on a report, the report's own answer, which `design-docs/findings-reports.md`
 § Report visibility holds: the right to read work nobody has announced in that
 product, whether or not the claim has been judged. The record and what
 arrived with it have one answer rather than two.

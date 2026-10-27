@@ -148,7 +148,7 @@ no read role, which an assignment gives content to.
 | The notification's own check stays beside it | A different check at a different moment. A channel that leaks only when another rule is wrong is a channel nobody notices is leaking |
 | The narrowing is not a switch an administrator turns on | It is what not granting reading already meant. There is no fourth state where somebody holds reading and is narrowed anyway |
 | **Administering the catalog is not reading it, for the set that narrows findings** | Two questions, answered by two rules: which products somebody may know exist, which an administrator may know all of, and which products' findings they read, which is only where they hold a read role. Asked as the first, an administrator holding nothing but a capability on a product read every disclosed finding in it — and a non-administrator holding the same grant was correctly excluded, which is what makes it a widening rather than a policy |
-| What a flaw recorded in another product wrote onto a shared issue is withheld from a reader who may not read that record: its summary, names and addresses. Its rating is never written there | The issue row is one row for every product holding the issue. `design-docs/findings.md` § Recorded words on a shared issue holds the rule and every reader it binds, and § The rating in force holds where a recorded rating lives |
+| What a flaw recorded in another product wrote onto a shared issue is withheld from a reader who may not read that record: its summary, names and addresses. Its rating is never written there | The issue row is one row for every product holding the issue. `design-docs/findings-flaws.md` § Recorded words on a shared issue holds the rule and every reader it binds, and § The rating in force holds where a recorded rating lives |
 | The report endpoints need no check added | Every query carries a subject and narrows in the data layer, so narrowing the subject narrows every trend, rate, bar and total with it. A check bolted onto a report is the per-handler enforcement this area exists to avoid |
 
 ## The upward tree
@@ -254,7 +254,7 @@ yourself is still doing it.
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
-| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever its reported problem (`design-docs/findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
+| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever its reported problem (`design-docs/findings-reports.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
 
 ### Assignment by narrowing
 
@@ -332,7 +332,7 @@ holder who cannot open it.
 |---|---|
 | A person keeps undisclosed and internal work where they read it, and disclosed work while they hold any role in the product | Disclosed work travels with its assignment. Anything else left with somebody who cannot open it is in no list at all |
 | A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | The rule a hand assignment to a team asks (§ Teams) |
-| A report goes where undisclosed work goes | A report is read under undisclosed reading (`design-docs/findings.md` § Report visibility) |
+| A report goes where undisclosed work goes | A report is read under undisclosed reading (`design-docs/findings-reports.md` § Report visibility) |
 | Code findings go by the same rule as findings | A code finding is work at its visibility like any other |
 | It goes back to nobody, and no sweep is queued | Exactly as when somebody leaves. The unassigned list holds it until somebody takes it, and an assignment rule places it when a rule is next recorded in the product. Queuing a sweep would let a full queue refuse a withdrawal of access |
 | Asked of whoever the write named, and of every team they are on | A team holds work only while a member reads it, so a member's reading going can strand the team's queue |
@@ -1244,7 +1244,7 @@ record, because it is the same question one layer up.
 |---|---|
 | Both values are kept, and absent is not empty | "Who raised the minimum severity to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
 | Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
-| Every row names its actor: a person, configuration, a merge, or an upgrade | Configuration is the deployment's startup configuration. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, adds and removes the group mappings in `OPENPSIRT_GROUP_ROLES`, and sets where roles come from to match, and records nothing else. A merge is a scan merging two issues its report named together, and records only a rating claim it withdrew or an incident it cleared, because another stood in its place in the same product (`design-docs/findings.md` § Merged issues). An upgrade is the one to v0.5.0, which recorded only a key it withdrew because another key holds its folded name, or a token it withdrew because another of its owner's does. No migration this tree carries writes one. None is a person. A row by a person names the person |
+| Every row names its actor: a person, configuration, a merge, or an upgrade | Configuration is the deployment's startup configuration. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, adds and removes the group mappings in `OPENPSIRT_GROUP_ROLES`, and sets where roles come from to match, and records nothing else. A merge is a scan merging two issues its report named together, and records only a rating claim it withdrew or an incident it cleared, because another stood in its place in the same product (`design-docs/findings-issues.md` § Merged issues). An upgrade is the one to v0.5.0, which recorded only a key it withdrew because another key holds its folded name, or a token it withdrew because another of its owner's does. No migration this tree carries writes one. None is a person. A row by a person names the person |
 | Configuration records a name when it starts or stops naming somebody | Administration moved with nobody in the application having moved it. A start naming the same people as the last records nothing, because nothing moved |
 | The record is written in the transaction that makes the change | Both are one act. Written afterwards, a change could succeed while the record of it silently failed, and a trail that is sometimes missing a line answers an auditor's question wrongly rather than not at all |
 | A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
@@ -1324,7 +1324,7 @@ ninety days after the report was received (REQ-37). A flaw found here carries
 none, because nobody outside is counting down to a publication, and neither does
 a public finding. A claim from outside ruled a duplicate of a flaw found here
 gives it one, counted from when that claim arrived, or brings an existing one
-earlier (`design-docs/findings.md` § Judgment). The point of having one
+earlier (`design-docs/findings-reports.md` § Judgment). The point of having one
 is that it gives the embargo an end somebody outside could hold this deployment
 to.
 
@@ -1395,7 +1395,7 @@ Three acts a person asks for, and two a ruling records, recorded apart.
 | **Extension** | The embargo ends later. The unilateral case: the fix slipped |
 | **Shortening** | The embargo ends sooner. The coordinated case: a coordinator or a peer vendor is publishing on a date of their own, or the detail leaked |
 | **Disclosure** | The embargo ends today and the issue is public. § Issue disclosure holds its rules |
-| **Duplicate** | A report from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the report. `design-docs/findings.md` § Judgment holds its rules |
+| **Duplicate** | A report from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the report. `design-docs/findings-reports.md` § Judgment holds its rules |
 | **Duplicate undone** | That ruling was withdrawn and the end put back where the rest of the record leaves it, which may be no end at all |
 
 A movement a ruling records takes no reason of its own. It carries the

@@ -460,7 +460,7 @@ on one build, with what fixed it and the build that fixed it.
 | Only a code finding the newest comparable run did not see is closed as fixed | That absence is the evidence the statement is made with; a run still reporting the result is the authority on what it found |
 | It closes the code finding on the build named and nowhere else | Each build holding it is a statement of its own |
 | It names the run whose build fixed it: one of the code finding's series on that build, applied and comparable, built at or after the first run that did not see the code finding, and any other run is refused | A statement of a fix names the build it shipped in. The code finding's evidence names the first run that did not see it, and once it is fixed, the run named |
-| It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`design-docs/findings.md` § Recorded flaws) |
+| It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`design-docs/findings-flaws.md` § Recorded flaws) |
 | A code finding seen again opens anew at the same occurrence | The matching that finds a closed code finding carries the result to its occurrence (§ Carrying) |
 | A decision about a code finding is read through the Decisions consumer (`design-docs/kinds.md` § Consumers) | The review queue, approval and one decision's reads include it; the findings lists do not |
 
@@ -694,7 +694,7 @@ at least one.
 ## Flaw records
 
 A confirmed code finding is recorded as a flaw found here (REQ-19), through the path
-every recorded flaw takes (`design-docs/findings.md` § Recorded flaws), and linked
+every recorded flaw takes (`design-docs/findings-flaws.md` § Recorded flaws), and linked
 to it. The code finding is then recorded as a flaw: its flaw is what is judged, fixed and
 disclosed.
 
@@ -712,7 +712,7 @@ flaw record is offered, and `POST` on the same address records it.
 | A code finding recorded as a flaw takes no decision, and no decision about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a decision out | The flaw's decisions replace the code finding's, and a confirmation withdrawn under a code finding recorded as a flaw leaves a flaw nobody confirmed |
 | Recording as a flaw, an inclusion in disclosure, a removal from it and a withdrawn flaw record are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
 
-| The flaw records the code finding it was recorded from, the component the offer ranked first, and the builds it proposed: every build the code finding was seen in, and the builds holding the chosen component that the series never analyzed | `design-docs/findings.md` § Recorded flaws. The record outlasts the link, so a flaw whose flaw record was undone still says where it came from |
+| The flaw records the code finding it was recorded from, the component the offer ranked first, and the builds it proposed: every build the code finding was seen in, and the builds holding the chosen component that the series never analyzed | `design-docs/findings-flaws.md` § Recorded flaws. The record outlasts the link, so a flaw whose flaw record was undone still says where it came from |
 | The flaw's page names its code finding to a reader who reads the flaw there and the code finding in full, and to nobody else | An internal-only code finding is internal, and a reader of the private flaw has not been given it (REQ-42) |
 
 ### Flaw record offer
@@ -790,7 +790,7 @@ included one out.
 | Each code finding is confirmed again: the link goes, the decision confirming it stands, and it returns to the queue's lists of held work with whoever held it | Undoing takes back the recording and leaves the decision that it is real |
 | An included code finding is read by its internal readers alone again | A code finding with no case to be in is the internal material it always was |
 | Every grant of the code findings ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
-| The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a flaw record somebody undid should not have been recorded, and a flaw record made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`design-docs/findings.md` § Affected build sets) |
+| The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a flaw record somebody undid should not have been recorded, and a flaw record made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`design-docs/findings-closure.md` § Affected build sets) |
 | The flaw keeps the record of its code finding, marked undone with who, when and why | What was recorded and taken back stays on the record |
 | It is written in one transaction that reads each flaw record again and deletes it only as read | An inclusion, a disclosure or a run describing the code finding since is a lost race, asked again (REQ-71) |
 | It is recorded in the administrative trail once per code finding, each under that code finding's own name, as each grant it ends is | It changes who reads the code findings and what the flaw is |
@@ -800,7 +800,7 @@ included one out.
 A flaw recorded from a code finding is offered as fixed on each build it is open on
 where its code finding is no longer detected, with the first run there that did not see
 it and, where a person closed the code finding as fixed, the run they named. A person
-closes the flaw there (`design-docs/findings.md` § Closure by a person), and the
+closes the flaw there (`design-docs/findings-closure.md` § Closure by a person), and the
 advisory names the build fixed from that closure (`design-docs/remediation.md`
 § The advisory).
 

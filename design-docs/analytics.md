@@ -67,7 +67,7 @@ measures churn:
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
 | `invalid` | A record taken back as a mistake was never present. The backlog trend leaves it out of every open set as well |
 | `unaffected` | The issue's CVE record states the release was never affected. Left out of every open set the same way |
-| `disclaimed` | A supplier states the product the occurrence sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing in the build changed, so nothing was fixed, and the release is counted as having held the issue, whatever the statement says: the occurrence is in the open sets up to its closure, and in the releases an issue was in (`design-docs/findings.md` § Closure reasons) |
+| `disclaimed` | A supplier states the product the occurrence sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing in the build changed, so nothing was fixed, and the release is counted as having held the issue, whatever the statement says: the occurrence is in the open sets up to its closure, and in the releases an issue was in (`design-docs/findings-closure.md` § Closure reasons) |
 
 The other five — removed, upgraded, revised, patched, and a recorded flaw
 declared fixed — are counted.
@@ -454,7 +454,7 @@ kernel or a runtime rather than a whole image.
 
 A carried patch shows here as a step down in the open count. A patch that names
 what it resolves closes the finding as patched on the scan that first carries it
-(`design-docs/findings.md` § Build-declared claims), and a patch that moves the shipped
+(`design-docs/findings-closure.md` § Build-declared claims), and a patch that moves the shipped
 version closes it as revised. In a list of what is open now the row is simply
 gone.
 
@@ -533,7 +533,7 @@ assembled differently every time.
 | Markdown, served as markdown | The same reason the release note is: the point of it is that it goes straight into a reply |
 | Nothing of yours affected is a document, not a refusal | "Are you affected by this" could be answered yes and never no, and the second is the answer an inquiry is usually asking for |
 | An identifier nobody has seen and one that sits only in products you cannot read produce the same document | Told apart, the pair says which issues this deployment holds, one guess at a time |
-| The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The issue row is shared, and a recorded flaw writes its summary, minted name and addresses onto it. `design-docs/findings.md` § Recorded words on a shared issue holds the rule every reader asks |
+| The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The issue row is shared, and a recorded flaw writes its summary, minted name and addresses onto it. `design-docs/findings-flaws.md` § Recorded words on a shared issue holds the rule every reader asks |
 | Every address in it goes through the rule an address stored beside a decision goes through, and names `http`, `https` or `mailto` | It is a document somebody forwards, and a scheme a reader's machine acts on is not something to hand them. Inside angle brackets anything but an absolute address opens markup, and a space, an ASCII control character or a bracket ends the address and makes the rest of the line markdown, so an address carrying one is left out |
 | Everything else in it that did not pass the submission policy is escaped where it is written | The identifier, description, severity and aliases come from feeds, the component, version and fixed-in version from scan files, and product and person names are not markdown. A reasoning passed the policy when it was typed and is written as it was |
 | It is bounded, and says when the list is a page of a longer one | An issue at a widely vendored component carries hundreds of decision occurrences, and what this is for is being read |
@@ -836,7 +836,7 @@ in one level, every open row grouped on the fold directly:
 The cost in one level is the sort on the fold, a 64-character key, over every
 open row. The planned upgrades are grouped in two levels, by integers first and by the
 fold over the partial groups;
-[design-docs/findings.md § Two-level grouping](findings.md#two-level-grouping)
+[design-docs/findings-queries.md § Two-level grouping](findings-queries.md#two-level-grouping)
 holds the form and its measurement.
 
 `make measure` takes the same measurement over the form in force, on every

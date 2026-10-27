@@ -40,7 +40,7 @@ declared before anything may name them.
 | Occurrence | A component and what directly pulled it in |
 | Finding | One component at one occurrence in one build. Twelve occurrences is twelve findings (REQ-17) |
 | Group | One issue at one component across every occurrence it sits at. The row the findings list returns, and the thing somebody decides about |
-| Report | A problem somebody reported to us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`design-docs/findings.md` § Reports) |
+| Report | A problem somebody reported to us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`design-docs/findings-reports.md` § Reports) |
 
 Each word names one thing, and the unit a scan is filed against is called a
 build wherever it is named. The finding-versus-group distinction is the
@@ -488,7 +488,7 @@ scoped to one product. So across reports the rule is scoped to one product.
 | A claim the build makes is matched against what its scanner was given | A claim matched against the row and a finding matched against the node disagree, and the build's own claim about a source tree stops covering a binary another product described first |
 | What a build did not state is taken from what other builds of the same product stated, earliest first | One product's builds describe one package one way, and a qualifier a later build states for it is what the product means by it |
 | Nothing stated is overwritten | A qualifier is compared key by key without regard to capitals. Two builds disagreeing is not something a reader can settle, so the build's own statement stands |
-| The supplier and the license are filled in on the row where it has none | `design-docs/findings.md` § Component suppliers. Neither reaches a scanner |
+| The supplier and the license are filled in on the row where it has none | `design-docs/findings-components.md` § Component suppliers. Neither reaches a scanner |
 | The repository a build states a component is built from is held on its node, without a credential or query, and never filled in from another build | It places an analyzer's result on the build that stated it (`design-docs/analysis.md` § Placement), and a repository another build named is a guess about this one |
 
 The fold key is worked out once, when the component is first stored, and does

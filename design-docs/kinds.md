@@ -9,7 +9,7 @@ the trail, queues and notifications are one implementation over every kind.
 Satisfies REQ-14, REQ-17, REQ-18, REQ-19, REQ-21, REQ-25, REQ-43, REQ-50.
 
 Neighboring pieces: what a vulnerability finding is and how a run closes one is
-in `design-docs/findings.md`; who reads each visibility is in `design-docs/access.md`;
+in `design-docs/findings.md` and `design-docs/findings-closure.md`; who reads each visibility is in `design-docs/access.md`;
 what is particular to analyzer results is in `design-docs/analysis.md`.
 
 ## Contents
@@ -46,7 +46,7 @@ reader and an evidence view, and nothing in this document changes for it.
 | Issue kind | Filed under | Its findings |
 |---|---|---|
 | Vulnerability | A CVE or an advisory database's identifier, with every name a report gives it | Vulnerability |
-| Flaw | An identifier this deployment minted (`design-docs/findings.md` § Recorded flaws) | Entered, and vulnerability where a scan reports a name recorded against it |
+| Flaw | An identifier this deployment minted (`design-docs/findings-flaws.md` § Recorded flaws) | Entered, and vulnerability where a scan reports a name recorded against it |
 | Rule | The analyzer's name and its rule, `clang/core.NullDereference` | Analysis |
 
 | Rule | |

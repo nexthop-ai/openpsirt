@@ -474,7 +474,7 @@ cycle.
 | Sent by the scan's sweep and by a rating put in or out of force here | The two places a decision lapses by its own proposer's work coming back |
 
 A merge that ends one of two answers in a product tells the product's
-triagers rather than whoever made it. `design-docs/findings.md` § Merged issues
+triagers rather than whoever made it. `design-docs/findings-issues.md` § Merged issues
 holds the rules.
 
 | Merge message | |

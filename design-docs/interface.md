@@ -855,7 +855,7 @@ decide. A write-up is what somebody triaging reads first, and a third party's
 claim about the finding is read against it rather than before it.
 
 A patch link carries the branches its commit is on, once its repository has
-been asked (`design-docs/findings.md` § Patch branches): three by name in version
+been asked (`design-docs/findings-patch-branches.md` § Display): three by name in version
 order, the rest as a count, all of them on hover. A commit its repository does
 not hold says so. A link not yet looked up carries nothing, because "not yet"
 is not a fact about the patch.
@@ -926,7 +926,7 @@ in" stands over records that name the consumer, and the third draws an empty
 name read off the end of a chain that is not there.
 
 One row per occurrence, however many rows a finding holds there. `design-docs/findings.md`
-owns that rule.
+§ Work across builds owns that rule.
 
 | Rule | |
 |---|---|
@@ -1442,7 +1442,7 @@ publishes may be evidence and may never be presentation.
 ## Vulnerability reports
 
 One product's reports, reached from the product page and from the two notices
-that name a report. `design-docs/findings.md` § Reports holds what a report is and
+that name a report. `design-docs/findings-reports.md` § Reports holds what a report is and
 § Dispositions what a ruling does; this is how the screens draw them.
 
 | Rule | |
@@ -1967,7 +1967,7 @@ What this deployment is doing, rather than what it has found.
 | What a full queue needs is both numbers | An operator adds workers or raises the limit, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the limit is a state rather than a proportion |
 | A resolved issue is counted at the severity it held while it was open | The step it left in no longer has one, and counting it as unrated would make every answered critical disappear from the answered column |
 | The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
-| Patch branch lookups are shown in the order the pass works: Now, Next, Failed, and Done folded away | A host that stops answering leaves labels missing from findings, and nothing on a finding says so. Now carries the step and a bar of commits looked up against those due, and the panel asks again every ten seconds while a visit is under way. Next is numbered. A failure's first line shows, the whole on hover, with when it is retried. Every repository is reachable, a page at a time; `design-docs/findings.md` § Patch branches holds what each part means |
+| Patch branch lookups are shown in the order the pass works: Now, Next, Failed, and Done folded away | A host that stops answering leaves labels missing from findings, and nothing on a finding says so. Now carries the step and a bar of commits looked up against those due, and the panel asks again every ten seconds while a visit is under way. Next is numbered. A failure's first line shows, the whole on hover, with when it is retried. Every repository is reachable, a page at a time; `design-docs/findings-patch-branches.md` § Display holds what each part means |
 
 ## The administration screens
 
@@ -2013,7 +2013,7 @@ said so.
 | Where both apply, the record's badge comes first | Read left to right, the fact about this product code findings |
 | Every row the server marks with the record draws its badge, and every caption counting the feed's flag counts the record beside it where there is one | A row showing the feed's flag alone, where the record is in hand, says less about this product than the server did |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |
-| The word is what compares down a column | Two schemes weigh reachability and impact differently, so a column of numbers from both is not a ranking. `design-docs/findings.md` § One ladder for every scheme holds the whole of it |
+| The word is what compares down a column | Two schemes weigh reachability and impact differently, so a column of numbers from both is not a ranking. `design-docs/findings-severity.md` § One ladder for every scheme holds the whole of it |
 | Where this product has rated something itself, that is what orders its list, and both ratings are shown | Being able to say a published rating is wrong is pointless if everything that sorts and filters then ignores us. The world's stays beside it, because a rating of ours standing where the world's goes reads as the world's. The list that spans products reads each row against its own product's rating, because a rating belongs to one (REQ-29) |
 
 ## Units, dates and copy

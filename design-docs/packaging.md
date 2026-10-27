@@ -117,7 +117,7 @@ image makes nothing for it.
 ## Repository copies
 
 Labeling a patch link with the branches that hold its commit keeps copies of
-repositories (REQ-78). `design-docs/findings.md` § Patch branches holds how they are
+repositories (REQ-78). `design-docs/findings-patch-branches.md` holds how they are
 used; this is where they live.
 
 | Rule | |

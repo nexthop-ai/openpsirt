@@ -701,8 +701,8 @@ record a second beside it.
 | **Live, not ever** | A withdrawn or lapsed decision covers nothing and stops holding the occurrence the moment it stops applying. Otherwise one lapse walls an occurrence off permanently |
 | **Per combination, not per occurrence** | The versions are part of what a decision is about, so a decision about one version and a decision about the next are different decisions and both stand |
 | Enforced by the database, not by a check | The key is held while a decision is live and set to null once it is not, under a unique index. Null values do not collide in a unique index on any of the four engines, which is what makes a rule applying to only some rows portable. A read-then-write check is exactly the shape two simultaneous proposals both walk through, and the test drives that case |
-| The same holds for a rating of an issue | Keyed on the issue, held from the moment an assessment is proposed, released when it is withdrawn. Six proposals at once leave one assessment standing; removing the constraint lets all six through. A merge of two issues that each held one in a product withdraws the one with less standing, naming the merge rather than a person, as `design-docs/findings.md` § Merged issues holds |
-| The key names the issue a decision is read as | A decision filed under an issue that merged into another holds its key under the other, and a new decision is filed under the issue that stands. `design-docs/findings.md` § Merged issues says how a merge settles the keys |
+| The same holds for a rating of an issue | Keyed on the issue, held from the moment an assessment is proposed, released when it is withdrawn. Six proposals at once leave one assessment standing; removing the constraint lets all six through. A merge of two issues that each held one in a product withdraws the one with less standing, naming the merge rather than a person, as `design-docs/findings-issues.md` § Merged issues holds |
+| The key names the issue a decision is read as | A decision filed under an issue that merged into another holds its key under the other, and a new decision is filed under the issue that stands. `design-docs/findings-issues.md` § Merged issues says how a merge settles the keys |
 
 Revising keeps the old words readable, takes back the approval given for them,
 returns the decision to the queue and records who wrote the new version. Two
@@ -1114,7 +1114,7 @@ every stored one wrong. The rewrite happens away from the request.
 | A replica that loses the race waits rather than skipping | A policy somebody just changed has to be applied |
 
 The other event that makes a stored deadline wrong is the issue becoming known to
-be exploited, which is in `design-docs/findings.md`.
+be exploited, which is in `design-docs/findings-severity.md` § Urgency.
 
 ## Lapse marking
 
@@ -1157,7 +1157,7 @@ what rated worse means.
 A decision also lapses when a report merges two issues and it is one of two live
 decisions at one occurrence, the one with less standing. The merge records which
 decision stands in its place, and the lapse is written in the transaction that
-applies the report. `design-docs/findings.md` § Merged issues holds the rule, and
+applies the report. `design-docs/findings-issues.md` § Merged issues holds the rule, and
 `design-docs/notifications.md` § Decision outcomes says who is told.
 
 What has **stopped standing** is one question to the decision list, and two to
@@ -1341,7 +1341,7 @@ distribution says, and what we decided — three statements, not one collapsed
 answer.
 
 A statement's reasoning is stored once however many components it names, cut
-to the same bound, the way a build's claim's is (`design-docs/findings.md` §
+to the same bound, the way a build's claim's is (`design-docs/findings-closure.md` §
 Build-declared claims). Its file name is made safe and bounded the way an
 attachment's is, because every statement the document makes carries it.
 
@@ -1387,7 +1387,7 @@ A statement whose product is a build's root speaks for the build's producer,
 whichever way it arrived (REQ-11). Sent with the inventory, it is recorded as
 the build's claim when the scan is read. In a document uploaded on its own, it
 is recorded by the run as a claim of the build taken from that statement. Both
-are applied alike: `design-docs/findings.md` § Build-declared claims holds what each
+are applied alike: `design-docs/findings-closure.md` § Build-declared claims holds what each
 status does.
 
 | Rule | |
