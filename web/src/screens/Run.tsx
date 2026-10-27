@@ -44,7 +44,7 @@ export function Run() {
   });
 
   if (ran.isPending) return <Loading />;
-  if (ran.isError) return <Failed error={ran.error} what="That run could not be read." />;
+  if (ran.isError) return <Failed error={ran.error} what="That scan could not be read." />;
   const it = ran.data;
   if (!it) return null;
 
@@ -55,9 +55,9 @@ export function Run() {
           <Link to={uploadsAt(build)} className="linkish" style={{ fontWeight: 500 }}>
             Uploads
           </Link>{" "}
-          › <b>run {it.run_id}</b>
+          › <b>known vulnerability scan {it.run_id}</b>
         </span>
-        <h2>Scan results</h2>
+        <h2>Known vulnerability scan</h2>
         <p>
           {product} · {stream} · {variant} ·{" "}
           {it.finished_at ? (

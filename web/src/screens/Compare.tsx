@@ -384,7 +384,9 @@ function Column({
                 {runsIn && row.because === "unexplained" && row.closed_by_run && (
                   <>
                     {" — "}
-                    <Link to={runAt(runsIn, row.closed_by_run)}>the run that stopped</Link>
+                    <Link to={runAt(runsIn, row.closed_by_run)}>
+                      the known vulnerability scan that stopped
+                    </Link>
                   </>
                 )}
               </span>

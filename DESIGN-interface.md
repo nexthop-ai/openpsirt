@@ -36,7 +36,7 @@ end rather than left to be found by clicking.
 - [The decision page](#the-decision-page)
 - [Assignments and routing rules](#assignments-and-routing-rules)
 - [Catalog and uploads](#catalog-and-uploads)
-- [Product and scan-run pages](#product-and-scan-run-pages)
+- [Product and scan pages](#product-and-scan-pages)
 - [Flaw entry](#flaw-entry)
 - [The inbox](#the-inbox)
 - [Static analysis leads](#static-analysis-leads)
@@ -1341,7 +1341,7 @@ table. What the settings are and how they are checked is `DESIGN-analysis.md`
 | A refusal is shown and the draft stays as typed | The server names the entry it refused |
 | A save moves the lead screens | A lead's links are built from these settings as it is read |
 
-## Product and scan-run pages
+## Product and scan pages
 
 The product page names every declared build with what is open, overdue,
 exploited, undecided and agreed in each, and when each was last scanned.
@@ -1358,8 +1358,11 @@ something is going.
 | "Undecided" and "agreed" are the findings list's own words | By the same definition and from the same expression. Two screens with two definitions of "decided" is how they come to disagree in front of somebody |
 | A build nobody has ever scanned is a row, not an omission | A product reads as clean when part of it was never looked at. One whose release is out of support says so |
 
-A scan run has a detail page. A receipt says a run happened; a row reading
-"7,604 opened" is a number with no shape. The page says what the run opened and
+A scan run has a detail page, Known vulnerability scan, reached from the
+upload's state, from its breadcrumb under Uploads, and from the release
+comparison's "the known vulnerability scan that stopped" beside a closure it
+does not explain. A receipt says a run happened; a row reading "7,604 opened"
+is a number with no shape. The page says what the run opened and
 closed, broken down by the rating in force, with how much of what it opened is
 known to be exploited — which is what decides whether an overnight jump is an
 evening's work or a night's. A band with none in it is left out rather than

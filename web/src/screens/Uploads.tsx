@@ -255,7 +255,7 @@ function SBOMs({ build }: { build: Build }) {
                     {scan.run_id ? (
                       <Link
                         to={runAt({ product, stream, variant }, scan.run_id)}
-                        title="The change this run made, and the tooling it was measured with"
+                        title="The known vulnerability scan: what it changed, and the tooling it was measured with"
                       >
                         <State state={scan.state} />
                       </Link>
