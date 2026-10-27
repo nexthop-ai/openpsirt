@@ -465,7 +465,7 @@ func (s *Store) registerQuery(productID int64,
 		// says "lapsed" about the same occurrence.
 		Join(`LEFT JOIN "person" AS "pp" ON "pp"."id" = "de"."proposed_by"`).
 		// The supplier's statement answering the occurrence, where one does.
-		Join(`LEFT JOIN "vex_statement" AS "sr" ON "sr"."id" = "f"."stated_by"`).
+		Join(`LEFT JOIN "received_vex_statement" AS "sr" ON "sr"."id" = "f"."stated_by"`).
 		Join(WordsJoin("sr")).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).

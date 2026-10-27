@@ -847,7 +847,7 @@ The rating sits inside the severity block, under the words it disagrees with,
 so it is changed where it is read. A pane of its own further down asks somebody
 reading a severity to go and find the control for it.
 
-The references sit above what publishers say, at the head of what is read to
+The references sit above the received VEX, at the head of what is read to
 decide. A write-up is what somebody triaging reads first, and a third party's
 claim about the finding is read against it rather than before it.
 
@@ -857,7 +857,7 @@ order, the rest as a count, all of them on hover. A commit its repository does
 not hold says so. A link not yet looked up carries nothing, because "not yet"
 is not a fact about the patch.
 
-What the build says is a card of its own, above what publishers say and shown
+What the build says is a card of its own, above the received VEX and shown
 whatever has been decided, because a mark the build put on an occurrence stays on it.
 One entry per claim the build still makes covering an occurrence shown: whose it is — the build, or the
 publisher whose document named the build as its product — the status, the
@@ -1569,9 +1569,9 @@ advisory is and § Editorial state holds who may agree.
 | Recording that it went out is its own act | What was published on a date cannot be worked out again once a release is added or a decision is revised, and without the record a second document cannot be a revision — which a customer's validator checks |
 | The three editorial statuses are shown under the standard's own names | Draft, final and interim, each with what reaching it means on hover. Interim is not "it has changed since it went out": a withdrawn agreement reaches it with nothing a reader acts on having moved |
 
-#### The VEX document
+#### Published VEX
 
-One build's VEX document has a screen of its own, reached from the release's
+One build's published VEX has a screen of its own, reached from the release's
 customer documents. `DESIGN-remediation.md` § The VEX document holds what it
 says and § Issuance records what recording keeps.
 
@@ -1689,7 +1689,7 @@ confirmation is never a toast and nothing navigates away.
 |---|---|
 | Waiting for a second person is said only where one is needed | A decision in force at once reads as in force |
 | An occurrence's address opens the decision page | A decision occurrence's address resolves to the decision it is one row of |
-| The finding screen's confirmation follows the card | Submitting hides the form and the publisher statements, and the page shortens by about 900 pixels under whoever pressed the button. A confirmation at the head of the screen lands out of view |
+| The finding screen's confirmation follows the card | Submitting hides the form and the received VEX, and the page shortens by about 900 pixels under whoever pressed the button. A confirmation at the head of the screen lands out of view |
 
 ## Reachable from a keyboard
 
@@ -2091,7 +2091,7 @@ same fact is written one way in this document and another on a screen.
 
 | On the screen | In this document |
 |---|---|
-| Nothing uploaded, under "What publishers say" | An empty panel reads as "nobody has an opinion about this", and what it means is that no document saying so has been uploaded here |
+| Nothing received, under Received VEX | An empty panel reads as "nobody has an opinion about this", and what it means is that no document saying so has been received here |
 | Planned fixes. Cleared by the next scan | A release clears when the next scan of it stops finding the issue, so nothing is marked done by hand |
 | Applies to every build with this component | The same code built several ways is one piece of work |
 

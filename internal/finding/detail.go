@@ -572,7 +572,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// The supplier's statement answering this occurrence on some routes, and
 		// the product it answers through.
-		Join(`LEFT JOIN "vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
+		Join(`LEFT JOIN "received_vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).

@@ -468,7 +468,7 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 		// The same claims, the way a retry hands them back, carrying the keys
 		// a pass before was given.
 		var given []int64
-		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Order("id").
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("id").Order("id").
 			Limit(int64(len(claims))).Scan(ctx, &given); err != nil {
 			t.Fatal(err)
 		}

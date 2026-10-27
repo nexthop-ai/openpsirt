@@ -50,7 +50,7 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 		}
 
 		// Somebody publishes it and says so.
-		recorded := httpapitest.RecordedIssuance(t, r, "triager")
+		recorded := httpapitest.RecordedPublishedVEX(t, r, "triager")
 		if recorded.Version != 1 || len(recorded.Digest) != 64 {
 			t.Errorf("what was recorded reads as %+v", recorded)
 		}
@@ -69,7 +69,7 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 		// hashed twice agrees. The moment, the version and the build of
 		// OpenPSIRT that wrote it all move between these two and none of them
 		// is what the document says.
-		unchanged := httpapitest.RecordedIssuance(t, r, "triager")
+		unchanged := httpapitest.RecordedPublishedVEX(t, r, "triager")
 		if unchanged.Digest != recorded.Digest {
 			t.Errorf("an unchanged document hashed differently: %q then %q",
 				recorded.Digest, unchanged.Digest)
@@ -82,7 +82,7 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 		// is the half that makes the comparison worth making.
 		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		r.Agreed(t, decision)
-		moved := httpapitest.RecordedIssuance(t, r, "triager")
+		moved := httpapitest.RecordedPublishedVEX(t, r, "triager")
 		if moved.Digest == recorded.Digest {
 			t.Errorf("a document carrying a statement it did not carry before hashed the same")
 		}
@@ -134,7 +134,7 @@ func TestTheVEXDocumentRecordedStatesTheVersionItIsRecordedUnder(t *testing.T) {
 			t.Fatalf("a document nobody has published is version %d", fetched.Version)
 		}
 		// Somebody else publishes in between.
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, httpapitest.ABuild+"/issuance", "")
 		if got.Code != http.StatusCreated {
@@ -203,7 +203,7 @@ func TestTheVEXRecordSaysWhetherTheDocumentMovedSinceItWentOut(t *testing.T) {
 			t.Errorf("with nothing gone out, changed reads %v", *gone.Changed)
 		}
 
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 		httpapitest.Read(t, r, "reader", httpapitest.ABuild+"/issuance", &gone)
 		if gone.Changed == nil || *gone.Changed {
 			t.Errorf("straight after it went out, changed reads %v", gone.Changed)
@@ -239,14 +239,14 @@ func TestAVEXDocumentIsNamedTheSameHoweverTheBuildIsSpelled(t *testing.T) {
 	})
 }
 
-// TestRecordingAVEXIssuanceNeedsTheTriageRoleOnTheProduct reaches the arm that
+// TestRecordingAPublishedVEXNeedsTheTriageRoleOnTheProduct reaches the arm that
 // answers that refusal.
 //
 // A reader may generate the document and may not say one went out: it is this
 // deployment's word to a customer. Left to the arm below it, the refusal
 // answers as a build nobody declared — which contradicts the document the same
 // caller has just been handed.
-func TestRecordingAVEXIssuanceNeedsTheTriageRoleOnTheProduct(t *testing.T) {
+func TestRecordingAPublishedVEXNeedsTheTriageRoleOnTheProduct(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 
@@ -349,14 +349,14 @@ func TestAVEXDocumentThatWentOutIsHandedBackAsItsKeptBytes(t *testing.T) {
 	// define, and nothing encoded differently on the way back out.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 
 		got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, httpapitest.ABuild+"/issuance/1", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("reading what went out answered %d: %s", got.Code, got.Body.String())
 		}
 		var kept string
-		if err := r.DB.DB.NewSelect().TableExpr(`"vex_issuance"`).
+		if err := r.DB.DB.NewSelect().TableExpr(`"published_vex"`).
 			Column("document").Limit(1).Scan(t.Context(), &kept); err != nil {
 			t.Fatal(err)
 		}

@@ -1167,7 +1167,7 @@ question widened by a case the subject was brought into.
 
 | Read | Answer to a subject that reads nothing there |
 |---|---|
-| Findings, occurrences, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the labels in use | Refused |
+| Findings, occurrences, runs, promised upgrades, carried patches, received VEX, readiness, standing, what each release holds, the release trend, the labels in use | Refused |
 | What each run opened and closed | Refused, for an empty list of runs as well |
 | The receipts list | The receipts, with no counts of what each run changed. The receipts are about what the pipeline sends; the counts are a report on findings |
 

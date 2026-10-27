@@ -29,7 +29,7 @@ import (
 // a prefill. A supplier's statement that its own product is not affected is
 // also applied, by the run, at the occurrences that product occupies (REQ-31).
 type Statement struct {
-	bun.BaseModel `bun:"table:vex_statement,alias:ss"`
+	bun.BaseModel `bun:"table:received_vex_statement,alias:ss"`
 
 	ID        int64 `bun:"id,pk,autoincrement"`
 	ProductID int64 `bun:"product_id,notnull"`

@@ -48,6 +48,8 @@ var tablesRenamedV0110 = []tableRename{
 	{"routing_rule", "assignment_rule"},
 	{"advisory_source", "supplier_advisory_feed"},
 	{"finding_tag", "finding_label"},
+	{"vex_statement", "received_vex_statement"},
+	{"vex_issuance", "published_vex"},
 }
 
 // columnRename is a column's name before and after, on its table as v0.11.0
@@ -209,6 +211,17 @@ var namesRenamedV0110 = []nameRename{
 	{aForeignKey, "finding_label", "finding_tag_component_fk", "finding_label_component_fk"},
 	{aForeignKey, "finding_label", "finding_tag_by_fk", "finding_label_by_fk"},
 	{anIndex, "finding_label", "finding_tag_named_idx", "finding_label_named_idx"},
+
+	{aPrimaryKey, "received_vex_statement", "vex_statement_pkey", "received_vex_statement_pkey"},
+	{aForeignKey, "received_vex_statement", "vex_statement_product_fk", "received_vex_statement_product_fk"},
+	{aForeignKey, "received_vex_statement", "vex_statement_by_fk", "received_vex_statement_by_fk"},
+	{anIndex, "received_vex_statement", "vex_statement_about_idx", "received_vex_statement_about_idx"},
+	{anIndex, "received_vex_statement", "vex_statement_from_idx", "received_vex_statement_from_idx"},
+
+	{aPrimaryKey, "published_vex", "vex_issuance_pkey", "published_vex_pkey"},
+	{aUnique, "published_vex", "vex_issuance_once_per_kind", "published_vex_once_per_kind"},
+	{aForeignKey, "published_vex", "vex_issuance_target_fk", "published_vex_target_fk"},
+	{aForeignKey, "published_vex", "vex_issuance_by_fk", "published_vex_by_fk"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
@@ -293,6 +306,10 @@ func declaredV0110(t *columnTypes, table string) []string {
 		statements = advisorySourceBaseline(t)
 	case "finding_tag":
 		statements = tagBaseline(t)
+	case "vex_statement":
+		statements = vexStatementV0100(t)
+	case "vex_issuance":
+		statements = vexIssuanceBaseline(t)
 	case "":
 		kept, ok := keptV0110[table]
 		if !ok {

@@ -40,7 +40,7 @@ func TestRenamingAVariantIsRefusedOnceADocumentHasGoneOut(t *testing.T) {
 			t.Fatalf("renaming it back answered %d: %s", got.Code, got.Body.String())
 		}
 
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, variant, `{"name":"broadcom-dnx"}`)
 		if got.Code != http.StatusConflict {
@@ -393,7 +393,7 @@ func TestAnAdvisoryForOneProductDoesNotRefuseAnothersRename(t *testing.T) {
 func TestAVEXDocumentRefusesAProductAndReleaseRename(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 
 		for _, at := range []string{"/v1/products/mine", "/v1/products/mine/branches-and-tags/master"} {
 			got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, at, `{"name":"other"}`)
@@ -426,7 +426,7 @@ func TestAVEXDocumentRefusesAProductAndReleaseRename(t *testing.T) {
 func TestACaseOnlyRenameMovesTheSpellingShown(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch,
 			"/v1/products/mine/variants/broadcom",

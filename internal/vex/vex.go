@@ -760,7 +760,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		First           int64  `bun:"first"`
 	}
 	err := s.closedInBuild(targetID, visible, finding.Disclaimed).
-		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
+		Join(`JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Where(`"ss"."superseded_at" IS NULL`).
 		// What the occurrence holds now: a later row at it, patched by the build
 		// or open again, is what the document goes by.
@@ -802,7 +802,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	where, args := database.InAnyOf(`"f"."id"`, ids)
 	if err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
+		Join(`JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Join(finding.WordsJoin("ss")).
 		ColumnExpr(`"f"."id" AS "id"`).
 		ColumnExpr(`"f"."closed_at" AS "closed_at"`).

@@ -958,13 +958,13 @@ var tables = []string{
 	"role_grant_all",
 	"role_grant",
 	// Before person and product, which they point at.
-	"vex_statement",
+	"received_vex_statement",
 	// Before supplier_advisory_feed and product, both of which it points at.
 	"document_upload",
 	// Before product and person, both of which it points at.
 	"supplier_advisory_feed",
 	// Before target and person, both of which it points at.
-	"vex_issuance",
+	"published_vex",
 	// Before person, which they point at.
 	"admin_change",
 	// Before team, person and product, all of which it points at.
@@ -1036,8 +1036,8 @@ var tables = []string{
 	"series",
 	"finding",
 	"suppression",
-	// After suppression and vex_statement, whose rows point at it with no
-	// foreign key.
+	// After suppression and received_vex_statement, whose rows point at it with
+	// no foreign key.
 	"statement_text",
 	// Before scan_run and vulnerability, both of which it points at, and
 	// after decision_occurrence_superseded, which points at it.

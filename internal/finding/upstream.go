@@ -162,7 +162,7 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var out []Offer
 	q := s.db.NewSelect().
-		TableExpr(`"vex_statement" AS "ss"`).
+		TableExpr(`"received_vex_statement" AS "ss"`).
 		Join(`JOIN "component" AS "c" ON "c"."name_folded" = "ss"."component" AND "c"."version" = "ss"."about"`).
 		Join(`JOIN "finding" AS "f" ON "f"."component_id" = "c"."id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).

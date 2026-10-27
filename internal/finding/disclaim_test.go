@@ -705,7 +705,7 @@ func TestTheSameDocumentReadAgainIsPlacedWhereItStands(t *testing.T) {
 			t.Fatal(err)
 		}
 		var before []int64
-		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Order("id").
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("id").Order("id").
 			Scan(ctx, &before); err != nil {
 			t.Fatal(err)
 		}
@@ -901,7 +901,7 @@ func TestARevisionRepeatingAClaimKeepsItsRow(t *testing.T) {
 			t.Fatal(err)
 		}
 		var first int64
-		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Scan(ctx, &first); err != nil {
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("id").Scan(ctx, &first); err != nil {
 			t.Fatal(err)
 		}
 		from.Digest = "sha256:second"
@@ -1053,7 +1053,7 @@ func TestAClaimMovedToAnotherReleaseOfTheProductIsSetAside(t *testing.T) {
 			t.Fatal(err)
 		}
 		var first int64
-		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Scan(ctx, &first); err != nil {
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("id").Scan(ctx, &first); err != nil {
 			t.Fatal(err)
 		}
 

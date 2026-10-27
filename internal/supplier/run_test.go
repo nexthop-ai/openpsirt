@@ -332,7 +332,7 @@ func TestAnAdvisoryIsRecordedAsTheAdministratorWhoNamedTheSupplier(t *testing.T)
 		}
 
 		var by []int64
-		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement" AS "ss"`).
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement" AS "ss"`).
 			ColumnExpr(`"ss"."uploaded_by"`).Scan(ctx, &by); err != nil {
 			t.Fatal(err)
 		}

@@ -311,7 +311,7 @@ func openClaims(ctx context.Context, db bun.IDB, targetID int64) ([]Claim, error
 		ColumnExpr("sup.*").
 		Join(`JOIN "target" AS "t" ON "t"."id" = "sup"."target_id"`).
 		Join(`JOIN "scan" AS "latest" ON "latest"."id" = "t"."last_scan_id"`).
-		Join(`LEFT JOIN "vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
+		Join(`LEFT JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
 		ColumnExpr(`COALESCE("ss"."restated_at", "ss"."uploaded_at", "latest"."received_at") AS "said"`).
 		Where(`"sup"."target_id" = ?`, targetID).Where(`"sup"."closed_scan_id" IS NULL`).
 		Order("sup.id").Scan(ctx)

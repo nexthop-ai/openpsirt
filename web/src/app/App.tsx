@@ -100,7 +100,7 @@ const Person = retrying(() => import("../screens/Person").then((m) => m.Person))
 const Branch = retrying(() => import("../screens/Branch").then((m) => m.Branch));
 const Advisories = retrying(() => import("../screens/Advisories").then((m) => m.Advisories));
 const Advisory = retrying(() => import("../screens/Advisory").then((m) => m.Advisory));
-const VEX = retrying(() => import("../screens/VEX").then((m) => m.VEX));
+const PublishedVEX = retrying(() => import("../screens/PublishedVEX").then((m) => m.PublishedVEX));
 
 export function App() {
   const who = useWho();
@@ -207,7 +207,7 @@ export function App() {
               <Route path={ROUTES.run} element={<Run />} />
               <Route path={ROUTES.plannedUpgrades} element={<PlannedUpgrades />} />
               <Route path={ROUTES.unmatchedComponents} element={<UnmatchedComponents />} />
-              <Route path={ROUTES.vex} element={<VEX />} />
+              <Route path={ROUTES.vex} element={<PublishedVEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
               <Route path={ROUTES.inventoryComparison} element={<InventoryCompare />} />
               <Route path={ROUTES.vulnerabilityReports} element={<VulnerabilityReports />} />

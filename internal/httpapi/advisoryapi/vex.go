@@ -61,9 +61,9 @@ func registerVEX(api huma.API, in core.Deps) {
 		})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-vex-issuances", Method: http.MethodGet,
+		OperationID: "list-published-vex", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
-		Summary: "List the times a VEX document went out",
+		Summary: "List the published VEX for a build",
 		Description: "What has been published for this build, oldest first: which revision, " +
 			"when, and what the document hashed to at the time.\n\n" +
 			"The record itself is read without generating a document. `changed` generates " +
@@ -84,7 +84,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			Stream  string       `path:"stream"`
 			Variant string       `path:"variant"`
 			Kind    documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
-		}) (*vexIssuances, error) {
+		}) (*publishedVEXList, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
@@ -106,11 +106,11 @@ func registerVEX(api huma.API, in core.Deps) {
 			case err != nil:
 				return nil, vexRefused(in, err, "what has gone out could not be compared")
 			}
-			out := &vexIssuances{}
+			out := &publishedVEXList{}
 			out.Body.Changed = changed
-			out.Body.Items = make([]VEXIssuanceBody, 0, len(gone))
+			out.Body.Items = make([]PublishedVEXBody, 0, len(gone))
 			for _, one := range gone {
-				out.Body.Items = append(out.Body.Items, VEXIssuanceBody{
+				out.Body.Items = append(out.Body.Items, PublishedVEXBody{
 					Version: one.Ordinal, Digest: one.Digest, IssuedBy: one.IssuedBy,
 					IssuedAt: core.Stamp(one.IssuedAt),
 				})
@@ -119,9 +119,9 @@ func registerVEX(api huma.API, in core.Deps) {
 		})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "record-vex-issued", Method: http.MethodPost,
+		OperationID: "record-published-vex", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
-		Summary: "Record that a VEX document went out",
+		Summary: "Record a published VEX",
 		Description: "Records that the document for this build was published: when, by whom, " +
 			"and a digest of the document as it stands now. Answers with the document " +
 			"that was recorded, which is the one to send: it carries the version it is " +
@@ -162,7 +162,7 @@ func registerVEX(api huma.API, in core.Deps) {
 				Status int
 				Body   VEXRecordedBody
 			}{Status: http.StatusCreated, Body: VEXRecordedBody{
-				VEXIssuanceBody: VEXIssuanceBody{
+				PublishedVEXBody: PublishedVEXBody{
 					Version: recorded.Ordinal, Digest: recorded.Digest,
 					IssuedBy: subject.Identity,
 					IssuedAt: core.Stamp(recorded.IssuedAt),
@@ -172,9 +172,9 @@ func registerVEX(api huma.API, in core.Deps) {
 		})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-vex-issued", Method: http.MethodGet,
+		OperationID: "get-published-vex", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}",
-		Summary: "Read a VEX document that went out",
+		Summary: "Read a published VEX",
 		Description: "The OpenVEX document recorded as one revision, byte for byte as it went " +
 			"out. It carries the version it was recorded under and the moment it was " +
 			"recorded.\n\n" +
@@ -230,24 +230,24 @@ func (k documentKind) kind() vex.Kind {
 	return vex.Kind(k)
 }
 
-// vexIssuances is what has gone out for a build, and whether what would be
+// publishedVEXList is what has gone out for a build, and whether what would be
 // generated now differs from the last of it.
-type vexIssuances struct {
+type publishedVEXList struct {
 	Body struct {
-		Items   []VEXIssuanceBody `json:"items"`
-		Changed *bool             `json:"changed,omitempty" doc:"Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured"`
+		Items   []PublishedVEXBody `json:"items"`
+		Changed *bool              `json:"changed,omitempty" doc:"Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured"`
 	}
 }
 
 // VEXRecordedBody is one issuance just recorded, with the document it
 // recorded.
 type VEXRecordedBody struct {
-	VEXIssuanceBody
+	PublishedVEXBody
 	Document json.RawMessage `json:"document" doc:"The OpenVEX document recorded, as its bytes, carrying the version it is recorded under. This is the one to send"`
 }
 
-// VEXIssuanceBody is one time the document for a build went out.
-type VEXIssuanceBody struct {
+// PublishedVEXBody is one time the document for a build went out.
+type PublishedVEXBody struct {
 	Version  int    `json:"version" doc:"Which revision went out, counting from one. It is the version that document carries"`
 	Digest   string `json:"digest" doc:"A digest of what the document said, so that what is published and what we would generate stay answerable against each other"`
 	IssuedBy string `json:"issued_by" doc:"Who published it. The act leaves this row and nothing else, so the row names them"`

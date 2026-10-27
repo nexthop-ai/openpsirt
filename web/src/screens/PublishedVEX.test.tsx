@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VEX } from "./VEX";
+import { PublishedVEX } from "./PublishedVEX";
 import { accept, location, mounted, screen, serve, settle } from "../test/mount";
 import { only, press, type Init } from "../test/controls";
 
@@ -27,7 +27,9 @@ async function drawn(at = "/products/sonic/streams/master/variants/arm/vex") {
       : undefined,
   );
   const sent = accept(() => ({ data: { version: 3 } }));
-  mount.render(screen(<VEX />, at, "/products/:product/streams/:stream/variants/:variant/vex"));
+  mount.render(
+    screen(<PublishedVEX />, at, "/products/:product/streams/:stream/variants/:variant/vex"),
+  );
   await settle();
   const asked = () =>
     (read.mock.calls as unknown as [string, Init][])
@@ -39,7 +41,7 @@ async function drawn(at = "/products/sonic/streams/master/variants/arm/vex") {
 const hrefs = () =>
   Array.from(mount.host().querySelectorAll("a")).map((a) => a.getAttribute("href") ?? "");
 
-describe("the VEX document for one build", () => {
+describe("the published VEX for one build", () => {
   it("asks for our own document unless the supplier tab is picked", async () => {
     const { asked, sent } = await drawn();
     expect(asked()[0]).toEqual({});

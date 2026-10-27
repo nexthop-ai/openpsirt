@@ -65,7 +65,7 @@ func claimedOn(ctx context.Context, db bun.IDB, ids []int64) ([]BuildClaim, erro
 	where, args := database.InAnyOf(`"sup"."id"`, ids)
 	if err := db.NewSelect().
 		TableExpr(`"suppression" AS "sup"`).
-		Join(`LEFT JOIN "vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
+		Join(`LEFT JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
 		Join(WordsJoin("sup")).
 		ColumnExpr(`"sup"."id" AS "id"`).
 		ColumnExpr(`"sup"."status" AS "status"`).

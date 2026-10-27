@@ -15,8 +15,9 @@ import (
 )
 
 // rulesV0100 is, in a v0.10.0 database, a standing rule handing work to a
-// team, a supplier whose advisories are read, and a word put on a finding.
-type rulesV0100 struct{ rule, feed, label int64 }
+// team, a supplier whose advisories are read, a word put on a finding, a
+// supplier's VEX statement and a VEX document that went out.
+type rulesV0100 struct{ rule, feed, label, received, published int64 }
 
 func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV0100 {
 	t.Helper()
@@ -63,6 +64,14 @@ func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV01
 	exec(`INSERT INTO "finding_tag" ("product_id", "vulnerability_id", "component_id", "tag", "typed",
 		"added_by", "added_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, product, issue, component, "waiting", "Waiting", person, at)
 	out.label = id(`SELECT MAX("id") FROM "finding_tag"`)
+	exec(`INSERT INTO "vex_statement" ("product_id", "publisher", "source", "document_id", "vulnerability",
+		"component", "about", "status", "document", "digest", "uploaded_by", "uploaded_at")
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, product, "acme", "vex", "", "cve-2026-1102", "libbar", "",
+		"not_affected", "acme.json", "digest", person, at)
+	out.received = id(`SELECT MAX("id") FROM "vex_statement"`)
+	exec(`INSERT INTO "vex_issuance" ("target_id", "kind", "ordinal", "digest", "document", "issued_by",
+		"issued_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, declared.Target.ID, "ours", 1, "digest", "{}", person, at)
+	out.published = id(`SELECT MAX("id") FROM "vex_issuance"`)
 	return out
 }
 
@@ -80,6 +89,10 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 			WHERE "id" = ? AND "display_name" = 'ExampleLinux'`, w.feed},
 		{"the label", `SELECT COUNT(*) FROM "finding_label"
 			WHERE "id" = ? AND "label" = 'waiting' AND "typed" = 'Waiting'`, w.label},
+		{"the received VEX statement", `SELECT COUNT(*) FROM "received_vex_statement"
+			WHERE "id" = ? AND "publisher" = 'acme'`, w.received},
+		{"the published VEX", `SELECT COUNT(*) FROM "published_vex"
+			WHERE "id" = ? AND "ordinal" = 1`, w.published},
 	} {
 		var n int
 		if err := db.DB.NewRaw(c.query, c.id).Scan(ctx, &n); err != nil {
@@ -91,7 +104,8 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 	}
 }
 
-// A v0.10.0 database holding a standing rule, a supplier and a label is upgraded, and every row reads
+// A v0.10.0 database holding a standing rule, a supplier, a label and VEX each
+// way is upgraded, and every row reads
 // back under v0.11.0's names in the shape the release declares.
 func TestAV0100DatabaseTakesTheV0110RuleNames(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -125,6 +139,12 @@ func TestAnUpgradeStoppedPartWayThroughTheRuleRenamesResumes(t *testing.T) {
 		{after: "tag"},
 		{after: "finding_tag_once", servers: true},
 		{after: "finding_tag_named_idx"},
+		{after: "vex_statement"},
+		{after: "vex_statement_by_fk", servers: true},
+		{after: "vex_statement_from_idx"},
+		{after: "vex_issuance"},
+		{after: "vex_issuance_once_per_kind", servers: true},
+		{after: "vex_issuance_by_fk", servers: true},
 	} {
 		t.Run(stop.after, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

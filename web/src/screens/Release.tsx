@@ -273,7 +273,7 @@ export function Release({ product, stream }: { product: string; stream: string }
             <li key={`vex-${variant.name}`}>
               <div>
                 <Link to={vexAt({ product, stream, variant: variant.name ?? "" })}>
-                  VEX document · {variant.name}
+                  Published VEX · {variant.name}
                 </Link>
               </div>
               <div className="hint">

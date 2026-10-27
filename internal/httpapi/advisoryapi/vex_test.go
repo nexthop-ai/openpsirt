@@ -675,7 +675,7 @@ func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
 	carryingOne := func(d *core.Deps) { d.VexCeiling = 1 }
 	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Two, carryingOne, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
 			decision, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
 			r.Agreed(t, decision)

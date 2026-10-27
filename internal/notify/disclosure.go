@@ -83,7 +83,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 	undisclosed, private := access.AnyWithheld(`"de"."visibility"`)
 	err := w.db.NewSelect().
 		TableExpr(finding.DecisionOccurrences).
-		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "de"."from_statement_id"`).
+		Join(`JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "de"."from_statement_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 		// The issue the decision is read as, which is the one a reader finds
 		// where a merge put another name under it.
@@ -104,7 +104,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		// An upstream's statement the upstream says again, word for word, is
 		// current again: trusting an upstream once more records what it says
 		// as new rows, and the ground under the decision has not moved.
-		Where(`NOT ("ss"."source" = ? AND EXISTS (SELECT 1 FROM "vex_statement" AS "sn"
+		Where(`NOT ("ss"."source" = ? AND EXISTS (SELECT 1 FROM "received_vex_statement" AS "sn"
 			WHERE "sn"."product_id" = "ss"."product_id" AND "sn"."publisher" = "ss"."publisher"
 			  AND "sn"."source" = "ss"."source" AND "sn"."vulnerability" = "ss"."vulnerability"
 			  AND "sn"."component" = "ss"."component" AND "sn"."about" = "ss"."about"

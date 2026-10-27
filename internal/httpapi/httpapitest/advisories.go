@@ -374,9 +374,9 @@ func (r *Reach) Alerts(t *testing.T, who, kind string) []string {
 
 const ABuild = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
-// RecordedIssuance records that the document for the build went out and
+// RecordedPublishedVEX records that the document for the build went out and
 // answers with what was recorded.
-func RecordedIssuance(t *testing.T, r *Reach, who string) struct {
+func RecordedPublishedVEX(t *testing.T, r *Reach, who string) struct {
 	Version int    `json:"version"`
 	Digest  string `json:"digest"`
 } {

@@ -9978,6 +9978,49 @@ components:
       required:
         - publishes
       type: object
+    PublishedVEXBody:
+      additionalProperties: false
+      properties:
+        digest:
+          description: A digest of what the document said, so that what is published and what we would generate stay answerable against each other
+          type: string
+        issued_at:
+          type: string
+        issued_by:
+          description: Who published it. The act leaves this row and nothing else, so the row names them
+          type: string
+        version:
+          description: Which revision went out, counting from one. It is the version that document carries
+          format: int64
+          type: integer
+      required:
+        - version
+        - digest
+        - issued_by
+        - issued_at
+      type: object
+    PublishedVEXListBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PublishedVEXListBody.json
+          format: uri
+          readOnly: true
+          type: string
+        changed:
+          description: Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured
+          type: boolean
+        items:
+          items:
+            $ref: "#/components/schemas/PublishedVEXBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+      type: object
     QueueOutputBody:
       additionalProperties: false
       properties:
@@ -13816,27 +13859,6 @@ components:
         - beneath
         - placed
       type: object
-    VEXIssuanceBody:
-      additionalProperties: false
-      properties:
-        digest:
-          description: A digest of what the document said, so that what is published and what we would generate stay answerable against each other
-          type: string
-        issued_at:
-          type: string
-        issued_by:
-          description: Who published it. The act leaves this row and nothing else, so the row names them
-          type: string
-        version:
-          description: Which revision went out, counting from one. It is the version that document carries
-          format: int64
-          type: integer
-      required:
-        - version
-        - digest
-        - issued_by
-        - issued_at
-      type: object
     VEXRecordedBody:
       additionalProperties: false
       properties:
@@ -13898,28 +13920,6 @@ components:
           type: boolean
       required:
         - name
-      type: object
-    VexIssuancesBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/VexIssuancesBody.json
-          format: uri
-          readOnly: true
-          type: string
-        changed:
-          description: Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured
-          type: boolean
-        items:
-          items:
-            $ref: "#/components/schemas/VEXIssuanceBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
       type: object
     Vulnerability:
       additionalProperties: false
@@ -24031,7 +24031,7 @@ paths:
         `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
 
         Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
-      operationId: list-vex-issuances
+      operationId: list-published-vex
       parameters:
         - in: path
           name: product
@@ -24063,7 +24063,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/VexIssuancesBody"
+                $ref: "#/components/schemas/PublishedVEXListBody"
           description: OK
         default:
           content:
@@ -24071,7 +24071,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List the times a VEX document went out
+      summary: List the published VEX for a build
       tags:
         - Findings
       x-openpsirt-requires:
@@ -24091,7 +24091,7 @@ paths:
         The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
 
         Requires: public-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the decision was approved.
-      operationId: record-vex-issued
+      operationId: record-published-vex
       parameters:
         - in: path
           name: product
@@ -24131,7 +24131,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Record that a VEX document went out
+      summary: Record a published VEX
       tags:
         - Findings
       x-openpsirt-requires:
@@ -24147,7 +24147,7 @@ paths:
         A revision nobody recorded answers 404.
 
         Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
-      operationId: get-vex-issued
+      operationId: get-published-vex
       parameters:
         - in: path
           name: product
@@ -24195,7 +24195,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Read a VEX document that went out
+      summary: Read a published VEX
       tags:
         - Findings
       x-openpsirt-requires:

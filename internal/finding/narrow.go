@@ -1097,13 +1097,13 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		// statement.
 		pairs := `(SELECT "ss"."product_id" AS "product_id", "vc"."id" AS "component_id",
 			"vv"."issue_id" AS "vulnerability_id"
-			FROM "vex_statement" AS "ss"
+			FROM "received_vex_statement" AS "ss"
 			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
 			JOIN "vulnerability" AS "vv" ON "vv"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `
 			UNION
 			SELECT "ss"."product_id", "vc"."id", "vl"."vulnerability_id"
-			FROM "vex_statement" AS "ss"
+			FROM "received_vex_statement" AS "ss"
 			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
 			JOIN "vulnerability_alias" AS "vl" ON "vl"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `)`
@@ -1124,7 +1124,7 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 			// is in the finding's own product, because the run reads that
 			// product's statements and no other's.
 			Where(`("vx"."component_id" IS NOT NULL OR "f"."stated_by" IN
-				(SELECT "ss"."id" FROM "vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
+				(SELECT "ss"."id" FROM "received_vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
 	}
 	return q
 }

@@ -34,7 +34,7 @@ var ErrMayNotPublish = fmt.Errorf(
 	"%w: recording that a document went out asks for the triage role on this product",
 	access.ErrDenied)
 
-// Issuance is one time the document for a build went out.
+// Published is one time the document for a build went out.
 //
 // A fact about a moment rather than a derived value. What was published on a
 // date cannot be worked out again once a decision is withdrawn, a decision is
@@ -45,8 +45,8 @@ var ErrMayNotPublish = fmt.Errorf(
 // what stands now holds no history of its own, so without a record of what
 // went out every generation is the first revision of something — which is what
 // a reader keeping documents by their identifier has no way to order.
-type Issuance struct {
-	bun.BaseModel `bun:"table:vex_issuance,alias:vi"`
+type Published struct {
+	bun.BaseModel `bun:"table:published_vex,alias:vi"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
 	// TargetID is the build the document was about, which is what its
@@ -95,7 +95,7 @@ type Issuance struct {
 // second pair of eyes on each statement it carries was taken when the decision
 // was approved.
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string, kind Kind) (*Issuance, error) {
+	product, stream, variant string, kind Kind) (*Published, error) {
 
 	if !who.Stated() {
 		return nil, ErrNoPublisher
@@ -107,7 +107,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	if !subject.Triages(access.Public, named.ProductID) {
 		return nil, ErrMayNotPublish
 	}
-	var recorded *Issuance
+	var recorded *Published
 	attempt := 0
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
 		attempt++
@@ -139,7 +139,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// back into the model and the ordinal below is read from the
 		// database. A retry of a rolled-back attempt would re-insert a model
 		// carrying both of that attempt's answers.
-		recorded = &Issuance{
+		recorded = &Published{
 			TargetID: target.ID, Kind: kind, Digest: digest,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
@@ -147,7 +147,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// left open while the insert runs is two statements interleaved on one
 		// connection, which one engine tolerates and another refuses.
 		var highest int
-		if err := tx.NewSelect().Model((*Issuance)(nil)).
+		if err := tx.NewSelect().Model((*Published)(nil)).
 			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
 			Where(`"target_id" = ?`, target.ID).
 			Where(`"kind" = ?`, kind).
@@ -225,7 +225,7 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 	}
 	var rows []Went
 	err = s.idb().NewSelect().
-		TableExpr(`"vex_issuance" AS "vi"`).
+		TableExpr(`"published_vex" AS "vi"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "vi"."issued_by"`).
 		ColumnExpr(`"vi"."ordinal" AS "ordinal"`).
 		ColumnExpr(`"vi"."digest" AS "digest"`).
@@ -259,7 +259,7 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 		return nil, err
 	}
 	var last string
-	err = s.idb().NewSelect().Model((*Issuance)(nil)).
+	err = s.idb().NewSelect().Model((*Published)(nil)).
 		Column("digest").
 		Where(`"target_id" = ?`, target.ID).
 		Where(`"kind" = ?`, kind).
@@ -297,7 +297,7 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject,
 		return "", err
 	}
 	var body string
-	err = s.idb().NewSelect().Model((*Issuance)(nil)).
+	err = s.idb().NewSelect().Model((*Published)(nil)).
 		Column("document").
 		Where(`"target_id" = ?`, target.ID).
 		Where(`"kind" = ?`, kind).
@@ -325,7 +325,7 @@ var ErrNoSuchRevision = refusal.New("no document went out as that revision")
 // they will be known by.
 func (s *Store) revision(ctx context.Context, targetID int64, kind Kind) (int, error) {
 	var highest int
-	err := s.idb().NewSelect().Model((*Issuance)(nil)).
+	err := s.idb().NewSelect().Model((*Published)(nil)).
 		ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
 		Where(`"target_id" = ?`, targetID).
 		Where(`"kind" = ?`, kind).
@@ -411,7 +411,7 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 }
 
 func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, what string) (bool, error) {
-	issued, err := db.NewSelect().Model((*Issuance)(nil)).
+	issued, err := db.NewSelect().Model((*Published)(nil)).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "vi"."target_id"`).
 		Where(where, id).
 		Exists(ctx)

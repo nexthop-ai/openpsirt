@@ -790,7 +790,7 @@ export function Finding() {
 
       <div className="acting">
         {/* Directly above the decision card it produced. Submitting hides the
-            form and the publisher statements, so the page shortens under
+            form and the received VEX, so the page shortens under
             whoever pressed the button, and a confirmation at the head of the
             screen lands out of view. */}
         {recorded && (
@@ -899,22 +899,22 @@ export function Finding() {
             {/* Said when there is nothing, because the difference matters:
                 an empty panel reads as "nobody has an opinion about this",
                 and what it actually means is that no document saying so has
-                been uploaded here. The layer is fed only by uploads
- — nothing derives it, and a distribution's
+                been received here. The layer is fed only by uploads and
+                supplier advisory feeds — nothing derives it, and a distribution's
                 will-not-fix arrives through the scanner as an upstream fix
                 status instead. */}
             {publishers.length === 0 && (
               <div className="card">
-                <h3>Publisher statements</h3>
-                <p className="reading" title="Uploaded by an administrator, never fetched">
-                  Nothing uploaded
+                <h3 title="What suppliers and other publishers state about this">Received VEX</h3>
+                <p className="reading" title="Uploaded, or fetched from a supplier advisory feed">
+                  Nothing received
                 </p>
               </div>
             )}
 
             {publishers.length > 0 && (
               <div className="card">
-                <h3>Publisher statements</h3>
+                <h3 title="What suppliers and other publishers state about this">Received VEX</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
                   Evidence. Only what is marked as applying here closes anything.
                 </p>

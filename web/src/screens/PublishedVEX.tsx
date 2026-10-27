@@ -13,7 +13,7 @@ import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { linkTo } from "../api/links";
 
-// The VEX document for one build: what it says now, what has gone out, and
+// The published VEX for one build: what it says now, what has gone out, and
 // recording another.
 //
 // Recording hands back the document it recorded, which is the one to send: it
@@ -22,7 +22,7 @@ import { linkTo } from "../api/links";
 //
 // Two documents, each with its own identifier and its own revisions: ours, and
 // ours with what suppliers state about their own products beside it.
-export function VEX() {
+export function PublishedVEX() {
   const { product = "", stream = "", variant = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const kind: "ours" | "with-suppliers" =
@@ -32,7 +32,7 @@ export function VEX() {
   const queries = useQueryClient();
 
   const gone = useQuery({
-    queryKey: ["vex-issuances", product, stream, variant, kind],
+    queryKey: ["published-vex", product, stream, variant, kind],
     queryFn: async () =>
       unwrap(
         await api.GET(
@@ -55,7 +55,7 @@ export function VEX() {
       ),
     onSuccess: () => {
       void queries.invalidateQueries({
-        queryKey: ["vex-issuances", product, stream, variant, kind],
+        queryKey: ["published-vex", product, stream, variant, kind],
       });
     },
   });
@@ -66,7 +66,7 @@ export function VEX() {
     <>
       <Crumbs product={product} stream={stream} variant={variant} />
       <div className="screen-head">
-        <h2>VEX document</h2>
+        <h2>Published VEX</h2>
         <p>
           For a customer&rsquo;s own scanner.{" "}
           {kind === "with-suppliers"

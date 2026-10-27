@@ -3754,7 +3754,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the times a VEX document went out
+         * List the published VEX for a build
          * @description What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
          *
          *     The record itself is read without generating a document. `changed` generates the public one to compare, so it is absent where that cannot be done.
@@ -3765,10 +3765,10 @@ export interface paths {
          *
          *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
          */
-        get: operations["list-vex-issuances"];
+        get: operations["list-published-vex"];
         put?: never;
         /**
-         * Record that a VEX document went out
+         * Record a published VEX
          * @description Records that the document for this build was published: when, by whom, and a digest of the document as it stands now. Answers with the document that was recorded, which is the one to send: it carries the version it is recorded under, and a document generated before recording may not.
          *
          *     A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a decision is withdrawn or revised or a scan closes a finding.
@@ -3779,7 +3779,7 @@ export interface paths {
          *
          *     Requires: public-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the decision was approved.
          */
-        post: operations["record-vex-issued"];
+        post: operations["record-published-vex"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3794,14 +3794,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Read a VEX document that went out
+         * Read a published VEX
          * @description The OpenVEX document recorded as one revision, byte for byte as it went out. It carries the version it was recorded under and the moment it was recorded.
          *
          *     A revision nobody recorded answers 404.
          *
          *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
          */
-        get: operations["get-vex-issued"];
+        get: operations["get-published-vex"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12707,6 +12707,29 @@ export interface components {
             /** @description Whether this product's security documents are served to anybody who asks, without signing in */
             publishes: boolean;
         };
+        PublishedVEXBody: {
+            /** @description A digest of what the document said, so that what is published and what we would generate stay answerable against each other */
+            digest: string;
+            issued_at: string;
+            /** @description Who published it. The act leaves this row and nothing else, so the row names them */
+            issued_by: string;
+            /**
+             * Format: int64
+             * @description Which revision went out, counting from one. It is the version that document carries
+             */
+            version: number;
+        };
+        PublishedVEXListBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PublishedVEXListBody.json
+             */
+            readonly $schema?: string;
+            /** @description Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured */
+            changed?: boolean;
+            items: components["schemas"]["PublishedVEXBody"][] | null;
+        };
         QueueOutputBody: {
             /**
              * Format: uri
@@ -14925,18 +14948,6 @@ export interface components {
             placed: boolean;
             version: string;
         };
-        VEXIssuanceBody: {
-            /** @description A digest of what the document said, so that what is published and what we would generate stay answerable against each other */
-            digest: string;
-            issued_at: string;
-            /** @description Who published it. The act leaves this row and nothing else, so the row names them */
-            issued_by: string;
-            /**
-             * Format: int64
-             * @description Which revision went out, counting from one. It is the version that document carries
-             */
-            version: number;
-        };
         VEXRecordedBody: {
             /**
              * Format: uri
@@ -14977,17 +14988,6 @@ export interface components {
             open?: number;
             /** @description Whether it has been taken out of use. A release still lists what it was built as */
             retired?: boolean;
-        };
-        VexIssuancesBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/VexIssuancesBody.json
-             */
-            readonly $schema?: string;
-            /** @description Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured */
-            changed?: boolean;
-            items: components["schemas"]["VEXIssuanceBody"][] | null;
         };
         Vulnerability: {
             acknowledgments?: components["schemas"]["Acknowledgment"][] | null;
@@ -20998,7 +20998,7 @@ export interface operations {
             };
         };
     };
-    "list-vex-issuances": {
+    "list-published-vex": {
         parameters: {
             query?: {
                 /** @description Which document about the build: ours or with-suppliers. Absent means ours */
@@ -21020,7 +21020,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VexIssuancesBody"];
+                    "application/json": components["schemas"]["PublishedVEXListBody"];
                 };
             };
             /** @description Error */
@@ -21034,7 +21034,7 @@ export interface operations {
             };
         };
     };
-    "record-vex-issued": {
+    "record-published-vex": {
         parameters: {
             query?: {
                 /** @description Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours */
@@ -21070,7 +21070,7 @@ export interface operations {
             };
         };
     };
-    "get-vex-issued": {
+    "get-published-vex": {
         parameters: {
             query?: {
                 /** @description Which document about the build: ours or with-suppliers. Absent means ours */

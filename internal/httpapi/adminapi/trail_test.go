@@ -705,7 +705,7 @@ var outsideTheTrail = map[string]string{
 	"upload-attachment":          "recorded on the attachment, which names who uploaded it",
 	"upload-scan":                "recorded as the scan's provenance",
 	"upload-analysis":            "recorded as the run's provenance",
-	"record-vex-issued":          "recorded as the issuance, which names who published it and when",
+	"record-published-vex":       "recorded as the issuance, which names who published it and when",
 	"record-told-outside":        "recorded as the notice, which names who recorded it and when",
 
 	// One person's own, and nothing anybody else reads changes.

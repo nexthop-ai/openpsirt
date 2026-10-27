@@ -149,12 +149,12 @@ func TestMeasureAForkReadingARealImagesDocuments(t *testing.T) {
 			t.Fatal(err)
 		}
 		var portable, statements int
-		if err := db.DB.NewSelect().TableExpr(`"vex_statement" AS "ss"`).ColumnExpr("COUNT(*)").
+		if err := db.DB.NewSelect().TableExpr(`"received_vex_statement" AS "ss"`).ColumnExpr("COUNT(*)").
 			Where(`"ss"."product_id" = ?`, w.fork.ID).Where(`"ss"."superseded_at" IS NULL`).
 			Scan(ctx, &statements); err != nil {
 			t.Fatal(err)
 		}
-		if err := db.DB.NewSelect().TableExpr(`"vex_statement" AS "ss"`).ColumnExpr("COUNT(*)").
+		if err := db.DB.NewSelect().TableExpr(`"received_vex_statement" AS "ss"`).ColumnExpr("COUNT(*)").
 			Where(`"ss"."product_id" = ?`, w.fork.ID).Where(`"ss"."superseded_at" IS NULL`).
 			Where(`"ss"."placement" = ?`, finding.PlacedAnybody).
 			Scan(ctx, &portable); err != nil {

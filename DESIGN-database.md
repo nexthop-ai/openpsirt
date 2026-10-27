@@ -520,7 +520,7 @@ Migration 44. No row moves. § Indexes says what each index serves,
 | `published_document` | A new table: one row per published document, holding the revision a reader is handed | Made by the release's statement, and stepped over where it is already there |
 | `upstream` | A new table: the upstream a product trusts, the key it confirmed, and how reading it went | Made by the release's statement, and stepped over where it is already there |
 | `upstream_document` | A new table: one row per document an upstream lists, at the revision last recorded | Made by the release's statement, and stepped over where it is already there |
-| `vex_statement` | Who here declined a statement and when, empty for every statement | Added where the table stands, and stepped over where it is already there |
+| `vex_statement`, v0.11.0's `received_vex_statement` | Who here declined a statement and when, empty for every statement | Added where the table stands, and stepped over where it is already there |
 
 | Check, on each of the four engines | What it holds |
 |---|---|
@@ -552,6 +552,8 @@ names.
 | `routing_rule` | `assignment_rule` |
 | `advisory_source` | `supplier_advisory_feed` |
 | `finding_tag` | `finding_label` |
+| `vex_statement` | `received_vex_statement` |
+| `vex_issuance` | `published_vex` |
 
 | Column | v0.11.0 name |
 |---|---|
