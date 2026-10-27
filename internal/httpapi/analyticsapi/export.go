@@ -44,7 +44,7 @@ func newStreamSlots(db *database.DB) streamSlots {
 }
 
 // take claims a slot, or refuses with a time to ask again. The release is
-// called once the branch or tag has finished writing.
+// called once the stream has finished writing.
 func (s streamSlots) take() (func(), error) {
 	select {
 	case s <- struct{}{}:

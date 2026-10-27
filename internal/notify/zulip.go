@@ -105,7 +105,7 @@ func (b *ZulipBot) Post(ctx context.Context, channel, topic string, n Note) erro
 		topic = defaultTopic
 	}
 	return b.send(ctx, url.Values{
-		"type": {"branch_or_tag"}, "to": {channel}, "topic": {topic}, "content": {zulipText(n)},
+		"type": {"stream"}, "to": {channel}, "topic": {topic}, "content": {zulipText(n)},
 	})
 }
 

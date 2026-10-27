@@ -164,7 +164,7 @@ func TestReadingPublicIsNotReadingPrivate(t *testing.T) {
 }
 
 // Each visibility is its own grant. Somebody working private reports holds
-// the undisclosed half and is not handed the disclosed branch or tag with it.
+// the undisclosed half and is not handed the disclosed stream with it.
 func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 	embargo := access.NewPerson(7, "embargo", false, map[int64][]access.Role{
 		4: {access.PrivateRead},

@@ -1057,7 +1057,7 @@ const (
 
 // properties reads one property bag. Every bag the document holds, read or
 // walked past, is refused with more members than the bound, as the reader's
-// branch or tag counts them.
+// stream counts them.
 func (rd *reader) properties(fn func(key string) error) error {
 	return rd.b.Object(fn)
 }

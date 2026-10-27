@@ -101,7 +101,7 @@ func SchemeOf(ecosystem string) Scheme {
 // without this a version nobody meant is a request for memory.
 //
 // Checked here rather than in the two schemes that need it, because the next
-// scheme added is the one where somebody forgets. The four that branch or tag are
+// scheme added is the one where somebody forgets. The four that stream are
 // unaffected by the check and would be unaffected by its absence.
 //
 // The bound is far above every real version and far below any size worth

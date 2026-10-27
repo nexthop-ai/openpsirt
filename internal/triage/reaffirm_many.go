@@ -489,7 +489,7 @@ func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirme
 // a second live decision where the later one already stands, or bring back a
 // decision somebody since took back.
 //
-// A decision made before the row stopped standing replaces nothing. Two branches and tags
+// A decision made before the row stopped standing replaces nothing. Two builds
 // at two versions hold sibling decisions at one occurrence, keyed apart by the
 // versions, and one lapsing leaves the other its own. Rows of one decision are
 // one decision and do not replace each other.

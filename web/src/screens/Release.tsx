@@ -23,7 +23,7 @@ import {
 
 // One release, gathered.
 //
-// A release is a flaw record, not a fifth summary page. What belongs here is
+// A release is a hand-off, not a fifth summary page. What belongs here is
 // everything handed over when a tag is cut — what changed since the last one,
 // what was said publicly, what a customer's own scanner reads, and the record
 // somebody audits — gathered in one place. A tag is not a branch, so it opens

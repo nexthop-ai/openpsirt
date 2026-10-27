@@ -379,8 +379,8 @@ func windowSaid(said WindowSaid) incident.WindowSaid {
 		out.From = &from
 	}
 	if said.LeadHours > 0 {
-		codeFinding := said.LeadHours
-		out.LeadHours = &codeFinding
+		lead := said.LeadHours
+		out.LeadHours = &lead
 	}
 	return out
 }

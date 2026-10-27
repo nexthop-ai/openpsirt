@@ -308,7 +308,7 @@ func decisionRollup(db bun.IDB, counted string) *bun.SelectQuery {
 // somebody's queue as work that is now late, and the whole value of the
 // warning is the time it leaves to do something else instead.
 func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) {
-	codeFinding, err := setting.NewStore(w.db).Duration(ctx,
+	lead, err := setting.NewStore(w.db).Duration(ctx,
 		setting.DeferralLead, setting.DefaultDeferralLead)
 	if err != nil {
 		return nil, fmt.Errorf("read how much warning a deferral gets: %w", err)
@@ -341,7 +341,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		Where(`"cl"."outcome" = ?`, triage.Deferred).
 		Where(`"cl"."deferred_until" IS NOT NULL`).
 		Where(`"cl"."deferred_until" > ?`, now).
-		Where(`"cl"."deferred_until" <= ?`, now.Add(codeFinding)).
+		Where(`"cl"."deferred_until" <= ?`, now.Add(lead)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which deferrals are running out: %w", err)

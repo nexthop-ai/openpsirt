@@ -23,7 +23,7 @@
 //   - a person whose display name is neither empty nor their identity
 //   - two variants, one reaching customers and one not, carrying different
 //     root component names
-//   - two branches and tags, a branch and a tag cut from it
+//   - a branch, and a tag cut from it
 //
 // A test asserting a count over the seeded world counts against the fixture
 // rather than against a literal, because the world has two of most things.
@@ -61,7 +61,7 @@ type Declared struct {
 	// name recapitalized, so a reader answering the display name where the
 	// address name is resolved fails immediately rather than passing.
 	Product *catalog.Product
-	// Branch and Tag are the two branches and tags. The tag's parent is the branch,
+	// Branch and Tag are a branch and a tag. The tag's parent is the branch,
 	// which is how a release compares against the line it was cut from.
 	Branch *catalog.BranchOrTag
 	Tag    *catalog.BranchOrTag

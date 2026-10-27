@@ -193,7 +193,7 @@ func TestZulipFindsPeopleAndSendsAsTheBot(t *testing.T) {
 	if forms[0].Get("type") != "direct" || forms[0].Get("to") != "[42]" {
 		t.Errorf("the direct message was sent as %v", forms[0])
 	}
-	if forms[1].Get("type") != "branch_or_tag" || forms[1].Get("to") != "security" ||
+	if forms[1].Get("type") != "stream" || forms[1].Get("to") != "security" ||
 		forms[1].Get("topic") != "OpenPSIRT" {
 		t.Errorf("the channel post was sent as %v", forms[1])
 	}

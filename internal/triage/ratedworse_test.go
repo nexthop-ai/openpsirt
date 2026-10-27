@@ -247,7 +247,7 @@ func TestAScanOfOneProductLapsesADecisionInAnother(t *testing.T) {
 }
 
 func TestASiblingDecisionAtAnotherVersionReplacesNothing(t *testing.T) {
-	// Two branches and tags at two versions hold sibling decisions at one occurrence, keyed
+	// Two builds at two versions hold sibling decisions at one occurrence, keyed
 	// apart by the versions. One lapsing leaves it the proposer's to
 	// re-affirm, whichever was made later.
 	each(t, func(t *testing.T, f *fixture) {

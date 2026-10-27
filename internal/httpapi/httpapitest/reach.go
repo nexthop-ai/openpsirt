@@ -389,7 +389,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		// somebody else, for the tests about what a recipient is told.
 		"private-dispatcher": {access.PublicTriage, access.PrivateTriage, access.Assigner},
 		// The undisclosed half alone: somebody working private reports
-		// who is not handed the disclosed branch or tag.
+		// who is not handed the disclosed stream.
 		"embargo-reader":  {access.PrivateRead},
 		"embargo-triager": {access.PrivateTriage},
 		// Reading the disclosed half and triaging the undisclosed one:

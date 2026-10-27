@@ -44,7 +44,7 @@ const (
 	Account Kind = "account"
 	// Team is a team declared or retired, or somebody put on one or taken off.
 	Team Kind = "team"
-	// AssignmentRule is a suppression rule that hands unheld work to a team,
+	// AssignmentRule is a standing rule that hands unheld work to a team,
 	// added or retired. Not a Role: a role is granted to a person against one
 	// product, and an assignment rule grants nobody anything — it decides who
 	// is asked.

@@ -560,7 +560,7 @@ func (s Subject) Holds(role Role, productID int64) bool {
 //
 // Each visibility is its own grant. Reading undisclosed findings does not
 // carry reading disclosed ones: somebody handling private reports is not
-// handed the public branch or tag as well, and somebody who wants both holds both.
+// handed the public stream as well, and somebody who wants both holds both.
 //
 // Triage implies reading at the same visibility: somebody who may decide about
 // a finding can necessarily see it, and a deployment that had to grant both

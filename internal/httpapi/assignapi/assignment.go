@@ -168,7 +168,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// triage.
 		//
 		// The same rule the component path states, asked in one place. Two
-		// spellings drift over which status a refused flaw record is, and
+		// spellings drift over which status a refused hand-off is, and
 		// answer a 404 on one route and a 422 on the other about the
 		// identical condition.
 		if err := mayHandOver(subject, product, input.Body.Person, input.Body.Team); err != nil {

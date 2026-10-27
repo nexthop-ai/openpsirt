@@ -333,7 +333,7 @@ waiting for review, what is being worked on, what stopped applying, then the
 trends, and the operational state at the foot. The trends answer a question
 asked occasionally, and they are also the slowest part of the page.
 
-The reader's own work code findings, then the shape of the estate. Assigned to them,
+The reader's own work leads, then the shape of the estate. Assigned to them,
 and decisions of theirs an approver sent back; then open at or above the floor,
 incidents where there are any, known exploited, pending their approval, and
 overdue. Led by the estate, home

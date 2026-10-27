@@ -83,7 +83,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 			return err
 		}
 		// Refused before anything is read, by the rule moveWhere holds, so a
-		// flaw record nobody may make is refused whether or not anything matches.
+		// hand-off nobody may make is refused whether or not anything matches.
 		if err := mayMove(subject, productID, to, dispatches); err != nil {
 			return err
 		}

@@ -264,7 +264,7 @@ func registerRegister(api huma.API, in core.Deps) {
 		// has is the more dangerous of the two: a file that claims to have
 		// left things out reads as complete about what remains.
 		store := finding.NewStore(in.DB.DB)
-		// Asked before a byte is written. Once the branch or tag has started the
+		// Asked before a byte is written. Once the stream has started the
 		// status is gone, so a refusal reaching it there can only be stated in
 		// the file, as an export that stopped early with a 200 in front of
 		// it.
@@ -296,7 +296,7 @@ func registerRegister(api huma.API, in core.Deps) {
 			// re-sorts the build's quarter of a million rows and skips past
 			// the ones already written — 52 minutes for a real build, against
 			// 1.9 seconds for one cursor over the same rows in the same order.
-			BranchOrTag: func(ctx context.Context, each func([]string) error) error {
+			Stream: func(ctx context.Context, each func([]string) error) error {
 				return store.RegisterEach(ctx, subject, build, input.narrow(),
 					func(row finding.Disposed) error {
 						body := disposedBody(ctx, in, row)

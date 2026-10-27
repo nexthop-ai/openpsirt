@@ -48,15 +48,15 @@ func (w *sweep) pastDisclosure(ctx context.Context, admins []int64) (map[int64][
 // them. In the application rather than by mail, because mail may not name an
 // undisclosed issue.
 func (w *sweep) approachingDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
-	codeFinding, err := setting.NewStore(w.db).Duration(ctx, setting.DisclosureLead,
+	lead, err := setting.NewStore(w.db).Duration(ctx, setting.DisclosureLead,
 		setting.DefaultDisclosureLead)
 	if err != nil {
 		return nil, fmt.Errorf("read how much warning to give: %w", err)
 	}
-	if codeFinding <= 0 {
-		codeFinding = setting.DefaultDisclosureLead
+	if lead <= 0 {
+		lead = setting.DefaultDisclosureLead
 	}
-	return w.disclosureWithin(ctx, admins, DisclosureNear, codeFinding)
+	return w.disclosureWithin(ctx, admins, DisclosureNear, lead)
 }
 
 // statementsRevised is every standing decision whose cited VEX statement has
@@ -169,7 +169,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 // from the map, was never reconciled, and their alert stood indefinitely with
 // nothing able to clear it. That alert names the issue and the product.
 func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
-	codeFinding time.Duration) (map[int64][]Holds, error) {
+	lead time.Duration) (map[int64][]Holds, error) {
 
 	var rows []struct {
 		Product         string    `bun:"product"`
@@ -188,12 +188,12 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		Where(`"f"."visibility" = ?`, access.Private).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."disclose_at" IS NOT NULL`).
-		Where(`"f"."disclose_at" <= ?`, time.Now().UTC().Add(codeFinding)).
+		Where(`"f"."disclose_at" <= ?`, time.Now().UTC().Add(lead)).
 		// With a lead time given this is the *coming* ones only: what has
 		// already arrived is the other condition, and one row raising both
 		// would be told twice about one thing.
 		Where(func() string {
-			if codeFinding > 0 {
+			if lead > 0 {
 				return `"f"."disclose_at" > ?`
 			}
 			return `"f"."disclose_at" <= ?`
@@ -238,7 +238,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 			row.Vulnerability+" in "+row.Product+" at "+row.Component+
 				" reached its disclosure date on "+
 				day(row.DiscloseAt)+" and nothing has been decided."
-		if codeFinding > 0 {
+		if lead > 0 {
 			about = "disclosure-near"
 			body = row.Vulnerability + " in " + row.Product + " at " + row.Component +
 				" discloses on " +

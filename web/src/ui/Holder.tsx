@@ -123,7 +123,7 @@ export function Holder({
 
   // Every row the arrows walk, in the order they are drawn. Nobody is one of
   // them: it is a choice like the others, and a row the keyboard could not
-  // reach was one somebody had to take a record as a flaw the keys for. A null stands
+  // reach was one somebody had to take a hand off the keys for. A null stands
   // for it, which is what choosing it sends.
   const rows: (Held | null)[] = [
     ...(you ? [you] : []),

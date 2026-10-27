@@ -83,7 +83,7 @@ func Notes(about Note, c *Comparison) string {
 	} else {
 		out.WriteString("## Security fixes\n")
 	}
-	codeFinding(&out, about)
+	lead(&out, about)
 	section(&out, fixed)
 	return out.String()
 }
@@ -166,12 +166,12 @@ func measuredWith(about Note) string {
 	return strings.ToUpper(line[:1]) + line[1:]
 }
 
-// codeFinding writes the line that makes the note re-checkable: which two builds, on
+// lead writes the line that makes the note re-checkable: which two builds, on
 // what day, measured against what.
 //
 // One line rather than a table, because it is prose somebody pastes into a
 // document of their own and a table there is somebody else's formatting.
-func codeFinding(out *strings.Builder, about Note) {
+func lead(out *strings.Builder, about Note) {
 	var said []string
 	if from := strings.TrimSpace(about.From); from != "" {
 		if to := strings.TrimSpace(about.To); to != "" {

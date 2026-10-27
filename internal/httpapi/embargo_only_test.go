@@ -11,7 +11,7 @@ import (
 )
 
 // Somebody working private reports holds the undisclosed half alone, and is
-// not handed the disclosed branch or tag with it. Each visibility is its own grant,
+// not handed the disclosed stream with it. Each visibility is its own grant,
 // and this is the identity the two private-only roles exist for.
 func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
