@@ -151,7 +151,7 @@ func TestASupplierThatCannotBeReachedDoesNotStopTheNext(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Wound back so the publisher's document is ahead of the mark.
-		if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
+		if _, err := f.db.DB.NewUpdate().Model((*supplier.Feed)(nil)).
 			Set(`"caught_up_to" = ?`, long).
 			Where(`"id" IN (?, ?)`, down.ID, up.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -171,7 +171,7 @@ func TestASupplierThatCannotBeReachedDoesNotStopTheNext(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		byName := map[string]supplier.Source{}
+		byName := map[string]supplier.Feed{}
 		for _, row := range rows {
 			if row.FetchedAt == nil {
 				t.Errorf("%q was never tried", row.Display)

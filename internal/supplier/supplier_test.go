@@ -340,7 +340,7 @@ func TestALaterMomentMovesTheDigestWithIt(t *testing.T) {
 			if err := c.record(row.ID, later, low); err != nil {
 				t.Fatal(err)
 			}
-			var held supplier.Source
+			var held supplier.Feed
 			if err := f.db.DB.NewSelect().Model(&held).Where(`"id" = ?`, row.ID).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}

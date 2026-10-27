@@ -15,8 +15,8 @@ import (
 )
 
 // rulesV0100 is, in a v0.10.0 database, a standing rule handing work to a
-// team.
-type rulesV0100 struct{ rule int64 }
+// team and a supplier whose advisories are read.
+type rulesV0100 struct{ rule, feed int64 }
 
 func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV0100 {
 	t.Helper()
@@ -49,6 +49,10 @@ func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV01
 	exec(`INSERT INTO "routing_rule" ("product_id", "team_id", "name", "ordinal", "upstream", "created_by",
 		"created_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, product, team, "curl to the curlers", 1, "curl", person, at)
 	out.rule = id(`SELECT MAX("id") FROM "routing_rule"`)
+	exec(`INSERT INTO "advisory_source" ("product_id", "name", "display_name", "url", "created_by", "created_at")
+		VALUES (?, ?, ?, ?, ?, ?)`, product, "examplelinux", "ExampleLinux",
+		"https://example.com/.well-known/csaf/provider-metadata.json", person, at)
+	out.feed = id(`SELECT MAX("id") FROM "advisory_source"`)
 	return out
 }
 
@@ -62,6 +66,8 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 	}{
 		{"the assignment rule", `SELECT COUNT(*) FROM "assignment_rule"
 			WHERE "id" = ? AND "name" = 'curl to the curlers' AND NOT "reports"`, w.rule},
+		{"the supplier advisory feed", `SELECT COUNT(*) FROM "supplier_advisory_feed"
+			WHERE "id" = ? AND "display_name" = 'ExampleLinux'`, w.feed},
 	} {
 		var n int
 		if err := db.DB.NewRaw(c.query, c.id).Scan(ctx, &n); err != nil {
@@ -73,7 +79,7 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 	}
 }
 
-// A v0.10.0 database holding a standing rule is upgraded, and every row reads
+// A v0.10.0 database holding a standing rule and a supplier is upgraded, and every row reads
 // back under v0.11.0's names in the shape the release declares.
 func TestAV0100DatabaseTakesTheV0110RuleNames(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -100,6 +106,9 @@ func TestAnUpgradeStoppedPartWayThroughTheRuleRenamesResumes(t *testing.T) {
 		{after: "routed_by"},
 		{after: "routing_rule_team_fk", servers: true},
 		{after: "routing_rule_order_idx"},
+		{after: "advisory_source"},
+		{after: "advisory_source_named_once", servers: true},
+		{after: "advisory_source_due_idx"},
 	} {
 		t.Run(stop.after, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

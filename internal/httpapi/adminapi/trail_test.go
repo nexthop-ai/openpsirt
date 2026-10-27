@@ -366,18 +366,18 @@ var administrativeActs = []trailedAct{
 		about: "outbound · pager · assigned",
 	},
 	{
-		id: "add-advisory-source", what: "a supplier to read advisories from",
+		id: "add-supplier-advisory-feed", what: "a supplier to read advisories from",
 		method: http.MethodPost, path: "/v1/products/mine/supplier-advisory-feeds",
 		body: `{"name":"ExampleLinux",` +
 			`"url":"https://supplier.example.test/.well-known/csaf/provider-metadata.json"}`,
-		kind: "setting", about: "advisory source · mine · ExampleLinux",
+		kind: "setting", about: "supplier advisory feed · mine · ExampleLinux",
 	},
 	{
-		id: "withdraw-advisory-source", what: "a supplier no longer read",
+		id: "withdraw-supplier-advisory-feed", what: "a supplier no longer read",
 		// Withdrawn in other capitals, which the match ignores; the row names
 		// the supplier as it was added.
 		method: http.MethodDelete, path: "/v1/products/mine/supplier-advisory-feeds/exampleLINUX",
-		kind: "setting", about: "advisory source · mine · ExampleLinux",
+		kind: "setting", about: "supplier advisory feed · mine · ExampleLinux",
 	},
 	{
 		id: "trust-upstream", what: "an upstream trusted", kind: "upstream", about: "upstream · mine",

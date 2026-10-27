@@ -19,8 +19,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// AdvisorySourceBody is one supplier this deployment reads advisories from.
-type AdvisorySourceBody struct {
+// SupplierAdvisoryFeedBody is one supplier this deployment reads advisories from.
+type SupplierAdvisoryFeedBody struct {
 	Name string `json:"name" doc:"The name this supplier is configured under"`
 	URL  string `json:"url" doc:"Where the supplier describes what they publish"`
 	// Tried, Read, CaughtUpTo and Because say whether it is working, which is
@@ -32,13 +32,13 @@ type AdvisorySourceBody struct {
 	Because    string `json:"because,omitempty" doc:"The reason the last attempt stopped, where one did"`
 }
 
-// registerAdvisorySources configures which suppliers this deployment reads
+// registerSupplierAdvisoryFeeds configures which suppliers this deployment reads
 // published advisories from.
-func registerAdvisorySources(api huma.API, in core.Deps) {
+func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 	const path = "/v1/products/{product}/supplier-advisory-feeds"
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-advisory-sources", Method: http.MethodGet, Path: path,
+		OperationID: "list-supplier-advisory-feeds", Method: http.MethodGet, Path: path,
 		Summary: "List supplier advisory feeds",
 		Description: "The suppliers configured for this product, when each was last " +
 			"tried, when one last succeeded, and how far through what they publish this " +
@@ -49,7 +49,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
-	}) (*core.ListOutput[AdvisorySourceBody], error) {
+	}) (*core.ListOutput[SupplierAdvisoryFeedBody], error) {
 		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
 		if err != nil {
 			return nil, err
@@ -61,10 +61,10 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 			// a fault in the log for a rule working exactly as written.
 			return nil, core.Asked(in.Logger, err)
 		}
-		out := &core.ListOutput[AdvisorySourceBody]{}
-		out.Body.Items = make([]AdvisorySourceBody, 0, len(rows))
+		out := &core.ListOutput[SupplierAdvisoryFeedBody]{}
+		out.Body.Items = make([]SupplierAdvisoryFeedBody, 0, len(rows))
 		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, AdvisorySourceBody{
+			out.Body.Items = append(out.Body.Items, SupplierAdvisoryFeedBody{
 				Name: row.Display, URL: row.URL, Tried: core.StampAt(row.FetchedAt),
 				Read: core.StampAt(row.ReachedAt), CaughtUpTo: core.StampAt(row.CaughtUpTo), Because: row.Failed,
 			})
@@ -73,7 +73,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "add-advisory-source", Method: http.MethodPost, Path: path,
+		OperationID: "add-supplier-advisory-feed", Method: http.MethodPost, Path: path,
 		Summary: "Add a supplier advisory feed",
 		Description: "Records a supplier whose published security advisories are read on " +
 			"the scan schedule. What they say arrives as evidence beside a finding and a " +
@@ -109,7 +109,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		}
 	}) (*struct {
 		Status int
-		Body   AdvisorySourceBody
+		Body   SupplierAdvisoryFeedBody
 	}, error) {
 		// Normalized here so the stored value is the address as it parses. The
 		// rule for what may be stored is the store's, where the rest of this
@@ -119,7 +119,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		if err == nil {
 			address = parsed.String()
 		}
-		var row *supplier.Source
+		var row *supplier.Feed
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename or a retirement
 			// committing between the two is what a retry reads.
@@ -142,7 +142,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 			// administrator reading the trail needs: which publisher this
 			// deployment started reading from.
 			if err := core.Noted(ctx, tx, trail.Setting,
-				"advisory source · "+product.Name+" · "+row.Display,
+				"supplier advisory feed · "+product.Name+" · "+row.Display,
 				nil, trail.Said(hostOf(row.URL), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
@@ -152,12 +152,12 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		}
 		return &struct {
 			Status int
-			Body   AdvisorySourceBody
-		}{Status: http.StatusCreated, Body: AdvisorySourceBody{Name: row.Display, URL: row.URL}}, nil
+			Body   SupplierAdvisoryFeedBody
+		}{Status: http.StatusCreated, Body: SupplierAdvisoryFeedBody{Name: row.Display, URL: row.URL}}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "withdraw-advisory-source", Method: http.MethodDelete,
+		OperationID: "withdraw-supplier-advisory-feed", Method: http.MethodDelete,
 		Path:    path + "/{name}",
 		Summary: "Remove a supplier advisory feed",
 		Description: "Stops reading a supplier. What they have already said stays " +
@@ -189,7 +189,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 			// Named as adding it was, from the row: the name is matched
 			// without regard to capitals, and the trail spells it one way.
 			if err := core.Noted(ctx, tx, trail.Setting,
-				"advisory source · "+product.Name+" · "+row.Display,
+				"supplier advisory feed · "+product.Name+" · "+row.Display,
 				trail.Said("in use", true), nil); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}

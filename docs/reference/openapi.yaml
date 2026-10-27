@@ -113,30 +113,6 @@ components:
         - product
         - vulnerability
       type: object
-    Add-advisory-sourceRequest:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/Add-advisory-sourceRequest.json
-          format: uri
-          readOnly: true
-          type: string
-        name:
-          description: The name this supplier is configured under
-          maxLength: 191
-          minLength: 1
-          type: string
-        url:
-          description: The address of the supplier's CSAF provider description
-          maxLength: 1000
-          minLength: 1
-          type: string
-      required:
-        - name
-        - url
-      type: object
     Add-assignment-ruleRequest:
       additionalProperties: false
       properties:
@@ -224,6 +200,30 @@ components:
       required:
         - name
         - kind
+      type: object
+    Add-supplier-advisory-feedRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Add-supplier-advisory-feedRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          description: The name this supplier is configured under
+          maxLength: 191
+          minLength: 1
+          type: string
+        url:
+          description: The address of the supplier's CSAF provider description
+          maxLength: 1000
+          minLength: 1
+          type: string
+      required:
+        - name
+        - url
       type: object
     AdvisoryBody:
       additionalProperties: false
@@ -365,38 +365,6 @@ components:
         - marked
         - changed
         - elsewhere
-      type: object
-    AdvisorySourceBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/AdvisorySourceBody.json
-          format: uri
-          readOnly: true
-          type: string
-        because:
-          description: The reason the last attempt stopped, where one did
-          type: string
-        caught_up_to:
-          description: The newest moment in what they list that has been read
-          type: string
-        name:
-          description: The name this supplier is configured under
-          type: string
-        read:
-          description: When a read of this supplier last succeeded
-          type: string
-        tried:
-          description: When this supplier was last tried
-          type: string
-        url:
-          description: Where the supplier describes what they publish
-          type: string
-      required:
-        - name
-        - url
       type: object
     AdvisoryTakenBody:
       additionalProperties: false
@@ -6794,28 +6762,6 @@ components:
       required:
         - items
       type: object
-    ListBodyAdvisorySourceBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyAdvisorySourceBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/AdvisorySourceBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
     ListBodyApprovalBody:
       additionalProperties: false
       properties:
@@ -7643,6 +7589,28 @@ components:
         items:
           items:
             type: string
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodySupplierAdvisoryFeedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodySupplierAdvisoryFeedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SupplierAdvisoryFeedBody"
           type:
             - array
             - "null"
@@ -13023,6 +12991,38 @@ components:
         - from
         - lacking
         - unanalyzed
+      type: object
+    SupplierAdvisoryFeedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/SupplierAdvisoryFeedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        because:
+          description: The reason the last attempt stopped, where one did
+          type: string
+        caught_up_to:
+          description: The newest moment in what they list that has been read
+          type: string
+        name:
+          description: The name this supplier is configured under
+          type: string
+        read:
+          description: When a read of this supplier last succeeded
+          type: string
+        tried:
+          description: When this supplier was last tried
+          type: string
+        url:
+          description: Where the supplier describes what they publish
+          type: string
+      required:
+        - name
+        - url
       type: object
     TLP:
       additionalProperties: false
@@ -30843,7 +30843,7 @@ paths:
         Two moments rather than one. An attempt that failed still happened, so how long a supplier has been unreachable is the gap between them; the reason the last attempt stopped is returned beside them.
 
         Requires: administrator
-      operationId: list-advisory-sources
+      operationId: list-supplier-advisory-feeds
       parameters:
         - in: path
           name: product
@@ -30855,7 +30855,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyAdvisorySourceBody"
+                $ref: "#/components/schemas/ListBodySupplierAdvisoryFeedBody"
           description: OK
         default:
           content:
@@ -30889,7 +30889,7 @@ paths:
         The address must be https and carry no user information. A product that is out of use takes no supplier.
 
         Requires: administrator
-      operationId: add-advisory-source
+      operationId: add-supplier-advisory-feed
       parameters:
         - in: path
           name: product
@@ -30900,14 +30900,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Add-advisory-sourceRequest"
+              $ref: "#/components/schemas/Add-supplier-advisory-feedRequest"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AdvisorySourceBody"
+                $ref: "#/components/schemas/SupplierAdvisoryFeedBody"
           description: Created
         default:
           content:
@@ -30928,7 +30928,7 @@ paths:
         The name is matched without regard to capitals. A name no supplier is configured under is refused with 404.
 
         Requires: administrator
-      operationId: withdraw-advisory-source
+      operationId: withdraw-supplier-advisory-feed
       parameters:
         - in: path
           name: product

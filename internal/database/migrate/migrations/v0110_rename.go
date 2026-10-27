@@ -46,6 +46,7 @@ var tablesRenamedV0110 = []tableRename{
 	{"obligation_window", "response_window"},
 	{"obligation_window_product", "response_window_product"},
 	{"routing_rule", "assignment_rule"},
+	{"advisory_source", "supplier_advisory_feed"},
 }
 
 // columnRename is a column's name before and after, on its table as v0.11.0
@@ -192,6 +193,12 @@ var namesRenamedV0110 = []nameRename{
 	{aForeignKey, "assignment_rule", "routing_rule_team_fk", "assignment_rule_team_fk"},
 	{aForeignKey, "assignment_rule", "routing_rule_by_fk", "assignment_rule_by_fk"},
 	{anIndex, "assignment_rule", "routing_rule_order_idx", "assignment_rule_order_idx"},
+
+	{aPrimaryKey, "supplier_advisory_feed", "advisory_source_pkey", "supplier_advisory_feed_pkey"},
+	{aUnique, "supplier_advisory_feed", "advisory_source_named_once", "supplier_advisory_feed_named_once"},
+	{aForeignKey, "supplier_advisory_feed", "advisory_source_product_fk", "supplier_advisory_feed_product_fk"},
+	{aForeignKey, "supplier_advisory_feed", "advisory_source_by_fk", "supplier_advisory_feed_by_fk"},
+	{anIndex, "supplier_advisory_feed", "advisory_source_due_idx", "supplier_advisory_feed_due_idx"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
@@ -270,6 +277,8 @@ func declaredV0110(t *columnTypes, table string) []string {
 		statements = obligationBaseline(t)
 	case "routing_rule":
 		statements = routingBaseline(t)
+	case "advisory_source":
+		statements = advisorySourceBaseline(t)
 	case "":
 		kept, ok := keptV0110[table]
 		if !ok {

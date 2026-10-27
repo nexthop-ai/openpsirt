@@ -350,7 +350,7 @@ func fetching(t *testing.T, f *ships, p *publisher) *supplier.Fetcher {
 var long = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // from is the source row for one publisher.
-func from(t *testing.T, f *ships, p *publisher) supplier.Source {
+func from(t *testing.T, f *ships, p *publisher) supplier.Feed {
 	t.Helper()
 	row, err := supplier.NewStore(f.db.DB).Add(t.Context(), f.by, f.product, "Example Linux",
 		p.described())
@@ -370,14 +370,14 @@ func from(t *testing.T, f *ships, p *publisher) supplier.Source {
 // passOver configures one publisher as a supplier, wound back so the documents
 // in a test are ahead of its mark, and a pass reading it through the test's
 // client.
-func passOver(t *testing.T, f *ships, p *publisher, replica string) (*supplier.Store, *supplier.Source, *supplier.Pass) {
+func passOver(t *testing.T, f *ships, p *publisher, replica string) (*supplier.Store, *supplier.Feed, *supplier.Pass) {
 	t.Helper()
 	store := supplier.NewStore(f.db.DB)
 	row, err := store.Add(t.Context(), f.by, f.product, "Example Linux", p.described())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
+	if _, err := f.db.DB.NewUpdate().Model((*supplier.Feed)(nil)).
 		Set(`"caught_up_to" = ?`, long).Where(`"id" = ?`, row.ID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}

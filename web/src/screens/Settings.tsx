@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { notACredential } from "../ui/noautofill";
-import { AdvisorySources } from "./AdvisorySources";
+import { SupplierAdvisoryFeeds } from "./SupplierAdvisoryFeeds";
 import { Webhooks } from "./Webhooks";
 import { ChatChannels } from "./ChatChannels";
 import { useId, useState } from "react";
@@ -89,7 +89,7 @@ export function Settings({ who }: { who: Who }) {
       ) : tab === "chat" ? (
         <ChatChannels platforms={who.chat?.platforms ?? []} />
       ) : tab === "suppliers" ? (
-        <AdvisorySources />
+        <SupplierAdvisoryFeeds />
       ) : (
         <section className="settinggroup">
           {note && <p className="hint settingnote">{note}</p>}

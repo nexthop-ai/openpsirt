@@ -28,7 +28,7 @@ import { since } from "../ui/when";
 // endpoint behind it refuses anybody else, so drawn for an auditor it would be
 // a table that could only fail to load.
 
-type Source = Body<"AdvisorySourceBody">;
+type Feed = Body<"SupplierAdvisoryFeedBody">;
 
 // Publishers whose CSAF provider directory is public, offered as a fill for
 // the form rather than configured: which product reads a publisher is still
@@ -69,15 +69,15 @@ export const KNOWN_SUPPLIERS = [
 
 // Whether a well-known publisher is already configured on the product, by
 // either the name it would be added under or the address it is read from.
-function configured(known: { name: string; url: string }, rows: readonly Source[]) {
+function configured(known: { name: string; url: string }, rows: readonly Feed[]) {
   return rows.some((row) => (row.name ?? "").toLowerCase() === known.name || row.url === known.url);
 }
 
 // The suppliers configured against one product. Asked only once a product is
 // chosen, because the endpoint is per product and there is no list across them.
-function useSources(product: string) {
+function useFeeds(product: string) {
   return useQuery({
-    queryKey: ["advisory-sources", product],
+    queryKey: ["supplier-advisory-feeds", product],
     enabled: product !== "",
     queryFn: async () =>
       unwrap(
@@ -94,7 +94,7 @@ function useSources(product: string) {
 // gap between them is the whole answer to "how long has this been broken". Drawn
 // from the successful read, so a publisher that has been refusing for a week
 // says a week rather than saying it failed three hours ago.
-function Read({ row }: { row: Source }) {
+function Read({ row }: { row: Feed }) {
   if (row.because) {
     return (
       <span className="state bad" title={row.because}>
@@ -106,7 +106,7 @@ function Read({ row }: { row: Source }) {
   return <>{since(row.read)}</>;
 }
 
-export function AdvisorySources() {
+export function SupplierAdvisoryFeeds() {
   const queries = useQueryClient();
   const [product, setProduct] = useState("");
   const [adding, setAdding] = useState(false);
@@ -114,7 +114,7 @@ export function AdvisorySources() {
   const [url, setUrl] = useState("");
 
   const products = useProducts();
-  const sources = useSources(product);
+  const feeds = useFeeds(product);
 
   const add = useMutation({
     mutationFn: async (body: { name: string; url: string }) =>
@@ -128,7 +128,7 @@ export function AdvisorySources() {
       setName("");
       setUrl("");
       setAdding(false);
-      void queries.invalidateQueries({ queryKey: ["advisory-sources", product] });
+      void queries.invalidateQueries({ queryKey: ["supplier-advisory-feeds", product] });
     },
   });
   const withdraw = useMutation({
@@ -138,11 +138,12 @@ export function AdvisorySources() {
           params: { path: { product, name: which } },
         }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["advisory-sources", product] }),
+    onSuccess: () =>
+      void queries.invalidateQueries({ queryKey: ["supplier-advisory-feeds", product] }),
   });
 
   const known = products.data?.items ?? [];
-  const rows = sources.data?.items ?? [];
+  const rows = feeds.data?.items ?? [];
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -174,26 +175,26 @@ export function AdvisorySources() {
 
       {product !== "" && (
         <div className="screen-head" style={{ marginTop: 16 }}>
-          <h4 style={{ margin: 0 }} title="Read on the scan schedule">
-            Fetched automatically
+          <h4 style={{ margin: 0 }} title="Fetched automatically, on the scan schedule">
+            Supplier advisory feeds
           </h4>
-          <AddButton label="Add supplier" onClick={() => setAdding(true)} />
+          <AddButton label="Add feed" onClick={() => setAdding(true)} />
         </div>
       )}
       {withdraw.error != null && (
-        <Failed error={withdraw.error} what="That supplier could not be withdrawn." />
+        <Failed error={withdraw.error} what="That feed could not be withdrawn." />
       )}
       {product === "" && products.isError ? (
         <Failed error={products.error} what="The products could not be read." />
       ) : product === "" ? (
-        <Empty title="Pick a product" detail="Suppliers are set up per product." />
-      ) : sources.isPending ? (
+        <Empty title="Pick a product" detail="Feeds are set up per product." />
+      ) : feeds.isPending ? (
         <Loading />
-      ) : sources.isError ? (
-        <Failed error={sources.error} what="The suppliers could not be read." />
+      ) : feeds.isError ? (
+        <Failed error={feeds.error} what="The feeds could not be read." />
       ) : rows.length === 0 ? (
         <Empty
-          title="No suppliers"
+          title="No feeds"
           detail="Add one by its CSAF provider directory, or upload a document below."
         />
       ) : (
@@ -238,13 +239,13 @@ export function AdvisorySources() {
       {product !== "" && <Upload product={product} />}
 
       <Declare
-        title="Add supplier"
+        title="Add supplier advisory feed"
         open={adding}
         onClose={() => setAdding(false)}
         onSubmit={() => add.mutate({ name: name.trim(), url: url.trim() })}
         error={add.error}
         busy={name.trim() === "" || url.trim() === "" || add.isPending}
-        ok="Add supplier"
+        ok="Add feed"
         hint="https only, on the host the address names. A redirect is refused rather than followed."
       >
         <div className="field">

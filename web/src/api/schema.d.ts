@@ -5611,7 +5611,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        get: operations["list-advisory-sources"];
+        get: operations["list-supplier-advisory-feeds"];
         put?: never;
         /**
          * Add a supplier advisory feed
@@ -5635,7 +5635,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        post: operations["add-advisory-source"];
+        post: operations["add-supplier-advisory-feed"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5660,7 +5660,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        delete: operations["withdraw-advisory-source"];
+        delete: operations["withdraw-supplier-advisory-feed"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7137,18 +7137,6 @@ export interface components {
             /** @description The identifier the issue is filed under */
             vulnerability: string;
         };
-        "Add-advisory-sourceRequest": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Add-advisory-sourceRequest.json
-             */
-            readonly $schema?: string;
-            /** @description The name this supplier is configured under */
-            name: string;
-            /** @description The address of the supplier's CSAF provider description */
-            url: string;
-        };
         "Add-assignment-ruleRequest": {
             /**
              * Format: uri
@@ -7194,6 +7182,18 @@ export interface components {
             topic?: string;
             /** @description A webhook's address. https only */
             url?: string;
+        };
+        "Add-supplier-advisory-feedRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Add-supplier-advisory-feedRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The name this supplier is configured under */
+            name: string;
+            /** @description The address of the supplier's CSAF provider description */
+            url: string;
         };
         AdvisoryBody: {
             /**
@@ -7277,26 +7277,6 @@ export interface components {
             stream: string;
             variant: string;
             vulnerability: string;
-        };
-        AdvisorySourceBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/AdvisorySourceBody.json
-             */
-            readonly $schema?: string;
-            /** @description The reason the last attempt stopped, where one did */
-            because?: string;
-            /** @description The newest moment in what they list that has been read */
-            caught_up_to?: string;
-            /** @description The name this supplier is configured under */
-            name: string;
-            /** @description When a read of this supplier last succeeded */
-            read?: string;
-            /** @description When this supplier was last tried */
-            tried?: string;
-            /** @description Where the supplier describes what they publish */
-            url: string;
         };
         AdvisoryTakenBody: {
             /**
@@ -10960,17 +10940,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyAdvisorySourceBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyAdvisorySourceBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["AdvisorySourceBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyApprovalBody: {
             /**
              * Format: uri
@@ -11386,6 +11355,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: string[] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodySupplierAdvisoryFeedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodySupplierAdvisoryFeedBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SupplierAdvisoryFeedBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -14488,6 +14468,26 @@ export interface components {
             namespace?: string;
             /** @description The builds holding the component that the lead's series never analyzed */
             unanalyzed: components["schemas"]["LeadBuild"][] | null;
+        };
+        SupplierAdvisoryFeedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/SupplierAdvisoryFeedBody.json
+             */
+            readonly $schema?: string;
+            /** @description The reason the last attempt stopped, where one did */
+            because?: string;
+            /** @description The newest moment in what they list that has been read */
+            caught_up_to?: string;
+            /** @description The name this supplier is configured under */
+            name: string;
+            /** @description When a read of this supplier last succeeded */
+            read?: string;
+            /** @description When this supplier was last tried */
+            tried?: string;
+            /** @description Where the supplier describes what they publish */
+            url: string;
         };
         TLP: {
             label: string;
@@ -24247,7 +24247,7 @@ export interface operations {
             };
         };
     };
-    "list-advisory-sources": {
+    "list-supplier-advisory-feeds": {
         parameters: {
             query?: never;
             header?: never;
@@ -24264,7 +24264,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyAdvisorySourceBody"];
+                    "application/json": components["schemas"]["ListBodySupplierAdvisoryFeedBody"];
                 };
             };
             /** @description Error */
@@ -24278,7 +24278,7 @@ export interface operations {
             };
         };
     };
-    "add-advisory-source": {
+    "add-supplier-advisory-feed": {
         parameters: {
             query?: never;
             header?: never;
@@ -24289,7 +24289,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Add-advisory-sourceRequest"];
+                "application/json": components["schemas"]["Add-supplier-advisory-feedRequest"];
             };
         };
         responses: {
@@ -24299,7 +24299,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdvisorySourceBody"];
+                    "application/json": components["schemas"]["SupplierAdvisoryFeedBody"];
                 };
             };
             /** @description Error */
@@ -24313,7 +24313,7 @@ export interface operations {
             };
         };
     };
-    "withdraw-advisory-source": {
+    "withdraw-supplier-advisory-feed": {
         parameters: {
             query?: never;
             header?: never;

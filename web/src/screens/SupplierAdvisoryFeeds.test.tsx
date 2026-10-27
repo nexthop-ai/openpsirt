@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AdvisorySources, KNOWN_SUPPLIERS } from "./AdvisorySources";
+import { SupplierAdvisoryFeeds, KNOWN_SUPPLIERS } from "./SupplierAdvisoryFeeds";
 import { api } from "../api/client";
 import { screen, serve, settle, mounted } from "../test/mount";
 
@@ -21,7 +21,7 @@ async function adding(already: { name: string; url: string }[]) {
     }
     return { data: { items: [], total: 0 } };
   });
-  mount.render(screen(<AdvisorySources />, "/settings/suppliers"));
+  mount.render(screen(<SupplierAdvisoryFeeds />, "/settings/suppliers"));
   await settle();
   const select = mount.host().querySelector<HTMLSelectElement>("select[aria-label=Product]");
   if (!select) throw new Error("no product list");
@@ -32,7 +32,7 @@ async function adding(already: { name: string; url: string }[]) {
   });
   await settle();
   const open = Array.from(document.querySelectorAll("button")).find(
-    (each) => each.textContent?.trim() === "Add supplier",
+    (each) => each.textContent?.trim() === "Add feed",
   );
   act(() => open?.click());
   await settle();

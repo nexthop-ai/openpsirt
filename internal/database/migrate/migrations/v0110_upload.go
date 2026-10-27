@@ -41,7 +41,7 @@ func documentUploadV0110(t *columnTypes) []string {
 			-- Who uploaded it, spelled as a scan's sender is, or the feed
 			-- that fetched it. One of the two, never both.
 			"credential"         ` + t.name + ` NULL,
-			"advisory_source_id" ` + t.refNull + ` NULL,
+			"supplier_advisory_feed_id" ` + t.refNull + ` NULL,
 			"received_at"        ` + t.timestamp + ` NOT NULL,
 			-- Completed or refused, and what the sender was told where it was
 			-- refused.
@@ -53,14 +53,14 @@ func documentUploadV0110(t *columnTypes) []string {
 			"superseded"         INTEGER NOT NULL,
 			CONSTRAINT "document_upload_product_fk" FOREIGN KEY ("product_id")
 				REFERENCES "product"("id"),
-			CONSTRAINT "document_upload_feed_fk" FOREIGN KEY ("advisory_source_id")
-				REFERENCES "advisory_source"("id")
+			CONSTRAINT "document_upload_feed_fk" FOREIGN KEY ("supplier_advisory_feed_id")
+				REFERENCES "supplier_advisory_feed"("id")
 		)` + t.suffix,
 		// A product's uploads of one kind, newest first, which is the list.
 		`CREATE INDEX "document_upload_list_idx" ON "document_upload"
 			("product_id", "source", "received_at")`,
 		// What a feed fetched, for the foreign key.
-		`CREATE INDEX "document_upload_feed_idx" ON "document_upload" ("advisory_source_id")`,
+		`CREATE INDEX "document_upload_feed_idx" ON "document_upload" ("supplier_advisory_feed_id")`,
 	}
 }
 

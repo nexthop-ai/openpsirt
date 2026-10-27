@@ -81,7 +81,7 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, limits sbom.Limits
 // Run reads until the context ends.
 //
 // Started whatever is configured and doing nothing where nothing is: the
-// sources are read each cycle, so naming a supplier takes effect without a
+// feeds are read each cycle, so naming a supplier takes effect without a
 // redeploy and — which matters more — so does withdrawing one. An operator who
 // decides that a publisher should no longer be read should not have to redeploy
 // to stop it.
@@ -135,12 +135,12 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 	// The deployment itself rather than anybody in it. Nobody is behind a
 	// background cycle, and what this asks for is the list of suppliers it is
 	// about to work through.
-	sources, err := NewStore(p.db).Due(ctx,
+	feeds, err := NewStore(p.db).Due(ctx,
 		access.Everything("fetching what suppliers publish"), p.now().Add(-every))
 	if err != nil {
 		return took, err
 	}
-	for _, source := range sources {
+	for _, feed := range feeds {
 		if ctx.Err() != nil {
 			return took, nil
 		}
@@ -154,7 +154,7 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 		case !mine:
 			return took, nil
 		}
-		one, err := p.from(ctx, source)
+		one, err := p.from(ctx, feed)
 		took.Documents += one.Documents
 		took.Recorded += one.Recorded
 		took.Skipped += one.Skipped
@@ -166,15 +166,15 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 			// disagreeing reads as healthy otherwise: every fetch succeeds and
 			// the documents are stepped over one at a time.
 			p.logger.Warn("documents did not match the digests their publisher serves",
-				"supplier", source.Display, "documents", one.Mismatched)
+				"supplier", feed.Display, "documents", one.Mismatched)
 		}
 		if err != nil {
-			// Recorded against the source and carried on. One publisher
+			// Recorded against the feed and carried on. One publisher
 			// unreachable says nothing about the next, and a pass that stopped
 			// at the first would leave every supplier after it unread for as
 			// long as that one stayed down.
 			p.logger.Warn("a supplier could not be read",
-				"supplier", source.Display, "error", err)
+				"supplier", feed.Display, "error", err)
 		}
 	}
 	return took, nil
@@ -191,8 +191,8 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 // the interval. The bound is per wake and the interval is a day, so a publisher
 // issuing more in a day than one pass takes would otherwise fall further behind
 // every day and never catch up.
-func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
-	took, err := p.fetch.From(ctx, recordedAs(source), source)
+func (p *Pass) from(ctx context.Context, feed Feed) (Taken, error) {
+	took, err := p.fetch.From(ctx, recordedAs(feed), feed)
 	store := NewStore(p.db)
 	// A pass cut short by shutdown is neither finished nor a failure of the
 	// publisher: the mark moves and the supplier stays due, the way it does
@@ -213,19 +213,19 @@ func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
 			took.Barred, took.BarredBy)
 	}
 	if cut || (took.Filled && err == nil) {
-		if marked := store.CaughtUp(ctx, source.ID, took.CaughtUpTo, took.Mark,
+		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark,
 			barred); marked != nil {
 			p.logger.Error("recording how far a supplier was read",
-				"supplier", source.Display, "error", marked)
+				"supplier", feed.Display, "error", marked)
 		}
 		return took, barred
 	}
 	if err == nil {
 		err = barred
 	}
-	if marked := store.Reached(ctx, source.ID, took.CaughtUpTo, took.Mark, err); marked != nil {
+	if marked := store.Reached(ctx, feed.ID, took.CaughtUpTo, took.Mark, err); marked != nil {
 		p.logger.Error("recording what came back from a supplier",
-			"supplier", source.Display, "error", marked)
+			"supplier", feed.Display, "error", marked)
 	}
 	return took, err
 }
@@ -240,8 +240,8 @@ func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
 // It holds nothing: what it is used for is the column saying who brought a
 // claim in, and every rule about who may read that claim is asked of the
 // reader.
-func recordedAs(source Source) access.Subject {
-	return access.Subject{Kind: access.Person, ID: source.CreatedBy, Identity: source.Display}
+func recordedAs(feed Feed) access.Subject {
+	return access.Subject{Kind: access.Person, ID: feed.CreatedBy, Identity: feed.Display}
 }
 
 // fetching reports whether this replica is the one that reaches out.
