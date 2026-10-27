@@ -535,11 +535,9 @@ is 21 to 29 MB beside a 306 MB table.
 Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
 says what a report's case holds.
 
-It renames the triage and incident records, the standing rules and the supplier advisory
-feeds first, so
-the rest of it and the release's declarations are written
-against the new
-names.
+It renames the triage and incident records, the standing rules, the supplier
+advisory feeds, the finding labels and the VEX tables first, so the rest of it
+and the release's declarations are written against the new names.
 
 | v0.10.0 table | v0.11.0 table |
 |---|---|
@@ -641,7 +639,7 @@ stored values, and the changes after them.
 | A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
 | A v0.10.0 database holding an incident, a release carrying its fix, a notice outside, a window counted from another and limited to a product, and a finding the incident ranks first | Upgraded, each row read back under its v0.11.0 name pointing where it did, each renamed table's declaration describing the table built, and a window declared after it numbered after the rows it had |
 | The same two, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
-| A v0.10.0 database holding a standing rule and a supplier, upgraded whole and stopped after each of their renames | The rule read back as an assignment rule placing findings and the supplier as a supplier advisory feed, and each renamed table's declaration describing the table built |
+| A v0.10.0 database holding a routing rule and a supplier, upgraded whole and stopped after each of their renames | The rule read back as an assignment rule placing findings and the supplier as a supplier advisory feed, and each renamed table's declaration describing the table built |
 | A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
 | A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a failed job, a kept filter naming the renamed words, the bulk action limit and a change on the trail of the renamed kind | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
 | The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, a job's state, a change's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |

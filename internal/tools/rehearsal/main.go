@@ -258,7 +258,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	// An upgrade of an empty database passes every check here, so a seed
 	// that filled nothing is a failed rehearsal rather than a clean one.
 	var empty []string
-	for _, table := range []string{"finding", "decision", "decision_occurrence", "vex_statement", "flaw_report"} {
+	for _, table := range []string{"finding", "decision", "decision_occurrence", "received_vex_statement", "flaw_report"} {
 		if held[table] == 0 {
 			empty = append(empty, table)
 		}

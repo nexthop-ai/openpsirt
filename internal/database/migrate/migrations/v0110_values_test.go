@@ -138,7 +138,7 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 			WHERE "about" = 'Obligation window Early warning'`, 2},
 		{"a job that ran out of attempts", `SELECT COUNT(*) FROM "job"
 			WHERE "state" = 'failed' AND "reference" = 'target:dead'`, 1},
-		{"a job that finished", `SELECT COUNT(*) FROM "job" WHERE "state" = 'done'`, 1},
+		{"the jobs that finished", `SELECT COUNT(*) FROM "job" WHERE "state" = 'done'`, 3},
 		{"a job of the v0.10.0 state", `SELECT COUNT(*) FROM "job" WHERE "state" = 'dead'`, 0},
 		{"the limit under its new name", `SELECT COUNT(*) FROM "application_setting"
 			WHERE "name" = 'triage.bulk-decision-cap' AND "value" = '250'`, 1},
