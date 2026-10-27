@@ -442,7 +442,7 @@ func TestReportsSittingInATeamQueueAreToldToTheMembersWhoReadReports(t *testing.
 		for i, judged := range []bool{false, false, true} {
 			row := &finding.FlawReport{
 				Reference: fmt.Sprintf("SONIC-R-2026-00000%d", i), ProductID: s.product,
-				Summary: "A claim.", RecordedBy: admin, RecordedAt: now,
+				ReportedProblem: "A claim.", RecordedBy: admin, RecordedAt: now,
 				AssignedTo: &queue.PartyID, AssignedAt: &routed,
 			}
 			if judged {

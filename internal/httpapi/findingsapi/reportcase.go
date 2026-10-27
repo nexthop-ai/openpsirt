@@ -20,26 +20,26 @@ import (
 
 // ReportEditBody is what a report says after an edit.
 type ReportEditBody struct {
-	Title      string `json:"title,omitempty" maxLength:"191" doc:"A line naming the claim. Empty clears it"`
-	Summary    string `json:"summary" maxLength:"65536" doc:"What was claimed, as markdown. Required"`
-	ReportedBy string `json:"reported_by,omitempty" maxLength:"191" doc:"The reporter, as they gave their name. Empty clears it"`
-	Contact    string `json:"contact,omitempty" maxLength:"191" doc:"The address to reach them at. Empty clears it"`
-	Credit     string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory"`
-	Received   string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD. Empty clears it"`
+	Title           string `json:"title,omitempty" maxLength:"191" doc:"A line naming the reported problem. Empty clears it"`
+	ReportedProblem string `json:"reported_problem" maxLength:"65536" doc:"The reported problem, as markdown. Required"`
+	ReportedBy      string `json:"reported_by,omitempty" maxLength:"191" doc:"The reporter, as they gave their name. Empty clears it"`
+	Contact         string `json:"contact,omitempty" maxLength:"191" doc:"The address to reach them at. Empty clears it"`
+	Credit          string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory"`
+	Received        string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD. Empty clears it"`
 }
 
 // ReportRevisionBody is what a report said before one edit replaced it.
 type ReportRevisionBody struct {
-	Version        int    `json:"version" doc:"The version number, counting from one. Version one is the report as it was recorded"`
-	Title          string `json:"title,omitempty" doc:"The line naming the claim"`
-	Summary        string `json:"summary,omitempty" doc:"What was claimed, as markdown"`
-	ReportedBy     string `json:"reported_by,omitempty" doc:"The reporter, as they gave their name"`
-	Contact        string `json:"contact,omitempty" doc:"The address to reach them at"`
-	Credit         string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
-	Received       string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD"`
-	ReplacedBy     string `json:"replaced_by" doc:"The person whose edit replaced it, by sign-in identity"`
-	ReplacedByName string `json:"replaced_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	ReplacedAt     string `json:"replaced_at" doc:"The moment it stopped saying that"`
+	Version         int    `json:"version" doc:"The version number, counting from one. Version one is the report as it was recorded"`
+	Title           string `json:"title,omitempty" doc:"The line naming the reported problem"`
+	ReportedProblem string `json:"reported_problem,omitempty" doc:"The reported problem, as markdown"`
+	ReportedBy      string `json:"reported_by,omitempty" doc:"The reporter, as they gave their name"`
+	Contact         string `json:"contact,omitempty" doc:"The address to reach them at"`
+	Credit          string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
+	Received        string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD"`
+	ReplacedBy      string `json:"replaced_by" doc:"The person whose edit replaced it, by sign-in identity"`
+	ReplacedByName  string `json:"replaced_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	ReplacedAt      string `json:"replaced_at" doc:"The moment it stopped saying that"`
 }
 
 // MessageDirection is which way a message went.
@@ -113,9 +113,9 @@ func registerReportCase(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "edit-report", Method: http.MethodPut, Path: one,
 		Summary: "Edit a vulnerability report",
-		Description: "Replaces the title, the claim and what is recorded about the reporter. " +
+		Description: "Replaces the title, the reported problem and what is recorded about the reporter. " +
 			"Every field is the whole new value, and one left empty is cleared, apart from " +
-			"`summary`, which is required.\n\n" +
+			"`reported_problem`, which is required.\n\n" +
 			"What it said before is kept, and read back from its revisions, the original " +
 			"first. An edit that changes nothing keeps nothing.\n\n" +
 			"Refused with 422 once the report has been judged, or while a ruling over it " +
@@ -133,7 +133,7 @@ func registerReportCase(api huma.API, in core.Deps) {
 		}
 		row, err := finding.NewStore(in.DB.DB).Revise(ctx, subject, product.ID, input.Reference,
 			finding.Rewritten{
-				Title: input.Body.Title, Summary: input.Body.Summary,
+				Title: input.Body.Title, ReportedProblem: input.Body.ReportedProblem,
 				ReportedBy: input.Body.ReportedBy, Contact: input.Body.Contact,
 				Credit: input.Body.Credit, Received: input.Body.Received,
 			})
@@ -178,7 +178,7 @@ func registerReportCase(api huma.API, in core.Deps) {
 		out.Body.Items = make([]ReportRevisionBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, ReportRevisionBody{
-				Version: row.Ordinal, Title: row.Title, Summary: row.Summary,
+				Version: row.Ordinal, Title: row.Title, ReportedProblem: row.ReportedProblem,
 				ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
 				Received:   core.DayOf(row.ReceivedOn),
 				ReplacedBy: who.Identity(row.ReplacedBy), ReplacedByName: who.Label(row.ReplacedBy),
@@ -318,7 +318,7 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 			"The message is told to the report's audience: whoever holds it, the members of " +
 			"the team whose queue it is in who read reports, or everybody who works reports " +
 			"here where nobody holds it. Whoever records it is not told.\n\n" +
-			"The text is markdown and goes through the policy a report's claim does; a 422 " +
+			"The text is markdown and goes through the policy a reported problem does; a 422 " +
 			"names the line and the offending text. Attach a file that came with it to the " +
 			"report and refer to it here.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,

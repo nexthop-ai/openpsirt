@@ -13,9 +13,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
+func TestAReportIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 	// The whole of what a report is for, over the routes somebody uses. A
-	// claim arrives, it is written down as it stands, somebody replies to
+	// report arrives, it is written down as it stands, somebody replies to
 	// whoever sent it, and only afterwards does anybody say what it turned
 	// out to be.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -23,31 +23,31 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 		arrived := time.Now().UTC().AddDate(0, 0, -3).Format(time.DateOnly)
 
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
-			`{"summary":"The management socket answers before anyone has authenticated.",`+
+			`{"reported_problem":"The management socket answers before anyone has authenticated.",`+
 				`"reported_by":"A. Researcher","contact":"a@example.org",`+
 				`"credit":"anonymous","received":"`+arrived+`"}`)
 		if got.Code != http.StatusCreated {
-			t.Fatalf("recording a claim answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("recording a report answered %d: %s", got.Code, got.Body.String())
 		}
 		var recorded httpapitest.ReportRead
 		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
 			t.Fatal(err)
 		}
 		if recorded.Reference == "" {
-			t.Fatal("a recorded claim came back with no reference")
+			t.Fatal("a recorded report came back with no reference")
 		}
 		if recorded.Issue != "" {
-			t.Errorf("a claim nobody judged came back as issue %q", recorded.Issue)
+			t.Errorf("a report nobody judged came back as issue %q", recorded.Issue)
 		}
 
 		at := "/v1/products/mine/reports/" + recorded.Reference
 		var one httpapitest.ReportRead
 		httpapitest.Read(t, r, "private-triage", at, &one)
-		if one.Summary != recorded.Summary || one.Received != arrived {
-			t.Errorf("the claim reads as %+v", one)
+		if one.ReportedProblem != recorded.ReportedProblem || one.Received != arrived {
+			t.Errorf("the report reads as %+v", one)
 		}
 		if one.Evaluated != "" {
-			t.Error("a claim nobody judged says when it was judged")
+			t.Error("a report nobody judged says when it was judged")
 		}
 
 		// It is in the product's list, which is what somebody works through.
@@ -63,13 +63,13 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 
 		// Nobody has answered them, which is a condition rather than an
 		// event: what is wrong is that nothing has happened. Named by the
-		// reference, because a claim nobody has judged has no identifier.
+		// reference, because a report nobody has judged has no identifier.
 		waiting := r.Alerts(t, "private-triage", "unanswered-report")
 		if len(waiting) != 1 {
-			t.Fatalf("an unanswered claim raised %d notices: %v", len(waiting), waiting)
+			t.Fatalf("an unanswered report raised %d notices: %v", len(waiting), waiting)
 		}
 		if !strings.Contains(waiting[0], recorded.Reference) {
-			t.Errorf("the notice does not name the claim: %q", waiting[0])
+			t.Errorf("the notice does not name the report: %q", waiting[0])
 		}
 		if told := r.Alerts(t, "triager", "unanswered-report"); len(told) != 0 {
 			t.Errorf("somebody who triages only announced work was told: %v", told)
@@ -84,12 +84,12 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 			t.Errorf("acknowledging recorded %q by %q", one.Acknowledged, one.AcknowledgedBy)
 		}
 		if still := r.Alerts(t, "private-triage", "unanswered-report"); len(still) != 0 {
-			t.Errorf("an answered claim is still reported as unanswered: %v", still)
+			t.Errorf("an answered report is still reported as unanswered: %v", still)
 		}
 
 		// And then somebody says what it turned out to be: an issue a scan
 		// already reported. A flaw recorded here carries its own report, so
-		// a claim about one of those is a duplicate rather than its record.
+		// a report about one of those is a duplicate rather than its record.
 		minted := "CVE-2026-9999"
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut, at+"/issue",
 			`{"vulnerability":"`+minted+`"}`); got.Code != http.StatusOK {
@@ -97,14 +97,14 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "private-triage", at, &one)
 		if one.Issue != minted {
-			t.Errorf("the claim points at %q, want %q", one.Issue, minted)
+			t.Errorf("the report points at %q, want %q", one.Issue, minted)
 		}
 		if one.Evaluated == "" || one.EvaluatedBy != "private-triage" {
 			t.Errorf("judging recorded %q by %q", one.Evaluated, one.EvaluatedBy)
 		}
 
 		// And it is the issue's report now, reachable at the route that was
-		// always there. One row, two ways in — a claim that decoupled and
+		// always there. One row, two ways in — a report that decoupled and
 		// was then judged must not be the one report the issue screen
 		// cannot find.
 		var byIssue httpapitest.ReportRead
@@ -115,7 +115,7 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 				byIssue.Reference, recorded.Reference)
 		}
 
-		// Judging twice is refused, and so is a second claim at one issue.
+		// Judging twice is refused, and so is a second report at one issue.
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut, at+"/issue",
 			`{"vulnerability":"`+minted+`"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("judging twice answered %d: %s", got.Code, got.Body.String())
@@ -123,8 +123,8 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 	})
 }
 
-func TestAClaimNobodyHasJudgedIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
-	// The matrix over the routes: a claim has no issue to be public about and
+func TestAReportNobodyHasJudgedIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
+	// The matrix over the routes: a report nobody has judged has no issue to be public about and
 	// nobody has decided it is safe to repeat, so a role short of reading
 	// unannounced work reaches none of it, a reader of unannounced work reads
 	// it and may not work it — and a product somebody holds nothing on
@@ -132,9 +132,9 @@ func TestAClaimNobodyHasJudgedIsReadWithPrivateReadAndWorkedWithPrivateTriage(t 
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
-			`{"summary":"They say the management socket lets anybody in."}`)
+			`{"reported_problem":"They say the management socket lets anybody in."}`)
 		if got.Code != http.StatusCreated {
-			t.Fatalf("recording a claim answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("recording a report answered %d: %s", got.Code, got.Body.String())
 		}
 		var recorded httpapitest.ReportRead
 		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {

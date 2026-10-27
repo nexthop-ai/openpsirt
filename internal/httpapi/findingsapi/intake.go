@@ -19,15 +19,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// ClaimedBody is a claim somebody sends us, as it is recorded.
-type ClaimedBody struct {
-	Title      string `json:"title,omitempty" maxLength:"191" doc:"A line naming the claim"`
-	Summary    string `json:"summary" maxLength:"65536" doc:"What was claimed, in the words it was claimed in"`
-	ReportedBy string `json:"reported_by,omitempty" maxLength:"191"`
-	Contact    string `json:"contact,omitempty" maxLength:"191"`
-	Credit     string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory"`
-	Received   string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD, which the embargo is counted from"`
-	FoundHere  bool   `json:"found_here,omitempty" doc:"Whether somebody here found it. Unset is a report from outside, which carries a disclosure date once it is recorded as a flaw"`
+// NewReportBody is a vulnerability report somebody sends us, as it is recorded.
+type NewReportBody struct {
+	Title           string `json:"title,omitempty" maxLength:"191" doc:"A line naming the reported problem"`
+	ReportedProblem string `json:"reported_problem" maxLength:"65536" doc:"What the reporter says is wrong, in their words"`
+	ReportedBy      string `json:"reported_by,omitempty" maxLength:"191"`
+	Contact         string `json:"contact,omitempty" maxLength:"191"`
+	Credit          string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory"`
+	Received        string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD, which the embargo is counted from"`
+	FoundHere       bool   `json:"found_here,omitempty" doc:"Whether somebody here found it. Unset is a report from outside, which carries a disclosure date once it is recorded as a flaw"`
 }
 
 // ReportIssueBody says what a report turned out to be.
@@ -43,14 +43,14 @@ func registerIntake(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "record-report", Method: http.MethodPost, Path: list,
 		Summary: "Record a vulnerability report",
-		Description: "Records a claim that arrived, or a flaw somebody here found, and " +
+		Description: "Records a report that arrived, or a flaw somebody here found, and " +
 			"returns the reference it is reached by.\n\n" +
-			"No issue is minted. What arrived is a claim, and whether it is a flaw is a " +
+			"No issue is minted. What arrived is a report, and whether it is a flaw is a " +
 			"judgment somebody makes afterwards — so a report nobody believes is answered and " +
 			"filed rather than either minting a flaw nobody believes or going unrecorded.\n\n" +
-			"`summary` is required and everything else is optional: a claim arriving " +
-			"anonymously is an ordinary claim, and a report with nothing in it records only " +
-			"that a mail arrived. The summary is stored as markdown and goes through the " +
+			"`reported_problem` is required and everything else is optional: a report arriving " +
+			"anonymously is an ordinary report, and a report with nothing in it records only " +
+			"that a mail arrived. The reported problem is stored as markdown and goes through the " +
 			"same submission policy a justification does, so raw HTML and a link using " +
 			"anything but " + markdown.SchemesSaid() + " are refused naming the line " +
 			"they are on.\n\n" +
@@ -58,13 +58,13 @@ func registerIntake(api huma.API, in core.Deps) {
 			"from. A date that cannot be read is treated as one nobody gave.\n\n" +
 			"`found_here` marks a flaw somebody here found. Recorded as a flaw, it carries " +
 			"no disclosure date, and it is never listed as waiting for an answer.\n\n" +
-			"`title` is an optional line naming the claim, and is refused across lines.\n\n" +
+			"`title` is an optional line naming the reported problem, and is refused across lines.\n\n" +
 			"Where a standing rule places this product's reports, the report goes to the " +
 			"first such rule's team that has a member who reads undisclosed work here.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
-		Body    ClaimedBody
+		Body    NewReportBody
 	}) (*struct {
 		Status int
 		Body   ReportBody
@@ -73,8 +73,8 @@ func registerIntake(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		row, err := finding.NewStore(in.DB.DB).Record(ctx, subject, product.ID, finding.Claimed{
-			Title: input.Body.Title, Summary: input.Body.Summary,
+		row, err := finding.NewStore(in.DB.DB).Record(ctx, subject, product.ID, finding.NewReport{
+			Title: input.Body.Title, ReportedProblem: input.Body.ReportedProblem,
 			Told: finding.Told{
 				ReportedBy: input.Body.ReportedBy, Contact: input.Body.Contact,
 				Credit: input.Body.Credit, Received: input.Body.Received,
@@ -97,7 +97,7 @@ func registerIntake(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-reports", Method: http.MethodGet, Path: list,
 		Summary: "List vulnerability reports",
-		Description: "Every claim recorded against this product, newest first, judged or " +
+		Description: "Every report recorded against this product, newest first, judged or " +
 			"not.\n\n" +
 			"A report already turned into an issue stays in the list, because it is the " +
 			"evidence that the issue came from outside.",
@@ -128,7 +128,7 @@ func registerIntake(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-recorded-report", Method: http.MethodGet, Path: one,
 		Summary: "Show a vulnerability report",
-		Description: "What was claimed, who claimed it, when it arrived, when somebody " +
+		Description: "The reported problem, who reported it, when it arrived, when somebody " +
 			"answered them, who holds it, and what it turned out to be.\n\n" +
 			"A reference nobody minted and one recorded against another product answer " +
 			"alike, so asking is not a way to find out which references exist.",
@@ -159,7 +159,7 @@ func registerIntake(api huma.API, in core.Deps) {
 			"so and when.\n\n" +
 			"The issue is one that already exists here. Recording a flaw is its own act, " +
 			"because it carries the builds the flaw ships in, the severity and the embargo — " +
-			"so agreeing that a claim is real is not the same keystroke as declaring where it " +
+			"so agreeing that a report is real is not the same keystroke as declaring where it " +
 			"lives.\n\n" +
 			"Refused where the report has already been judged, where a ruling holds it — " +
 			"withdraw a waiting ruling first — and where another report is " +
@@ -208,10 +208,10 @@ func registerIntake(api huma.API, in core.Deps) {
 		Path:    one + "/attachments",
 		Summary: "Attach a file to a vulnerability report",
 		Description: "Stores one file against a report and returns the reference to put in " +
-			"text. A claim that has not been judged has no issue to hang a screenshot on, and " +
+			"text. A report that has not been judged has no issue to hang a screenshot on, and " +
 			"the screenshot is often the whole of what was sent.\n\n" +
 			"The file stays with the report once the report gains an issue, and stays as " +
-			"readable as the report: saying a claim is a disclosed issue does not publish " +
+			"readable as the report: saying a report is a disclosed issue does not publish " +
 			"what somebody sent with it. Attach it to the issue to put it there.\n\n" +
 			"The content type is decided here from the bytes and is never the one that was " +
 			"uploaded. Everything outside a small allowlist of raster images is served as an " +

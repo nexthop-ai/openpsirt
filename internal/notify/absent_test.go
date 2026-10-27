@@ -300,7 +300,7 @@ func TestSomebodyAwayHoldingOnlyReportsIsRaised(t *testing.T) {
 		report := func(reference string, holder int64, judged bool) {
 			t.Helper()
 			row := &finding.FlawReport{
-				Reference: reference, ProductID: w.Product.ID, Summary: "A claim.",
+				Reference: reference, ProductID: w.Product.ID, ReportedProblem: "A report.",
 				RecordedBy: admin.ID, RecordedAt: now, AssignedTo: &holder, AssignedAt: &now,
 			}
 			if judged {

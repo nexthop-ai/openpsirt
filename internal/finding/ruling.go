@@ -24,18 +24,18 @@ import (
 type Disposition string
 
 const (
-	// Accepted is a claim that turned out to be an issue here. It is written
+	// Accepted is a report that turned out to be an issue here. It is written
 	// by pointing the report at that issue, never by a ruling.
 	Accepted Disposition = "accepted"
-	// Duplicate is a claim about an issue that is already open here. The
+	// Duplicate is a report about an issue that is already open here. The
 	// work exists elsewhere, so nothing is hidden and nobody else agrees.
 	Duplicate Disposition = "duplicate"
-	// NotReproducible is a claim nobody could make happen.
+	// NotReproducible is a report nobody could make happen.
 	NotReproducible Disposition = "not-reproducible"
-	// OutOfScope is a claim about something this product does not answer
+	// OutOfScope is a report about something this product does not answer
 	// for.
 	OutOfScope Disposition = "out-of-scope"
-	// Rejected is a claim that is not a flaw.
+	// Rejected is a report that is not a flaw.
 	Rejected Disposition = "rejected"
 )
 
@@ -56,11 +56,11 @@ func (d Disposition) Rulable() bool {
 // NeedsSecondPerson reports whether somebody other than the proposer has to
 // agree before the disposition takes effect.
 //
-// Rejecting a claim and declaring it out of scope set it aside with nothing
+// Rejecting a report and declaring it out of scope set it aside with nothing
 // left anywhere to work on, which is hiding risk in the sense REQ-24 means.
 func (d Disposition) NeedsSecondPerson() bool { return d == OutOfScope || d == Rejected }
 
-// ReportRuling is one act of saying what one or more claims are, where the
+// ReportRuling is one act of saying what one or more reports are, where the
 // answer is not an issue here.
 type ReportRuling struct {
 	bun.BaseModel `bun:"table:report_ruling,alias:rr"`
@@ -199,7 +199,7 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 	}
 	reasoning := strings.TrimSpace(in.Reasoning)
 	// A duplicate's reason is the issue it names. Every other disposition
-	// sets a claim aside, and a reviewer or a reporter asking why is owed a
+	// sets a report aside, and a reviewer or a reporter asking why is owed a
 	// sentence.
 	if reasoning == "" && in.Disposition != Duplicate {
 		return nil, ErrNoReasoning
@@ -328,7 +328,7 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 		if _, err := tx.NewInsert().Model(&covered).Exec(ctx); err != nil {
 			return fmt.Errorf("record which reports a ruling covers: %w", err)
 		}
-		// A claim from outside ruled a duplicate of a flaw recorded here
+		// A report from outside ruled a duplicate of a flaw recorded here
 		// starts that flaw's disclosure date, in the same act.
 		return duplicateDated(ctx, tx, ruling, ids, now)
 	})
@@ -359,7 +359,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 	// Open is work somebody still has in front of them: not closed, not
 	// argued away by the build, and not dismissed by a decision in force at
 	// that occurrence. A dismissal and a suppression leave the row open and close
-	// the question, so a duplicate of one sends the new claim somewhere
+	// the question, so a duplicate of one sends the new report somewhere
 	// nobody is looking. A deferral or a promised upgrade leaves work that
 	// comes back, so those count as open.
 	standing, held := InForce()
@@ -463,7 +463,7 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 		if changed == 0 {
 			return ErrNotWaiting
 		}
-		// Who judged each claim is who proposed the ruling, and when they
+		// Who judged each report is who proposed the ruling, and when they
 		// did. Written now, so that a report waiting on a second person does
 		// not read as judged.
 		if _, err := tx.NewUpdate().Model((*FlawReport)(nil)).
@@ -618,8 +618,8 @@ type RulingsAsked struct {
 // in, newest first, with how many there are.
 //
 // A product somebody may not read reports in contributes nothing, not even to
-// the count: a ruling says what a stranger's claim is, and reading it reads
-// the claim.
+// the count: a ruling says what a stranger's report is, and reading it reads
+// the report.
 func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
 	asked RulingsAsked) ([]ReportRuling, int, error) {
 

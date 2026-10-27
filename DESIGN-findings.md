@@ -731,23 +731,23 @@ in a comparison exactly as a reported one does.
 
 ## Reports
 
-A report is the record that a claim arrived. It stands whether or not the claim
-turns out to be a flaw, because the evidence that it was received and answered
+A report is the record that a reported problem arrived. It stands whether or
+not the problem turns out to be a flaw, because the evidence that it was received and answered
 is the record itself.
 
-Recorded only by minting an issue, a claim nobody believes either fills the
+Recorded only by minting an issue, a report nobody believes either fills the
 findings with a flaw nobody believes or goes unrecorded — and an unrecorded
-claim destroys the evidence the record exists for. Slop reports are generated
+report destroys the evidence the record exists for. Slop reports are generated
 and arrive in greater numbers than real ones, so this holds before a security
 contact address is published rather than at some volume of them.
 
 | Rule | Reason |
 |---|---|
-| A report exists without an issue | Whether a claim is a flaw is a decision somebody makes afterwards, and the record has to stand before it is made |
-| It carries what was claimed, and an empty claim is refused | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. Refused at recording and at every edit. A report written in the same act as a flaw recorded by hand carries the flaw's summary as its claim, and the upgrade gives every report v0.10.0 left with no claim on a flaw recorded here the flaw's summary. Any other report v0.10.0 recorded with no claim keeps none |
-| It may carry a title | One line naming the claim, which a list of reports is read by. Optional, because a claim arriving as a mail has a subject at best |
-| Everything about the reporter is optional | A claim arriving anonymously is an ordinary claim, and a flaw found by whoever is typing has no reporter at all. A form demanding one asks them to invent an answer |
-| A report says whether it was found here | The one fact that separates a flaw somebody here found from a claim that arrived. It decides the disclosure date and whether an answer is owed, and nothing else: the same fields, the same triage and the same rulings apply to both |
+| A report exists without an issue | Whether a reported problem is a flaw is a decision somebody makes afterwards, and the record has to stand before it is made |
+| It carries the reported problem, and an empty one is refused | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. Refused at recording and at every edit. A report written in the same act as a flaw recorded by hand carries the flaw's summary as its reported problem, and the upgrade gives every report v0.10.0 left with none on a flaw recorded here the flaw's summary. Any other report v0.10.0 recorded with none keeps none |
+| It may carry a title | One line naming the reported problem, which a list of reports is read by. Optional, because a report arriving as a mail has a subject at best |
+| Everything about the reporter is optional | A report arriving anonymously is an ordinary report, and a flaw found by whoever is typing has no reporter at all. A form demanding one asks them to invent an answer |
+| A report says whether it was found here | The one fact that separates a flaw somebody here found from a report that arrived. It decides the disclosure date and whether an answer is owed, and nothing else: the same fields, the same triage and the same rulings apply to both |
 | One row per issue, not per finding | A flaw recorded against four builds is one report from one person, and four copies of their address is four places for it to be wrong |
 | **It records the product it was reported against, and that is who may read it** | Read with the right every read of a report asks, reading undisclosed work in that product, on the issue as on the report itself: one reporter has one rule. Writing to them is working the report and asks for triage there. An issue's identity spans its aliases, so once a CVE is recorded the same issue is open in every product a scan reports it in; keyed on the product, the reporter's name, address and received date stay with the product they wrote to, and a message recorded in one product answers nobody in another |
 | An issue merged from issues reported in two products answers each product with its own report | Each name carried its own report. The one a reader reads and writes to is the first received that they may read, and a message on what nobody here may read is refused as no such report |
@@ -797,8 +797,8 @@ act is kept and readable.
 
 | Part | Rule |
 |---|---|
-| Edits | The title, the claim and what is known of the reporter change while the report is open: not judged, and no ruling waiting over it. Every version an edit replaces is kept with who replaced it and when, numbered from one, and version one is the report as recorded. An edit that changes nothing keeps nothing |
-| Edits once judged | Refused. A decision is of particular words, as an approval is (REQ-28); the claim a ruling or an acceptance answered is the one on record |
+| Edits | The title, the reported problem and what is known of the reporter change while the report is open: not judged, and no ruling waiting over it. Every version an edit replaces is kept with who replaced it and when, numbered from one, and version one is the report as recorded. An edit that changes nothing keeps nothing |
+| Edits once judged | Refused. A decision is of particular words, as an approval is (REQ-28); the reported problem a ruling or an acceptance answered is the one on record |
 | Correspondence | A message is recorded with its direction, sent or received, the day it carries and what it said, which may reference files attached to the report. Nothing is sent from this deployment: a message is recorded after somebody sent it, from an address they already have |
 | Message days | Today where none is given. More than a day ahead of today is refused; one day ahead is the reach of a time zone. A message is never edited or removed, because it is evidence of what the reporter was told |
 | Correspondence on a flaw found here | Refused. Nobody outside sent it, so there is nobody to write to |
@@ -819,11 +819,11 @@ flaw. Recording a flaw carries the builds it ships in, the severity and the
 embargo, so it asks for those where accepting a report as an existing issue
 does not.
 
-A flaw recorded here already has its report, so a second claim about it is a
+A flaw recorded here already has its report, so a second report about it is a
 duplicate. Accepting a report as an existing issue reaches the issues a scan
 reported.
 
-A claim from outside ruled a duplicate of a flaw found here gives the flaw a
+A report from outside ruled a duplicate of a flaw found here gives the flaw a
 disclosure date, counted from when the report was received as for any outside
 report, because its reporter is counting down to a publication whoever found
 the flaw first (REQ-37). A flaw that already carries a date keeps the earlier
@@ -847,13 +847,13 @@ one.
 | Another report is already that issue's record | One report is one issue's record. A second pointed at the same issue is a duplicate, which is a ruling of its own |
 | A ruling holds the report | A report waiting to be rejected and accepted by somebody else in the meantime would be two things when the approval lands. Asked in the write |
 | The issue is not one the judge may be told of here | Resolving first and refusing after makes the refusal informative: an identifier nobody has filed and one filed on work this person cannot see would come back differently, which turns this into a way to ask which identifiers are open here |
-| A flaw may be recorded from a report | The claim turned out to be a flaw nobody had recorded. Recording it from the report accepts that report as the new flaw in the same write, so one report is the record rather than two, and who told us and when are read from it — naming a reporter as well is refused. The embargo counts from the day the report says it arrived. A report already judged, or under a ruling, is refused |
+| A flaw may be recorded from a report | The reported problem turned out to be a flaw nobody had recorded. Recording it from the report accepts that report as the new flaw in the same write, so one report is the record rather than two, and who told us and when are read from it — naming a reporter as well is refused. The embargo counts from the day the report says it arrived. A report already judged, or under a ruling, is refused |
 | The judge may not work reports here | Asked before the issue's name is resolved. Asked after, an identifier nobody has filed and one filed here come back in different words to somebody who may not judge a report at all. The same holds for the issue a duplicate names, and, for somebody who may not read reports, for the issue whose duplicates are listed |
 
 ### Report visibility
 
-A claim is undisclosed: there is no issue to be public about, and nobody has
-decided the claim is safe to repeat. This is the **report rule**.
+A report nobody has judged is undisclosed: there is no issue to be public
+about, and nobody has decided the reported problem is safe to repeat. This is the **report rule**.
 
 | Act | Asks for |
 |---|---|
@@ -928,9 +928,9 @@ one act, with one reason, covering one or more reports in one product.
 
 | Rule | Reason |
 |---|---|
-| Rejecting and declaring out of scope wait for a second person (REQ-24) | Both set a claim aside with nothing left anywhere to work on, which is hiding risk. The proposer never approves their own, with no override |
+| Rejecting and declaring out of scope wait for a second person (REQ-24) | Both set a report aside with nothing left anywhere to work on, which is hiding risk. The proposer never approves their own, with no override |
 | A duplicate needs nobody else, and names an issue open in this product | The work exists elsewhere, so nothing is hidden. The target is resolved against what the proposer may be told of, and one they may not answers as one that is not here |
-| Not reproducible needs nobody else | It records that an attempt failed rather than that the claim is false. The reporter is still owed an answer and the report is raised as unanswered until they have one, and a reply carrying a way to reproduce it is met by withdrawing the ruling |
+| Not reproducible needs nobody else | It records that an attempt failed rather than that the reported problem is false. The reporter is still owed an answer and the report is raised as unanswered until they have one, and a reply carrying a way to reproduce it is met by withdrawing the ruling |
 | A duplicate of an issue not open here is refused at submission | Nothing is left to work on, so it buries the report with nobody having agreed. Open is an occurrence not closed, not suppressed by what the build said, and not dismissed by a decision in force; a deferral or a promised upgrade is work that comes back, and counts as open. The refusal says to reject it instead, which takes the second person |
 | A reason is required on everything but a duplicate, and goes through the submission policy | A reviewer and a reporter asking why are owed a sentence. A duplicate's reason is the issue it names |
 | A reason is never edited (REQ-28) | An approval is of particular words. Different words are a new ruling |
@@ -941,7 +941,7 @@ one act, with one reason, covering one or more reports in one product.
 | A report under a waiting ruling reads as unjudged | Who judged it is written when the ruling takes effect. Before then one person has said it and nobody has agreed |
 | Withdrawing needs nobody else | It opens every report the ruling covered again, unanswered, which re-exposes risk. Sending a waiting ruling back and undoing one in force are this one act, and the proposer may withdraw their own |
 | A withdrawn ruling stays on record with the reports it covered | The live pointer on each report is cleared; the list of what the ruling covered is kept apart from it |
-| Rulings are read and approved under the report rule | A ruling says what a stranger's claim is, and reading it reads the claim. The approver capability over reading undisclosed work may agree to one, as a triager of undisclosed work may; the capability alone reaches none. Listed across products, a product the reader may not read reports in contributes nothing, not even to the count |
+| Rulings are read and approved under the report rule | A ruling says what a stranger's report is, and reading it reads the report. The approver capability over reading undisclosed work may agree to one, as a triager of undisclosed work may; the capability alone reaches none. Listed across products, a product the reader may not read reports in contributes nothing, not even to the count |
 
 #### Duplicates on the issue
 
@@ -952,7 +952,7 @@ readable says nothing about whether what a stranger sent is.
 
 #### The unanswered condition
 
-A ruling answers what a claim is. It does not answer the reporter. A rejected
+A ruling answers what a report is. It does not answer the reporter. A rejected
 report with no message sent is still raised as unanswered. A report found here
 is never raised: there is nobody outside to answer.
 

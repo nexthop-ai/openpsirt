@@ -254,7 +254,7 @@ yourself is still doing it.
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
-| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever it claims (`DESIGN-findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
+| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever its reported problem (`DESIGN-findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
 
 ### Assignment by narrowing
 
@@ -1395,12 +1395,12 @@ Three acts a person asks for, and two a ruling records, recorded apart.
 | **Extension** | The embargo ends later. The unilateral case: the fix slipped |
 | **Shortening** | The embargo ends sooner. The coordinated case: a coordinator or a peer vendor is publishing on a date of their own, or the detail leaked |
 | **Disclosure** | The embargo ends today and the issue is public. § Issue disclosure holds its rules |
-| **Duplicate** | A claim from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the claim. `DESIGN-findings.md` § Judgment holds its rules |
+| **Duplicate** | A report from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the report. `DESIGN-findings.md` § Judgment holds its rules |
 | **Duplicate undone** | That ruling was withdrawn and the end put back where the rest of the record leaves it, which may be no end at all |
 
 A movement a ruling records takes no reason of its own. It carries the
 ruling's reasoning, which a duplicate may leave empty, and that reasoning, like
-the ruling and the claim, is shown only to a reader of the product's reports.
+the ruling and the report, is shown only to a reader of the product's reports.
 
 | Ruled movement | Second person | Toward the threshold |
 |---|---|---|

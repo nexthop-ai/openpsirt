@@ -876,7 +876,7 @@ func TestADuplicateOfAnIssueASupplierAnswersEverywhereIsRefused(t *testing.T) {
 			t.Fatalf("the occurrence is %+v, want it open and answered through Y", open)
 		}
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		named := f.claims(t, who, 1)
+		named := f.received(t, who, 1)
 		_, err := f.store.Rule(ctx, who, f.productID, finding.Ruled{
 			References: []string{named[0]}, Disposition: finding.Duplicate,
 			DuplicateOf: f.issueID(t, inside),

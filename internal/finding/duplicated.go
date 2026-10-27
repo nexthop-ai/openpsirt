@@ -3,7 +3,7 @@
 
 package finding
 
-// The disclosure date a claim from outside starts on a flaw recorded here when
+// The disclosure date a report from outside starts on a flaw recorded here when
 // it is ruled a duplicate of it.
 
 import (
@@ -21,7 +21,7 @@ import (
 )
 
 // duplicateStart is the date a duplicate ruling over these reports gives a
-// flaw, the claim it counts from, and where the embargo ends before it.
+// flaw, the report it counts from, and where the embargo ends before it.
 type duplicateStart struct {
 	at     time.Time
 	report int64
@@ -31,9 +31,9 @@ type duplicateStart struct {
 // startOf works out the date a duplicate ruling over these reports gives the
 // flaw's undisclosed occurrences in one product, or nothing where it gives none.
 //
-// Counted from when the earliest claim from outside arrived, or was recorded
+// Counted from when the earliest report from outside arrived, or was recorded
 // where it does not say, plus the disclosure window: the reporter publishes on
-// their own clock, which started when they told us (REQ-37). A claim found here
+// their own clock, which started when they told us (REQ-37). A report found here
 // starts nothing. Nothing either where every occurrence already ends on that date
 // or earlier, because an earlier end is one somebody is already held to.
 //
@@ -52,7 +52,7 @@ func startOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 		Where(`"fr"."found_here" = ?`, false).
 		Order("fr.id").
 		Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read when those claims arrived: %w", err)
+		return nil, fmt.Errorf("read when those reports arrived: %w", err)
 	}
 	var start *duplicateStart
 	for _, report := range reports {
@@ -157,7 +157,7 @@ func dateFlaw(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 
 // duplicateDated gives the flaw a duplicate ruling names the date the ruling
 // starts, and records it as a movement of the embargo naming the ruling and
-// the claim it counts from.
+// the report it counts from.
 //
 // Inside the ruling's transaction, so the ruling and the date are one act.
 func duplicateDated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,

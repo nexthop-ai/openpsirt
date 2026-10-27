@@ -29,11 +29,11 @@ func (f *fixture) flaw(t *testing.T, who access.Subject, told finding.Told) int6
 	return rows[0].VulnerabilityID
 }
 
-// claim records a claim told as given and returns its reference.
-func (f *fixture) claim(t *testing.T, who access.Subject, told finding.Told) string {
+// told records a report told as given and returns its reference.
+func (f *fixture) told(t *testing.T, who access.Subject, told finding.Told) string {
 	t.Helper()
-	row, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
-		Summary: "The management socket lets anybody in.", Told: told,
+	row, err := f.store.Record(t.Context(), who, f.productID, finding.NewReport{
+		ReportedProblem: "The management socket lets anybody in.", Told: told,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +41,7 @@ func (f *fixture) claim(t *testing.T, who access.Subject, told finding.Told) str
 	return row.Reference
 }
 
-// duplicate rules claims a duplicate of an issue.
+// duplicate rules reports a duplicate of an issue.
 func (f *fixture) duplicate(t *testing.T, who access.Subject, issue int64,
 	references ...string) *finding.ReportRuling {
 
@@ -108,8 +108,8 @@ func TestADuplicateFromOutsideStartsTheDateOnAFlawFoundHere(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{FoundHere: true})
-		later := f.claim(t, who, finding.Told{Received: "2026-09-05"})
-		earlier := f.claim(t, who, finding.Told{Received: "2026-09-01"})
+		later := f.told(t, who, finding.Told{Received: "2026-09-05"})
+		earlier := f.told(t, who, finding.Told{Received: "2026-09-01"})
 
 		ruling := f.duplicate(t, who, issue, later, earlier)
 		want := f.windowAfter(t, "2026-09-01")
@@ -138,12 +138,12 @@ func TestAClaimFoundHereStartsNoDate(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{FoundHere: true})
-		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{FoundHere: true, Received: "2026-09-01"}))
+		f.duplicate(t, who, issue, f.told(t, who, finding.Told{FoundHere: true, Received: "2026-09-01"}))
 		if got := f.flawEnds(t, issue); got != nil {
-			t.Errorf("a claim found here dated the flaw %s", got)
+			t.Errorf("a report found here dated the flaw %s", got)
 		}
 		if moved := f.movedBy(t, who, issue); len(moved) != 0 {
-			t.Errorf("a claim found here recorded %+v", moved)
+			t.Errorf("a report found here recorded %+v", moved)
 		}
 	})
 }
@@ -152,7 +152,7 @@ func TestAClaimNotSayingWhenItArrivedCountsFromWhenItWasRecorded(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{FoundHere: true})
-		reference := f.claim(t, who, finding.Told{ReportedBy: "a researcher"})
+		reference := f.told(t, who, finding.Told{ReportedBy: "a researcher"})
 		recorded := f.reportNamed(t, who, reference).RecordedAt
 		f.duplicate(t, who, issue, reference)
 		window, err := setting.NewStore(f.db.DB).Duration(t.Context(),
@@ -167,26 +167,26 @@ func TestAClaimNotSayingWhenItArrivedCountsFromWhenItWasRecorded(t *testing.T) {
 }
 
 func TestADuplicateMovesADateOnlyEarlier(t *testing.T) {
-	// An end already earlier is one somebody is held to. An earlier claim
+	// An end already earlier is one somebody is held to. An earlier report
 	// brings a later end in, and says where it was.
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{Received: "2026-06-01"})
 		first := f.windowAfter(t, "2026-06-01")
 
-		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-07-01"}))
+		f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-07-01"}))
 		if got := f.flawEnds(t, issue); !isAt(got, first) {
-			t.Errorf("a later claim moved the flaw to %v, want it kept at %s", got, first)
+			t.Errorf("a later report moved the flaw to %v, want it kept at %s", got, first)
 		}
 		if moved := f.movedBy(t, who, issue); len(moved) != 0 {
-			t.Errorf("a claim that moved nothing recorded %+v", moved)
+			t.Errorf("a report that moved nothing recorded %+v", moved)
 		}
 
 		// Twelve days in, well inside the thirty-day threshold, so in force.
-		ruling := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-05-20"}))
+		ruling := f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-05-20"}))
 		want := f.windowAfter(t, "2026-05-20")
 		if got := f.flawEnds(t, issue); !isAt(got, want) {
-			t.Errorf("an earlier claim left the flaw at %v, want %s", got, want)
+			t.Errorf("an earlier report left the flaw at %v, want %s", got, want)
 		}
 		moved := f.movedBy(t, who, issue)
 		if len(moved) != 1 || !isAt(moved[0].Was, first) || *moved[0].RulingID != ruling.ID ||
@@ -217,7 +217,7 @@ func TestADuplicateBringingADateEarlierPastTheThresholdWaitsForASecondPerson(t *
 		issue := f.flaw(t, who, finding.Told{Received: "2026-06-01"})
 		first := f.windowAfter(t, "2026-06-01")
 
-		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-04-01"}))
+		f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-04-01"}))
 		if got := f.flawEnds(t, issue); !isAt(got, first) {
 			t.Errorf("a shortening waiting for agreement moved the flaw to %v", got)
 		}
@@ -242,7 +242,7 @@ func TestAWaitingShortenedDateCannotBeAgreedOnceItsRulingIsWithdrawn(t *testing.
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		second := f.somebody(t, "second@example.com", access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{Received: "2026-06-01"})
-		ruling := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-04-01"}))
+		ruling := f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-04-01"}))
 		moved := f.movedBy(t, who, issue)
 		if _, err := f.store.WithdrawRuling(t.Context(), who, f.productID, ruling.ID); err != nil {
 			t.Fatal(err)
@@ -276,8 +276,8 @@ func TestWithdrawingADuplicatePutsTheDateBackWhereTheRestLeaveIt(t *testing.T) {
 			"Fixed in every release."); err != nil {
 			t.Fatal(err)
 		}
-		overtaken := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-08-01"}))
-		standing := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-07-20"}))
+		overtaken := f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-08-01"}))
+		standing := f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-07-20"}))
 		earlier := f.windowAfter(t, "2026-07-20")
 
 		if _, err := f.store.WithdrawRuling(t.Context(), who, f.productID, overtaken.ID); err != nil {
@@ -313,7 +313,7 @@ func TestWithdrawingADuplicateKeepsADateAPersonSetSince(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{FoundHere: true})
-		ruling := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-08-01"}))
+		ruling := f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-08-01"}))
 		extended := f.windowAfter(t, "2026-08-01").Add(10 * 24 * time.Hour)
 		if _, err := f.store.Extend(t.Context(), who, f.productID, issue, extended,
 			"The fix slipped a week."); err != nil {
@@ -340,7 +340,7 @@ func TestADuplicateOfAScannedIssueStartsNoDate(t *testing.T) {
 			Where(`"vulnerability_id" = ?`, issue).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-09-01"}))
+		f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-09-01"}))
 		if got := f.flawEnds(t, issue); got != nil {
 			t.Errorf("a duplicate of a scanned issue dated it %s", got)
 		}
@@ -351,7 +351,7 @@ func TestTheRulingFormIsToldTheDateADuplicateWouldStart(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{FoundHere: true})
-		named := f.claim(t, who, finding.Told{Received: "2026-09-01"})
+		named := f.told(t, who, finding.Told{Received: "2026-09-01"})
 
 		starts, err := f.store.DuplicateStarts(t.Context(), who, f.productID, issue, []string{named})
 		if err != nil {
@@ -365,18 +365,18 @@ func TestTheRulingFormIsToldTheDateADuplicateWouldStart(t *testing.T) {
 			t.Errorf("asking what a ruling would start dated the flaw %s", got)
 		}
 
-		// Ruled, the same claim again would start nothing.
+		// Ruled, the same report again would start nothing.
 		f.duplicate(t, who, issue, named)
 		if starts, err := f.store.DuplicateStarts(t.Context(), who, f.productID, issue,
-			[]string{f.claim(t, who, finding.Told{Received: "2026-09-10"})}); err != nil || starts != nil {
-			t.Errorf("a later claim would start %v (%v), want nothing", starts, err)
+			[]string{f.told(t, who, finding.Told{Received: "2026-09-10"})}); err != nil || starts != nil {
+			t.Errorf("a later report would start %v (%v), want nothing", starts, err)
 		}
 		// Two months earlier brings the date in past the threshold, which
 		// waits for a second person.
 		if early, err := f.store.DuplicateStarts(t.Context(), who, f.productID, issue,
-			[]string{f.claim(t, who, finding.Told{Received: "2026-07-01"})}); err != nil ||
+			[]string{f.told(t, who, finding.Told{Received: "2026-07-01"})}); err != nil ||
 			early == nil || !early.NeedsApproval {
-			t.Errorf("a claim two months earlier would start %+v (%v), want it to wait", early, err)
+			t.Errorf("a report two months earlier would start %+v (%v), want it to wait", early, err)
 		}
 
 		// Asked under the rule proposing the ruling is.

@@ -35,11 +35,11 @@ func TestWithdrawingADuplicateKeepsAnExtensionAgreedAfterIt(t *testing.T) {
 		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.MovementThreshold, "87600h"); err != nil {
 			t.Fatal(err)
 		}
-		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-05-25"}))
+		f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-05-25"}))
 		if _, err := f.store.AgreeToMovement(ctx, second, asked.ID); err != nil {
 			t.Fatal(err)
 		}
-		later := f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-05-28"}))
+		later := f.duplicate(t, who, issue, f.told(t, who, finding.Told{Received: "2026-05-28"}))
 		if got, want := f.flawEnds(t, issue), f.windowAfter(t, "2026-05-28"); !isAt(got, want) {
 			t.Fatalf("the later ruling left the flaw at %v, want %s", got, want)
 		}
@@ -62,7 +62,7 @@ func TestARulingsReasoningIsReadOnlyUnderTheReportRule(t *testing.T) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.flaw(t, who, finding.Told{FoundHere: true})
-		reference := f.claim(t, who, finding.Told{Received: "2025-01-01"})
+		reference := f.told(t, who, finding.Told{Received: "2025-01-01"})
 		said := "The reporter's screenshot shows the same crash."
 		if _, err := f.store.Rule(ctx, who, f.productID, finding.Ruled{
 			References: []string{reference}, Disposition: finding.Duplicate,

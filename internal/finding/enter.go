@@ -557,12 +557,12 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			ProductID: productID,
 			// What was claimed is the flaw's own summary, so no report is
 			// written with nothing claimed.
-			Summary:    strings.TrimSpace(in.Summary),
-			ReportedBy: strings.TrimSpace(told.ReportedBy),
-			Contact:    strings.TrimSpace(told.Contact),
-			Credit:     strings.TrimSpace(told.Credit),
-			ReceivedOn: told.When(),
-			FoundHere:  told.FoundHere,
+			ReportedProblem: strings.TrimSpace(in.Summary),
+			ReportedBy:      strings.TrimSpace(told.ReportedBy),
+			Contact:         strings.TrimSpace(told.Contact),
+			Credit:          strings.TrimSpace(told.Credit),
+			ReceivedOn:      told.When(),
+			FoundHere:       told.FoundHere,
 			// Judged at the moment it was recorded: whoever typed this in
 			// said what the flaw is in the same act.
 			EvaluatedAt: &now, EvaluatedBy: &subject.ID,

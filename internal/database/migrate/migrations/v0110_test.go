@@ -274,11 +274,12 @@ func TestTheV0110UpgradeMakesWhatAStopLeftUnmade(t *testing.T) {
 	})
 }
 
-// The report v0.10.0 wrote beside a flaw recorded by hand, with no claim of
-// its own, carries the flaw's summary as its claim after the upgrade. A
-// report on a published vulnerability is left as it was: that issue's
-// description is the publisher's, never what the reporter claimed.
-func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
+// The report v0.10.0 wrote beside a flaw recorded by hand, with no reported
+// problem of its own, carries the flaw's summary as its reported problem after
+// the upgrade, under the column's new name. A report on a published
+// vulnerability is left as it was: that issue's description is the
+// publisher's, never what the reporter said.
+func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsReportedProblem(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
@@ -302,7 +303,7 @@ func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
 			}
 		}
 		// The third is a report a flaw was recorded from, which carries the
-		// reporter's own claim and keeps it. Its issue is made a flaw
+		// reporter's own words and keeps them. Its issue is made a flaw
 		// recorded here the way the seed makes the first.
 		if _, err := db.DB.NewRaw(`INSERT INTO "finding" ("target_id", "kind", "visibility",
 			"vulnerability_id", "component_id", "place_identity", "urgency", "urgency_exploited",
@@ -317,8 +318,8 @@ func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
 			t.Fatal(err)
 		}
 		for reference, seeded := range map[string]struct {
-			issue int64
-			claim string
+			issue   int64
+			problem string
 		}{
 			"SONIC-R-2026-333333": {issues.recorded, ""},
 			"SONIC-R-2026-444444": {issues.scanned, ""},
@@ -328,7 +329,7 @@ func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
 				("reference", "product_id", "vulnerability_id", "summary", "recorded_by", "recorded_at",
 				 "evaluated_at", "evaluated_by", "found_here")
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				reference, product, seeded.issue, seeded.claim, person, at, at, person, false).Exec(ctx); err != nil {
+				reference, product, seeded.issue, seeded.problem, person, at, at, person, false).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -339,7 +340,7 @@ func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
 			"SONIC-R-2026-555555": "The reporter's own words.",
 		} {
 			var got *string
-			if err := db.DB.NewRaw(`SELECT "summary" FROM "flaw_report" WHERE "reference" = ?`,
+			if err := db.DB.NewRaw(`SELECT "reported_problem" FROM "flaw_report" WHERE "reference" = ?`,
 				reference).Scan(ctx, &got); err != nil {
 				t.Fatal(err)
 			}
@@ -348,7 +349,7 @@ func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
 				said = *got
 			}
 			if said != want {
-				t.Errorf("report %s claims %q after the upgrade, want %q", reference, said, want)
+				t.Errorf("report %s reports %q after the upgrade, want %q", reference, said, want)
 			}
 		}
 		leaveAtLatest(t, ctx, db)

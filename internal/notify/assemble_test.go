@@ -312,7 +312,7 @@ func TestADigestCountsTheReportsInTheReadersTeamsQueues(t *testing.T) {
 			"SONIC-R-2026-777777": theirs, "SONIC-R-2026-888888": other,
 		} {
 			row := &finding.FlawReport{
-				Reference: reference, ProductID: w.Product.ID, Summary: "A claim.",
+				Reference: reference, ProductID: w.Product.ID, ReportedProblem: "A report.",
 				RecordedBy: holder.ID, RecordedAt: now, AssignedTo: &team.PartyID, AssignedAt: &now,
 			}
 			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {

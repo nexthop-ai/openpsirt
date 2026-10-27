@@ -46,7 +46,7 @@ type RulingProposedBody struct {
 	DuplicateOf string                  `json:"duplicate_of,omitempty" maxLength:"191" doc:"The open issue a duplicate points at, under any identifier it goes by. Only on a duplicate"`
 }
 
-// registerRulings is saying what claims are when the answer is not an issue
+// registerRulings is saying what reports are when the answer is not an issue
 // here, and the second person some of those answers take.
 func registerRulings(api huma.API, in core.Deps) {
 	const list = "/v1/products/{product}/report-rulings"

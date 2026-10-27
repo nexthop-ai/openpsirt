@@ -372,12 +372,14 @@ func AgreedTo(t *testing.T, r *Reach, at string) {
 	}
 }
 
-func (r *Reach) Claim(t *testing.T, summary string) string {
+// Reported records a vulnerability report saying this and returns its
+// reference.
+func (r *Reach) Reported(t *testing.T, problem string) string {
 	t.Helper()
 	got := AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
-		`{"summary":"`+summary+`"}`)
+		`{"reported_problem":"`+problem+`"}`)
 	if got.Code != http.StatusCreated {
-		t.Fatalf("recording a claim answered %d: %s", got.Code, got.Body.String())
+		t.Fatalf("recording a report answered %d: %s", got.Code, got.Body.String())
 	}
 	var recorded ReportRead
 	if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
@@ -528,18 +530,18 @@ func FindingAt(vulnerability string) string {
 
 // ReportRead is what the report routes answer, as a test reads it.
 type ReportRead struct {
-	Reference      string `json:"reference"`
-	Summary        string `json:"summary"`
-	ReportedBy     string `json:"reported_by"`
-	Contact        string `json:"contact"`
-	Received       string `json:"received"`
-	Acknowledged   string `json:"acknowledged"`
-	AcknowledgedBy string `json:"acknowledged_by"`
-	Issue          string `json:"issue"`
-	Evaluated      string `json:"evaluated"`
-	EvaluatedBy    string `json:"evaluated_by"`
-	RecordedBy     string `json:"recorded_by"`
-	RecordedAt     string `json:"recorded_at"`
+	Reference       string `json:"reference"`
+	ReportedProblem string `json:"reported_problem"`
+	ReportedBy      string `json:"reported_by"`
+	Contact         string `json:"contact"`
+	Received        string `json:"received"`
+	Acknowledged    string `json:"acknowledged"`
+	AcknowledgedBy  string `json:"acknowledged_by"`
+	Issue           string `json:"issue"`
+	Evaluated       string `json:"evaluated"`
+	EvaluatedBy     string `json:"evaluated_by"`
+	RecordedBy      string `json:"recorded_by"`
+	RecordedAt      string `json:"recorded_at"`
 }
 
 // EndingIn declares a second release of the product with its own end-of-life

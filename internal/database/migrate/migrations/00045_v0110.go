@@ -62,8 +62,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A product records each VEX document and supplier advisory that arrived
 //     for it: who sent it or which feed fetched it, when, and what became of
 //     it.
-//   - A vulnerability report is a case: it has a title, a holder, revisions,
-//     notes, a log of correspondence with its reporter and a record of who
+//   - A vulnerability report is a case: its summary is its reported problem,
+//     and it has a title, a holder, revisions, notes, a log of correspondence with its reporter and a record of who
 //     held it, and the acknowledgement is the first message sent. A routing
 //     rule may place reports. The report beside a flaw recorded by hand
 //     carries the flaw's summary as its reported problem.
@@ -104,7 +104,7 @@ func changeV0110(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{
 		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createLeadV0110,
 		notificationInternalV0110, createDecisionStampV0110, createDocumentUploadV0110,
-		reportCaseV0110, claimFromFlawV0110,
+		reportCaseV0110, reportedProblemFromFlawV0110,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

@@ -29,25 +29,25 @@ type ReportRevision struct {
 	FlawReportID int64 `bun:"flaw_report_id,notnull"`
 	// Ordinal is which version this was, counting from one. Version one is
 	// the report as it was first recorded.
-	Ordinal    int        `bun:"ordinal,notnull"`
-	Title      string     `bun:"title"`
-	Summary    string     `bun:"summary"`
-	ReportedBy string     `bun:"reported_by"`
-	Contact    string     `bun:"contact"`
-	Credit     string     `bun:"credit"`
-	ReceivedOn *time.Time `bun:"received_on"`
-	ReplacedBy int64      `bun:"replaced_by,notnull"`
-	ReplacedAt time.Time  `bun:"replaced_at,notnull"`
+	Ordinal         int        `bun:"ordinal,notnull"`
+	Title           string     `bun:"title"`
+	ReportedProblem string     `bun:"reported_problem"`
+	ReportedBy      string     `bun:"reported_by"`
+	Contact         string     `bun:"contact"`
+	Credit          string     `bun:"credit"`
+	ReceivedOn      *time.Time `bun:"received_on"`
+	ReplacedBy      int64      `bun:"replaced_by,notnull"`
+	ReplacedAt      time.Time  `bun:"replaced_at,notnull"`
 }
 
 // Rewritten is what a report says after an edit. Every field is the whole new
-// value; one left empty is cleared, apart from the claim, which is required.
+// value; one left empty is cleared, apart from the reported problem, which is required.
 type Rewritten struct {
-	Title      string
-	Summary    string
-	ReportedBy string
-	Contact    string
-	Credit     string
+	Title           string
+	ReportedProblem string
+	ReportedBy      string
+	Contact         string
+	Credit          string
 	// Received is the day it arrived, as a date. Empty clears it, and a date
 	// that cannot be read is refused.
 	Received string
@@ -76,17 +76,17 @@ func titled(typed string) (string, error) {
 	return title, nil
 }
 
-// claimed is a claim as it is stored: trimmed, required, and through the
-// submission policy a justification goes through.
-func claimed(typed string) (string, error) {
-	summary := strings.TrimSpace(typed)
-	if summary == "" {
-		return "", ErrNothingClaimed
+// reportedProblem is a reported problem as it is stored: trimmed, required,
+// and through the submission policy a justification goes through.
+func reportedProblem(typed string) (string, error) {
+	problem := strings.TrimSpace(typed)
+	if problem == "" {
+		return "", ErrNoReportedProblem
 	}
-	if err := markdown.Check(summary); err != nil {
+	if err := markdown.Check(problem); err != nil {
 		return "", err
 	}
-	return summary, nil
+	return problem, nil
 }
 
 // reportIn reads one report by its reference, through the handle given, with
@@ -106,7 +106,7 @@ func reportIn(ctx context.Context, db bun.IDB, productID int64, reference string
 	return row, nil
 }
 
-// Revise changes what a report says: its title, its claim, and who sent it.
+// Revise changes what a report says: its title, its reported problem, and who sent it.
 //
 // Only while it is open. A report judged, or under a ruling waiting for a
 // second person, is what was judged, and an edit after that would change the
@@ -118,7 +118,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 	if err := mayWorkReference(subject, productID); err != nil {
 		return nil, err
 	}
-	summary, err := claimed(in.Summary)
+	problem, err := reportedProblem(in.ReportedProblem)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 		received = &parsed
 	}
 	next := FlawReport{
-		Title: title, Summary: summary,
+		Title: title, ReportedProblem: problem,
 		ReportedBy: strings.TrimSpace(in.ReportedBy),
 		Contact:    strings.TrimSpace(in.Contact),
 		Credit:     strings.TrimSpace(in.Credit),
@@ -172,7 +172,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 		now := s.now().UTC().Truncate(time.Microsecond)
 		if _, err := tx.NewInsert().Model(&ReportRevision{
 			FlawReportID: row.ID, Ordinal: highest + 1,
-			Title: row.Title, Summary: row.Summary,
+			Title: row.Title, ReportedProblem: row.ReportedProblem,
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
 			ReceivedOn: row.ReceivedOn, ReplacedBy: subject.ID, ReplacedAt: now,
 		}).Exec(ctx); err != nil {
@@ -183,7 +183,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 		}
 		res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
 			Set(`"title" = ?`, next.Title).
-			Set(`"summary" = ?`, next.Summary).
+			Set(`"reported_problem" = ?`, next.ReportedProblem).
 			Set(`"reported_by" = ?`, next.ReportedBy).
 			Set(`"contact" = ?`, next.Contact).
 			Set(`"credit" = ?`, next.Credit).
@@ -203,7 +203,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 		if changed == 0 {
 			return ErrAlreadyJudged
 		}
-		row.Title, row.Summary = next.Title, next.Summary
+		row.Title, row.ReportedProblem = next.Title, next.ReportedProblem
 		row.ReportedBy, row.Contact, row.Credit = next.ReportedBy, next.Contact, next.Credit
 		row.ReceivedOn = next.ReceivedOn
 		return nil
@@ -218,7 +218,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 func sameText(was, next FlawReport) bool {
 	sameDay := (was.ReceivedOn == nil) == (next.ReceivedOn == nil) &&
 		(was.ReceivedOn == nil || was.ReceivedOn.Format(time.DateOnly) == next.ReceivedOn.Format(time.DateOnly))
-	return sameDay && was.Title == next.Title && was.Summary == next.Summary &&
+	return sameDay && was.Title == next.Title && was.ReportedProblem == next.ReportedProblem &&
 		was.ReportedBy == next.ReportedBy && was.Contact == next.Contact && was.Credit == next.Credit
 }
 
@@ -307,7 +307,7 @@ type Logged struct {
 // LogMessage records a message sent to or received from a report's reporter,
 // and answers the report it was logged on.
 //
-// Open or judged alike: correspondence goes on after a claim is judged, and
+// Open or judged alike: correspondence goes on after a report is judged, and
 // the reporter is owed the outcome. Refused on a flaw found here, which has
 // nobody outside to write to. A day more than one ahead of today is refused,
 // because a message cannot have been sent in the future and a day either side

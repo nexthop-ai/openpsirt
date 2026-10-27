@@ -1415,7 +1415,7 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 |---|---|
 | `POST /v1/products/{product}/reports/{reference}/acknowledgement` and `POST /v1/products/{product}/issues/{vulnerability}/report/acknowledgement` are removed, and a request to either is refused. v0.10.2 recorded with them that somebody answered the reporter | Record a message sent to the reporter instead, with `POST /v1/products/{product}/reports/{reference}/messages` and `direction` set to `sent`. The first message recorded as sent is the acknowledgement |
 | A report's `acknowledged` is the day of the first message recorded as sent, as `YYYY-MM-DD`, and `acknowledged_by` is whoever recorded it. v0.10.2 answered the moment somebody pressed acknowledge | Nothing. The upgrade writes each acknowledgement v0.10.2 recorded as the first message sent, dated the day it was recorded in UTC, by whoever recorded it, with no text. A client parsing `acknowledged` as a moment parses a day |
-| A report's claim is required when it is recorded and when it is edited. v0.10.2 accepted an empty one | Nothing. A report v0.10.2 left with no claim on a flaw recorded here takes the flaw's summary as its claim. Any other report v0.10.2 recorded with no claim keeps none, and an edit to it while it is open fills one in |
+| A report's reported problem, which v0.10.2 named `summary`, is required when it is recorded and when it is edited. v0.10.2 accepted an empty one | Send `reported_problem`. A report v0.10.2 left with none on a flaw recorded here takes the flaw's summary as its reported problem. Any other report v0.10.2 recorded with none keeps none, and an edit to it while it is open fills one in |
 | A routing rule takes `reports`, which places the product's vulnerability reports instead of findings | Nothing. A rule without it places findings, as before |
 | The unanswered notice and a reporter writing back go to whoever holds the report, the members of the team whose queue it is in, or everybody who works reports in the product where nobody holds it | Nothing. Every report the upgrade carries is held by nobody, so its notices reach whom they reached in v0.10.2 |
 | Withdrawing a role that is not somebody's last, a group-bound sign-in that derives fewer roles, the first sign-in after the switch into group-bound mode, a switch out of it, taking somebody off a team and retiring a team hand back the work they leave with a holder who may no longer read it. v0.10.2 handed work back only when somebody's last role on a product went, or they were deactivated | Nothing. Work v0.10.2 already left with somebody who cannot read it stays with them until a write names its holder |
@@ -1459,6 +1459,7 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | `place_limit` | `occurrence_limit` |
 | `exploited_here`, whether an incident stands | `incident` |
 | `exploited_here`, a finding's incidents or a count of issues with one | `incidents` |
+| `summary`, on a vulnerability report | `reported_problem` |
 
 A notice's `places`, the places it named, keeps its name.
 

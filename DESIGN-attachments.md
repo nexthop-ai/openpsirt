@@ -44,7 +44,7 @@ decision covers every occurrence an issue sits at, and binding a file to one of
 forty-eight rows would make it unreachable the day that row closed while its
 siblings stayed open.
 
-A report is the other thing a file arrives with. A claim that has not been
+A report is the other thing a file arrives with. A report that has not been
 judged has no issue to hang a screenshot on, and the screenshot is often the
 whole of what was sent. The file stays with the report once the report gains
 an issue, because what was sent is a fact about the report — moved to the
@@ -58,7 +58,7 @@ becomes readable along with the words describing it.
 |---|---|
 | Attached to text | The ordinary case. A file attached while composing is bound to the issue alone until that text is saved |
 | Attached to the issue | Evidence for a recorded flaw. Attached the moment it arrives. The caller requests this; it is not the default |
-| Attached to the report | What arrived with a claim. Attached the moment it arrives, and it stays on the report when the claim is judged. A report ruled a duplicate is listed on the issue it duplicates, and its files are reached through it there |
+| Attached to the report | What arrived with a report. Attached the moment it arrives, and it stays on the report when the report is judged. A report ruled a duplicate is listed on the issue it duplicates, and its files are reached through it there |
 | Attached to nothing | Collected by the reaper |
 
 ## Fetch authorization
@@ -82,8 +82,8 @@ For a file on a report, the report's own answer, which `DESIGN-findings.md`
 product, whether or not the claim has been judged. The record and what
 arrived with it have one answer rather than two.
 
-A file on a report does not follow the issue the claim turned out to be. What
-a stranger sent is reviewed by nobody, so judging the claim to be a disclosed
+A file on a report does not follow the issue the report turned out to be. What
+a stranger sent is reviewed by nobody, so judging the report to be a disclosed
 issue must not publish it; anything meant to be read there is attached to the
 issue instead.
 

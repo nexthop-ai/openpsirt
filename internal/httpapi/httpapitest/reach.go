@@ -73,7 +73,7 @@ func DeclaredBody(method, path, name string) io.Reader {
 		return strings.NewReader(`{"because": "` + name + `", "fixed_in": 1}`)
 	}
 	if strings.HasSuffix(path, "/reports") {
-		return strings.NewReader(`{"summary": "` + name + `"}`)
+		return strings.NewReader(`{"reported_problem": "` + name + `"}`)
 	}
 	if strings.HasSuffix(path, "/branches-and-tags") {
 		return strings.NewReader(`{"name": "` + name + `", "kind": "branch"}`)
@@ -100,7 +100,7 @@ func reportBody(method, path, name string) io.Reader {
 	case strings.Contains(rest, "/notes"):
 		return strings.NewReader(`{"body": "` + name + `"}`)
 	case method == http.MethodPut && !strings.Contains(rest, "/"):
-		return strings.NewReader(`{"summary": "` + name + `"}`)
+		return strings.NewReader(`{"reported_problem": "` + name + `"}`)
 	}
 	return nil
 }

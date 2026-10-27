@@ -18,7 +18,7 @@ import (
 
 func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 	// The condition is about a letter somebody sent and nobody answered, and
-	// a claim nobody has judged is the one most in need of an answer. Derived
+	// a report nobody has judged is the one most in need of an answer. Derived
 	// from the issue alone it fires for none of them, because there is no
 	// issue — so the reports the feature exists for are the reports nothing
 	// reports.
@@ -31,7 +31,7 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 		product := w.Product
 		// Somebody who may triage work nobody has announced, and somebody who
 		// may only triage what has been. The second is told nothing: the
-		// claim is one they cannot open, and an alert about a letter you
+		// report is one they cannot open, and an alert about a letter you
 		// cannot read is one you can do nothing with.
 		answers, err := rights.Ensure(ctx, "answers@example.com", "Answers", nil, nil)
 		if err != nil {
@@ -61,10 +61,10 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 
 		report := &finding.FlawReport{
 			Reference: "SONIC-R-2026-424242", ProductID: product.ID,
-			Summary:    "The management socket accepts a request nobody authenticated.",
-			ReportedBy: "A Researcher",
-			RecordedBy: answers.ID,
-			RecordedAt: time.Now().UTC().Truncate(time.Microsecond),
+			ReportedProblem: "The management socket accepts a request nobody authenticated.",
+			ReportedBy:      "A Researcher",
+			RecordedBy:      answers.ID,
+			RecordedAt:      time.Now().UTC().Truncate(time.Microsecond),
 		}
 		if _, err := db.DB.NewInsert().Model(report).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -86,7 +86,7 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 		if len(told) != 1 {
 			t.Fatalf("whoever may answer was told %d things, want 1", len(told))
 		}
-		// Named by the reference, because a claim nobody has judged has no
+		// Named by the reference, because a report nobody has judged has no
 		// identifier and no finding screen to point at.
 		if !strings.Contains(told[0].Body, report.Reference) {
 			t.Errorf("the alert reads %q and does not name %q",

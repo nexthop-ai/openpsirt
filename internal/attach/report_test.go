@@ -15,9 +15,9 @@ import (
 )
 
 func TestAFileArrivesWithAClaimNobodyHasJudged(t *testing.T) {
-	// A claim that has not been judged has no issue to hang a screenshot on,
+	// A report that has not been judged has no issue to hang a screenshot on,
 	// and the screenshot is often the whole of what was sent. Without this
-	// the evidence is lost or the claim has to be turned into a flaw nobody
+	// the evidence is lost or the report has to be turned into a flaw nobody
 	// believes in order to keep it.
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.who(t, access.PrivateTriage)
@@ -31,15 +31,15 @@ func TestAFileArrivesWithAClaimNobodyHasJudged(t *testing.T) {
 			t.Fatal(err)
 		}
 		if stored.VulnerabilityID != nil {
-			t.Errorf("a file on a claim points at issue %d", *stored.VulnerabilityID)
+			t.Errorf("a file on a report points at issue %d", *stored.VulnerabilityID)
 		}
 		if stored.FlawReportID == nil || *stored.FlawReportID != report {
-			t.Errorf("a file on a claim points at report %v", stored.FlawReportID)
+			t.Errorf("a file on a report points at report %v", stored.FlawReportID)
 		}
 
 		rows, err := f.store.ForReport(t.Context(), who, f.product, report)
 		if err != nil || len(rows) != 1 {
-			t.Fatalf("what arrived with the claim: %d rows, %v", len(rows), err)
+			t.Fatalf("what arrived with the report: %d rows, %v", len(rows), err)
 		}
 		back, err := f.store.Find(t.Context(), who, stored.Token)
 		if err != nil || back.Token != stored.Token {
@@ -49,7 +49,7 @@ func TestAFileArrivesWithAClaimNobodyHasJudged(t *testing.T) {
 }
 
 func TestAFileOnAnUnjudgedClaimIsReadWithPrivateReadAndAttachedWithPrivateTriage(t *testing.T) {
-	// There is no issue to be public about, and nobody has decided the claim
+	// There is no issue to be public about, and nobody has decided the report
 	// is safe to repeat. So the file takes the same answer the report does:
 	// a reader who may see only this product's announced work sees none of
 	// it, a reader of undisclosed work reads it, and attaching another asks
@@ -68,7 +68,7 @@ func TestAFileOnAnUnjudgedClaimIsReadWithPrivateReadAndAttachedWithPrivateTriage
 		for _, held := range []access.Role{access.PublicRead, access.PublicTriage} {
 			stranger := f.who(t, held)
 			if _, err := f.store.Find(t.Context(), stranger, stored.Token); err == nil {
-				t.Errorf("%s fetched a file on a claim nobody has judged", held)
+				t.Errorf("%s fetched a file on a report nobody has judged", held)
 			}
 			if _, err := f.store.ForReport(t.Context(), stranger, f.product,
 				report); !errors.Is(err, access.ErrDenied) {
@@ -101,8 +101,8 @@ func TestAFileOnAnUnjudgedClaimIsReadWithPrivateReadAndAttachedWithPrivateTriage
 
 func TestJudgingAClaimDoesNotPublishWhatArrivedWithIt(t *testing.T) {
 	// A file on a report follows the report and not the issue, which is the
-	// one place the two differ. What arrived with a claim is what a stranger
-	// sent and nobody has reviewed it, so saying the claim is a disclosed
+	// one place the two differ. What arrived with a report is what a stranger
+	// sent and nobody has reviewed it, so saying the report is a disclosed
 	// issue must not hand it to everybody who reads that product. A file
 	// meant to be read there is attached to the issue, which is an act
 	// somebody takes.
@@ -131,7 +131,7 @@ func TestJudgingAClaimDoesNotPublishWhatArrivedWithIt(t *testing.T) {
 			t.Errorf("a reader could not fetch a file on announced work: %v", err)
 		}
 		if _, err := f.store.Find(t.Context(), reader, onTheReport.Token); err == nil {
-			t.Error("judging a claim to be announced work published what arrived with it")
+			t.Error("judging a report to be announced work published what arrived with it")
 		}
 	})
 }
@@ -154,19 +154,19 @@ func TestAFileHangsOffOneThingOrTheOther(t *testing.T) {
 	})
 }
 
-// aReport records a claim against the fixture's product, pointed at an issue
+// aReport records a report against the fixture's product, pointed at an issue
 // where one is given.
 func (f *fixture) aReport(t *testing.T, who access.Subject, issue *int64) int64 {
 	t.Helper()
 	row := &finding.FlawReport{
 		Reference: "SONIC-R-2026-" + time.Now().Format("150405.000000000"),
 		ProductID: f.product, VulnerabilityID: issue,
-		Summary:    "They say the management socket lets anybody in.",
-		Contact:    "them@example.org",
-		RecordedBy: who.ID, RecordedAt: time.Now().UTC().Truncate(time.Microsecond),
+		ReportedProblem: "They say the management socket lets anybody in.",
+		Contact:         "them@example.org",
+		RecordedBy:      who.ID, RecordedAt: time.Now().UTC().Truncate(time.Microsecond),
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
-		t.Fatalf("record a claim: %v", err)
+		t.Fatalf("record a report: %v", err)
 	}
 	return row.ID
 }

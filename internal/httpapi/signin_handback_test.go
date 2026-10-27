@@ -50,8 +50,8 @@ func TestASignInThatTakesUndisclosedReadingAwayHandsBackTheReportsHeld(t *testin
 		}
 		recorder := access.NewPerson(person.ID, "granted", false,
 			map[int64][]access.Role{r.product: {access.PrivateTriage}}, person.PartyID)
-		row, err := finding.NewStore(r.db.DB).Record(ctx, recorder, r.product, finding.Claimed{
-			Title: "A title", Summary: "Something.",
+		row, err := finding.NewStore(r.db.DB).Record(ctx, recorder, r.product, finding.NewReport{
+			Title: "A title", ReportedProblem: "Something.",
 			Told: finding.Told{ReportedBy: "A. Researcher", Contact: "a@example.org", Received: "2026-09-01"},
 		})
 		if err != nil {
@@ -119,8 +119,8 @@ func TestATrustedHeaderSignInThatTakesUndisclosedReadingAwayHandsBackTheReportsH
 			return subject
 		}
 		subject := ask("platform,security")
-		row, err := finding.NewStore(r.db.DB).Record(ctx, subject, r.product, finding.Claimed{
-			Title: "A title", Summary: "Something.",
+		row, err := finding.NewStore(r.db.DB).Record(ctx, subject, r.product, finding.NewReport{
+			Title: "A title", ReportedProblem: "Something.",
 			Told: finding.Told{ReportedBy: "A. Researcher", Contact: "a@example.org", Received: "2026-09-01"},
 		})
 		if err != nil {

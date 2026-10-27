@@ -35,11 +35,11 @@ func (f *fixture) holder(t *testing.T, identity string, roles ...access.Role) ac
 		map[int64][]access.Role{f.productID: roles}, person.PartyID)
 }
 
-// aReport records one claim and answers it.
+// aReport records one report and answers it.
 func (f *fixture) aReport(t *testing.T, who access.Subject, summary string) *finding.FlawReport {
 	t.Helper()
-	row, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
-		Title: "A title", Summary: summary,
+	row, err := f.store.Record(t.Context(), who, f.productID, finding.NewReport{
+		Title: "A title", ReportedProblem: summary,
 		Told: finding.Told{ReportedBy: "A. Researcher", Contact: "a@example.org", Received: "2026-09-01"},
 	})
 	if err != nil {
@@ -55,19 +55,19 @@ func TestAnEditKeepsWhatTheReportSaidBefore(t *testing.T) {
 		row := f.aReport(t, who, "The first words.")
 
 		edited, err := f.store.Revise(ctx, who, f.productID, row.Reference, finding.Rewritten{
-			Title: "A better title", Summary: "The second words.",
+			Title: "A better title", ReportedProblem: "The second words.",
 			ReportedBy: "A. Researcher", Contact: "new@example.org", Received: "2026-08-30",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if edited.Summary != "The second words." || edited.Contact != "new@example.org" ||
+		if edited.ReportedProblem != "The second words." || edited.Contact != "new@example.org" ||
 			edited.ReceivedOn.Format(time.DateOnly) != "2026-08-30" {
 			t.Errorf("the edit reads %+v", edited)
 		}
 		// An edit that changes nothing keeps nothing.
 		if _, err := f.store.Revise(ctx, who, f.productID, row.Reference, finding.Rewritten{
-			Title: "A better title", Summary: "The second words.",
+			Title: "A better title", ReportedProblem: "The second words.",
 			ReportedBy: "A. Researcher", Contact: "new@example.org", Received: "2026-08-30",
 		}); err != nil {
 			t.Fatal(err)
@@ -79,7 +79,7 @@ func TestAnEditKeepsWhatTheReportSaidBefore(t *testing.T) {
 		if len(was) != 1 {
 			t.Fatalf("two edits, one of them changing nothing, kept %d revisions, want 1", len(was))
 		}
-		if was[0].Ordinal != 1 || was[0].Summary != "The first words." ||
+		if was[0].Ordinal != 1 || was[0].ReportedProblem != "The first words." ||
 			was[0].Title != "A title" || was[0].Contact != "a@example.org" ||
 			was[0].ReceivedOn.Format(time.DateOnly) != "2026-09-01" || was[0].ReplacedBy != who.ID {
 			t.Errorf("the original reads %+v", was[0])
@@ -98,10 +98,10 @@ func TestAnEditIsRefusedWhereItWouldChangeWhatWasJudged(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		edit := finding.Rewritten{Summary: "Changed."}
+		edit := finding.Rewritten{ReportedProblem: "Changed."}
 
 		// A ruling waiting for a second person holds it: the approver reads
-		// the claim as it stands.
+		// the report as it stands.
 		waiting := f.aReport(t, who, "Waiting.")
 		if _, err := f.store.Rule(ctx, who, f.productID, finding.Ruled{
 			References: []string{waiting.Reference}, Disposition: finding.Rejected,
@@ -147,20 +147,20 @@ func TestAnEmptyClaimIsRefusedWhenRecordedAndWhenEdited(t *testing.T) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		if _, err := f.store.Record(ctx, who, f.productID,
-			finding.Claimed{Summary: "  \n "}); !errors.Is(err, finding.ErrNothingClaimed) {
-			t.Errorf("an empty claim was recorded: %v", err)
+			finding.NewReport{ReportedProblem: "  \n "}); !errors.Is(err, finding.ErrNoReportedProblem) {
+			t.Errorf("an empty report was recorded: %v", err)
 		}
 		row := f.aReport(t, who, "Something.")
 		if _, err := f.store.Revise(ctx, who, f.productID, row.Reference,
-			finding.Rewritten{Summary: " "}); !errors.Is(err, finding.ErrNothingClaimed) {
-			t.Errorf("a claim was edited to nothing: %v", err)
+			finding.Rewritten{ReportedProblem: " "}); !errors.Is(err, finding.ErrNoReportedProblem) {
+			t.Errorf("a report was edited to nothing: %v", err)
 		}
 		if _, err := f.store.Revise(ctx, who, f.productID, row.Reference,
-			finding.Rewritten{Summary: "Something.", Received: "last tuesday"}); !errors.Is(err, finding.ErrUnreadableDay) {
+			finding.Rewritten{ReportedProblem: "Something.", Received: "last tuesday"}); !errors.Is(err, finding.ErrUnreadableDay) {
 			t.Errorf("an unreadable day was accepted on an edit: %v", err)
 		}
 		if _, err := f.store.Revise(ctx, who, f.productID, row.Reference,
-			finding.Rewritten{Summary: "Something.", Title: "two\nlines"}); !errors.Is(err, finding.ErrTitleOneLine) {
+			finding.Rewritten{ReportedProblem: "Something.", Title: "two\nlines"}); !errors.Is(err, finding.ErrTitleOneLine) {
 			t.Errorf("a title across lines was accepted: %v", err)
 		}
 	})
@@ -199,8 +199,8 @@ func TestAMessageIsRecordedOnAReportFromOutsideAndNoOther(t *testing.T) {
 			t.Errorf("the correspondence reads %+v (%v)", read, err)
 		}
 
-		here, err := f.store.Record(ctx, who, f.productID, finding.Claimed{
-			Summary: "Found here.", Told: finding.Told{FoundHere: true},
+		here, err := f.store.Record(ctx, who, f.productID, finding.NewReport{
+			ReportedProblem: "Found here.", Told: finding.Told{FoundHere: true},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -340,7 +340,7 @@ func TestAReportIsTakenGivenAndHandedBackUnderTheFindingRule(t *testing.T) {
 		both := access.NewPerson(lead.ID, "lead@example.com", false, map[int64][]access.Role{
 			f.productID: {access.PrivateTriage}, elsewhere.ID: {access.PrivateTriage, access.Assigner},
 		}, lead.Party())
-		there, err := f.store.Record(ctx, both, elsewhere.ID, finding.Claimed{Summary: "Elsewhere."})
+		there, err := f.store.Record(ctx, both, elsewhere.ID, finding.NewReport{ReportedProblem: "Elsewhere."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -491,7 +491,7 @@ func TestAReportsHistoryHoldsEveryAct(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row := f.aReport(t, who, "Something.")
 		if _, err := f.store.Revise(ctx, who, f.productID, row.Reference,
-			finding.Rewritten{Summary: "Something more."}); err != nil {
+			finding.Rewritten{ReportedProblem: "Something more."}); err != nil {
 			t.Fatal(err)
 		}
 		note, _, err := f.store.NoteOnReport(ctx, who, f.productID, row.Reference, "A thought.")
@@ -544,7 +544,7 @@ func TestTwoEditsAtOnceKeepEveryVersion(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row := f.aReport(t, who, "The first words.")
 		edit := func(summary string) finding.Rewritten {
-			return finding.Rewritten{Title: "A title", Summary: summary,
+			return finding.Rewritten{Title: "A title", ReportedProblem: summary,
 				ReportedBy: "A. Researcher", Contact: "a@example.org", Received: "2026-09-01"}
 		}
 		// The rival lands after the report is read and before the next
@@ -569,7 +569,7 @@ func TestTwoEditsAtOnceKeepEveryVersion(t *testing.T) {
 		}
 		var said []string
 		for _, revision := range was {
-			said = append(said, revision.Summary)
+			said = append(said, revision.ReportedProblem)
 		}
 		if !slices.Equal(said, []string{"The first words.", "The rival's words."}) {
 			t.Errorf("the revisions kept read %q, want the first words, then the rival's", said)
@@ -582,7 +582,7 @@ func TestTwoEditsOfANoteAtOnceKeepEveryWording(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		row := f.aReport(t, who, "A claim.")
+		row := f.aReport(t, who, "A report.")
 		note, _, err := f.store.NoteOnReport(ctx, who, f.productID, row.Reference, "First.")
 		if err != nil {
 			t.Fatal(err)

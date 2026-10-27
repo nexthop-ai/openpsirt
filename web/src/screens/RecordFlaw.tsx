@@ -75,7 +75,7 @@ export function RecordFlaw() {
   // Seeded from the decision where it is already cached, which is the ordinary
   // arrival from the report's own page. The reseed below covers a decision that
   // arrives after the form is drawn.
-  const [summary, setSummary] = useState(report.data?.summary ?? "");
+  const [summary, setSummary] = useState(report.data?.reported_problem ?? "");
   const [severity, setSeverity] = useState("");
   const [component, setComponent] = useState("");
   // Only ever set by picking one of the choices a refusal offered. Asking for
@@ -117,7 +117,7 @@ export function RecordFlaw() {
   // The decision's words as a starting point, once they arrive and only while the
   // summary is still empty.
   useReseed(report.data?.reference ?? "", () => {
-    if (report.data?.summary && summary === "") setSummary(report.data.summary);
+    if (report.data?.reported_problem && summary === "") setSummary(report.data.reported_problem);
   });
 
   const may = mayOf(who.data, product);
@@ -255,7 +255,7 @@ export function RecordFlaw() {
   const recordReport = useRecordReport(product);
   const filing = useMutation({
     mutationFn: async () => {
-      const made = await recordReport.mutateAsync({ summary: summary.trim(), ...told() });
+      const made = await recordReport.mutateAsync({ reported_problem: summary.trim(), ...told() });
       const failed: string[] = [];
       for (const each of files) {
         try {

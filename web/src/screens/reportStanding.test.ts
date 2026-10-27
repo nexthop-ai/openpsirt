@@ -39,7 +39,7 @@ describe("which reports a ruling may cover", () => {
 });
 
 describe("the second person", () => {
-  it("is asked for setting a claim aside and for nothing else", () => {
+  it("is asked for setting a report aside and for nothing else", () => {
     expect(needsSecond("rejected")).toBe(true);
     expect(needsSecond("out-of-scope")).toBe(true);
     expect(needsSecond("duplicate")).toBe(false);

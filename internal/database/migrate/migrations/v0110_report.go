@@ -28,23 +28,24 @@ func flawReportV0110(t *columnTypes) []string {
 			-- The name this report is reached by, and the one somebody
 			-- quotes back to a reporter. Drawn at random rather than
 			-- counted: a sequence tells anybody who may ask how many
-			-- claims this product has received and when the last one
+			-- reports this product has received and when the last one
 			-- arrived. Composed of a product's name and twelve more
 			-- characters, so it is sized as a composed value.
 			"reference"        VARCHAR(` + strconv.Itoa(database.ComposedWidth) + `) NOT NULL,
-			-- A line naming the claim, as somebody here wrote it. Optional:
-			-- the claim is what is evaluated and answered.
+			-- A line naming the reported problem, as somebody here wrote it.
+			-- Optional: the reported problem is what is evaluated and
+			-- answered.
 			"title"            ` + t.free + ` NULL,
 			-- The product it was reported against, which decides who may
 			-- read it.
 			"product_id"       ` + t.ref + ` NOT NULL,
 			-- The issue it turned out to be, where somebody accepted it as
-			-- one. Null is a claim nobody has judged, and one a ruling
+			-- one. Null is a report nobody has judged, and one a ruling
 			-- answers.
 			"vulnerability_id" ` + t.refNull + ` NULL,
-			-- What was claimed, as it stands now. What it said before an edit
-			-- is in the revisions.
-			"summary"          ` + t.text + ` NULL,
+			-- The reported problem, as it stands now. What it said before an
+			-- edit is in the revisions.
+			"reported_problem" ` + t.text + ` NULL,
 			-- Who sent it, how to reach them and how they wish to be
 			-- credited. Free text: a reporter has no account here.
 			"reported_by"      ` + t.free + ` NULL,
@@ -52,7 +53,7 @@ func flawReportV0110(t *columnTypes) []string {
 			"credit"           ` + t.free + ` NULL,
 			-- The day it arrived, which the embargo runs from.
 			"received_on"      ` + t.date + ` NULL,
-			-- When somebody judged the claim, and who.
+			-- When somebody judged the report, and who.
 			"evaluated_at"     ` + t.timestamp + ` NULL,
 			"evaluated_by"     ` + t.refNull + ` NULL,
 			"recorded_by"      ` + t.ref + ` NOT NULL,
@@ -96,8 +97,8 @@ func flawReportV0110(t *columnTypes) []string {
 			-- stands is one past the highest here, and version one is the
 			-- report as it was first recorded.
 			"ordinal"        ` + t.ref + ` NOT NULL,
-			"title"          ` + t.free + ` NULL,
-			"summary"        ` + t.text + ` NULL,
+			"title"            ` + t.free + ` NULL,
+			"reported_problem" ` + t.text + ` NULL,
 			"reported_by"    ` + t.free + ` NULL,
 			"contact"        ` + t.free + ` NULL,
 			"credit"         ` + t.free + ` NULL,
@@ -226,6 +227,19 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	declared := flawReportV0110(u.t)
+	// A report's summary is its reported problem. Renamed here rather than
+	// in the rename step, whose names hold in every table: an advisory
+	// issuance's summary and a component's keep theirs. Asked first, because
+	// a stopped start can have renamed it already.
+	summary, err := u.hasColumn("flaw_report", "summary")
+	if err != nil {
+		return err
+	}
+	if summary {
+		if err := u.run([]string{`ALTER TABLE "flaw_report" RENAME COLUMN "summary" TO "reported_problem"`}); err != nil {
+			return err
+		}
+	}
 	for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
 		"report_note_revision", "report_assignment"} {
 		present, err := u.hasColumn(table, "id")
@@ -329,21 +343,22 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 		add: []added{{column: "reports"}}})
 }
 
-// claimFromFlawV0110 gives every report with no claim on a flaw recorded here
-// the flaw's summary as its claim. v0.10.0 left the claim of the report
-// written beside a flaw recorded by hand empty and kept the summary on the
-// issue alone, and a judged report can no longer be edited to fill it. Run after the issue kinds are marked, which
-// is how a flaw recorded by hand is told from a published vulnerability; a
-// report with a claim of its own keeps it, so a second start changes nothing.
-func claimFromFlawV0110(ctx context.Context, tx bun.Tx) error {
+// reportedProblemFromFlawV0110 gives every report with no reported problem on
+// a flaw recorded here the flaw's summary as its reported problem. v0.10.0
+// left the report written beside a flaw recorded by hand empty and kept the
+// summary on the issue alone, and a judged report can no longer be edited to
+// fill it. Run after the issue kinds are marked, which is how a flaw recorded
+// by hand is told from a published vulnerability; a report with a reported
+// problem of its own keeps it, so a second start changes nothing.
+func reportedProblemFromFlawV0110(ctx context.Context, tx bun.Tx) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE "flaw_report"
-		SET "summary" = (SELECT "v"."description" FROM "vulnerability" AS "v"
+		SET "reported_problem" = (SELECT "v"."description" FROM "vulnerability" AS "v"
 			WHERE "v"."id" = "flaw_report"."vulnerability_id")
-		WHERE ("flaw_report"."summary" IS NULL OR "flaw_report"."summary" = '')
+		WHERE ("flaw_report"."reported_problem" IS NULL OR "flaw_report"."reported_problem" = '')
 		  AND EXISTS (SELECT 1 FROM "vulnerability" AS "v"
 			WHERE "v"."id" = "flaw_report"."vulnerability_id" AND "v"."kind" = 'flaw'
 			  AND "v"."description" IS NOT NULL AND "v"."description" <> '')`); err != nil {
-		return fmt.Errorf("give each flaw's report its claim: %w", err)
+		return fmt.Errorf("give each flaw's report its reported problem: %w", err)
 	}
 	return nil
 }

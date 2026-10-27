@@ -166,7 +166,7 @@ export function useDuplicates(product: string, vulnerability: string) {
 export function useRecordReport(product: string) {
   const after = useAfterReport();
   return useMutation({
-    mutationFn: async (body: Body<"ClaimedBody">) =>
+    mutationFn: async (body: Body<"NewReportBody">) =>
       unwrap(
         await api.POST("/v1/products/{product}/reports", {
           params: { path: { product } },

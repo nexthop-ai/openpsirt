@@ -18,9 +18,9 @@ import (
 
 // FlawReport is what somebody told us, and what became of it.
 //
-// It stands whether or not the claim turns out to be a flaw. A report nobody
+// It stands whether or not the report turns out to be a flaw. A report nobody
 // believes still has to be recorded, because the evidence that it arrived and
-// was answered is the record itself — and a claim that can only be recorded by
+// was answered is the record itself — and a report that can only be recorded by
 // minting an issue for it either fills the findings with flaws nobody believes
 // or goes unrecorded.
 //
@@ -40,8 +40,8 @@ type FlawReport struct {
 	// quotes back to a reporter. Drawn rather than counted, for the reason a
 	// recorded flaw's identifier is.
 	Reference string `bun:"reference,notnull"`
-	// Title is a line naming the claim, as somebody here wrote it. Optional,
-	// because the claim is what is evaluated and answered.
+	// Title is a line naming the reported problem, as somebody here wrote it.
+	// Optional, because the reported problem is what is evaluated and answered.
 	Title string `bun:"title"`
 	// ProductID is the product it was reported against, which is what decides
 	// who may read it. An issue's identity spans its aliases, so the same
@@ -53,10 +53,10 @@ type FlawReport struct {
 	// as one. Absent is every other report: one nobody has judged, which is
 	// the state every report arrives in, and one a ruling answers.
 	VulnerabilityID *int64 `bun:"vulnerability_id"`
-	// Summary is what was claimed, in the words it was claimed in. A report
-	// written beside a flaw recorded by hand carries the flaw's summary. Empty
-	// only on a report v0.10.0 recorded with no claim.
-	Summary string `bun:"summary"`
+	// ReportedProblem is what the reporter says is wrong, in their words. A
+	// report written beside a flaw recorded by hand carries the flaw's summary.
+	// Empty only on a report v0.10.0 recorded with no reported problem.
+	ReportedProblem string `bun:"reported_problem"`
 	// ReportedBy and Contact are free text, because a reporter is somebody
 	// outside this deployment with no account here — which is the whole shape
 	// of the thing rather than an omission.
@@ -74,7 +74,7 @@ type FlawReport struct {
 	// outside sent. It carries no disclosure date and nobody is owed an
 	// answer.
 	FoundHere bool `bun:"found_here,notnull"`
-	// EvaluatedAt and EvaluatedBy are when somebody judged the claim, and
+	// EvaluatedAt and EvaluatedBy are when somebody judged the report, and
 	// who. The person who transcribes a mail is not the person who decides
 	// what it is worth, and a record that cannot tell them apart evidences
 	// neither.
@@ -100,7 +100,7 @@ func (r *FlawReport) Editable() bool {
 
 // Told is what somebody types in about where a flaw came from.
 //
-// Every field is optional. A claim arriving anonymously has no reporter, and a
+// Every field is optional. A report arriving anonymously has no reporter, and a
 // form that demanded one would be asking them to invent an answer — which is
 // the failure mode of every required field that is not always true.
 type Told struct {
@@ -110,7 +110,7 @@ type Told struct {
 	// Received is the day it arrived, as a date. Empty is the day it was
 	// recorded.
 	Received string
-	// FoundHere is a flaw somebody here found. Unset is a claim from outside,
+	// FoundHere is a flaw somebody here found. Unset is a report from outside,
 	// which is the case with a reporter counting down to a publication, so a
 	// form left alone errs toward the disclosure date rather than away from it.
 	FoundHere bool
@@ -146,7 +146,7 @@ func (t Told) When() *time.Time {
 // nothing in.
 //
 // The same rule a report reached by its reference takes, because it is the
-// same row. Asked as the issue's own visibility instead, judging a claim
+// same row. Asked as the issue's own visibility instead, judging a report
 // handed what a stranger wrote to everybody who triages announced work in
 // that product — a widening by the act of filing, which is the one thing a
 // report's visibility rule says does not happen.
@@ -216,7 +216,7 @@ type Unanswered struct {
 // than an unanswered letter, and a condition nobody can act on teaches people
 // to ignore the list. A report with no issue has none to be open, and is
 // still owed an answer whether or not a ruling says what it is — a ruling
-// answers what the claim is, not the person who sent it.
+// answers what the report is, not the person who sent it.
 func (s *Store) Unacknowledged(ctx context.Context) ([]Unanswered, error) {
 	out, err := s.unacknowledgedOnIssues(ctx)
 	if err != nil {
@@ -322,7 +322,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 		Where(`"fr"."vulnerability_id" IS NULL`).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read which claims nobody has answered: %w", err)
+		return nil, fmt.Errorf("read which reports nobody has answered: %w", err)
 	}
 	out := make([]Unanswered, 0, len(rows))
 	for _, row := range rows {
