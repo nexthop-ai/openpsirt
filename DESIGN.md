@@ -55,7 +55,20 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 
 | Document | Covers | Terms |
 |---|---|---|
-| [interface](design-docs/interface.md) | The web interface and how it reaches the server | routing, generated client, the shell, findings list, filters, saved filters, finding screen, decision form, review queue, editor, keyboard, screen copy |
+| [interface](design-docs/interface.md) | The web interface's build, routing and server contract, and rules every screen follows | one artifact, path routing, route table, generated client, capabilities, failed reads, render boundaries, expired session, units, dates, screen copy, copy gate, demo, test coverage |
+| [interface-look](design-docs/interface-look.md) | How the interface is drawn | tokens, light and dark, work surface, state chips, phone layout, wide tables, stacking, cards per option, keyboard, focus ring, severity marks, known exploited, incident badge, mockup divergence |
+| [interface-shell](design-docs/interface-shell.md) | The frame around every screen | rail, folded rail, top bar, upload, phone tab bar, scope picker, build-only screens, home, tiles, deadline floors, search box |
+| [interface-findings-list](design-docs/interface-findings-list.md) | The findings list screen | row content, way down, cross-product list, sorting, paging, selection, bulk form, select all, by-component view, by-upgrade view, list navigation, restored position |
+| [interface-filters](design-docs/interface-filters.md) | The findings list's filters and saved filters | filter bar, chips, More filters, release kind, support, multi-value filters, Mixed, filters over a group, saved filters, prepared decision, deferral length |
+| [interface-finding](design-docs/interface-finding.md) | The finding screen and deciding on it | layout, references, what the build says, dependency path, notes and comments, decision form, deferral forecast, locations, reach sheet, answer placement |
+| [interface-component](design-docs/interface-component.md) | The component screen and the dependency tree | source package page, binaries, where it could go, promise form, component reads, tree counts, beneath, unmatched components, tree search |
+| [interface-review](design-docs/interface-review.md) | Review, decision and assignment screens | review queue tabs, outliers, reaffirm, queue filters and exports, decision page, reach when lapsed, assignments, unassigned, assignment rules |
+| [interface-editor](design-docs/interface-editor.md) | Writing text on screen | editor, preview, drafts, draft keys, sign-out clearing, tab memory, file attachment, mentions, people pickers |
+| [interface-catalog](design-docs/interface-catalog.md) | Catalog, upload, product and release screens | catalog drawer, retiring, upload drawer, Uploads tabs, receipts, inherited lines, inventory changes, component comparison, repositories screen, product page, scan run page, release page |
+| [interface-flaws](design-docs/interface-flaws.md) | Flaw, report, disclosure and incident screens | flaw entry, score vector, vulnerability reports, rulings, disclosure deadlines, standing notice, advisory screens, published VEX, flaw panel, Incidents screen |
+| [interface-security-testing](design-docs/interface-security-testing.md) | Code findings on screen | Security testing screen, code finding page, Also found by, decisions on code findings, flaw records, include in disclosure, suppression rules |
+| [interface-administration](design-docs/interface-administration.md) | Reports and administration screens | analytics catalog, printing, audit log, settings, webhooks, suppliers, System screen, Access, credentials, own page, a person whole |
+| [interface-measurements](design-docs/interface-measurements.md) | Benchmark runs behind the interface's reads | component read timings, ways down, tree walk, tree search |
 | [text](design-docs/text.md) | Text people write, and where it is checked and rendered | markdown policy, raw markup, link schemes, issue references, refusals, code block language tags, bounds |
 | [attachments](design-docs/attachments.md) | Files on an issue or a report | references in text, fetch authorization, storage, delivery, quota and removal |
 
