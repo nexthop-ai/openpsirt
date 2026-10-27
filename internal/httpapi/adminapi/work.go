@@ -19,22 +19,22 @@ import (
 
 // Work that stopped being retried, and putting it back.
 //
-// The queue sets a job aside once it has run out of attempts. Without
+// A job fails once it has run out of attempts. Without
 // somewhere to see that, a deployment learns about it from a build that has
 // quietly stopped being scanned. The two routes here are the whole of the
-// operator surface over the dead state: what stopped, and try it again.
+// operator surface over the failed state: what stopped, and try it again.
 //
 // Deliberately not a general view of the queue. Work that is waiting or
 // running needs no attention and a list of it invites somebody to act on a
-// state that changes underneath them; what is set aside has stopped moving by
+// state that changes underneath them; a failed job has stopped moving by
 // definition, which is what makes it worth showing.
 
-// SetAsideBody is one piece of work that stopped being retried.
-type SetAsideBody struct {
+// FailedJobBody is one job that stopped being retried.
+type FailedJobBody struct {
 	ID int64 `json:"id" doc:"The job, for putting it back"`
 	// Kind and Reference are the work itself, in the queue's own words. No
 	// attempt is made to resolve the reference into whatever it points at:
-	// the thing may have been deleted since, and a list of set-aside work
+	// the thing may have been deleted since, and a list of failed jobs
 	// that fails to render because one row points at nothing is worse than
 	// one that says what the row says.
 	Kind      string `json:"kind" doc:"The worker the job was for"`
@@ -47,7 +47,7 @@ type SetAsideBody struct {
 	// grant that reads the records — that grant is declared, three times over,
 	// to reach no product's findings.
 	LastError string `json:"last_error,omitempty" doc:"The reason it stopped, where anything reported one. Worker output, which may quote what the job was about"`
-	StoppedAt string `json:"stopped_at" doc:"The moment it was set aside"`
+	StoppedAt string `json:"stopped_at" doc:"The moment it failed"`
 }
 
 // QueuedBody is how much of one kind of work is waiting, against the bound
@@ -136,38 +136,38 @@ func registerWork(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-set-aside-work", Method: http.MethodGet, Path: "/v1/failed-jobs",
+		OperationID: "list-failed-jobs", Method: http.MethodGet, Path: "/v1/failed-jobs",
 		Summary: "List failed jobs",
 		Description: "Returns background jobs that failed, newest first, with why " +
 			"each stopped where anything reported a reason. A job fails once it has " +
 			"been tried as many times as it is allowed to be, whether it reported a failure " +
 			"or its worker stopped answering.\n\n" +
 			fmt.Sprintf("At most %d are returned. `total` is how many have failed in all, so a clipped "+
-				"page can be told from a complete one.\n\n", queue.SetAsideCeiling) +
+				"page can be told from a complete one.\n\n", queue.FailedJobsCeiling) +
 			"`waiting` is what has not stopped: how much of each kind is queued, against the " +
 			"bound that refuses more of it. A queue filling up and a queue that has given up " +
 			"are different faults and only one of them leaves rows here.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct {
 		Body struct {
-			Items   []SetAsideBody `json:"items"`
-			Total   int            `json:"total"`
-			Waiting []QueuedBody   `json:"waiting"`
+			Items   []FailedJobBody `json:"items"`
+			Total   int             `json:"total"`
+			Waiting []QueuedBody    `json:"waiting"`
 		}
 	}, error) {
 		type answer = struct {
 			Body struct {
-				Items   []SetAsideBody `json:"items"`
-				Total   int            `json:"total"`
-				Waiting []QueuedBody   `json:"waiting"`
+				Items   []FailedJobBody `json:"items"`
+				Total   int             `json:"total"`
+				Waiting []QueuedBody    `json:"waiting"`
 			}
 		}
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
-		jobs, total, err := in.Queue.SetAside(ctx, 0)
+		jobs, total, err := in.Queue.FailedJobs(ctx, 0)
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "work that was set aside could not be read", err)
+			return nil, core.WentWrong(in.Logger, "the failed jobs could not be read", err)
 		}
 		out := &answer{}
 		out.Body.Total = total
@@ -184,9 +184,9 @@ func registerWork(api huma.API, in core.Deps) {
 			out.Body.Waiting = append(out.Body.Waiting,
 				QueuedBody{Kind: kind, Waiting: depth, Limit: limit})
 		}
-		out.Body.Items = make([]SetAsideBody, 0, len(jobs))
+		out.Body.Items = make([]FailedJobBody, 0, len(jobs))
 		for _, job := range jobs {
-			body := SetAsideBody{
+			body := FailedJobBody{
 				ID: job.ID, Kind: job.Kind, Reference: job.Reference,
 				Attempts: job.Attempts, StoppedAt: core.Stamp(job.UpdatedAt),
 			}
@@ -199,7 +199,7 @@ func registerWork(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "retry-set-aside-work", Method: http.MethodPost,
+		OperationID: "retry-failed-job", Method: http.MethodPost,
 		Path:    "/v1/failed-jobs/{id}/retry",
 		Summary: "Retry a failed job",
 		Description: "Puts one failed job back in the queue for whichever worker takes it " +
@@ -213,8 +213,8 @@ func registerWork(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		if err := in.Queue.Requeue(ctx, in2.ID); err != nil {
-			if errors.Is(err, queue.ErrNotSetAside) {
-				return nil, huma.Error404NotFound("that job was not set aside")
+			if errors.Is(err, queue.ErrNotFailed) {
+				return nil, huma.Error404NotFound("that job has not failed")
 			}
 			return nil, core.WentWrong(in.Logger, "the job could not be put back", err)
 		}

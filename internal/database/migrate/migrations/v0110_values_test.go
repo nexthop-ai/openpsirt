@@ -25,9 +25,10 @@ const (
 // seedWordsV0100 writes, in a v0.10.0 database, a row holding each stored
 // word v0.11.0 renames: a bulk claim, a notification and a destination of
 // each renamed kind, a notification linking a decision's row and one linking
-// a claim, a kept filter naming the renamed words, the bulk action limit
-// under its v0.10.0 name, and a change on the trail of the renamed kind
-// beside one of a kind kept.
+// a claim, a job that ran out of attempts beside one that finished, a kept
+// filter naming the renamed words, the bulk action limit under its v0.10.0
+// name, and a change on the trail of the renamed kind beside one of a kind
+// kept.
 func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	declared, err := world.Declare(ctx, db)
@@ -59,6 +60,11 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 		exec(`INSERT INTO "notification" ("person_id", "kind", "lifetime", "about", "body", "link",
 			"private", "together", "attempts", "created_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			person, "sent-back", "event", "about-"+link, "Sent back.", link, false, "", 0, at)
+	}
+	for _, state := range []string{"dead", "done"} {
+		exec(`INSERT INTO "job" ("kind", "reference", "state", "attempts", "max_attempts", "run_after",
+			"created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"scan", "target:"+state, state, 5, 5, at, at, at)
 	}
 	exec(`INSERT INTO "saved_filter" ("person_id", "name", "query", "created_at") VALUES (?, ?, ?, ?)`,
 		person, "waiting", savedV0100, at)
@@ -119,6 +125,10 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 		{"a change of the v0.10.0 kind", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'exploited-here'`, 0},
 		{"what a change was about, as written", `SELECT COUNT(*) FROM "admin_change"
 			WHERE "about" = 'Obligation window Early warning'`, 2},
+		{"a job that ran out of attempts", `SELECT COUNT(*) FROM "job"
+			WHERE "state" = 'failed' AND "reference" = 'target:dead'`, 1},
+		{"a job that finished", `SELECT COUNT(*) FROM "job" WHERE "state" = 'done'`, 1},
+		{"a job of the v0.10.0 state", `SELECT COUNT(*) FROM "job" WHERE "state" = 'dead'`, 0},
 		{"the limit under its new name", `SELECT COUNT(*) FROM "application_setting"
 			WHERE "name" = 'triage.bulk-decision-cap' AND "value" = '250'`, 1},
 		{"the limit under its v0.10.0 name",
@@ -167,7 +177,7 @@ func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
 	for _, step := range []string{
 		"decision.bulk", "notification.decision-lapsed", "outbound.decision-waiting",
 		"notification.link", "notification.response-window-near", "outbound.response-window-passed",
-		"admin_change.incident", "saved_filter", "application_setting",
+		"admin_change.incident", "job.failed", "saved_filter", "application_setting",
 	} {
 		t.Run(step, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

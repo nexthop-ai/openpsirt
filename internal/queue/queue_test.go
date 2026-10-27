@@ -160,7 +160,7 @@ func TestFailedWorkComesBackLater(t *testing.T) {
 	})
 }
 
-func TestWorkThatKeepsFailingIsSetAside(t *testing.T) {
+func TestWorkThatKeepsFailingFails(t *testing.T) {
 	// Without a limit, one job that can never succeed retries for ever and
 	// crowds out work that could.
 	opts := queue.DefaultOptions()
@@ -190,8 +190,8 @@ func TestWorkThatKeepsFailingIsSetAside(t *testing.T) {
 		if err := db.QueryRowContext(ctx, `SELECT "state" FROM "job" WHERE "reference" = ?`, "doomed").Scan(&state); err != nil {
 			t.Fatal(err)
 		}
-		if state != string(queue.Dead) {
-			t.Errorf("state is %q, want %q", state, queue.Dead)
+		if state != string(queue.Failed) {
+			t.Errorf("state is %q, want %q", state, queue.Failed)
 		}
 	})
 }
@@ -241,7 +241,7 @@ func TestWorkWhoseJobWasTakenOverSettlesAsHandedOver(t *testing.T) {
 }
 
 // Work stopped at the ceiling on one hold is its own failure: reported, and
-// the attempt counted, so a job that wedges every worker is set aside.
+// the attempt counted, so a job that wedges every worker fails.
 func TestWorkStoppedAtTheCeilingSettlesAsAFailure(t *testing.T) {
 	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, q *queue.Queue) {
 		ctx := t.Context()
@@ -302,7 +302,7 @@ func TestAStaleClaimIsTakenOverByAnotherWorker(t *testing.T) {
 	})
 }
 
-func TestWorkWhoseWorkerKeepsDyingIsSetAside(t *testing.T) {
+func TestWorkWhoseWorkerKeepsDyingFails(t *testing.T) {
 	// The other way work stops succeeding, and the one nothing reports.
 	//
 	// A worker that fails tells the queue so, and the attempts ceiling is
@@ -348,7 +348,7 @@ func TestWorkWhoseWorkerKeepsDyingIsSetAside(t *testing.T) {
 			t.Fatal(err)
 		}
 		if buried != 1 {
-			t.Errorf("the pass set aside %d jobs, want one", buried)
+			t.Errorf("the pass failed %d jobs, want one", buried)
 		}
 		var state string
 		var reported sql.NullString
@@ -357,12 +357,12 @@ func TestWorkWhoseWorkerKeepsDyingIsSetAside(t *testing.T) {
 			Scan(&state, &reported); err != nil {
 			t.Fatal(err)
 		}
-		if state != string(queue.Dead) {
+		if state != string(queue.Failed) {
 			t.Errorf("the job is %q rather than %q, so it is still held by a worker "+
-				"that is not coming back", state, queue.Dead)
+				"that is not coming back", state, queue.Failed)
 		}
 		if !reported.Valid || reported.String == "" {
-			t.Error("the set-aside job says nothing about why it stopped")
+			t.Error("the failed job says nothing about why it stopped")
 		}
 	})
 }
@@ -707,8 +707,8 @@ func TestRenewalsStopWithTheWorkTheyHeldFor(t *testing.T) {
 	})
 }
 
-func TestSetAsideWorkCanBeSeenAndPutBack(t *testing.T) {
-	// Setting work aside without somewhere to see it moves the silence rather
+func TestAFailedJobCanBeSeenAndPutBack(t *testing.T) {
+	// Failing a job without somewhere to see it moves the silence rather
 	// than ending it: the job stops being retried and the only signal is the
 	// thing it was about quietly not happening.
 	opts := queue.DefaultOptions()
@@ -721,25 +721,25 @@ func TestSetAsideWorkCanBeSeenAndPutBack(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		aside, total, err := q.SetAside(ctx, 0)
+		failed, total, err := q.FailedJobs(ctx, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(aside) != 1 {
-			t.Fatalf("the set-aside list holds %d jobs, want one", len(aside))
+		if len(failed) != 1 {
+			t.Fatalf("the failed jobs list holds %d jobs, want one", len(failed))
 		}
 		if total != 1 {
-			t.Errorf("the list reports %d set aside in all, want one", total)
+			t.Errorf("the list reports %d failed in all, want one", total)
 		}
-		if aside[0].Reference != "unreadable" {
-			t.Errorf("the list names %q", aside[0].Reference)
+		if failed[0].Reference != "unreadable" {
+			t.Errorf("the list names %q", failed[0].Reference)
 		}
-		if aside[0].LastError == nil || *aside[0].LastError == "" {
-			t.Error("the set-aside job does not say why it stopped")
+		if failed[0].LastError == nil || *failed[0].LastError == "" {
+			t.Error("the failed job does not say why it stopped")
 		}
 
 		// Put back with its attempts started again. A job that came back with
-		// one attempt left would be set aside by the next transient failure,
+		// one attempt left would fail on the next transient failure,
 		// which is not what somebody who fixed the cause asked for.
 		if err := q.Requeue(ctx, job.ID); err != nil {
 			t.Fatal(err)
@@ -754,13 +754,13 @@ func TestSetAsideWorkCanBeSeenAndPutBack(t *testing.T) {
 	})
 }
 
-func TestOnlySetAsideWorkIsPutBack(t *testing.T) {
+func TestOnlyAFailedJobIsPutBack(t *testing.T) {
 	// Putting back a job somebody is running would hand the same work to two
 	// workers, which on an ingest looks like real change rather than an error.
 	each(t, queue.DefaultOptions(), func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		job := claimed(t, q, "ingest", "in-progress", "worker")
-		if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotSetAside) {
+		if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotFailed) {
 			t.Errorf("putting back running work answered %v, want it refused", err)
 		}
 	})
@@ -883,22 +883,22 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		setAside := func(want int) {
+		failed := func(want int) {
 			t.Helper()
 			deadline := time.After(10 * time.Second)
 			for {
-				var aside int
+				var marked int
 				if err := db.QueryRowContext(ctx,
-					`SELECT COUNT(*) FROM "job" WHERE "state" = ?`, string(queue.Dead)).
-					Scan(&aside); err != nil {
+					`SELECT COUNT(*) FROM "job" WHERE "state" = ?`, string(queue.Failed)).
+					Scan(&marked); err != nil {
 					t.Fatal(err)
 				}
-				if aside == want {
+				if marked == want {
 					return
 				}
 				select {
 				case <-deadline:
-					t.Fatalf("the pass set aside %d of %d abandoned jobs", aside, want)
+					t.Fatalf("the pass failed %d of %d abandoned jobs", marked, want)
 				case <-time.After(5 * time.Millisecond):
 				}
 			}
@@ -912,9 +912,9 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 			queue.NewUndertaker(q, queue.NewLeases(db.DB), "the-only-replica", quiet).
 				Run(ctx, time.Millisecond)
 		}()
-		setAside(1)
+		failed(1)
 		abandon("second")
-		setAside(2)
+		failed(2)
 
 		// And it stops when it is told to. A pass that ignores cancellation
 		// holds the database open while the process is trying to shut down.
@@ -934,9 +934,9 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 	})
 }
 
-func TestAClippedSetAsideListSaysHowManyThereAre(t *testing.T) {
+func TestAClippedFailedJobsListSaysHowManyThereAre(t *testing.T) {
 	// A page that stops at the cap with nothing saying so cannot be told from
-	// a complete answer, and a restart loop sets aside far more than one page
+	// a complete answer, and a restart loop fails far more than one page
 	// holds — which is the state somebody opens this in.
 	opts := queue.DefaultOptions()
 	opts.MaxAttempts = 1
@@ -958,7 +958,7 @@ func TestAClippedSetAsideListSaysHowManyThereAre(t *testing.T) {
 			}
 		}
 
-		page, total, err := q.SetAside(ctx, 2)
+		page, total, err := q.FailedJobs(ctx, 2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -966,7 +966,7 @@ func TestAClippedSetAsideListSaysHowManyThereAre(t *testing.T) {
 			t.Errorf("the page holds %d, want the two asked for", len(page))
 		}
 		if total != set {
-			t.Errorf("the list reports %d set aside in all, want %d", total, set)
+			t.Errorf("the list reports %d failed in all, want %d", total, set)
 		}
 	})
 }

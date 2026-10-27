@@ -409,7 +409,7 @@ func configure(ctx context.Context, cfg config.Config, logger *slog.Logger) (con
 	// The ceiling on one hold is what cuts a long scan off, and it is the only
 	// bound here that can: the claim is renewed for as long as the scan runs,
 	// so the claim timeout never reaches it. A scanner allowed to run past the
-	// ceiling would be killed mid-run on every attempt and the job set aside
+	// ceiling would be killed mid-run on every attempt and the job would fail
 	// with nothing saying why, so the two are compared where both are in hand
 	// rather than left to a documentation row.
 	if queueing.MaxHold > 0 && cfg.ScannerTimeout >= queueing.MaxHold {
@@ -671,7 +671,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// Removes uploads nothing ever referred to. Nil where this deployment
 	// holds no files, which is ordinary.
 	keeper := attach.NewKeeper(db.DB, files, logger, 0)
-	// Sets aside work whose worker never came back. Nothing else is the
+	// Fails the jobs whose worker never came back. Nothing else is the
 	// moment to notice: a worker that was killed reports nothing, so the row
 	// would sit claimed for ever and read everywhere else as work in progress.
 	undertaker := queue.NewUndertaker(work, queue.NewLeases(db.DB), name, logger)

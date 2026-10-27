@@ -451,7 +451,7 @@ products = ["router-os", "switch-os"]
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
 | `OPENPSIRT_SCANNER_PATH` | `scanner.path` | Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in | unset |
-| `OPENPSIRT_SCANNER_TIMEOUT` | `scanner.timeout` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
+| `OPENPSIRT_SCANNER_TIMEOUT` | `scanner.timeout` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job fails once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
 | `GRYPE_DB_CACHE_DIR` | — | Where the scanner keeps its vulnerability data. The image sets it, and the chart sets it from `scanner.cacheDir`, where it mounts the volume; outside the chart, a deployment that moves it moves the volume with it, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
 | `GRYPE_DB_AUTO_UPDATE` | — | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
 | `GRYPE_CHECK_FOR_APP_UPDATE` | — | Whether the scanner asks its publisher for a newer release of itself on every run. Off unless set: it is a request to a host nobody configured | `false` |
@@ -1136,7 +1136,7 @@ build server and waiting for a restart is not a remedy.
 
 | Variable | File key | What it does | Default |
 |---|---|---|---|
-| `OPENPSIRT_QUEUE_MAX_ATTEMPTS` | `queue.max_attempts` | How many times a job is tried before it is set aside with its last error | `5` |
+| `OPENPSIRT_QUEUE_MAX_ATTEMPTS` | `queue.max_attempts` | How many times a job is tried before it fails with its last error | `5` |
 | `OPENPSIRT_QUEUE_CLAIM_TIMEOUT` | `queue.claim_timeout` | How long a claim is honored with nothing heard from the worker holding it, after which another worker may take the job. It bounds a worker going silent, not how long a job may take | `30m` |
 | `OPENPSIRT_QUEUE_HEARTBEAT` | `queue.heartbeat` | How often a running job renews its claim. Well under the claim timeout, so several renewals may fail before the claim is at risk — a value that is not below it is refused at startup | `5m` |
 | `OPENPSIRT_QUEUE_MAX_HOLD` | `queue.max_hold` | How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and `OPENPSIRT_SCANNER_TIMEOUT`, which the process checks at startup | `2h` |
@@ -1273,7 +1273,7 @@ the signal in the message:
 run /usr/local/bin/grype: signal: killed
 ```
 
-The job is retried with backoff and set aside after `OPENPSIRT_QUEUE_MAX_ATTEMPTS`
+The job is retried with backoff and fails after `OPENPSIRT_QUEUE_MAX_ATTEMPTS`
 attempts, so the symptom is scans that will not complete rather than a pod that
 will not stay up. Where the pod itself is killed instead, a deployment without a
 kept database restarts into the import that exhausted it.

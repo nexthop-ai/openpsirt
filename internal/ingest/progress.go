@@ -230,7 +230,7 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 		return Refused, sc.Failure, "", nil
 	}
 	switch job.State {
-	case queue.Dead:
+	case queue.Failed:
 		// The scan row is marked too, but a job that died before it could mark
 		// anything would otherwise read as still being worked on. Fixed words:
 		// the job's last error is whatever failed, a dropped connection's

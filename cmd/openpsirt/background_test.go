@@ -35,7 +35,7 @@ var alwaysRuns = []string{
 	"send what is owed outward",
 	"route unheld work to teams",
 	"apply analyzer runs",
-	"set aside work whose worker died",
+	"fail jobs whose worker died",
 }
 
 // optional is every pass that runs only where what it works on is configured.

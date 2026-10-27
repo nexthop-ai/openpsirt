@@ -34,6 +34,7 @@ var valuesRewrittenV0110 = []valueRewrite{
 	{"outbound", "kind", "obligation-near", "response-window-near"},
 	{"outbound", "kind", "obligation-passed", "response-window-passed"},
 	{"admin_change", "kind", "exploited-here", "incident"},
+	{"job", "state", "dead", "failed"},
 }
 
 // settingRenamedV0110 is the setting v0.11.0 renames, from its v0.10.0 name.
@@ -51,8 +52,8 @@ var errValuesStopped = errors.New("the stored words were stopped part way")
 
 // valuesV0110 gives every stored word the renames reach its v0.11.0
 // spelling: a decision's kind, the kinds of notification and destination,
-// the link a notification holds to a decision's row, the address a kept
-// filter opens and a setting's name. It runs after the
+// the link a notification holds to a decision's row, a job's state, the
+// address a kept filter opens and a setting's name. It runs after the
 // renames, against the tables as v0.11.0 names them.
 //
 // Every step changes only rows still holding a v0.10.0 word, so a start that

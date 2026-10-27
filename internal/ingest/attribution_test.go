@@ -437,7 +437,7 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 				t.Fatal(err)
 			}
 			if _, err := s.DB().NewUpdate().Model((*queue.Job)(nil)).
-				Set(`"state" = ?`, queue.Dead).
+				Set(`"state" = ?`, queue.Failed).
 				Set(`"last_error" = ?`, lastError).
 				Where(`"reference" = ?`, strconv.FormatInt(scanID, 10)).
 				Exec(ctx); err != nil {

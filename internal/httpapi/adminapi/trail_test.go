@@ -731,7 +731,7 @@ var outsideTheTrail = map[string]string{
 
 	// Running the tool rather than changing it: a job that was set aside is
 	// asked to run again, and nothing about what anybody may do moves.
-	"retry-set-aside-work": "operating the queue",
+	"retry-failed-job": "operating the queue",
 }
 
 // TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot walks the document

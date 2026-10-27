@@ -261,13 +261,13 @@ function because(why?: string) {
 function BackgroundJobs() {
   const queries = useQueryClient();
   const work = useQuery({
-    queryKey: ["set-aside"],
+    queryKey: ["failed-jobs"],
     queryFn: async () => unwrap(await api.GET("/v1/failed-jobs", {})),
   });
   const retry = useMutation({
     mutationFn: async (id: number) =>
       unwrap(await api.POST("/v1/failed-jobs/{id}/retry", { params: { path: { id } } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["set-aside"] }),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["failed-jobs"] }),
   });
 
   if (work.isPending) return <Loading />;

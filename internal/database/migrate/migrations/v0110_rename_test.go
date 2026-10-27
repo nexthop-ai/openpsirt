@@ -293,6 +293,7 @@ func TestAnUpgradeStoppedPartWayThroughItsRenamesResumes(t *testing.T) {
 		{after: "exploited_fix_record_fk", servers: true},
 		{after: "told_outside_record_idx"},
 		{after: "obligation_window_product_window_fk", servers: true},
+		{after: "job_set_aside_idx"},
 	} {
 		t.Run(stop.after, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

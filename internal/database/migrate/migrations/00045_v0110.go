@@ -42,6 +42,9 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     notification a decision waiting or lapsed and a response window
 //     raise, the address a kept filter opens, and the bulk action limit's
 //     setting name.
+//   - A job that ran out of attempts is a failed job: its state reads failed,
+//     and the index listing failed jobs is named for them. The index is
+//     renamed with the triage names and the state with the stored words.
 //   - An issue records what sort of issue it is: a published vulnerability, a
 //     flaw minted here, or an analyzer's rule.
 //   - The finding indexes a read answers from without the table carry the

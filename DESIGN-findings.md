@@ -1337,7 +1337,7 @@ row and logged, so the row does not read as a closure nothing was recorded for.
 
 A scan that waits is asked before its run begins, and its job goes back on the
 queue for five minutes without spending an attempt (`DESIGN-queue.md`
-§ Failure handling). Failed, the job would be set aside after a few minutes,
+§ Failure handling). Failed, the job would run out of attempts after a few minutes,
 and a run begun keeps the schedule from asking again for a day.
 
 The register lists the findings closed this way under their own reason, with

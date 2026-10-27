@@ -260,7 +260,7 @@ func TestWaitingForALeaseOutlastsATakeThatFails(t *testing.T) {
 
 // A commit that succeeded and whose answer never arrived is retried, and the
 // retry finds nothing left to match. Each ending asks the row rather than
-// reporting the job lost or not set aside.
+// reporting the job lost or not failed.
 func TestEndingsAlreadyRecordedAreNotALostClaim(t *testing.T) {
 	const why = "the scanner could not be reached"
 	for _, c := range []struct {
@@ -305,7 +305,7 @@ func TestEndingsAlreadyRecordedAreNotALostClaim(t *testing.T) {
 	}
 }
 
-// The same for putting back work that was set aside: the job is back on the
+// The same for putting back a failed job: the job is back on the
 // queue, which is what was asked.
 func TestPuttingBackWorkAlreadyPutBackIsNotRefused(t *testing.T) {
 	ctx := t.Context()
@@ -322,15 +322,15 @@ func TestPuttingBackWorkAlreadyPutBackIsNotRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := handle.ExecContext(ctx, `UPDATE "job" SET "state" = 'dead'`); err != nil {
+	if _, err := handle.ExecContext(ctx, `UPDATE "job" SET "state" = 'failed'`); err != nil {
 		t.Fatal(err)
 	}
 	owner.Arm(1)
 	if err := q.Requeue(ctx, job.ID); err != nil {
 		t.Errorf("putting back work that reads put back answered %v", err)
 	}
-	// And a job that was never set aside is still refused.
-	if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotSetAside) {
+	// And a job that never failed is still refused.
+	if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotFailed) {
 		t.Errorf("putting back a job that is waiting answered %v", err)
 	}
 }

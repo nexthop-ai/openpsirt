@@ -84,7 +84,7 @@ describe("the deployment's own state", () => {
     const [path, init] = only(sent);
     expect(path).toBe("/v1/failed-jobs/{id}/retry");
     expect(init.params?.path).toEqual({ id: 9 });
-    expect(invalidated()).toContain("set-aside");
+    expect(invalidated()).toContain("failed-jobs");
     expect(text()).toContain("Showing 1 of 3.");
     expect(text()).toContain("nothing said");
   });

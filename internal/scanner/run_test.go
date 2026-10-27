@@ -764,7 +764,7 @@ func TestARunRecordsTheCVERecordSnapshotItRead(t *testing.T) {
 func TestAScanWithAnUnreadableSnapshotWaitsWithoutSpendingAnAttempt(t *testing.T) {
 	// Run without it, every finding a record had closed would open again and
 	// close again on the next run that reads one. Failed instead, the job
-	// would be set aside within minutes and the run would keep the schedule
+	// would run out of attempts within minutes and the run would keep the schedule
 	// from asking again for a day.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		dir := t.TempDir()

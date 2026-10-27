@@ -1277,7 +1277,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        get: operations["list-set-aside-work"];
+        get: operations["list-failed-jobs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1303,7 +1303,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        post: operations["retry-set-aside-work"];
+        post: operations["retry-failed-job"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9544,6 +9544,26 @@ export interface components {
             /** @description The date the embargo should end */
             until: string;
         };
+        FailedJobBody: {
+            /**
+             * Format: int64
+             * @description The number of attempts
+             */
+            attempts: number;
+            /**
+             * Format: int64
+             * @description The job, for putting it back
+             */
+            id: number;
+            /** @description The worker the job was for */
+            kind: string;
+            /** @description The reason it stopped, where anything reported one. Worker output, which may quote what the job was about */
+            last_error?: string;
+            /** @description The subject of the work */
+            reference: string;
+            /** @description The moment it failed */
+            stopped_at: string;
+        };
         FindingBody: {
             /**
              * Format: int64
@@ -10874,6 +10894,18 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        "List-failed-jobsResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-failed-jobsResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["FailedJobBody"][] | null;
+            /** Format: int64 */
+            total: number;
+            waiting: components["schemas"]["QueuedBody"][] | null;
+        };
         "List-issues-at-componentResponse": {
             /**
              * Format: uri
@@ -10914,18 +10946,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["LeadSeriesBody"][] | null;
-        };
-        "List-set-aside-workResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-set-aside-workResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["SetAsideBody"][] | null;
-            /** Format: int64 */
-            total: number;
-            waiting: components["schemas"]["QueuedBody"][] | null;
         };
         ListBodyAdvisoryListedBody: {
             /**
@@ -13981,26 +14001,6 @@ export interface components {
              */
             readonly $schema?: string;
             value: string;
-        };
-        SetAsideBody: {
-            /**
-             * Format: int64
-             * @description The number of attempts
-             */
-            attempts: number;
-            /**
-             * Format: int64
-             * @description The job, for putting it back
-             */
-            id: number;
-            /** @description The worker the job was for */
-            kind: string;
-            /** @description The reason it stopped, where anything reported one. Worker output, which may quote what the job was about */
-            last_error?: string;
-            /** @description The subject of the work */
-            reference: string;
-            /** @description The moment it was set aside */
-            stopped_at: string;
         };
         SettingBody: {
             /** @description Nobody has set this; the shipped value is in use */
@@ -17109,7 +17109,7 @@ export interface operations {
             };
         };
     };
-    "list-set-aside-work": {
+    "list-failed-jobs": {
         parameters: {
             query?: never;
             header?: never;
@@ -17124,7 +17124,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-set-aside-workResponse"];
+                    "application/json": components["schemas"]["List-failed-jobsResponse"];
                 };
             };
             /** @description Error */
@@ -17138,7 +17138,7 @@ export interface operations {
             };
         };
     };
-    "retry-set-aside-work": {
+    "retry-failed-job": {
         parameters: {
             query?: never;
             header?: never;

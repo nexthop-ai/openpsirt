@@ -28,7 +28,7 @@ the job claimed until the claim goes stale.
 |---|---|
 | Kind | Which worker may claim it |
 | Reference | The thing being worked on |
-| State | Queued, claimed, done, or set aside |
+| State | Queued, claimed, done, or failed |
 
 A job holds no payload. The reference points at the subject, so the queue stays
 small however large that subject is.
@@ -58,27 +58,27 @@ afterwards.
 |---|---|
 | Retry with a growing delay | A briefly unavailable dependency is not hammered while it recovers |
 | A limit on attempts | A job that can never succeed would otherwise retry forever and crowd out work that could |
-| Set aside, never deleted | The row is kept with its last error, which is the evidence of why it failed |
-| The limit is charged on the reclaim as well as on a reported failure | A worker that is killed reports nothing, so the only record of the attempt is the count the claim itself incremented. Charged only where a worker reports, a job that kills its worker is reclaimed for ever and the set-aside state is never reached |
-| A claim that can no longer be reclaimed is set aside by a pass of its own | A job left in the claimed state reads everywhere else as work somebody is doing, and a worker that died is not something any act by a person is the moment to notice. Folded into the claim instead, it is a range update every worker runs on every poll over the rows every other worker is claiming — which on MySQL deadlocks six workers against one another rather than handing out work |
+| A failed job is kept, never deleted | The row is kept with its last error, which is the evidence of why it failed |
+| The limit is charged on the reclaim as well as on a reported failure | A worker that is killed reports nothing, so the only record of the attempt is the count the claim itself incremented. Charged only where a worker reports, a job that kills its worker is reclaimed for ever and the failed state is never reached |
+| A claim that can no longer be reclaimed is failed by a pass of its own | A job left in the claimed state reads everywhere else as work somebody is doing, and a worker that died is not something any act by a person is the moment to notice. Folded into the claim instead, it is a range update every worker runs on every poll over the rows every other worker is claiming — which on MySQL deadlocks six workers against one another rather than handing out work |
 | One replica buries | Every replica running the same range update is the same contention between processes that folding it into the claim caused between workers |
 | Work abandoned by its worker records that, in place of the reason nobody reported | Downstream it is the same failure. Somebody reading the row has to be able to tell "this failed" from "nothing was left alive to say" |
-| Work that cannot start yet is put back untried, with a delay and the reason | Something it needs has not arrived, which is not a failure of the work. The attempt the claim counted is given back, so waiting never sets a job aside, and the reason is kept where a failure's would be |
+| Work that cannot start yet is put back untried, with a delay and the reason | Something it needs has not arrived, which is not a failure of the work. The attempt the claim counted is given back, so waiting never fails a job, and the reason is kept where a failure's would be |
 
-### Set-aside work
+### Failed jobs
 
-Set-aside work has an operator surface: a list of what stopped and why, and a
+Failed jobs have an operator surface: a list of what stopped and why, and a
 way to put one back.
 
 | Rule | Reason |
 |---|---|
-| What is listed is set-aside work; what is waiting is counted | A list of waiting work invites acting on a state that moves underneath the reader, and what is set aside has stopped moving by definition. A *count* of what is waiting moves too and nothing acts on one — it says whether the queue is filling up, which is the other way this goes wrong and which nothing else answered |
+| What is listed is failed jobs; what is waiting is counted | A list of waiting work invites acting on a state that moves underneath the reader, and a failed job has stopped moving by definition. A *count* of what is waiting moves too and nothing acts on one — it says whether the queue is filling up, which is the other way this goes wrong and which nothing else answered |
 | What is waiting is counted per kind, against the bound | The bound is per kind, so counted across the queue one producer's own backlog hides behind everybody else's empty queues — and what an operator does about a full queue needs both numbers |
 | Work held by a worker that has stopped reporting counts as waiting | It is work waiting for whoever takes it next. Counted as running, a queue in the middle of a reclaim cycle reads as empty |
 | Reading any of it is administration | What a worker reported is not one of the deployment's own records: a failed parse quotes the cause it was given, and that can carry a component name or a package address out of an SBOM the reader holds nothing on |
-| Putting a job back starts its attempts again | Whoever does it has decided the cause is dealt with. A job returned with one attempt left is set aside again by the next transient failure |
+| Putting a job back starts its attempts again | Whoever does it has decided the cause is dealt with. A job returned with one attempt left fails again on the next transient failure |
 | The last error survives being put back | It is the evidence of the previous run, and the decision to try again is not a reason to destroy it |
-| Only set-aside work is put back | Returning a running job hands the same work to two workers, which on an ingest looks like real change rather than an error |
+| Only a failed job is put back | Returning a running job hands the same work to two workers, which on an ingest looks like real change rather than an error |
 | The listing is capped | A read on an interactive route carries a bound, and a deployment whose queue has gone wrong is where the list is longest |
 
 ## Claim renewal
@@ -181,7 +181,7 @@ queue may get is the sixth and is a stored setting.
 
 | Bound | What it decides |
 |---|---|
-| Attempts | How many times a job is tried before it is set aside |
+| Attempts | How many times a job is tried before it fails |
 | Claim timeout | How long a claim is honored with nothing heard from the worker holding it |
 | Heartbeat | How often a running job renews its claim |
 | The ceiling on one hold | How long one claim may be renewed for altogether |
@@ -223,7 +223,7 @@ own.
 |---|---|
 | A cluster refuses at commit, not at the statement | See `DESIGN-database.md` § Retryable transactions. A write outside a transaction cannot be retried at all: the failure arrives where there is nothing left to go again |
 | Finishing is the write where it costs most | Reported up rather than retried, a job that finished is recorded by its caller as failed and handed out again. The work runs twice, which on an ingest looks like real change |
-| An ending whose commit was refused asks the row rather than assuming | A second attempt covers both "somebody else holds it now" and "the commit succeeded and the answer never arrived". A finish reads as done; a failure and a postponement read as unclaimed, with their own reason; a job put back reads as no longer set aside, where an earlier attempt matched it. Reporting a lost claim for an ending that landed has the caller record a takeover that did not happen, and reporting a job as not set aside after it was put back tells an operator their act did nothing |
+| An ending whose commit was refused asks the row rather than assuming | A second attempt covers both "somebody else holds it now" and "the commit succeeded and the answer never arrived". A finish reads as done; a failure and a postponement read as unclaimed, with their own reason; a job put back reads as no longer failed, where an earlier attempt matched it. Reporting a lost claim for an ending that landed has the caller record a takeover that did not happen, and reporting a job as not failed after it was put back tells an operator their act did nothing |
 | A lease take that is refused would read as losing a race | A replica told it lost a race it never ran stops sweeping, with nothing logged, on every replica at once |
 | The moment a write compares against is read inside each attempt | A retry runs after a pause. A claim judging staleness by the moment before the first attempt misses a job that went stale during it, and a lease taken again runs short by the pause |
 

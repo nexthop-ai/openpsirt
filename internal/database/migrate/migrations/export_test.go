@@ -94,7 +94,7 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		"notification":   notificationV0110(t),
 		"decision_stamp": decisionStampV0110(t),
 	}
-	for _, table := range []string{"upgrade", "told_outside"} {
+	for table := range keptV0110 {
 		out[table] = declaredV0110(t, table)
 	}
 	for _, r := range tablesRenamedV0110 {

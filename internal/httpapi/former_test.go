@@ -137,8 +137,8 @@ var formerAddresses = []struct{ method, path, operation string }{
 	{http.MethodPost, "/v1/products/{product}/vex-statements", "upload-vex-statements"},
 	{http.MethodGet, "/v1/scanning", "list-scanning"},
 	{http.MethodGet, "/v1/scanning.{format}", "export-scanning"},
-	{http.MethodGet, "/v1/work/set-aside", "list-set-aside-work"},
-	{http.MethodPost, "/v1/work/set-aside/{id}/retry", "retry-set-aside-work"},
+	{http.MethodGet, "/v1/work/set-aside", "list-failed-jobs"},
+	{http.MethodPost, "/v1/work/set-aside/{id}/retry", "retry-failed-job"},
 }
 
 // formerNames stands in a value for each parameter of a former address.

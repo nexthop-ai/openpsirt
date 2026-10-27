@@ -558,7 +558,8 @@ release's declarations are written against the new names.
 Every index and constraint named after a renamed table or column is renamed
 with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`,
 `finding_place_idx` is `finding_occurrence_idx`, and `told_outside_record_idx`,
-named for the record an incident was, is `told_outside_incident_idx`. The tables v0.11.0 creates are
+named for the record an incident was, is `told_outside_incident_idx`.
+`job_set_aside_idx`, which lists the failed jobs, is `job_failed_idx`. The tables v0.11.0 creates are
 declared under the new names, `decision_stamp` among them.
 
 | Rule | Why |
@@ -583,6 +584,7 @@ its own after the renames.
 | `kind` on `notification` and `outbound` | `claim-waiting`, `claim-lapsed`, `obligation-open`, `obligation-near`, `obligation-passed` | `decision-waiting`, `decision-lapsed`, `response-window-open`, `response-window-near`, `response-window-passed` |
 | A notification's `link` to a decision's row at one occurrence | `/decisions/{id}` | `/decision-occurrences/{id}` |
 | A change's `kind` on `admin_change` | `exploited-here` | `incident` |
+| A failed job's `state` on `job` | `dead` | `failed` |
 | A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
 | The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
 
@@ -625,8 +627,8 @@ stored values, and the changes after them.
 | A v0.10.0 database holding an incident, a release carrying its fix, a notice outside, a window counted from another and limited to a product, and a finding the incident ranks first | Upgraded, each row read back under its v0.11.0 name pointing where it did, each renamed table's declaration describing the table built, and a window declared after it numbered after the rows it had |
 | The same two, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
 | A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
-| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a kept filter naming the renamed words, the bulk action limit and a change on the trail of the renamed kind | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
-| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, a change's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
+| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a failed job, a kept filter naming the renamed words, the bulk action limit and a change on the trail of the renamed kind | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
+| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, a job's state, a change's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
 
 ### Release records
 

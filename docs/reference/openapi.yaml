@@ -4332,6 +4332,36 @@ components:
         - until
         - reason
       type: object
+    FailedJobBody:
+      additionalProperties: false
+      properties:
+        attempts:
+          description: The number of attempts
+          format: int64
+          type: integer
+        id:
+          description: The job, for putting it back
+          format: int64
+          type: integer
+        kind:
+          description: The worker the job was for
+          type: string
+        last_error:
+          description: The reason it stopped, where anything reported one. Worker output, which may quote what the job was about
+          type: string
+        reference:
+          description: The subject of the work
+          type: string
+        stopped_at:
+          description: The moment it failed
+          type: string
+      required:
+        - id
+        - kind
+        - reference
+        - attempts
+        - stopped_at
+      type: object
     FindingBody:
       additionalProperties: false
       properties:
@@ -6627,6 +6657,36 @@ components:
         - items
         - total
       type: object
+    List-failed-jobsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/List-failed-jobsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/FailedJobBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+        waiting:
+          items:
+            $ref: "#/components/schemas/QueuedBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+        - total
+        - waiting
+      type: object
     List-issues-at-componentResponse:
       additionalProperties: false
       properties:
@@ -6701,36 +6761,6 @@ components:
             - "null"
       required:
         - items
-      type: object
-    List-set-aside-workResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-set-aside-workResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/SetAsideBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-        waiting:
-          items:
-            $ref: "#/components/schemas/QueuedBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
-        - total
-        - waiting
       type: object
     ListBodyAdvisoryListedBody:
       additionalProperties: false
@@ -12106,36 +12136,6 @@ components:
       required:
         - value
       type: object
-    SetAsideBody:
-      additionalProperties: false
-      properties:
-        attempts:
-          description: The number of attempts
-          format: int64
-          type: integer
-        id:
-          description: The job, for putting it back
-          format: int64
-          type: integer
-        kind:
-          description: The worker the job was for
-          type: string
-        last_error:
-          description: The reason it stopped, where anything reported one. Worker output, which may quote what the job was about
-          type: string
-        reference:
-          description: The subject of the work
-          type: string
-        stopped_at:
-          description: The moment it was set aside
-          type: string
-      required:
-        - id
-        - kind
-        - reference
-        - attempts
-        - stopped_at
-      type: object
     SettingBody:
       additionalProperties: false
       properties:
@@ -17381,13 +17381,13 @@ paths:
         `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
 
         Requires: administrator
-      operationId: list-set-aside-work
+      operationId: list-failed-jobs
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-set-aside-workResponse"
+                $ref: "#/components/schemas/List-failed-jobsResponse"
           description: OK
         default:
           content:
@@ -17408,7 +17408,7 @@ paths:
         A job that has not failed is refused rather than moved.
 
         Requires: administrator
-      operationId: retry-set-aside-work
+      operationId: retry-failed-job
       parameters:
         - description: The job to put back
           in: path

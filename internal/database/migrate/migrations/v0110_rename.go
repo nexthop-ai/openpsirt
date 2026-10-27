@@ -181,6 +181,8 @@ var namesRenamedV0110 = []nameRename{
 		"response_window_product_window_fk"},
 	{aForeignKey, "response_window_product", "obligation_window_product_product_fk",
 		"response_window_product_product_fk"},
+
+	{anIndex, "job", "job_set_aside_idx", "job_failed_idx"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
@@ -224,8 +226,17 @@ func renamedV0110(statements []string) []string {
 	return out
 }
 
-// declaredV0110 is v0.11.0's declaration of a table it renames, and the
-// indexes it makes: the declaration the table last had, renamed.
+// keptV0110 is each table v0.11.0 renames a column or an index of and keeps
+// the name of, with the declaration the table last had.
+var keptV0110 = map[string]func(*columnTypes) []string{
+	"upgrade":      upgradeBaseline,
+	"job":          jobBaseline,
+	"told_outside": obligationBaseline,
+}
+
+// declaredV0110 is v0.11.0's declaration of a table it renames or renames
+// something in, and the indexes it makes: the declaration the table last had,
+// renamed.
 func declaredV0110(t *columnTypes, table string) []string {
 	var before string
 	var statements []string
@@ -248,15 +259,11 @@ func declaredV0110(t *columnTypes, table string) []string {
 	case "exploited_here", "exploited_fix", "obligation_window", "obligation_window_product":
 		statements = obligationBaseline(t)
 	case "":
-		switch table {
-		case "upgrade":
-			statements = upgradeBaseline(t)
-		case "told_outside":
-			statements = obligationBaseline(t)
-		default:
+		kept, ok := keptV0110[table]
+		if !ok {
 			panic("v0.11.0 gives no table the name " + table)
 		}
-		before = table
+		before, statements = table, kept(t)
 	default:
 		statements = triageBaseline(t)
 	}

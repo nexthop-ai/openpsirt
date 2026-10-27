@@ -564,8 +564,8 @@ func (r *Reach) EndingIn(t *testing.T, stream string, days int) {
 	}
 }
 
-// SetAside queues one job and sets it aside, answering its identifier.
-func (r *Reach) SetAside(t *testing.T, kind, reference string) int64 {
+// FailJob queues one job and fails it, answering its identifier.
+func (r *Reach) FailJob(t *testing.T, kind, reference string) int64 {
 	t.Helper()
 	ctx := t.Context()
 	job, err := queue.New(r.DB, queue.DefaultOptions()).Add(ctx, kind, reference)
@@ -573,7 +573,7 @@ func (r *Reach) SetAside(t *testing.T, kind, reference string) int64 {
 		t.Fatal(err)
 	}
 	if _, err := r.DB.NewUpdate().Model((*queue.Job)(nil)).
-		Set(`"state" = ?`, queue.Dead).Set(`"attempts" = "max_attempts"`).
+		Set(`"state" = ?`, queue.Failed).Set(`"attempts" = "max_attempts"`).
 		Where(`"id" = ?`, job.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
