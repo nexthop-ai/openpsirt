@@ -34,7 +34,7 @@ deployment is one container and the interface is never a version behind its API.
 | Rule | Reason |
 |---|---|
 | Nothing is fetched at run time: no font, script or stylesheet | An air-gapped install is an ordinary install |
-| The embedded directory always exists, tracked empty, and the frontend build fills it | The embed fails to compile on a missing directory, and the built output is not committed |
+| The embedded directory always exists, tracked empty, and the frontend build fills it; its placeholder is un-ignored at the top level with its directory | The embed fails to compile on a missing directory; `dist/` is ignored everywhere and git does not descend into an excluded directory |
 | A binary built without the interface serves the API alone | A checkout with no node toolchain still builds and runs; a supported build |
 
 ## Path routing
@@ -89,7 +89,7 @@ committed. The interface uses no private endpoint.
 |---|---|
 | A table of words over a server word is keyed on the generated union | A word the server adds is a compile error until it has words |
 | A lint refuses a literal table in the screens keyed on any string, whole or partial; a table typed by an index signature is not caught. A table over an open set (a package kind, a keyboard key, this interface's own names) says why beside it | |
-| A read is declared once and asked through its hook | Two declarations are one cache entry under two sets of conditions, and an invalidation misses one |
+| A read is declared once and asked through its hook | Two declarations miss each other's invalidations |
 | The catalog's products, branches and variants, one release's variants, where an issue sits, a decision's approvals and revisions, what sits around a component, and the outbound destinations each have one definition, keyed so a change reaches every screen showing them | |
 | A download or document link is built by one link builder over the generated paths: the path is a key of the document, each placeholder required, named as the path names it and escaped as a segment; a placeholder with no value is refused | The browser fetches these, not the client |
 
@@ -104,7 +104,7 @@ they reach.
 
 | Rule | Reason |
 |---|---|
-| Capabilities, never roles | Every client re-implementing the role mapping drifts, and the drifted copy offers a button that is refused |
+| Capabilities, never roles | A second copy of the role mapping drifts into offering refused buttons |
 | A product somebody cannot reach is absent, and a screen treats it as not there (REQ-42) | The server's answer |
 | `GET /v1/sign-in` is answered without a credential, listing the providers an operator configured (REQ-41); a test asserts it says nothing about whether any account exists | It is what somebody sees before they have a credential |
 | A 401 from `session/me` is an answer: nobody is signed in | A fresh browser |
@@ -176,7 +176,7 @@ Every count says what it is a count of (REQ-60).
 
 | Date form | Rule |
 |---|---|
-| Absolute | The UTC day, never localized: one instant is one day to every reader. Every stored instant on a screen goes through one formatter, a key's or token's last use included |
+| Absolute | The UTC day, never localized: the server writes a day from the moment in UTC, and a moment sent with an offset is shown as the UTC day it falls on. Every stored instant on a screen goes through one formatter, a key's or token's last use included |
 | To the minute | The UTC day and minute, saying UTC, for a moment correlated with another: a comment, a grant, a scan arriving |
 | Typed to the minute | In UTC, labeled so, defaulting to now in UTC; the minute typed is the minute shown |
 | Relative | For staleness, one scale in both directions, with the absolute form on the title |
@@ -185,7 +185,7 @@ A value that is not a stored moment is drawn as nothing in both forms: the shape
 is checked, because a bare number parses as a year, and so is the calendar day,
 because a parser rolls a day past month's end into the next.
 
-Waiting is one component everywhere, announced politely to a screen reader.
+Waiting is one component everywhere, saying it is waiting and announced politely to a screen reader.
 
 A statement about a trend waits for enough history (REQ-54). Leading empty steps
 are dropped and the rest kept, since an empty week inside the history is real.
@@ -295,16 +295,15 @@ The entry point and the test harness are outside the measure.
 | The shade stops at the header row and the hovered row | Both carry an opaque background; the note above the table still says it scrolls |
 | What only a browser shows | The checks see a screen disagreeing with the server, never a wrong layout, a wrong tone or an empty name |
 
-A token referenced and never defined is checked: every reference is put to the
-definitions, a token set per element in a style object counting as defined.
+Checked: a token referenced and never defined, every reference put to the
+definitions, a token set per element in a style object counting as defined; and
+a text file that reads as binary, which every text tool skips silently.
 
 ## Not built
 
 | Item | Detail |
 |---|---|
 | A decision scoped to a consumer subtree | Rejected by the owner: one sentence answering a thousand findings is unreadable afterwards |
-| A spacing scale | The values in use run continuously from 3 to 18; a scale is a judgment made against a running browser |
-| How an operator overrides color and the brand mark | Unsettled; the palette is in one stylesheet, so the answer is a stylesheet |
 
 ## Limits
 
@@ -312,4 +311,3 @@ definitions, a token set per element in a style object counting as defined.
 |---|---|
 | No component library | Built from the mockup's tokens and components written here; a packaged data grid owning its markup cannot become cards on a phone (REQ-55) |
 | Dependencies are pinned exactly | A range resolves at build time; `npm ci` installs the lockfile |
-| A failure shows the server's sentence | It names the line or part to fix |

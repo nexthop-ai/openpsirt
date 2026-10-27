@@ -52,7 +52,7 @@ names them.
 | Stamped on the root element before the first paint | Otherwise every fresh page flashes the wrong look |
 | The page's stamp holds its own copy of the key and the looks; a web test holds the two copies together. A look the stamp does not know is replaced by the system's on load | It cannot import them |
 | Kept in the browser, changing nothing anybody else sees | |
-| Each look has its own accent beside the same severity scale, exploited above critical; severity never borrows the accent | "Critical" in the brand color leaves nothing meaning "act on this" |
+| Each look has its own accent beside the same five-band severity scale, exploited above critical; severity never borrows the accent | "Critical" in the brand color leaves nothing meaning "act on this" |
 
 ## State chips
 
@@ -93,7 +93,6 @@ Every screen works on a phone (REQ-55).
 | Rule | Reason |
 |---|---|
 | A small screen is shaped for review and respond: read a finding, agree or send back, see what is assigned. Wide-only screens stay wide and say so | Nobody triages three hundred findings on a phone |
-| Narrow screens get cards, never a table that scrolls sideways | |
 | A table wider than its box says so at every width, in a note above it pinned while it scrolls, with the clipped edge shaded; only tables that are wider, measured by the table itself | A stylesheet cannot ask, and a note over a table that fits teaches people to skip notes |
 | A table that scrolls takes a tab stop while there is somewhere to scroll | Arrow keys move a box only once it has focus |
 | Headings and field labels are noun phrases (REQ-60); the explanation sits under them; a card always has a name of its own | Somebody scanning reads thirty names, never thirty sentences |
@@ -107,7 +106,7 @@ Every screen works on a phone (REQ-55).
 | The way back in after a session ends is the top step | Under an open sheet or the phone rail, its controls are covered |
 | The stylesheet's order is the cascade; print rules are imported last and win by position | |
 | A closed vocabulary the server owns is rendered from the generated client | A hand table has members it cannot label |
-| An outcome's class is what the server publishes in the caller's description, read once at start: hides risk, carries a date, states a reason, is a dismissal. The dismissal reports, the audit log's filter and labels, every form asking for a reason, and the decision form's second-person hint read it. The hint tells a deferral from a promise by name, since their dates are measured against different things. Nothing is classed before the answer arrives | An outcome the server moves moves here |
+| An outcome's class is what the server publishes in the caller's description, read once at start: hides risk, carries a date, states a reason, is a dismissal. The dismissal reports, the audit log's filter and labels, every form asking for a reason, and the decision form's second-person hint (`design-docs/interface-finding.md` § The decision form) read it. Nothing is classed before the answer arrives, and a report asking for dismissals waits for it | An outcome the server moves moves here |
 | A count is never shown before it is known: a faint placeholder in flight, a dash with the reason on hover on failure, the figure once answered. An empty state is drawn once every read it depends on has answered. One renderer does all three, held by a web test | A zero while loading answers a question not yet asked |
 | A word the table does not know is shown as it arrived | Unfamiliar beats blank |
 | A choice with a consequence is a card per option carrying what picking it does: where a flaw came from, filing or recording, a recorded flaw's disclosure, a ruling's disposition. An option somebody may not pick is left out and said below. A radio group to the keyboard | |
@@ -161,23 +160,19 @@ Each screen was compared with the restyled mockup control for control.
 
 | Mockup | Here |
 |---|---|
-| A known-exploited tile at every scope | It needs a product to narrow inside |
-| Builds past the fix shown and not offered on the reach sheet | Every build at another version is offered; the reach read does not order versions |
+| A known-exploited tile at every scope | `design-docs/interface-shell.md` § Limits |
+| Builds past the fix shown and not offered on the reach sheet | Every build at another version is offered and the not-offered card is empty (`design-docs/interface-finding.md` § The reach sheet) |
 | Reaffirms a lapsed occurrence inline on the queue card | On the finding; whole decisions from the To reaffirm tab |
 | Variants and branches screens carry their own product select | The scope picker |
-| The queue card separates "matching automatically" from "ticked deliberately" | The record does not keep which; an approval keeps one number |
+| The queue card separates "matching automatically" from "ticked deliberately" | `design-docs/interface-review.md` § Limits |
 | The users table lists user, identity, last sign-in, roles and assigned | User, identity, roles and a grant control; sign-in and assigned work are on the person's own screen |
 | Administration in the grant grid | A control of its own beside the grid: it is global |
-| A pipeline key created elsewhere | Created where keys are listed |
-| A personal token's reach chosen after it is made | Fixed at creation and asked there; the list shows each token's reach |
-| A withdrawn credential leaves the list | It stays, dimmed, the button replaced by the word |
+| A pipeline key created elsewhere; a token's reach chosen after it is made; a withdrawn credential leaving the list | `design-docs/interface-administration.md` § The administration screens |
 | The sign-in screen drawn where there is one way in | Forwarded straight to the provider, except: over live work after a session ended, straight after sign-out (the provider's session would sign somebody back in), and a second arrival in a tab that already forwarded |
 | Uploads' SBOM table carries product, branch and variant columns | The scope bar; it adds when the producer says the build was made |
 | Settings write "3 days" in the field | The field holds the server's duration syntax, with the reading beside it |
 | A gray canvas with raised white cards | One white plane with hairlines (§ The work surface) |
-| Uppercase letter-spaced labels | Sentence case, small, muted |
-| The accent on the primary button, a pressed chip and a selected tab | Ink on all three |
-| A tinted pill for severity | A dot and the word |
+| Uppercase letter-spaced labels; the accent on the primary button, a pressed chip and a selected tab; a tinted severity pill | § The work surface |
 
 The trend is drawn by hand: open as an area in its own band, new against
 resolved as paired bars beneath on their own scale, one x axis. On the chart
@@ -188,4 +183,5 @@ severity split and the ring use the library.
 
 | Limit | Detail |
 |---|---|
-| Color and the brand mark resolve through tokens in one stylesheet | How an operator overrides them is not built |
+| How an operator overrides color and the brand mark is not built | Both resolve through tokens in one stylesheet, so the answer is a stylesheet |
+| A spacing scale is not built | The values in use run continuously from 3 to 18; a scale is a judgment made against a running browser |

@@ -25,17 +25,17 @@ action, both opening a drawer; the table is the screen.
 | Rule | Reason |
 |---|---|
 | The catalog says what each entry holds: a product its branch, tag and variant counts, what is open and when last scanned; a branch or tag what it came from; a variant whether it ships to customers. Every count is issues at components | |
-| What is open is counted only where asked: the three screens drawing the column ask; the pickers do not. Absent, never zero, where not asked | It is the whole cost of a catalog read: 0.39 s for two products against 1 ms for a liveness probe |
-| A product row says what it triages from, "deployment's" where it follows the deployment; an administrator changes it there | It explains a number |
+| What is open is counted only where asked: the three screens drawing the column ask; the pickers do not. Absent, never zero, where not asked | It is the whole cost of a catalog read (`design-docs/interface-measurements.md` § Catalog reads) |
+| A product row says what it triages from, "deployment's" where it follows the deployment, never the deployment's current word; an administrator changes it there | It explains a number; following and stating differ |
 | A product row says whether its documents are published: a box for an administrator, a word for others (`design-docs/publishing.md`) | |
 | An administrator's row action opens the trusted upstream drawer: the upstream as trusted, how reading it goes, a key it offers in place of the trusted one, stop trusting, and a field to name one. Naming is check, then trust, showing the key before anything is read (`design-docs/upstream.md`) | |
 | An administrator's row action opens the repository settings (§ The repositories screen) | |
 | A product, a release and a variant are corrected and retired from the list declaring them; a release's list of variants carries no control | It is what the release was built as |
 | A product's edit offers both names, the one scans and documents use and the one screens show, which move independently; only the first is refused once a document is published, and the drawer says so where the name is typed | A published document is held under its name |
-| A retired product says so on its own page, apart from its out-of-support date | Only a kept link reaches it |
-| A retired tag opens its release page and says it is retired; nothing offers it as the release before another | |
+| A retired product says so on its own page | Only a kept link reaches it |
+| A retired tag opens its release page, which reads retired lines to resolve it, and says it is retired; nothing offers it as the release before another | |
 | A retired variant is marked on releases built as it | Their findings stay open |
-| An inventory is uploaded from the bar and from Uploads (REQ-05): the drawer takes the build (prefilled from the scope, refused if undeclared), one CycloneDX or SPDX inventory, and any number of OpenVEX suppression documents; it posts the pipeline's multipart request and opens Uploads | |
+| An inventory is uploaded from the bar and from Uploads (REQ-05): the drawer takes the build (prefilled from the scope, refused if undeclared), one CycloneDX or SPDX inventory, as the file itself says, and any number of OpenVEX suppression documents; it posts the pipeline's multipart request and opens Uploads | |
 
 ## The Uploads screen
 
@@ -59,7 +59,7 @@ One build's uploads, a tab per kind, each reading its own list
 | The VEX and supplier tabs are product-wide and say "All builds of this product" above the list and on hover | |
 | A document row says who sent it: the uploader's display name, or the supplier and "feed" | |
 | A refused document shows the reason the sender was told, under its state | |
-| The newest taken copy of a document is marked Current; an earlier copy is replaced | |
+| The newest taken copy of a document is marked Current; an earlier copy is kept and replaced | |
 | An address a feed fetched from is not a link, shown on hover | A third party's URL |
 | VEX documents and supplier advisories are uploaded from the suppliers settings, which an empty tab links | |
 | An empty document tab says uploads before v0.11.0 are not listed, and their statements still apply | |
@@ -87,9 +87,9 @@ sides. It is where an alert about a sharply changed build leads.
 
 | Rule | Reason |
 |---|---|
-| Removals, then arrivals, then names at new versions, ordered by the server | The order is the answer |
+| Removals, then arrivals, then names at new versions, ordered by the server, never by a sorted column | The order is the answer |
 | One kind at a time is a filter asked of the server | A page's count is of the page |
-| A name that went is not a link | |
+| A name that went is not a link; every other name opens the component | |
 
 The component comparison is the same listing between any two builds of a
 product as each stands now, reached from release comparison with its two builds
@@ -175,5 +175,4 @@ a branch what it is built as nightly.
 
 | Limit | Detail |
 |---|---|
-| A retired product is not tracked as a date | Its out-of-support date is the end of support |
-| Uploads before v0.11.0 have no document record | Their statements still apply |
+| When a product was retired is not recorded | Its out-of-support date is when support ended |

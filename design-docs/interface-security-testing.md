@@ -40,7 +40,7 @@ product page.
 |---|---|
 | The page holds, in order: the result, the path, the related places, Also found by, the decision | |
 | Each place is file and line, linked to the repository where the address passes the link check, with the analyzer's message there and the captured code | |
-| Also found by (the same flaw) and Possibly also found by (maybe) are two lists; one decision covers the first, said on hover, never the second | |
+| Also found by (the same flaw) and Possibly also found by (maybe) are two lists; one decision covers the first, said on hover | |
 | The result card names the holder and offers the finding's holder picker to a triager, searching readers of internal work, not past end of life; choosing applies to every build it is open on | It is held as internal until its flaw is disclosed |
 | The decision card names the standing decision, opening the decision page, or offers the form | A code finding under a decision takes no second |
 | The form offers the three code finding outcomes as cards, a reason for a dismissal, and reasoning; "Propose" where somebody else agrees, "Submit" for a confirmation, effective at once | |
@@ -78,4 +78,4 @@ product page.
 
 | Limit | Detail |
 |---|---|
-| Included code findings never reach published VEX or CSAF | The preview says so |
+| A decision never covers Possibly also found by | Those may be other flaws |

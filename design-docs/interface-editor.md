@@ -21,8 +21,7 @@ published.
 
 | Rule | Reason |
 |---|---|
-| Every toolbar control is a button, never only a shortcut | It works on a phone |
-| Toolbar marks are bundled-font characters or icons from the rail's set (`design-docs/interface-look.md` § Interface-wide rules) | |
+| Every toolbar control is a button rather than a keyboard shortcut | It works on a phone |
 | Preview is the published renderer | |
 | Preview returns warnings beside the rendering (REQ-67) | What would be refused says so before submit |
 | An attached file's reference goes in at the cursor when the upload lands; the field stays editable meanwhile | What was typed is kept |
@@ -75,8 +74,8 @@ mention itself says a finding exists.
 | Asking who may be mentioned on undisclosed work is a question about undisclosed work; a non-reader is answered as though the product were not there | Otherwise it enumerates who holds private access |
 | The term after `@` is read from the text before the cursor | It stays right however the text is edited |
 | What is typed is sent and the server narrows, matching display names and identities | A local filter over a first page misses people |
-| The holder pickers ask the same endpoint (REQ-34) | People who may read it can open what they are handed; the people list is administration |
-| A box people type `@` into offers names at the visibility discussed: a decision at its most careful row's, a code finding's decision at internal | |
+| The holder pickers ask the same endpoint (REQ-34) | It offers people who can open what they are handed |
+| A box people type `@` into offers names at the visibility discussed: a decision at its most careful row's, a code finding's decision at internal, the visibility its rows hold until its flaw is disclosed | |
 | The bulk decision form offers no mentions | It carries no visibility to ask with |
 
 The team-member picker and the case picker are typed against the list. The team
@@ -94,4 +93,4 @@ term to the endpoint.
 
 | Limit | Detail |
 |---|---|
-| A sign-in redirect leaves the page | A draft is saved first and the person returns to it (`design-docs/interface.md` § An expired session) |
+| A draft is held in the browser that typed it | Another browser or device starts empty |

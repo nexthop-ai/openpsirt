@@ -1,11 +1,12 @@
 # Interface measurements
 
-Benchmark runs behind the interface's reads: the component screen, the findings
-list's ways down, the dependency tree's walk and its search.
+Benchmark runs behind the interface's reads: the component screen, the catalog,
+the findings list's ways down, the dependency tree's walk and its search.
 
 ## Contents
 
 - [Component screen](#component-screen)
+- [Catalog reads](#catalog-reads)
 - [Ways down on the list](#ways-down-on-the-list)
 - [Tree walk](#tree-walk)
 - [Tree search](#tree-search)
@@ -55,6 +56,14 @@ The measurement fixture's kernel, 204,000 occurrences, statistics settled:
 | Where it sits, 34 consumers above | 154 ms | 358 ms | 172 ms | 141 ms |
 | That build's findings list | 110 to 144 ms | | | |
 
+## Catalog reads
+
+| Read | Time |
+|---|---:|
+| A list of two products, counted | 0.39 s |
+| A liveness probe | 1 ms |
+| A product holding 8,839 findings, against one holding 28 | 0.39 s against 0.24 s |
+
 ## Ways down on the list
 
 | Case | Rows read |
@@ -81,5 +90,3 @@ per matched component against in one pass:
 | `li`, 698 matches | 17.1 s → 0.24 s | 1.38 s → 0.09 s | 0.33 s → 0.37 s | 33.5 s → 0.13 s |
 | `open` | 12.7 s → 0.24 s | 0.30 s → 0.08 s | 16 ms → 0.35 s | 13 ms → 0.13 s |
 | `ssl`, 6 matches | 0.15 s → 0.22 s | 6 ms → 75 ms | 14 ms → 0.36 s | 12 ms → 0.13 s |
-
-A narrow term is slower on three engines, because the pass reads the whole build.

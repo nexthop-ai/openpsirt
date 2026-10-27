@@ -28,7 +28,7 @@ role on.
 | A report is its own page at `/analytics/<name>` | Printable, linkable, quotable |
 | The catalog holds the list and files reachable nowhere else; an unnamed question is asked on the findings list | The filters live there |
 | A report about the thing stood on stays on that screen and is listed in the catalog; one spanning things lives only there. Release comparison keeps its address and gains an entry arriving with the product chosen | |
-| An entry that cannot answer at the selection is listed with a tag beside its name saying it needs a product or a build; pressing it opens the scope picker | A missing report reads as nonexistent |
+| An entry that cannot answer at the selection is listed with a tag beside its name saying it needs a product or a build; the name stays drawn as a name, and pressing it opens the scope picker | A missing report reads as nonexistent |
 | Grouped by question: program, controls, coverage, releases, records; an entry leading to an audit log filter sits with its question | |
 | A rail screen answering a named question is listed under "Also on screens" by its rail name | |
 | One address is one entry; release comparison carries the known issues a build ships with | |
@@ -37,8 +37,7 @@ role on.
 | A figure opens the list it was counted with: links from home and product figures turn the list's three silent-address narrowings off, and a sheet's figures carry its window and product | |
 | A list report exports CSV and JSON; a figures report prints, every figure linking its list | An aggregate has no stream; the list is the traceable form |
 | A figure is the response's, never recounted from the page beneath it; each list says its total | |
-| Print waits until every figure has arrived | |
-| A page past a list's end says so and keeps its footer | Previous must be reachable |
+| A page past a list's end says so and keeps its footer | The register holds its position when the build under it changes, and Previous must be reachable |
 
 ## The audit log
 
@@ -66,7 +65,7 @@ role on.
 | An inherited end of support opens empty, and stating the same date is a change | A stated date stays when the product's moves (REQ-15) |
 | A one-of-a-few setting is a select | A free box invites "yes" and "1" |
 | The server takes a word regardless of capitals and surrounding space and stores its own spelling: `High` sets a minimum severity | |
-| A setting nobody set is composed like a set one; an empty composer opens on days | An embargo is said in days |
+| A setting nobody set is composed like a set one; an empty composer opens on days | The plain box cannot ask whether 90 is hours, days or weeks, and an embargo is said in days |
 | Patch branch lookups show on Outbound, read-only, to administrators; a failed read says so, never Off | Configured by whoever deployed it; the progress endpoint is administrator-only |
 | Webhooks are configured here by administrators, the whole panel hidden from others | The endpoint refuses others |
 | A webhook's address and signing secret are masked, and every field tells a password manager it is not a credential | A chat address carries its token; form history leaks |
@@ -96,7 +95,6 @@ because each fails by looking quiet.
 | A webhook shows name, kind and host, never its address; the host is no link | The path is the credential for two services |
 | A destination's kinds use the notification area's words, the wildcard "everything", from a closed list | |
 | A resolved issue is counted at the severity it held while open | |
-| The signing secret is never shown; changing it is recording the destination again | |
 | Patch branch lookups show in the pass's order: Now, Next, Failed, Done folded. Now carries the step and a bar of commits looked up against due, re-asked every ten seconds during a visit; Next is numbered; a failure shows its first line, the whole on hover, with its retry time; every repository is reachable a page at a time (`design-docs/findings-patch-branches.md` § Display) | A silent host leaves labels missing |
 
 ## The administration screens
@@ -129,7 +127,7 @@ Reached from the person's own menu.
 
 | Rule | Reason |
 |---|---|
-| It mints personal tokens and turns the daily digest on | |
+| It mints personal tokens and turns on the daily digest, which is off until asked for | |
 | A switch that changes nothing is not offered: without a recorded address the card says so; unassigned lines without the digest are not offered | |
 | A token's secret is shown once, saying so while shown | A digest is stored |
 | It shows what they may do, never roles | |
@@ -143,8 +141,8 @@ screen: what somebody was told is asked after a leak.
 | Section | Answers |
 |---|---|
 | Grants in force | The roles in force, and whether one grants nothing |
-| Their part in the record | Decisions argued, agreements standing, agreements taken back, over every product; sent to an administrator, absent for an auditor |
-| Roles granted and withdrawn | Every change, newest first, with who made it |
+| Their part in the record | Decisions argued, agreements standing, agreements taken back, over every product; sent to an administrator, absent for an auditor, and drawn only where sent |
+| Roles granted and withdrawn | Every change, newest first, with who made it. Absent before means nobody set it; absent after means withdrawn |
 | Notifications sent | Everything sent, acknowledged and cleared included |
 
 | Rule | Reason |
@@ -153,10 +151,10 @@ screen: what somebody was told is asked after a leak.
 | What they were told is not narrowed by what they may read now | A line about undisclosed work sent under a role is the point |
 | A name nobody holds and an unreachable one answer alike | |
 | Each list is a page with its total | Both only grow |
-| Leaving is recorded at the foot, saying first what it does: refused at every way in, sessions ended, work handed back, nothing deleted, no role withdrawn. Once recorded it is said at the top, with bringing them back. Both acts are an administrator's; an auditor sees them disabled with the reason | |
+| Leaving is recorded at the foot, saying first what it does: refused at every way in, sessions ended, work handed back, nothing deleted, no role withdrawn. Once recorded it is said at the top, with bringing them back. Both acts are an administrator's; an auditor sees them disabled with the reason on hover | |
 
 ## Limits
 
 | Limit | Detail |
 |---|---|
-| A report never spans products a person holds no role on | Visibility is the data layer's |
+| A webhook's signing secret is never shown | Changing it is recording the destination again |

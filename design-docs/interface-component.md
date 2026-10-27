@@ -40,7 +40,7 @@ carries) and the act hangs off it.
 | Per build, because the answer differs by build | A maintained older line and a moved-on branch are different work |
 | The package identifier travels with the row; the ecosystem and upstream address are read from it, stored nowhere, fetched from nowhere | |
 | Where to read about the package is built from its identifier, an ecosystem with no address offering none; the name is encoded into the path | It came from a scan file |
-| Where it could go carries two counts: what a release fixed (open issues naming that exact version) and what reaching it closes (that plus everything fixed before). Ordered on the second | On the first, the release closing all 158 of the demo kernel's fixed 2 of its own |
+| Where it could go carries two counts: what a release fixed (open issues naming that exact version) and what reaching it closes (that plus everything fixed before) | Sorted on the first, the version worth taking sinks: on the demo kernel the release closing all 158 fixed 2 of its own, and the one fixing 49 led |
 | Furthest along first where versions order; unranked where any comparison refuses, the two counts then equal and the screen saying so | An ordering is per ecosystem |
 | The second count is consumers; occurrences are the row's title | The ceiling on one action is in occurrences |
 | It carries where the component sits: what pulls it in, what it pulls in, and twelve weeks of what opened and closed under it | Arriving from the tree is a question about the graph |
@@ -74,7 +74,7 @@ two builds. Every read is shaped by that size;
 | A component's own open count in the tree groups to one row per issue before counting | 42 ms against 103 counted distinct |
 | One step through the graph reads the neighbors first and counts what is open on them and beneath them, named as values | 3 ms against 32 for the whole build joined |
 | What is beneath each neighbor is the per-neighbor union of issues on what it reaches, taken in the application | Joined, each of 45 parents brings the kernel's issues: 302,269 rows sorted, 345 ms |
-| The issues on what the walk reaches are read for the reached components, named as values | Walked again, SQLite read every node, and statistics after a large scan made it 4.2 s on PostgreSQL and 14.2 s on MariaDB |
+| The issues on what the walk reaches are read for the reached components, named as values | Walked again, statistics after a large scan made it 4.2 s on PostgreSQL |
 | A neighbor reaching one carrying component takes that component's counts, with no union | 44 of the kernel's 45 parents |
 | Rows of one name at one rank are ordered by component identifier | A build ships a name at two versions |
 
@@ -96,11 +96,11 @@ as on it, worked out when read, never stored, because findings move.
 | A level is drawn whole; the cap is for inventories that are not honest | 5,270 components seen under one root |
 | Arriving from a finding opens on the component with every parent expanded; the chain travels in the link, and a step past a level's cap is kept | |
 | A version every component at a level shares is drawn once above the rows | A switch image's thirty containers carry one build stamp |
-| A node's number is shown as one bar of band widths in a fixed-width column, numbers on the title, rolled up in the counting statement so bands sum to the total, banded by the rating in force in this product | The list it opens groups by that rating |
+| A node's number is shown as one bar of band widths, the component screen's control, in a fixed-width column, numbers on the title, rolled up in the counting statement so bands sum to the total, banded by the rating in force in this product | The list it opens groups by that rating |
 | A node count opens its list: `beneath`, every open finding at or under the component by the same walk; `under` stays the direct consumer | The figures need not match; the list is one row per issue and component |
 | A name the build does not hold answers not found | An empty list is a clean subtree |
 | The count is every open issue, answered or not | The screen answers "what is open here" |
-| The marker opening a row is a button | |
+| The marker opening a row is a button | Otherwise no node past the first level is reachable without a pointer |
 | A row is keyed by name, version, package kind and namespace: what is open, what was drawn, what sits under it, and the request for children; a request naming two things is refused | A component shipped twice must open |
 | A component's name opens the component; the node name selects, so the link is the row's own control and the names in the two lists beside the tree | |
 | There is no pane over the tree | The component screen answers it |
@@ -116,7 +116,7 @@ occurrences is one answer.
 | Issues, never finding rows | |
 | A hit carries what is beneath it, by the tree's walk and bands | |
 | The build's own root is not a hit | |
-| Counted in one pass over the build, grouped by component | Per match, a broad term took most of a minute on SQLite; every term is under half a second on every engine (`design-docs/interface-measurements.md` § Tree search) |
+| Counted in one pass over the build, grouped by component; a narrow term is slower than counted per match on three engines, since the pass reads the whole build | Every term is under half a second on every engine (`design-docs/interface-measurements.md` § Tree search) |
 | Hits are marked in the list, which stays while the term does, each with a link to its component | A hit carries no chain, so the tree cannot open at it |
 
 ## Limits
@@ -124,5 +124,4 @@ occurrences is one answer.
 | Limit | Detail |
 |---|---|
 | The component read has a floor of one pass over a source package's occurrences | Fix, deadline and occurrence are read from the table, as no index carries them: 100 ms of 243 on PostgreSQL. Lower needs a stored per-issue total rewritten as findings move |
-| Sibling components are not folded on the tree | Folding removes 281 of 36,991 child rows, leaving a 4,679-row level |
-| A narrow tree search term is slower than a per-match count | The pass reads the whole build |
+| Sibling components are not folded on the tree | Folding removes 281 of 36,991 child rows and shrinks the largest level from 4,867 to 4,679, still too large to browse |
