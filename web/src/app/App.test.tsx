@@ -4,7 +4,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { mounted, screen, serve, settle, type Answer } from "../test/mount";
+import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 
 const mount = mounted();
 
@@ -72,5 +72,48 @@ describe("the application for somebody signed in", () => {
     await drawn(() => ({ data: WHO }));
     expect(mount.host().querySelector(".topsearch")).not.toBeNull();
     expect(text()).toContain("A link from outside the application can also point at a screen");
+  });
+});
+
+// Each address a screen had before it was renamed, and where it lands. The
+// destinations are written out rather than built with the route helpers, so a
+// forward pointed at the wrong screen fails here.
+describe("a former address drawn by the application", () => {
+  const build = "/products/sonic/branches-and-tags/main/variants/broadcom";
+  it.each([
+    ["/people", "/access"],
+    ["/people/ana", "/access/ana"],
+    ["/work?tab=people", "/assignments?tab=people"],
+    ["/exploited-here", "/incidents"],
+    ["/obligations", "/incidents"],
+    ["/audit", "/audit-log"],
+    ["/record?product=sonic", "/audit-log?product=sonic"],
+    ["/disclosing", "/disclosure-deadlines"],
+    ["/report-a-flaw", "/record-a-flaw"],
+    ["/reports", "/analytics"],
+    ["/reports/deadline-compliance", "/analytics/deadline-compliance"],
+    ["/products/sonic/inbox", "/products/sonic/vulnerability-reports"],
+    ["/products/sonic/inbox/R-7", "/products/sonic/vulnerability-reports/R-7"],
+    [`${build}/components`, `${build}/dependencies`],
+    [`${build}/scans`, `${build}/uploads`],
+    [`${build}/inventories`, `${build}/uploads`],
+    [`${build}/scans/7/changes`, `${build}/uploads/7/changes`],
+    [`${build}/inventories/7/changes`, `${build}/uploads/7/changes`],
+    ["/claims/12", "/decisions/12"],
+    [`${build}/components/libnl/decide`, `${build}/components/libnl/bulk-decision`],
+    [`${build}/match-coverage`, `${build}/unmatched-components`],
+    [`${build}/pending-upgrades`, `${build}/planned-upgrades`],
+    ["/products/sonic/streams/main/variants/broadcom/findings", `${build}/findings`],
+    [
+      "/products/sonic/streams/main/variants/broadcom/components/libnl/decide",
+      `${build}/components/libnl/bulk-decision`,
+    ],
+  ])("forwards %s to %s", async (from, to) => {
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    await drawn(() => ({ data: WHO }), from);
+    // Long enough for the screen landed on to load and read, so a screen that
+    // forwards again on its own is seen doing so.
+    for (let i = 0; i < 5; i++) await settle();
+    expect(location()).toBe(to);
   });
 });
