@@ -1,0 +1,53 @@
+name: Dependabot
+
+# A Dependabot pull request moving a minor or patch release is approved and
+# queued as it opens, and again after each rebase, since a push dismisses the
+# approval. The queue still runs the whole gate, so a red bump never merges.
+#
+# Left to a person:
+#
+# - A major release, which usually needs code to change.
+# - The actions group: an action runs with this repository's token, and its
+#   pin is what a reader checks in the diff.
+# - A dependency whose maintainers changed, the signal a takeover gives.
+#
+# Not a gate: it declares no `merge_group:`, so a queue entry waits on nothing
+# here. On a pull request it reports a check, which Merge Status waits for, and
+# it is skipped on every pull request Dependabot did not open.
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  queue:
+    name: Queue Dependabot update
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3.1.0
+      - name: Approve and queue
+        if: >-
+          steps.meta.outputs.update-type != 'version-update:semver-major' &&
+          steps.meta.outputs.package-ecosystem != 'github_actions' &&
+          steps.meta.outputs.maintainer-changes != 'true'
+        env:
+          PR: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # An approval is refused while the repository does not let Actions
+        # approve pull requests. Refused, the pull request is still queued,
+        # which merges it where no approval is required and leaves it waiting
+        # for a person where one is.
+        run: |
+          gh pr review --approve "$PR" \
+            || echo "::warning::not approved: allow GitHub Actions to approve pull requests in the repository's Actions settings"
+          gh pr merge --auto --squash "$PR"

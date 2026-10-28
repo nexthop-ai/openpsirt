@@ -184,6 +184,9 @@ and an SPDX identifier; `make spdx-fix` writes missing ones.
 | Interface minor and patch releases are grouped; a major release is its own pull request | |
 | TypeScript majors are not offered | The linter's TypeScript support and the API client generator both refuse 7. It lifts when both accept it |
 | Updates go through the merge queue | |
+| A minor or patch update is approved and queued as it opens and after each rebase, by the `Dependabot` workflow | The queue runs the whole gate; a push dismisses an approval |
+| A major update, the actions group and a dependency whose maintainers changed wait for a person | A major release needs code; an action runs with the repository's token; a maintainer change is what a takeover looks like |
+| An approval refused, because the repository does not let Actions approve, warns and still queues | Where no approval is required it merges |
 
 ## Limits
 
@@ -191,3 +194,4 @@ and an SPDX identifier; `make spdx-fix` writes missing ones.
 |---|---|
 | A new call into an affected function of an unchanged module is not introduced | The module was already reported |
 | The scanner and inventory tool pins are watched by nobody | `design-docs/packaging.md` § Limits |
+| An update the `Dependabot` workflow queues may merge without starting `main`'s push workflows | GitHub starts no workflow for an event the job's own token causes, so the documentation publish and the caches wait for the next merge |
