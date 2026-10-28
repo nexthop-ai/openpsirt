@@ -1384,7 +1384,7 @@ openpsirt-upload upload \
 </tr>
 <tr>
 <td><code>--snippets</code></td>
-<td>Send the source lines of each location. Without it, no source leaves the pipeline</td>
+<td>Send the source lines of each location, which is the default. With <code>--snippets=false</code>, no source leaves the pipeline</td>
 </tr>
 <tr>
 <td><code>--salt-file</code></td>
@@ -2055,7 +2055,7 @@ of the suite, so its runs need no rules file.</p>
 </tr>
 <tr>
 <td>Source</td>
-<td>Nothing, unless <code>--snippets</code> is given. Whole-file contents, attachments and suggested fixes in an analyzer's SARIF are always removed</td>
+<td>Each location's lines and two lines either side, unless <code>--snippets=false</code> is given. Whole-file contents, attachments and suggested fixes in an analyzer's SARIF are always removed</td>
 </tr>
 </tbody>
 </table>

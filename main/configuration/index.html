@@ -4697,6 +4697,14 @@ changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> s
 <td>A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for any of them</td>
 </tr>
 <tr>
+<td>A product keeps the source snippets an analysis upload sends wherever no path of its repository settings says not to. v0.10.2 kept them only under a path saying to</td>
+<td>To keep none for a product, add the empty path with Snippets set to Not kept on its Repositories screen, or <code>{"prefix":"","snippets":false}</code> in its repository settings. Snippets stored before the upgrade are unchanged, and none is disclosed with a flaw unless a path says to</td>
+</tr>
+<tr>
+<td><code>openpsirt-upload</code> sends each location's source lines unless given <code>--snippets=false</code>. v0.10.2 sent them only with <code>--snippets</code></td>
+<td>Give <code>--snippets=false</code> in a pipeline whose source must not leave it</td>
+</tr>
+<tr>
 <td>A change on the administrative trail recording or clearing an incident, or naming its fix, has the kind <code>incident</code>, which v0.10.2 answered as <code>exploited-here</code>. The trail's <code>kind</code> filter takes <code>incident</code></td>
 <td>Ask for <code>kind=incident</code>. The upgrade rewrites every stored change. A change to a window v0.10.2 recorded keeps saying <code>Obligation window</code> in what it was about; one recorded after says <code>Response window</code></td>
 </tr>
