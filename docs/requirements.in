@@ -4,6 +4,6 @@
 #   pip-compile --generate-hashes --no-index --output-file=docs/requirements.txt docs/requirements.in
 #
 # Run it on the Python the workflows use, which is the version they pin.
-mkdocs-material==9.7.7
+mkdocs-material==9.8.0
 mkdocs-swagger-ui-tag==0.8.1
 mike==2.2.0
