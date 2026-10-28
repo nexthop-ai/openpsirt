@@ -17,7 +17,7 @@ func TestAPageOfGroupsHoldsTheRowsItsTotalCounts(t *testing.T) {
 	// undecided is CVE-2026-2, so the page holds it and the total says one.
 	// Differing puts a distinct count of builds in the HAVING the filter
 	// builds, and every case after the first adds a second condition beside
-	// it: the shape DESIGN-database.md § Silently wrong query shapes names.
+	// it: the shape design-docs/database-queries.md § Silently wrong query shapes names.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))

@@ -115,7 +115,7 @@ func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) 
 //
 // Every audience starts from it. A departed person's grants stay in place, so
 // a question answered from grants alone would keep telling somebody who has
-// left (DESIGN-access.md § Somebody who has left).
+// left (design-docs/access-grants.md § Somebody who has left).
 func present(people []access.Account) []access.Account {
 	out := make([]access.Account, 0, len(people))
 	for _, person := range people {

@@ -14,7 +14,8 @@ implement something else.
 | File | Holds | Lifetime |
 |---|---|---|
 | `REQUIREMENTS.md` | Why: every decision, with reasoning, by area | Permanent |
-| `DESIGN-*.md` | How: structures, flows, behavior | Permanent |
+| `DESIGN.md` | Index: which design document holds which contract | Permanent |
+| `design-docs/*.md` | How: structures, flows, behavior | Permanent |
 | `TODO.md` | What is left: not built, deferred, or waiting on a decision | Until it is empty |
 | Code | What runs | — |
 
@@ -32,7 +33,14 @@ and a decision says why.
 
 ## Design documents
 
-At the repository root, named `DESIGN-<area>.md`.
+Under `design-docs/`, one subject each: `<area>.md` for an area's core,
+`<area>-<subject>.md` for the rest. `DESIGN.md` at the root indexes them.
+
+- Read `DESIGN.md` first, then only the documents it points at.
+- A document added, renamed or removed changes its `DESIGN.md` row in the same change; the gate holds both directions.
+- A row's terms are the words a reader searches for. Keeping them true is a person's job.
+- Split by subject, never to hit a size. A long document on one subject stays whole.
+- A reference to a section is `design-docs/<file>.md` § Heading. The gate holds every one to a heading in that file.
 
 - Language-agnostic: behavior, architecture and domain concepts such as SBOM structure, dependency paths, triage outcomes and visibility rules. Never type names, struct fields, function signatures or source paths; those belong in code.
 - Name the decisions satisfied, by ID, and describe each.
@@ -47,14 +55,14 @@ does not explain, argue, or recount what used to be.
 
 | Surface | Register |
 |---|---|
-| `DESIGN-*.md` | Spec, with the `Contents` and `Limits` rules |
+| `design-docs/*.md` | Spec, with the `Contents` and `Limits` rules |
 | `docs/`, `README.md`, `SECURITY.md` | Spec, with no `Limits` block. A `docs/` page has no `Contents`, because the site generates one; `README.md` has one |
 | Code comments | Spec, without the `Contents` and `Limits` rules |
 | The published API document | Spec, with § The published API document |
 | `REQUIREMENTS.md` rows | Spec, plus one clause of reason |
 | This file | Spec. § The Spec register is the one place a register's history belongs |
 | `TODO.md` | Spec; § The work list says what may reference it |
-| Interface strings | Labels, skimmed: `DESIGN-interface.md` § Screen copy |
+| Interface strings | Labels, skimmed: `design-docs/interface.md` § Screen copy |
 | Commit messages, pull request descriptions | Why, including what the behavior was and what the change makes of it |
 
 Prior behavior belongs only in the last row. The exception is an upgrade note,
@@ -78,8 +86,8 @@ behavior.
 | A table, a list or an example before a paragraph | Parts are a table, steps or cases a list, a shape an example. A paragraph is for the one thing that is none of those |
 | Plain words, short sentences | One clause per point; a sentence read twice fails |
 | One fact in one place | Point at the owner; two copies disagree |
-| Cross-rule rationale goes in `Limits` | The block at the foot of every `DESIGN-*.md`. A published page carries none |
-| Every `DESIGN-*.md` opens with `Contents` | One entry per `##` heading, in order |
+| Cross-rule rationale goes in `Limits` | The block at the foot of every `design-docs/*.md` except a measurements one. A published page carries none |
+| Every `design-docs/*.md` opens with `Contents` | One entry per `##` heading, in order |
 | Measured numbers stay | "5,047 fixable rows are 271 distinct bumps". Cut the sentence introducing it, never the number |
 | Component selection is design | Why this scanner, database or format belongs. Why a variable has its name does not |
 
@@ -125,7 +133,7 @@ and what was measured and left alone. An item filed as an issue leaves it.
 - Every item has an identifier, `TODO-` and a number, never changed or reused, for conversation and pull requests to cite.
 - An item says in plain words what exists, what is missing or wrong, the work as an instruction, and what it waits on.
 - Code, comments, commit messages and design documents never cite the file or its identifiers; an identifier dies with its item.
-- Anything durable moves to `REQUIREMENTS.md` or a `DESIGN-*.md` before an item is deleted.
+- Anything durable moves to `REQUIREMENTS.md` or a `design-docs/*.md` before an item is deleted.
 
 ## Non-negotiables
 
@@ -133,7 +141,7 @@ The decisions easiest to violate by accident and costliest to unpick.
 
 | Rule | Decision |
 |---|---|
-| No engine-specific SQL in the core. Four engines are supported; engine-specific code lives in the database package and the job queue's locking only, listed in `DESIGN-database.md` and nowhere else | REQ-71 |
+| No engine-specific SQL in the core. Four engines are supported; engine-specific code lives in the database package and the job queue's locking only, listed in `design-docs/database.md` and nowhere else | REQ-71 |
 | Never trust identifiers a scan file supplies to be stable between builds or consistent between producers. Identity is derived from content | REQ-08 |
 | Visibility is enforced in the data-access layer, never per handler, and every query carries a subject: counts, aggregates, search and exports as well as rows | REQ-42 and REQ-43 |
 | A finding is a component at a specific occurrence. Never deduplicate up to the package; grouping is presentation | REQ-17 |
@@ -142,7 +150,7 @@ The decisions easiest to violate by accident and costliest to unpick.
 | Every transaction is retryable as a whole, through the one helper. A cluster certifies at `COMMIT`, so a write whose statements all succeeded can still roll back | REQ-71 |
 | Nothing a transaction depends on is read outside it. A retry re-runs the closure against a moved database, so anything the closure uses but does not fetch is a defect | REQ-71 |
 | SQL values are parameterized; SQL identifiers come from an allowlist. A placeholder cannot bind a column, so a sort column from a query parameter is the real risk | REQ-66 |
-| Every identifier is quoted: declared, named and invented. Engines reserve different words, and a word is reserved only bare. `make reserved` reports bare names; it cannot see a string constant holding one qualified name or a column built from an alias at run time, which are quoted where written. See `DESIGN-database.md` § Identifier quoting | REQ-71 |
+| Every identifier is quoted: declared, named and invented. Engines reserve different words, and a word is reserved only bare. `make reserved` reports bare names; it cannot see a string constant holding one qualified name or a column built from an alias at run time, which are quoted where written. See `design-docs/database-queries.md` § Identifier quoting | REQ-71 |
 | A name a query invents also avoids reserved words. A derived table `groups` fails on MySQL 8; quoting makes it legal, not readable | REQ-71 |
 | An affected-row count means rows matched, not changed, so a write whose values were already correct still reports its row. The connection settings make that true on all four engines | REQ-71 |
 | Exported code with no caller is a defect. `make unreachable` counts a test as a caller, so a symbol only its tests reach is a person's to catch | — |
@@ -164,7 +172,7 @@ The decisions easiest to violate by accident and costliest to unpick.
 
 - A cap follows reversibility: what nothing re-checks is capped.
 - Every bulk decision has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, so one answering many findings stays a size a reviewer can follow, and an unbounded write is a denial of service somebody triggers by accident.
-- A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. Its transaction size was measured and needs no chunking (`DESIGN-triage.md`).
+- A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. Its transaction size was measured and needs no chunking (`design-docs/triage-promises.md`).
 - A cap bounds what is written, never what was asked for, because one named issue expands into many occurrences (REQ-27).
 
 ## Source file size
@@ -197,7 +205,7 @@ Below 1.0 there is no schema or API compatibility (REQ-76); the API path version
 is the shape 1.0 will have, and promises nothing.
 
 - A schema change edits the declaration in the untagged release's own migration, never a new migration beside it, and a development database is recreated.
-- What a tagged release shipped never changes; each release's declarations sit beside its upgrade migration (`DESIGN-database.md` § Migrations).
+- What a tagged release shipped never changes; each release's declarations sit beside its upgrade migration (`design-docs/database-migrations.md` § Migrations).
 - Migration 41 is the baseline, v0.7.0's schema at once. An older database is refused.
 - Migrations 42, 43 and 44 upgrade databases v0.7.0, v0.8.0 and v0.9.0 built.
 - The next schema change is migration 45, edited until a tag ships it.
@@ -205,11 +213,14 @@ is the shape 1.0 will have, and promises nothing.
 
 ## Evidence beside a decision
 
-A decision settled by a measurement carries it: "335,021 findings for one image,
+A decision settled by a measurement carries it, in one clause beside the rule: "335,021 findings for one image,
 305,487 of them a single kernel across 62 modules"; "3 ms on PostgreSQL, 11 ms on
 MySQL, for the worst component in a real graph". A number can be re-checked in
 two years and records why the decision was taken then. A reversal records what
 was believed, what was measured, and which was wrong.
+
+A benchmark run (the model, the tables, the caveats) sits in
+`design-docs/<area>-measurements.md`, and the rule it justifies points at it.
 
 ## Code conventions
 
@@ -220,7 +231,7 @@ was believed, what was measured, and which was wrong.
 - A measurement of something outside the repository stays, such as "1,415 against 38".
 - No ticket or tracker references in code, comments or documents. Keep linkage in the tracker and the pull request.
 - Comment density matches the surrounding code. Explain why, not what.
-- Interface copy is labels: cut first, then say what a thing is or does in a couple of words, with clarification on hover, in plain spoken English for a technical reader. Contractions are allowed there. `DESIGN-interface.md` § Screen copy holds the rest.
+- Interface copy is labels: cut first, then say what a thing is or does in a couple of words, with clarification on hover, in plain spoken English for a technical reader. Contractions are allowed there. `design-docs/interface.md` § Screen copy holds the rest.
 - American spelling in prose, comments and identifiers: license, catalog, normalize, behavior, color, authorize. Text quoted from a producer and field names a consumed format defines are exempt.
 - No contractions in anything durable; temporary documents and commit messages are exempt.
 - Write OpenPSIRT wherever a person reads it: documentation, the API description, the version the binary prints, a chart description.
@@ -276,7 +287,7 @@ Read by somebody deciding whether to review now, and later by somebody working
 out why the code looks as it does.
 
 - The title is an imperative verb, then the feature, screen or defect by its searchable name, in one clause of about 50 characters, with no "and" joining two halves: "Speed up the Inventories page", "Publish CSAF and OpenVEX documents", "Make v0.7.0 the oldest supported schema". Never a paraphrase naming nothing, such as "Report failures as what they are". Squash-merge makes it the subject on `main` and a release-notes line.
-- Short, plain spoken English, as `DESIGN-interface.md` § Screen copy describes.
+- Short, plain spoken English, as `design-docs/interface.md` § Screen copy describes.
 - Lists, tables and before-and-after examples before prose.
 - A measurement where there is one.
 - No count of the tree's own contents: "every trailed act", not "38 trailed acts", because the description changes as the branch does.
@@ -294,7 +305,7 @@ out why the code looks as it does.
 ## Building
 
 Every CI step is a `make` target, so a failure reproduces locally with the same
-pinned versions. `DESIGN-build.md` § Make targets lists them all.
+pinned versions. `design-docs/build.md` § Make targets lists them all.
 
 | Target | Use |
 |---|---|
@@ -314,13 +325,13 @@ the OpenAPI drift check, the frontend, the race detector and three engines.
 
 ### Tier selection
 
-`DESIGN-build.md` § Gate tiers holds the table, and `make gate` applies it.
+`design-docs/build.md` § Gate tiers holds the table, and `make gate` applies it.
 
 - A change to documents alone runs the document checks only, in seconds.
 - `check-engines` never runs for a documents-only change: it can only pass, and running it teaches people the gate is expensive.
 - The generated `docs/reference/openapi.yaml` and TypeScript client take the API tier.
 - A design document committed with code takes the code's tier.
-- Test binaries run in parallel, each with its own database per server through a leased slot (`DESIGN-build.md` § Test databases).
+- Test binaries run in parallel, each with its own database per server through a leased slot (`design-docs/build-tests.md` § Test databases).
 
 ### The second command
 
@@ -341,7 +352,7 @@ tests on the other three.
 - Make reads the URLs when it starts, so run `make engines-up` first, then `make check && make check-engines`.
 - It writes `OPENPSIRT_TEST_POSTGRES_URL`, `OPENPSIRT_TEST_MYSQL_URL`, `OPENPSIRT_TEST_MARIADB_URL` and `OPENPSIRT_TEST_TOO_OLD_URL`. Each is set with `?=`, so the same variable in the environment points one run elsewhere.
 - `OPENPSIRT_TEST_TOO_OLD_URL` is a server below the supported floor (postgres:13 in CI), so the refusal to run against it is exercised rather than skipped.
-- `OPENPSIRT_TEST_RELAX_DURABILITY` lets the harness turn off commit durability on the MySQL and MariaDB servers, which is server-wide, so it is for throwaway servers only (`DESIGN-build.md` § Commit durability). Left out, a server keeps its own.
+- `OPENPSIRT_TEST_RELAX_DURABILITY` lets the harness turn off commit durability on the MySQL and MariaDB servers, which is server-wide, so it is for throwaway servers only (`design-docs/build-tests.md` § Commit durability). Left out, a server keeps its own.
 
 ### A new table
 

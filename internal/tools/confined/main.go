@@ -4,7 +4,7 @@
 // Command confined reports engine-specific code outside where it is allowed.
 //
 // Queries here are written once and run against four engines. The places that
-// have to ask an engine directly are enumerated in `DESIGN-database.md`, and
+// have to ask an engine directly are enumerated in `design-docs/database.md`, and
 // that list said it was "checked by grep rather than trusted" while nothing
 // checked it — which is the shape the list itself was written about: the
 // document records that it stated three while there were five, because each
@@ -56,7 +56,7 @@ var selecting = regexp.MustCompile(`dbtest\.\w+\([^)]*database\.\w+`)
 
 // allowed is where an engine may be named, and why.
 //
-// `DESIGN-database.md` holds the same list in prose. Two copies is the thing
+// `design-docs/database.md` holds the same list in prose. Two copies is the thing
 // this program exists to catch, so the document points at the mechanism and
 // this is the mechanism: a path added here without the document changing is
 // the drift, and a reviewer reading either finds the other.
@@ -136,6 +136,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s asks an engine directly, outside where that is allowed\n", one)
 	}
 	fmt.Fprintf(os.Stderr, "\n%d place(s) outside internal/database and the queue's locking. "+
-		"Move it there, or widen the list here and in DESIGN-database.md together.\n", len(bad))
+		"Move it there, or widen the list here and in design-docs/database.md together.\n", len(bad))
 	os.Exit(1)
 }

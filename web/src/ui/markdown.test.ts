@@ -98,7 +98,7 @@ describe("the renderer", () => {
   });
 
   it("keeps a link to somewhere in this deployment", () => {
-    // DESIGN-text.md: one finding referring to another is ordinary, and the
+    // design-docs/text.md: one finding referring to another is ordinary, and the
     // submission check accepts it. The sanitizer keeps the anchor, so a link
     // accepted when it was written is still a link when anybody reads it.
     const out = render("See [the other one](/findings/CVE-2026-1000).");

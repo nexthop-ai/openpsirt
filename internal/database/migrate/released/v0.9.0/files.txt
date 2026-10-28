@@ -1,5 +1,5 @@
 # The migrations v0.9.0 tagged, and the digest of each file below its license header.
-# v090_merge.go is amended after the tag, with the same schema recorded below: DESIGN-database.md § Release records.
+# v090_merge.go is amended after the tag, with the same schema recorded below: design-docs/database-migrations.md § Release records.
 last 43
 c8a890aeebe7950f2cb2d0199496053aa5c9d82a83ef4fb4e8dbefe8cc9a5428  00043_v090.go
 8e9d37e15e3048f073980d7172f12bf3c2a44ce2e165424fe67e287f7c09e4ec  v090_delivery.go

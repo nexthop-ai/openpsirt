@@ -275,7 +275,7 @@ func TestDocsCheckTestsEveryPackageThatReadsADocument(t *testing.T) {
 func TestATestReadingADocumentIsFound(t *testing.T) {
 	got := documentReaders(map[string]string{
 		"internal/a/a_test.go": `os.ReadFile("../../docs/x.md")`,
-		"internal/b/b_test.go": `os.ReadFile(filepath.Join("..", "..", "DESIGN-x.md"))`,
+		"internal/b/b_test.go": `os.ReadFile(filepath.Join("..", "..", "design-docs", "x.md"))`,
 		"internal/c/c_test.go": `archive(map[string][]byte{"README.md": nil})`,
 		"internal/d/d_test.go": `os.ReadFile(filepath.Join("..", "..", "docs", "x.md"))`,
 		"internal/e/e_test.go": "root := filepath.Join(\"..\", \"..\")\nif filepath.Ext(path) != \".md\" {",

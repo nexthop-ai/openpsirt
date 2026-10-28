@@ -787,7 +787,7 @@ const foldedWidth = database.NameWidth
 //
 // Only where a report states a value and the stored row does not, so a later
 // report fills in what an earlier one did not know and overwrites nothing — the
-// rule `DESIGN-findings.md` states for every other field two reports can
+// rule `design-docs/findings-issues.md` § Report merging states for every other field two reports can
 // disagree about. Without it a component first interned through a producer
 // that states no supplier or license never gets one, however many later scans
 // say what it is.

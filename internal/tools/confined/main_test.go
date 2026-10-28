@@ -74,7 +74,7 @@ func TestChoosingWhichEngineATestRunsOnIsNotABranch(t *testing.T) {
 }
 
 func TestWhereAnEngineMayBeNamedIsTheListTheDocumentHolds(t *testing.T) {
-	// DESIGN-database.md holds the same list in prose, and two copies is the
+	// design-docs/database.md holds the same list in prose, and two copies is the
 	// thing this program exists to catch — so the list is checked for saying
 	// something rather than for being exactly what somebody last typed.
 	if len(allowed) == 0 {

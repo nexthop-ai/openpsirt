@@ -161,7 +161,7 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 }
 
 // TestAPipelineKeyIsRefusedByTheReadRatherThanAnsweredEmpty pins the rule
-// DESIGN-access.md places in the data layer, over the reads that answer a
+// design-docs/access-enforcement.md places in the data layer, over the reads that answer a
 // selection rather than one row.
 //
 // Refused by the read itself, because a check in a handler is the one somebody

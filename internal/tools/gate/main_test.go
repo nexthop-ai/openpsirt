@@ -41,7 +41,7 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 		file string
 		want []tier
 	}{
-		{"a design document", write("DESIGN-thing.md", "# Thing\n"), []tier{documents}},
+		{"a design document", write(filepath.Join("design-docs", "thing.md"), "# Thing\n"), []tier{documents}},
 		{"the interface's source, which the license check reads", "web/src/screens/Home.tsx", []tier{web, webPackages}},
 		{"anything else under the interface", "web/scripts/check.mjs", []tier{web}},
 		{"the module files", "go.mod", []tier{modules}},
@@ -135,7 +135,7 @@ func TestTheTiersAboveDocumentsCarryTheOneBelow(t *testing.T) {
 	query := write("store.go", "package p\n\nfunc read() { db.NewSelect().Model(&x) }\n")
 	route := write("route.go", "package p\n\nfunc r() { huma.Register(api, huma.Operation{"+
 		"OperationID: \"x\"}, h) }\n")
-	prose := write("DESIGN-thing.md", "# Thing\n")
+	prose := write("thing.md", "# Thing\n")
 
 	for _, c := range []struct {
 		what  string
@@ -259,7 +259,7 @@ func TestEveryNarrowTierScansForSecrets(t *testing.T) {
 func TestEveryFileReadableReadsTakesATierRunningIt(t *testing.T) {
 	// readable reads documents and the interface's source, so a control byte
 	// pasted into either fails CI unless the tier the file lands in runs it.
-	for _, file := range []string{"DESIGN-thing.md", "web/src/screens/Home.tsx", "web/scripts/check.mjs"} {
+	for _, file := range []string{filepath.Join("design-docs", "thing.md"), "web/src/screens/Home.tsx", "web/scripts/check.mjs"} {
 		reached := map[tier]bool{}
 		for _, tr := range classify(file) {
 			reached[tr] = true

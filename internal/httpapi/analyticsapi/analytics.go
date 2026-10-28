@@ -333,7 +333,7 @@ func registerNotes(api huma.API, in core.Deps) {
 			"which a customer's own scanner reads. The comparison itself still answers all " +
 			"three.\n\n" +
 			"Worst first and stably ordered, so two runs over the same pair of builds produce " +
-			"the same document. A code finding line names both builds, the day, and the scanner and " +
+			"the same document. A lead line names both builds, the day, and the scanner and " +
 			"vulnerability-database versions the later build was last measured with.\n\n" +
 			"Public findings only unless you ask otherwise, as the comparison itself is. " +
 			"Where fixes are left out for not having been disclosed, the note says how many " +

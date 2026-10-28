@@ -752,7 +752,7 @@ func TestAnInactiveGrantIsNotSomethingSomebodyHolds(t *testing.T) {
 }
 
 // TestGrantingWhatIsAlreadyHeldSucceedsAndChangesNothing pins the branch
-// DESIGN-access.md states in prose and nothing executed: the arm GrantRole
+// design-docs/access-grants.md states in prose and nothing executed: the arm GrantRole
 // falls into when the insert is refused was at 0.0%.
 //
 // An administrator clicking twice, or two of them acting at once, is the

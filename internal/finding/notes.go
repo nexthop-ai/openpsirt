@@ -92,7 +92,7 @@ func Notes(about Note, c *Comparison) string {
 //
 // Every one of these is somebody else's text: the release names were given at
 // upload and the scanner and database versions are what the scanner reported.
-// Each is escaped once here, so the heading, the code finding and the sentence a
+// Each is escaped once here, so the heading, the lead line and the sentence a
 // release that fixed nothing is carry them as text.
 func written(about Note) Note {
 	about.From = markdown.Literal(strings.TrimSpace(about.From))

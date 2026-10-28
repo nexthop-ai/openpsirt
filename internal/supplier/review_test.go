@@ -81,7 +81,7 @@ func aBatchIsReadWhole(t *testing.T, stamp string) {
 func TestUploadingAnAdvisoryTheFetchNarrowedStillRecordsIt(t *testing.T) {
 	// The store treats a document whose digest it already holds as one that
 	// changes nothing. Keyed on the bytes alone, a fetch that narrowed a
-	// document to nothing left the upload path — which DESIGN-ingest names as
+	// document to nothing left the upload path — which design-docs/ingest-suppliers.md names as
 	// the remedy — writing nothing and reporting success.
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()

@@ -147,7 +147,7 @@ func requirementsIn(text string) ([]string, map[string]int, error) {
 // comment is not described anywhere permanent — a comment describes one
 // function rather than the system.
 func namedByDesigns(width map[string]int) (map[string]bool, error) {
-	designs, err := fs.Glob(here, "DESIGN-*.md")
+	designs, err := fs.Glob(here, "design-docs/*.md")
 	if err != nil {
 		return nil, err
 	}

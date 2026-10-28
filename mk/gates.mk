@@ -41,7 +41,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 # Known vulnerabilities in Go modules and the toolchain. A change fails for one
 # the branch it targets was not already affected by; one it was is reported and
 # does not fail it (REQ-75). AUDIT_BASE names that branch, origin/main unless
-# set. DESIGN-build.md § Known vulnerabilities has the rules.
+# set. design-docs/build-dependencies.md § Known vulnerabilities has the rules.
 govulncheck:
 	$(GO) run ./internal/tools/advisories go -- \
 	  $(call tool,govulncheck) -format json $(PACKAGES)
@@ -174,7 +174,7 @@ reserved:
 	$(GO) run ./internal/tools/reserved
 
 # That no query outside the database package asks an engine what it is. The
-# list of places where that is allowed lives here and in DESIGN-database.md,
+# list of places where that is allowed lives here and in design-docs/database.md,
 # and widening one without the other is what fails.
 confined:
 	$(GO) run ./internal/tools/confined

@@ -760,7 +760,7 @@ demo-reset: demo-down
 	@echo "  removed the demo database. The scanner cache in $(DEMO_DIR)/grype and the repository copies in $(DEMO_DIR)/repositories were kept."
 
 # A database a tagged release built and seeded, carried through an upgrade to
-# this tree and checked. DESIGN-database.md § Upgrade rehearsal says what it
+# this tree and checked. design-docs/database-migrations.md § Upgrade rehearsal says what it
 # checks; it is a step of the release checklist there.
 #
 #   make upgrade-rehearsal FROM=v0.7.0 ENGINE=postgres

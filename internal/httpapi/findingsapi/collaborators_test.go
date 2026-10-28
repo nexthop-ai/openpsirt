@@ -296,7 +296,7 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 
 func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testing.T) {
 	// "A grant that shows a row in a list and refuses it when opened is a
-	// grant with no content" — DESIGN-access.md says so, about the reads by
+	// grant with no content" — design-docs/access-disclosure.md says so, about the reads by
 	// identifier. The finding detail is a fourth, through the graph.
 	//
 	// graph.visibleIn asks Sees and Reads product-wide with no case arm, and

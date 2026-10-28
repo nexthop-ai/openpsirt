@@ -3,7 +3,7 @@
 
 // Standing prose on a screen.
 //
-// Screen copy is labels and values (DESIGN-interface.md § Screen copy). What
+// Screen copy is labels and values (design-docs/interface.md § Screen copy). What
 // this refuses is the shape it drifts into: a paragraph under a heading that
 // explains the design to somebody working a list. It measures the words a
 // paragraph can put on the screen at once — every text node and string it
