@@ -12,7 +12,13 @@ import {
   type CodeFindingMethod,
   type CodeFindingState,
 } from "../api/codeFindings";
-import { codeFindingAt, suppressionRulesAt, codeFindingsAt, productAt } from "../app/routes";
+import {
+  codeFindingAt,
+  componentAt,
+  suppressionRulesAt,
+  codeFindingsAt,
+  productAt,
+} from "../app/routes";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -24,7 +30,9 @@ import {
   CODE_FINDING_METHODS,
   CODE_FINDING_STATES,
   CODE_FINDING_TONES,
+  ON_BUILD_HINT,
   located,
+  placedOn,
   stateSaid,
 } from "./codeFindings";
 
@@ -211,6 +219,7 @@ export function CodeFindings() {
                 <tr>
                   <th>Rule</th>
                   <th>Location</th>
+                  <th>Component</th>
                   <th>Message</th>
                   <th>Build</th>
                   <th>Opened</th>
@@ -237,6 +246,22 @@ export function CodeFindings() {
                       </td>
                       <td className="mono" title={row.function}>
                         {located(row.path, row.line)}
+                      </td>
+                      <td className="mono">
+                        {placedOn(row).component ? (
+                          <Link
+                            to={componentAt(product, row.component, row.version, {
+                              branch_or_tag: row.branch_or_tag,
+                              variant: row.variant,
+                            })}
+                          >
+                            {placedOn(row).label}
+                          </Link>
+                        ) : (
+                          <span className="hint" title={ON_BUILD_HINT}>
+                            {placedOn(row).label}
+                          </span>
+                        )}
                       </td>
                       <td>{row.message}</td>
                       <td className="hint" style={{ whiteSpace: "nowrap" }}>

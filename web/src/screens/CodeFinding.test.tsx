@@ -88,6 +88,23 @@ describe("a code finding", () => {
     expect(text()).toContain("Possibly also found by");
   });
 
+  it("links the component it is placed on, at the build it is read on", async () => {
+    await drawn(false, { ...EVIDENCE, component: "frr", version: "10.2" });
+    const link = Array.from(mount.host().querySelectorAll("a")).find(
+      (each) => each.textContent === "frr 10.2",
+    );
+    expect(link?.getAttribute("href")).toBe(
+      "/products/sonic/components/frr?version=10.2&branch_or_tag=master&variant=broadcom",
+    );
+  });
+
+  it("says a code finding in no component's repository is on the whole build", async () => {
+    await drawn(false, { ...EVIDENCE, component: "sonic", on_build: true });
+    expect(text()).toContain("in the whole build");
+    const links = Array.from(mount.host().querySelectorAll("a"), (a) => a.getAttribute("href"));
+    expect(links.filter((to) => to?.includes("/components/"))).toEqual([]);
+  });
+
   it("links a step at an address a browser may open, and not one it may not", async () => {
     await drawn(false);
     const hrefs = [...mount.host().querySelectorAll("a")].map((a) => a.getAttribute("href"));

@@ -29,6 +29,9 @@ type CodeFindingRowBody struct {
 	ThirdParty  bool             `json:"third_party,omitempty" doc:"Whether the code finding is in code the newest run that saw it declared third-party"`
 	BranchOrTag string           `json:"branch_or_tag" doc:"The branch or tag of the newest build the code finding is listed on, to link to"`
 	Variant     string           `json:"variant" doc:"The variant of that build"`
+	Component   string           `json:"component" doc:"The component the code finding is placed on in that build: the one built from the repository its path is in, or the build itself"`
+	Version     string           `json:"version,omitempty" doc:"That component's version, where it states one"`
+	OnBuild     bool             `json:"on_build,omitempty" doc:"Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from"`
 	State       CodeFindingState `json:"state" doc:"Where the code finding stands on that build"`
 	Builds      int              `json:"builds" doc:"The number of builds in the list's scope the code finding is listed on, in the state the list asks for"`
 	Opened      string           `json:"opened" format:"date" doc:"When the code finding was first opened on any of them"`
@@ -106,6 +109,7 @@ func codeFindingRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow
 			Occurrence: r.Occurrence, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message,
 			ThirdParty:  r.ThirdParty,
 			BranchOrTag: r.BranchOrTag, Variant: r.Variant, State: CodeFindingState(r.State), Builds: r.Builds,
+			Component: r.Component, Version: r.Version, OnBuild: r.OnBuild,
 			Opened: r.Opened.UTC().Format(time.DateOnly),
 		}
 		if r.Line != nil {
@@ -125,6 +129,7 @@ func codeFindingColumns() []string {
 	return []string{
 		"rule", "path", "line", "function", "message", "state", "branch_or_tag", "variant",
 		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "occurrence", "third_party",
+		"component", "version", "on_build",
 	}
 }
 
@@ -139,7 +144,7 @@ func codeFindingCells(row CodeFindingRowBody) []string {
 		row.Rule, row.Path, line, row.Function, row.Message,
 		string(row.State), row.BranchOrTag, row.Variant, strconv.Itoa(row.Builds), row.Opened,
 		row.AssignedTo, row.AssignedName, strconv.FormatBool(row.AssignedTeam), row.Occurrence,
-		strconv.FormatBool(row.ThirdParty),
+		strconv.FormatBool(row.ThirdParty), row.Component, row.Version, strconv.FormatBool(row.OnBuild),
 	}
 }
 

@@ -1102,3 +1102,44 @@ func TestACodeFindingsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T)
 		}
 	})
 }
+
+func TestTheQueueAndEvidenceNameTheComponentACodeFindingIsPlacedOn(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR, inSWSS}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		reader := w.holding(t, "analyst", access.InternalRead)
+		queue, err := CodeFindingsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		type placed struct {
+			component, version string
+			onBuild            bool
+		}
+		listed := map[string]placed{}
+		for _, r := range queue.Rows {
+			listed[r.Path] = placed{r.Component, r.Version, r.OnBuild}
+		}
+		want := map[string]placed{
+			"src/sonic-frr/frr/bgpd/bgp_attr.c": {"frr", "10.2", false},
+			inSWSS.uri:                          {"sonic", "", true},
+		}
+		for path, p := range want {
+			if listed[path] != p {
+				t.Errorf("the queue places %s on %+v; want %+v", path, listed[path], p)
+			}
+		}
+		for _, codeFinding := range w.codeFindings(t, w.Build.ID) {
+			got, err := EvidenceOf(t.Context(), w.DB.DB, reader, &codeFinding, w.Product.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p := (placed{got.Component, got.Version, got.OnBuild}); p != want[got.At.Path] {
+				t.Errorf("the evidence places %s on %+v; want %+v", got.At.Path, p, want[got.At.Path])
+			}
+		}
+	})
+}

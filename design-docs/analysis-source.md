@@ -31,6 +31,7 @@ newest read inventory.
 | Else into the first component whose CPE names its owner as vendor and name as product, lower case, hyphen and underscore alike | `cpe:2.3:a:frrouting:frr` is `github.com/FRRouting/frr`; weakest, so last |
 | Repositories compare as host, owner and name, lower case, without scheme, credentials, port, revision or `.git` | SSH and HTTPS spellings are one repository |
 | A result in no inventory repository is placed on the build | Every build has a root |
+| The queue, its file and the evidence name the component a code finding is placed on, its version, and whether it is the build itself, on the build each names | A component is the place a decision about it reaches |
 
 ## Source
 

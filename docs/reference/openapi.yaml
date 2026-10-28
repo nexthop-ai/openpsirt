@@ -2255,6 +2255,9 @@ components:
         compare:
           description: The address comparing the code finding's repository between those two builds
           type: string
+        component:
+          description: "The component the code finding is placed on: the one built from the repository its path is in, or the build itself"
+          type: string
         decision_occurrence:
           $ref: "#/components/schemas/DecisionOccurrenceBody"
           description: The live decision at the code finding, agreed to or waiting for a second person. Absent where there is none
@@ -2286,6 +2289,9 @@ components:
           description: The run that did not see the code finding, which a statement that it was fixed may name
           format: int64
           type: integer
+        on_build:
+          description: Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from
+          type: boolean
         open:
           description: Whether the code finding is open on the build
           type: boolean
@@ -2329,9 +2335,13 @@ components:
         unchanged:
           description: Whether those two builds name the same commit for the code finding's repository and neither patched it at build time, so its disappearance is not a change to that code
           type: boolean
+        version:
+          description: That component's version, where it states one
+          type: string
       required:
         - rule
         - at
+        - component
         - steps
         - related
         - open
@@ -2485,6 +2495,9 @@ components:
           description: The number of builds in the list's scope the code finding is listed on, in the state the list asks for
           format: int64
           type: integer
+        component:
+          description: "The component the code finding is placed on in that build: the one built from the repository its path is in, or the build itself"
+          type: string
         function:
           description: The function the result is in, where the analyzer names one
           type: string
@@ -2498,6 +2511,9 @@ components:
         occurrence:
           description: The code finding's occurrence identity, which addresses it on every build it is on
           type: string
+        on_build:
+          description: Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from
+          type: boolean
         opened:
           description: When the code finding was first opened on any of them
           format: date
@@ -2525,6 +2541,9 @@ components:
         variant:
           description: The variant of that build
           type: string
+        version:
+          description: That component's version, where it states one
+          type: string
       required:
         - occurrence
         - rule
@@ -2532,6 +2551,7 @@ components:
         - message
         - branch_or_tag
         - variant
+        - component
         - state
         - builds
         - opened

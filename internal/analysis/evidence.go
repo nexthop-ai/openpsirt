@@ -53,7 +53,19 @@ type Evidence struct {
 	// ThirdParty says the code finding is under a path the newest run that saw it
 	// declared as third-party code.
 	ThirdParty bool
+	// Component and Version are the component the code finding is placed on,
+	// and OnBuild says that component is the build itself.
+	Component string
+	Version   string
+	OnBuild   bool
 }
+
+// placedOn selects the component a code finding "f" is placed on, joined as
+// "co": its name, its version, and 1 where it is a root of the build, which is
+// where a result in no inventory repository is placed. It takes true.
+const placedOn = `"co"."name" AS "component", "co"."version" AS "component_version", ` +
+	`CASE WHEN EXISTS (SELECT 1 FROM "graph_node" AS "gn" WHERE "gn"."build_id" = "f"."build_id" ` +
+	`AND "gn"."component_id" = "f"."component_id" AND "gn"."is_root" = ?) THEN 1 ELSE 0 END AS "on_build"`
 
 // RunAt is one run, by the build it analyzed: when it was made and the
 // commit at the top of its checkout, empty where the run stated none.
@@ -150,15 +162,20 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, codeFin
 		}
 	}
 	state, stateArgs := stateOf(productID)
+	var onBuild int
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
+		Join(`JOIN "component" AS "co" ON "co"."id" = "f"."component_id"`).
 		ColumnExpr(state+` AS "state"`, stateArgs...).
 		ColumnExpr(`"vu"."identifier" AS "rule"`).
-		Where(`"f"."id" = ?`, codeFinding.ID).Limit(1).Scan(ctx, &out.State, &out.Rule); err != nil {
+		ColumnExpr(placedOn, true).
+		Where(`"f"."id" = ?`, codeFinding.ID).Limit(1).
+		Scan(ctx, &out.State, &out.Rule, &out.Component, &out.Version, &onBuild); err != nil {
 		return Evidence{}, fmt.Errorf("read where code finding %d stands: %w", codeFinding.ID, err)
 	}
+	out.OnBuild = onBuild == 1
 	if out.Kin, err = KinOf(ctx, db, subject, productID, codeFinding.ID); err != nil {
 		return Evidence{}, err
 	}

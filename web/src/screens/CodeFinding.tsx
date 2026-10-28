@@ -14,7 +14,7 @@ import {
   type CodeFindingOccurrence,
   type CodeFindingReason,
 } from "../api/codeFindings";
-import { decisionAt, codeFindingAt, codeFindingsAt, type Build } from "../app/routes";
+import { decisionAt, codeFindingAt, codeFindingsAt, componentAt, type Build } from "../app/routes";
 import { ChoiceCards } from "../ui/ChoiceCards";
 import { Editor } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
@@ -27,7 +27,9 @@ import {
   CODE_FINDING_OUTCOMES,
   CODE_FINDING_REASONS,
   CODE_FINDING_TONES,
+  ON_BUILD_HINT,
   located,
+  placedOn,
   reasonSaid,
   stateSaid,
 } from "./codeFindings";
@@ -55,6 +57,7 @@ export function CodeFinding() {
     return <Failed error={codeFinding.error} what="The code finding could not be read." />;
   const evidence = codeFinding.data;
   const at = evidence.at;
+  const placed = placedOn(evidence);
   // A code finding seen only in releases past their end of life is kept as it stands.
   // A move of one already recorded as a flaw concerns its flaw, and stays offered.
   const ended = !!evidence.past_end_of_life;
@@ -68,7 +71,21 @@ export function CodeFinding() {
       <div className="screen-head">
         <h2 className="mono">{evidence.rule}</h2>
         <p>
-          <span className="mono">{located(at.path, at.start_line)}</span> ·{" "}
+          <span className="mono">{located(at.path, at.start_line)}</span> · in{" "}
+          {placed.component ? (
+            <Link
+              className="mono"
+              to={componentAt(product, placed.component, evidence.version, {
+                branch_or_tag: branchOrTag,
+                variant,
+              })}
+            >
+              {placed.label}
+            </Link>
+          ) : (
+            <span title={ON_BUILD_HINT}>the whole build</span>
+          )}{" "}
+          ·{" "}
           <Link to={codeFindingsAt(product, { branch_or_tag: branchOrTag, variant })}>
             {product} · {branchOrTag} · {variant}
           </Link>{" "}

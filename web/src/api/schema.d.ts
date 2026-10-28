@@ -8368,6 +8368,8 @@ export interface components {
             at: components["schemas"]["CodeFindingOccurrence"];
             /** @description The address comparing the code finding's repository between those two builds */
             compare?: string;
+            /** @description The component the code finding is placed on: the one built from the repository its path is in, or the build itself */
+            component: string;
             /** @description The live decision at the code finding, agreed to or waiting for a second person. Absent where there is none */
             decision_occurrence?: components["schemas"]["DecisionOccurrenceBody"];
             /** @description The build a person stated fixed the code finding, once they closed it as fixed */
@@ -8393,6 +8395,8 @@ export interface components {
              * @description The run that did not see the code finding, which a statement that it was fixed may name
              */
             not_seen_run?: number;
+            /** @description Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from */
+            on_build?: boolean;
             /** @description Whether the code finding is open on the build */
             open: boolean;
             /** @description Whether every release the code finding was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or flaw record */
@@ -8414,6 +8418,8 @@ export interface components {
             third_party?: boolean;
             /** @description Whether those two builds name the same commit for the code finding's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
+            /** @description That component's version, where it states one */
+            version?: string;
         };
         CodeFindingFixedBody: {
             /**
@@ -8513,6 +8519,8 @@ export interface components {
              * @description The number of builds in the list's scope the code finding is listed on, in the state the list asks for
              */
             builds: number;
+            /** @description The component the code finding is placed on in that build: the one built from the repository its path is in, or the build itself */
+            component: string;
             /** @description The function the result is in, where the analyzer names one */
             function?: string;
             /**
@@ -8524,6 +8532,8 @@ export interface components {
             message: string;
             /** @description The code finding's occurrence identity, which addresses it on every build it is on */
             occurrence: string;
+            /** @description Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from */
+            on_build?: boolean;
             /**
              * Format: date
              * @description When the code finding was first opened on any of them
@@ -8542,6 +8552,8 @@ export interface components {
             third_party?: boolean;
             /** @description The variant of that build */
             variant: string;
+            /** @description That component's version, where it states one */
+            version?: string;
         };
         CodeFindingRunBody: {
             /**

@@ -85,17 +85,25 @@ func CodeFindingAssignees() []string { return []string{finding.HeldByNobody} }
 // QueueRow is one code finding in a product: its occurrence, and what the newest of its
 // findings in the scope says about it.
 type QueueRow struct {
-	Occurrence  string    `bun:"occurrence_identity"`
-	Rule        string    `bun:"rule"`
-	Path        string    `bun:"path"`
-	Line        *int      `bun:"start_line"`
-	Function    string    `bun:"enclosing"`
-	Message     string    `bun:"message_text"`
-	BranchOrTag string    `bun:"branch_or_tag"`
-	Variant     string    `bun:"variant"`
-	State       State     `bun:"stands"`
-	Builds      int       `bun:"builds"`
-	Opened      time.Time `bun:"opened"`
+	Occurrence  string `bun:"occurrence_identity"`
+	Rule        string `bun:"rule"`
+	Path        string `bun:"path"`
+	Line        *int   `bun:"start_line"`
+	Function    string `bun:"enclosing"`
+	Message     string `bun:"message_text"`
+	BranchOrTag string `bun:"branch_or_tag"`
+	Variant     string `bun:"variant"`
+	// Component and Version are the component the code finding is placed on
+	// in that build, and OnBuild says that component is the build itself.
+	Component string    `bun:"component"`
+	Version   string    `bun:"component_version"`
+	OnBuild   bool      `bun:"-"`
+	State     State     `bun:"stands"`
+	Builds    int       `bun:"builds"`
+	Opened    time.Time `bun:"opened"`
+	// Placed is OnBuild as the query answers it, 1 or 0, since engines return
+	// a boolean expression in different types.
+	Placed int `bun:"on_build"`
 	// Holder is the party dealing with the code finding on that build, where anybody
 	// is: a person, or a team it is queued with.
 	Holder *int64 `bun:"assigned_to"`
@@ -256,6 +264,8 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 		ColumnExpr(`"f"."occurrence_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
 		ColumnExpr(`"s"."name" AS "branch_or_tag", "va"."name" AS "variant", "f"."assigned_to"`).
+		Join(`JOIN "component" AS "co" ON "co"."id" = "f"."component_id"`).
+		ColumnExpr(placedOn, true).
 		// A finding has one sighting, and its last run is the run the evidence
 		// reads.
 		Join(`JOIN "series_run" AS "sr" ON "sr"."id" = "si"."last_run_id"`).
@@ -272,7 +282,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	out.Rows = make([]QueueRow, 0, len(page))
 	for _, p := range page {
 		r := byOccurrence[p.Occurrence]
-		r.Builds, r.Opened = p.Builds, p.Opened
+		r.Builds, r.Opened, r.OnBuild = p.Builds, p.Opened, r.Placed == 1
 		r.ThirdParty = declaredIn(r.Declared, r.Path) != ""
 		out.Rows = append(out.Rows, r)
 	}
