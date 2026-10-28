@@ -93,8 +93,9 @@ type QueueRow struct {
 	Message     string `bun:"message_text"`
 	BranchOrTag string `bun:"branch_or_tag"`
 	Variant     string `bun:"variant"`
-	// Component and Version are the component the code finding is placed on
-	// in that build, and OnBuild says that component is the build itself.
+	// Component is the component the code finding is placed on in that build,
+	// Version its version while the build still ships it, and OnBuild says
+	// that component is the build itself.
 	Component string    `bun:"component"`
 	Version   string    `bun:"component_version"`
 	OnBuild   bool      `bun:"-"`

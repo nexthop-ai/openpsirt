@@ -59,7 +59,7 @@ JSON (`design-docs/analytics-exports.md` § Exports).
 |---|---|
 | The file is the list, every row, same filters and order, same visibility (REQ-42, REQ-43) | One read |
 | A row names the holder (who, display name, whether a team's queue) and whether third-party, from the newest run seeing it | A team and a person may share a name |
-| A row names the component it is placed on, its version and whether it is the build itself, on the row's build (`design-docs/analysis-source.md` § Placement) | |
+| A row names the component it is placed on, its version while the build still ships it and whether it is the build itself, on the row's build (`design-docs/analysis-source.md` § Placement) | |
 | No row carries source text | |
 | With no state named, the file says it lists the queue; narrowed to unheld work, it says so | An empty query reads as everything |
 | A refusal is answered before the first byte | |

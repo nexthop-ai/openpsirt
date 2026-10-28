@@ -53,19 +53,31 @@ type Evidence struct {
 	// ThirdParty says the code finding is under a path the newest run that saw it
 	// declared as third-party code.
 	ThirdParty bool
-	// Component and Version are the component the code finding is placed on,
-	// and OnBuild says that component is the build itself.
+	// Component is the component the code finding is placed on, Version its
+	// version while the build still ships it, and OnBuild says that component
+	// is the build itself.
 	Component string
 	Version   string
 	OnBuild   bool
 }
 
 // placedOn selects the component a code finding "f" is placed on, joined as
-// "co": its name, its version, and 1 where it is a root of the build, which is
-// where a result in no inventory repository is placed. It takes true.
-const placedOn = `"co"."name" AS "component", "co"."version" AS "component_version", ` +
-	`CASE WHEN EXISTS (SELECT 1 FROM "graph_node" AS "gn" WHERE "gn"."build_id" = "f"."build_id" ` +
-	`AND "gn"."component_id" = "f"."component_id" AND "gn"."is_root" = ?) THEN 1 ELSE 0 END AS "on_build"`
+// "co": its name; its version while the build still ships it, empty once a
+// later inventory moved it, because a finding keeps the component it opened
+// on; and 1 where it is the build itself. It takes true.
+var placedOn = `"co"."name" AS "component", ` +
+	`CASE WHEN EXISTS (SELECT 1 FROM "graph_node" AS "gv" WHERE "gv"."build_id" = "f"."build_id" ` +
+	`AND "gv"."component_id" = "f"."component_id" AND "gv"."closed_scan_id" IS NULL) ` +
+	`THEN "co"."version" ELSE '' END AS "component_version", ` +
+	`CASE WHEN ` + wasRoot(`"f"."build_id"`, `"f"."component_id"`) + ` THEN 1 ELSE 0 END AS "on_build"`
+
+// wasRoot is whether a component was ever a build's root, given each as a SQL
+// expression; it takes true. A closed node counts: a root renamed since a code
+// finding opened on it is still what that build is, and no component of it.
+func wasRoot(build, component string) string {
+	return `EXISTS (SELECT 1 FROM "graph_node" AS "gn" WHERE "gn"."build_id" = ` + build +
+		` AND "gn"."component_id" = ` + component + ` AND "gn"."is_root" = ?)`
+}
 
 // RunAt is one run, by the build it analyzed: when it was made and the
 // commit at the top of its checkout, empty where the run stated none.

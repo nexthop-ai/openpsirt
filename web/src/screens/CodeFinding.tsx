@@ -75,7 +75,7 @@ export function CodeFinding() {
           {placed.component ? (
             <Link
               className="mono"
-              to={componentAt(product, placed.component, evidence.version, {
+              to={componentAt(product, placed.component, undefined, {
                 branch_or_tag: branchOrTag,
                 variant,
               })}

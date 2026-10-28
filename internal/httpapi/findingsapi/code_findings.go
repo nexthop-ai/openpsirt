@@ -44,7 +44,7 @@ type CodeFindingEvidenceBody struct {
 	Rule               string                       `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
 	At                 CodeFindingOccurrence        `json:"at" doc:"Where the code finding is"`
 	Component          string                       `json:"component" doc:"The component the code finding is placed on: the one built from the repository its path is in, or the build itself"`
-	Version            string                       `json:"version,omitempty" doc:"That component's version, where it states one"`
+	Version            string                       `json:"version,omitempty" doc:"That component's version, where it states one and the build still ships it at that version"`
 	OnBuild            bool                         `json:"on_build,omitempty" doc:"Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from"`
 	Steps              []CodeFindingOccurrence      `json:"steps" doc:"The path the analyzer took to it, in order"`
 	Related            []CodeFindingOccurrence      `json:"related" doc:"The other places the analyzer names"`

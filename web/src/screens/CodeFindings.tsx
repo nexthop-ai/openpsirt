@@ -250,7 +250,7 @@ export function CodeFindings() {
                       <td className="mono">
                         {placedOn(row).component ? (
                           <Link
-                            to={componentAt(product, row.component, row.version, {
+                            to={componentAt(product, row.component, undefined, {
                               branch_or_tag: row.branch_or_tag,
                               variant: row.variant,
                             })}

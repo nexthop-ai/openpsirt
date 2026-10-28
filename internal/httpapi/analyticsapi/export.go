@@ -85,9 +85,10 @@ func registerExport(api huma.API, in core.Deps) {
 			"included and those open only in releases past their end of life left out: `code finding` is " +
 			"true on those " +
 			"rows, and `path`, `line`, `function` and `message` say where each is and what the " +
-			"analyzer said. No row carries source text. A code finding carries no rating, component or " +
-			"decision, so a file narrowed by any filter but the order holds no code finding, and says " +
-			"so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, " +
+			"analyzer said, and `component` and `version` name the component it is placed on, empty where " +
+			"it is the build itself. No row carries source text. The filters ask what a code finding mostly " +
+			"does not carry, a rating, an upstream or a decision, so a file narrowed by any filter but the " +
+			"order holds no code finding, and says so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, " +
 			"and `on=branch` with `support=in-support`, which is what the list reads when " +
 			"neither is asked.\n\n" +
 			"Takes every filter the findings list takes.",
@@ -270,9 +271,10 @@ func findingCells(g finding.Group) []string {
 const codeFindingsListed = "every open code finding, below the findings, those a decision waits on included and those open only in releases past their end of life left out"
 
 // withCodeFindings is the fact a findings file states about the code findings it holds. A
-// code finding carries no rating, component, upstream, decision or deadline, so a
-// narrowing asking anything but the order matches none, and the file says so
-// rather than leaving a reader to wonder where the code findings went.
+// narrowing is the findings list's, asked of what a code finding mostly does not carry: a
+// rating, an upstream, a decision or a deadline. So a narrowing asking anything but the
+// order matches none, and the file says so rather than leaving a reader to wonder where
+// the code findings went.
 func withCodeFindings(by core.Narrowing, at core.AtOneBuild) core.Stated {
 	switch {
 	case !kind.Exports.Includes(kind.Analysis):
@@ -310,15 +312,20 @@ func codeFindingRows(in core.Deps, subject access.Subject, scope analysis.Scope,
 	}
 }
 
-// codeFindingCells is one code finding as a row of a findings file. The rule is the issue.
-// A line the analyzer named none for is an empty cell, never a zero.
+// codeFindingCells is one code finding as a row of a findings file. The rule is the issue,
+// and the component it is placed on fills the component and version, empty where it is the
+// build itself. A line the analyzer named none for is an empty cell, never a zero.
 func codeFindingCells(r analysis.QueueRow) []string {
 	line := ""
 	if r.Line != nil {
 		line = strconv.Itoa(*r.Line)
 	}
+	component, version := r.Component, r.Version
+	if r.OnBuild {
+		component, version = "", ""
+	}
 	return []string{
-		r.Rule, "", "", "", "", "", "", "", "", "", "", "", r.Opened.UTC().Format(time.DateOnly), "",
+		r.Rule, "", "", "", "", component, version, "", "", "", "", "", r.Opened.UTC().Format(time.DateOnly), "",
 		r.BranchOrTag, r.Variant, "true", r.Path, line, r.Function, r.Message,
 	}
 }

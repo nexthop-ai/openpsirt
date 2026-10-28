@@ -598,9 +598,10 @@ demo-vex:
 # saying which is meant, and this is a seed rather than a person making that
 # choice — so those rows are left alone.
 # The upgrade names no version: it resolves the component by name, and the
-# filter above keeps only names shipped at one version. A version it names is
-# the source package's, which the export does not carry; the binary version the
-# export shows names nothing open.
+# filter above keeps only names with a fixed finding at one version. A name
+# shipped again at a version with none is refused as two source versions. A
+# version it names is the source package's, which the export does not carry;
+# the binary version the export shows names nothing open.
 # The upgrade goes on a different package from the ones decided above, because
 # it answers *everything* open on its component: planning one where a decision
 # already stands at some of those occurrences is refused, and rightly — one act

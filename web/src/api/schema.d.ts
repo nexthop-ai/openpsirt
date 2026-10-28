@@ -4207,7 +4207,7 @@ export interface paths {
          *
          *     The line this deployment triages at is stated in the file.
          *
-         *     Below the findings come every open static analysis code finding of the same branch or tag and variant, in the code finding queue's order, where you read them, those a decision waits on included and those open only in releases past their end of life left out: `code finding` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text. A code finding carries no rating, component or decision, so a file narrowed by any filter but the order holds no code finding, and says so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
+         *     Below the findings come every open static analysis code finding of the same branch or tag and variant, in the code finding queue's order, where you read them, those a decision waits on included and those open only in releases past their end of life left out: `code finding` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said, and `component` and `version` name the component it is placed on, empty where it is the build itself. No row carries source text. The filters ask what a code finding mostly does not carry, a rating, an upstream or a decision, so a file narrowed by any filter but the order holds no code finding, and says so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
          *
          *     Takes every filter the findings list takes.
          *
@@ -8418,7 +8418,7 @@ export interface components {
             third_party?: boolean;
             /** @description Whether those two builds name the same commit for the code finding's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
-            /** @description That component's version, where it states one */
+            /** @description That component's version, where it states one and the build still ships it at that version */
             version?: string;
         };
         CodeFindingFixedBody: {
@@ -8552,7 +8552,7 @@ export interface components {
             third_party?: boolean;
             /** @description The variant of that build */
             variant: string;
-            /** @description That component's version, where it states one */
+            /** @description That component's version, where it states one and the build still ships it at that version */
             version?: string;
         };
         CodeFindingRunBody: {

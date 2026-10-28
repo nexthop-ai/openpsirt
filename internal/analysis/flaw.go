@@ -458,22 +458,15 @@ type named struct {
 // componentOf is a component, and whether it is what a build is.
 func componentOf(ctx context.Context, db bun.IDB, buildID, componentID int64) (named, bool, error) {
 	var out named
+	var root int
 	if err := db.NewSelect().TableExpr(`"component" AS "c"`).
 		ColumnExpr(`"c"."name", "c"."purl"`).
+		ColumnExpr(`CASE WHEN `+wasRoot("?", `"c"."id"`)+` THEN 1 ELSE 0 END AS "root"`, buildID, true).
 		Where(`"c"."id" = ?`, componentID).
-		Scan(ctx, &out); err != nil {
+		Scan(ctx, &out.Name, &out.Purl, &root); err != nil {
 		return out, false, fmt.Errorf("read the component the code finding is on: %w", err)
 	}
-	root, err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
-		Where(`"n"."build_id" = ?`, buildID).
-		Where(`"n"."component_id" = ?`, componentID).
-		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`"n"."is_root" = ?`, true).
-		Exists(ctx)
-	if err != nil {
-		return out, false, fmt.Errorf("read whether the code finding is on the build itself: %w", err)
-	}
-	return out, root, nil
+	return out, root == 1, nil
 }
 
 // resembling is the components a build holds whose names resemble the last

@@ -74,7 +74,7 @@ describe("the code findings", () => {
       (each) => each.textContent === "frr 10.2",
     );
     expect(link?.getAttribute("href")).toBe(
-      "/products/sonic/components/frr?version=10.2&branch_or_tag=master&variant=broadcom",
+      "/products/sonic/components/frr?branch_or_tag=master&variant=broadcom",
     );
     expect(text()).toContain("Whole build");
   });

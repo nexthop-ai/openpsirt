@@ -70,10 +70,10 @@ selection, in the queue's order and under its visibility (REQ-50;
 | Readers of disclosed or undisclosed work alone get none | |
 | Code findings a decision waits on are held; those open only in releases past end of life are not | |
 | The cross-product file holds each product's queue in turn, by product name | |
-| Any filter but the order narrows them all out, and the file says it holds none | A code finding carries no rating, component, upstream, decision or deadline |
+| Any filter but the order narrows them all out, and the file says it holds none | The filters ask what a code finding mostly does not carry: a rating, an upstream, a decision or a deadline |
 | Three filters keep them: the minimum severity widened, work no promised upgrade covers, branches in support | Each answers alike for every code finding; the screen writes all three into the exported address |
 | A file states which code findings it holds | |
-| A code finding row uses the findings columns: the rule as the issue, the newest build's opened date, branch or tag and variant, then a marker, path, line, function and message; other columns empty, and these empty on other rows | One header keeps one table |
+| A code finding row uses the findings columns: the rule as the issue, the component it is placed on and its version, empty where it is the build itself, the newest build's opened date, branch or tag and variant, then a marker, path, line, function and message; other columns empty, and these empty on other rows | One header keeps one table |
 
 ## Limits
 

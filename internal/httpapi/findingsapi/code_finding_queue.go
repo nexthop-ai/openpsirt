@@ -30,7 +30,7 @@ type CodeFindingRowBody struct {
 	BranchOrTag string           `json:"branch_or_tag" doc:"The branch or tag of the newest build the code finding is listed on, to link to"`
 	Variant     string           `json:"variant" doc:"The variant of that build"`
 	Component   string           `json:"component" doc:"The component the code finding is placed on in that build: the one built from the repository its path is in, or the build itself"`
-	Version     string           `json:"version,omitempty" doc:"That component's version, where it states one"`
+	Version     string           `json:"version,omitempty" doc:"That component's version, where it states one and the build still ships it at that version"`
 	OnBuild     bool             `json:"on_build,omitempty" doc:"Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from"`
 	State       CodeFindingState `json:"state" doc:"Where the code finding stands on that build"`
 	Builds      int              `json:"builds" doc:"The number of builds in the list's scope the code finding is listed on, in the state the list asks for"`

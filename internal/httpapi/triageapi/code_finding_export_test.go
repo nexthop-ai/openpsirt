@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -121,7 +122,7 @@ func TestTheFindingsFileCarriesTheOpenCodeFindingsToInternalReadersAlone(t *test
 	})
 }
 
-// A code finding carries no rating, component or decision, so a findings file
+// A code finding carries no rating, upstream or decision, so a findings file
 // narrowed by anything but its order holds none, and says so.
 func TestAFindingsFileNarrowedByAFilterHoldsNoCodeFindingAndSaysSo(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -153,6 +154,30 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoCodeFindingAndSaysSo(t *testing.T)
 			if !strings.HasPrefix(said["code findings"], "none") {
 				t.Errorf("%s: the narrowed file says its code findings are %q", asked, said["code findings"])
 			}
+		}
+	})
+}
+
+// A findings file names the component a code finding is placed on and its version,
+// as the code finding list does, and leaves both empty for one on the build itself.
+func TestAFindingsFileNamesTheComponentACodeFindingIsPlacedOn(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededCodeFinding(t, r)
+		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv")
+		if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 1 ||
+			codeFindings[0]["component"] != "" || codeFindings[0]["version"] != "" {
+			t.Fatalf("the code finding on the build is written as %v; want no component", codeFindings)
+		}
+		// The seeded run names no repository, so it is moved onto zlib by hand.
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"component_id" = (SELECT "id" FROM "component" WHERE "name" = ?)`, "zlib").
+			Where(`"kind" = ?`, kind.Analysis).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		_, _, header, rows = findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv")
+		if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 1 ||
+			codeFindings[0]["component"] != "zlib" || codeFindings[0]["version"] != "1.3" {
+			t.Errorf("the code finding on zlib is written as %v; want zlib 1.3", codeFindings)
 		}
 	})
 }
