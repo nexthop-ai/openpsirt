@@ -96,7 +96,7 @@ policies are published.
 
 | Effect | Detail |
 |---|---|
-| No deadline | A finding on a release out of support carries none, or the overdue figure fills with releases nobody will fix. `design-docs/triage.md` |
+| No deadline | A finding on a release out of support carries none, or the overdue figure fills with releases nobody will fix. `design-docs/triage-severity.md` § Minimum severity |
 | Silence is expected | A build that stops being scanned is not reported as quiet (REQ-52). It is still listed with how long it has been. `design-docs/ingest.md` |
 
 ## Variants and builds

@@ -67,7 +67,7 @@ A SARIF document is hostile input (REQ-66, REQ-69). Each bound is configuration
 Documents are read whole and results placed before anything is stored, so bytes
 and entries are bounded across the upload as memory: placed results take about
 1.25 times their encoding, and 150,000 results with 600,000 flow steps read as
-145 MB plus 103 MB placed.
+145 MB plus 103 MB placed, an encoding of 98 MB.
 
 | Bound | On |
 |---|---|

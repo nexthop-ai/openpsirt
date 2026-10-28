@@ -59,9 +59,9 @@ component and grouped again by fold.
 | The first level carries what the second reads: sums, minimums, maximums, earliest opening and soonest deadline under their own names | Both levels read them alike |
 | A distinct build count adds the build to the first level's key | It does not decompose |
 | The issue is joined after the first level | Likelihood or score is read once per partial group |
-| Decision flags are counted beside the first level on its keys, from decision occurrences matched under every occurrence condition | Joined to every open occurrence: 1,067 ms against 575 ms |
-| The decided groups are stacked with the partial groups and folded on the keys, never joined | Joined, MariaDB recomputed them per partial group: 71 s against 0.23 s |
-| The holder is read from the covering index, which carries the assignee last, never counted in an arm of its own | 0.67 s against 1.08 s for the unassigned badge. An arm grows with what is held |
+| Decision flags are counted beside the first level on its keys, from decision occurrences matched under every occurrence condition | Joined to every open occurrence, each of 368,847 rows is looked up in 148,102 decided occurrences: 1,067 ms against 575 ms |
+| The decided groups are stacked with the partial groups and folded on the keys, never joined | Joined, MariaDB recomputed them for each of 12,260 partial groups: 71 s against 0.23 s |
+| The holder is read from the covering index, which carries the assignee last, never counted in an arm of its own | 0.67 s against 1.08 s for the unassigned badge over 368,849 open occurrences. An arm grows with what is held |
 | Each occurrence is counted once only where a condition compares decided occurrences with occurrences | Agreed and an outcome need every occurrence; the rest ask any or none |
 | Across products, the minimum severity applies after the first level, which also keys on product and exploitation signal | Each partial group is wholly above or below |
 | Another view's groups under a condition reading no decision are grouped in one level and joined back | Over two levels PostgreSQL misestimates tenfold and did not finish in two minutes |
@@ -96,8 +96,8 @@ occurrence once per open finding: 331 s against 0.78 s.
 
 Rewriting every deadline walks the identifier range once, with a batch of
 opening moments inside each statement as a case. A statement per moment, band
-and slice is 189,000 statements for a product scanned nightly for a year, and
-overruns the half-hour its caller allows.
+and slice is 189,000 statements for a product scanned nightly for a year, which
+holds about 1,800 distinct moments, and overruns the half-hour its caller allows.
 
 ## Receipts pairing
 

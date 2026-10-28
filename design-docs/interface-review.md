@@ -17,8 +17,9 @@ Satisfies REQ-25, REQ-27, REQ-28, REQ-29, REQ-34.
 One card per decision (REQ-28): one proposer's act, however many occurrences. The
 card carries the reasoning as it stands, how many records the decision wrote, how
 many locations and builds it reaches, whether it was approved before and came
-back, and how long the finding has been put off. `design-docs/triage.md` says
-what the queue holds and on what terms.
+back, and how long the finding has been put off.
+`design-docs/triage-approval.md` § The review queue says what the queue holds and
+on what terms.
 
 | Tab | Holds | A card offers |
 |---|---|---|
@@ -74,7 +75,7 @@ the batch with decisions.
 
 One decision whole, and every act at that grain: revise, withdraw, comment,
 agree, send back, hold rows back, and say where the work is happening.
-`design-docs/triage.md` says what a decision is and what the read answers.
+`design-docs/triage-decisions.md` says what a decision is and what the read answers.
 
 | Rule | Reason |
 |---|---|
@@ -87,7 +88,7 @@ agree, send back, hold rows back, and say where the work is happening.
 | A decision occurrence's address resolves here, replacing rather than pushing history | Notices, reports and the evidence list name occurrences, and the audit log names the decision |
 | Reaffirming is on the finding | It is one occurrence in one build |
 | It says whom a published statement holds for, marked as from the reason where none is stated | |
-| Acts offered follow `design-docs/triage.md`'s act-and-needs table and the session's capabilities, never roles | A second copy disagrees |
+| Acts offered follow the act-and-needs table in `design-docs/triage-approval.md` § Rights and the session's capabilities, never roles | A second copy disagrees |
 | Holding rows back is offered only on a bulk decision with outliers | It is the author's side of the approver's choice |
 | The capability is a gate only while it means what the operation accepts: one the operation grants a triager is reported to a triager | A two-person team without the approver capability is otherwise shown a decision it cannot answer |
 

@@ -170,7 +170,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | Go the API document is generated from: the registering package, or a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |
 | a tool's module under `tools/` | the whole gate |
-| the gate programs' shared repository reader | the whole gate (§ Gate inputs) |
+| a gate program under `internal/tools/`, the shared repository reader included | the whole gate (§ Gate inputs) |
 | anything else, or nothing | the whole gate |
 
 | Rule | Reason |

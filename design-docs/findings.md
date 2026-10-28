@@ -70,8 +70,10 @@ uses.
 A decision carries no variant: it is keyed on product, occurrence and upstream
 versions, so answering it on one build answers every build of the product
 holding the same code (REQ-25). Work lists show one item per issue in a
-component in a product. On two variants of one switch image, 15,197 per-build
-rows are 7,612 items, 27 of them genuine differences.
+component in a product; listed per build, a second variant took the list from
+7,354 items to 14,681 against one estate. On two variants of one switch image,
+7,587 and 7,610 rows read per build are 7,612 items: 7,585 seen twice and 27
+genuine differences.
 
 | Rule | Reason |
 |---|---|

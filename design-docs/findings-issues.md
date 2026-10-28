@@ -43,7 +43,7 @@ applies the scan, and is a record of its own (REQ-22).
 |---|---|
 | The kept issue is the one filed under the best-known of all the names, otherwise the one recorded first | |
 | A merge record names the absorbed issue, the kept issue, the report's names, the run and the moment | The issue page reads where a name came from |
-| Every issue states the issue it is read as: itself, or the one it merged into, one step away however many merges led there | Equality on that column is indexed on every engine: counting decisions over 300,000 findings takes 72 ms on PostgreSQL, 0.47 s on MySQL, 2.5 s on MariaDB; through a subquery, over ten minutes; through a null meaning itself, 0.19 s hashing every row |
+| Every issue states the issue it is read as: itself, or the one it merged into, one step away however many merges led there | Equality on that column is indexed on every engine: counting decisions over 300,000 findings and 150,000 decision rows takes 72 ms on PostgreSQL, 0.47 s on MySQL, 2.5 s on MariaDB; through a subquery, over ten minutes; through a null meaning itself, 0.19 s hashing every row |
 | Two scans merging overlapping sets take the issues in turn, and go again where one is no longer its own | No issue ends two steps from the one that stands |
 | What people recorded stays filed under the absorbed issue and is read as the kept issue: decisions and their occurrences, approvals, revisions, notes, rating claims, incidents, attachments, case grants, advisories, embargo movements, reports | History is append-only. A decision about the absorbed issue suppresses, counts and lists at the kept issue's findings as at its own. The rows below are the whole of what a merge writes to them |
 | A case grant under either name reaches every record under either | |
@@ -111,14 +111,14 @@ A scan's reports are interned together:
 | The last copy is skipped where nothing since the first resolved to or merged that issue | |
 | What is on record for a run of reports is read together: one statement per kind of record for a few hundred reports | |
 | A part of a report is written only where the read says its statement would match a row | A rescan of unchanged data writes nothing |
-| A newer estimate is written in a statement per day and batch of issues, each value chosen by identifier inside it, and the batch is written before anything reads the rows again | A feed moves nearly every issue on one day: 46 statements against 7,652 |
+| A newer estimate is written in a statement per day and batch of issues, each value chosen by identifier inside it, and the batch is written before anything reads the rows again | A feed moves nearly every issue on one day: 7,640 estimates in 46 statements, against 7,652 |
 | Whether a queued estimate moved is answered from the read where both days are the start of a UTC day; otherwise the issue's own statement runs | |
 | A report the read cannot answer for is resolved alone from the database | Names reaching no issue or several, a better-known name than the filed one, non-ASCII names, or an issue an earlier report in the run wrote. Creating, merging and renaming happen there only |
 | Comparisons lean toward writing; names compare case-insensitively, never narrower than an engine | A wasted statement costs a round trip; a skipped one loses a write |
 | Description and advisory are written only into a gap; spaces alone are a gap | MySQL and MariaDB compare spaces equal to empty |
 
 A test interns random overlapping rounds both ways and requires identical rows,
-names, merges and moves. An unchanged rescan of 11,435 reports is 570
+names, merges and moves. An unchanged rescan of 11,435 reports naming 7,643 issues is 570
 statements rewriting no issue row, against 114,339 a report at a time rewriting
 all 11,435.
 

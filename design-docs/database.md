@@ -67,7 +67,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Recognizing what an engine reports | Each driver has its own error type. Three questions, each silent when wrong: a lost race worth retrying (REQ-71), a unique constraint refusing a duplicate, a failure from the engine rather than an impossible request |
 | Subtracting two moments | No portable expression yields seconds: one engine returns an interval, one a number of days |
 | Inserting a row another writer may already have written | `ON CONFLICT DO NOTHING` on two engines, `ON DUPLICATE KEY UPDATE` setting the key to itself on two. Never `INSERT IGNORE`, which also stores a value cut to fit, a dangling reference or a missing value as a warning. Only for a table of facts, where two writers agree |
-| The job queue's locking | The one place outside the database package, because the queue owns the statement |
+| The job queue's locking | The one application file outside the database package, because the queue owns the statement |
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped and PostgreSQL refuses it in a timestamp column. PostgreSQL casts to a zoned timestamp, MySQL and MariaDB to a six-digit datetime, SQLite to nothing |
 | The test harness | It names each engine to choose a connection and report which ran, never to write a query |
 | Leasing the harness's slots | A named lock on MySQL and MariaDB, a numbered advisory lock on PostgreSQL, each held for the connection |
@@ -168,7 +168,7 @@ style.
 | One connection while migrating | A migration's connection settings must reach its transaction (`design-docs/database-migrations.md` § Migration locks) |
 | One connection in the test harness | A read through the root handle inside a transaction then waits on the held connection and the test's deadline reports it. On a wider pool it answers from outside the transaction, silently |
 | Write-ahead log, synchronous NORMAL | A scan applies hundreds of thousands of rows. A process crash loses nothing; a power loss can lose the last commits, never consistency |
-| Planner statistics refreshed at start and after every scan | SQLite gathers none unless asked. On 361,429 findings the review queue took 4.1 s without them and 0.08 s with them, and a whole analysis 0.66 s. After every scan, because a scan changes how rows divide: analyzed only on growth, the findings list took 2.1 s instead of 0.57 s. Sampling the first rows of each index misjudged which findings were assigned |
+| Planner statistics refreshed at start and after every scan | SQLite gathers none unless asked. On 361,429 findings the review queue took 4.1 s and the list of what is running out 2.5 s without them, 0.08 s and 0.13 s with them, and a whole analysis 0.66 s. After every scan, because a scan changes how rows divide: analyzed only on growth, the findings list took 2.1 s instead of 0.57 s. Sampling the first rows of each index took 71 ms and misjudged which findings were assigned |
 | A connection lives a minute, and a refresh closes the idle ones | A connection reads statistics when it opens and never again. Across a refresh the review queue took 4.1 s on every connection but the one that analyzed |
 
 The pragmas are set on the connection string, and a URL may add its own after

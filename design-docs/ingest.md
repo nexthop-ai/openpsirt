@@ -141,8 +141,8 @@ Nightly scans are transient; tagged releases are kept and fetched back
 
 ## Scan application
 
-A worker claims the scan, reads its documents and applies them, all in one
-transaction (REQ-06).
+A worker claims the scan and reads its documents, then applies what they
+describe in one transaction (REQ-06).
 
 | Rule | Reason |
 |---|---|

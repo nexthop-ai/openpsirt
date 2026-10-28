@@ -27,7 +27,7 @@ Satisfies REQ-06, REQ-14, REQ-17, REQ-18, REQ-19, REQ-21, REQ-25, REQ-43, REQ-50
 | What arrives | An inventory, matched by the scanner | A person (REQ-19) | SARIF (`design-docs/analysis.md`) |
 | Issue | A published vulnerability, or a flaw minted here later given a CVE | A flaw minted here | The analyzer's rule |
 | Occurrence identity | Component and consumer (`design-docs/data-model-graph.md` § Occurrence identity, REQ-17) | Component and consumer | Minted at first sighting, carried by matching |
-| Carry across builds | Version and chain match (REQ-25) | Stated by a person | Matching (`design-docs/analysis-matching.md` § Matching) |
+| Carry across builds | Version and chain match (REQ-25) | Stated by a person | Matching (`design-docs/analysis-matching.md` § Carrying) |
 | Absence | The run closes it with a reason (REQ-21) | Nothing; a person closes it | No longer detected; it stays open |
 | Visibilities | Public, private | Private, public | Internal, public once its flaw is disclosed |
 
@@ -79,7 +79,7 @@ A consumer reads findings and names its kinds; others never reach it.
 | Advisories | Documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What people are told about findings | Vulnerability, entered |
 | Evidence | One code finding's place, path, links and kept source (`design-docs/analysis-source.md` § Source) | Analysis |
-| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, § Code finding notices) | Analysis |
+| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, `design-docs/notifications-work.md` § Code finding notices) | Analysis |
 
 The audit log's file follows Decisions and includes code finding decisions under
 the log's visibility (REQ-50). `design-docs/interface-security-testing.md` § Security testing

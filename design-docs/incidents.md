@@ -55,7 +55,7 @@ Facts about moments, stored because the moment is gone when anybody asks.
 | Fact | Detail |
 |---|---|
 | This product was exploited through an issue | Person-recorded, append-only, on a finding of any kind; an inherited flaw needs no flaw of our own |
-| An attack through no published issue | A flaw found here at the build's root, one occurrence across variants (`design-docs/findings-flaws.md` § Recorded flaws), with the record against it |
+| An attack through no published issue | A flaw found here at the build's root, one occurrence across variants (`design-docs/findings-flaws.md` § Builds and occurrences), with the record against it |
 | The moment it became known | Stated, never the clock's: people learn before reaching a screen |
 | The grounds | What is asserted and how it is known, the whole of what a later reader has |
 | Somebody outside was told | § Notices outside |

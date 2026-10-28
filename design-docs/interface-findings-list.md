@@ -64,7 +64,8 @@ the server the same filters from one definition.
 |---|---|
 | Without a product, no subtree, "differs between builds" or spread across variants is offered or sent, and each is dropped from the query | A subtree is one build's edges; the others describe a selection; a hidden filter narrows silently |
 | "Only this variant" is offered and sent only where the selection names a variant | |
-| Deciding from the list and the export return once a product is picked | They are a product's own |
+| The export and the row's preview, decision form included, are offered here too; each row decides on its own build | |
+| Assigning to somebody else and Select all return once a product is picked | Who may hold work is a question about one product |
 | Saved filters are offered | A saved filter keeps no scope |
 | The product is a column where it varies, and the row links to that product's list | |
 | There is one view and no view tabs | |

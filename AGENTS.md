@@ -86,7 +86,7 @@ behavior.
 | A table, a list or an example before a paragraph | Parts are a table, steps or cases a list, a shape an example. A paragraph is for the one thing that is none of those |
 | Plain words, short sentences | One clause per point; a sentence read twice fails |
 | One fact in one place | Point at the owner; two copies disagree |
-| Cross-rule rationale goes in `Limits` | The block at the foot of every `design-docs/*.md`. A published page carries none |
+| Cross-rule rationale goes in `Limits` | The block at the foot of every `design-docs/*.md` except a measurements one. A published page carries none |
 | Every `design-docs/*.md` opens with `Contents` | One entry per `##` heading, in order |
 | Measured numbers stay | "5,047 fixable rows are 271 distinct bumps". Cut the sentence introducing it, never the number |
 | Component selection is design | Why this scanner, database or format belongs. Why a variable has its name does not |

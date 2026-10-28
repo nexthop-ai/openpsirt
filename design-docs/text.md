@@ -132,8 +132,8 @@ A held file is fetched through a path that authorizes the reader
 |---|---|
 | The origin decides, since both share a column | Otherwise a scan file's author formats text in the browsers of those with the most access |
 | Escaping happens where text enters a document, and the origins stay distinguishable | |
-| The release note and the issue document, served as markdown, escape every value that did not pass the policy (`design-docs/analytics.md`) | |
-| A webhook's subject and text are escaped line by line by the same rule (`design-docs/notifications.md`) | |
+| The release note and the issue document, served as markdown, escape every value that did not pass the policy (`design-docs/analytics-releases.md` § The release note, `design-docs/analytics-releases.md` § One issue across the estate) | |
+| A webhook's subject and text are escaped line by line by the same rule (`design-docs/notifications-delivery.md` § Outbound HTTP) | |
 
 | Escaped | Where | Opens |
 |---|---|---|

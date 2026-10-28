@@ -110,7 +110,7 @@ is and § Dispositions what a ruling does.
 
 Published advisories lists every advisory this deployment minted, and each has
 its own screen. `design-docs/remediation-advisories.md` § The advisory holds what an advisory
-is and § Editorial state who may agree.
+is and `design-docs/remediation-advisories.md` § Editions and agreement who may agree.
 
 | Rule | Reason |
 |---|---|
@@ -138,7 +138,7 @@ is and § Editorial state who may agree.
 
 One build's published VEX has its own screen, reached from the release's customer
 documents. `design-docs/remediation-vex.md` § The VEX document holds what it says
-and § Issuance records what recording keeps.
+and `design-docs/remediation-advisories.md` § Issuance records what recording keeps.
 
 | Rule | Reason |
 |---|---|

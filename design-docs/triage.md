@@ -48,7 +48,7 @@ build invalidates a decision about a leaf.
 | A rebuilt container image lapses nothing beneath it; a package inside it that moves lapses its own decision | An image stores no version (`design-docs/data-model-components.md` § Container images) |
 | A carried patch lapses nothing, so under heavy patching a decision may never be re-examined | A patch moves no version this can see |
 | A decision's age travels with it everywhere it appears | The compensating control for the line above |
-| A deferral runs out on a date, never a version, and its finding returns marked deferred | A bump does not change priority, nor a calendar applicability |
+| A deferral also runs out on its date, and its finding returns marked deferred | The date is when somebody said they would look again |
 | A wrong match runs out on neither (§ Corrections) | |
 | A decision a severity bears on also lapses when its issue is rated worse (REQ-25), by a sweep (`design-docs/triage-lapse.md` § Lapse marking) | Nothing matched changes |
 | A lapsed decision is found by the structural half of its key | Its reasoning is offered to whoever decides again |
@@ -151,7 +151,7 @@ naming for an unrelated project at every point release.
 ### The standing set
 
 Corrections in force are read from the audit log, filtered by the outcome and by
-what applies now (`design-docs/analytics.md`). What applies now differs from
+what applies now (`design-docs/analytics-controls.md` § Standing corrections). What applies now differs from
 what was approved, since an approved decision lapses when the code moves.
 
 ## One live decision per key

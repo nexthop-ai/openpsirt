@@ -109,7 +109,7 @@ A named person submits it as their decision, and a second person approves it
 | The reasoning is required where an outcome is | An empty prefill proposes a dismissal saying nothing |
 | Saving over a name takes the old prefill with it | |
 | It proposes nothing itself, and the screen says so; the record carries the submitter's name and the form names the filter | |
-| A deferral is prepared as a length, required for a deferral and refused otherwise (`design-docs/interface.md` turns it into a date) | |
+| A deferral is prepared as a length, required for a deferral and refused otherwise (`design-docs/interface-filters.md` § Saved filters turns it into a date) | |
 | A prefill passes the decision submission gate, called rather than restated: a recognized outcome, a reason exactly where one is taken, the markdown policy | A refusal lands at saving, not at submitting |
 | A prefill cannot state that mitigations already exist | That reason needs words a filter does not carry |
 | `saved.max-per-person` caps one person's filters and bounds the list | The panel reads every row on every open |

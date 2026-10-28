@@ -56,7 +56,7 @@ rest.
 | Rule | Reason |
 |---|---|
 | Every table is analyzed at start, on every engine | A server refreshes estimates after about a tenth of a table changes, so a database loaded before that, restored, or on a stalled server arrives with estimates that describe nothing |
-| An upgrade is followed by a start that analyzes | MySQL and MariaDB analyze only tables an upgrade rebuilds. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, and a decision audit page ran over four hours; analyzed, 5 ms |
+| An upgrade is followed by a start that analyzes | MySQL and MariaDB analyze only tables an upgrade rebuilds. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, beside an accurate 2,202 decision occurrences, and a decision audit page ran over four hours; analyzed, 5 ms |
 | A server is not asked again after a scan | Its own background refresh follows the writes. SQLite is asked after every scan (`design-docs/database.md` § SQLite settings) |
 | A failed refresh is logged and the start goes on | Stale estimates make a statement slow, never wrong |
 | The refresh has a quarter of the startup deadline | The rest of the start keeps its time |
@@ -75,8 +75,8 @@ same table took about 60 ms, and a query after it waited for nothing.
 |---|---|
 | Text a producer supplies has no width unless an index carries it: a component's name and version, what it was forked from, a fix's version list | No format bounds them, and a width would fail the scan carrying an unusual value, which reads as a product that stopped having problems |
 | Text an index carries has the name width, 191 characters | Index key length is tightest on MySQL |
-| Text a producer or a document supplies past the width is cut in characters: an issue's identifier, a claim's justification and versions, a key's name | Two values agreeing that far are one value, and a refusal would fail the scan |
-| A name a person types past the width is refused, naming the width | A series, a response window, a notice outside, an assignment rule. The typist can shorten it |
+| Text a producer or a document supplies past the width is cut in characters: an issue's identifier, a claim's justification and versions | Two values agreeing that far are one value, and a refusal would fail the scan |
+| A name a person types past the width is refused, naming the width | A series, a response window, a notice outside, an assignment rule, a key's name. The typist can shorten it |
 | A value too long to index whole is keyed on its SHA-256 digest | A reference's address as given, an upstream document's address, a component's fold |
 
 Against the reference producer's real output, 6,845 components: longest

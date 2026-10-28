@@ -36,5 +36,6 @@ Grouped in one level, every open row on the fold directly:
 The cost is the sort on the fold, a 64-character key, over every open row. The
 planned upgrades group in two levels, by integers first and by the fold over the
 partial groups; `design-docs/findings-queries.md` § Two-level grouping holds the
-form and its measurement. `make measure` takes it over the form in force on every
+form and `design-docs/findings-measurements.md` § Two-level grouping its
+measurement. `make measure` takes it over the form in force on every
 engine.

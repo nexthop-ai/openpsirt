@@ -16,7 +16,7 @@ Satisfies REQ-56, REQ-60.
 ## The component screen
 
 The page is a source package at the version it was built at: the fold
-`design-docs/data-model.md` defines. It is arranged on where the package sits,
+`design-docs/data-model-components.md` § The fold defines. It is arranged on where the package sits,
 because that decides what can be done: a leaf carries its own risk and is
 upgraded; a package vendored pre-built carries everything beneath it and moves
 only when it does. The graph leads (what pulls it in, the package, what it
@@ -52,7 +52,7 @@ carries) and the act hangs off it.
 | What the product's upstream says about the component is a card: every standing statement about a component of this name at any version, with issue, version, status, mark, link and decline control; drawn only where it says something | |
 | A container image lists the versions each build stated for it, newest first, with the dates each was stated across; the first five shown and the rest counted | An image carries no version of its own (`design-docs/data-model-components.md` § Container images) |
 
-An upgrade is promised here on the terms `design-docs/triage.md` sets: the
+An upgrade is promised here on the terms `design-docs/triage-promises.md` § Promised work sets: the
 releases, the version, the date, the reason, and who carries it.
 
 ## Component screen reads

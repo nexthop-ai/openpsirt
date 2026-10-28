@@ -7,7 +7,7 @@ Satisfies REQ-19, REQ-28, REQ-34, REQ-35, REQ-36.
 Deadlines, upstream currency, version ordering, advisories, the CSAF document,
 the VEX document and the provider directory have documents of their own
 (`DESIGN.md`). The escalation view, time remaining and the compliance rate are
-in `design-docs/analytics.md`; the party work is assigned to, in
+in `design-docs/analytics-program.md`; the party work is assigned to, in
 `design-docs/access.md`.
 
 ## Contents
@@ -63,9 +63,8 @@ commitment's build. Nothing is written onto findings.
 | A decision somebody agreed to | Through the act revising it, with a reason; it withdraws every agreement and returns the rows to the queue, and the revisions keep what was promised before |
 | Intent nobody argued for | The row is edited |
 
-A promise needs a second person when its date falls after the earliest
-deadline among what the decision covers. A promise with no date, or over
-nothing that carries a deadline, always needs one.
+`design-docs/triage-promises.md` § Approval gate holds when a promise needs a
+second person, and refuses a promise with no date.
 
 | Rule | Reason |
 |---|---|
@@ -130,7 +129,7 @@ history over its scans.
 
 A decision carries one link to work elsewhere, stored and read by people;
 nothing is sent to it (REQ-36). The signed outbound request (REQ-46) is
-`design-docs/notifications.md`'s, with its egress controls and the one place a
+`design-docs/notifications-delivery.md` § Outbound HTTP's, with its egress controls and the one place a
 private address is permitted.
 
 | Rule | Reason |

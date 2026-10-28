@@ -5,7 +5,7 @@ How long a finding has, when its clock starts, and the reason one carries none.
 Satisfies REQ-15, REQ-33.
 
 The escalation view, time remaining and the compliance rate are in
-`design-docs/analytics.md`.
+`design-docs/analytics-program.md`.
 
 ## Contents
 
