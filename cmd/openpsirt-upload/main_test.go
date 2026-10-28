@@ -167,6 +167,27 @@ func TestTheOutputOfTwoAnalyzersIsWrittenToAFileOfEach(t *testing.T) {
 	}
 }
 
+func TestSourceIsSentUnlessSnippetsAreTurnedOff(t *testing.T) {
+	_, sarif := checkout(t)
+	for flags, want := range map[string]bool{"": true, "--snippets=false": false} {
+		out := filepath.Join(t.TempDir(), "out.sarif")
+		args := []string{"write", "--series", "lint", "--output", out}
+		if flags != "" {
+			args = append(args, flags)
+		}
+		if err := run(context.Background(), append(args, sarif), &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+		doc, err := os.ReadFile(out) //nolint:gosec // G304: a path under the test's own directory
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := bytes.Contains(doc, []byte("int x;")); got != want {
+			t.Errorf("with %q the document carries the source %v; want %v", flags, got, want)
+		}
+	}
+}
+
 func TestOneAnalyzersRulesAreRefusedForTheOutputOfTwo(t *testing.T) {
 	_, sarif := checkout(t)
 	srv, got := deployment(t)
