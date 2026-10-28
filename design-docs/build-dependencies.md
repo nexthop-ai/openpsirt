@@ -185,8 +185,8 @@ and an SPDX identifier; `make spdx-fix` writes missing ones.
 | TypeScript majors are not offered | The linter's TypeScript support and the API client generator both refuse 7. It lifts when both accept it |
 | Updates go through the merge queue | |
 | A minor or patch update is approved and queued as it opens and after each rebase, by the `Dependabot` workflow | The queue runs the whole gate; a push dismisses an approval |
-| A major update, the actions group and a dependency whose maintainers changed wait for a person | A major release needs code; an action runs with the repository's token; a maintainer change is what a takeover looks like |
-| An approval refused, because the repository does not let Actions approve, warns and still queues | Where no approval is required it merges |
+| A major update, the actions group, a dependency whose maintainers changed and a push Dependabot did not make wait for a person | A major release needs code; an action runs with the repository's token; a maintainer change is what a takeover looks like; anybody who can push could otherwise have their own commit approved |
+| An approval refused, because the organization does not let Actions approve, warns and still queues | Where no approval is required it merges |
 
 ## Limits
 

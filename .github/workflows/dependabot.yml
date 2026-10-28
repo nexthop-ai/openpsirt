@@ -10,10 +10,15 @@ name: Dependabot
 # - The actions group: an action runs with this repository's token, and its
 #   pin is what a reader checks in the diff.
 # - A dependency whose maintainers changed, the signal a takeover gives.
+# - A push somebody else made to a Dependabot branch. Its first commit is
+#   still Dependabot's, which is all the metadata step checks, so the job
+#   asks who pushed; otherwise anybody who can push could have their own
+#   commit approved as Dependabot's.
 #
 # Not a gate: it declares no `merge_group:`, so a queue entry waits on nothing
 # here. On a pull request it reports a check, which Merge Status waits for, and
-# it is skipped on every pull request Dependabot did not open.
+# it is skipped on every pull request Dependabot did not open and on every
+# push Dependabot did not make.
 
 on:
   pull_request:
@@ -27,7 +32,7 @@ concurrency:
 jobs:
   queue:
     name: Queue Dependabot update
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -43,11 +48,11 @@ jobs:
         env:
           PR: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # An approval is refused while the repository does not let Actions
-        # approve pull requests. Refused, the pull request is still queued,
-        # which merges it where no approval is required and leaves it waiting
-        # for a person where one is.
+        # An approval is refused while the organization does not let Actions
+        # approve pull requests; the repository's setting follows it. Refused,
+        # the pull request is still queued, which merges it where no approval
+        # is required and leaves it waiting for a person where one is.
         run: |
           gh pr review --approve "$PR" \
-            || echo "::warning::not approved: allow GitHub Actions to approve pull requests in the repository's Actions settings"
+            || echo "::warning::not approved: allow GitHub Actions to create and approve pull requests in the organization's Actions settings"
           gh pr merge --auto --squash "$PR"

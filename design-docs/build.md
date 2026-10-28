@@ -210,7 +210,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | `Merge Status`, a job in the `PR` workflow, is the one check the ruleset requires; it waits for every other check to pass or be skipped | |
 | `Release` runs on a tag (`design-docs/packaging-release.md` § The release procedure) | |
 | Every gating workflow declares `merge_group:` | Without it a queue entry gets no check, which looks unstarted |
-| `Dependabot` runs on pull requests alone, skipped on any Dependabot did not open (`design-docs/build-dependencies.md` § Action pinning) | It queues; it gates nothing |
+| `Dependabot` runs on pull requests alone, skipped on any Dependabot did not open or push (`design-docs/build-dependencies.md` § Action pinning) | It queues; it gates nothing |
 | Documentation publishing is its own workflow, on `main` alone | It writes to the repository |
 | Dependency review is not run | It needs paid Advanced Security on a private repository; `licenses`, `web-audit` and `secrets` cover it and run locally (REQ-75) |
 
