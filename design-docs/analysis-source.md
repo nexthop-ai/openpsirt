@@ -82,7 +82,7 @@ leaving the repository.
 
 | Rule | Reason |
 |---|---|
-| Source is kept under the longest prefix stating so, nowhere else, off by default | A private product may forbid its source elsewhere |
+| Source is kept unless the longest prefix stating either says not; a product stating nothing keeps it | The code beside a finding is what triage reads; a private product turns it off at the empty prefix |
 | The upload's own statement of public paths decides nothing | A pipeline could mislabel a private path |
 | Decided on arrival for the result, every step and related place; nothing outside the checkout; source not kept is counted as discarded and the upload accepted | A changed setting reaches later uploads |
 | A context region is preferred, with its starting line | It is wider |

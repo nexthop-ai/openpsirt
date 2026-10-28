@@ -198,8 +198,8 @@ func TestTheNearestPrefixStatingItDecidesWhetherSnippetsAreKept(t *testing.T) {
 			t.Errorf("%s keeps snippets %v; want %v", path, got, want)
 		}
 	}
-	if (Config{}).Snippets("a.c") {
-		t.Errorf("a product saying nothing keeps snippets")
+	if !(Config{}).Snippets("a.c") {
+		t.Errorf("a product saying nothing keeps no snippets; want them kept")
 	}
 }
 

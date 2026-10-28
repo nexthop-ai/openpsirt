@@ -129,8 +129,8 @@ repository holding the path, else at the build
 ## Source locations
 
 Path, lines, columns, function, flow steps and related places are stored as the
-newest run stated them; links are built when read, and source is kept only
-where the product allows (`design-docs/analysis-source.md` § Source).
+newest run stated them; links are built when read, and source is kept unless
+the product turns it off (`design-docs/analysis-source.md` § Source).
 
 ## Limits
 

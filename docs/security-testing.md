@@ -125,7 +125,7 @@ Run it inside the checkout, or name the checkout with `--source-root`.
 | `--rule`, `--rules-file` | The rules enabled, so a rule that found nothing reads as checked. `--rule` is repeatable; the file names one rule per line, and leaves out blank lines and lines opening with `#` |
 | `--third-party` | A directory of code the product did not write, relative to the checkout. Repeatable |
 | `--tool-version` | The analyzer's version, where its output does not state one |
-| `--snippets` | Send the source lines of each location. Without it, no source leaves the pipeline |
+| `--snippets` | Send the source lines of each location, which is the default. With `--snippets=false`, no source leaves the pipeline |
 | `--salt-file` | A file holding a secret that keys each result's fingerprint. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt changes every fingerprint, and the next run is matched as a fingerprint change |
 | `--url` | The deployment's address, where `OPENPSIRT_URL` is not set |
 | `--output` | Where `write` stores the document |
@@ -697,6 +697,6 @@ of the suite, so its runs need no rules file.
 | Paths | Relative to the checkout, with `/`, in the case the checkout's index holds, whether the tool wrote it through a symbolic link or not. A path outside the checkout is sent as it is and dropped by the deployment with its result |
 | Repositories | Every repository the checkout holds, submodules included, with its commit and its remote as a web address. A repository with uncommitted changes is named as changed |
 | Fingerprints | A hash of each result's line and the line either side, with white space and line endings normalized, so a result keeps its identity when the code around it moves. With `--salt-file` the hash is keyed, and the analyzer's own fingerprints are left out. A salt can be rotated: the first run under a new one keeps each result's code finding, and its dismissal, wherever the result is the only one of its rule, file, message without digits, function and call chain. Results sharing all of those are matched as any run's are, by function and then line, and their dismissals wait to be confirmed again |
-| Source | Nothing, unless `--snippets` is given. Whole-file contents, attachments and suggested fixes in an analyzer's SARIF are always removed |
+| Source | Each location's lines and two lines either side, unless `--snippets=false` is given. Whole-file contents, attachments and suggested fixes in an analyzer's SARIF are always removed |
 
 `write` stores exactly the document `upload` would send.

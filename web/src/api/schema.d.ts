@@ -13439,7 +13439,7 @@ export interface components {
             prefix: string;
             /** @description The repository the code under the prefix is, where an upload names none. Sent with branch */
             remote?: string;
-            /** @description Whether source snippets under the prefix are kept. Absent takes the nearest prefix that states it, and no prefix stating it is off */
+            /** @description Whether source snippets under the prefix are kept. Absent takes the nearest prefix that states it, and no prefix stating it keeps them. False at the empty prefix turns them off for the product */
             snippets?: boolean;
         };
         "Repromise-upgradeRequest": {

@@ -1019,9 +1019,9 @@ func TestAClosedCodeFindingFoundAgainIsReopenedWhereAnOlderBuildHoldsItToo(t *te
 func TestSourceIsStoredOnlyUnderAPathTheProductKeepsItFor(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Build.ID)
-		yes := true
+		yes, no := true, false
 		if err := sourcelink.NewStore(w.DB.DB).Replace(t.Context(), w.Product.ID,
-			sourcelink.Config{Paths: []sourcelink.Path{{Prefix: "src/sonic-frr", Snippets: &yes}}}); err != nil {
+			sourcelink.Config{Paths: []sourcelink.Path{{Prefix: "", Snippets: &no}, {Prefix: "src/sonic-frr", Snippets: &yes}}}); err != nil {
 			t.Fatal(err)
 		}
 		run, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), documentOf(
