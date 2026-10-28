@@ -22,7 +22,7 @@
 # Included by the makefile beside it, so every target here is reached the same
 # way it was: `make demo`, `make dev`, `make scanner-db`, and the rest.
 
-.PHONY: scanner-db scanner-db-verify cve-records cve-records-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status upgrade-rehearsal dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: scanner-db scanner-db-verify cve-records cve-records-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-analysis demo-reset demo-status upgrade-rehearsal dev dev-up dev-down dev-seed dev-reset dev-status
 
 # A throwaway deployment to click around in. Everything about it is
 # overridable, because the two settings people get wrong are the host they
@@ -378,7 +378,7 @@ demo-down:
 #   $(3) the origin a browser there sends   $(4) the product
 seed-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(4) %{http_code}\n" \
 	  -X POST $(2) -H "Origin: $(3)" -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(4)\",\"role\":\"public-triage\"},{\"product\":\"$(4)\",\"role\":\"private-triage\"},{\"product\":\"$(4)\",\"role\":\"assigner\"},{\"product\":\"$(4)\",\"role\":\"approver\"}]}" \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(4)\",\"role\":\"public-triage\"},{\"product\":\"$(4)\",\"role\":\"private-triage\"},{\"product\":\"$(4)\",\"role\":\"assigner\"},{\"product\":\"$(4)\",\"role\":\"approver\"},{\"product\":\"$(4)\",\"role\":\"internal-read\"},{\"product\":\"$(4)\",\"role\":\"internal-triage\"}]}" \
 	  "$(1)/v1/people"
 demo-grant = $(call seed-grant,$(DEMO_URL),,$(DEMO_URL),$(1))
 
@@ -597,11 +597,11 @@ demo-vex:
 # A name a build ships at several versions cannot be decided about without
 # saying which is meant, and this is a seed rather than a person making that
 # choice — so those rows are left alone.
-# The upgrade names the version it moves from. The filter above counts only the
-# versions with a fixed finding, and a build can ship the same name again at a
-# version with none — two openssl packages in the SONiC image, one built locally
-# and one from Debian — which the upgrade, resolving against the whole build,
-# refuses as ambiguous.
+# The upgrade names no version: it resolves the component by name, and the
+# filter above keeps only names with a fixed finding at one version. A name
+# shipped again at a version with none is refused as two source versions. A
+# version it names is the source package's, which the export does not carry;
+# the binary version the export shows names nothing open.
 # The upgrade goes on a different package from the ones decided above, because
 # it answers *everything* open on its component: planning one where a decision
 # already stands at some of those occurrences is refused, and rightly — one act
@@ -659,11 +659,10 @@ demo-triage:
 	  'index(skip, "|" $$2 "|") == 0 && !found { print; found = 1 }'); \
 	component=$$(echo "$$one" | cut -d'|' -f2); \
 	to=$$(echo "$$one" | cut -d'|' -f3 | tr ',' '\n' | tr -d ' ' | sort -V | tail -1); \
-	from=$$(echo "$$one" | cut -d'|' -f4); \
 	if [ -n "$$component" ] && [ -n "$$to" ]; then \
 	  curl -sS --noproxy '*' -o /dev/null -w "  upgrade $$component to $$to %{http_code}\n" \
 	    -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	    -d '{"version":"'"$$from"'","to":"'"$$to"'","by":"'"$$(date -u -d '+3 days' +%Y-%m-%d)"'","team":"platform","reasoning":"Taking the kernel bump in the next build; the team is tracking it.","builds":[{"branch_or_tag":"'"$$stream"'","variant":"'"$$variant"'"}]}' \
+	    -d '{"to":"'"$$to"'","by":"'"$$(date -u -d '+3 days' +%Y-%m-%d)"'","team":"platform","reasoning":"Taking the kernel bump in the next build; the team is tracking it.","builds":[{"branch_or_tag":"'"$$stream"'","variant":"'"$$variant"'"}]}' \
 	    "$(DEMO_URL)/v1/products/$$product/components/$$component/upgrade"; \
 	fi; \
 	echo "  seeded. A 422 or 409 above is this having been run before: a"; \
@@ -733,6 +732,45 @@ demo-flaw:
 	else \
 	  echo "  it was refused: $$filed"; \
 	fi
+
+# Static analysis runs against the first build, so the code findings screens
+# have something to show.
+#
+# `sonic-cppcheck.sarif` names the checkout's repositories, as the upload
+# client writes them, so its results in `src/sonic-dhcpmon/` and
+# `src/sonic-linkmgrd/` are placed on the components the inventory says those
+# submodules built, and its one result elsewhere on the build. The other
+# documents are the reader's real fixtures; they name no repository, so every
+# result they hold is placed on the build. GitHub is declared as the host, so
+# places in a named repository link into it.
+#
+# Running it again sends a later run of each series, which sees the same
+# results and opens nothing new.
+demo-analysis:
+	@command -v curl >/dev/null || { echo "curl is needed"; exit 1; }
+	@product='$(word 2,$(first-build))'; \
+	stream='$(word 4,$(first-build))'; \
+	variant='$(word 5,$(first-build))'; \
+	curl -sS --noproxy '*' -o /dev/null -w "  repositories %{http_code}\n" \
+	  -X PUT -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
+	  -d '{"hosts":[{"remote":"github.com","web":"https://github.com","style":"github"}],"paths":[]}' \
+	  "$(DEMO_URL)/v1/products/$$product/repositories"; \
+	at="$(DEMO_URL)/v1/products/$$product/branches-and-tags/$$stream/variants/$$variant/analyses"; \
+	built=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+	fixtures=internal/sarif/testdata; \
+	run() { name=$$1; shift; \
+	  curl -sS --noproxy '*' -o /dev/null -w "  analysis $$name %{http_code}\n" \
+	    -X POST -H "Origin: $(DEMO_URL)" -F "built=$$built" -F "exit-status=0" "$$@" "$$at"; }; \
+	run cppcheck-sonic -F sarif=@$$fixtures/sonic-cppcheck.sarif -F series=cppcheck-sonic \
+	  -F commit=4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39 -F source-root=/home/builder/sonic; \
+	run clang-analyzer -F sarif=@$$fixtures/clang18-a.sarif -F sarif=@$$fixtures/clang18-b.sarif \
+	  -F series=clang-analyzer -F tool-version=18.1.3 -F source-root=/home/builder/sonic \
+	  -F units-expected=2 -F units-analyzed=2; \
+	run cppcheck -F sarif=@$$fixtures/cppcheck222.sarif -F series=cppcheck -F tool-version=2.22.0 \
+	  -F source-root=/home/builder/sonic/src -F units-expected=2 -F units-analyzed=2; \
+	run clang-tidy -F sarif=@$$fixtures/clangtidy-artemis.sarif -F series=clang-tidy \
+	  -F source-root=/var/tmp/testing-dir/assignment -F units-expected=1 -F units-analyzed=1; \
+	run codeql -F sarif=@$$fixtures/codeql2150-cpp.sarif -F series=codeql -F tool-version=2.15.0
 
 demo-status:
 	@$(call seed-status,$(DEMO_URL),,openpsirt:main:binary openpsirt:main:container openpsirt:v1.0:binary openpsirt:v1.0:container)

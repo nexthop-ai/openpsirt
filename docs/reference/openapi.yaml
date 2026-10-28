@@ -2255,6 +2255,9 @@ components:
         compare:
           description: The address comparing the code finding's repository between those two builds
           type: string
+        component:
+          description: "The component the code finding is placed on: the one built from the repository its path is in, or the build itself"
+          type: string
         decision_occurrence:
           $ref: "#/components/schemas/DecisionOccurrenceBody"
           description: The live decision at the code finding, agreed to or waiting for a second person. Absent where there is none
@@ -2286,6 +2289,9 @@ components:
           description: The run that did not see the code finding, which a statement that it was fixed may name
           format: int64
           type: integer
+        on_build:
+          description: Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from
+          type: boolean
         open:
           description: Whether the code finding is open on the build
           type: boolean
@@ -2329,9 +2335,13 @@ components:
         unchanged:
           description: Whether those two builds name the same commit for the code finding's repository and neither patched it at build time, so its disappearance is not a change to that code
           type: boolean
+        version:
+          description: That component's version, where it states one and the build still ships it at that version
+          type: string
       required:
         - rule
         - at
+        - component
         - steps
         - related
         - open
@@ -2485,6 +2495,9 @@ components:
           description: The number of builds in the list's scope the code finding is listed on, in the state the list asks for
           format: int64
           type: integer
+        component:
+          description: "The component the code finding is placed on in that build: the one built from the repository its path is in, or the build itself"
+          type: string
         function:
           description: The function the result is in, where the analyzer names one
           type: string
@@ -2498,6 +2511,9 @@ components:
         occurrence:
           description: The code finding's occurrence identity, which addresses it on every build it is on
           type: string
+        on_build:
+          description: Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from
+          type: boolean
         opened:
           description: When the code finding was first opened on any of them
           format: date
@@ -2525,6 +2541,9 @@ components:
         variant:
           description: The variant of that build
           type: string
+        version:
+          description: That component's version, where it states one and the build still ships it at that version
+          type: string
       required:
         - occurrence
         - rule
@@ -2532,6 +2551,7 @@ components:
         - message
         - branch_or_tag
         - variant
+        - component
         - state
         - builds
         - opened
@@ -25709,7 +25729,7 @@ paths:
 
         The line this deployment triages at is stated in the file.
 
-        Below the findings come every open static analysis code finding of the same branch or tag and variant, in the code finding queue's order, where you read them, those a decision waits on included and those open only in releases past their end of life left out: `code finding` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text. A code finding carries no rating, component or decision, so a file narrowed by any filter but the order holds no code finding, and says so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
+        Below the findings come every open static analysis code finding of the same branch or tag and variant, in the code finding queue's order, where you read them, those a decision waits on included and those open only in releases past their end of life left out: `code finding` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said, and `component` and `version` name the component it is placed on, empty where it is the build itself. No row carries source text. The filters ask what a code finding mostly does not carry, a rating, an upstream or a decision, so a file narrowed by any filter but the order holds no code finding, and says so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
 
         Takes every filter the findings list takes.
 

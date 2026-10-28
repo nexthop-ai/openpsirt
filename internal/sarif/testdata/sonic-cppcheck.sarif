@@ -1,0 +1,293 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "cppcheck",
+          "semanticVersion": "2.22.0",
+          "rules": [
+            {
+              "id": "memleak",
+              "shortDescription": {
+                "text": "Memory leak"
+              },
+              "properties": {
+                "tags": [
+                  "external/cwe/cwe-401"
+                ]
+              }
+            },
+            {
+              "id": "nullPointer",
+              "shortDescription": {
+                "text": "Null pointer dereference"
+              },
+              "properties": {
+                "tags": [
+                  "external/cwe/cwe-476"
+                ]
+              }
+            },
+            {
+              "id": "bufferAccessOutOfBounds",
+              "shortDescription": {
+                "text": "Buffer is accessed out of bounds"
+              },
+              "properties": {
+                "tags": [
+                  "external/cwe/cwe-788"
+                ]
+              }
+            },
+            {
+              "id": "uninitvar",
+              "shortDescription": {
+                "text": "Uninitialized variable"
+              },
+              "properties": {
+                "tags": [
+                  "external/cwe/cwe-457"
+                ]
+              }
+            },
+            {
+              "id": "resourceLeak",
+              "shortDescription": {
+                "text": "Resource leak"
+              },
+              "properties": {
+                "tags": [
+                  "external/cwe/cwe-775"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "originalUriBaseIds": {
+        "SRCROOT": {
+          "uri": "file:///home/builder/sonic/"
+        }
+      },
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "https://github.com/sonic-net/sonic-buildimage",
+          "revisionId": "4f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39",
+          "mappedTo": {
+            "uriBaseId": "SRCROOT"
+          }
+        },
+        {
+          "repositoryUri": "https://github.com/sonic-net/sonic-dhcpmon",
+          "revisionId": "9b1d7e3a5c2f8e6d4b0a1c3e5f7d9b2a4c6e8f01",
+          "mappedTo": {
+            "uri": "src/sonic-dhcpmon/",
+            "uriBaseId": "SRCROOT"
+          }
+        },
+        {
+          "repositoryUri": "https://github.com/sonic-net/sonic-linkmgrd",
+          "revisionId": "e7c5a3b1d9f2e4c6a8b0d2f4e6a8c0b2d4f6a813",
+          "mappedTo": {
+            "uri": "src/sonic-linkmgrd/",
+            "uriBaseId": "SRCROOT"
+          }
+        }
+      ],
+      "properties": {
+        "openpsirt/unitsExpected": 214,
+        "openpsirt/unitsAnalyzed": 214
+      },
+      "results": [
+        {
+          "ruleId": "memleak",
+          "level": "error",
+          "message": {
+            "text": "Memory leak: context"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/sonic-dhcpmon/src/dhcp_device.cpp",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 412,
+                  "startColumn": 5,
+                  "snippet": {
+                    "text": "        return -1;"
+                  }
+                },
+                "contextRegion": {
+                  "startLine": 410,
+                  "endLine": 414,
+                  "snippet": {
+                    "text": "    dhcp_device_context_t *context = (dhcp_device_context_t *) malloc(sizeof(*context));\n    if (dhcp_device_init_socket(context, ifname) < 0) {\n        return -1;\n    }\n    *device = context;"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "bufferAccessOutOfBounds",
+          "level": "error",
+          "message": {
+            "text": "Buffer is accessed out of bounds: options"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/sonic-dhcpmon/src/dhcp_device.cpp",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 288,
+                  "startColumn": 17,
+                  "snippet": {
+                    "text": "        uint8_t code = options[offset++];"
+                  }
+                },
+                "contextRegion": {
+                  "startLine": 286,
+                  "endLine": 289,
+                  "snippet": {
+                    "text": "    size_t offset = 0;\n    while (offset <= sizeof(options)) {\n        uint8_t code = options[offset++];\n        if (code == OPTION_DHCP_END) {"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "resourceLeak",
+          "level": "error",
+          "message": {
+            "text": "Resource leak: sock"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/sonic-dhcpmon/src/dhcp_mon.cpp",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 157,
+                  "startColumn": 9,
+                  "snippet": {
+                    "text": "        return -1;"
+                  }
+                },
+                "contextRegion": {
+                  "startLine": 155,
+                  "endLine": 158,
+                  "snippet": {
+                    "text": "    if (setsockopt(sock, SOL_SOCKET, SO_ATTACH_FILTER, &prog, sizeof(prog)) < 0) {\n        syslog(LOG_ALERT, \"setsockopt: failed to attach filter\");\n        return -1;\n    }"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "nullPointer",
+          "level": "error",
+          "message": {
+            "text": "Null pointer dereference: peer"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/sonic-linkmgrd/src/link_prober/LinkProber.cpp",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 233,
+                  "startColumn": 13,
+                  "snippet": {
+                    "text": "    peer->sendHeartbeat(mTxBuffer, mTxPacketSize);"
+                  }
+                },
+                "contextRegion": {
+                  "startLine": 231,
+                  "endLine": 235,
+                  "snippet": {
+                    "text": "    std::shared_ptr<LinkProberPeer> peer = mPeers.find(mPeerIpv4Address);\n    MUXLOGDEBUG(boost::format(\"%s: probing peer\") % mMuxPortConfig.getPortName());\n    peer->sendHeartbeat(mTxBuffer, mTxPacketSize);\n    mStream.async_write_some(\n        boost::asio::buffer(mTxBuffer.data(), mTxPacketSize),"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "uninitvar",
+          "level": "error",
+          "message": {
+            "text": "Uninitialized variable: state"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/sonic-linkmgrd/src/link_manager/LinkManagerStateMachineActiveStandby.cpp",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 641,
+                  "startColumn": 21,
+                  "snippet": {
+                    "text": "        switchMuxState(nextState, state);"
+                  }
+                },
+                "contextRegion": {
+                  "startLine": 639,
+                  "endLine": 643,
+                  "snippet": {
+                    "text": "    mux_state::MuxState::Label state;\n    if (mComponentInitState.all()) {\n        switchMuxState(nextState, state);\n    }\n    mMuxStateMachine.setWaitStateCause(WaitStateCause::SwssUpdate);"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "resourceLeak",
+          "level": "error",
+          "message": {
+            "text": "Resource leak: fp"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/systemd-sonic-generator/systemd-sonic-generator.cpp",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 96,
+                  "startColumn": 9,
+                  "snippet": {
+                    "text": "        return -1;"
+                  }
+                },
+                "contextRegion": {
+                  "startLine": 94,
+                  "endLine": 97,
+                  "snippet": {
+                    "text": "    if (fp == NULL) return -1;\n    if (fgets(line, sizeof(line), fp) == NULL) {\n        return -1;\n    }"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

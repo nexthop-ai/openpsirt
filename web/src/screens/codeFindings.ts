@@ -93,3 +93,19 @@ export function located(path?: string, line?: number): string {
   if (!path) return "";
   return line ? `${path}:${line}` : path;
 }
+
+// The component a code finding is placed on, as a reader names it: its name and
+// version, or the whole build where its path is in no component's repository.
+export function placedOn(placed: { component?: string; version?: string; on_build?: boolean }): {
+  label: string;
+  component?: string;
+} {
+  if (placed.on_build || !placed.component) return { label: "Whole build" };
+  return {
+    label: placed.version ? `${placed.component} ${placed.version}` : placed.component,
+    component: placed.component,
+  };
+}
+
+// Why a code finding is on the whole build.
+export const ON_BUILD_HINT = "Its path is in no repository a component of the build was built from";

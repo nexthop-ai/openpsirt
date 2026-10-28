@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -143,16 +144,22 @@ func (w *world) inventory(t *testing.T, buildID int64) {
 // as the inventory describes it.
 func (w *world) inventoryWith(t *testing.T, buildID int64, frr graph.Described) {
 	t.Helper()
+	w.inventoryAt(t, buildID, fmt.Sprintf("inventory-%d", buildID), time.Now().UTC().Add(-2*time.Hour),
+		graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}, frr)
+}
+
+// inventoryAt records a read inventory for a build, made at built, of a root
+// holding FRR, and notes the open root and FRR nodes' components.
+func (w *world) inventoryAt(t *testing.T, buildID int64, hash string, built time.Time, root, frr graph.Described) {
+	t.Helper()
 	ctx := t.Context()
 	scans := ingest.NewStore(w.DB.DB)
 	scan, outcome, err := scans.Record(ctx, ingest.Arriving{
-		BuildID: buildID, ContentHash: fmt.Sprintf("inventory-%d", buildID),
-		BuiltAt: time.Now().UTC().Add(-2 * time.Hour), ParserVersion: "test",
+		BuildID: buildID, ContentHash: hash, BuiltAt: built, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record the inventory: %v %v", outcome, err)
 	}
-	root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
 	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, buildID, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{frr},
 		Dependencies: []graph.Dependency{{Parent: root, Child: frr}},
@@ -168,7 +175,8 @@ func (w *world) inventoryWith(t *testing.T, buildID int64, frr graph.Described) 
 	}
 	if err := w.DB.DB.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id", "n"."is_root"`).
-		Where(`"n"."build_id" = ?`, buildID).Scan(ctx, &nodes); err != nil {
+		Where(`"n"."build_id" = ?`, buildID).Where(`"n"."closed_scan_id" IS NULL`).
+		Scan(ctx, &nodes); err != nil {
 		t.Fatal(err)
 	}
 	for _, n := range nodes {
@@ -1099,6 +1107,115 @@ func TestACodeFindingsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T)
 		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &codeFinding, w.Product.ID)
 		if err != nil || got.At.Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" {
 			t.Errorf("an internal reader was answered %+v, %v; want the code finding's occurrence", got.At, err)
+		}
+	})
+}
+
+func TestTheQueueAndEvidenceNameTheComponentACodeFindingIsPlacedOn(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR, inSWSS}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		reader := w.holding(t, "analyst", access.InternalRead)
+		queue, err := CodeFindingsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		type placed struct {
+			component, version string
+			onBuild            bool
+		}
+		listed := map[string]placed{}
+		for _, r := range queue.Rows {
+			listed[r.Path] = placed{r.Component, r.Version, r.OnBuild}
+		}
+		want := map[string]placed{
+			"src/sonic-frr/frr/bgpd/bgp_attr.c": {"frr", "10.2", false},
+			inSWSS.uri:                          {"sonic", "", true},
+		}
+		for path, p := range want {
+			if listed[path] != p {
+				t.Errorf("the queue places %s on %+v; want %+v", path, listed[path], p)
+			}
+		}
+		for _, codeFinding := range w.codeFindings(t, w.Build.ID) {
+			got, err := EvidenceOf(t.Context(), w.DB.DB, reader, &codeFinding, w.Product.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p := (placed{got.Component, got.Version, got.OnBuild}); p != want[got.At.Path] {
+				t.Errorf("the evidence places %s on %+v; want %+v", got.At.Path, p, want[got.At.Path])
+			}
+		}
+	})
+}
+
+// placement is where the queue and the evidence say each code finding of the
+// build is placed, by path.
+func (w *world) placement(t *testing.T) (map[string][3]string, map[string][3]string) {
+	t.Helper()
+	reader := w.holding(t, "analyst", access.InternalRead)
+	queue, err := CodeFindingsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed, evidenced := map[string][3]string{}, map[string][3]string{}
+	for _, r := range queue.Rows {
+		listed[r.Path] = [3]string{r.Component, r.Version, strconv.FormatBool(r.OnBuild)}
+	}
+	for _, codeFinding := range w.codeFindings(t, w.Build.ID) {
+		got, err := EvidenceOf(t.Context(), w.DB.DB, reader, &codeFinding, w.Product.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evidenced[got.At.Path] = [3]string{got.Component, got.Version, strconv.FormatBool(got.OnBuild)}
+	}
+	return listed, evidenced
+}
+
+func TestACodeFindingOnAComponentTheBuildMovedOffNamesItWithoutItsVersion(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		w.inventoryAt(t, w.Build.ID, "inventory-frr-moved", time.Now().UTC().Add(-30*time.Minute),
+			graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"},
+			graph.Described{Purl: "pkg:github/frrouting/frr@10.3", Name: "frr", Version: "10.3"})
+		listed, evidenced := w.placement(t)
+		want := [3]string{"frr", "", "false"}
+		const path = "src/sonic-frr/frr/bgpd/bgp_attr.c"
+		if listed[path] != want || evidenced[path] != want {
+			t.Errorf("the queue places it on %v and the evidence on %v; want %v, since the build ships frr 10.3",
+				listed[path], evidenced[path], want)
+		}
+	})
+}
+
+func TestACodeFindingOnARootRenamedSinceIsOnTheBuild(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inSWSS}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		was := w.root
+		w.inventoryAt(t, w.Build.ID, "inventory-root-renamed", time.Now().UTC().Add(-30*time.Minute),
+			graph.Described{Purl: "pkg:generic/sonic-os@1.0", Name: "sonic-os", Version: "1.0"},
+			graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frr", Version: "10.2"})
+		if w.root == was {
+			t.Fatal("the renamed root is the same component; the test renames nothing")
+		}
+		listed, evidenced := w.placement(t)
+		if listed[inSWSS.uri][2] != "true" || evidenced[inSWSS.uri][2] != "true" {
+			t.Errorf("the queue places it on %v and the evidence on %v; want the build itself",
+				listed[inSWSS.uri], evidenced[inSWSS.uri])
+		}
+		if _, root, err := componentOf(t.Context(), w.DB.DB, w.Build.ID, was); err != nil || !root {
+			t.Errorf("a flaw record reads the former root as the build %v, %v; want true", root, err)
 		}
 	})
 }

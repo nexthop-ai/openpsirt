@@ -28,6 +28,7 @@ product page.
 | Above the queue: how many wait for approval, how many a suppression rule dismisses (opening the dismissed tab), how many are past end of life | |
 | A row opens the code finding on its build, naming that build and how many others hold it in the listed state; build and opening date do not wrap | Evidence is per build |
 | Rows name the holder, a team marked team | |
+| Rows name the component the code finding is placed on, with its version, opening the component on the row's build; one on the build itself reads Whole build, why on hover | |
 | The branch and variant are in the address, so a build's link narrows it; a product picked in the scope bar keeps the screen and drops them | A branch is one product's |
 | A series in the address narrows it and is named in the heading; each figure of Code findings by analyzer opens its series and state | |
 | Unassigned only narrows to code findings nobody holds, in the address and heading, across tabs, counts and the file (`design-docs/analysis-queue.md` § Code finding queue) | The findings list holds no code finding |
@@ -39,6 +40,7 @@ product page.
 | Rule | Reason |
 |---|---|
 | The page holds, in order: the result, the path, the related places, Also found by, the decision | |
+| The heading names the component it is placed on, opening the component on its build, or the whole build, why on hover | |
 | Each place is file and line, linked to the repository where the address passes the link check, with the analyzer's message there and the captured code | |
 | Also found by (the same flaw) and Possibly also found by (maybe) are two lists; one decision covers the first, said on hover | |
 | The result card names the holder and offers the finding's holder picker to a triager, searching readers of internal work, not past end of life; choosing applies to every build it is open on | It is held as internal until its flaw is disclosed |

@@ -43,6 +43,9 @@ type CodeFindingOccurrence struct {
 type CodeFindingEvidenceBody struct {
 	Rule               string                       `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
 	At                 CodeFindingOccurrence        `json:"at" doc:"Where the code finding is"`
+	Component          string                       `json:"component" doc:"The component the code finding is placed on: the one built from the repository its path is in, or the build itself"`
+	Version            string                       `json:"version,omitempty" doc:"That component's version, where it states one and the build still ships it at that version"`
+	OnBuild            bool                         `json:"on_build,omitempty" doc:"Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from"`
 	Steps              []CodeFindingOccurrence      `json:"steps" doc:"The path the analyzer took to it, in order"`
 	Related            []CodeFindingOccurrence      `json:"related" doc:"The other places the analyzer names"`
 	Open               bool                         `json:"open" doc:"Whether the code finding is open on the build"`
@@ -185,6 +188,7 @@ func registerCodeFindings(api huma.API, in core.Deps) {
 			LastCommit: evidence.LastCommit, NotSeenCommit: evidence.NotSeenCommit,
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: CodeFindingState(evidence.State),
 			Kin: make([]CodeFindingKin, 0, len(evidence.Kin)), ThirdParty: evidence.ThirdParty,
+			Component: evidence.Component, Version: evidence.Version, OnBuild: evidence.OnBuild,
 		}
 		switch err := finding.CodeFindingEnded(ctx, in.DB.DB, named.ProductID, codeFinding.OccurrenceIdentity, time.Now().UTC()); {
 		case errors.Is(err, finding.ErrCodeFindingPastEndOfLife):

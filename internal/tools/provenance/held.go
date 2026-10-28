@@ -125,6 +125,7 @@ var Held = []Entry{
 	{"internal/sarif/testdata/clang18-a.sarif", Ours, ""},
 	{"internal/sarif/testdata/clang18-b.sarif", Ours, ""},
 	{"internal/sarif/testdata/cppcheck222.sarif", Ours, ""},
+	{"internal/sarif/testdata/sonic-cppcheck.sarif", Ours, ""},
 	{"internal/sarif/testdata/src/a.c", Ours, ""},
 	{"internal/sarif/testdata/src/b.c", Ours, ""},
 	{"internal/sarif/testdata/src/include/shared.h", Ours, ""},

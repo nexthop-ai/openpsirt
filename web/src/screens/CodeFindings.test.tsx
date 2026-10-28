@@ -10,23 +10,24 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const ROWS = [
-  {
-    occurrence: "abc",
-    rule: "clang/unix.Malloc",
-    path: "src/a.c",
-    line: 7,
-    message: "p is leaked",
-    branch_or_tag: "master",
-    variant: "broadcom",
-    builds: 3,
-    opened: "2026-10-01",
-    state: "open",
-    assigned_to: "kernel",
-    assigned_to_name: "Kernel",
-    assigned_team: true,
-  },
-];
+const ROW = {
+  occurrence: "abc",
+  rule: "clang/unix.Malloc",
+  path: "src/a.c",
+  line: 7,
+  message: "p is leaked",
+  branch_or_tag: "master",
+  variant: "broadcom",
+  builds: 3,
+  component: "frr",
+  version: "10.2",
+  opened: "2026-10-01",
+  state: "open",
+  assigned_to: "kernel",
+  assigned_to_name: "Kernel",
+  assigned_team: true,
+};
+const ROWS = [ROW];
 
 async function drawn(at = "/products/sonic/code-findings", rows: object[] = ROWS) {
   const asked: unknown[] = [];
@@ -64,6 +65,20 @@ async function drawn(at = "/products/sonic/code-findings", rows: object[] = ROWS
 const text = () => mount.host().textContent ?? "";
 
 describe("the code findings", () => {
+  it("links each row's component, and names the whole build where it is on no component", async () => {
+    await drawn("/products/sonic/code-findings", [
+      ROW,
+      { ...ROW, occurrence: "def", component: "sonic", version: "", on_build: true },
+    ]);
+    const link = Array.from(mount.host().querySelectorAll("a")).find(
+      (each) => each.textContent === "frr 10.2",
+    );
+    expect(link?.getAttribute("href")).toBe(
+      "/products/sonic/components/frr?branch_or_tag=master&variant=broadcom",
+    );
+    expect(text()).toContain("Whole build");
+  });
+
   it("offers the list as a file asked with the same narrowing", async () => {
     const asked = await drawn(
       "/products/sonic/code-findings?state=no-longer-detected&series=semgrep%2Fdefault",

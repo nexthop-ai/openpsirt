@@ -103,6 +103,7 @@ make demo DEMO_CAST="8091:ana:public-read,public-triage,approver \
 | `make demo-triage` | A few decisions once the scans have landed: a dismissal, a deferral and a backport proposed by one of the cast and agreed to by another, plus an upgrade carried by a team |
 | `make demo-vex` | A VEX document attributed to a distribution, written from what the scans actually found |
 | `make demo-flaw` | One flaw in what this deployment ships, recorded by hand and undisclosed |
+| `make demo-analysis` | Static analysis runs against the first build: results placed on the components their repositories built and on the build itself, linked into GitHub |
 | `make dev` | This machine's binary plus the interface's own dev server, for editing the interface and watching it reload |
 
 - A demo where every figure reads zero demonstrates nothing. Without

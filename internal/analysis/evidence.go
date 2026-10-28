@@ -53,6 +53,30 @@ type Evidence struct {
 	// ThirdParty says the code finding is under a path the newest run that saw it
 	// declared as third-party code.
 	ThirdParty bool
+	// Component is the component the code finding is placed on, Version its
+	// version while the build still ships it, and OnBuild says that component
+	// is the build itself.
+	Component string
+	Version   string
+	OnBuild   bool
+}
+
+// placedOn selects the component a code finding "f" is placed on, joined as
+// "co": its name; its version while the build still ships it, empty once a
+// later inventory moved it, because a finding keeps the component it opened
+// on; and 1 where it is the build itself. It takes true.
+var placedOn = `"co"."name" AS "component", ` +
+	`CASE WHEN EXISTS (SELECT 1 FROM "graph_node" AS "gv" WHERE "gv"."build_id" = "f"."build_id" ` +
+	`AND "gv"."component_id" = "f"."component_id" AND "gv"."closed_scan_id" IS NULL) ` +
+	`THEN "co"."version" ELSE '' END AS "component_version", ` +
+	`CASE WHEN ` + wasRoot(`"f"."build_id"`, `"f"."component_id"`) + ` THEN 1 ELSE 0 END AS "on_build"`
+
+// wasRoot is whether a component was ever a build's root, given each as a SQL
+// expression; it takes true. A closed node counts: a root renamed since a code
+// finding opened on it is still what that build is, and no component of it.
+func wasRoot(build, component string) string {
+	return `EXISTS (SELECT 1 FROM "graph_node" AS "gn" WHERE "gn"."build_id" = ` + build +
+		` AND "gn"."component_id" = ` + component + ` AND "gn"."is_root" = ?)`
 }
 
 // RunAt is one run, by the build it analyzed: when it was made and the
@@ -150,15 +174,20 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, codeFin
 		}
 	}
 	state, stateArgs := stateOf(productID)
+	var onBuild int
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
+		Join(`JOIN "component" AS "co" ON "co"."id" = "f"."component_id"`).
 		ColumnExpr(state+` AS "state"`, stateArgs...).
 		ColumnExpr(`"vu"."identifier" AS "rule"`).
-		Where(`"f"."id" = ?`, codeFinding.ID).Limit(1).Scan(ctx, &out.State, &out.Rule); err != nil {
+		ColumnExpr(placedOn, true).
+		Where(`"f"."id" = ?`, codeFinding.ID).Limit(1).
+		Scan(ctx, &out.State, &out.Rule, &out.Component, &out.Version, &onBuild); err != nil {
 		return Evidence{}, fmt.Errorf("read where code finding %d stands: %w", codeFinding.ID, err)
 	}
+	out.OnBuild = onBuild == 1
 	if out.Kin, err = KinOf(ctx, db, subject, productID, codeFinding.ID); err != nil {
 		return Evidence{}, err
 	}
