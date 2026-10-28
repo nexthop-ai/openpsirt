@@ -124,7 +124,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs.Var(&analyzed, "units-analyzed", "how many it analyzed; for clang, the plist documents given where unset")
 	fs.StringVar(&compileCommands, "compile-commands", "", "a compilation database whose entries are the units the run was meant to analyze")
 	fs.Var(&exitStatus, "exit-status", "the analyzer's exit status")
-	fs.BoolVar(&snippets, "snippets", false, "send the source lines of each location; off, no source leaves the pipeline")
+	fs.BoolVar(&snippets, "snippets", true, "send the source lines of each location; with --snippets=false no source leaves the pipeline")
 	fs.StringVar(&saltFile, "salt-file", "", "a file holding the secret the content fingerprint is keyed with")
 	fs.StringVar(&out, "output", "", "where write puts the document")
 	if err := fs.Parse(args[1:]); err != nil {

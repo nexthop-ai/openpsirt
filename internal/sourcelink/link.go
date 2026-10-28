@@ -156,9 +156,9 @@ func CommitOf(modules []Module, top, path string) string {
 }
 
 // Snippets is whether source under a path is kept: the setting of the
-// longest prefix that states one, and off where none does.
+// longest prefix that states one, and kept where none does.
 func (c Config) Snippets(path string) bool {
-	best, keep := -1, false
+	best, keep := -1, true
 	for _, p := range c.Paths {
 		if p.Snippets != nil && under(path, p.Prefix) && len(p.Prefix) > best {
 			best, keep = len(p.Prefix), *p.Snippets

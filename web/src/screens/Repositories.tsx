@@ -283,7 +283,7 @@ function Draft({ product, held }: { product: string; held: Settings }) {
       <div className="card">
         <h3>Paths</h3>
         {paths.length === 0 ? (
-          <Empty title="No paths." detail="No snippets are kept, and none are disclosed." />
+          <Empty title="No paths." detail="Snippets are kept, and none are disclosed." />
         ) : (
           <Wide>
             <table>
@@ -292,10 +292,10 @@ function Draft({ product, held }: { product: string; held: Settings }) {
                   <th title="From the top of the checkout. Empty is the whole product">Prefix</th>
                   <th title="Where an upload names none. Named with its branch">Repository</th>
                   <th title="Links open on it, marked approximate">Branch</th>
-                  <th title="Inherited takes the longest shorter prefix that says, and none is off">
+                  <th title="Inherited takes the longest shorter prefix that says, and none is kept. Not kept on the empty prefix turns them off">
                     Snippets
                   </th>
-                  <th title="Disclosed with the flaw of a code finding included in its flaw's disclosure. Inherited works as for snippets">
+                  <th title="Disclosed with the flaw of a code finding included in its flaw's disclosure. Inherited takes the longest shorter prefix that says, and none is stripped">
                     In disclosure
                   </th>
                   <th />

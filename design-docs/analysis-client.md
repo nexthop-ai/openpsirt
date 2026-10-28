@@ -26,7 +26,7 @@ analyzer with what the output alone lacks, and sends each as
 
 ```
 openpsirt-upload upload --product P --branch-or-tag B --variant V --series [TOOL=]NAME... \
-  [--commit SHA] [--built TIME] [--snippets] [--salt-file FILE] \
+  [--commit SHA] [--built TIME] [--snippets=false] [--salt-file FILE] \
   [--third-party PATH]... OUTPUT...
 openpsirt-upload write --series [TOOL=]NAME... --output FILE OUTPUT...
 ```
@@ -99,8 +99,8 @@ Each result carries `openpsirt/context/v1`, a content fingerprint of its line
 
 | Rule | Reason |
 |---|---|
-| No source leaves without `--snippets` | |
-| With it, each location carries its lines and two lines of context either side, each at most 4,096 bytes, carriage returns removed | |
+| Source is sent unless `--snippets=false`, which sends none | The deployment decides what it keeps |
+| Each location carries its lines and two lines of context either side, each at most 4,096 bytes, carriage returns removed | |
 | Forwarded SARIF loses whole-file contents, fixes, attachments, snippets and markdown messages, counted in the output; a markdown-only message is reduced as the deployment reduces one | |
 | A snippet is removed from every location: result, related places, flow steps, stack frames, shared flow steps, notification places | |
 | A forwarded run's artifact list and starting points are removed | Paths are already resolved |

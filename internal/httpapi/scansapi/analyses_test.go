@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/scansapi"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/series"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 const clangRun = `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"clang-tidy","version":"18.1.3"}},` +
@@ -111,6 +112,17 @@ func TestAnAnalyzerRunIsQueuedAndASecondSendingIsTheSameRun(t *testing.T) {
 
 func TestAnAnalyzerRunIsHeldAsItsPlacedResultsAndNeverAsSent(t *testing.T) {
 	httpapitest.IngestOn(t, dbtest.Two, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		// The product keeps no source, so the snippet is only the document's.
+		var product int64
+		if err := f.DB.DB.NewSelect().TableExpr(`"product"`).ColumnExpr(`"id"`).Limit(1).
+			Scan(t.Context(), &product); err != nil {
+			t.Fatal(err)
+		}
+		no := false
+		if err := sourcelink.NewStore(f.DB.DB).Replace(t.Context(), product,
+			sourcelink.Config{Paths: []sourcelink.Path{{Prefix: "", Snippets: &no}}}); err != nil {
+			t.Fatal(err)
+		}
 		sent := strings.Replace(clangRun, `"region":{"startLine":4}`,
 			`"region":{"startLine":4,"snippet":{"text":"token = \"hunter2\""}}`, 1)
 		code, run, body := sendRun(t, f, []string{sent}, map[string]string{
