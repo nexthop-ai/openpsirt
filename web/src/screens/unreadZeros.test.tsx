@@ -238,6 +238,28 @@ describe("the findings list", () => {
     expect(asked(spy)).not.toContain("/v1/products/{product}/findings/components");
     expect(asked(spy)).not.toContain("/v1/products/{product}/planned-upgrades");
   });
+
+  it.each([
+    ["components", "/v1/products/{product}/findings/components"],
+    ["bumps", "/v1/products/{product}/planned-upgrades"],
+  ])(
+    "says why a kept link to the %s view is empty, and asks for none of it",
+    async (view, path) => {
+      const spy = serving(ELSEWHERE);
+      mount.render(
+        screen(
+          <Findings />,
+          `/products/sonic/findings?view=${view}`,
+          "/products/:product/findings",
+          signedIn(ELSEWHERE),
+        ),
+      );
+      await settle();
+      expect(text()).toContain("You don't read dependency findings in sonic.");
+      expect(text()).not.toContain("Nothing matches what you are looking at.");
+      expect(asked(spy)).not.toContain(path);
+    },
+  );
 });
 
 describe("the findings list's total", () => {

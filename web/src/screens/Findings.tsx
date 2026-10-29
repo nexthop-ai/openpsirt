@@ -814,6 +814,29 @@ export function Findings() {
     return <Navigate replace to={allFindingsAt(asking)} />;
   }
 
+  const where = spanning ? (
+    <>Every product you can read</>
+  ) : (
+    <>
+      {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
+    </>
+  );
+
+  // A list of findings the reader does not read at its scope: no total, no
+  // view counts and no controls over rows there are none of, and none of it
+  // asked, in every view a kept link names. The line says why it is empty.
+  if (!reads) {
+    return (
+      <>
+        <div className="screen-head">
+          <h2>Findings</h2>
+          <p>{where}</p>
+        </div>
+        <Empty title="Nothing to list." detail={heldSaid} />
+      </>
+    );
+  }
+
   if (view === "bumps") {
     return (
       <>
@@ -878,29 +901,6 @@ export function Findings() {
           }}
           onPage={go}
         />
-      </>
-    );
-  }
-
-  const where = spanning ? (
-    <>Every product you can read</>
-  ) : (
-    <>
-      {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
-    </>
-  );
-
-  // A list of findings the reader does not read at its scope: no total, no
-  // view counts and no controls over rows there are none of, and none of it
-  // asked. The line says why it is empty.
-  if (!reads) {
-    return (
-      <>
-        <div className="screen-head">
-          <h2>Findings</h2>
-          <p>{where}</p>
-        </div>
-        <Empty title="Nothing to list." detail={heldSaid} />
       </>
     );
   }
