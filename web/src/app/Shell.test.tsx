@@ -111,3 +111,92 @@ describe("the dependency findings entry", () => {
     expect(entry("Dependency findings")?.title).toBe("SCA");
   });
 });
+
+describe("the rail for a reader without dependency findings", () => {
+  const securityTestingOnly = [
+    {
+      product: "sonic",
+      may_see: true,
+      reads_security_testing: true,
+      triages_security_testing: true,
+    },
+  ];
+
+  it("draws no Dependency findings or Unassigned entry for a reader holding them nowhere", async () => {
+    await railAt("/products/sonic", securityTestingOnly);
+    expect(entry("Dependency findings")).toBeUndefined();
+    expect(entry("Unassigned")).toBeUndefined();
+  });
+
+  it("draws no phone findings tab for a reader holding dependency findings nowhere", async () => {
+    await railAt("/products/sonic", securityTestingOnly);
+    const tabs = [...mount.host().querySelectorAll(".tabbar a")].map((each) => each.textContent);
+    expect(tabs).toContain("Home");
+    expect(tabs).not.toContain("Findings");
+  });
+
+  it("declines Dependency findings where they are read in another product, saying so", async () => {
+    await railAt("/products/sonic", [
+      { product: "edge", may_see: true, reads_private: true, reads_public: true },
+      { product: "sonic", may_see: true, reads_security_testing: true },
+    ]);
+    expect(entry("Dependency findings")?.tagName).toBe("BUTTON");
+    expect(entry("Dependency findings")?.title).toBe(
+      "You don't read dependency findings in sonic.",
+    );
+  });
+
+  it("asks no dependency count for a product the reader does not read them in", async () => {
+    window.sessionStorage.clear();
+    const spy = serve(() => ({ data: { items: [], total: 0 } }));
+    const reach = [
+      { product: "edge", may_see: true, reads_private: true, reads_public: true },
+      { product: "sonic", may_see: true, reads_security_testing: true },
+    ];
+    mount.render(
+      screen(
+        <Shell who={{ ...who, reach: reach as unknown as Who["reach"] }}>{null}</Shell>,
+        "/products/sonic",
+      ),
+    );
+    await settle();
+    const asked = (spy.mock.calls as unknown as [string][]).map(([path]) => path);
+    expect(asked).toContain("/v1/findings");
+    expect(asked).not.toContain("/v1/products/{product}/findings");
+  });
+
+  it("draws no Disclosure deadlines for a reader of no undisclosed work", async () => {
+    await railAt("/start", securityTestingOnly);
+    expect(entry("Disclosure deadlines")).toBeUndefined();
+  });
+
+  it("draws no Record a flaw for a reader who may record one nowhere", async () => {
+    await railAt("/start", securityTestingOnly);
+    expect(entry("Record a flaw")).toBeUndefined();
+  });
+
+  it("offers Disclosure deadlines and Record a flaw to a triager of undisclosed work", async () => {
+    await railAt("/start", [
+      { product: "sonic", may_see: true, reads_private: true, reads_public: true, may_hide: true },
+    ]);
+    expect(entry("Disclosure deadlines")).toBeDefined();
+    expect(entry("Record a flaw")).toBeDefined();
+  });
+
+  it("says on the Unassigned badge that a disclosed-only reader's count is of disclosed findings", async () => {
+    window.sessionStorage.clear();
+    serve(() => ({ data: { items: [], total: 4 } }));
+    const reach = [{ product: "sonic", may_see: true, reads_public: true }];
+    mount.render(
+      screen(
+        <Shell who={{ ...who, reach: reach as unknown as Who["reach"] }}>{null}</Shell>,
+        "/start",
+      ),
+    );
+    await settle();
+    const badge = entry("Unassigned4")?.querySelector(".count");
+    expect(badge?.getAttribute("title")).toContain(
+      "Counting disclosed findings, the ones you read here.",
+    );
+  });
+});

@@ -3,7 +3,7 @@
 The frame every screen sits in: the rail, the top bar, the scope picker, home,
 and the search box.
 
-Satisfies REQ-05, REQ-25, REQ-58, REQ-64.
+Satisfies REQ-05, REQ-25, REQ-42, REQ-58, REQ-60, REQ-64.
 
 ## Contents
 
@@ -34,6 +34,21 @@ is waiting on the reader, and who they are.
 | The bar's search is the findings list's search; "/" focuses it unless somebody is typing | |
 | Upload is in the bar on every screen (REQ-05), and on Uploads | The form picks its own build; Uploads is where the result appears |
 | On a narrow screen the rail gives way to a tab bar: home, findings, queue, and a fourth tab and a bar control opening the whole rail as a panel | What somebody reviews and responds from on a phone |
+
+### Rail entries by holding
+
+Each entry follows `design-docs/interface.md` § Families a reader holds, or the
+right its screen asks for.
+
+| Entry | Drawn for |
+|---|---|
+| Dependency findings, Unassigned, the phone tab Findings | A reader of dependency findings in some product |
+| Dependency findings with a product picked | Declines where the reader holds them in another product, saying so on hover; its count is asked only where they are read here |
+| The Dependency findings and Unassigned badges | A disclosed-only reader's unit says the count is of disclosed findings |
+| Security testing | A reader of security testing work in some product; declines in a product where it is not read |
+| Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
+| Record a flaw | A reader who may triage undisclosed or disclosed work in some product |
+| Access, Settings | An administrator or a holder of the audit permission |
 
 ### The folded rail
 

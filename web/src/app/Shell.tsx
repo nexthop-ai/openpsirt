@@ -23,6 +23,7 @@ import {
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
 import { mayOf, signedOutBy, signOut } from "./session";
+import { counted, heldLine, holding } from "./families";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -73,6 +74,18 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // follows reading security testing material.
   const codeFindingsAnywhere = (who.reach ?? []).some((each) => each.reads_security_testing);
   const codeFindingsHere = !!product && !!mayOf(who, product)?.reads_security_testing;
+  // Dependency findings, across products and at the product picked. Held
+  // nowhere, the entries and the tab that open them are absent; held elsewhere,
+  // the entry declines and its count is not asked, so no zero stands for work
+  // the reader cannot see.
+  const dependencies = holding(who, "dependency");
+  const dependenciesAnywhere = dependencies.held !== "nowhere";
+  const dependenciesHere = product ? holding(who, "dependency", product) : dependencies;
+  // Disclosure deadlines are undisclosed work, and the server narrows the list
+  // to products where the reader reads it.
+  const embargoesAnywhere = (who.reach ?? []).some((each) => each.reads_private);
+  // Recording a flaw is triage at the visibility it is recorded at.
+  const recordsAnywhere = (who.reach ?? []).some((each) => each.may_hide || each.triages_public);
   const scope = [product ?? "all products", branchOrTag, variant].filter(Boolean).join(" · ");
   const build = whole ? { product, branch_or_tag: branchOrTag, variant } : undefined;
   const [uploading, setUploading] = useState(false);
@@ -116,6 +129,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // that address names no product.
   const unassigned = useQuery({
     queryKey: ["findings", "unowned"],
+    enabled: dependenciesAnywhere,
     queryFn: async () =>
       unwrap(await api.GET("/v1/findings", { params: { query: { ...UNOWNED_QUERY, limit: 1 } } })),
     refetchInterval: 60_000,
@@ -126,7 +140,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // rather than one that declines.
   const open = useQuery({
     queryKey: ["findings", "count", product, branchOrTag, variant],
-    enabled: !!product,
+    enabled: !!product && counted(dependenciesHere),
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/findings", {
@@ -212,16 +226,21 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               unread={queue.isError || approvable.isError}
               unit="waiting for your approval"
             />
-            <Rail
-              to={UNOWNED_LIST}
-              mark={UNOWNED}
-              icon="nobody"
-              label="Unassigned"
-              count={unassigned.data?.total}
-              unread={unassigned.isError}
-              unit="findings nobody holds and nobody has decided"
-              quiet
-            />
+            {dependenciesAnywhere && (
+              <Rail
+                to={UNOWNED_LIST}
+                mark={UNOWNED}
+                icon="nobody"
+                label="Unassigned"
+                count={unassigned.data?.total}
+                unread={unassigned.isError}
+                unit={withLine(
+                  "dependency findings nobody holds and nobody has decided",
+                  heldLine(dependencies),
+                )}
+                quiet
+              />
+            )}
             <Rail to="/assignments" icon="people" label="Assignments" />
             {/* The audit log of what was decided. Across products because that
               is how it is asked for — an auditor asks about a period, not a
@@ -242,16 +261,23 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               Findings needs nothing: it answers for whatever the picker has
               selected, and for every product a reader can see when nothing
               is. */}
-            <Rail
-              to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}
-              icon="bug"
-              label="Dependency findings"
-              hint="SCA"
-              count={open.data?.total}
-              unread={open.isError}
-              unit="findings — an issue at a component, counted once per build"
-              quiet
-            />
+            {dependenciesAnywhere && (
+              <Rail
+                to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}
+                icon="bug"
+                label="Dependency findings"
+                hint="SCA"
+                count={open.data?.total}
+                unread={open.isError}
+                unit={withLine(
+                  "findings — an issue at a component, counted once per build",
+                  heldLine(dependenciesHere),
+                )}
+                quiet
+                needs={dependenciesHere.held !== "elsewhere"}
+                why={heldLine(dependenciesHere)}
+              />
+            )}
             <Rail
               to={build ? dependenciesAt(build) : ""}
               icon="tree"
@@ -311,11 +337,13 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               being recorded is precisely what is *not* in that list, and it asks
               more than a control beside a table has room for. It needs no
               product picked, because the screen asks for one. */}
-            <Rail to="/record-a-flaw" icon="record" label="Record a flaw" />
+            {recordsAnywhere && <Rail to="/record-a-flaw" icon="record" label="Record a flaw" />}
             {/* What is running out of embargo. The list is itself a disclosure,
               so a product somebody may not read undisclosed work in contributes
               nothing to it — the server narrows it. */}
-            <Rail to="/disclosure-deadlines" icon="bell" label="Disclosure deadlines" />
+            {embargoesAnywhere && (
+              <Rail to="/disclosure-deadlines" icon="bell" label="Disclosure deadlines" />
+            )}
             {/* Incidents: the standing attacks and the response windows
               counted from each. Beside Disclosure deadlines because both are dates with
               somebody outside waiting on them, which no remediation deadline
@@ -405,9 +433,11 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         <NavLink to="/" end>
           Home
         </NavLink>
-        <NavLink to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}>
-          Findings
-        </NavLink>
+        {dependenciesAnywhere && (
+          <NavLink to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}>
+            Findings
+          </NavLink>
+        )}
         <NavLink to="/review-queue">Queue</NavLink>
         <button type="button" aria-expanded={menu} onClick={() => setMenu(!menu)}>
           Menu
@@ -417,6 +447,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
       <UploadDrawer open={uploading} onClose={() => setUploading(false)} />
     </div>
   );
+}
+
+// A badge's unit, with the line saying which findings it counts where the
+// reader reads only some of them.
+function withLine(unit: string, line: string): string {
+  return line ? `${unit}. ${line}` : unit;
 }
 
 // The version running here.
