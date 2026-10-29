@@ -152,3 +152,4 @@ chosen (REQ-64).
 | Limit | Detail |
 |---|---|
 | A known-exploited tile needs a product | Nothing counts exploited findings without one to narrow inside |
+| A case collaborator's home lists none of their cases | Their Records panel opens nothing they hold. Their case is reached from the notice that brought them in and from Incidents |
