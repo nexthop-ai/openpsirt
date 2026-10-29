@@ -147,6 +147,9 @@ describe("the component screen", () => {
 });
 
 describe("the product page", () => {
+  const labels = () =>
+    Array.from(mount.host().querySelectorAll(".kpi .l")).map((each) => each.textContent ?? "");
+
   const OVERVIEW = {
     "/v1/products/{product}/overview": {
       name: "sonic",
@@ -159,17 +162,34 @@ describe("the product page", () => {
     serving(ELSEWHERE, OVERVIEW);
     mount.render(screen(<Product />, "/products/sonic", "/products/:product"));
     await settle();
-    expect(mount.host().querySelector(".kpis")).toBeNull();
+    expect(labels()).not.toContain("Past a deadline");
+    expect(labels()).not.toContain("Open · sonic");
     expect(text()).not.toContain("Overdue");
     expect(text()).toContain("You don't read dependency findings in sonic.");
     expect(text()).toContain("master");
+  });
+
+  it("counts what waits on a second person for an approver reading code findings alone", async () => {
+    const approver = who([
+      reaching("sonic", { may_see: true, reads_security_testing: true, may_agree: true }),
+    ]);
+    serving(approver, {
+      "/v1/products/{product}/overview": {
+        ...OVERVIEW["/v1/products/{product}/overview"],
+        waiting: 2,
+      },
+    });
+    mount.render(screen(<Product />, "/products/sonic", "/products/:product"));
+    await settle();
+    expect(labels()).not.toContain("Past a deadline");
+    expect(labels()).toContain("Waiting on a second person");
   });
 
   it("says a disclosed-only reader's figures are of disclosed findings", async () => {
     serving(DISCLOSED, OVERVIEW);
     mount.render(screen(<Product />, "/products/sonic", "/products/:product"));
     await settle();
-    expect(mount.host().querySelector(".kpis")).not.toBeNull();
+    expect(labels()).toContain("Past a deadline");
     expect(text()).toContain("Counting disclosed findings, the ones you read here.");
   });
 });
@@ -297,6 +317,20 @@ describe("the home page", () => {
     expect(asked(spy)).not.toContain("/v1/running-out");
     expect(asked(spy)).not.toContain("/v1/products/{product}/findings");
     expect(tiles().some((each) => each.startsWith("Assigned to you"))).toBe(true);
+  });
+
+  const panels = () =>
+    Array.from(mount.host().querySelectorAll(".panel h3")).map((each) => each.textContent ?? "");
+
+  it("draws lapsed decisions for a reader of code findings alone, asking no dependency count", async () => {
+    const spy = await home(DEVELOPER);
+    expect(panels()).toContain("Lapsed decisions");
+    expect(asked(spy)).not.toContain("/v1/products/{product}/findings");
+  });
+
+  it("draws no lapsed decisions where the reader reads neither family", async () => {
+    await home(OTHER_PRODUCT);
+    expect(panels()).not.toContain("Lapsed decisions");
   });
 
   it("says in one line that dependency findings are read in another product", async () => {
@@ -658,21 +692,17 @@ describe("the home page's incidents", () => {
   const tiles = () =>
     Array.from(mount.host().querySelectorAll(".kpi .l")).map((each) => each.textContent ?? "");
 
-  it("draws no incidents tile, and asks for no shelf, where dependency findings are not read", async () => {
-    const spy = serving(ELSEWHERE, SHELF);
-    mount.render(screen(<Home who={ELSEWHERE} />, "/products/sonic", "/products/:product"));
+  it("counts a case collaborator's incident though they read no dependency finding", async () => {
+    const collaborator = who([]);
+    serving(collaborator, SHELF);
+    mount.render(screen(<Home who={collaborator} />, "/products/sonic", "/products/:product"));
     await settle();
-    expect(tiles().some((each) => each.includes("Incidents"))).toBe(false);
-    expect(asked(spy)).not.toContain("/v1/incidents");
+    expect(tiles().some((each) => each.includes("Incidents"))).toBe(true);
   });
 
-  it("draws no incidents tile from a shelf another screen read", async () => {
-    serving(ELSEWHERE, SHELF);
-    const queries = signedIn(ELSEWHERE);
-    queries.setQueryData(["incidents"], SHELF["/v1/incidents"]);
-    mount.render(
-      screen(<Home who={ELSEWHERE} />, "/products/sonic", "/products/:product", queries),
-    );
+  it("draws no incidents tile over an empty shelf", async () => {
+    serving(ELSEWHERE);
+    mount.render(screen(<Home who={ELSEWHERE} />, "/products/sonic", "/products/:product"));
     await settle();
     expect(tiles().some((each) => each.includes("Incidents"))).toBe(false);
   });

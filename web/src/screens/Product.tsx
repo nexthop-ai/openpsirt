@@ -123,33 +123,37 @@ export function Product() {
           its own address when the address says nothing, and the figures are
           counted with none of them — so without this every number here opened
           a list with fewer rows in it than the number said. */}
-      {figures && (
-        <div className="kpis">
-          <Link className="kpi" to={productFindingsAt(product, listed())}>
-            <span className="l">Open · {it.name}</span>
-            <span className="n">{(it.open ?? 0).toLocaleString()}</span>
-            <span className="d">issues at components, as the list counts them</span>
-          </Link>
-          <Link
-            className={`kpi${(it.overdue ?? 0) > 0 ? " urgent" : ""}`}
-            to={productFindingsAt(product, listed("&running=overdue"))}
-          >
-            <span className="l">Past a deadline</span>
-            <span className="n">{(it.overdue ?? 0).toLocaleString()}</span>
-            <span className="d">already late, across every build</span>
-          </Link>
-          <Link className="kpi" to={productFindingsAt(product, listed("&state=undecided"))}>
-            <span className="l">Nobody has argued about</span>
-            <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
-            <span className="d">no occurrence has a decision of any kind</span>
-          </Link>
-          <Link className="kpi" to={reviewQueueAt({ product })}>
-            <span className="l">Waiting on a second person</span>
-            <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
-            <span className="d">decisions here that nobody has agreed to</span>
-          </Link>
-        </div>
-      )}
+      <div className="kpis">
+        {figures && (
+          <>
+            <Link className="kpi" to={productFindingsAt(product, listed())}>
+              <span className="l">Open · {it.name}</span>
+              <span className="n">{(it.open ?? 0).toLocaleString()}</span>
+              <span className="d">issues at components, as the list counts them</span>
+            </Link>
+            <Link
+              className={`kpi${(it.overdue ?? 0) > 0 ? " urgent" : ""}`}
+              to={productFindingsAt(product, listed("&running=overdue"))}
+            >
+              <span className="l">Past a deadline</span>
+              <span className="n">{(it.overdue ?? 0).toLocaleString()}</span>
+              <span className="d">already late, across every build</span>
+            </Link>
+            <Link className="kpi" to={productFindingsAt(product, listed("&state=undecided"))}>
+              <span className="l">Nobody has argued about</span>
+              <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
+              <span className="d">no occurrence has a decision of any kind</span>
+            </Link>
+          </>
+        )}
+        {/* Counted by the right to approve across both families, so it is
+            drawn whatever the reader reads. */}
+        <Link className="kpi" to={reviewQueueAt({ product })}>
+          <span className="l">Waiting on a second person</span>
+          <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
+          <span className="d">decisions here that nobody has agreed to</span>
+        </Link>
+      </div>
       <HeldLine at={dependencies} />
 
       <div className="card" style={{ marginTop: 14 }}>

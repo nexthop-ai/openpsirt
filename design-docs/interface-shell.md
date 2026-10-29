@@ -113,7 +113,8 @@ are the slowest read.
 
 | Rule | Reason |
 |---|---|
-| The estate's figures (open, known exploited, overdue, due soon), the trends, lapsed decisions and release readiness count dependency findings, and are drawn under `design-docs/interface.md` § Families a reader holds at the picked scope | A zero for work the reader cannot see reads as nothing open |
+| The estate's figures (open, known exploited, overdue, due soon), the trends and release readiness count dependency findings, and are drawn under `design-docs/interface.md` § Families a reader holds at the picked scope | A zero for work the reader cannot see reads as nothing open |
+| Lapsed decisions are drawn for a reader of either family at the picked scope; its line counting findings with a lapsed decision is asked only where dependency findings are counted there | A decision lapses on either family; the findings line counts dependency findings |
 | The work figures (assigned, sent back, pending approval) and in progress stay for every reader of either family | They hold both families' work |
 | A reader of no finding in any product has a Records panel in place of the estate's figures, opening the audit log, access and settings where they may read them; the work figures and panels stay; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records, and a capability held without a read role still brings assigned work (`design-docs/access.md` § Breadth of view) |
 | The line under the greeting counts the products the reader reads | |
@@ -126,7 +127,7 @@ are the slowest read.
 |---|---|
 | Release readiness | The picked branch against the last release cut from it, band by band, the move shown as a direction colored by meaning (fewer is better). Drawn only for a whole build on a branch |
 | Quiet builds | A build no longer scanned, named one at a time. Also on the scans screen. It reports nothing new and fails nothing, so looks healthy |
-| Incidents | Standing incidents, one per issue and product, from the shelf, narrowed to the picked product, opening the shelf narrowed so. Its own tile beside known exploited, because the feed's count says nothing about this product. Drawn only where there is one, and the shelf asked only where dependency findings are counted at the picked scope. A branch or variant scope counts the whole product and says so, since an incident is against a product |
+| Incidents | Standing incidents, one per issue and product, from the shelf, narrowed to the picked product, opening the shelf narrowed so. Its own tile beside known exploited, because the feed's count says nothing about this product. Drawn only where there is one, and the shelf asked of every reader, since it holds what each may be told of, a collaborator's own case included. A branch or variant scope counts the whole product and says so, since an incident is against a product |
 | Overdue and due soon | One read of the deadline list, each tile opening the list it counts. The read is capped and ordered soonest first, so a cut page holding a row still due holds every overdue row. Overdue is a floor only where the whole cut page is overdue; due soon wherever the page is cut. The all-products figure follows the same rule over its own read |
 | Review queue count | One count per product: the rail's badge, the pending figure and the across-products figure are one request under one key, polled once a minute by the rail |
 | Assigned to you | What the reader and their teams hold, in the list's unit, with the reports they hold beside it, never among them: a report is against a product and no build |

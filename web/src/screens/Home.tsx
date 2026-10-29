@@ -120,7 +120,9 @@ export function Home({ who }: { who: Who }) {
         {readsNothing(who) && <Records who={who} />}
         <Pending />
         <InProgress me={who.identity} />
-        {figures && <Lapsed />}
+        {/* Lapsed decisions are on either family; the lapsed findings line
+            counts dependency findings alone. */}
+        {(figures || counted(holding(who, "code", at.product))) && <Lapsed findings={figures} />}
 
         {figures && (
           <>
@@ -449,11 +451,11 @@ function Figures({
   // Standing records that a product was attacked through an issue. The shelf
   // is unpaged and narrowed record by record, so its length is the count, and
   // the scope is applied here: a record belongs to a product and no build.
-  // A record is against an issue of the dependency family, so the shelf is
-  // asked only where those findings are counted.
+  // Asked of every reader: the server narrows it to the records each may be
+  // told of, a case collaborator's own case included, and the tile draws
+  // only a count above zero.
   const shelf = useQuery({
     queryKey: ["incidents"],
-    enabled: figures,
     queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
   });
   // This person's holdings, and what has come back to them: Home answers
@@ -620,7 +622,7 @@ function Figures({
           product, so the two are never one number. Drawn only where there is
           a record, and counted in records: one is against an issue and a
           product. It opens the shelf narrowed to the product it counted. */}
-      {figures && (shelf.isError || attacked > 0) && (
+      {(shelf.isError || attacked > 0) && (
         <button
           type="button"
           className="kpi urgent"
@@ -965,7 +967,7 @@ function InProgress({ me }: { me: string }) {
 // A decision the code moved out from under, and a deferral whose date has
 // passed, are both somebody having to look again — and both disappear silently
 // without somewhere that says so.
-function Lapsed() {
+function Lapsed({ findings }: { findings: boolean }) {
   // Decisions are listed by product and no finer, so this follows the
   // product of the scope the head names and says when it is not the whole
   // of it.
@@ -989,8 +991,10 @@ function Lapsed() {
   // list its line opens, so the number and the list cannot disagree: the
   // findings a lapsed decision left behind, and the expired deferrals the
   // review queue holds for the reader.
+  // Dependency findings, asked only where the reader counts them here.
   const lapsed = useQuery({
     queryKey: ["home", "lapsed", product],
+    enabled: findings,
     queryFn: async () =>
       unwrap(
         at.product
@@ -1052,7 +1056,9 @@ function Lapsed() {
           )}
         </span>
         <span className={!unread && stoppedTotal > 0 ? "tally urgent" : "tally"}>
-          <Count of={[stopped, lapsed, expired]}>{() => stoppedTotal.toLocaleString()}</Count>
+          <Count of={findings ? [stopped, lapsed, expired] : [stopped, expired]}>
+            {() => stoppedTotal.toLocaleString()}
+          </Count>
         </span>
       </header>
       {unread && (

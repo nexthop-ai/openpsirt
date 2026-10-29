@@ -135,6 +135,7 @@ products table is administration; this page is reading how something goes.
 | "Undecided" and "agreed" are the findings list's words, from the same expression | |
 | A build never scanned is a row; one out of support says so | |
 | The figures and each build's counts are dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: absent for a reader not reading them here, with one line where they are read in another product; the builds and their last scans stay | Zeros for a reader holding security testing alone read as a clean product |
+| Waiting on a second person is drawn for every reader | The server counts it by the right to approve, across both families |
 
 A scan run's page, Known vulnerability scan, is reached from the upload's state,
 its breadcrumb under Uploads, and release comparison's "the known vulnerability
