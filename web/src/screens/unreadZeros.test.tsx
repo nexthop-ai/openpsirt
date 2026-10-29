@@ -592,19 +592,44 @@ describe("the incidents screen", () => {
   }
 
   it("says the reader reads no dependency findings, never that none are recorded", async () => {
-    const spy = await shelf(DEVELOPER, "/incidents");
+    await shelf(DEVELOPER, "/incidents");
     expect(text()).not.toContain("No incidents are recorded.");
     expect(text()).toContain("You don't read dependency findings in any product.");
     expect(mount.host().querySelector(".screen-head .n")).toBeNull();
-    expect(asked(spy)).not.toContain("/v1/incidents");
   });
 
   it("says in one line that dependency findings are read in another product", async () => {
-    const spy = await shelf(ELSEWHERE, "/incidents?product=sonic");
+    await shelf(ELSEWHERE, "/incidents?product=sonic");
     expect(text()).not.toContain("has no incidents");
     expect(text()).toContain("You don't read dependency findings in sonic.");
     expect(mount.host().querySelector(".screen-head .n")).toBeNull();
-    expect(asked(spy)).not.toContain("/v1/incidents");
+  });
+
+  it("lists a collaborator's own case for a reader of no dependency findings", async () => {
+    const spy = serving(DEVELOPER, {
+      "/v1/incidents": {
+        items: [
+          {
+            id: 7,
+            product: "sonic",
+            product_name: "SONIC",
+            vulnerability: "CVE-2026-9",
+            standing: true,
+            known_at: "2026-09-01T00:00:00Z",
+            grounds: "Seen in the field.",
+            windows: [],
+            told: [],
+            fixes: [],
+          },
+        ],
+      },
+    });
+    mount.render(screen(<Incidents />, "/incidents", "/incidents", signedIn(DEVELOPER)));
+    await settle();
+    expect(asked(spy)).toContain("/v1/incidents");
+    expect(text()).toContain("CVE-2026-9");
+    expect(text()).not.toContain("Nothing to list.");
+    expect(mount.host().querySelector(".screen-head .n")).toBeNull();
   });
 
   it("names what its zero counts for a reader of dependency findings here", async () => {

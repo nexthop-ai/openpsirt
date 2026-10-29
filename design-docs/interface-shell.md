@@ -48,7 +48,7 @@ right its screen asks for.
 | Security testing | A reader of security testing work in some product; declines in a product where it is not read, with the code family's line on hover |
 | Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
 | Record a flaw | A reader who may triage undisclosed or disclosed work in some product |
-| Incidents | A reader of dependency findings in some product, since a record is against an issue of that family; and an administrator, who declares the response windows there |
+| Incidents | Everybody: the shelf holds what each reader may be told of, a collaborator's own case included, and an administrator declares the response windows there |
 | Analytics | Everybody: the coverage reports answer what is scanned to anybody who sees a build, and a report counting a family the reader does not hold shows the line |
 | Access, Settings | An administrator or a holder of the audit permission |
 

@@ -184,9 +184,9 @@ describe("the rail for a reader without dependency findings", () => {
     expect(entry("Record a flaw")).toBeDefined();
   });
 
-  it("draws no Incidents for a reader holding dependency findings nowhere", async () => {
+  it("offers Incidents to a reader of no dependency findings, whose own case may be on it", async () => {
     await railAt("/start", securityTestingOnly);
-    expect(entry("Incidents")).toBeUndefined();
+    expect(entry("Incidents")).toBeDefined();
   });
 
   it("offers Incidents to an administrator reading no finding, who declares the windows", async () => {

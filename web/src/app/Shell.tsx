@@ -343,12 +343,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* Incidents: the standing attacks and the response windows
               counted from each. Beside Disclosure deadlines because both are dates with
               somebody outside waiting on them, which no remediation deadline
-              has. A record is against an issue of the dependency family, so
-              the entry is for a reader of those somewhere, and for an
-              administrator, who declares the windows there. */}
-            {(dependenciesAnywhere || who.admin) && (
-              <Rail to="/incidents" icon="shield" label="Incidents" />
-            )}
+              has. Offered to everybody: the shelf answers each reader with
+              what they may be told of, a collaborator's own case included,
+              which is one of the two ways a collaborator reaches their case. */}
+            <Rail to="/incidents" icon="shield" label="Incidents" />
             {/* What this deployment has said about its own flaws. Beside
               Disclosure deadlines because an embargo reaching its date is one
               of the three things an advisory gets written for. */}

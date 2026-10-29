@@ -53,14 +53,14 @@ export function Incidents() {
   const [params] = useSearchParams();
   const product = params.get("product") ?? "";
   const [recording, setRecording] = useState(false);
-  // A record is against an issue of the dependency family, so the shelf is
-  // read and counted only where the reader reads those findings at the scope
-  // the address names.
+  // A record is against an issue of the dependency family, so it is counted
+  // only where the reader reads those findings at the scope the address
+  // names. The shelf is read for everybody: it holds what each reader may be
+  // told of, and a collaborator's own case is on it whatever they read.
   const dependencies = holding(who.data, "dependency", product || undefined);
   const shown = counted(dependencies);
   const shelf = useQuery({
     queryKey: ["incidents"],
-    enabled: shown,
     queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
   });
   const windows = useQuery({
@@ -73,11 +73,11 @@ export function Incidents() {
   // silent-read: the identity read, whose failure the frame draws in place of every screen.
   const triaged = (who.data?.reach ?? []).filter((each) => each.may_triage);
 
-  if ((shown && shelf.isPending) || windows.isPending) return <Loading />;
-  if (shown && shelf.isError) {
+  if (shelf.isPending || windows.isPending) return <Loading />;
+  if (shelf.isError) {
     return <Failed error={shelf.error} what="The incidents could not be read." />;
   }
-  const items = (shown ? (shelf.data?.items ?? []) : []).filter(
+  const items = (shelf.data?.items ?? []).filter(
     (incident) => !product || incident.product === product,
   );
   const productName = items[0]?.product_name || product;
@@ -113,7 +113,7 @@ export function Incidents() {
       )}
 
       {shown && <HeldLine at={dependencies} />}
-      {!shown ? (
+      {!shown && items.length === 0 ? (
         <Empty title="Nothing to list." detail={heldLine(dependencies)} />
       ) : items.length === 0 ? (
         <Empty
