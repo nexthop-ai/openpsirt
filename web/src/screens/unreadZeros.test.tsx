@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Who } from "../app/session";
 import { client, mounted, screen, serve, settle } from "../test/mount";
 import { reaching, readingDependencies } from "../test/reach";
+import { PUBLISHED } from "../test/outcomes";
 import { AuditLog } from "./AuditLog";
 import { Component } from "./Component";
 import { Dependencies } from "./Dependencies";
@@ -607,8 +608,11 @@ describe("analytics", () => {
   });
 
   it("draws no decision figure in the program overview for a reader of no finding", async () => {
-    const spy = await report(<Overview />, AUDITOR);
+    // Outcomes the server publishes, so the dismissals would be asked and
+    // drawn were the reader not turned away.
+    const spy = await report(<Overview />, { ...AUDITOR, outcomes: PUBLISHED });
     expect(text()).not.toContain("Triage times");
+    expect(text()).not.toContain("Dismissals");
     expect(text()).toContain("Nothing to list.");
     expect(text()).toContain("You don't read findings in any product.");
     expect(asked(spy)).not.toContain("/v1/measures");
@@ -616,7 +620,7 @@ describe("analytics", () => {
   });
 
   it("draws no decision figure in the program overview for a reader of findings in another product", async () => {
-    const spy = await report(<Overview />, OTHER_PRODUCT);
+    const spy = await report(<Overview />, { ...OTHER_PRODUCT, outcomes: PUBLISHED });
     expect(text()).not.toContain("Triage times");
     expect(text()).not.toContain("Dismissals");
     expect(text()).toContain("Nothing to list.");
