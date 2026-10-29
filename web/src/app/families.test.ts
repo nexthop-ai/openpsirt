@@ -89,6 +89,16 @@ describe("how a reader holds a family of findings", () => {
     expect(counted(at)).toBe(true);
   });
 
+  it("draws the counts of a product the session does not list to a reader of the family nowhere listed", () => {
+    const at = holding(
+      who([reaching("sonic", { may_see: true, reads_security_testing: true })]),
+      "dependency",
+      "old",
+    );
+    expect(at.held).toBe("here");
+    expect(heldLine(at)).toBe("");
+  });
+
   it("names the products read disclosed only, across products where others are read whole", () => {
     const at = holding(
       who([readingDependencies("edge"), reaching("sonic", { may_see: true, reads_public: true })]),

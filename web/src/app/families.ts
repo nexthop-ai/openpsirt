@@ -50,15 +50,16 @@ export function holding(who: Who | null | undefined, family: Family, product?: s
   // count already: the figures stand as they are until it answers.
   if (!who) return { held: "here", family };
   const reach = who.reach ?? [];
+  // A product with no row is one the session does not list, a retired one
+  // reached by a kept link most often: the server has narrowed its counts
+  // already, so they stand, whatever the reader holds in the products listed.
+  const row = product
+    ? reach.find((each) => each.product.toLowerCase() === product.toLowerCase())
+    : undefined;
+  if (product && !row) return { held: "here", family };
   const readers = reach.filter((can) => reads(can, family));
   if (readers.length === 0) return { held: "nowhere", family };
-  if (product) {
-    const named = product.toLowerCase();
-    // A product with no row is one the session does not list, a retired one
-    // reached by a kept link most often: the server has narrowed its counts
-    // already, so they stand.
-    const row = reach.find((each) => each.product.toLowerCase() === named);
-    if (!row) return { held: "here", family };
+  if (product && row) {
     if (!reads(row, family)) return { held: "elsewhere", family, product };
     const half = halfOnly(row, family);
     if (!half) return { held: "here", family };
