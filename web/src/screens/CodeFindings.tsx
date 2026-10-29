@@ -3,7 +3,8 @@
 
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { mayOf, useWho } from "../app/session";
+import { useWho } from "../app/session";
+import { counted, heldLine, holding } from "../app/families";
 import { fileAt } from "../api/links";
 import {
   PAGE,
@@ -52,17 +53,24 @@ export function CodeFindings() {
     : undefined;
   const assigned = params.get("assigned") === "nobody" ? "nobody" : undefined;
   const [offset, setOffset] = useState(0);
-  const listed = useCodeFindings(product, {
-    state,
-    branch_or_tag: branchOrTag,
-    variant,
-    series,
-    method,
-    assigned,
-    offset,
-  });
+  // Code findings, asked and drawn only where the reader reads them in the
+  // product: a queue of zeros reads as an analyzer finding nothing.
+  const code = holding(useWho().data, "code", product);
+  const reads = counted(code);
+  const listed = useCodeFindings(
+    product,
+    {
+      state,
+      branch_or_tag: branchOrTag,
+      variant,
+      series,
+      method,
+      assigned,
+      offset,
+    },
+    reads,
+  );
   const opener = useRowOpener();
-  const reads = !!mayOf(useWho().data, product)?.reads_security_testing;
 
   const go = (next?: CodeFindingState, unheld = assigned, by = method) => {
     setOffset(0);
@@ -96,6 +104,20 @@ export function CodeFindings() {
     });
   const counts = listed.data?.states ?? {};
   const rows = listed.data?.items ?? [];
+
+  if (!reads) {
+    return (
+      <div>
+        <div className="screen-head">
+          <h2>Security testing</h2>
+          <p>
+            Code findings in <Link to={productAt(product)}>{product}</Link>
+          </p>
+        </div>
+        <Empty title="Nothing to list." detail={heldLine(code)} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -204,11 +226,6 @@ export function CodeFindings() {
         <Empty
           title={
             state ? `No ${stateSaid(state).toLowerCase()} code findings.` : "Nothing in the queue."
-          }
-          detail={
-            reads
-              ? undefined
-              : "Code findings are security testing results. Reading them takes security-testing-read on the product."
           }
         />
       ) : (

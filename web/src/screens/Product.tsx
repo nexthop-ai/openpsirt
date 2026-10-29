@@ -11,9 +11,9 @@ import { Empty } from "../ui/Empty";
 import { UNNARROWED } from "../app/scope";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
-import { mayOf, useWho } from "../app/session";
+import { useWho } from "../app/session";
 import { useRulings } from "../api/intake";
-import { counted, holding } from "../app/families";
+import { counted, holding, readsUndisclosed } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
 import {
   buildFindingsAt,
@@ -40,7 +40,7 @@ export function Product() {
   const { product = "" } = useParams();
   const who = useWho();
   // The vulnerability reports ask what reading a report asks: reading undisclosed work.
-  const mayReadReports = !!mayOf(who.data, product)?.reads_private;
+  const mayReadReports = !!who.data && readsUndisclosed(who.data, product);
   const mayReadCodeFindings = !!who.data && counted(holding(who.data, "code", product));
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
   // The overview counts dependency findings. Where the reader does not read

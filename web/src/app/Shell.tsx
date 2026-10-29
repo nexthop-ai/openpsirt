@@ -22,8 +22,8 @@ import {
 } from "./routes";
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
-import { mayOf, signedOutBy, signOut } from "./session";
-import { counted, heldLine, holding } from "./families";
+import { signedOutBy, signOut } from "./session";
+import { counted, heldLine, holding, readsUndisclosed } from "./families";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -67,11 +67,10 @@ const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const { product, branch_or_tag: branchOrTag, variant } = useScope();
   const whole = !!(product && branchOrTag && variant);
-  // Reading reports and disclosure deadlines takes reading undisclosed work,
-  // which is what reads_private says; the server narrows both to products
-  // where the reader reads it.
-  const undisclosedAnywhere = (who.reach ?? []).some((each) => each.reads_private);
-  const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
+  // Reading reports and disclosure deadlines takes reading undisclosed work;
+  // the server narrows both to products where the reader reads it.
+  const undisclosedAnywhere = readsUndisclosed(who);
+  const reportsHere = !!product && readsUndisclosed(who, product);
   // A code finding is security testing work, held as the code family.
   const codeFindingsAnywhere = holding(who, "code").held !== "nowhere";
   const codeFindingsHere = product ? holding(who, "code", product) : undefined;

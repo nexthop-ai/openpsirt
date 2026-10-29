@@ -29,6 +29,8 @@ import { Incidents } from "./Incidents";
 import { Uploads } from "./Uploads";
 import { Run } from "./Run";
 import { Assignments } from "./Assignments";
+import { CodeFindings } from "./CodeFindings";
+import { CodeFindingSeries } from "./analytics/CodeFindingSeries";
 
 // Each screen counting dependency findings, drawn for a reader who does not
 // read them where the screen is: none of its zeros may stand for "nothing
@@ -908,5 +910,82 @@ describe("assignments", () => {
     expect(text()).toContain("Assigned to others");
     expect(text()).toContain("Nobody else is holding anything.");
     expect(asked(spy)).toContain("/v1/assignments");
+  });
+
+  it("asks for no one's list from a kept link the reader is not shown", async () => {
+    const spy = await assignments(AUDITOR, "/assignments?tab=people&person=bob");
+    const holders = (spy.mock.calls as unknown as [string, { params?: { path?: unknown } }][])
+      .filter(([path]) => path === "/v1/people/{identity}/assignments")
+      .map(([, init]) => (init?.params?.path as { identity?: string } | undefined)?.identity);
+    expect(holders).not.toContain("bob");
+    expect(holders).toContain("me");
+  });
+
+  it("asks for no team's list from a kept link the reader is not shown", async () => {
+    const spy = await assignments(AUDITOR, "/assignments?tab=people&team=intake");
+    expect(asked(spy)).toContain("/v1/people/{identity}/assignments");
+    expect(asked(spy)).not.toContain("/v1/teams/{team}/assignments");
+  });
+
+  it("links a retired product's unassigned code findings, as the session holds its counts", async () => {
+    remember({ product: "old" });
+    await assignments(DEVELOPER);
+    expect(text()).toContain("Unassigned code findings in old");
+  });
+});
+
+describe("security testing", () => {
+  // A reader of code findings in edge alone, with a role in sonic too.
+  const CODE_ELSEWHERE = who([
+    reaching("edge", { may_see: true, reads_security_testing: true }),
+    reaching("sonic", { may_see: true }),
+  ]);
+
+  it("says the list is one the reader does not read in the product, and asks for none", async () => {
+    const spy = serving(CODE_ELSEWHERE);
+    mount.render(
+      screen(
+        <CodeFindings />,
+        "/products/sonic/code-findings",
+        "/products/:product/code-findings",
+        signedIn(CODE_ELSEWHERE),
+      ),
+    );
+    await settle();
+    expect(text()).toContain("Nothing to list.");
+    expect(text()).toContain("You don't read code findings in sonic.");
+    expect(text()).not.toContain("Nothing in the queue.");
+    expect(asked(spy)).not.toContain("/v1/products/{product}/code-findings");
+  });
+
+  it("lists a retired product's code findings, as the session holds its counts", async () => {
+    const spy = serving(CODE_ELSEWHERE);
+    mount.render(
+      screen(
+        <CodeFindings />,
+        "/products/old/code-findings",
+        "/products/:product/code-findings",
+        signedIn(CODE_ELSEWHERE),
+      ),
+    );
+    await settle();
+    expect(asked(spy)).toContain("/v1/products/{product}/code-findings");
+  });
+
+  it("names the product code findings are not read in on the analyzer report", async () => {
+    remember({ product: "sonic" });
+    const spy = serving(CODE_ELSEWHERE);
+    mount.render(screen(<CodeFindingSeries />, "/analytics/report", "*", signedIn(CODE_ELSEWHERE)));
+    await settle();
+    expect(text()).toContain("You don't read code findings in sonic.");
+    expect(asked(spy)).not.toContain("/v1/products/{product}/code-finding-series");
+  });
+
+  it("counts a retired product's analyzers, as the session holds its counts", async () => {
+    remember({ product: "old" });
+    const spy = serving(CODE_ELSEWHERE);
+    mount.render(screen(<CodeFindingSeries />, "/analytics/report", "*", signedIn(CODE_ELSEWHERE)));
+    await settle();
+    expect(asked(spy)).toContain("/v1/products/{product}/code-finding-series");
   });
 });

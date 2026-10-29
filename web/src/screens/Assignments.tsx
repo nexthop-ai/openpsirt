@@ -7,7 +7,7 @@ import { initials } from "../ui/initials";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { scopeQuery, useScope } from "../app/scope";
-import { mayOf, useWho } from "../app/session";
+import { useWho } from "../app/session";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -81,8 +81,11 @@ export function Assignments() {
         }),
       ),
   });
+  // Another holder's list is drawn on the Assigned to others tab alone, so it
+  // is asked only there: a kept link naming somebody, followed by a reader the
+  // tab is not drawn for, asks nothing.
   const theirs = useQuery({
-    enabled: person !== "",
+    enabled: tab === "people" && person !== "",
     queryKey: ["assigned", person, scope, offset],
     queryFn: async () =>
       unwrap(
@@ -92,7 +95,7 @@ export function Assignments() {
       ),
   });
   const theTeams = useQuery({
-    enabled: team !== "",
+    enabled: tab === "people" && team !== "",
     queryKey: ["team-assigned", team, scope, offset],
     queryFn: async () =>
       unwrap(
@@ -126,10 +129,7 @@ export function Assignments() {
   const myCount = peopleRows.find(own)?.open ?? 0;
   // Code findings are left out of the findings list, so the unheld ones of the
   // product in scope are linked where this screen points at unheld work.
-  const codeFindingsIn =
-    scope.product && mayOf(who.data, scope.product)?.reads_security_testing
-      ? scope.product
-      : undefined;
+  const codeFindingsIn = scope.product && counted(code) ? scope.product : undefined;
 
   return (
     <>

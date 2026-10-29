@@ -133,7 +133,7 @@ zero for work they cannot see reads as nothing open.
 |---|---|
 | The holding is worked out in the browser from the session's answer (§ Capabilities before drawing): reading disclosed or undisclosed work is the dependency family, reading security testing work the code family | The answer already says what each product lets the reader read; nothing new is asked of the server |
 | Either half of the dependency family may be read without the other, and each read alone is said | Reading is granted per visibility (`design-docs/access.md` § Roles) |
-| One helper decides it, and every screen counting a family asks it | Decided per screen, the answers drift apart |
+| One helper decides it, and every screen counting a family or listing undisclosed work alone asks it, never the session's read flags directly | Decided per screen, the answers drift apart |
 | A table spanning products draws a dash, with the line on hover, in a row whose product the reader does not read the family in | A zero in one row reads as that product being clean |
 | A screen whose subject is the family (the findings list, release comparison, a report on it) shows "Nothing to list." and the line in place of its body, the line included for a reader holding it in no product | Reached by a kept link, its empty body reads as nothing open |
 | A report on decisions (the overview's triage times and dismissals, approval quality, effort) is asked and drawn where the reader reads either family at the report's product; elsewhere it shows "Nothing to list." and "You don't read findings in sonic.", or "in any product" for a reader of neither anywhere | Decisions are on either family and narrowed to the reader; an empty exception report reads as a clean one |

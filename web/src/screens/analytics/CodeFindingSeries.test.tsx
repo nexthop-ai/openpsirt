@@ -3,7 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeFindingSeries } from "./CodeFindingSeries";
-import { mounted, screen, serve, settle } from "../../test/mount";
+import { client, mounted, screen, serve, settle } from "../../test/mount";
 
 const mount = mounted();
 
@@ -14,17 +14,18 @@ const COUNTS = "/v1/products/{product}/code-finding-series";
 
 async function drawn(readsSecurityTesting: boolean) {
   window.sessionStorage.setItem("openpsirt.scope", JSON.stringify({ product: "sonic" }));
+  const session = {
+    identity: "ana",
+    name: "Ana",
+    kind: "person",
+    reach: [{ product: "sonic", reads_security_testing: readsSecurityTesting }],
+    outcomes: [],
+  };
+  // The session held already, as the app's is by the time a screen draws.
+  const queries = client();
+  queries.setQueryData(["whoami"], session);
   const spy = serve((path) => {
-    if (path === "/v1/session/me")
-      return {
-        data: {
-          identity: "ana",
-          name: "Ana",
-          kind: "person",
-          reach: [{ product: "sonic", reads_security_testing: readsSecurityTesting }],
-          outcomes: [],
-        },
-      };
+    if (path === "/v1/session/me") return { data: session };
     if (path === COUNTS)
       return {
         data: {
@@ -40,7 +41,7 @@ async function drawn(readsSecurityTesting: boolean) {
       };
     return undefined;
   });
-  mount.render(screen(<CodeFindingSeries />, "/analytics/code-findings-by-analyzer"));
+  mount.render(screen(<CodeFindingSeries />, "/analytics/code-findings-by-analyzer", "*", queries));
   await settle();
   return spy;
 }
@@ -51,9 +52,9 @@ describe("code findings by analyzer", () => {
   it("asks for no count where the reader does not read security testing material in the product", async () => {
     const spy = await drawn(false);
     const paths = (spy.mock.calls as unknown as [string][]).map(([path]) => path);
-    expect(paths).toContain("/v1/session/me");
     expect(paths).not.toContain(COUNTS);
-    expect(text()).toContain("Code findings are security testing results.");
+    expect(text()).toContain("Nothing to list.");
+    expect(text()).toContain("You don't read code findings in any product.");
   });
 
   it("opens each figure on the list of that series in that state", async () => {

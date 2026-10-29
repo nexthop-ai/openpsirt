@@ -148,19 +148,27 @@ export function heldLine(at: Holding): string {
   }
 }
 
-// The line a list of undisclosed work alone shows in place of its rows, such
-// as the embargoes running out: empty where the reader reads undisclosed work
-// at the scope. A product the session does not list is read as its rows,
+// Whether the reader reads undisclosed work at the product, or in some product
+// where none is named: what vulnerability reports and the disclosure
+// deadlines list. A product the session does not list is read as its rows,
 // which the server has narrowed already.
-export function undisclosedLine(who: Who | null | undefined, product?: string): string {
-  if (!who) return "";
+export function readsUndisclosed(who: Who | null | undefined, product?: string): boolean {
+  if (!who) return true;
   const reach = who.reach ?? [];
   if (product) {
     const named = product.toLowerCase();
     const row = reach.find((each) => each.product.toLowerCase() === named);
-    return !row || row.reads_private ? "" : `You don't read undisclosed findings in ${product}.`;
+    return !row || row.reads_private;
   }
-  return reach.some((each) => each.reads_private)
-    ? ""
+  return reach.some((each) => each.reads_private);
+}
+
+// The line a list of undisclosed work alone shows in place of its rows, such
+// as the embargoes running out: empty where the reader reads undisclosed work
+// at the scope.
+export function undisclosedLine(who: Who | null | undefined, product?: string): string {
+  if (readsUndisclosed(who, product)) return "";
+  return product
+    ? `You don't read undisclosed findings in ${product}.`
     : "You don't read undisclosed findings in any product.";
 }

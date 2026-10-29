@@ -65,8 +65,10 @@ export function codeFindingsQuery(asked: CodeFindingsAsked): Record<string, stri
 export function useCodeFindings(
   product: string,
   asked: CodeFindingsAsked & { offset?: number },
+  enabled = true,
 ): UseQueryResult<CodeFindings> {
   return useQuery({
+    enabled,
     queryKey: ["code-findings", product, asked],
     queryFn: async () =>
       unwrap(
