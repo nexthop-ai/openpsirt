@@ -146,6 +146,7 @@ func (p passes) loops() []loop {
 		{"watch for quiet builds", p.watch.Run, 0},
 		{"send what is owed outward", p.outward.Run, 0},
 		{"assign unheld work to teams", p.assigning.Run, readInterval},
+		{"sweep every ruled product", p.assigning.CatchUp, 0},
 		{"apply analyzer runs", p.analyze.Run, readInterval},
 		{"fail jobs whose worker died", p.undertaker.Run, 0},
 	}

@@ -28,8 +28,9 @@ import (
 //
 // Queued only where the product has a rule placing findings, so a deployment
 // with no rules queues nothing. A full sweep queue leaves this arrival to the
-// next one rather than failing what brought it: refusing a scan loses its
-// findings, where an unqueued sweep only delays placing them.
+// next one, or to the daily sweep of every ruled product, rather than failing
+// what brought it: refusing a scan loses its findings, where an unqueued sweep
+// only delays placing them.
 func Arrived(ctx context.Context, tx bun.IDB, q *queue.Queue, productID int64) error {
 	if q == nil {
 		return nil
@@ -53,6 +54,78 @@ func Arrived(ctx context.Context, tx bun.IDB, q *queue.Queue, productID int64) e
 		return fmt.Errorf("queue the assignment sweep of product %d: %w", productID, err)
 	}
 	return nil
+}
+
+// CatchUpLease names the work of queuing every ruled product's sweep, so that
+// one replica does it.
+const CatchUpLease = "assignment.catch-up"
+
+// betweenCatchUps is how often every ruled product is swept whatever arrived.
+// A day: what it catches is work an arrival could not queue a sweep for, and
+// a deployment's start, which places what was unheld before it.
+const betweenCatchUps = 24 * time.Hour
+
+// CatchUp queues every ruled product's sweep as the process starts and once a
+// day after, until the context ends, and hands the lease back then.
+//
+// Arrivals and rule writes queue a sweep, and neither covers two cases: an
+// arrival while the sweep queue is full, and work left unheld before this
+// deployment queued sweeps on arrival. A product nobody scans again would
+// keep either forever.
+func (s *Sweeper) CatchUp(ctx context.Context, interval time.Duration) {
+	leases := queue.NewLeases(s.db.DB)
+	defer leases.Handback(ctx, CatchUpLease, s.name, s.logger)
+	background.Every(ctx, interval, betweenCatchUps, func(ctx context.Context) {
+		queued, err := s.CatchUpOnce(ctx, leases, interval)
+		if err != nil {
+			if ctx.Err() == nil {
+				s.logger.Error("queuing the sweep of every ruled product", "error", err)
+			}
+			return
+		}
+		if queued > 0 {
+			s.logger.Info("queued the sweep of every ruled product", "products", queued)
+		}
+	})
+}
+
+// CatchUpOnce queues the sweep of every product a rule in force places
+// findings in, where this replica holds the lease, reporting how many it
+// queued. A full queue stops the pass; the next one asks again.
+func (s *Sweeper) CatchUpOnce(ctx context.Context, leases *queue.Leases, interval time.Duration) (int, error) {
+	if interval <= 0 {
+		interval = betweenCatchUps
+	}
+	// Held a little past a cycle, so the holder keeps it by asking each
+	// cycle and a replica that stops without handing it back holds it for
+	// one cycle at most.
+	mine, err := leases.Take(ctx, CatchUpLease, s.name, interval+time.Hour)
+	if err != nil || !mine {
+		return 0, err
+	}
+	var products []int64
+	if err := s.db.DB.NewSelect().Model((*AssignmentRule)(nil)).
+		Distinct().Column("product_id").
+		Where(`"retired_at" IS NULL`).
+		Where(`"reports" = ?`, false).
+		Order("product_id").
+		Scan(ctx, &products); err != nil {
+		return 0, fmt.Errorf("list the products a rule places work in: %w", err)
+	}
+	queued := 0
+	for _, productID := range products {
+		_, err := s.queue.Add(ctx, queue.AssignmentSweep, strconv.FormatInt(productID, 10))
+		if errors.Is(err, queue.ErrBacklogFull) {
+			s.logger.Warn("stopped queuing ruled products' sweeps because the queue is full",
+				"queued", queued, "left", len(products)-queued)
+			return queued, nil
+		}
+		if err != nil {
+			return queued, fmt.Errorf("queue the assignment sweep of product %d: %w", productID, err)
+		}
+		queued++
+	}
+	return queued, nil
 }
 
 // Sweeper applies standing assignment rules to work nobody holds.
