@@ -120,7 +120,7 @@ A product's sweep is queued when a rule is written and when work arrives.
 |---|---|
 | A scan opening findings | The scan's write |
 | An analyzer run opening code findings | The run's write |
-| A flaw recorded here | The recording |
+| A flaw recorded here, by hand or from a code finding | The recording |
 | A recorded flaw widened to another build | The widening |
 
 | Rule | Reason |

@@ -247,6 +247,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 		}
 		done, err := analysis.RecordAsFlaw(ctx, in.DB.DB, subject, analysis.Recording{
 			ProductID: at.named.ProductID, OccurrenceIdentity: input.Occurrence, IncludeInDisclosure: input.Body.IncludeInDisclosure,
+			Sweeps: in.Queue,
 			Flaw: finding.Entering{
 				BuildIDs: buildIDs, Component: input.Body.Component,
 				Ecosystem: input.Body.Ecosystem, Namespace: input.Body.Namespace,
