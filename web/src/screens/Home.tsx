@@ -19,6 +19,7 @@ import { SOON_DAYS } from "./FindingsFilters";
 import { paceReading, mixReading } from "../ui/trend";
 import { decisionOf, useQueueCount } from "../api/decisions";
 import type { Who } from "../app/session";
+import { counted, heldLine, holding, readsNothing, type Holding } from "../app/families";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
 import {
@@ -65,16 +66,28 @@ export function blockingPath(at: Parameters<typeof findingsPath>[0]): string {
 // follow the scope, each with what it would say without one beside it, then the
 // work — what is pending, what is in progress, what lapsed — then the trends,
 // then the system's own state. Somebody opening this most days wants the size
-// of the day before its contents.
+// of the day before its contents. A reader of no finding in any product is
+// shown the deployment's records instead.
 export function Home({ who }: { who: Who }) {
+  if (readsNothing(who)) return <Records who={who} />;
+  return <Estate who={who} />;
+}
+
+function Estate({ who }: { who: Who }) {
   const at = useScope();
   const scope = scopeQuery(at);
   const counting = at.product
     ? [at.product, at.branch_or_tag, at.variant].filter(Boolean).join(" · ")
     : "all products";
+  // The dependency figures and trends are drawn only where they count what
+  // they say; elsewhere one line stands in for them.
+  const dependencies = holding(who, "dependency", at.product);
+  const figures = counted(dependencies);
+  const line = heldLine(dependencies);
 
   const trend = useQuery({
     queryKey: ["home", "trend", scope],
+    enabled: figures,
     queryFn: async () =>
       unwrap(await api.GET("/v1/trend", { params: { query: { weeks: TREND_WEEKS, ...scope } } })),
   });
@@ -85,7 +98,7 @@ export function Home({ who }: { who: Who }) {
   // than the step change they were.
   const releases = useQuery({
     queryKey: ["home", "release-trend", scope],
-    enabled: !!at.product,
+    enabled: figures && !!at.product,
     queryFn: async () =>
       unwrap(await api.GET("/v1/trend/releases", { params: { query: { limit: 12, ...scope } } })),
   });
@@ -104,87 +117,94 @@ export function Home({ who }: { who: Who }) {
         </p>
       </div>
 
-      <Figures counting={counting} points={points} trend={trend} />
+      <Figures counting={counting} points={points} trend={trend} dependencies={dependencies} />
+      {line && dependencies.held !== "nowhere" && <p className="hint">{line}</p>}
 
       <div className="panels">
         <Pending />
         <InProgress me={who.identity} />
-        <Lapsed />
+        {figures && <Lapsed />}
 
-        <div className="panel wide">
-          <header>
-            <h3>
-              {byRelease ? "Open issues in each release" : "Trend: open, new and resolved issues"}
-            </h3>
-            <span className="eyebrow" style={{ marginLeft: "auto" }}>
-              {byRelease ? "release over release" : trendSaid} · {counting}
-            </span>
-          </header>
-          {trend.isError ? (
-            <Failed error={trend.error} what="The trend could not be read." />
-          ) : releases.isError ? (
-            <Failed error={releases.error} what="The release trend could not be read." />
-          ) : trend.isPending || (!!at.product && releases.isPending) ? (
-            <Loading />
-          ) : byRelease ? (
-            <>
-              <Releases points={releases.data?.items ?? []} />
-              <p className="hint">Each release against today&rsquo;s vulnerability data.</p>
-            </>
-          ) : (
-            <>
-              <Pace points={points} />
-              <div className="legend">
-                <span>
-                  <i style={{ background: "var(--accent)" }} /> Open issues
+        {figures && (
+          <>
+            <div className="panel wide">
+              <header>
+                <h3>
+                  {byRelease
+                    ? "Open issues in each release"
+                    : "Trend: open, new and resolved issues"}
+                </h3>
+                <span className="eyebrow" style={{ marginLeft: "auto" }}>
+                  {byRelease ? "release over release" : trendSaid} · {counting}
                 </span>
-                <span>
-                  <i style={{ background: "var(--sev-high)" }} /> New
+              </header>
+              {trend.isError ? (
+                <Failed error={trend.error} what="The trend could not be read." />
+              ) : releases.isError ? (
+                <Failed error={releases.error} what="The release trend could not be read." />
+              ) : trend.isPending || (!!at.product && releases.isPending) ? (
+                <Loading />
+              ) : byRelease ? (
+                <>
+                  <Releases points={releases.data?.items ?? []} />
+                  <p className="hint">Each release against today&rsquo;s vulnerability data.</p>
+                </>
+              ) : (
+                <>
+                  <Pace points={points} />
+                  <div className="legend">
+                    <span>
+                      <i style={{ background: "var(--accent)" }} /> Open issues
+                    </span>
+                    <span>
+                      <i style={{ background: "var(--sev-high)" }} /> New
+                    </span>
+                    <span>
+                      <i style={{ background: "var(--ok)" }} /> Resolved
+                    </span>
+                  </div>
+                  <p className="reading">{paceReading(points)}</p>
+                </>
+              )}
+            </div>
+
+            <div className="panel wide">
+              <header>
+                <h3>Severity over time</h3>
+                <span className="eyebrow" style={{ marginLeft: "auto" }}>
+                  Open, by severity
                 </span>
-                <span>
-                  <i style={{ background: "var(--ok)" }} /> Resolved
+              </header>
+              <Reading query={trend} what="The trend could not be read.">
+                {() => (
+                  <>
+                    <Mix points={points} />
+                    <p className="reading">{mixReading(points)}</p>
+                  </>
+                )}
+              </Reading>
+            </div>
+
+            <div className="panel">
+              <header>
+                <h3>Open issues by severity</h3>
+                <span className="eyebrow" style={{ marginLeft: "auto" }}>
+                  Open now
                 </span>
-              </div>
-              <p className="reading">{paceReading(points)}</p>
-            </>
-          )}
-        </div>
+              </header>
+              <Reading query={trend} what="The trend could not be read.">
+                {() => (
+                  <>
+                    <Ring point={points[points.length - 1]} />
+                    <p className="reading">Known exploited is counted with what it is rated.</p>
+                  </>
+                )}
+              </Reading>
+            </div>
 
-        <div className="panel wide">
-          <header>
-            <h3>Severity over time</h3>
-            <span className="eyebrow" style={{ marginLeft: "auto" }}>
-              Open, by severity
-            </span>
-          </header>
-          <Reading query={trend} what="The trend could not be read.">
-            {() => (
-              <>
-                <Mix points={points} />
-                <p className="reading">{mixReading(points)}</p>
-              </>
-            )}
-          </Reading>
-        </div>
-
-        <div className="panel">
-          <header>
-            <h3>Open issues by severity</h3>
-            <span className="eyebrow" style={{ marginLeft: "auto" }}>
-              Open now
-            </span>
-          </header>
-          <Reading query={trend} what="The trend could not be read.">
-            {() => (
-              <>
-                <Ring point={points[points.length - 1]} />
-                <p className="reading">Known exploited is counted with what it is rated.</p>
-              </>
-            )}
-          </Reading>
-        </div>
-
-        <Readiness at={at} />
+            <Readiness at={at} />
+          </>
+        )}
 
         <Status />
       </div>
@@ -390,14 +410,18 @@ function Figures({
   counting,
   points,
   trend,
+  dependencies,
 }: {
   counting: string;
   points: { open?: number; by_severity?: Record<string, number> }[];
   trend: Readable;
+  dependencies: Holding;
 }) {
   const at = useScope();
   const scope = scopeQuery(at);
   const navigate = useNavigate();
+  // The estate's dependency figures, drawn only where they count what they say.
+  const figures = counted(dependencies);
 
   // One definition at every scope: the trend's latest point, which counts
   // distinct issues. The findings list counts one row per issue and component,
@@ -409,7 +433,7 @@ function Figures({
     // where a product is picked, because the cross-product list counts a row
     // per product as well — a tile that changed unit as the picker moved
     // would quote two figures for one word.
-    enabled: !!at.product,
+    enabled: figures && !!at.product,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/findings", {
@@ -464,7 +488,7 @@ function Figures({
   const widely = !!at.product;
   const allOpen = useQuery({
     queryKey: ["home", "trend", "all"],
-    enabled: widely,
+    enabled: figures && widely,
     queryFn: async () =>
       unwrap(await api.GET("/v1/trend", { params: { query: { weeks: TREND_WEEKS } } })),
   });
@@ -473,7 +497,7 @@ function Figures({
   const allQueue = useQueueCount(undefined, { enabled: widely });
   const allLate = useQuery({
     queryKey: ["home", "running-out", "all"],
-    enabled: widely,
+    enabled: figures && widely,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/running-out", {
@@ -486,6 +510,7 @@ function Figures({
   // rather than two reads that can disagree about the same list.
   const late = useQuery({
     queryKey: ["home", "running-out", scope],
+    enabled: figures,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/running-out", {
@@ -577,17 +602,19 @@ function Figures({
       {/* Unnarrowed, because the figure is. The list writes three narrowings
           into its own address when the address says nothing, and none of them
           applies to the count, so the list opens with the number's rows. */}
-      <button type="button" className="kpi" onClick={() => navigate(findingsPath(at, true))}>
-        <span className="l">Open issues · {counting}</span>
-        <span className="n">
-          <Count of={trend}>
-            {() => (openCount === undefined ? "—" : openCount.toLocaleString())}
-          </Count>
-        </span>
-        {everywhere(known(allOpen) ? allPoints[allPoints.length - 1]?.open : undefined) ?? (
-          <span className="d">distinct issues, not findings</span>
-        )}
-      </button>
+      {figures && (
+        <button type="button" className="kpi" onClick={() => navigate(findingsPath(at, true))}>
+          <span className="l">Open issues · {counting}</span>
+          <span className="n">
+            <Count of={trend}>
+              {() => (openCount === undefined ? "—" : openCount.toLocaleString())}
+            </Count>
+          </span>
+          {everywhere(known(allOpen) ? allPoints[allPoints.length - 1]?.open : undefined) ?? (
+            <span className="d">distinct issues, not findings</span>
+          )}
+        </button>
+      )}
       {/* A person's record that a product was attacked, as a count of its
           own beside the feed's. The feed's figure says nothing about this
           product, so the two are never one number. Drawn only where there is
@@ -610,7 +637,7 @@ function Figures({
           </span>
         </button>
       )}
-      {!!at.product && (
+      {figures && !!at.product && (
         <button
           type="button"
           className={`kpi${known(exploited) && (exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
@@ -662,48 +689,52 @@ function Figures({
           and past its deadline. The assignments screen answers a different
           question — what is *mine* — and would disagree with the number for
           everybody but the one person holding all of it. */}
-      <button type="button" className="kpi" onClick={() => navigate(runningOut(at, "overdue"))}>
-        <span className="l">
-          <i style={{ background: "var(--sev-critical)" }} /> Overdue
-        </span>
-        {/* The list behind this is capped, so a page cut before it reached
+      {figures && (
+        <button type="button" className="kpi" onClick={() => navigate(runningOut(at, "overdue"))}>
+          <span className="l">
+            <i style={{ background: "var(--sev-critical)" }} /> Overdue
+          </span>
+          {/* The list behind this is capped, so a page cut before it reached
             anything still due is said to be a floor rather than passed off as
             the count. */}
-        <span className="n">
-          <Count of={late}>
-            {() => `${overdue.length.toLocaleString()}${overdueCut ? "+" : ""}`}
-          </Count>
-        </span>
-        {(known(allLate) && everywhereAtLeast(allOverdue, overdueCutEverywhere)) || (
-          <span className="d">
-            {overdueExploited > 0 ? `${overdueExploited} known exploited · ` : ""}undecided, past
-            the deadline
-            {overdueCut ? " · at least" : ""}
+          <span className="n">
+            <Count of={late}>
+              {() => `${overdue.length.toLocaleString()}${overdueCut ? "+" : ""}`}
+            </Count>
           </span>
-        )}
-      </button>
+          {(known(allLate) && everywhereAtLeast(allOverdue, overdueCutEverywhere)) || (
+            <span className="d">
+              {overdueExploited > 0 ? `${overdueExploited} known exploited · ` : ""}undecided, past
+              the deadline
+              {overdueCut ? " · at least" : ""}
+            </span>
+          )}
+        </button>
+      )}
       {/* The tile that is actually actionable. Overdue is a report about
           something that has already happened; this is the week somebody can
           still finish. */}
-      <button
-        type="button"
-        className={`kpi${soonExploited > 0 ? " urgent" : ""}`}
-        onClick={() => navigate(runningOut(at, String(SOON_DAYS)))}
-      >
-        <span className="l">
-          <i style={{ background: "var(--wait)" }} /> Due soon
-        </span>
-        <span className="n">
-          <Count of={late}>{() => `${soon.length.toLocaleString()}${cut ? "+" : ""}`}</Count>
-        </span>
-        {(known(allLate) && everywhereAtLeast(allSoon, cutEverywhere)) || (
-          <span className="d">
-            {soonExploited > 0 ? `${soonExploited} known exploited · ` : ""}undecided, due within{" "}
-            {SOON_DAYS} days
-            {cut ? " · at least" : ""}
+      {figures && (
+        <button
+          type="button"
+          className={`kpi${soonExploited > 0 ? " urgent" : ""}`}
+          onClick={() => navigate(runningOut(at, String(SOON_DAYS)))}
+        >
+          <span className="l">
+            <i style={{ background: "var(--wait)" }} /> Due soon
           </span>
-        )}
-      </button>
+          <span className="n">
+            <Count of={late}>{() => `${soon.length.toLocaleString()}${cut ? "+" : ""}`}</Count>
+          </span>
+          {(known(allLate) && everywhereAtLeast(allSoon, cutEverywhere)) || (
+            <span className="d">
+              {soonExploited > 0 ? `${soonExploited} known exploited · ` : ""}undecided, due within{" "}
+              {SOON_DAYS} days
+              {cut ? " · at least" : ""}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -715,10 +746,53 @@ function greeting(): string {
   return "Good evening";
 }
 
+// Home for a reader holding no finding in any product: an auditor, or an
+// administrator with no role on a product. Their work is the deployment's own
+// records, so those are what it opens, never a page of figures that are zero
+// because none of them is theirs to count.
+function Records({ who }: { who: Who }) {
+  const keeps = who.admin || !!who.audits;
+  return (
+    <>
+      <div className="screen-head">
+        <h2>
+          {greeting()}, {who.name.replace(/^[a-z]+:/, "")}
+        </h2>
+        <p>{holdings(who)}</p>
+      </div>
+      <div className="panels">
+        <div className="panel">
+          <header>
+            <h3>Records</h3>
+          </header>
+          <p className="reading">You don&rsquo;t read findings in any product.</p>
+          {keeps && (
+            <footer>
+              <Link to="/audit-log" className="linkish">
+                Change history →
+              </Link>
+              <Link to="/access" className="linkish">
+                Access →
+              </Link>
+              <Link to="/settings" className="linkish">
+                Settings →
+              </Link>
+            </footer>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // Said in what the roles let somebody do rather than what they are called.
+// A product reached only to administer or audit it is not one they read.
 function holdings(who: Who): string {
   if (who.admin) return "You administer this deployment";
-  const reach = who.reach ?? [];
+  const reach = (who.reach ?? []).filter((each) => each.may_see);
+  if (reach.length === 0) {
+    return who.audits ? "You audit this deployment" : "You hold no role on a product";
+  }
   const triage = reach
     .filter((each) => each.may_triage || each.triages_security_testing)
     .map((each) => each.product);

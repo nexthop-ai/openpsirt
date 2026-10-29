@@ -26,6 +26,7 @@ import { Wide } from "../ui/Wide";
 import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
 import { useUpstreamSaid } from "../api/upstream";
 import { mayOf, useWho } from "../app/session";
+import { counted, heldLine, holding } from "../app/families";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
 
 // One source package, and the one piece of work it is.
@@ -86,6 +87,13 @@ const bulkDecisionHere = (product: string, row: Build, component: string, pkg?: 
 export function Component() {
   const { product = "", component = "" } = useParams();
   const [params, setParams] = useSearchParams();
+  // Every count on this page is of dependency findings. Where the reader does
+  // not read them here, a zero would say the component is clean, so no count
+  // is drawn and nothing is said to be open or not.
+  const who = useWho();
+  const dependencies = holding(who.data, "dependency", product);
+  const counts = counted(dependencies);
+  const line = heldLine(dependencies);
 
   const builds = useQuery({
     queryKey: ["component", product, component],
@@ -164,7 +172,7 @@ export function Component() {
   const link = pkg.package_page_url ?? null;
   // The bands are declared worst first, so the first one present is the worst.
   const worst = ROLLED.find((band) => (here.by_severity ?? {})[band]);
-  const action = openIssues(product, here);
+  const action = counts ? openIssues(product, here) : undefined;
 
   return (
     <>
@@ -183,12 +191,13 @@ export function Component() {
           </span>
           <span className="vchip id">{here.version}</span>
           {here.ecosystem && <span className="vchip">{here.ecosystem}</span>}
-          {!action && <span className="vchip ok">nothing open on it</span>}
+          {counts && !action && <span className="vchip ok">no dependency findings open</span>}
           <Incident when={here.incident} />
           {here.exploited && <span className="vchip bad">known exploited</span>}
           {worst && <Severity word={worst} />}
           {here.due_at && <span className="vchip differs">due {on(here.due_at)}</span>}
         </p>
+        {line && dependencies.held !== "nowhere" && <p className="hint">{line}</p>}
       </div>
 
       {versions.length > 1 && (
@@ -216,8 +225,8 @@ export function Component() {
                   });
                 }}
               >
-                <span className="id">{each.at}</span>{" "}
-                <span className="hint">{each.issues} open</span>
+                <span className="id">{each.at}</span>
+                {counts && <span className="hint"> {each.issues} open</span>}
               </button>
             ))}
           </p>
@@ -225,7 +234,7 @@ export function Component() {
       )}
 
       {(here.packages ?? []).length > 1 && (
-        <Binaries here={here} pkg={pkg} onPick={(name) => go({ package: name })} />
+        <Binaries here={here} pkg={pkg} counts={counts} onPick={(name) => go({ package: name })} />
       )}
 
       <div className="detail">
@@ -235,6 +244,7 @@ export function Component() {
             pkg={pkg}
             here={here}
             builds={rows}
+            counts={counts}
             onBuild={(row) =>
               go({
                 branch_or_tag: row.branch_or_tag ?? "",
@@ -356,15 +366,15 @@ export function Component() {
             </dl>
           </div>
 
-          <Landed here={here} />
+          {counts && <Landed here={here} />}
         </div>
       </div>
 
-      <Ships product={product} rows={rows} here={here} />
+      <Ships product={product} rows={rows} here={here} counts={counts} />
 
       <UpstreamStatements product={product} component={component} />
 
-      <History product={product} pkg={pkg} here={here} />
+      {counts && <History product={product} pkg={pkg} here={here} />}
     </>
   );
 }
@@ -457,10 +467,12 @@ function ImageVersions({ stated }: { stated: Body<"StatedVersionBody">[] }) {
 function Binaries({
   here,
   pkg,
+  counts,
   onPick,
 }: {
   here: Build;
   pkg: Package;
+  counts: boolean;
   onPick: (name: string) => void;
 }) {
   const all = here.packages ?? [];
@@ -480,8 +492,8 @@ function Binaries({
             title="Show its place in the graph"
             onClick={() => onPick(each.name)}
           >
-            <span className="id">{each.name}</span>{" "}
-            <span className="hint">{each.issues ?? 0} open</span>
+            <span className="id">{each.name}</span>
+            {counts && <span className="hint"> {each.issues ?? 0} open</span>}
           </button>
         ))}
       </p>
@@ -499,12 +511,14 @@ function Sits({
   pkg,
   here,
   builds,
+  counts,
   onBuild,
 }: {
   product: string;
   pkg: Package;
   here: Build;
   builds: Build[];
+  counts: boolean;
   onBuild: (row: Build) => void;
 }) {
   const scope = { product, branch_or_tag: here.branch_or_tag ?? "", variant: here.variant ?? "" };
@@ -589,17 +603,22 @@ function Sits({
               {component} <span className="hint">{pkg.version}</span>
             </span>
             <span className="sub">
-              {(pkg.issues ?? 0) > 0 ? (
-                <Link to={findingsAt(product, here, [component])}>
-                  {(pkg.issues ?? 0).toLocaleString()} open
-                </Link>
-              ) : (
-                "0 open"
-              )}{" "}
-              on it, under {(pkg.consumers ?? 0).toLocaleString()}{" "}
+              {counts && (
+                <>
+                  {(pkg.issues ?? 0) > 0 ? (
+                    <Link to={findingsAt(product, here, [component])}>
+                      {(pkg.issues ?? 0).toLocaleString()} open
+                    </Link>
+                  ) : (
+                    "0 open"
+                  )}{" "}
+                  on it,{" "}
+                </>
+              )}
+              under {(pkg.consumers ?? 0).toLocaleString()}{" "}
               {pkg.consumers === 1 ? "consumer" : "consumers"}
             </span>
-            {(here.packages ?? []).length === 1 && <Shape by={here.by_severity} />}
+            {counts && (here.packages ?? []).length === 1 && <Shape by={here.by_severity} />}
           </li>
 
           <li>
@@ -610,6 +629,8 @@ function Sits({
               <span className="sub">Working it out…</span>
             ) : below.length === 0 ? (
               <span className="sub">Nothing — a leaf</span>
+            ) : !counts ? (
+              <span className="sub">{below.length.toLocaleString()} packages</span>
             ) : (
               <>
                 <span className="sub">
@@ -1063,7 +1084,17 @@ function Upgrade({
 }
 
 // The version each release ships, and what is open against it there.
-function Ships({ product, rows, here }: { product: string; rows: Build[]; here: Build }) {
+function Ships({
+  product,
+  rows,
+  here,
+  counts,
+}: {
+  product: string;
+  rows: Build[];
+  here: Build;
+  counts: boolean;
+}) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
@@ -1078,7 +1109,7 @@ function Ships({ product, rows, here }: { product: string; rows: Build[]; here: 
             <tr>
               <th>Release</th>
               <th>Ships</th>
-              <th className="num">Open on it</th>
+              {counts && <th className="num">Open on it</th>}
               <th className="num">Consumers</th>
               <th className="num">Occurrences</th>
               <th>Due</th>
@@ -1098,11 +1129,13 @@ function Ships({ product, rows, here }: { product: string; rows: Build[]; here: 
                   <span className="hint">{row.variant}</span>
                 </td>
                 <td className="id">{row.version}</td>
-                <td className="num">
-                  <Link to={findingsAt(product, row, binaries(row))}>
-                    {(row.issues ?? 0).toLocaleString()}
-                  </Link>
-                </td>
+                {counts && (
+                  <td className="num">
+                    <Link to={findingsAt(product, row, binaries(row))}>
+                      {(row.issues ?? 0).toLocaleString()}
+                    </Link>
+                  </td>
+                )}
                 <td className="num">{(row.consumers ?? 0).toLocaleString()}</td>
                 <td className="num" style={{ color: "var(--faint)" }}>
                   {(row.occurrences ?? 0).toLocaleString()}

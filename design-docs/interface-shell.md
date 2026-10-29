@@ -111,6 +111,10 @@ are the slowest read.
 
 | Rule | Reason |
 |---|---|
+| The estate's figures (open, known exploited, overdue, due soon), the trends, lapsed decisions and release readiness count dependency findings, and are drawn under `design-docs/interface.md` § Families a reader holds at the picked scope | A zero for work the reader cannot see reads as nothing open |
+| The work figures (assigned, sent back, pending approval) and in progress stay for every reader of either family | They hold both families' work |
+| A reader of no finding in any product lands on a Records panel opening the audit log, access and settings, where they may read them; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records |
+| The line under the greeting counts products the reader reads, never those reached only to administer or audit | |
 | Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
 | What became of decisions is counted from a page read, and the tile says where the page was cut | It is derived, with no count to ask for |
 | Every figure opens the list it counts, narrowed as counted, the aging buckets included (`design-docs/interface-administration.md` § Analytics) | |

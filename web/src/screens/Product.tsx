@@ -13,6 +13,7 @@ import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 import { mayOf, useWho } from "../app/session";
 import { useRulings } from "../api/intake";
+import { counted, heldLine, holding } from "../app/families";
 import {
   buildFindingsAt,
   vulnerabilityReportsAt,
@@ -41,6 +42,11 @@ export function Product() {
   const mayReadReports = !!mayOf(who.data, product)?.reads_private;
   const mayReadCodeFindings = !!mayOf(who.data, product)?.reads_security_testing;
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
+  // The overview counts dependency findings. Where the reader does not read
+  // them here, its figures are zeros that mean nothing, so they are not drawn.
+  const dependencies = holding(who.data, "dependency", product);
+  const figures = counted(dependencies);
+  const line = heldLine(dependencies);
   const overview = useQuery({
     queryKey: ["overview", product],
     queryFn: async () =>
@@ -56,7 +62,7 @@ export function Product() {
   const builds = it.builds ?? [];
   // The list as the figures here count it, with one more filter where a figure
   // is narrower.
-  const counted = (more = "") => new URLSearchParams(UNNARROWED + more);
+  const listed = (more = "") => new URLSearchParams(UNNARROWED + more);
 
   return (
     <div>
@@ -117,31 +123,34 @@ export function Product() {
           its own address when the address says nothing, and the figures are
           counted with none of them — so without this every number here opened
           a list with fewer rows in it than the number said. */}
-      <div className="kpis">
-        <Link className="kpi" to={productFindingsAt(product, counted())}>
-          <span className="l">Open · {it.name}</span>
-          <span className="n">{(it.open ?? 0).toLocaleString()}</span>
-          <span className="d">issues at components, as the list counts them</span>
-        </Link>
-        <Link
-          className={`kpi${(it.overdue ?? 0) > 0 ? " urgent" : ""}`}
-          to={productFindingsAt(product, counted("&running=overdue"))}
-        >
-          <span className="l">Past a deadline</span>
-          <span className="n">{(it.overdue ?? 0).toLocaleString()}</span>
-          <span className="d">already late, across every build</span>
-        </Link>
-        <Link className="kpi" to={productFindingsAt(product, counted("&state=undecided"))}>
-          <span className="l">Nobody has argued about</span>
-          <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
-          <span className="d">no occurrence has a decision of any kind</span>
-        </Link>
-        <Link className="kpi" to={reviewQueueAt({ product })}>
-          <span className="l">Waiting on a second person</span>
-          <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
-          <span className="d">decisions here that nobody has agreed to</span>
-        </Link>
-      </div>
+      {figures && (
+        <div className="kpis">
+          <Link className="kpi" to={productFindingsAt(product, listed())}>
+            <span className="l">Open · {it.name}</span>
+            <span className="n">{(it.open ?? 0).toLocaleString()}</span>
+            <span className="d">issues at components, as the list counts them</span>
+          </Link>
+          <Link
+            className={`kpi${(it.overdue ?? 0) > 0 ? " urgent" : ""}`}
+            to={productFindingsAt(product, listed("&running=overdue"))}
+          >
+            <span className="l">Past a deadline</span>
+            <span className="n">{(it.overdue ?? 0).toLocaleString()}</span>
+            <span className="d">already late, across every build</span>
+          </Link>
+          <Link className="kpi" to={productFindingsAt(product, listed("&state=undecided"))}>
+            <span className="l">Nobody has argued about</span>
+            <span className="n">{(it.undecided ?? 0).toLocaleString()}</span>
+            <span className="d">no occurrence has a decision of any kind</span>
+          </Link>
+          <Link className="kpi" to={reviewQueueAt({ product })}>
+            <span className="l">Waiting on a second person</span>
+            <span className="n">{(it.waiting ?? 0).toLocaleString()}</span>
+            <span className="d">decisions here that nobody has agreed to</span>
+          </Link>
+        </div>
+      )}
+      {line && dependencies.held !== "nowhere" && <p className="hint">{line}</p>}
 
       <div className="card" style={{ marginTop: 14 }}>
         <h3>Builds</h3>
@@ -156,11 +165,15 @@ export function Product() {
               <thead>
                 <tr>
                   <th>Build</th>
-                  <th className="num">Open</th>
-                  <th className="num">Overdue</th>
-                  <th className="num">Known exploited</th>
-                  <th className="num">Undecided</th>
-                  <th className="num">Decided</th>
+                  {figures && (
+                    <>
+                      <th className="num">Open</th>
+                      <th className="num">Overdue</th>
+                      <th className="num">Known exploited</th>
+                      <th className="num">Undecided</th>
+                      <th className="num">Decided</th>
+                    </>
+                  )}
                   <th>Last scanned</th>
                 </tr>
               </thead>
@@ -174,7 +187,7 @@ export function Product() {
                   return (
                     <tr key={`${row.branch_or_tag} ${row.variant}`} className="row">
                       <td>
-                        <Link to={buildFindingsAt(build, counted())} className="id">
+                        <Link to={buildFindingsAt(build, listed())} className="id">
                           {row.branch_or_tag}
                         </Link>{" "}
                         <span className="hint">·</span> <span className="id">{row.variant}</span>
@@ -190,46 +203,50 @@ export function Product() {
                           </>
                         )}
                       </td>
-                      <td className="num">{(row.open ?? 0).toLocaleString()}</td>
-                      <td className="num">
-                        {row.overdue ? (
-                          <Link
-                            to={buildFindingsAt(build, counted("&running=overdue"))}
-                            className="due over"
-                          >
-                            {row.overdue.toLocaleString()}
-                          </Link>
-                        ) : (
-                          <span className="hint">—</span>
-                        )}
-                      </td>
-                      <td className="num">
-                        {row.exploited ? (
-                          <Link to={buildFindingsAt(build, counted("&exploited=1"))}>
-                            {row.exploited.toLocaleString()}
-                          </Link>
-                        ) : (
-                          <span className="hint">—</span>
-                        )}
-                      </td>
-                      <td className="num">
-                        {row.undecided ? (
-                          <Link to={buildFindingsAt(build, counted("&state=undecided"))}>
-                            {row.undecided.toLocaleString()}
-                          </Link>
-                        ) : (
-                          <span className="hint">—</span>
-                        )}
-                      </td>
-                      <td className="num">
-                        {row.agreed ? (
-                          <Link to={buildFindingsAt(build, counted("&state=agreed"))}>
-                            {row.agreed.toLocaleString()}
-                          </Link>
-                        ) : (
-                          <span className="hint">—</span>
-                        )}
-                      </td>
+                      {figures && (
+                        <>
+                          <td className="num">{(row.open ?? 0).toLocaleString()}</td>
+                          <td className="num">
+                            {row.overdue ? (
+                              <Link
+                                to={buildFindingsAt(build, listed("&running=overdue"))}
+                                className="due over"
+                              >
+                                {row.overdue.toLocaleString()}
+                              </Link>
+                            ) : (
+                              <span className="hint">—</span>
+                            )}
+                          </td>
+                          <td className="num">
+                            {row.exploited ? (
+                              <Link to={buildFindingsAt(build, listed("&exploited=1"))}>
+                                {row.exploited.toLocaleString()}
+                              </Link>
+                            ) : (
+                              <span className="hint">—</span>
+                            )}
+                          </td>
+                          <td className="num">
+                            {row.undecided ? (
+                              <Link to={buildFindingsAt(build, listed("&state=undecided"))}>
+                                {row.undecided.toLocaleString()}
+                              </Link>
+                            ) : (
+                              <span className="hint">—</span>
+                            )}
+                          </td>
+                          <td className="num">
+                            {row.agreed ? (
+                              <Link to={buildFindingsAt(build, listed("&state=agreed"))}>
+                                {row.agreed.toLocaleString()}
+                              </Link>
+                            ) : (
+                              <span className="hint">—</span>
+                            )}
+                          </td>
+                        </>
+                      )}
                       <td className="hint">
                         {/* A build nobody has ever scanned is the row this
                             page exists to show: a product reads as clean when
@@ -247,9 +264,11 @@ export function Product() {
             </table>
           </Wide>
         )}
-        <p className="hint" style={{ marginTop: 8 }}>
-          Issues at components. <b>Decided</b> means every occurrence has a standing decision.
-        </p>
+        {figures && (
+          <p className="hint" style={{ marginTop: 8 }}>
+            Issues at components. <b>Decided</b> means every occurrence has a standing decision.
+          </p>
+        )}
       </div>
     </div>
   );

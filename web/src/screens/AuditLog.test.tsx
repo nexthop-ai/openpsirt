@@ -7,6 +7,7 @@ import { AuditLog, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./
 import { classesOf } from "../ui/outcomes";
 import { PUBLISHED } from "../test/outcomes";
 import { screen, serve, settle, mounted } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -17,7 +18,15 @@ describe("the change history on the audit log", () => {
     const asked: number[] = [];
     serve((path, init) => {
       if (path === "/v1/session/me") {
-        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
       }
       if (path === "/v1/administration/changes") {
         const limit = (init as { params: { query: { limit: number } } }).params.query.limit;
@@ -55,7 +64,15 @@ describe("the change history's kind", () => {
     const kinds: unknown[] = [];
     serve((path, init) => {
       if (path === "/v1/session/me") {
-        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
       }
       if (path === "/v1/administration/changes") {
         kinds.push((init as { params: { query: { kind?: string } } }).params.query.kind);
@@ -89,7 +106,15 @@ describe("the period on the audit log", () => {
     const ends: Record<string, unknown> = {};
     serve((path, init) => {
       if (path === "/v1/session/me") {
-        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
       }
       const query = (init as { params?: { query?: Record<string, unknown> } }).params?.query;
       if (query && "to" in query) ends[path] = query.to;
@@ -130,7 +155,15 @@ describe("the audit log's list", () => {
   it("draws one card per decision and links to where its decisions sit", async () => {
     serve((path) => {
       if (path === "/v1/session/me") {
-        return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
       }
       if (path === "/v1/audit/decisions") {
         return {
@@ -194,7 +227,7 @@ describe("the exception report", () => {
             name: "Ana",
             admin: true,
             kind: "person",
-            reach: [],
+            reach: [readingDependencies("sonic")],
             outcomes: PUBLISHED,
           },
         };

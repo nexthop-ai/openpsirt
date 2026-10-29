@@ -7,6 +7,7 @@ import { Queue } from "./Queue";
 import { stillPicked } from "./useQueueApproval";
 import { Product } from "./Product";
 import { accept, screen, serve, settle, mounted } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -213,7 +214,15 @@ describe("a product's page", () => {
       if (path === "/v1/products/{product}/overview")
         return { data: { name: "sonic", waiting: 3 } };
       if (path === "/v1/session/me") {
-        return { data: { identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] } };
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: false,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
       }
       return { data: { items: [], total: 0 } };
     });

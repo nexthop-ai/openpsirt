@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Who } from "../app/session";
 import { Home } from "./Home";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -15,7 +16,7 @@ const ana: Who = {
   name: "Ana",
   admin: false,
   kind: "person",
-  reach: [],
+  reach: [readingDependencies("p")],
   outcomes: [],
 };
 

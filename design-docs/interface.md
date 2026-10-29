@@ -126,6 +126,7 @@ zero for work they cannot see reads as nothing open.
 | Holds it here, nothing open | A real zero, naming what it counts (REQ-60) |
 | Reads only disclosed work here | The counts, with "Counting disclosed findings, the ones you read here." (REQ-42) |
 | Reads disclosed work only in some products, across products | The counts, with the products read disclosed only named |
+| Reads no finding of either family in any product | The deployment's records: the change history, access and settings where the audit permission or administration allows |
 
 | Rule | Reason |
 |---|---|
@@ -335,5 +336,6 @@ a text file that reads as binary, which every text tool skips silently.
 
 | Limit | Detail |
 |---|---|
+| Code findings are counted on no shared screen | The code family's rule reaches the rail and the product page's link alone; home, the component screen, the tree and the product figures count dependency findings |
 | No component library | Built from the mockup's tokens and components written here; a packaged data grid owning its markup cannot become cards on a phone (REQ-55) |
 | Dependencies are pinned exactly | A range resolves at build time; `npm ci` installs the lockfile |

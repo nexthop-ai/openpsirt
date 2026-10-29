@@ -36,6 +36,7 @@ import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
 import { activates, meansFor, moved, typingIn } from "./keys";
 import { useWho } from "../app/session";
+import { counted, heldLine, holding } from "../app/families";
 import { useWeaknessNames } from "../ui/cwe";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
@@ -210,6 +211,10 @@ export function Findings() {
   const [stayed, setStayed] = useState(0);
   const everyMatching = everyFor !== null && everyFor === questionIn(asked);
   const me = useWho();
+  // Whether this list's total means what it says: the line names a list the
+  // reader reads only disclosed findings in, or one they read none of.
+  const dependencies = holding(me.data, "dependency", product || undefined);
+  const heldSaid = heldLine(dependencies);
   const [handing, setHanding] = useState("");
   // The list somebody has turned down a prepared decision for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
@@ -953,6 +958,7 @@ export function Findings() {
           )}
         </p>
       </div>
+      {heldSaid && counted(dependencies) && <p className="hint">{heldSaid}</p>}
 
       {controls}
 
@@ -1065,20 +1071,24 @@ export function Findings() {
           // that produced it are scrolled off above, and the reader is looking
           // at a panel that says so and offers nothing. What is on, and the
           // way to take it all off.
-          <Empty
-            title="Nothing matches these filters."
-            detail={
-              advanced > 0
-                ? `${advanced.toLocaleString()} ${advanced === 1 ? "filter is" : "filters are"} narrowing this list.`
-                : "Nothing is open here at all."
-            }
-          >
-            {advanced > 0 && (
-              <button type="button" className="btn quiet" onClick={() => ask(withoutAny(asked))}>
-                Clear every filter
-              </button>
-            )}
-          </Empty>
+          !counted(dependencies) ? (
+            <Empty title="Nothing to list." detail={heldSaid} />
+          ) : (
+            <Empty
+              title="Nothing matches these filters."
+              detail={
+                advanced > 0
+                  ? `${advanced.toLocaleString()} ${advanced === 1 ? "filter is" : "filters are"} narrowing this list.`
+                  : "Nothing is open here at all."
+              }
+            >
+              {advanced > 0 && (
+                <button type="button" className="btn quiet" onClick={() => ask(withoutAny(asked))}>
+                  Clear every filter
+                </button>
+              )}
+            </Empty>
+          )
         ) : (
           <FindingsTable
             rows={rows}

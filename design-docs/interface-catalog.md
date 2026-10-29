@@ -4,7 +4,7 @@ The catalog, uploading an inventory, the Uploads screen and its receipts, an
 upload's changes, the repositories screen, the product page, a scan run's page,
 release comparison, and a tag's release page.
 
-Satisfies REQ-05, REQ-13, REQ-15, REQ-54, REQ-60.
+Satisfies REQ-05, REQ-13, REQ-15, REQ-42, REQ-54, REQ-60.
 
 ## Contents
 
@@ -132,6 +132,7 @@ products table is administration; this page is reading how something goes.
 | The product's totals are counted again over the product, never summed from builds | A sum put 15,231 over a list of 7,629 |
 | "Undecided" and "agreed" are the findings list's words, from the same expression | |
 | A build never scanned is a row; one out of support says so | |
+| The figures and each build's counts are dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: absent for a reader not reading them here, with one line where they are read in another product; the builds and their last scans stay | Zeros for a reader holding security testing alone read as a clean product |
 
 A scan run's page, Known vulnerability scan, is reached from the upload's state,
 its breadcrumb under Uploads, and release comparison's "the known vulnerability
