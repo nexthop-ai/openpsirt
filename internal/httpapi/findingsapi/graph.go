@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -29,6 +30,10 @@ type NeighborBody struct {
 	// sum to `beneath`, because an issue has one rating.
 	BeneathBy map[string]int `json:"beneath_by_severity,omitempty" doc:"The same number by how the issues were rated, which is what says whether a branch is worth opening. 'unrated' is what nobody scored, and the bands sum to beneath"`
 	Children  int            `json:"children" doc:"The number of components it pulls in. Zero means nothing to open"`
+	// The code findings are asked for apart, by a reader who reads them, so a
+	// tree drawn for anybody else does not count them.
+	CodeFindings *int `json:"code_findings,omitempty" doc:"Open code findings placed on this component itself, where code_findings was asked for. On the build's own root these are the code findings in files no repository of the build holds"`
+	CodeBeneath  *int `json:"code_findings_beneath,omitempty" doc:"Open code findings placed on it and everything under it, each once, where code_findings was asked for"`
 	// Ecosystem is what tells two components of one name and one version
 	// apart. The endpoint that answers about one refuses a name the build
 	// holds twice and says to send this; a list that did not carry it left
@@ -93,12 +98,16 @@ func registerGraph(api huma.API, in core.Deps) {
 		Variant     string `path:"variant"`
 		Term        string `query:"q" maxLength:"200" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
 		Limit       int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of matches returned. Only read when searching"`
+		Code        bool   `query:"code_findings" doc:"Count the open code findings on each component and beneath it as well. Requires security-testing-read on the product"`
 	}) (*rootsOutput, error) {
-		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
+		subject, product, build, err := core.BrowsingIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		store := graph.NewStore(in.DB.DB)
+		store, err := countingCode(in, subject, product, input.Code)
+		if err != nil {
+			return nil, err
+		}
 
 		// A refusal from the store is the answer a build nobody declared
 		// gets, not a fault. Falling through to the fault answer, this route
@@ -130,7 +139,7 @@ func registerGraph(api huma.API, in core.Deps) {
 				return nil, core.WentWrong(in.Logger, "the build could not be searched", err)
 			}
 			out.Body.Term = input.Term
-			out.Body.Items = neighbors(found)
+			out.Body.Items = neighbors(found, input.Code)
 			return out, nil
 		}
 
@@ -141,9 +150,9 @@ func registerGraph(api huma.API, in core.Deps) {
 		case err != nil:
 			return nil, core.WentWrong(in.Logger, "the build's contents could not be read", err)
 		}
-		out.Body.Items = neighbors(roots)
+		out.Body.Items = neighbors(roots, input.Code)
 		if root != nil {
-			at := neighbors([]graph.Neighbor{*root})[0]
+			at := neighbors([]graph.Neighbor{*root}, input.Code)[0]
 			out.Body.Root = &at
 		}
 		return out, nil
@@ -174,12 +183,17 @@ func registerGraph(api huma.API, in core.Deps) {
 		Version     string `query:"version" doc:"The version, where the build ships that name at more than one"`
 		Ecosystem   string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components"`
 		Namespace   string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components"`
+		Code        bool   `query:"code_findings" doc:"Count the open code findings on each component and beneath it as well. Requires security-testing-read on the product"`
 	}) (*struct{ Body AroundBody }, error) {
-		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
+		subject, product, build, err := core.BrowsingIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		above, below, err := graph.NewStore(in.DB.DB).Around(ctx, subject, build,
+		store, err := countingCode(in, subject, product, input.Code)
+		if err != nil {
+			return nil, err
+		}
+		above, below, err := store.Around(ctx, subject, build,
 			input.Component, graph.Choice{
 				Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
 			})
@@ -187,15 +201,38 @@ func registerGraph(api huma.API, in core.Deps) {
 			return nil, core.AmbiguousOrMissing(in.Logger, err)
 		}
 		return &struct{ Body AroundBody }{Body: AroundBody{
-			Above: neighbors(above), Below: neighbors(below),
+			Above: neighbors(above, input.Code), Below: neighbors(below, input.Code),
 		}}, nil
 	})
 }
 
-func neighbors(rows []graph.Neighbor) []NeighborBody {
+// countingCode is the graph store, counting code findings where they were
+// asked for. A reader who does not read security testing material in the
+// product is refused: a count of code findings is at that visibility, and a
+// flaw's reader reads one code finding, not the figures.
+func countingCode(in core.Deps, subject access.Subject, productID int64, asked bool) (*graph.Store, error) {
+	store := graph.NewStore(in.DB.DB)
+	if !asked {
+		return store, nil
+	}
+	if !subject.Reads(access.SecurityTesting, productID) {
+		return nil, core.Refused(in.Logger, access.Denied("count the code findings in the tree"),
+			"code finding counts need security-testing-read on the product")
+	}
+	return store.CountingCode(func(ctx context.Context, buildID int64, components []int64) (map[int64][]string, error) {
+		return analysis.OpenOn(ctx, in.DB.DB, subject, productID, buildID, components)
+	}), nil
+}
+
+func neighbors(rows []graph.Neighbor, code bool) []NeighborBody {
 	out := make([]NeighborBody, 0, len(rows))
 	for _, row := range rows {
+		var on, beneath *int
+		if code {
+			on, beneath = &row.CodeFindings, &row.CodeBeneath
+		}
 		out = append(out, NeighborBody{
+			CodeFindings: on, CodeBeneath: beneath,
 			Component: row.Name, Version: row.Version,
 			Findings: row.Findings, Beneath: row.Beneath,
 			BeneathBy: banded(row.BeneathBy),

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -16,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
@@ -54,6 +56,23 @@ type Scope struct {
 	// Method keeps the code findings one testing method reported. Empty, every
 	// method.
 	Method Method
+	// Component keeps the code findings placed on one source package: every
+	// binary built from a source of this name, or of the source a binary of
+	// this name was built from, compared without regard to capitals, as the
+	// component screen reads a name. ComponentVersion keeps the source at one
+	// version. Empty, every component.
+	Component        string
+	ComponentVersion string
+	// Beneath keeps the code findings on the build BuildID names that are
+	// placed at this component or anywhere under it, by the walk the
+	// dependency tree counts with. Nil, no narrowing.
+	Beneath *int64
+	BuildID *int64
+	// on keeps the code findings on BuildID placed on these components, for
+	// counting what sits on each.
+	on []int64
+	// placing reads whether each code finding is placed on the build itself.
+	placing bool
 }
 
 // Method is a way of testing our own code, by the word people search for it
@@ -308,7 +327,7 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
-		ColumnExpr(`"f"."id", "f"."occurrence_identity", "f"."build_id", "f"."opened_at", "si"."series_id", "t"."branch_or_tag_id"`).
+		ColumnExpr(`"f"."id", "f"."occurrence_identity", "f"."build_id", "f"."component_id", "f"."opened_at", "si"."series_id", "t"."branch_or_tag_id"`).
 		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 		ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
 		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
@@ -333,6 +352,31 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 	}
 	if scope.Method != "" {
 		q = q.Where(`"f"."kind" = ?`, methodKinds[scope.Method])
+	}
+	if name := graph.Folded(scope.Component); name != "" {
+		// The fold keys the name reaches, matched as the component screen
+		// matches it, so a binary's name reaches every binary of its source.
+		folds := db.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`"c"."fold_key"`).
+			Where(`("c"."name_folded" = ? OR "c"."upstream_folded" = ?)`, name, name)
+		if version := strings.TrimSpace(scope.ComponentVersion); version != "" {
+			folds = folds.Where(finding.SourceVersion+` = ?`, version)
+		}
+		q = q.Where(`"f"."component_id" IN (?)`, db.NewSelect().TableExpr(`"component" AS "pc"`).
+			ColumnExpr(`"pc"."id"`).Where(`"pc"."fold_key" IN (?)`, folds))
+	}
+	if scope.BuildID != nil {
+		q = q.Where(`"f"."build_id" = ?`, *scope.BuildID)
+		if scope.Beneath != nil {
+			// The subtree as the engine walks it: under a build's root it is
+			// the whole build.
+			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAny(db, *scope.BuildID, []int64{*scope.Beneath}))
+		}
+		if scope.on != nil {
+			q = q.Where(`"f"."component_id" IN (?)`, bun.List(scope.on))
+		}
+	}
+	if scope.placing {
+		q = q.ColumnExpr(`CASE WHEN `+wasRoot(`"f"."build_id"`, `"f"."component_id"`)+` THEN 1 ELSE 0 END AS "unplaced"`, true)
 	}
 	if scope.Series != "" {
 		named, namedArgs := kind.CodeFindings.Where(`"sn"."kind"`)

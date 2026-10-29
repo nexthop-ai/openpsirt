@@ -4,13 +4,14 @@ How a product's code findings are listed, ordered, counted and written out,
 the weakness families the order rests on, and code findings two analyzers
 report as one flaw.
 
-Satisfies REQ-30, REQ-42, REQ-43, REQ-50.
+Satisfies REQ-17, REQ-30, REQ-42, REQ-43, REQ-50, REQ-56, REQ-64.
 
 ## Contents
 
 - [Code finding queue](#code-finding-queue)
 - [Queue file](#queue-file)
 - [Code findings by series](#code-findings-by-series)
+- [Code findings of a component](#code-findings-of-a-component)
 - [Weakness families](#weakness-families)
 - [Grouped code findings](#grouped-code-findings)
 - [Limits](#limits)
@@ -46,6 +47,9 @@ its code findings out.
 | A series narrows by name, ignoring capitals; an unknown name lists nothing | |
 | A testing method narrows to its kind; the filter offers every method known, and an unrecorded one is refused by name | SAST, the analysis kind, is the one recorded |
 | Narrowed to unheld work, it keeps code findings with no holder on each row's build, under the findings list's parameter, and every count follows | The findings list holds no code finding |
+| A component narrows to the code findings placed on a source package, by a binary's name or the source's, ignoring capitals; a version narrows to the source version it was built at, and every count follows | The component screen names a source package (`design-docs/interface-component.md` § The component screen) |
+| Beneath a component narrows to one build and the code findings placed at the component or anywhere under it, by the tree's walk, and every count follows (REQ-56) | A tree count opens the list it counts |
+| Beneath is refused without one build; a name the build does not hold answers not found, after the reader is authorized (REQ-42) | An empty list is a clean subtree, and a refusal after resolving a name is a directory |
 | A rule's rating is the newest naming run's, held until rated again | |
 | A rule's tier is the highest of every weakness recorded for it, re-ranked each run naming it | |
 | A severity outside 0 to 10 or not a number, and an unknown precision, are none | |
@@ -79,6 +83,34 @@ analyzer series by state, drawn as Code findings by analyzer
 | A series with no code finding is listed with zeros | |
 | Only `security-testing-read` on the product reads it; anybody else is refused naming no count or series | Counts are at security testing visibility; a flaw's reader reads one code finding, not the figures |
 | Ordered by series name | |
+
+## Code findings of a component
+
+Every count here is the queue's own read for the same reader, narrowed by
+component, so a count is the length of the list it opens. Code findings are
+counted by occurrence, once however many builds hold one (REQ-17). Only
+`security-testing-read` on the product reads any of them; anybody else is
+refused naming no count, before any component name is resolved (REQ-42,
+REQ-43).
+
+| Read | Counts |
+|---|---|
+| `GET /v1/products/{product}/components/{component}/code-finding-counts` | Every series of the product by state, zero included, over every build; the open ones placed on a build's own root, as unplaced; and the open ones per build and source version |
+| The tree's components and one step around a component, with `code_findings` | Open code findings on each row's component and at it or under it, one build |
+| `GET .../components/{component}/code-finding-trend` | Per week on one build: the code findings at the component or under it not fixed at its end, and those opened and fixed in it |
+| `GET /v1/components?q=` | Open code findings on each source package a term matches, beside its open issues (`design-docs/interface-shell.md` § The search box) |
+
+| Rule | Reason |
+|---|---|
+| Open is the queue's open state, a decision waiting included | The list a count opens holds them |
+| Unplaced is the code findings on a build's root component: what no repository the build is built from holds (`design-docs/analysis-source.md` § Placement) | The root is a component, so the tree counts them on its root row |
+| Under a tree row is the union of the occurrences on everything the walk reaches from it, each once | A code finding placed on a library pulled in twice is one |
+| A tree count is asked for only with `code_findings`; asked by a reader not reading security testing material, the read is refused | A count not drawn is not asked for |
+| The trend's line is not fixed: from opening until a person closes it as fixed; a decision answers a code finding and closes nothing, and absence closes nothing | Ruling a code finding not a problem keeps its record; the line counts what remains in the code |
+| Opened and fixed are the difference between one week's set and the last, so the three numbers agree | |
+| Plotted on when a run was applied, as the dependency trend is | |
+| The weeks are 1 to 104, twelve unless named | |
+| A chooser match in a product where the reader does not read security testing material carries no code finding count; one where they read no dependency finding carries no issue count | Absent is never zero (`design-docs/interface.md` § Families a reader holds) |
 
 ## Weakness families
 

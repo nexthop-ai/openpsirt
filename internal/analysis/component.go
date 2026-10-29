@@ -1,0 +1,284 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package analysis
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+)
+
+// BuildCount is how many open code findings one build places on a source
+// package at one version.
+type BuildCount struct {
+	BranchOrTag string `bun:"branch_or_tag"`
+	Variant     string `bun:"variant"`
+	// Version is the version the source package was built at, as the
+	// component screen names it.
+	Version string `bun:"source_version"`
+	Open    int    `bun:"open"`
+}
+
+// ComponentCounts is how many code findings a product places on one source
+// package: per analyzer series and state over every build, and the open ones
+// per build and source version.
+type ComponentCounts struct {
+	Series []SeriesCount
+	Builds []BuildCount
+}
+
+// readsSecurityTesting refuses a count of code findings to anybody who does
+// not read security testing material in the product. A count is at security
+// testing visibility however it is narrowed; a flaw's reader reads one code
+// finding, not the figures.
+func readsSecurityTesting(subject access.Subject, productID int64, what string) error {
+	if !subject.Sees(productID) || !subject.Reads(access.SecurityTesting, productID) {
+		return access.Denied(fmt.Sprintf("%s of product %d", what, productID))
+	}
+	return nil
+}
+
+// CountsOfComponent is how many code findings a product places on the source
+// package scope.Component names, read as the queue reads them for the same
+// reader, so each count is the length of the list asking for that component,
+// series and state. Every series of the product is listed, zero included.
+//
+// Unplaced on each series is the open code findings placed on the build
+// itself: a build's root is a component, and what no repository of the build
+// holds is placed there.
+func CountsOfComponent(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope) (*ComponentCounts, error) {
+	if err := readsSecurityTesting(subject, scope.ProductID, "count the code findings of a component"); err != nil {
+		return nil, err
+	}
+	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
+	if err != nil {
+		return nil, err
+	}
+	scope.placing = true
+	series, err := countBySeries(ctx, db, subject, scope, visible)
+	if err != nil {
+		return nil, err
+	}
+
+	var unplaced []struct {
+		SeriesID     int64 `bun:"series_id"`
+		CodeFindings int   `bun:"code_findings"`
+	}
+	if err := db.NewSelect().
+		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+		ColumnExpr(`"l"."series_id", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
+		Where(`"l"."stands" = ?`, string(Open)).
+		Where(`"l"."unplaced" = 1`).
+		GroupExpr(`"l"."series_id"`).
+		Scan(ctx, &unplaced); err != nil {
+		return nil, fmt.Errorf("count the unplaced code findings of product %d: %w", scope.ProductID, err)
+	}
+	for _, each := range unplaced {
+		if one, ok := series.at[each.SeriesID]; ok {
+			one.Unplaced = each.CodeFindings
+		}
+	}
+
+	out := &ComponentCounts{Series: series.out}
+	if err := db.NewSelect().
+		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "l"."component_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "l"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
+		ColumnExpr(`"s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
+		ColumnExpr(finding.SourceVersion+` AS "source_version"`).
+		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity") AS "open"`).
+		Where(`"l"."stands" = ?`, string(Open)).
+		GroupExpr(`"s"."name", "va"."name", `+finding.SourceVersion).
+		OrderExpr(`"s"."name", "va"."name", `+finding.SourceVersion).
+		Scan(ctx, &out.Builds); err != nil {
+		return nil, fmt.Errorf("count the open code findings of a component per build in product %d: %w", scope.ProductID, err)
+	}
+	return out, nil
+}
+
+// OpenOn is the open code findings one build places on each of these
+// components, by occurrence, where the subject may read them. Refused to
+// anybody who does not read security testing material in the product, as
+// every count of code findings is.
+func OpenOn(ctx context.Context, db bun.IDB, subject access.Subject, productID, buildID int64,
+	components []int64) (map[int64][]string, error) {
+
+	if err := readsSecurityTesting(subject, productID, "count the code findings in the tree"); err != nil {
+		return nil, err
+	}
+	out := map[int64][]string{}
+	if len(components) == 0 {
+		return out, nil
+	}
+	visible, err := finding.CodeFindingVisible(subject, productID)
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		ComponentID int64  `bun:"component_id"`
+		Occurrence  string `bun:"occurrence_identity"`
+	}
+	scope := Scope{ProductID: productID, BuildID: &buildID, on: components}
+	if err := db.NewSelect().
+		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+		ColumnExpr(`"l"."component_id", "l"."occurrence_identity"`).
+		Where(`"l"."stands" = ?`, string(Open)).
+		GroupExpr(`"l"."component_id", "l"."occurrence_identity"`).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read the open code findings on components of build %d: %w", buildID, err)
+	}
+	for _, row := range rows {
+		out[row.ComponentID] = append(out[row.ComponentID], row.Occurrence)
+	}
+	return out, nil
+}
+
+// TrendPoint is the code findings at a moment: those not fixed, and those
+// opened and fixed in the step it ends.
+type TrendPoint struct {
+	At       time.Time
+	NotFixed int
+	Opened   int
+	Fixed    int
+}
+
+// TrendBeneath is the code findings one build places at a component or
+// anywhere under it, step by step: how many were not fixed at the end of each
+// step, and how many were opened and fixed in it. Plotted on when a run was
+// applied, as the dependency trend is.
+//
+// A code finding is not fixed from when it opened until a person closes it as
+// fixed: absence closes nothing, and a decision answers a code finding
+// without closing it.
+// Refused to anybody who does not read security testing material in the
+// product.
+func TrendBeneath(ctx context.Context, db bun.IDB, subject access.Subject, productID, buildID, beneath int64,
+	since time.Time, step time.Duration, steps int) ([]TrendPoint, error) {
+
+	if err := readsSecurityTesting(subject, productID, "trend the code findings of a component"); err != nil {
+		return nil, err
+	}
+	visible, err := finding.CodeFindingVisible(subject, productID)
+	if err != nil {
+		return nil, err
+	}
+	until := since.Add(time.Duration(steps) * step)
+	reach := finding.CodeFindingReach(subject, productID)
+	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
+	var rows []struct {
+		Occurrence string     `bun:"occurrence_identity"`
+		OpenedAt   time.Time  `bun:"opened_at"`
+		ClosedAt   *time.Time `bun:"closed_at"`
+	}
+	err = db.NewSelect().TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`"f"."occurrence_identity", "f"."opened_at", "f"."closed_at"`).
+		Where(`"f"."build_id" = ?`, buildID).
+		Where(`"f"."component_id" IN (?)`, graph.WithinAny(db, buildID, []int64{beneath})).
+		Where(kinds, kindArgs...).
+		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
+		Where(`"f"."opened_at" <= ?`, until).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr(`"f"."closed_at" IS NULL`).WhereOr(`"f"."closed_at" > ?`, since)
+		}).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read the code findings beneath a component of build %d over time: %w", buildID, err)
+	}
+
+	// Each step is the set of occurrences not fixed at its end, and the flows
+	// are the difference between one set and the last, so the three numbers
+	// agree. A code finding closes only as fixed.
+	open := make([]map[string]bool, steps)
+	for i := range open {
+		open[i] = map[string]bool{}
+	}
+	for _, row := range rows {
+		for i := 0; i < steps; i++ {
+			to := since.Add(time.Duration(i+1) * step)
+			if row.OpenedAt.After(to) || (row.ClosedAt != nil && !row.ClosedAt.After(to)) {
+				continue
+			}
+			open[i][row.Occurrence] = true
+		}
+	}
+	points := make([]TrendPoint, 0, steps)
+	for i := 0; i < steps; i++ {
+		point := TrendPoint{At: since.Add(time.Duration(i+1) * step), NotFixed: len(open[i])}
+		if i > 0 {
+			for occurrence := range open[i] {
+				if !open[i-1][occurrence] {
+					point.Opened++
+				}
+			}
+			for occurrence := range open[i-1] {
+				if !open[i][occurrence] {
+					point.Fixed++
+				}
+			}
+		}
+		points = append(points, point)
+	}
+	return points, nil
+}
+
+// OpenOfMatches is the open code findings on each matched source package in
+// its product's builds in scope, as the queue counts them for the same reader
+// asked for the source by name. A match in a product where the subject does
+// not read security testing material has no entry: a count of code findings
+// is at that visibility.
+func OpenOfMatches(ctx context.Context, db bun.IDB, subject access.Subject,
+	matches []finding.SourceMatch) (map[int]int, error) {
+
+	out := map[int]int{}
+	byProduct := map[int64][]int{}
+	for i, m := range matches {
+		byProduct[m.ProductID] = append(byProduct[m.ProductID], i)
+	}
+	for productID, at := range byProduct {
+		if readsSecurityTesting(subject, productID, "count the code findings of components") != nil {
+			continue
+		}
+		visible, err := finding.CodeFindingVisible(subject, productID)
+		if err != nil {
+			return nil, err
+		}
+		names := make([]string, 0, len(at))
+		for _, i := range at {
+			names = append(names, matches[i].Folded)
+		}
+		folds, foldArgs := finding.NamedFolds(names)
+		var counted []struct {
+			Asked        string `bun:"asked"`
+			CodeFindings int    `bun:"code_findings"`
+		}
+		if err := db.NewSelect().
+			TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, Scope{ProductID: productID}, visible)).
+			Join(`JOIN "component" AS "pc" ON "pc"."id" = "l"."component_id"`).
+			Join(`JOIN `+folds+` ON "nf"."fold_key" = "pc"."fold_key"`, foldArgs...).
+			ColumnExpr(`"nf"."asked", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
+			Where(`"l"."stands" = ?`, string(Open)).
+			Where(`"l"."build_id" IN (?)`, bun.List(matches[at[0]].Builds)).
+			GroupExpr(`"nf"."asked"`).
+			Scan(ctx, &counted); err != nil {
+			return nil, fmt.Errorf("count the open code findings on components of product %d: %w", productID, err)
+		}
+		open := map[string]int{}
+		for _, c := range counted {
+			open[c.Asked] = c.CodeFindings
+		}
+		for _, i := range at {
+			out[i] = open[matches[i].Folded]
+		}
+	}
+	return out, nil
+}

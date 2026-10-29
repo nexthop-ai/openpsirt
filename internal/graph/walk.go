@@ -82,6 +82,64 @@ func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 // screen. With the queue on the outside each step is one index seek, and
 // the same two statements take 0.018 s and 0.08 s.
 
+// reaching is one component a walk started from, and one it reached.
+type reaching struct {
+	Start   int64 `bun:"start"`
+	Reached int64 `bun:"reached"`
+}
+
+// reach walks beneath each of these components in one statement, answering
+// every component each one reaches, itself included.
+func (s *Store) reach(ctx context.Context, buildID int64, of []int64, adopt adoption) ([]reaching, error) {
+	if len(of) == 0 {
+		return nil, nil
+	}
+	// Every start is walked from itself. An adoption walks the adopted
+	// components as though from the one adopting them, so the adopter's count
+	// is its own subtree and theirs as one set, in the same walk as everything
+	// else being counted.
+	seeds := `SELECT "n"."id" AS "start", "n"."id" AS "node"
+		FROM "graph_node" AS "n"
+		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
+	walkArgs := []any{buildID, bun.List(of)}
+	if len(adopt.IDs) > 0 {
+		seeds += `
+		UNION ALL
+		SELECT "bn"."id", "n"."id"
+		FROM "graph_node" AS "bn"
+		JOIN "graph_node" AS "n" ON "n"."build_id" = "bn"."build_id"
+		WHERE "bn"."build_id" = ? AND "bn"."closed_scan_id" IS NULL AND "bn"."component_id" = ?
+		  AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
+		walkArgs = append(walkArgs, buildID, adopt.By, bun.List(adopt.IDs))
+	}
+	walkArgs = append(walkArgs, buildID)
+	// No depth in the rows. With one, the union keeps a node once per depth
+	// it is reached at, and a node reached along many paths is walked again
+	// from each: 1,612,405 rows for 43,904 pairs under one real product's
+	// root, 9.0 s against 0.19 s. Without one, a pair already reached is not
+	// added again, which is also what ends a cycle.
+	walk := `WITH RECURSIVE "down" AS (
+		SELECT "seed"."start", "seed"."node" FROM (` + seeds + `) AS "seed"
+		UNION
+		SELECT "d"."start", "e"."child_id"
+		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
+		WHERE "e"."build_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
+		  AND "e"."parent_id" <> "e"."child_id"
+	)
+	`
+
+	var reached []reaching
+	err := s.db.NewRaw(walk+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
+	FROM "down" AS "d"
+	JOIN "graph_node" AS "sn" ON "sn"."id" = "d"."start"
+	JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`, walkArgs...).
+		Scan(ctx, &reached)
+	if err != nil {
+		return nil, fmt.Errorf("walk beneath each component: %w", err)
+	}
+	return reached, nil
+}
+
 // beneath counts the distinct issues open under each of these components,
 // including on it.
 //
@@ -121,59 +179,9 @@ func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 // issues; the total is summed from them by the caller, so the number and its
 // parts cannot disagree.
 func (s *Store) beneath(ctx context.Context, productID, buildID int64,
-	visible []access.Visibility, of []int64, adopt adoption) (map[int64]map[string]int, error) {
+	visible []access.Visibility, reached []reaching) (map[int64]map[string]int, error) {
 
 	totals := map[int64]map[string]int{}
-	if len(of) == 0 {
-		return totals, nil
-	}
-	// Every start is walked from itself. An adoption walks the adopted
-	// components as though from the one adopting them, so the adopter's count
-	// is its own subtree and theirs as one set, in the same walk as everything
-	// else being counted.
-	seeds := `SELECT "n"."id" AS "start", "n"."id" AS "node"
-		FROM "graph_node" AS "n"
-		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-	walkArgs := []any{buildID, bun.List(of)}
-	if len(adopt.IDs) > 0 {
-		seeds += `
-		UNION ALL
-		SELECT "bn"."id", "n"."id"
-		FROM "graph_node" AS "bn"
-		JOIN "graph_node" AS "n" ON "n"."build_id" = "bn"."build_id"
-		WHERE "bn"."build_id" = ? AND "bn"."closed_scan_id" IS NULL AND "bn"."component_id" = ?
-		  AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-		walkArgs = append(walkArgs, buildID, adopt.By, bun.List(adopt.IDs))
-	}
-	walkArgs = append(walkArgs, buildID)
-	// No depth in the rows. With one, the union keeps a node once per depth
-	// it is reached at, and a node reached along many paths is walked again
-	// from each: 1,612,405 rows for 43,904 pairs under one real product's
-	// root, 9.0 s against 0.19 s. Without one, a pair already reached is not
-	// added again, which is also what ends a cycle.
-	walk := `WITH RECURSIVE "down" AS (
-		SELECT "seed"."start", "seed"."node" FROM (` + seeds + `) AS "seed"
-		UNION
-		SELECT "d"."start", "e"."child_id"
-		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE "e"."build_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
-		  AND "e"."parent_id" <> "e"."child_id"
-	)
-	`
-
-	var reached []struct {
-		Start   int64 `bun:"start"`
-		Reached int64 `bun:"reached"`
-	}
-	err := s.db.NewRaw(walk+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
-	FROM "down" AS "d"
-	JOIN "graph_node" AS "sn" ON "sn"."id" = "d"."start"
-	JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`, walkArgs...).
-		Scan(ctx, &reached)
-	if err != nil {
-		return nil, fmt.Errorf("walk beneath each component: %w", err)
-	}
-
 	// The occurrences are grouped to one row per issue on a component before the
 	// rating is joined, and only on the components the walk reaches.
 	var open []struct {
@@ -195,7 +203,7 @@ func (s *Store) beneath(ctx context.Context, productID, buildID int64,
 	kinds, kindArgs := kind.Inventory.Where(`"f"."kind"`)
 	args := append([]any{buildID, bun.List(visible)}, kindArgs...)
 	args = append(args, bun.List(all), productID)
-	err = s.db.NewRaw(`SELECT "g"."component_id" AS "component_id", "g"."vulnerability_id" AS "vulnerability_id",
+	err := s.db.NewRaw(`SELECT "g"."component_id" AS "component_id", "g"."vulnerability_id" AS "vulnerability_id",
 	       `+rating.EffectiveExpr+` AS "band"
 	FROM (SELECT "f"."component_id" AS "component_id", "f"."vulnerability_id" AS "vulnerability_id"
 	      FROM "finding" AS "f"
@@ -559,4 +567,52 @@ func (r region) unwind() map[int64][]Step {
 		chains[component] = chain
 	}
 	return chains
+}
+
+// codeCounts is the open code findings on each component counted, and on it
+// and everything it reaches, each once.
+type codeCounts struct {
+	on      map[int64]int
+	beneath map[int64]int
+}
+
+// codeBeneath counts the open code findings on and beneath each start of a
+// walk, by the components it reached, where the store counts code findings.
+// Nil where it does not.
+func (s *Store) codeBeneath(ctx context.Context, buildID int64, reached []reaching) (*codeCounts, error) {
+	if s.code == nil {
+		return nil, nil
+	}
+	out := &codeCounts{on: map[int64]int{}, beneath: map[int64]int{}}
+	seen := map[int64]bool{}
+	var all []int64
+	for _, row := range reached {
+		if !seen[row.Reached] {
+			seen[row.Reached] = true
+			all = append(all, row.Reached)
+		}
+	}
+	on, err := s.code(ctx, buildID, all)
+	if err != nil {
+		return nil, err
+	}
+	under := map[int64]map[string]bool{}
+	for _, row := range reached {
+		if row.Start == row.Reached {
+			out.on[row.Start] = len(on[row.Start])
+		}
+		if len(on[row.Reached]) == 0 {
+			continue
+		}
+		if under[row.Start] == nil {
+			under[row.Start] = map[string]bool{}
+		}
+		for _, occurrence := range on[row.Reached] {
+			under[row.Start][occurrence] = true
+		}
+	}
+	for start, occurrences := range under {
+		out.beneath[start] = len(occurrences)
+	}
+	return out, nil
 }

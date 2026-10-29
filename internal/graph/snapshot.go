@@ -109,6 +109,22 @@ type Applied struct {
 type Store struct {
 	db         bun.IDB
 	components *Components
+	// code counts the open code findings on components, where the reader
+	// asked for them beside the issues. Nil, none are counted.
+	code CodeCounter
+}
+
+// CodeCounter reads the open code findings one build places on each of these
+// components, by occurrence, narrowed to the reader. The graph cannot read
+// them itself: their state is the analysis package's, which reads the graph.
+type CodeCounter func(ctx context.Context, buildID int64, components []int64) (map[int64][]string, error)
+
+// CountingCode is the store with every neighbor it answers carrying the open
+// code findings on it and beneath it as well, by the same walk as its issues.
+func (s *Store) CountingCode(counter CodeCounter) *Store {
+	counting := *s
+	counting.code = counter
+	return &counting
 }
 
 // NewStore returns a graph store over db.
@@ -674,6 +690,12 @@ type Neighbor struct {
 	// the count is the issues there, not the rows across every occurrence.
 	Findings int `bun:"findings"`
 	Beneath  int `bun:"beneath,scanonly"`
+	// CodeFindings and CodeBeneath are the open code findings on it, and on
+	// it and everything under it with each once, where the store counts code
+	// findings. A code finding is at one occurrence, so the union is of
+	// occurrences, as the issues' is of issues.
+	CodeFindings int `bun:"-"`
+	CodeBeneath  int `bun:"-"`
 	// BeneathBy is that same number by how the issues were rated. A node
 	// saying five thousand beneath it says nothing about whether any of it
 	// matters, which is exactly what somebody deciding where to descend is
@@ -769,7 +791,15 @@ func (s *Store) filledWith(ctx context.Context, productID, buildID int64,
 			ids = append(ids, row.ComponentID)
 		}
 	}
-	totals, err := s.beneath(ctx, productID, buildID, readable, ids, adopt)
+	reached, err := s.reach(ctx, buildID, ids, adopt)
+	if err != nil {
+		return err
+	}
+	totals, err := s.beneath(ctx, productID, buildID, readable, reached)
+	if err != nil {
+		return err
+	}
+	codes, err := s.codeBeneath(ctx, buildID, reached)
 	if err != nil {
 		return err
 	}
@@ -783,6 +813,10 @@ func (s *Store) filledWith(ctx context.Context, productID, buildID int64,
 			rows[i].Beneath = 0
 			for _, n := range bands {
 				rows[i].Beneath += n
+			}
+			if codes != nil {
+				rows[i].CodeFindings = codes.on[rows[i].ComponentID]
+				rows[i].CodeBeneath = codes.beneath[rows[i].ComponentID]
 			}
 		}
 	}
@@ -867,6 +901,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, buildID int64
 	}
 	root.Beneath = top[0].Beneath
 	root.BeneathBy = top[0].BeneathBy
+	root.CodeFindings, root.CodeBeneath = top[0].CodeFindings, top[0].CodeBeneath
 	ordered(kids)
 	return root, kids, nil
 }

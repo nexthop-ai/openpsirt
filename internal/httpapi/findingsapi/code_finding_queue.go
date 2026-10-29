@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -64,7 +65,13 @@ type CodeFindingsAsked struct {
 	Method      CodeFindingMethod `query:"method" doc:"Limit to the code findings one testing method reported. Left out, every method. sast is static analysis"`
 	// Assigned is the findings list's parameter and value for work nobody
 	// holds, so the two read alike.
-	Assigned CodeFindingAssignee `query:"assigned" doc:"Limit to the code findings with no holder on the build each row names. Every count is then of those code findings"`
+	Assigned         CodeFindingAssignee `query:"assigned" doc:"Limit to the code findings with no holder on the build each row names. Every count is then of those code findings"`
+	Component        string              `query:"component" maxLength:"200" doc:"Limit to the code findings placed on one source package: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name"`
+	ComponentVersion string              `query:"component_version" maxLength:"200" doc:"Limit component to the source package at this version. Ignored without component"`
+	Beneath          string              `query:"beneath" maxLength:"200" doc:"Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
+	BeneathVersion   string              `query:"beneath_version" maxLength:"200" doc:"The version, where the build holds that name at several"`
+	BeneathEcosystem string              `query:"beneath_ecosystem" maxLength:"200" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+	BeneathNamespace string              `query:"beneath_namespace" maxLength:"200" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
 }
 
 // scoped resolves what is asked for against what the reader may see. A
@@ -83,11 +90,24 @@ func (a CodeFindingsAsked) scoped(ctx context.Context, in core.Deps) (access.Sub
 	if _, err := access.Readable(subject, *scope.ProductID); err != nil {
 		return subject, analysis.Scope{}, core.Refused(in.Logger, err, "cannot read the code findings")
 	}
-	return subject, analysis.Scope{
+	out := analysis.Scope{
 		ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
 		Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
 		Method: analysis.Method(a.Method),
-	}, nil
+	}
+	if out.Component = strings.TrimSpace(a.Component); out.Component != "" {
+		out.ComponentVersion = strings.TrimSpace(a.ComponentVersion)
+	}
+	// Resolved after the product is authorized: a name is looked up only in
+	// a build the reader may read.
+	build, beneath, err := core.BeneathAt(ctx, in, scope, strings.TrimSpace(a.Beneath), graph.Choice{
+		Version: a.BeneathVersion, Ecosystem: a.BeneathEcosystem, Namespace: a.BeneathNamespace,
+	})
+	if err != nil {
+		return subject, analysis.Scope{}, err
+	}
+	out.BuildID, out.Beneath = build, beneath
+	return subject, out, nil
 }
 
 // codeFindingRows is a page of code findings as the list and its file both state them, with
@@ -166,7 +186,10 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			"releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in " +
 			"such releases is kept as it stands: a decision, a fixed closure, an assignment and recording " +
 			"it as a flaw are refused with 409. " +
-			"`branch_or_tag`, `variant`, `series` and `method` are optional and independent. `assigned=nobody` keeps " +
+			"`branch_or_tag`, `variant`, `series` and `method` are optional and independent. `component` keeps " +
+			"the code findings placed on one source package, by its name or a binary's. `beneath` keeps those " +
+			"placed at a component or under it on one build, which needs a branch or tag and a variant. " +
+			"`assigned=nobody` keeps " +
 			"the code findings nobody holds on the build each row names, and combines with every other filter. " +
 			"Supports limit and offset.",
 		Tags: []string{"Findings"},
@@ -222,6 +245,15 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 		}
 		if input.Assigned == finding.HeldByNobody {
 			listing += ", nobody holding them"
+		}
+		if scope.Component != "" {
+			listing += ", placed on " + scope.Component
+			if scope.ComponentVersion != "" {
+				listing += " " + scope.ComponentVersion
+			}
+		}
+		if scope.Beneath != nil {
+			listing += ", at or beneath " + strings.TrimSpace(input.Beneath)
 		}
 		out := core.Exporting{
 			What:   "code findings",
