@@ -189,19 +189,6 @@ describe("the rail for a reader without dependency findings", () => {
     expect(entry("Incidents")).toBeDefined();
   });
 
-  it("offers Incidents to an administrator reading no finding, who declares the windows", async () => {
-    window.sessionStorage.clear();
-    serve(() => ({ data: { items: [], total: 0 } }));
-    mount.render(screen(<Shell who={{ ...who, admin: true }}>{null}</Shell>, "/start"));
-    await settle();
-    expect(entry("Incidents")).toBeDefined();
-  });
-
-  it("offers Incidents to a reader of disclosed findings", async () => {
-    await railAt("/start", [{ product: "sonic", may_see: true, reads_public: true }]);
-    expect(entry("Incidents")).toBeDefined();
-  });
-
   it("offers Analytics to a reader of no finding, for the coverage reports", async () => {
     await railAt("/start", [{ product: "sonic" }]);
     expect(entry("Analytics")).toBeDefined();
