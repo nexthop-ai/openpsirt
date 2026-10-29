@@ -319,7 +319,7 @@ func TestASweepDoesNotStopBecauseSomebodyTookOneRow(t *testing.T) {
 		sweeper := finding.NewSweeper(r.DB, work,
 			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
 		for range 20 {
-			placed, err := sweeper.Once(t.Context())
+			_, placed, err := sweeper.Once(t.Context())
 			if err != nil {
 				t.Fatalf("sweeping: %v", err)
 			}
@@ -377,7 +377,7 @@ func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
 		}
 		sweeper := finding.NewSweeper(r.DB, work,
 			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
-		if _, err := sweeper.Once(ctx); err == nil {
+		if _, _, err := sweeper.Once(ctx); err == nil {
 			t.Fatal("a full batch whose continuation could not be queued reported success")
 		}
 		done, err := r.DB.DB.NewSelect().Table("job").

@@ -160,7 +160,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			buildIDs = append(buildIDs, build.ID)
 		}
 
-		rows, identifier, err := finding.NewStore(in.DB.DB).Enter(ctx, subject, finding.Entering{
+		rows, identifier, err := finding.NewStore(in.DB.DB).Sweeping(in.Queue).Enter(ctx, subject, finding.Entering{
 			BuildIDs: buildIDs, Component: input.Body.Component,
 			Version: input.Body.Version, Ecosystem: input.Body.Ecosystem,
 			Namespace: input.Body.Namespace,
@@ -912,7 +912,7 @@ func registerAffects(api huma.API, in core.Deps) {
 			buildIDs = append(buildIDs, build.ID)
 		}
 
-		changed, err := finding.NewStore(in.DB.DB).Affects(ctx, subject,
+		changed, err := finding.NewStore(in.DB.DB).Sweeping(in.Queue).Affects(ctx, subject,
 			product.ID, issue, buildIDs, input.Body.Reason)
 		if err != nil {
 			var several *graph.Ambiguous

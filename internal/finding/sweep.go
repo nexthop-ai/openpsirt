@@ -5,16 +5,55 @@ package finding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
+
+// Arrived queues the assignment sweep of a product that work has just opened
+// in, inside the transaction that opened it, so the sweep cannot be claimed
+// before the work it is for exists.
+//
+// A rule places what nobody holds whenever its product's sweep runs, so a
+// sweep runs when a rule is written and when work arrives.
+//
+// Queued only where the product has a rule placing findings, so a deployment
+// with no rules queues nothing. A full sweep queue leaves this arrival to the
+// next one rather than failing what brought it: refusing a scan loses its
+// findings, where an unqueued sweep only delays placing them.
+func Arrived(ctx context.Context, tx bun.IDB, q *queue.Queue, productID int64) error {
+	if q == nil {
+		return nil
+	}
+	ruled, err := tx.NewSelect().Model((*AssignmentRule)(nil)).
+		Where(`"product_id" = ?`, productID).
+		Where(`"retired_at" IS NULL`).
+		Where(`"reports" = ?`, false).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("ask whether a rule places work in product %d: %w", productID, err)
+	}
+	if !ruled {
+		return nil
+	}
+	_, err = q.AddTx(ctx, tx, queue.AssignmentSweep, strconv.FormatInt(productID, 10))
+	if errors.Is(err, queue.ErrBacklogFull) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("queue the assignment sweep of product %d: %w", productID, err)
+	}
+	return nil
+}
 
 // Sweeper applies standing assignment rules to work nobody holds.
 //
@@ -35,14 +74,9 @@ type Sweeper struct {
 }
 
 // NewSweeper is the sweep as a deployment runs it, taking its bound from the
-// deployment rather than from the binary.
-//
-// The bound was a constant here and a second constant in the writer, under a
-// comment declining the decision that says a bulk write's cap is a setting.
-// An operator on a large estate has reason to move it in either direction — a
-// pass too big holds a connection through the whole of it, and one too small
-// leaves a fifty-thousand-finding product re-queuing twenty-five times — and
-// neither is a rebuild.
+// deployment's settings: a pass too big holds a connection through the whole
+// of it, and one too small leaves a fifty-thousand-finding product re-queuing
+// twenty-five times.
 func NewSweeper(db *database.DB, q *queue.Queue, logger *slog.Logger, name string) *Sweeper {
 	return &Sweeper{db: db, queue: q, logger: logger, name: name}
 }
@@ -52,27 +86,24 @@ func NewSweeper(db *database.DB, q *queue.Queue, logger *slog.Logger, name strin
 const betweenSweeps = 10 * time.Second
 
 // Run works the sweep queue until the context ends.
+//
+// A pass claims sweeps until none is waiting, a sweep that places nothing
+// included: most arrivals find their work already placed, and a pass ending
+// there drains one sweep per interval while scans queue them at the speed of
+// the work, until a full queue refuses every rule written.
 func (s *Sweeper) Run(ctx context.Context, interval time.Duration) {
-	background.Every(ctx, interval, betweenSweeps, func(ctx context.Context) {
-		for {
-			placed, err := s.Once(ctx)
-			if err != nil {
-				if ctx.Err() == nil {
-					s.logger.Error("placing work by rule", "error", err)
-				}
-				break
-			}
-			if placed == 0 {
-				break
-			}
+	background.Drain(ctx, interval, betweenSweeps, func(ctx context.Context) (bool, error) {
+		claimed, placed, err := s.Once(ctx)
+		if placed > 0 {
 			s.logger.Info("placed work by rule", "findings", placed)
 		}
-	})
+		return claimed, err
+	}, func(err error) { s.logger.Error("placing work by rule", "error", err) })
 }
 
-// Once claims one sweep and runs a batch of it, reporting how many findings it
-// placed.
-func (s *Sweeper) Once(ctx context.Context) (int, error) {
+// Once claims one sweep and runs a batch of it, reporting whether it claimed
+// one and how many findings it placed.
+func (s *Sweeper) Once(ctx context.Context) (bool, int, error) {
 	// Read as the pass begins rather than when the sweeper was built, so a
 	// number an administrator changes takes effect on the next pass rather
 	// than on the next restart. Read before anything is claimed, so a failure
@@ -80,12 +111,12 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	batch, err := setting.NewStore(s.db.DB).Count(ctx, setting.AssignmentBatch,
 		setting.DefaultAssignmentBatch)
 	if err != nil {
-		return 0, err
+		return false, 0, err
 	}
 
 	job, err := s.queue.Claim(ctx, s.name, queue.AssignmentSweep)
 	if err != nil || job == nil {
-		return 0, err
+		return false, 0, err
 	}
 	productID, err := strconv.ParseInt(job.Reference, 10, 64)
 	if err != nil {
@@ -97,9 +128,9 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 		// otherwise sits claimed until its lease runs out, and nobody hears.
 		if err := s.queue.Fail(settled, job.ID, s.name,
 			fmt.Errorf("not a product: %q", job.Reference)); err != nil {
-			return 0, fmt.Errorf("fail assignment sweep %d, whose reference is not a product: %w", job.ID, err)
+			return true, 0, fmt.Errorf("fail assignment sweep %d, whose reference is not a product: %w", job.ID, err)
 		}
-		return 0, nil
+		return true, 0, nil
 	}
 
 	working, release := s.queue.Holding(ctx, job.ID, s.name, s.logger)
@@ -118,16 +149,14 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	// rather than looped here, so the worker is free between batches and an
 	// operator can see that the work is still going.
 	//
-	// Full is measured by what the batch read rather than by what it wrote:
-	// one assignment made by a person inside the window leaves a row of the
-	// batch already held, and reading that as the end stopped the sweep with
-	// the rest of the estate unrouted and the job reported successful.
+	// Full is measured by what the batch read: one assignment made by a
+	// person inside the window leaves a row of the batch already held, and
+	// counted on writes the sweep ends with the rest of the estate unrouted.
 	//
 	// Queued before this job is settled, and a failure to queue is this job's
-	// failure: settled as done first, a failure to queue the rest stops the
-	// sweep with the rest of the estate unrouted and the job reported
-	// successful. Failed, the job is tried again, and a batch run twice places
-	// only what nobody holds.
+	// failure, which is tried again: settled as done first, a failure to queue
+	// the rest ends the sweep as a success. A batch run twice places only what
+	// nobody holds.
 	if filled && err == nil {
 		// Its own context that outlives a cancellation, for the same reason
 		// settling has one: a shutdown must not be what loses the rest of the
@@ -141,7 +170,7 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 
 	ending := s.queue.Settle(ctx, job, s.name, "product", s.logger, err, taken, nil)
 	if ending.HandedOver || ending.Err != nil {
-		return placed, ending.Err
+		return true, placed, ending.Err
 	}
-	return placed, nil
+	return true, placed, nil
 }

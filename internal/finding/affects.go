@@ -213,6 +213,11 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			// just stated.
 			out.Added++
 		}
+		if opened > 0 {
+			if err := Arrived(ctx, tx, s.sweeps, productID); err != nil {
+				return err
+			}
+		}
 
 		out.Closed = len(leaving)
 		if len(closing) == 0 {

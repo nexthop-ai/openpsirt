@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
@@ -695,6 +696,9 @@ type Recording struct {
 	// a person confirmed and the component they chose.
 	Flaw                finding.Entering
 	IncludeInDisclosure bool
+	// Sweeps is the queue the recording asks to place the flaw's findings on
+	// (finding.Arrived), or nothing where no sweep is wanted.
+	Sweeps *queue.Queue
 }
 
 // Recorded is a flaw recorded from a code finding: the identifier it was filed under,
@@ -802,7 +806,7 @@ func RecordAsFlaw(ctx context.Context, db bun.IDB, subject access.Subject, in Re
 		}
 		return nil
 	}
-	store := finding.NewStore(db)
+	store := finding.NewStore(db).Sweeping(in.Sweeps)
 	rows, identifier, err := store.Enter(ctx, subject, in.Flaw)
 	if err != nil {
 		return nil, err

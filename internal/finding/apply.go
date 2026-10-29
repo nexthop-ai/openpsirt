@@ -101,6 +101,11 @@ func (s *Store) Apply(ctx context.Context, buildID, runID int64, reported []Repo
 			Merged:                len(run.interned.absorbed),
 			Displaced:             run.interned.displaced,
 		}
+		if wrote.opened > 0 {
+			if err := Arrived(ctx, tx, s.sweeps, run.productID); err != nil {
+				return err
+			}
+		}
 
 		// Last, and over every build rather than this one. Three of the four
 		// signals the order is worked out from are properties of the issue,
@@ -125,6 +130,7 @@ func (s *Store) Apply(ctx context.Context, buildID, runID int64, reported []Repo
 // clock.
 type applyRun struct {
 	buildID, runID  int64
+	productID       int64
 	interned        *Vulnerabilities
 	vulnerabilities map[string]int64
 	ratings         map[int64]Rating
@@ -169,6 +175,7 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, buildID, runID int64,
 	if err != nil {
 		return nil, err
 	}
+	run.productID = productID
 	// The record for each issue: the rating in force — this product's where
 	// somebody here has made one, the published one otherwise — and the
 	// signals that rank it. What a finding is ordered, admitted and clocked by

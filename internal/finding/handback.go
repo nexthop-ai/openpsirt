@@ -36,7 +36,8 @@ func HandBack(ctx context.Context, db bun.IDB, narrowed access.Narrowed) error {
 //
 // Work goes back to nobody, exactly as when somebody leaves. No assignment sweep
 // is queued, because a full queue would then refuse the write that took the
-// reading away; a rule places the work when one is next recorded.
+// reading away; the product's next sweep places the work, when a rule is
+// written or work arrives.
 func (s *Store) HandBackUnread(ctx context.Context, narrowed access.Narrowed) (int64, error) {
 	var moved int64
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {

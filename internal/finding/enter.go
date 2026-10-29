@@ -529,6 +529,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// rather than through the store, because the store holds a
 		// database and this is inside one of its transactions.
 		then := func() error {
+			if err := Arrived(ctx, tx, s.sweeps, productID); err != nil {
+				return err
+			}
 			if in.Then == nil {
 				return nil
 			}

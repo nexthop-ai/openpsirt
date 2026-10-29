@@ -392,7 +392,7 @@ func (r *Reach) Reported(t *testing.T, problem string) string {
 func (r *Reach) Swept(t *testing.T) int {
 	t.Helper()
 	work := queue.New(r.DB, queue.DefaultOptions())
-	placed, err := finding.NewSweeper(r.DB, work,
+	_, placed, err := finding.NewSweeper(r.DB, work,
 		slog.New(slog.NewTextHandler(io.Discard, nil)), "test").Once(t.Context())
 	if err != nil {
 		t.Fatalf("sweeping: %v", err)

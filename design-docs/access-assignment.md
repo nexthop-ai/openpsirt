@@ -114,8 +114,22 @@ Turning a rule on is a bulk write counted on rows written. How many one pass
 places is a setting: too large holds a connection, too small re-queues a large
 product many times.
 
+A product's sweep is queued when a rule is written and when work arrives.
+
+| Arrival | Queued by |
+|---|---|
+| A scan opening findings | The scan's write |
+| An analyzer run opening code findings | The run's write |
+| A flaw recorded here, by hand or from a code finding | The recording |
+| A recorded flaw widened to another build | The widening |
+
 | Rule | Reason |
 |---|---|
+| An arrival queues its sweep in the transaction that opened the work | Queued after, a sweep can be claimed before the work exists |
+| An arrival queues a sweep only where the product holds a rule in force that places findings | A product with no rule queues nothing per scan |
+| A full sweep queue leaves the arrival to the next one and refuses nothing | A refused scan loses its findings; an unqueued sweep only delays placing them |
+| Every arrival queues its own sweep, never skipping one already waiting | A waiting sweep can be claimed and read before the arrival commits |
+| A pass claims sweeps until none is waiting, one placing nothing included | Most arrivals find their work already placed; a pass ending there drains one sweep per interval and fills the queue |
 | Queued work in bounded batches; a full batch queues the next, never loops in the worker | |
 | The next batch is queued before the batch's own job is settled, and a failure to queue fails the job, which is retried | Settled first, a failed queue ends the sweep as a success |
 | A batch run twice places only what nobody holds | |
@@ -159,7 +173,7 @@ work it leaves with a holder who cannot open it.
 | A person keeps undisclosed and internal work where they read it, and disclosed work while they hold any role in the product | Disclosed work travels with its assignment |
 | A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | § Teams |
 | A report goes where undisclosed work goes; a code finding by the rule for findings | `design-docs/findings-reports.md` § Report visibility |
-| It goes back to nobody, and no sweep is queued | An assignment rule places it when a rule is next recorded in the product; a full queue must never refuse a withdrawal of access |
+| It goes back to nobody, and no sweep is queued | The product's next sweep places it, when a rule is written or work arrives; a full queue must never refuse a withdrawal of access |
 | Asked of whoever the write named and every team they are on | |
 | Inside the write that took the reading away; deactivation's timing is `design-docs/access-trail.md` § The administration trail | Done after, a failure strands the work with nothing to retry it |
 | Nobody is told | |
@@ -172,4 +186,5 @@ work it leaves with a holder who cannot open it.
 |---|---|
 | A rule naming a component with a letter outside ASCII matches on the three servers and not on SQLite | SQLite folds ASCII only. No deployment runs SQLite; agreement needs a stored folded name, a schema change |
 | The batch-fullness rule is reasoned, never pinned by a test | The divergence needs a write between a batch's read and write; what is pinned is that a sweep spanning several batches routes everything it matches |
+| Work arriving while the sweep queue is full waits for the next arrival or rule in its product | The queue's cap is per kind; nothing retries the skipped sweep |
 | After a switch into group-bound mode, work held by somebody who never signs in again stays with them until they do, are deactivated, or it is handed back by hand | Their set-aside roles grant nothing, so the work is in no list. A person whose groups derive no role is asked about on every sign-in |
