@@ -29,6 +29,8 @@ import { mayOf, useWho } from "../app/session";
 import { counted, holding } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
+import { useComponentCodeCounts } from "../api/codeFindings";
+import { BuildCodeCell, CodeHistory, SecurityTesting, codeByBuild } from "./ComponentCode";
 
 // One source package, and the one piece of work it is.
 //
@@ -94,6 +96,12 @@ export function Component() {
   const who = useWho();
   const dependencies = holding(who.data, "dependency", product);
   const counts = counted(dependencies);
+  // Code findings sit beside them, counted and asked for only where the reader
+  // reads security testing material here, which the session has to say first.
+  const code = holding(who.data, "code", product);
+  const codeCounts = !!who.data && counted(code);
+  const codeHeld = useComponentCodeCounts(product, component, codeCounts);
+  const codeOn = useMemo(() => codeByBuild(codeHeld.data), [codeHeld.data]);
 
   const builds = useQuery({
     queryKey: ["component", product, component],
@@ -199,6 +207,8 @@ export function Component() {
         </p>
         <HeldLine at={dependencies} />
       </div>
+
+      <SecurityTesting product={product} source={here.source} code={code} counts={codeHeld} />
 
       {versions.length > 1 && (
         <div className="card" style={{ marginBottom: 12 }}>
@@ -370,11 +380,26 @@ export function Component() {
         </div>
       </div>
 
-      <Ships product={product} rows={rows} here={here} counts={counts} />
+      <Ships
+        product={product}
+        rows={rows}
+        here={here}
+        counts={counts}
+        code={codeCounts ? codeOn : undefined}
+      />
 
       <UpstreamStatements product={product} component={component} />
 
       {counts && <History product={product} pkg={pkg} here={here} />}
+
+      {codeCounts && (
+        <CodeHistory
+          product={product}
+          build={here}
+          component={pkg.name}
+          which={{ version: pkg.version, ecosystem: here.ecosystem, namespace: pkg.namespace }}
+        />
+      )}
     </>
   );
 }
@@ -1089,11 +1114,15 @@ function Ships({
   rows,
   here,
   counts,
+  code,
 }: {
   product: string;
   rows: Build[];
   here: Build;
   counts: boolean;
+  // The open code findings per build and source version, where the reader
+  // reads them; absent, the column is not drawn.
+  code?: Map<string, number>;
 }) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
@@ -1110,6 +1139,11 @@ function Ships({
               <th>Release</th>
               <th>Ships</th>
               {counts && <th className="num">Open on it</th>}
+              {code && (
+                <th className="num" title="Open code findings on it in that build">
+                  Code findings
+                </th>
+              )}
               <th className="num">Consumers</th>
               <th className="num">Occurrences</th>
               <th>Due</th>
@@ -1136,6 +1170,7 @@ function Ships({
                     </Link>
                   </td>
                 )}
+                {code && <BuildCodeCell product={product} row={row} code={code} />}
                 <td className="num">{(row.consumers ?? 0).toLocaleString()}</td>
                 <td className="num" style={{ color: "var(--faint)" }}>
                   {(row.occurrences ?? 0).toLocaleString()}

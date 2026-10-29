@@ -31,10 +31,18 @@ const SAMPLES: Record<string, () => string[]> = {
   codeFindingsAt: () => [
     routes.codeFindingsAt(odd),
     routes.codeFindingsAt(odd, { state: "no-longer-detected", branch_or_tag: odd, variant: odd }),
+    routes.codeFindingsAt(odd, { component: odd, component_version: odd }),
+    routes.codeFindingsAt(odd, {
+      beneath: odd,
+      beneath_version: odd,
+      beneath_ecosystem: odd,
+      beneath_namespace: odd,
+    }),
   ],
   codeFindingAt: () => [routes.codeFindingAt(build, odd)],
   suppressionRulesAt: () => [routes.suppressionRulesAt(odd)],
   repositoriesAt: () => [routes.repositoriesAt(odd)],
+  componentSearchAt: () => [routes.componentSearchAt(odd)],
   componentAt: () => [routes.componentAt(odd, odd), routes.componentAt(odd, odd, odd, build)],
   allFindingsAt: () => [routes.allFindingsAt(), routes.allFindingsAt({ q: odd })],
   productFindingsAt: () => [routes.productFindingsAt(odd, { q: odd })],

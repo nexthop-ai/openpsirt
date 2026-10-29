@@ -3,11 +3,12 @@
 The component screen, the reads behind it, and the dependency tree with its
 counts and search.
 
-Satisfies REQ-56, REQ-60.
+Satisfies REQ-42, REQ-56, REQ-60, REQ-64.
 
 ## Contents
 
 - [The component screen](#the-component-screen)
+- [Security testing on the component](#security-testing-on-the-component)
 - [Component screen reads](#component-screen-reads)
 - [The dependency tree](#the-dependency-tree)
 - [Tree search](#tree-search)
@@ -52,8 +53,8 @@ carries) and the act hangs off it.
 | What the product's upstream says about the component is a card: every standing statement about a component of this name at any version, with issue, version, status, mark, link and decline control; drawn only where it says something | |
 | A container image lists the versions each build stated for it, newest first, with the dates each was stated across; the first five shown and the rest counted | An image carries no version of its own (`design-docs/data-model-components.md` § Container images) |
 
-Every count on the page is of dependency findings, drawn under
-`design-docs/interface.md` § Families a reader holds.
+Every count on the page but the security testing ones is of dependency
+findings, drawn under `design-docs/interface.md` § Families a reader holds.
 
 | Rule | Reason |
 |---|---|
@@ -65,6 +66,26 @@ Every count on the page is of dependency findings, drawn under
 
 An upgrade is promised here on the terms `design-docs/triage-promises.md` § Promised work sets: the
 releases, the version, the date, the reason, and who carries it.
+
+## Security testing on the component
+
+The component is where both families meet: every screen naming a component
+links here, and what the analyzers hold on it sits beside the issues
+(`design-docs/analysis-queue.md` § Code findings of a component).
+
+| Part | Holds |
+|---|---|
+| The Security testing card, under the heading | Open code findings over every build, opening the queue on the source package; a row per analyzer series with a count per state, each opening the queue at that series and state; the open ones on the build itself, named as unplaced, with a link to Repositories |
+| A code findings column on each build row | The open ones that build places on the source package at the row's version, opening the queue at that build and version |
+| A second twelve-week panel | Code findings at the package and under it on the graph's build not fixed each week, with weekly new and fixed; its own panel beside the issues' |
+
+| Rule | Reason |
+|---|---|
+| The families are never summed: no total, line or column adds code findings to issues | A rule at a place and an advisory at a component are different units |
+| Drawn and asked for only where the reader reads security testing material in the product, once the session says so; held elsewhere, the card is the family's one line; held nowhere, nothing is drawn (`design-docs/interface.md` § Families a reader holds) | A count not drawn is not asked for, and a zero here reads as clean code |
+| The card's counts are over every build of the product | The card answers for the source package; the build column answers per build |
+| A count of zero is drawn, never linked | The list it would open is empty |
+| The card is drawn whether or not the reader reads dependency findings | A developer reading code findings alone arrives here from the queue |
 
 ## Component screen reads
 
@@ -116,6 +137,8 @@ as on it, worked out when read, never stored, because findings move.
 | A component's name opens the component; the node name selects, so the link is the row's own control and the names in the two lists beside the tree | |
 | There is no pane over the tree | The component screen answers it |
 | For a reader not reading dependency findings in the product, rows carry no count or band and search hits are not said to be ordered by findings; one line says where they are read elsewhere (`design-docs/interface.md` § Families a reader holds) | A tree of zeros reads as a clean build |
+| For a reader of security testing material in the product, each row and search hit carries a code findings badge of its own: open code findings at it and under it, opening the queue beneath it on the build. Asked for only then; held elsewhere, one line says so | The families are different units, so the badge sits beside the issue count, never added to it |
+| Under the root row, a line states how many open code findings are unplaced, on the build itself, with a link to Repositories, zero included | Code findings in files no repository holds sit on the root; a repository's settings are what place them |
 
 ## Tree search
 

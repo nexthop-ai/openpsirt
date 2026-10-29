@@ -53,6 +53,14 @@ type CodeFindingsAsked = {
   method?: CodeFindingMethod;
   state?: CodeFindingState;
   assigned?: "nobody";
+  // A source package by any of its names, at the version it was built at.
+  component?: string;
+  component_version?: string;
+  // Everything at or under one component of one build, by the tree's walk.
+  beneath?: string;
+  beneath_version?: string;
+  beneath_ecosystem?: string;
+  beneath_namespace?: string;
 };
 
 // The narrowing as the query a request carries, with nothing for what is unset.
@@ -84,6 +92,12 @@ export function useCodeFindings(
               ...(asked.method ? { method: asked.method } : {}),
               ...(asked.state ? { state: asked.state } : {}),
               ...(asked.assigned ? { assigned: asked.assigned } : {}),
+              ...(asked.component ? { component: asked.component } : {}),
+              ...(asked.component_version ? { component_version: asked.component_version } : {}),
+              ...(asked.beneath ? { beneath: asked.beneath } : {}),
+              ...(asked.beneath_version ? { beneath_version: asked.beneath_version } : {}),
+              ...(asked.beneath_ecosystem ? { beneath_ecosystem: asked.beneath_ecosystem } : {}),
+              ...(asked.beneath_namespace ? { beneath_namespace: asked.beneath_namespace } : {}),
             },
           },
         }),
@@ -104,6 +118,60 @@ export function useCodeFindingSeries(product: string): UseQueryResult<CodeFindin
         await api.GET("/v1/products/{product}/code-finding-series", {
           params: { path: { product } },
         }),
+      ).items ?? [],
+    retry: false,
+  });
+}
+
+export type ComponentCodeCounts = Body<"ComponentCodeFindingsBody">;
+
+// How many code findings a product places on one source package: per series
+// and state over every build, and the open ones per build. Asked only where the
+// reader reads security testing material in the product, because a count not
+// drawn is not asked for.
+export function useComponentCodeCounts(
+  product: string,
+  component: string,
+  enabled: boolean,
+): UseQueryResult<ComponentCodeCounts> {
+  return useQuery({
+    enabled,
+    queryKey: ["code-findings", product, "component", component],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/components/{component}/code-finding-counts", {
+          params: { path: { product, component } },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+// Code findings at a component and under it on one build, week by week.
+export function useComponentCodeTrend(
+  build: Build,
+  component: string,
+  which: { version?: string; ecosystem?: string; namespace?: string },
+  weeks: number,
+): UseQueryResult<Body<"TrendPointBody">[]> {
+  return useQuery({
+    queryKey: ["code-findings", build.product, "trend", build, component, which, weeks],
+    queryFn: async () =>
+      unwrap(
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/code-finding-trend",
+          {
+            params: {
+              path: { ...build, component },
+              query: {
+                weeks,
+                ...(which.version ? { version: which.version } : {}),
+                ...(which.ecosystem ? { ecosystem: which.ecosystem } : {}),
+                ...(which.namespace ? { namespace: which.namespace } : {}),
+              },
+            },
+          },
+        ),
       ).items ?? [],
     retry: false,
   });

@@ -7,7 +7,13 @@ import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { STEP, keyOf, partsOf, stepsOf, type At, type Node } from "./treeshape";
 import { aroundKey, fetchAround } from "../api/around";
-import { buildFindingsAt, componentAt, unmatchedComponentsAt } from "../app/routes";
+import {
+  buildFindingsAt,
+  codeFindingsAt,
+  componentAt,
+  repositoriesAt,
+  unmatchedComponentsAt,
+} from "../app/routes";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -222,6 +228,10 @@ function Whole({ who }: { who: Who | null | undefined }) {
   // as the inventory alone.
   const dependencies = holding(who, "dependency", product);
   const counts = counted(dependencies);
+  // Code findings are a column of their own, asked for and drawn only where
+  // the reader reads security testing material here.
+  const code = holding(who, "code", product);
+  const codeCounts = counted(code);
   const at = useMemo(
     () => ({ product, branch_or_tag: branchOrTag, variant }),
     [product, branchOrTag, variant],
@@ -244,13 +254,19 @@ function Whole({ who }: { who: Who | null | undefined }) {
   const [typed, setTyped] = useState(term);
 
   const top = useQuery({
-    queryKey: ["tree-top", at, term],
+    queryKey: ["tree-top", at, term, codeCounts],
     queryFn: async () =>
       unwrap(
         await api.GET(
           "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components",
           {
-            params: { path: at, query: term ? { q: term } : {} },
+            params: {
+              path: at,
+              query: {
+                ...(term ? { q: term } : {}),
+                ...(codeCounts ? { code_findings: true } : {}),
+              },
+            },
           },
         ),
       ),
@@ -306,8 +322,8 @@ function Whole({ who }: { who: Who | null | undefined }) {
     queries: wanted.map((key) => {
       const { component, version, ecosystem, namespace } = partsOf(key);
       return {
-        queryKey: aroundKey(at, component, version, ecosystem, namespace),
-        queryFn: fetchAround(at, component, version, ecosystem, namespace),
+        queryKey: aroundKey(at, component, version, ecosystem, namespace, codeCounts),
+        queryFn: fetchAround(at, component, version, ecosystem, namespace, codeCounts),
       };
     }),
   });
@@ -383,6 +399,7 @@ function Whole({ who }: { who: Who | null | undefined }) {
         </p>
       </div>
       <HeldLine at={dependencies} />
+      <HeldLine at={code} />
 
       {/* Searching is the way in, and browsing is for answering "what else is
           under this" once somebody is already somewhere. Eight thousand
@@ -442,7 +459,14 @@ function Whole({ who }: { who: Who | null | undefined }) {
                   detail="Part of a name, ignoring case. Components not in this build will not appear."
                 />
               ) : (
-                <Matches at={at} found={found} focus={focus} counts={counts} onSelect={select} />
+                <Matches
+                  at={at}
+                  found={found}
+                  focus={focus}
+                  counts={counts}
+                  code={codeCounts}
+                  onSelect={select}
+                />
               ))}
             {!searching && root && (
               <Branches
@@ -454,6 +478,7 @@ function Whole({ who }: { who: Who | null | undefined }) {
                 onPath={onPath}
                 focus={focus}
                 counts={counts}
+                code={codeCounts}
                 onToggle={toggle}
                 onSelect={select}
                 onWiden={(key) => setWidened((prev) => new Set(prev).add(key))}
@@ -479,12 +504,14 @@ function Matches({
   found,
   focus,
   counts,
+  code,
   onSelect,
 }: {
   at: At;
   found: Node[];
   focus: string;
   counts: boolean;
+  code: boolean;
   onSelect: (name: string, version?: string, ecosystem?: string, namespace?: string) => void;
 }) {
   return (
@@ -512,6 +539,7 @@ function Matches({
               {node.beneath.toLocaleString()}
             </span>
           )}
+          {code && <CodeCount at={at} node={node} first={!counts} />}
           {/* The same way through a tree row offers: what pulls it in, what it
               pulls in and what is open against it, on the component's own
               screen. Search is how anything is found in a build of thousands,
@@ -562,6 +590,34 @@ function beneathComponent(
   return buildFindingsAt(at, query);
 }
 
+// The open code findings at a node and under it, opening the security testing
+// queue narrowed to the same walk. A count of its own beside the issues, never
+// added to them: a rule at a place and an advisory at a component are
+// different units. First in the row where no issue count is drawn, so it takes
+// the column the strip would.
+function CodeCount({ at, node, first }: { at: At; node: Node; first: boolean }) {
+  const beneath = node.code_findings_beneath ?? 0;
+  return (
+    <Link
+      className={`code${beneath === 0 ? " none" : ""}`}
+      style={first ? { marginLeft: "auto" } : undefined}
+      title={`${beneath.toLocaleString()} open code findings in here, ${(node.code_findings ?? 0).toLocaleString()} on this component`}
+      to={codeFindingsAt(at.product, {
+        branch_or_tag: at.branch_or_tag,
+        variant: at.variant,
+        beneath: node.component,
+        beneath_version: node.version || undefined,
+        beneath_ecosystem: node.ecosystem || undefined,
+        beneath_namespace: node.namespace || undefined,
+        state: "open",
+      })}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {beneath.toLocaleString()} code
+    </Link>
+  );
+}
+
 // One flat list of indented rows rather than nested lists, so the rule down the
 // left stays a straight line whatever a branch does.
 function Branches({
@@ -573,6 +629,7 @@ function Branches({
   onPath,
   focus,
   counts,
+  code,
   onToggle,
   onSelect,
   onWiden,
@@ -585,6 +642,7 @@ function Branches({
   onPath: Set<string>;
   focus: string;
   counts: boolean;
+  code: boolean;
   onToggle: (key: string) => void;
   onSelect: (name: string, version?: string, ecosystem?: string, namespace?: string) => void;
   onWiden: (key: string) => void;
@@ -697,6 +755,7 @@ function Branches({
             {node.beneath.toLocaleString()}
           </span>
         )}
+        {code && <CodeCount at={at} node={node} first={!counts} />}
         {/* What pulls it in, what it pulls in, its history and what is open
             against it, on the component's own screen rather than a second
             copy of that page drawn over the tree. */}
@@ -711,6 +770,23 @@ function Branches({
         </Link>
       </div>,
     );
+
+    // The root carries the code findings in files no repository of the build
+    // holds, and says so beneath its own row, with the way to the settings
+    // that place them.
+    if (code && depth === 0) {
+      const unplaced = node.code_findings ?? 0;
+      rows.push(
+        <div key={`${path}/unplaced`} className="node" style={{ paddingLeft: 20 }}>
+          <span className="rule">·</span>
+          <span className="hint" title="In files no repository this build is built from holds">
+            {unplaced.toLocaleString()} open{" "}
+            {unplaced === 1 ? "code finding is" : "code findings are"} unplaced, on the build itself
+            · <Link to={repositoriesAt(at.product)}>Repositories</Link>
+          </span>
+        </div>,
+      );
+    }
 
     if (!isOpen || repeated) return;
 

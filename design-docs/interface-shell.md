@@ -145,6 +145,10 @@ chosen (REQ-64).
 | It asks at the picker's selection, including none, which is every product the reader sees | Returning without navigating swallows what was typed |
 | A term resolving to an issue goes to the issue, decided by asking | A second copy of name resolution is wrong about minted identifiers |
 | A term resolves to an issue when the issue's read holds a row; an empty answer is a component search; only an unanswered read stops at the box | The read answers an issue nobody here carries with an empty list |
+| A component search lands on a chooser: each source package matching the term in the picker's selection, one row per product, with its open issues and open code findings, each opening the component screen (`design-docs/interface-component.md` § Security testing on the component) | The component is the hub both families link into |
+| A family the reader does not read in a row's product is a dash with the family's line on hover, never a zero | |
+| The chooser offers the findings list's search for the same term | A finding's name is not always a component's |
+| The term is in the chooser's path and the scope is the picker's, so a change of selection answers the same term again | |
 | The findings list's box holds the term the list applies, and whatever removes it from the address (its chip, clearing filters, a saved filter, Back) empties the box | Enter would restore a search the reader thought gone |
 
 ## Limits

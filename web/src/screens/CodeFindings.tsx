@@ -52,6 +52,17 @@ export function CodeFindings() {
     ? (askedMethod as CodeFindingMethod)
     : undefined;
   const assigned = params.get("assigned") === "nobody" ? "nobody" : undefined;
+  // A source package, or everything under one component of one build: the
+  // component screen's and the tree's counts open the queue narrowed so, and
+  // every count here follows.
+  const placed = {
+    component: params.get("component") ?? undefined,
+    component_version: params.get("component_version") ?? undefined,
+    beneath: params.get("beneath") ?? undefined,
+    beneath_version: params.get("beneath_version") ?? undefined,
+    beneath_ecosystem: params.get("beneath_ecosystem") ?? undefined,
+    beneath_namespace: params.get("beneath_namespace") ?? undefined,
+  };
   const [offset, setOffset] = useState(0);
   // Code findings, asked and drawn only where the reader reads them in the
   // product: a queue of zeros reads as an analyzer finding nothing.
@@ -66,6 +77,7 @@ export function CodeFindings() {
       series,
       method,
       assigned,
+      ...placed,
       offset,
     },
     reads,
@@ -83,6 +95,7 @@ export function CodeFindings() {
           series,
           method: by,
           assigned: unheld,
+          ...placed,
         }).filter(([, value]) => value !== undefined),
       ) as Record<string, string>,
       { replace: true },
@@ -100,6 +113,7 @@ export function CodeFindings() {
         series,
         method,
         assigned,
+        ...placed,
       }),
     });
   const counts = listed.data?.states ?? {};
@@ -130,6 +144,20 @@ export function CodeFindings() {
           {series && ` · ${series}`}
           {method && ` · ${CODE_FINDING_METHODS[method].label}`}
           {assigned && " · unassigned"}
+          {placed.component && (
+            <>
+              {" · on "}
+              <span className="id">{placed.component}</span>
+              {placed.component_version && ` ${placed.component_version}`}
+            </>
+          )}
+          {placed.beneath && (
+            <>
+              {" · at or under "}
+              <span className="id">{placed.beneath}</span>
+              {placed.beneath_version && ` ${placed.beneath_version}`}
+            </>
+          )}
         </p>
         <span style={{ marginLeft: "auto" }}>
           <Link className="btn quiet" to={suppressionRulesAt(product)}>
@@ -203,6 +231,7 @@ export function CodeFindings() {
                     series,
                     method,
                     assigned,
+                    ...placed,
                   })}
                 >
                   {listed.data.ruled.toLocaleString()} dismissed by a rule

@@ -60,6 +60,7 @@ const SuppressionRules = retrying(() =>
   import("../screens/SuppressionRules").then((m) => m.SuppressionRules),
 );
 const Repositories = retrying(() => import("../screens/Repositories").then((m) => m.Repositories));
+const Components = retrying(() => import("../screens/Components").then((m) => m.Components));
 const InventoryCompare = retrying(() =>
   import("../screens/InventoryCompare").then((m) => m.InventoryCompare),
 );
@@ -217,6 +218,9 @@ export function App() {
               <Route path={ROUTES.codeFinding} element={<CodeFinding />} />
               <Route path={ROUTES.suppressionRules} element={<SuppressionRules />} />
               <Route path={ROUTES.repositories} element={<Repositories />} />
+              {/* A search no issue answers: the components it names, each with
+                both families' counts, leading to the component screen. */}
+              <Route path={ROUTES.componentSearch} element={<Components />} />
               {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}
               <Route path={ROUTES.me} element={<Me />} />

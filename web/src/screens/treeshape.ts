@@ -19,6 +19,11 @@ export type Node = {
   // about whether any of it matters, which is exactly what somebody deciding
   // where to descend is asking.
   beneath_by_severity?: Record<string, number>;
+  // Open code findings on it and at or under it, where they were asked for.
+  // On the root, the first is the code findings no repository of the build
+  // holds.
+  code_findings?: number;
+  code_findings_beneath?: number;
   children: number;
   // The field that tells two components of one name and one version apart. A
   // build ships one twice, and the endpoint that answers about a component

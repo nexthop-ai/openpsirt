@@ -100,6 +100,12 @@ export const codeFindingsAt = (
     series?: string;
     method?: string;
     assigned?: "nobody";
+    component?: string;
+    component_version?: string;
+    beneath?: string;
+    beneath_version?: string;
+    beneath_ecosystem?: string;
+    beneath_namespace?: string;
   },
 ) => at("codeFindings", { product }, query);
 // One code finding's evidence on one build.
@@ -109,6 +115,8 @@ export const codeFindingAt = (build: Build, occurrence: string) =>
 export const suppressionRulesAt = (product: string) => at("suppressionRules", { product });
 // The hosts a product's source links open on, and what it says per path.
 export const repositoriesAt = (product: string) => at("repositories", { product });
+// The components a term names, in the picker's selection.
+export const componentSearchAt = (term: string) => at("componentSearch", { term });
 
 // A component of a product, wherever it sits. The version travels with it
 // where it is known, and so does the build it was reached from, so the screen
