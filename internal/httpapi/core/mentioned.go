@@ -166,10 +166,10 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 				whoever(subject), about.About),
 			Link: link,
 			// Anything not disclosed carries no detail out of the
-			// deployment, internal material included.
-			Private:  about.Visibility != access.Public,
-			Internal: about.Visibility == access.Internal,
-			Concerns: notify.Concerning(about.ProductID, about.VulnerabilityID, 0),
+			// deployment, security testing material included.
+			Private:         about.Visibility != access.Public,
+			SecurityTesting: about.Visibility == access.SecurityTesting,
+			Concerns:        notify.Concerning(about.ProductID, about.VulnerabilityID, 0),
 			// The same two as columns. Concerns is a string a digest
 			// matches on; these are what a read narrows by, and a
 			// narrowing cannot rest on a shape another pass invented.

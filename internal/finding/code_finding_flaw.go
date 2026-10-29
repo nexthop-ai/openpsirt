@@ -30,7 +30,7 @@ type CodeFindingFlaw struct {
 	OccurrenceIdentity string `bun:"occurrence_identity,notnull"`
 	VulnerabilityID    int64  `bun:"vulnerability_id,notnull"`
 	// Visibility is what the code finding's findings hold, and what a sighting
-	// opening later opens at: internal while its flaw is undisclosed, whether or
+	// opening later opens at: security testing while its flaw is undisclosed, whether or
 	// not it is included in disclosure, and public once an included code finding was disclosed with its flaw.
 	Visibility access.Visibility `bun:"visibility,notnull"`
 	RecordedBy int64             `bun:"recorded_by,notnull"`
@@ -38,7 +38,7 @@ type CodeFindingFlaw struct {
 	IncludedBy *int64            `bun:"included_by"`
 	IncludedAt *time.Time        `bun:"included_at"`
 	// DisclosedAt is when its flaw was disclosed, whether or not the code finding was
-	// included in disclosure. An internal-only code finding stays internal past it, so the visibility alone does not say so.
+	// included in disclosure. A security-testing-only code finding stays at security testing visibility past it, so the visibility alone does not say so.
 	DisclosedAt *time.Time `bun:"disclosed_at"`
 	// LastRunID is the last analysis run to describe the code finding, written before
 	// the run writes anything about it. A write matched on it finds a run that
@@ -172,7 +172,7 @@ const undisclosedCodeFinding = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS
 
 // caseVisibilities is what an included code finding holds while its flaw is a case and
 // once it is disclosed.
-var caseVisibilities = []access.Visibility{access.Internal, access.Public}
+var caseVisibilities = []access.Visibility{access.SecurityTesting, access.Public}
 
 // CodeFindingReading is who may read the code finding finding under "f" in one product, as
 // two conditions with what each binds.
@@ -184,7 +184,7 @@ var caseVisibilities = []access.Visibility{access.Internal, access.Public}
 //
 // Included is a code finding included in its flaw's disclosure while the flaw is
 // undisclosed, to somebody who reads private work in the product. The code finding
-// stays internal, so its internal readers keep it, and the flaw's private
+// stays at security testing visibility, so its security testing readers keep it, and the flaw's private
 // readers read it as well. A list of the product's code findings carries it beside the
 // product's own visibilities.
 type CodeFindingReading struct {
@@ -218,9 +218,9 @@ func CodeFindingReach(s access.Subject, productID int64) CodeFindingReading {
 		args = append(args, bun.List(caseVisibilities), productID, bun.List(cases))
 	}
 	out := none
-	if s.Sees(productID) && s.Reads(access.Private, productID) && !s.Reads(access.Internal, productID) {
+	if s.Sees(productID) && s.Reads(access.Private, productID) && !s.Reads(access.SecurityTesting, productID) {
 		out.Included = `("f"."visibility" = ? AND ` + includedCodeFinding + ` AND ` + undisclosedCodeFinding + `)`
-		out.IncludedArgs = []any{access.Internal, productID, productID}
+		out.IncludedArgs = []any{access.SecurityTesting, productID, productID}
 		clauses = append(clauses, out.Included)
 		args = append(args, out.IncludedArgs...)
 	}
@@ -259,7 +259,7 @@ func codeFindingsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilit
 	var included []CodeFindingFlaw
 	for _, h := range recorded {
 		// Matched on whether it was included and on the run it was read after:
-		// a code finding taken out of disclosure since stays internal, and a run
+		// a code finding taken out of disclosure since stays at security testing visibility, and a run
 		// describing the code finding since wrote source this transaction cannot
 		// see. The retry reads both again.
 		result, err := h.matchedOn(db.NewUpdate().Model((*CodeFindingFlaw)(nil)).
@@ -276,7 +276,7 @@ func codeFindingsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilit
 		} else if n != 1 {
 			return fmt.Errorf("record the code findings recorded as this flaw as disclosed: %w", database.ErrGoAgain)
 		}
-		if h.Included() && h.Visibility == access.Internal {
+		if h.Included() && h.Visibility == access.SecurityTesting {
 			included = append(included, h)
 		}
 	}
@@ -292,7 +292,7 @@ func codeFindingsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilit
 	if err := stripUndisclosedSnippets(ctx, db, productID, occurrences); err != nil {
 		return err
 	}
-	if err := SetCodeFindingVisibility(ctx, db, productID, occurrences, access.Internal, access.Public); err != nil {
+	if err := SetCodeFindingVisibility(ctx, db, productID, occurrences, access.SecurityTesting, access.Public); err != nil {
 		return err
 	}
 	// Matched on what was read: a code finding taken out of disclosure since is a
@@ -300,7 +300,7 @@ func codeFindingsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilit
 	result, err := db.NewUpdate().Model((*CodeFindingFlaw)(nil)).
 		Set(`"visibility" = ?`, access.Public).
 		Where(`"id" IN (?)`, bun.List(ids)).
-		Where(`"visibility" = ?`, access.Internal).
+		Where(`"visibility" = ?`, access.SecurityTesting).
 		Where(`"included_at" IS NOT NULL`).
 		Exec(ctx)
 	if err != nil {

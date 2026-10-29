@@ -51,7 +51,7 @@ func recipient(err error, otherwise func(error) error) error {
 }
 
 // personAdmits refuses handing a person work some of which is undisclosed, or
-// internal, in a product where they may not read work of that visibility: the
+// security testing, in a product where they may not read work of that visibility: the
 // hand-over would be the disclosure. Each visibility the work holds is asked
 // about, because each is its own grant. Asked through the transaction that
 // hands the work over.
@@ -62,9 +62,9 @@ func personAdmits(person *access.Account, productID int64) finding.Admits {
 			if err != nil {
 				return err
 			}
-			if !reads && v == access.Internal {
+			if !reads && v == access.SecurityTesting {
 				return errRecipient{huma.Error422UnprocessableEntity(
-					"some of this is internal and they may not read internal work here, " +
+					"some of this is at security testing visibility and they may not read security testing work here, " +
 						"so handing it to them would show it to them")}
 			}
 			if !reads {
@@ -186,11 +186,11 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		arrived := handed.Pieces - len(handed.Left)
 		if to != nil && *to != subject.Party() && whoToTell != 0 && arrived > 0 &&
 			seenBy(ctx, in, input.Body.Person, product, handed.Withheld) {
-			private, internal := notify.Withholding(handed.Withheld)
+			private, securityTesting := notify.Withholding(handed.Withheld)
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: piecesOfWork(arrived) + " in " + input.Product,
-				Link: weblink.Assignments(), Private: private, Internal: internal,
+				Link: weblink.Assignments(), Private: private, SecurityTesting: securityTesting,
 				ProductID: &product,
 			}, "person", whoToTell)
 		}

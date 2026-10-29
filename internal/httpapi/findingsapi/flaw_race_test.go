@@ -24,7 +24,7 @@ import (
 func confirmedCodeFinding(t *testing.T, r *httpapitest.Reach) (string, int64, int64) {
 	t.Helper()
 	occurrence := httpapitest.SeededCodeFinding(t, r)
-	if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+	if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
 		`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 		t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 	}
@@ -92,7 +92,7 @@ func TestARecordAsFlawLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, decision, build := confirmedCodeFinding(t, r)
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "decision", "decision_stamp", 3*time.Second, func() error {
-			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete,
+			if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodDelete,
 				fmt.Sprintf("/v1/decisions/%d", decision), ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("the withdrawal answered %d: %s", got.Code, got.Body)
 			}
@@ -128,7 +128,7 @@ func TestAWithdrawalLosingToARecordAsFlawIsRefused(t *testing.T) {
 			}
 			return nil
 		})
-		subject, err := r.Rights.Resolve(t.Context(), "internal-triager")
+		subject, err := r.Rights.Resolve(t.Context(), "security-testing-triager")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -155,9 +155,9 @@ func TestAWithdrawalLosingToARecordAsFlawIsRefused(t *testing.T) {
 }
 
 // A removal from disclosure after a disclosure read the code finding's flaw record and before the
-// disclosure writes it leaves the code finding internal: the disclosure is asked
-// again, finds the code finding internal only, and leaves it internal.
-func TestARemovalFromDisclosureLandingWhileADisclosureAppliesKeepsTheCodeFindingInternal(t *testing.T) {
+// disclosure writes it leaves the code finding at security testing visibility: the disclosure is asked
+// again, finds the code finding security testing only, and leaves it security testing.
+func TestARemovalFromDisclosureLandingWhileADisclosureAppliesKeepsTheCodeFindingSecurityTesting(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, true)
 		movement := askToDisclose(t, r, flaw)
@@ -188,8 +188,8 @@ func TestARemovalFromDisclosureLandingWhileADisclosureAppliesKeepsTheCodeFinding
 			Where(`"de"."occurrence_identity" = ?`, occurrence).Scan(t.Context(), &decisions); err != nil {
 			t.Fatal(err)
 		}
-		if len(held) == 0 || len(decisions) == 0 || slices.ContainsFunc(append(held, decisions...), func(v string) bool { return v != "internal" }) {
-			t.Errorf("the code finding's findings are %v and its decisions %v; want both internal, the code finding taken out of disclosure", held, decisions)
+		if len(held) == 0 || len(decisions) == 0 || slices.ContainsFunc(append(held, decisions...), func(v string) bool { return v != "security-testing" }) {
+			t.Errorf("the code finding's findings are %v and its decisions %v; want both at security testing visibility, the code finding taken out of disclosure", held, decisions)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, codeFindingAt(occurrence), ""),
 			http.StatusNotFound)

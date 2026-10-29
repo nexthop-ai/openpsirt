@@ -71,7 +71,7 @@ func (w *sweep) waitingDecisions(ctx context.Context) (map[int64][]Holds, error)
 		ProposedAt           time.Time `bun:"proposed_at"`
 		Rows                 int       `bun:"rows_written"`
 		PrivateRows          int       `bun:"private_rows"`
-		Internal             int       `bun:"internal_rows"`
+		SecurityTesting      int       `bun:"security_testing_rows"`
 	}
 	err = decisionRollup(w.db, "rows_written").
 		ColumnExpr(`MIN("de"."id") AS "decision_occurrence_id"`).
@@ -93,8 +93,8 @@ func (w *sweep) waitingDecisions(ctx context.Context) (map[int64][]Holds, error)
 
 	now := time.Now().UTC()
 	for _, row := range rows {
-		split := rowsOf(row.Rows, row.PrivateRows, row.Internal)
-		private, internal := split.told()
+		split := rowsOf(row.Rows, row.PrivateRows, row.SecurityTesting)
+		private, securityTesting := split.told()
 		days := int(now.Sub(row.ProposedAt).Hours() / 24)
 		holds := Holds{
 			// The words v0.10.0 hashed, kept: an open condition is matched by
@@ -103,9 +103,9 @@ func (w *sweep) waitingDecisions(ctx context.Context) (map[int64][]Holds, error)
 			Body: fmt.Sprintf("A decision in %s has been waiting %s for a second person. "+
 				"It covers %s and takes effect only once somebody agrees to it.",
 				row.Product, plainly(days), rowsWritten(row.Rows)),
-			Link:     weblink.ReviewQueue(),
-			Private:  private,
-			Internal: internal,
+			Link:            weblink.ReviewQueue(),
+			Private:         private,
+			SecurityTesting: securityTesting,
 			// A decision is one product and, in bulk, many issues, so it names
 			// the product and no single issue.
 			ProductID: &row.ProductID,
@@ -220,14 +220,14 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 	since := time.Now().UTC().Add(-after)
 
 	var rows []struct {
-		DecisionID  int64     `bun:"decision_id"`
-		ProductID   int64     `bun:"product_id"`
-		Product     string    `bun:"product"`
-		ProposedBy  int64     `bun:"proposed_by"`
-		SentBackAt  time.Time `bun:"sent_back_at"`
-		Rows        int       `bun:"rows_written"`
-		PrivateRows int       `bun:"private_rows"`
-		Internal    int       `bun:"internal_rows"`
+		DecisionID      int64     `bun:"decision_id"`
+		ProductID       int64     `bun:"product_id"`
+		Product         string    `bun:"product"`
+		ProposedBy      int64     `bun:"proposed_by"`
+		SentBackAt      time.Time `bun:"sent_back_at"`
+		Rows            int       `bun:"rows_written"`
+		PrivateRows     int       `bun:"private_rows"`
+		SecurityTesting int       `bun:"security_testing_rows"`
 	}
 	err = decisionRollup(w.db, "rows_written").
 		ColumnExpr(`MIN("de"."sent_back_at") AS "sent_back_at"`).
@@ -247,8 +247,8 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 
 	now := time.Now().UTC()
 	for _, row := range rows {
-		split := rowsOf(row.Rows, row.PrivateRows, row.Internal)
-		private, internal := split.told()
+		split := rowsOf(row.Rows, row.PrivateRows, row.SecurityTesting)
+		private, securityTesting := split.told()
 		at := reach[row.ProposedBy][row.ProductID]
 		// A proposer who has since lost the reading that made the decision
 		// possible hears nothing. The condition is about a finding, and an
@@ -262,10 +262,10 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 			Body: fmt.Sprintf("A decision of yours in %s was sent back %s ago and has not "+
 				"been revised. It applies to nothing until it is.",
 				row.Product, plainly(days)),
-			Link:      weblink.ReviewQueueMine(),
-			Private:   private,
-			Internal:  internal,
-			ProductID: &row.ProductID,
+			Link:            weblink.ReviewQueueMine(),
+			Private:         private,
+			SecurityTesting: securityTesting,
+			ProductID:       &row.ProductID,
 		})
 	}
 	return out, nil
@@ -278,8 +278,8 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 // conditions and the columns of its own.
 //
 // A row is about an issue of the kinds decisions are made about, code findings'
-// rules included. A decision on a code finding is internal work, counted apart so that
-// its audience is the product's internal readers.
+// rules included. A decision on a code finding is security testing work, counted apart so that
+// its audience is the product's security testing readers.
 //
 // The withheld rows are counted rather than taken from an aggregate over
 // the word itself. A visibility is a name, and MIN over names would answer "is
@@ -296,7 +296,7 @@ func decisionRollup(db bun.IDB, counted string) *bun.SelectQuery {
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
 		ColumnExpr(access.WithheldCountAs(`"de"."visibility"`, "private_rows")).
-		ColumnExpr(access.InternalCountAs(`"de"."visibility"`, "internal_rows")).
+		ColumnExpr(access.SecurityTestingCountAs(`"de"."visibility"`, "security_testing_rows")).
 		GroupExpr(`"de"."decision_id", "de"."product_id", "de"."proposed_by"`)
 }
 
@@ -317,14 +317,14 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	standing, held := finding.InForce()
 
 	var rows []struct {
-		DecisionID  int64     `bun:"decision_id"`
-		ProductID   int64     `bun:"product_id"`
-		Product     string    `bun:"product"`
-		ProposedBy  int64     `bun:"proposed_by"`
-		Until       time.Time `bun:"until"`
-		Occurrences int       `bun:"places"`
-		PrivateRows int       `bun:"private_rows"`
-		Internal    int       `bun:"internal_rows"`
+		DecisionID      int64     `bun:"decision_id"`
+		ProductID       int64     `bun:"product_id"`
+		Product         string    `bun:"product"`
+		ProposedBy      int64     `bun:"proposed_by"`
+		Until           time.Time `bun:"until"`
+		Occurrences     int       `bun:"places"`
+		PrivateRows     int       `bun:"private_rows"`
+		SecurityTesting int       `bun:"security_testing_rows"`
 	}
 	err = decisionRollup(w.db, "places").
 		// The argument, which is where the date lives.
@@ -354,8 +354,8 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	}
 
 	for _, row := range rows {
-		split := rowsOf(row.Occurrences, row.PrivateRows, row.Internal)
-		private, internal := split.told()
+		split := rowsOf(row.Occurrences, row.PrivateRows, row.SecurityTesting)
+		private, securityTesting := split.told()
 		at := reach[row.ProposedBy][row.ProductID]
 		if !at.readsAll(split) {
 			continue
@@ -365,10 +365,10 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 			Body: fmt.Sprintf("A deferral of yours in %s ends on %s, covering %s. "+
 				"On that date it stops applying and the finding is open again.",
 				row.Product, day(row.Until), rowsWritten(row.Occurrences)),
-			Link:      weblink.ReviewQueueMine(),
-			Private:   private,
-			Internal:  internal,
-			ProductID: &row.ProductID,
+			Link:            weblink.ReviewQueueMine(),
+			Private:         private,
+			SecurityTesting: securityTesting,
+			ProductID:       &row.ProductID,
 		})
 	}
 	return out, nil
@@ -558,8 +558,8 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 //
 // A code finding is one piece of work at its occurrence, however many builds it is open
 // on. One recorded as a flaw is closed work for its holder, and one a decision
-// stands on is being judged. Every code finding it counts is internal, so it reaches
-// the members who read the product's internal work and nobody else.
+// stands on is being judged. Every code finding it counts is at security testing visibility, so it reaches
+// the members who read the product's security testing work and nobody else.
 func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, out map[int64][]Holds) error {
 	var rows []struct {
 		TeamID    int64  `bun:"team_id"`
@@ -619,12 +619,12 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 				"Work in a queue is held by nobody until somebody picks it up.",
 				row.Team, codeFindingsWaiting(row.Waiting), row.Product),
 			Link:    weblink.AssignmentsTeam(row.TeamName),
-			Private: true, Internal: true,
+			Private: true, SecurityTesting: true,
 			ProductID: &productID,
 			TeamID:    &teamID,
 		}
 		for _, personID := range members {
-			if !w.reach[personID][row.ProductID].readsInternal {
+			if !w.reach[personID][row.ProductID].readsSecurityTesting {
 				continue
 			}
 			out[personID] = append(out[personID], holds)

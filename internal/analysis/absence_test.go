@@ -111,7 +111,7 @@ func TestACodeFindingNoLongerSeenNamesItsRepositorysCommitInBothBuilds(t *testin
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		w.send(t, w.Build.ID, start, atCommits(document([]sent{inFRR, inSWSS}, 10), "1111111", "AAAAAAA"))
 		w.send(t, w.Build.ID, start.Add(time.Hour), atCommits(document([]sent{inSWSS}, 10), "2222222", "bbbbbbb"))
-		reader := w.holding(t, "analyst", access.InternalRead)
+		reader := w.holding(t, "analyst", access.SecurityTestingRead)
 		for _, codeFinding := range w.codeFindings(t, w.Build.ID) {
 			got, err := EvidenceOf(t.Context(), w.DB.DB, reader, &codeFinding, w.Product.ID)
 			if err != nil {

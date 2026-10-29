@@ -529,14 +529,14 @@ func waitFor(t *testing.T, done func() bool, what string) {
 	t.Fatalf("waited for %s and it did not happen", what)
 }
 
-// Somebody who triages only internal work reads and previews the assignment rules,
-// because a rule places code findings. Reading internal work without triaging it is
+// Somebody who triages only security testing work reads and previews the assignment rules,
+// because a rule places code findings. Reading security testing work without triaging it is
 // refused both.
 func TestSomebodyWhoTriagesCodeFindingsAloneReadsAndPreviewsTheAssignmentRules(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededCodeFinding(t, r)
 		const at = "/v1/products/mine/assignment-rules"
-		for who, want := range map[string]int{"internal-triager": http.StatusOK, "internal-reader": http.StatusForbidden} {
+		for who, want := range map[string]int{"security-testing-triager": http.StatusOK, "security-testing-reader": http.StatusForbidden} {
 			for _, path := range []string{at, at + "/preview?beneath=mine"} {
 				if got := httpapitest.AsPerson(t, r, who, http.MethodGet, path, ""); got.Code != want {
 					t.Errorf("%s reading %s answered %d; want %d: %s", who, path, got.Code, want, got.Body)

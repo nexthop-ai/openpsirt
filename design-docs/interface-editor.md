@@ -75,7 +75,7 @@ mention itself says a finding exists.
 | The term after `@` is read from the text before the cursor | It stays right however the text is edited |
 | What is typed is sent and the server narrows, matching display names and identities | A local filter over a first page misses people |
 | The holder pickers ask the same endpoint (REQ-34) | It offers people who can open what they are handed |
-| A box people type `@` into offers names at the visibility discussed: a decision at its most careful row's, a code finding's decision at internal, the visibility its rows hold until its flaw is disclosed | |
+| A box people type `@` into offers names at the visibility discussed: a decision at its most careful row's, a code finding's decision at security testing visibility, the visibility its rows hold until its flaw is disclosed | |
 | The bulk decision form offers no mentions | It carries no visibility to ask with |
 
 The team-member picker and the case picker are typed against the list. The team

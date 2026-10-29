@@ -232,15 +232,15 @@ func TestAnAnalyzerUploadTurnedAwayIsRecordedAgainstItsSeries(t *testing.T) {
 }
 
 func TestAnAnalyzerUploadFromSomebodyNotAdmittedIsRecordedNowhere(t *testing.T) {
-	// Signed in and reading the product's internal work, but not triaging
+	// Signed in and reading the product's security testing work, but not triaging
 	// it, so the upload is refused by admission rather than before it.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		body, form := httpapitest.Form(t, httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: `{"runs":`},
 			httpapitest.Part{Field: "series", Content: "stranger"})
-		got := r.Post(t, "internal-reader", http.MethodPost,
+		got := r.Post(t, "security-testing-reader", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses", body, form)
 		if got.Code != http.StatusForbidden {
-			t.Fatalf("an upload from somebody who does not triage internal work answered %d: %s", got.Code, got.Body)
+			t.Fatalf("an upload from somebody who does not triage security testing work answered %d: %s", got.Code, got.Body)
 		}
 		held, err := r.DB.DB.NewSelect().TableExpr(`"series_refusal"`).Count(t.Context())
 		if err != nil {

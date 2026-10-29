@@ -40,10 +40,10 @@ var ErrNotConfirmed = refusal.New("only a confirmed code finding is recorded as 
 var ErrNotRecordedAsFlaw = refusal.New("that code finding was not recorded as a flaw")
 
 // ErrAlreadyIncluded and ErrNotIncluded refuse including a code finding already included in
-// its flaw's disclosure and taking out one that is internal only.
+// its flaw's disclosure and taking out one that is security testing only.
 var (
 	ErrAlreadyIncluded = refusal.New("that code finding is already included in its flaw's disclosure")
-	ErrNotIncluded     = refusal.New("that code finding is internal only, so there is nothing to take out of disclosure")
+	ErrNotIncluded     = refusal.New("that code finding is security testing only, so there is nothing to take out of disclosure")
 )
 
 // ErrFlawDisclosed refuses including a code finding in or taking it out of a flaw's
@@ -183,10 +183,10 @@ type learned struct {
 }
 
 // MayRecordAsFlaw refuses somebody who may not record a code finding as a flaw, include it
-// in disclosure or take it out: it takes triage of the internal code finding and of the private
+// in disclosure or take it out: it takes triage of the security testing code finding and of the private
 // flaw. Asked before any name a request carries is resolved.
 func MayRecordAsFlaw(subject access.Subject, productID int64) error {
-	if !subject.Triages(access.Internal, productID) || !subject.Triages(access.Private, productID) {
+	if !subject.Triages(access.SecurityTesting, productID) || !subject.Triages(access.Private, productID) {
 		return access.Denied(fmt.Sprintf("record as a flaw a code finding in product %d", productID))
 	}
 	return nil
@@ -774,7 +774,7 @@ func RecordAsFlaw(ctx context.Context, db bun.IDB, subject access.Subject, in Re
 		for _, occurrence := range together {
 			row := &finding.CodeFindingFlaw{
 				ProductID: in.ProductID, OccurrenceIdentity: occurrence, VulnerabilityID: vulnerabilityID,
-				Visibility: access.Internal, RecordedBy: subject.ID, RecordedAt: now,
+				Visibility: access.SecurityTesting, RecordedBy: subject.ID, RecordedAt: now,
 			}
 			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
 				if database.IsDuplicate(err) {
@@ -883,7 +883,7 @@ func learn(ctx context.Context, tx bun.IDB, productID int64, prefix, component, 
 	return nil
 }
 
-// IncludeInDisclosure includes an internal-only code finding in its flaw's disclosure while the flaw is undisclosed,
+// IncludeInDisclosure includes a security-testing-only code finding in its flaw's disclosure while the flaw is undisclosed,
 // and every code finding recorded as the flaw with it.
 func IncludeInDisclosure(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, occurrenceIdentity string,
 	now time.Time) error {
@@ -955,7 +955,7 @@ func ExcludeFromDisclosure(ctx context.Context, db bun.IDB, subject access.Subje
 
 // excludeFrom takes an included code finding out of its flaw's disclosure, and the undo is
 // recorded as the access change it is. The code finding and the decisions about it stay
-// internal throughout, so only the flaw's readers lose it.
+// at security testing visibility throughout, so only the flaw's readers lose it.
 func excludeFrom(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.CodeFindingFlaw) error {
 	if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.CodeFindingFlaw)(nil)).
 		Set(`"included_by" = NULL`).Set(`"included_at" = NULL`), h); err != nil {
@@ -966,7 +966,7 @@ func excludeFrom(ctx context.Context, tx bun.IDB, subject access.Subject, h *fin
 
 // includeIn includes a code finding recorded as a flaw in its flaw's disclosure, and the inclusion is
 // recorded as the access change it is. The code finding and the decisions about it stay
-// internal, so everybody who read it keeps it, and the flaw's readers read it
+// at security testing visibility, so everybody who read it keeps it, and the flaw's readers read it
 // as well (finding.CodeFindingReading).
 func includeIn(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.CodeFindingFlaw, now time.Time) error {
 	by := subject.ID
@@ -1018,7 +1018,7 @@ func recordInclusion(ctx context.Context, tx bun.IDB, subject access.Subject, h 
 	if err != nil {
 		return err
 	}
-	was, became := "internal only", "included in disclosure"
+	was, became := "security testing only", "included in disclosure"
 	if !included {
 		was, became = became, was
 	}

@@ -9,7 +9,7 @@ import { mounted, screen, serve, settle } from "../test/mount";
 const mount = mounted();
 
 describe("the front page's greeting", () => {
-  it("says somebody who triages internal work alone holds triage", async () => {
+  it("says somebody who triages security testing work alone holds triage", async () => {
     serve(() => ({ data: { items: [], total: 0 } }));
     mount.render(
       screen(
@@ -20,7 +20,12 @@ describe("the front page's greeting", () => {
             admin: false,
             kind: "person",
             reach: [
-              { product: "sonic", may_see: true, may_triage: false, triages_internal: true },
+              {
+                product: "sonic",
+                may_see: true,
+                may_triage: false,
+                triages_security_testing: true,
+              },
             ] as unknown as Who["reach"],
             outcomes: [],
           }}

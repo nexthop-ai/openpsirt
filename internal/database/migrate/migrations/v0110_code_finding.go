@@ -94,7 +94,7 @@ func codeFindingV0110(t *columnTypes) []string {
 			"occurrence_identity" ` + t.hash + ` NOT NULL,
 			-- The flaw it was recorded as.
 			"vulnerability_id"    ` + t.ref + ` NOT NULL,
-			-- The visibility the code finding's findings hold: internal while its
+			-- The visibility the code finding's findings hold: security testing while its
 			-- flaw is undisclosed, and public once a code finding included in
 			-- disclosure is disclosed with its flaw. A sighting opening later
 			-- opens at it.
@@ -102,7 +102,7 @@ func codeFindingV0110(t *columnTypes) []string {
 			"recorded_by"         ` + t.ref + ` NOT NULL,
 			"recorded_at"         ` + t.timestamp + ` NOT NULL,
 			-- Who included it in its flaw's disclosure and when. Null while it is
-			-- internal only.
+			-- security testing only.
 			"included_by"         ` + t.refNull + `,
 			"included_at"         ` + t.timestamp + `,
 			-- When its flaw was disclosed, whether or not the code finding was

@@ -61,11 +61,11 @@ func TestTheCodeFindingOfAFlawIsReadOnlyByWhoeverReadsBoth(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		_, flaw := httpapitest.RecordedCodeFinding(t, r, false)
 		path := "/v1/products/mine/issues/" + flaw + "/code-finding"
-		// Reads the flaw and not the internal-only code finding it was recorded from.
+		// Reads the flaw and not the security-testing-only code finding it was recorded from.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, path, ""),
 			http.StatusNotFound)
 		// Reads the code finding and not the undisclosed flaw.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, path, ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, path, ""),
 			http.StatusNotFound)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodGet,
 			"/v1/products/mine/issues/SONIC-2026-000000/code-finding", ""), http.StatusNotFound)
@@ -104,7 +104,7 @@ func TestAnUndoneRecordAsFlawConfirmsTheCodeFindingAgainAndTakesTheFlawBack(t *t
 			codeFindingAt(occurrence)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("granting the code finding answered %d: %s", got.Code, got.Body)
 		}
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, undo,
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, undo,
 			`{"because":"recorded as a flaw by mistake"}`), http.StatusForbidden)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, undo,
 			`{"because":"   "}`), http.StatusUnprocessableEntity)
@@ -113,9 +113,9 @@ func TestAnUndoneRecordAsFlawConfirmsTheCodeFindingAgainAndTakesTheFlawBack(t *t
 			t.Fatalf("undoing the flaw record answered %d: %s", got.Code, got.Body)
 		}
 
-		if got := evidenceAs(t, r, "internal-reader", occurrence); got.State != "confirmed" ||
+		if got := evidenceAs(t, r, "security-testing-reader", occurrence); got.State != "confirmed" ||
 			got.RecordedAsFlaw != nil || got.At.Message != "p is leaked" {
-			t.Errorf("an internal reader reads the code finding as %s %+v; want the whole code finding, confirmed", got.State, got)
+			t.Errorf("a security testing reader reads the code finding as %s %+v; want the whole code finding, confirmed", got.State, got)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "outsider", http.MethodGet, codeFindingAt(occurrence), ""),
 			http.StatusNotFound)

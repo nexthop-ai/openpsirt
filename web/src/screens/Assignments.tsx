@@ -117,7 +117,9 @@ export function Assignments() {
   // Code findings are left out of the findings list, so the unheld ones of the
   // product in scope are linked where this screen points at unheld work.
   const codeFindingsIn =
-    scope.product && mayOf(who.data, scope.product)?.reads_internal ? scope.product : undefined;
+    scope.product && mayOf(who.data, scope.product)?.reads_security_testing
+      ? scope.product
+      : undefined;
 
   return (
     <>

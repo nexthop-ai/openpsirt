@@ -552,7 +552,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 			"end their sessions to cut them off now.\n\n" +
 			"What they were dealing with there and may no longer read goes back to the " +
 			"unassigned list: everything, where it was their last role on that product, and " +
-			"otherwise the undisclosed or internal work and vulnerability reports the role let " +
+			"otherwise the undisclosed or security testing work and vulnerability reports the role let " +
 			"them read. Left with them, that work is in no list at all: not in the shared one " +
 			"because it is assigned, and not in theirs because they can no longer open it. " +
 			"Teams they are on give up work no remaining member reads. `released` says how " +

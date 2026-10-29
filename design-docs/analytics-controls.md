@@ -64,7 +64,7 @@ and the screen states which question it asks.
 | Product, outcome and state take several values; a named product the reader may not see refuses the request | |
 | It says "this should be empty" only where every outcome asked is a dismissal | |
 | What was asked is printed with every value | |
-| A code finding decision is listed and counted only for a reader of internal material in its product | REQ-42, REQ-43 |
+| A code finding decision is listed and counted only for a reader of security testing material in its product | REQ-42, REQ-43 |
 | The audit log narrows to one build through the findings at each occurrence, in the decision's own product | A decision names no build |
 | A build is a product, a branch or tag and a variant together, or none | A branch name alone matches another product's |
 | The file carries the whole agreement record beside who agrees now | `design-docs/analytics-exports.md` § File contents |

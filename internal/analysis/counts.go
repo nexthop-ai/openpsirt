@@ -32,15 +32,15 @@ type SeriesCount struct {
 // CountsBySeries is how many code findings each analyzer series of a product holds,
 // by where they stand, one entry per series in the order of its name.
 //
-// Refused to anybody who does not read internal material in the product, in
-// whole: a count of code findings is internal however it is narrowed. Counted over
+// Refused to anybody who does not read security testing material in the product, in
+// whole: a count of code findings is at security testing visibility however it is narrowed. Counted over
 // what the code finding queue lists for the same reader, so each figure is the length
 // of the list asking for that series and state.
 //
 // A series holding no code finding is listed with every count zero. An analyzer that
 // runs and finds nothing is a fact about the product.
 func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, productID int64) ([]SeriesCount, error) {
-	if !subject.Sees(productID) || !subject.Reads(access.Internal, productID) {
+	if !subject.Sees(productID) || !subject.Reads(access.SecurityTesting, productID) {
 		return nil, access.Denied(fmt.Sprintf("read the code finding counts of product %d", productID))
 	}
 	visible, err := finding.CodeFindingVisible(subject, productID)

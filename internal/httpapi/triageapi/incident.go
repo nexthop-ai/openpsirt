@@ -178,10 +178,10 @@ func tellTheProposers(ctx context.Context, in core.Deps, undone triage.Undone,
 		}
 		core.Tell(ctx, in, "could not say that an agreement was taken back", notify.Telling{
 			PersonID: one.PersonID, Kind: notify.ApprovalUndone,
-			Body:     what + " " + why,
-			Link:     weblink.DecisionOccurrence(one.DecisionOccurrenceID),
-			Private:  one.Undisclosed,
-			Internal: one.Internal,
+			Body:            what + " " + why,
+			Link:            weblink.DecisionOccurrence(one.DecisionOccurrenceID),
+			Private:         one.Undisclosed,
+			SecurityTesting: one.SecurityTesting,
 			// The narrowing a later read applies.
 			ProductID:       &one.ProductID,
 			VulnerabilityID: &one.VulnerabilityID,

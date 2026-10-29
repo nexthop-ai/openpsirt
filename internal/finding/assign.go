@@ -27,9 +27,9 @@ import (
 var ErrSamePerson = refusal.New("that would hand their work to themselves")
 
 // ErrRecipientMayNotRead says work was handed to somebody not cleared to read
-// all of it: some of it is undisclosed or internal in a product where they may
+// all of it: some of it is undisclosed or security testing in a product where they may
 // not read work of that visibility. The hand-over would show it to them.
-var ErrRecipientMayNotRead = refusal.New("some of this is undisclosed or internal and they may " +
+var ErrRecipientMayNotRead = refusal.New("some of this is undisclosed or security testing and they may " +
 	"not read work of that visibility there, so handing it to them would show it to them")
 
 // moveWork is the write itself, apart from the answering: which rows move, and
@@ -372,7 +372,7 @@ func heldElsewhere(productID int64) error {
 // naming selects holds, among the visibilities given, each once and in the
 // order access.Visibilities names them.
 //
-// A set rather than the strictest of them: undisclosed and internal work are
+// A set rather than the strictest of them: undisclosed and security testing work are
 // read under separate grants, so neither is stricter than the other, and a
 // recipient is asked about each one present. Work where this is empty is
 // disclosed throughout, and travels with an assignment to whoever holds it.
@@ -530,7 +530,7 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 }
 
 // mayReadAllOf refuses a hand-over whose recipient may not read the
-// undisclosed or internal part of what it moves.
+// undisclosed or security testing part of what it moves.
 //
 // Asked per product and per visibility, of the products where the work being
 // moved holds something other than disclosed work, and inside the transaction
@@ -552,7 +552,7 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 		Where(notRecordedAsFlaw).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &held); err != nil {
-		return fmt.Errorf("read where their undisclosed and internal work is: %w", err)
+		return fmt.Errorf("read where their undisclosed and security testing work is: %w", err)
 	}
 	reported, err := reportProductsHeld(ctx, tx, from)
 	if err != nil {

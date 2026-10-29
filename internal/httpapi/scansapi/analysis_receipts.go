@@ -67,7 +67,7 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 			"`refused` is, for each series, the last upload to the build turned away once its sender " +
 			"was admitted, with what the sender was told.\n\n" +
 			"An API key sees every run on a build it may upload to. A person sees them where they " +
-			"read internal findings in the product.",
+			"read security testing findings in the product.",
 		Tags: []string{"Ingest"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`

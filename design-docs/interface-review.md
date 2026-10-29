@@ -106,7 +106,7 @@ Assignments is two tabs: what is due soon and undecided, and who holds what.
 | A picker nobody can use says so in the box, "Pick a product to assign", and is drawn disabled | |
 | Offering work to somebody needs a product picked, and says so; taking it does not | The list spans products |
 | A team's row opens the team's queue | A team holds work as a person does |
-| Where nobody else holds anything in a picked product, it links that product's unassigned code findings for a reader of internal material there | The findings list holds no code finding |
+| Where nobody else holds anything in a picked product, it links that product's unassigned code findings for a reader of security testing material there | The findings list holds no code finding |
 | A holder's list carries the reports they hold below their findings, and the people tab the reports nobody holds, drawn only where there are any; the people table counts each holder's open reports in a column; the narrowing is the product picked | Most people read no reports |
 | A holder nothing matches holds nothing, never refused; the read is narrowed by what the caller may see | A refusal would answer whether a team exists |
 

@@ -62,8 +62,8 @@ func Lapse(one triage.ForPerson) Telling {
 		Body: what + why + again,
 		Link: weblink.ReviewQueueReaffirm(),
 		// As careful as the most careful row.
-		Private:  one.Undisclosed,
-		Internal: one.Internal,
+		Private:         one.Undisclosed,
+		SecurityTesting: one.SecurityTesting,
 		// The fields a later read narrows by, off the representative row.
 		ProductID:       &one.ProductID,
 		VulnerabilityID: &one.VulnerabilityID,

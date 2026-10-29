@@ -30,9 +30,9 @@ func registerCodeFindingSeries(api huma.API, in core.Deps) {
 			"with how many of its code findings stand in each state across every build of the product. " +
 			"A series with no code findings is listed with every count zero.\n\n" +
 			"Each count is the total the code finding list answers for the same `series` and `state`.\n\n" +
-			"Refused, with no count, to anybody who does not read internal material in the product.",
+			"Refused, with no count, to anybody who does not read security testing material in the product.",
 		Tags: []string{"Analytics"},
-	}, core.AnyPerson, "Requires internal-read on the product."), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, "Requires security-testing-read on the product."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*struct {
 		Body struct {

@@ -134,15 +134,15 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 		OperationID: "undo-code-finding-flaw", Method: http.MethodPost, Path: codeFindingPath + "/flaw/withdrawal",
 		Summary: "Undo recording a code finding as a flaw",
 		Description: "Undoes recording a code finding as a flaw while its flaw is undisclosed, with every code finding linked " +
-			"to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and " +
+			"to the same flaw. Each is confirmed again and at security testing visibility, its collaborators' grants end, and " +
 			"the flaw is taken back out of every build it was recorded against, closed as `invalid` for " +
 			"the reason given. The flaw keeps the record of the code finding it was recorded from, marked " +
 			"undone.\n\n" +
 			"`because` is required. Recorded in the administration trail. A code finding not recorded as a flaw, or one " +
 			"whose flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
-		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
+		access.SecurityTestingTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`

@@ -86,7 +86,7 @@ var (
 // against it is undisclosed here, whatever else is open beside it — the same
 // rule that decides what may be said about a group outside the application.
 // Each visibility other than public is its own grant and neither answers for
-// the other, so an issue holding private and internal rows asks for both.
+// the other, so an issue holding private and security testing rows asks for both.
 // Only an issue with nothing but disclosed rows asks for public. Asked at the
 // moment of the request rather than copied onto the attachment, so an embargo
 // ending carries the file with the words.

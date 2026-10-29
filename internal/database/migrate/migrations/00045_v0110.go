@@ -70,7 +70,10 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A product records the suppression rules that dismiss code findings.
 //   - An analyzer's rule records the tool's own rating of its results and
 //     the weakness families it finds, and a result the last place it names.
-//   - A notification records whether what it withholds is internal work.
+//   - A notification records whether what it withholds is security testing
+//     work.
+//   - A role's name is declared at a short identifier's width, which the
+//     security testing roles need.
 //   - A decision has a stamp, in a table of its own, that a flaw record resting
 //     on it and the writes that could take that support away change.
 //   - A product records each VEX document and supplier advisory that arrived
@@ -117,8 +120,8 @@ func changeV0110(ctx context.Context, tx bun.Tx) error {
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
 		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createCodeFindingV0110,
-		notificationInternalV0110, createDecisionStampV0110, createDocumentUploadV0110,
-		reportCaseV0110, reportedProblemFromFlawV0110,
+		notificationSecurityTestingV0110, createDecisionStampV0110, createDocumentUploadV0110,
+		reportCaseV0110, reportedProblemFromFlawV0110, roleWidthV0110,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

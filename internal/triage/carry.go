@@ -359,7 +359,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		return nil, fmt.Errorf("look up which product this line belongs to: %w", err)
 	}
 	// Public and private only: a version carries decisions about the kinds
-	// VersionCarry reads, and those hold no internal finding.
+	// VersionCarry reads, and those hold no security testing finding.
 	var readable []access.Visibility
 	for _, v := range []access.Visibility{access.Public, access.Private} {
 		if mayDecide(subject, productID, v) {

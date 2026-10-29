@@ -103,7 +103,7 @@ every binary built from it.
 | Rules are ordered, first match wins, and the finding records which rule placed it | |
 | The ordinal is one past the highest; ties break by identifier | Two rules created at once share a number |
 | Writing a rule asks for the assigner right beside disclosed or undisclosed triage | |
-| Reading and previewing ask for triage at any visibility, internal included | |
+| Reading and previewing ask for triage at any visibility, security testing included | |
 | Somebody who sees the product and lacks the right is refused 403; an unseen product answers as not declared | |
 | A rule pointing at a retired team places nothing; retiring a rule leaves what it placed | |
 | The listing names a rule's team by identifier and marks a retired one | |
@@ -158,7 +158,7 @@ work it leaves with a holder who cannot open it.
 
 | Write | What goes back |
 |---|---|
-| A role withdrawn on one product | Their work there they may no longer read: everything where it was their last role, otherwise the undisclosed or internal work, and the reports, the role let them read |
+| A role withdrawn on one product | Their work there they may no longer read: everything where it was their last role, otherwise the undisclosed or security testing work, and the reports, the role let them read |
 | A role withdrawn across every product | The same, product by product |
 | A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went or nothing was derived before, since a trusted-header sign-in runs on every request |
 | The first group-bound sign-in after a switch into group-bound mode | What administrator-assigned roles let them hold that their groups do not let them read |
@@ -170,7 +170,7 @@ work it leaves with a holder who cannot open it.
 
 | Rule | Reason |
 |---|---|
-| A person keeps undisclosed and internal work where they read it, and disclosed work while they hold any role in the product | Disclosed work travels with its assignment |
+| A person keeps undisclosed and security testing work where they read it, and disclosed work while they hold any role in the product | Disclosed work travels with its assignment |
 | A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | § Teams |
 | A report goes where undisclosed work goes; a code finding by the rule for findings | `design-docs/findings-reports.md` § Report visibility |
 | It goes back to nobody, and no sweep is queued | The product's next sweep places it, when a rule is written or work arrives; a full queue must never refuse a withdrawal of access |

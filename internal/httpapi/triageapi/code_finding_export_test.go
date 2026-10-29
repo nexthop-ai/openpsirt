@@ -69,11 +69,11 @@ func codeFindingRowsIn(t *testing.T, header []string, rows [][]string) []map[str
 }
 
 // The findings lists' files carry the open code findings of the selection, under the
-// queue's visibility, to the readers who read them: an internal reader gets the code finding,
+// queue's visibility, to the readers who read them: a security testing reader gets the code finding,
 // a reader of disclosed or undisclosed work alone gets none, and somebody who
 // may not read the product is refused before a byte is written. Across
 // products the code finding is written under its product.
-func TestTheFindingsFileCarriesTheOpenCodeFindingsToInternalReadersAlone(t *testing.T) {
+func TestTheFindingsFileCarriesTheOpenCodeFindingsToSecurityTestingReadersAlone(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededCodeFinding(t, r)
 		const message, snippet = "p is leaked", "return;"
@@ -82,7 +82,7 @@ func TestTheFindingsFileCarriesTheOpenCodeFindingsToInternalReadersAlone(t *test
 			"/v1/products/mine/findings.csv?branch_or_tag=master&variant=broadcom",
 			"/v1/findings.csv",
 		} {
-			for _, who := range []string{"internal-reader", "internal-triager", "code-finding-handler"} {
+			for _, who := range []string{"security-testing-reader", "security-testing-triager", "code-finding-handler"} {
 				_, said, header, rows := findingsFile(t, r, who, path)
 				codeFindings := codeFindingRowsIn(t, header, rows)
 				if len(codeFindings) != 1 {
@@ -112,7 +112,7 @@ func TestTheFindingsFileCarriesTheOpenCodeFindingsToInternalReadersAlone(t *test
 					t.Fatalf("%s: %s exporting answered %d", path, who, code)
 				}
 				if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 0 {
-					t.Errorf("%s: %s, who reads no internal work, exports the code findings %v", path, who, codeFindings)
+					t.Errorf("%s: %s, who reads no security testing work, exports the code findings %v", path, who, codeFindings)
 				}
 			}
 		}
@@ -134,7 +134,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoCodeFindingAndSaysSo(t *testing.T)
 			"on=branch&support=in-support&planned=unplanned&sort=age",
 			"below_minimum_severity=true",
 		} {
-			_, said, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv?"+asked)
+			_, said, header, rows := findingsFile(t, r, "security-testing-reader", "/v1/products/mine/findings.csv?"+asked)
 			if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 1 {
 				t.Fatalf("%s: the file holds the code findings %v; want the seeded code finding", asked, codeFindings)
 			}
@@ -143,7 +143,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoCodeFindingAndSaysSo(t *testing.T)
 			}
 		}
 		for _, asked := range []string{"severity=high", "q=leak", "exploited=true", "beneath=zlib", "on=tag", "planned=planned"} {
-			code, said, header, rows := findingsFile(t, r, "internal-reader",
+			code, said, header, rows := findingsFile(t, r, "security-testing-reader",
 				"/v1/products/mine/findings.csv?branch_or_tag=master&variant=broadcom&"+asked)
 			if code != http.StatusOK {
 				t.Fatalf("%s: exporting answered %d", asked, code)
@@ -163,7 +163,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoCodeFindingAndSaysSo(t *testing.T)
 func TestAFindingsFileNamesTheComponentACodeFindingIsPlacedOn(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededCodeFinding(t, r)
-		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv")
+		_, _, header, rows := findingsFile(t, r, "security-testing-reader", "/v1/products/mine/findings.csv")
 		if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 1 ||
 			codeFindings[0]["component"] != "" || codeFindings[0]["version"] != "" {
 			t.Fatalf("the code finding on the build is written as %v; want no component", codeFindings)
@@ -174,7 +174,7 @@ func TestAFindingsFileNamesTheComponentACodeFindingIsPlacedOn(t *testing.T) {
 			Where(`"kind" = ?`, kind.Analysis).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		_, _, header, rows = findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv")
+		_, _, header, rows = findingsFile(t, r, "security-testing-reader", "/v1/products/mine/findings.csv")
 		if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 1 ||
 			codeFindings[0]["component"] != "zlib" || codeFindings[0]["version"] != "1.3" {
 			t.Errorf("the code finding on zlib is written as %v; want zlib 1.3", codeFindings)
@@ -190,10 +190,10 @@ func TestAFindingsFileHoldsAnOpenCodeFindingADecisionWaitsOn(t *testing.T) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		decideCodeFinding(t, r, occurrence,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
-		if queue := codeFindingsOf(t, r, "internal-reader", ""); queue.Total != 0 || queue.Waiting != 1 {
+		if queue := codeFindingsOf(t, r, "security-testing-reader", ""); queue.Total != 0 || queue.Waiting != 1 {
 			t.Fatalf("the queue is %+v; want the code finding left out as waiting, or this checks nothing", queue)
 		}
-		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv")
+		_, _, header, rows := findingsFile(t, r, "security-testing-reader", "/v1/products/mine/findings.csv")
 		if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 1 || codeFindings[0]["issue"] != "clang-tidy/leak" {
 			t.Errorf("the findings file holds the code findings %v; want the code finding a decision waits on", codeFindings)
 		}
@@ -201,13 +201,13 @@ func TestAFindingsFileHoldsAnOpenCodeFindingADecisionWaitsOn(t *testing.T) {
 }
 
 // A code finding in the queue reaches none of the vulnerability figures: a product's
-// overview counts nothing open for a reader of internal work alone. The VEX
+// overview counts nothing open for a reader of security testing work alone. The VEX
 // document's exclusion is pinned beside the other vulnerability consumers,
 // because no outcome a code finding takes is one the document states.
 func TestACodeFindingInTheQueueReachesNoFigure(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededCodeFinding(t, r)
-		if got := codeFindingsOf(t, r, "internal-reader", ""); got.Total != 1 {
+		if got := codeFindingsOf(t, r, "security-testing-reader", ""); got.Total != 1 {
 			t.Fatalf("the queue holds %d code findings; want the seeded code finding, or this checks nothing", got.Total)
 		}
 		var overview struct {
@@ -217,14 +217,14 @@ func TestACodeFindingInTheQueueReachesNoFigure(t *testing.T) {
 				Open int `json:"open"`
 			} `json:"builds"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/overview", &overview)
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/overview", &overview)
 		if overview.Open != 0 || overview.Undecided != 0 {
-			t.Errorf("the overview counts %d open and %d undecided for a reader of internal work alone",
+			t.Errorf("the overview counts %d open and %d undecided for a reader of security testing work alone",
 				overview.Open, overview.Undecided)
 		}
 		for _, b := range overview.Builds {
 			if b.Open != 0 {
-				t.Errorf("a build counts %d open for a reader of internal work alone", b.Open)
+				t.Errorf("a build counts %d open for a reader of security testing work alone", b.Open)
 			}
 		}
 	})

@@ -120,7 +120,7 @@ func sameOrUnstated(offered, chosen string) bool {
 
 // UndoRecordAsFlaw undoes the flaw record of the code finding at an occurrence in a product while
 // its flaw is undisclosed, with every code finding recorded as the flaw: each is
-// confirmed again and internal, its collaborators' grants end, and the flaw is
+// confirmed again and at security testing visibility, its collaborators' grants end, and the flaw is
 // taken back out of every build it was recorded against, closed as invalid
 // for the reason given. The flaw keeps the record of the code finding it was recorded
 // from, marked undone.

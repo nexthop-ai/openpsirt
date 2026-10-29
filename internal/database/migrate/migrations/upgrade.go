@@ -219,6 +219,37 @@ func (u *upgrader) change(statements []string, c change) error {
 	return u.run(stmts)
 }
 
+// widen gives an existing table's column the wider type the release declares
+// it at, keeping whether it takes a null. Declaring the same type again changes
+// nothing, so a start that stopped after it runs it again safely. SQLite bounds
+// no text, so there the table stands as it is.
+func (u *upgrader) widen(statements []string, table, column string) error {
+	made, _, err := pick(statements, table)
+	if err != nil {
+		return err
+	}
+	items, err := declared(made)
+	if err != nil {
+		return err
+	}
+	def, err := items.column(column)
+	if err != nil {
+		return err
+	}
+	switch u.engine {
+	case database.SQLite:
+		return nil
+	case database.Postgres:
+		fields := strings.Fields(def)
+		if len(fields) < 2 {
+			return fmt.Errorf("no type is declared for %s on %s", column, table)
+		}
+		return u.run([]string{`ALTER TABLE "` + table + `" ALTER COLUMN "` + column + `" TYPE ` + fields[1]})
+	default:
+		return u.run([]string{`ALTER TABLE "` + table + `" MODIFY COLUMN ` + def})
+	}
+}
+
 // index makes the named indexes on a table as the release declares them. An
 // index of that name the table already has is replaced. The table is left
 // where it stands on every engine, SQLite included: an index is made and

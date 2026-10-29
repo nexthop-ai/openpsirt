@@ -2,16 +2,16 @@
 
 Security testing records problems in the product's own code as code findings,
 beside the dependency findings a scan of the build's inventory reports. A code
-finding is internal until a person judges it, and is triaged on the Security
-testing screen. Static analysis is the method recorded.
+finding is visible only to those granted security testing until a person
+judges it, and is triaged on the Security testing screen. Static analysis is the method recorded.
 
 ## Static analysis
 
 A static analyzer's run over a build is sent with `openpsirt-upload`, the
 upload client published with every release. It reads the analyzer's own
 output and the checkout, and sends one run per analyzer per build. Each result
-is recorded as an internal finding of the build, and the run's receipt counts
-what it opened, saw again and no longer found.
+is recorded as a security testing finding of the build, and the run's receipt
+counts what it opened, saw again and no longer found.
 
 Sending one needs the product, branch or tag, and variant declared and a pipeline key,
 as [Build pipelines](pipeline.md) describes for an inventory. A run is applied

@@ -12,7 +12,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const COUNTS = "/v1/products/{product}/code-finding-series";
 
-async function drawn(readsInternal: boolean) {
+async function drawn(readsSecurityTesting: boolean) {
   window.sessionStorage.setItem("openpsirt.scope", JSON.stringify({ product: "sonic" }));
   const spy = serve((path) => {
     if (path === "/v1/session/me")
@@ -21,7 +21,7 @@ async function drawn(readsInternal: boolean) {
           identity: "ana",
           name: "Ana",
           kind: "person",
-          reach: [{ product: "sonic", reads_internal: readsInternal }],
+          reach: [{ product: "sonic", reads_security_testing: readsSecurityTesting }],
           outcomes: [],
         },
       };
@@ -48,12 +48,12 @@ async function drawn(readsInternal: boolean) {
 const text = () => mount.host().textContent ?? "";
 
 describe("code findings by analyzer", () => {
-  it("asks for no count where the reader does not read internal material in the product", async () => {
+  it("asks for no count where the reader does not read security testing material in the product", async () => {
     const spy = await drawn(false);
     const paths = (spy.mock.calls as unknown as [string][]).map(([path]) => path);
     expect(paths).toContain("/v1/session/me");
     expect(paths).not.toContain(COUNTS);
-    expect(text()).toContain("Code findings are internal.");
+    expect(text()).toContain("Code findings are security testing results.");
   });
 
   it("opens each figure on the list of that series in that state", async () => {

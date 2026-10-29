@@ -74,10 +74,11 @@ export function Me() {
                             the one that drifts. */}
                         {where.reads_public && chip("Reads public findings")}
                         {where.reads_private && chip("Reads private findings")}
-                        {where.reads_internal && chip("Reads internal findings")}
+                        {where.reads_security_testing && chip("Reads security testing findings")}
                         {where.triages_public && chip("Argues about public findings")}
                         {where.may_hide && chip("Argues about private findings")}
-                        {where.triages_internal && chip("Argues about internal findings")}
+                        {where.triages_security_testing &&
+                          chip("Argues about security testing findings")}
                         {where.may_assign && chip("Hands work to others")}
                         {where.may_agree && chip("Agrees to somebody else's decision")}
                       </span>
@@ -305,7 +306,7 @@ function Tokens() {
             // owner holds — the server intersects, so naming all of them
             // narrows to reading without asking the browser who holds what.
             ...(readOnly
-              ? { holds: ["public-read", "private-read", "internal-read"] as const }
+              ? { holds: ["public-read", "private-read", "security-testing-read"] as const }
               : {}),
           },
         }),

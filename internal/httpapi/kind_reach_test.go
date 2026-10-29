@@ -46,7 +46,7 @@ func openRows(t *testing.T, r *httpapitest.Reach, identifier string) int {
 func TestAScansSweepClosesNoCodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		asKind(t, r, "CVE-2026-1000", "analysis", "internal")
+		asKind(t, r, "CVE-2026-1000", "analysis", "security-testing")
 		r.Ran(t, r.BuildOf(t, httpapitest.SeededBuild), nil)
 		if got := openRows(t, r, "CVE-2026-9999"); got != 0 {
 			t.Fatalf("the sweep left %d vulnerability findings open, so this checks nothing", got)
@@ -279,12 +279,12 @@ func TestTheCodeFindingReadsRefuseEveryOtherKind(t *testing.T) {
 				var queue struct {
 					Total int `json:"total"`
 				}
-				httpapitest.Read(t, r, "internal-triager", "/v1/products/mine/code-findings?state="+state, &queue)
+				httpapitest.Read(t, r, "security-testing-triager", "/v1/products/mine/code-findings?state="+state, &queue)
 				total += queue.Total
 			}
 			return total
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
 			t.Fatalf("the code finding's evidence answered %d, so this checks nothing: %s", got.Code, got.Body)
 		}
 		if got := queued(); got != 1 {
@@ -292,12 +292,12 @@ func TestTheCodeFindingReadsRefuseEveryOtherKind(t *testing.T) {
 		}
 		for _, other := range []string{"vulnerability", "entered"} {
 			r.PatchedRows(t, `UPDATE "finding" SET "kind" = '`+other+`' WHERE "occurrence_identity" = '`+occurrence+`'`)
-			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
+			if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
 				t.Errorf("the evidence of a finding of kind %s answered %d: %s", other, got.Code, got.Body)
 			}
 			// No longer detected, so the closure would otherwise be taken.
 			r.PatchedRows(t, `UPDATE "sighting" SET "absent_run_id" = "last_run_id"`)
-			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at+"/fixed",
+			if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, at+"/fixed",
 				`{"because":"the parser was rewritten","fixed_in":1}`); got.Code != http.StatusNotFound {
 				t.Errorf("closing a finding of kind %s as a fixed code finding answered %d: %s", other, got.Code, got.Body)
 			}

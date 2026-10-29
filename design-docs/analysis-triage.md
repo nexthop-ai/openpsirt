@@ -41,7 +41,7 @@ it covers the code finding on every branch, tag and variant (REQ-25).
 |---|---|
 | A code finding takes these outcomes alone, a vulnerability none | One asks whether it is real; the other how a known issue applies |
 | A dismissal states one of the four reasons | |
-| Approval needs `approver` and `internal-read` on the product, never the author | |
+| Approval needs `approver` and `security-testing-read` on the product, never the author | |
 | A fixed code finding takes no decision | It reopens when seen |
 | A probable pairing lapses a dismissal or not-security decision, re-affirmed as any lapsed decision (`design-docs/triage-lapse.md` § Re-affirmation); a confirmation stands | The pairing guesses it is the same result |
 | The lapse is written with the pairing | |
@@ -57,7 +57,7 @@ fixed it.
 | Only a code finding the newest comparable run did not see | A run still reporting it is the authority |
 | On the build named alone | |
 | It names the fixing run: its series on that build, applied, comparable, built at or after the first not seeing it; any other is refused | A fix ships in a build |
-| By somebody holding `internal-triage`, saying what fixed it (`design-docs/findings-flaws.md` § Recorded flaws) | |
+| By somebody holding `security-testing-triage`, saying what fixed it (`design-docs/findings-flaws.md` § Recorded flaws) | |
 | Seen again, it opens anew at the same occurrence (`design-docs/analysis-matching.md` § Carrying) | |
 
 ## Suppression rules
@@ -83,7 +83,7 @@ them.
 
 | Rule | Reason |
 |---|---|
-| Proposed by `internal-triage`, approved by somebody else with `approver` and `internal-read` | A dismissal's second person (REQ-24) |
+| Proposed by `security-testing-triage`, approved by somebody else with `approver` and `security-testing-read` | A dismissal's second person (REQ-24) |
 | It names a rule, a path or both, and one reason with reasoning | |
 | A rule with no path is refused, at proposal and approval, where it finds memory safety or injection (`design-docs/analysis-queue.md` § Weakness families) or no run recorded it; one approved before stops dismissing at once | Those are judged one at a time; a whole checker goes where it fights a convention, measures style or cannot model the code |
 | A path is a prefix from the checkout top, no edge slashes, compared exactly | `src` holds `src/a.c`, not `src2/a.c`; SQLite's LIKE ignores case |
@@ -129,12 +129,12 @@ to nobody, as a finding is assigned (`design-docs/access-assignment.md` § Assig
 | Past its end of life, or recorded as a flaw, it is refused with 409, and the latter's page offers no holder | Its flaw is assigned instead |
 | Seen on a build where it was not open when assigned, it starts unassigned | |
 | Lost reading, deactivation and handover move code findings with everything else (`design-docs/kinds.md` § Consumers) | |
-| A team's assignment rules place unheld code findings, never one recorded as a flaw; whoever triages internal work reads and previews them (`design-docs/access-assignment.md` § Assignment rules) | |
-| The lists of held work show each once to readers of internal work, naming the analyzer's rule | |
+| A team's assignment rules place unheld code findings, never one recorded as a flaw; whoever triages security testing work reads and previews them (`design-docs/access-assignment.md` § Assignment rules) | |
+| The lists of held work show each once to readers of security testing work, naming the analyzer's rule | |
 | The unassigned list and the queue narrowed to unheld work leave out sightings past their end of life | |
 | One recorded as a flaw leaves the lists of held work; a handover leaves it with its holder and asks nothing, and releasing their work releases it | It is listed to nobody |
 | The page, every queue row and the file name the holder | |
-| The person given it is told, at internal visibility (`design-docs/notifications-work.md` § Code finding notices) | |
+| The person given it is told, at security testing visibility (`design-docs/notifications-work.md` § Code finding notices) | |
 
 ## End of life
 

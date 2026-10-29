@@ -356,7 +356,7 @@ func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	// Who may approve, product by product: a triager may agree to somebody
 	// else's decision, and so may somebody holding the approver capability,
 	// either one only where they may read. Every decision counted here is about
-	// a vulnerability or a recorded flaw, so reading internal findings alone
+	// a vulnerability or a recorded flaw, so reading security testing findings alone
 	// approves none of them.
 	reach := w.reach
 	able := map[int64]int{}

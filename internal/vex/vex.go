@@ -261,7 +261,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	if err != nil {
 		return nil, err
 	}
-	// Disclosed work, and undisclosed work for a preview. Internal material
+	// Disclosed work, and undisclosed work for a preview. Security testing material
 	// is never disclosed, so no document carries it.
 	visible := []access.Visibility{access.Public}
 	if undisclosed {

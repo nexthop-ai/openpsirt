@@ -39,7 +39,7 @@ func queueNotices(t *testing.T, r *httpapitest.Reach, who string) []string {
 	}
 	out := make([]string, 0, len(rows))
 	for _, row := range rows {
-		if row.TeamID == nil || !row.Internal {
+		if row.TeamID == nil || !row.SecurityTesting {
 			t.Errorf("a code finding queue notice was written without its team or as disclosed: %+v", row)
 		}
 		out = append(out, row.Body)
@@ -48,20 +48,20 @@ func queueNotices(t *testing.T, r *httpapitest.Reach, who string) []string {
 }
 
 // A code finding assigned to a team's queue and left there is told to the members who
-// read internal work, as any queued work is, and to nobody else on the team.
+// read security testing work, as any queued work is, and to nobody else on the team.
 func TestACodeFindingLeftInATeamsQueueIsToldToTheMembersWhoReadIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		granted(t, r, "internal-triager", access.Assigner)
+		granted(t, r, "security-testing-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
-			`{"name":"analysis-desk","members":["internal-reader","reader"]}`); made.Code != http.StatusCreated {
+			`{"name":"analysis-desk","members":["security-testing-reader","reader"]}`); made.Code != http.StatusCreated {
 			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("queueing the code finding with the team answered %d: %s", got.Code, got.Body)
 		}
-		if told := queueNotices(t, r, "internal-reader"); len(told) != 0 {
+		if told := queueNotices(t, r, "security-testing-reader"); len(told) != 0 {
 			t.Fatalf("a code finding queued a moment ago was told as untaken: %q", told)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
@@ -69,19 +69,19 @@ func TestACodeFindingLeftInATeamsQueueIsToldToTheMembersWhoReadIt(t *testing.T) 
 			Where(`"occurrence_identity" = ?`, occurrence).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		told := queueNotices(t, r, "internal-reader")
+		told := queueNotices(t, r, "security-testing-reader")
 		if len(told) != 1 || !strings.Contains(told[0], "1 static analysis code finding") {
-			t.Errorf("a member reading internal work was told %q; want the one code finding waiting", told)
+			t.Errorf("a member reading security testing work was told %q; want the one code finding waiting", told)
 		}
 		if told := queueNotices(t, r, "reader"); len(told) != 0 {
-			t.Errorf("a member reading only disclosed work was told of internal work: %q", told)
+			t.Errorf("a member reading only disclosed work was told of security testing work: %q", told)
 		}
 		// Judged, it is being worked on, and no longer waits in the queue.
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
-		if told := queueNotices(t, r, "internal-reader"); len(told) != 0 {
+		if told := queueNotices(t, r, "security-testing-reader"); len(told) != 0 {
 			t.Errorf("a code finding a decision stands on was still told as waiting: %q", told)
 		}
 	})

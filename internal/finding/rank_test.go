@@ -37,15 +37,15 @@ func TestWhatIsBeingExploitedComesFirst(t *testing.T) {
 func TestWhatReachesCustomersOutranksWhatDoesNot(t *testing.T) {
 	// A critical in something only the build system runs matters less than a
 	// medium in what people install.
-	for _, pair := range []struct{ shipped, internal finding.Ranked }{
+	for _, pair := range []struct{ shipped, securityTesting finding.Ranked }{
 		{finding.Ranked{Shipped: true, ScoreCenti: 550},
 			finding.Ranked{ScoreCenti: 1000, LikelihoodPPM: 1_000_000}},
 		// At another magnitude, and with nothing published about likelihood.
 		{finding.Ranked{Shipped: true, ScoreCenti: 100},
 			finding.Ranked{ScoreCenti: 1_000}},
 	} {
-		if pair.shipped.Rank() <= pair.internal.Rank() {
-			t.Errorf("%+v ranked at or below %+v", pair.shipped, pair.internal)
+		if pair.shipped.Rank() <= pair.securityTesting.Rank() {
+			t.Errorf("%+v ranked at or below %+v", pair.shipped, pair.securityTesting)
 		}
 	}
 }

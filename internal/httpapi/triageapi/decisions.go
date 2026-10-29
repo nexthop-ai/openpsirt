@@ -89,10 +89,10 @@ func registerDecisions(api huma.API, in core.Deps) {
 				// words about an embargo landing in a mail
 				// server.
 				Private: true,
-				// Withheld as internal where any row set aside is
-				// internal work, which a reader of undisclosed work
+				// Withheld as security testing work where any row set aside is
+				// security testing work, which a reader of undisclosed work
 				// alone does not read.
-				Internal: done.ReturnedInternal,
+				SecurityTesting: done.ReturnedSecurityTesting,
 				// The product the returned rows are in, which
 				// is what a later read narrows by.
 				ProductID: &done.ReturnedIn,
@@ -159,8 +159,8 @@ func registerDecisions(api huma.API, in core.Deps) {
 				// than off its representative row: that row is
 				// chosen by identifier and a decision's rows need
 				// not agree.
-				Private:  back.Undisclosed,
-				Internal: back.Internal,
+				Private:         back.Undisclosed,
+				SecurityTesting: back.SecurityTesting,
 				// Off the representative row, which is a row of
 				// this decision and so names its product and its
 				// issue.

@@ -195,7 +195,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 		}
 	}
 	// A code finding recorded as a flaw opens at the visibility its flaw record holds, so the
-	// next run's sighting is not a new internal code finding.
+	// next run's sighting is not a new security testing code finding.
 	handed, err := recordedVisibility(ctx, db, productID, occurrences)
 	if err != nil {
 		return nil, err

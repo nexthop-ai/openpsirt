@@ -42,14 +42,14 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 		Description: "Records what a code finding is: `dismissed`, `not-security` or `confirmed`.\n\n" +
 			"`dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or " +
 			"`mitigated`. A dismissal and `not-security` take effect once somebody else holding " +
-			"`approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.\n\n" +
+			"`approver` and `security-testing-read` on the product agrees; `confirmed` takes effect at once.\n\n" +
 			"The decision covers the code finding on every branch or tag and variant it is seen on, and every code finding " +
 			"another analyzer reports as the same flaw on the build that nothing answers yet, as one " +
 			"decision agreed to once. A code finding that " +
 			"is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw " +
 			"is refused with 409, because its flaw is judged instead.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
-	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", access.SecurityTestingTriage), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`
@@ -143,7 +143,7 @@ func registerCodeFindingFixed(api huma.API, in core.Deps) {
 			"with 422.\n\n" +
 			"A code finding seen again opens anew at the same occurrence.",
 		Tags: []string{"Triage"},
-	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", access.SecurityTestingTriage), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`

@@ -180,7 +180,7 @@ const (
 	DeltaFloor = "scanning.delta-floor"
 	// AnalysisDropShare and AnalysisDropFloor are when an analyzer's run
 	// marks so much of a build's results no longer detected at once that the
-	// product's internal readers are told.
+	// product's security testing readers are told.
 	//
 	// Both have to be passed, for the reason the inventory pair does. A run
 	// that analyzed a fraction of the tree and said so is not comparable and

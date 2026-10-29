@@ -77,7 +77,12 @@ async function drawn(evidence: object, hides = true, offer: object = OFFER) {
           name: "Ana",
           kind: "person",
           reach: [
-            { product: "sonic", reads_internal: true, triages_internal: true, may_hide: hides },
+            {
+              product: "sonic",
+              reads_security_testing: true,
+              triages_security_testing: true,
+              may_hide: hides,
+            },
           ],
           outcomes: [],
         },
@@ -215,7 +220,7 @@ describe("a code finding recorded as a flaw", () => {
     await drawn(RECORDED);
     const sent = answer("PUT", () => ({ status: 204 }));
     expect(mount.host().querySelector('a[href*="SONIC-2026-000001"]')).not.toBeNull();
-    expect(text()).toContain("Internal only");
+    expect(text()).toContain("Security testing only");
     expect(text()).not.toContain("Decision");
     expect(text()).toContain("Grants reading this code finding only.");
     // What including it publishes is said before it is made.

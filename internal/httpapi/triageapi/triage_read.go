@@ -64,9 +64,9 @@ type DecisionDetail struct {
 	// that may be mentioned follows the visibility of what is being discussed,
 	// and a decision is as careful as its most careful row.
 	Undisclosed bool `json:"undisclosed,omitempty" doc:"At least one occurrence it covers is about a finding nobody has announced"`
-	// Internal says at least one row is about internal material, which
+	// SecurityTesting says at least one row is about security testing material, which
 	// decides who may agree to it.
-	Internal bool `json:"internal,omitempty" doc:"At least one occurrence it covers is about internal material, a static analysis code finding. Agreeing to it takes the approver capability"`
+	SecurityTesting bool `json:"security_testing,omitempty" doc:"At least one occurrence it covers is about security testing material, a static analysis code finding. Agreeing to it takes the approver capability"`
 }
 
 // EndedReachBody is the rows of a decision that stopped applying one way, and
@@ -274,7 +274,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			Builds:             whole.Builds,
 			Ended:              endedReach(whole.Ended),
 			Undisclosed:        whole.Undisclosed,
-			Internal:           whole.Internal,
+			SecurityTesting:    whole.SecurityTesting,
 		}
 		body.When = core.StampAt(whole.When)
 		if whole.By != 0 {

@@ -30,7 +30,7 @@ func toldOfKind(t *testing.T, r *httpapitest.Reach, who string, kind notify.Kind
 	return n
 }
 
-func TestRowsOfACodeFindingDecisionSetAsideAreToldToAProposerWhoReadsOnlyInternalWork(t *testing.T) {
+func TestRowsOfACodeFindingDecisionSetAsideAreToldToAProposerWhoReadsOnlySecurityTestingWork(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, kin := besideTheLeak(t, r, 4)
 		decided := decideCodeFinding(t, r, occurrence,
@@ -41,46 +41,46 @@ func TestRowsOfACodeFindingDecisionSetAsideAreToldToAProposerWhoReadsOnlyInterna
 			Scan(t.Context(), &aside); err != nil {
 			t.Fatal(err)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID),
 			fmt.Sprintf(`{"except":[%d],"because":"the overflow is not the leak"}`, aside)); got.Code != http.StatusOK {
 			t.Fatalf("approving with a row set aside answered %d: %s", got.Code, got.Body)
 		}
-		if n := toldOfKind(t, r, "internal-triager", notify.SentBack); n != 1 {
-			t.Errorf("the proposer, who reads internal work alone, read %d lines about the rows set aside; want one", n)
+		if n := toldOfKind(t, r, "security-testing-triager", notify.SentBack); n != 1 {
+			t.Errorf("the proposer, who reads security testing work alone, read %d lines about the rows set aside; want one", n)
 		}
 	})
 }
 
-func TestAMentionOnACodeFindingDecisionReachesSomebodyWhoReadsOnlyInternalWork(t *testing.T) {
+func TestAMentionOnACodeFindingDecisionReachesSomebodyWhoReadsOnlySecurityTestingWork(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		decided := decideCodeFinding(t, r, httpapitest.SeededCodeFinding(t, r),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/comments", decided.DecisionID),
-			`{"body":"@internal-reader, could you look at the check above?"}`); got.Code >= 400 {
+			`{"body":"@security-testing-reader, could you look at the check above?"}`); got.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body)
 		}
-		if n := toldOfKind(t, r, "internal-reader", notify.Mentioned); n != 1 {
-			t.Errorf("somebody who reads internal work alone read %d mentions; want one", n)
+		if n := toldOfKind(t, r, "security-testing-reader", notify.Mentioned); n != 1 {
+			t.Errorf("somebody who reads security testing work alone read %d mentions; want one", n)
 		}
 	})
 }
 
-func TestAnApprovalBatchUndoneIsToldToACodeFindingProposerWhoReadsOnlyInternalWork(t *testing.T) {
+func TestAnApprovalBatchUndoneIsToldToACodeFindingProposerWhoReadsOnlySecurityTestingWork(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		decided := decideCodeFinding(t, r, httpapitest.SeededCodeFinding(t, r),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving under a batch answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodDelete,
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodDelete,
 			"/v1/approval-batches/tuesday", ""); got.Code != http.StatusOK {
 			t.Fatalf("undoing the batch answered %d: %s", got.Code, got.Body)
 		}
-		if n := toldOfKind(t, r, "internal-triager", notify.ApprovalUndone); n != 1 {
-			t.Errorf("the proposer, who reads internal work alone, read %d lines about the batch undone; want one", n)
+		if n := toldOfKind(t, r, "security-testing-triager", notify.ApprovalUndone); n != 1 {
+			t.Errorf("the proposer, who reads security testing work alone, read %d lines about the batch undone; want one", n)
 		}
 	})
 }

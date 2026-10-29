@@ -18,7 +18,7 @@ func TestACodeFindingsEvidenceLinksEachOccurrenceIntoItsSource(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		var got findingsapi.CodeFindingEvidenceBody
-		httpapitest.Read(t, r, "internal-reader", codeFindingsAt+occurrence, &got)
+		httpapitest.Read(t, r, "security-testing-reader", codeFindingsAt+occurrence, &got)
 		if want := "https://github.com/acme/mine/blob/" + httpapitest.CodeFindingCommit + "/src/a.c#L12-L12"; got.At.Link != want {
 			t.Errorf("the code finding links to %q (%s); want %q", got.At.Link, got.At.Unlinked, want)
 		}
@@ -31,7 +31,7 @@ func TestACodeFindingsEvidenceLinksEachOccurrenceIntoItsSource(t *testing.T) {
 		}
 
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.CodeFindingRun(false))
-		httpapitest.Read(t, r, "internal-reader", codeFindingsAt+occurrence, &got)
+		httpapitest.Read(t, r, "security-testing-reader", codeFindingsAt+occurrence, &got)
 		if got.NotSeen == "" || !got.Unchanged || got.Compare != "" {
 			t.Errorf("not seen %v, unchanged %v, compare %q; want a disappearance at the same commit said so",
 				got.NotSeen, got.Unchanged, got.Compare)
@@ -39,10 +39,10 @@ func TestACodeFindingsEvidenceLinksEachOccurrenceIntoItsSource(t *testing.T) {
 	})
 }
 
-func TestACodeFindingIsAnsweredOnlyToSomebodyReadingInternalMaterial(t *testing.T) {
+func TestACodeFindingIsAnsweredOnlyToSomebodyReadingSecurityTestingMaterial(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		absent := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, codeFindingsAt+"0000", "")
+		absent := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, codeFindingsAt+"0000", "")
 		if absent.Code != http.StatusNotFound {
 			t.Fatalf("an occurrence holding no code finding answered %d; want 404", absent.Code)
 		}

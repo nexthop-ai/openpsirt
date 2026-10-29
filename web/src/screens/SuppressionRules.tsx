@@ -27,8 +27,8 @@ import { CODE_FINDING_REASONS, RULE_STATE_HINTS, reasonSaid, ruleStateSaid } fro
 export function SuppressionRules() {
   const { product = "" } = useParams();
   const may = mayOf(useWho().data, product);
-  const triages = !!may?.triages_internal;
-  const agrees = !!may?.agrees_internal;
+  const triages = !!may?.triages_security_testing;
+  const agrees = !!may?.agrees_security_testing;
 
   return (
     <div>

@@ -39,7 +39,7 @@ func AnyPrivate(column string) (string, any) {
 // stays inside the deployment, with the argument it binds: every visibility
 // but public.
 //
-// Undisclosed and internal rows both. Disclosure applies to private work
+// Undisclosed and security testing rows both. Disclosure applies to private work
 // alone, and PrivateCount is the question it asks; what a message leaving
 // the deployment may say about a row is asked of this one.
 func WithheldCount(column string) (string, any) {
@@ -80,15 +80,15 @@ func WithheldCountAs(column, name string) (string, any) {
 	return count + as("WithheldCountAs", name), arg
 }
 
-// InternalCountAs is an aggregate counting the rows of a group that are
-// internal work, selected under a name, with the argument it binds. A reader
+// SecurityTestingCountAs is an aggregate counting the rows of a group that are
+// security testing work, selected under a name, with the argument it binds. A reader
 // of undisclosed work reads none of them, so an audience is asked about them
 // apart.
-func InternalCountAs(column, name string) (string, any) {
+func SecurityTestingCountAs(column, name string) (string, any) {
 	if !visibilityColumns[column] {
-		panic("access.InternalCountAs: " + column + " is not a visibility column")
+		panic("access.SecurityTestingCountAs: " + column + " is not a visibility column")
 	}
-	return "COUNT(CASE WHEN " + column + " = ? THEN 1 END)" + as("InternalCountAs", name), string(Internal)
+	return "COUNT(CASE WHEN " + column + " = ? THEN 1 END)" + as("SecurityTestingCountAs", name), string(SecurityTesting)
 }
 
 // AnyPrivateAs is AnyPrivate selected under a name, for a column list.

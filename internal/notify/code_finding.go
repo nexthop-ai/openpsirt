@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// CodeFindingAct is something a person did to a code finding that the product's internal
+// CodeFindingAct is something a person did to a code finding that the product's security testing
 // triagers hear about: recorded it as a flaw, included it in or took it out of its
 // flaw's disclosure, or withdrew the agreed dismissal holding it out of the queue.
 type CodeFindingAct struct {
@@ -30,7 +30,7 @@ type CodeFindingAct struct {
 	Into bool
 }
 
-// TellCodeFindingTriagers tells everybody who triages internal work in the product
+// TellCodeFindingTriagers tells everybody who triages security testing work in the product
 // what was done to a code finding. Each is an event: what happened stays true of the
 // moment it happened.
 func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct) error {
@@ -48,9 +48,9 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 	case CodeFindingRecordedAsFlaw:
 		body = what + " was recorded as a flaw."
 	case CodeFindingIncludedInDisclosure:
-		body = what + " was included in its flaw's disclosure. Internal readers keep its state, rule, occurrence and sightings."
+		body = what + " was included in its flaw's disclosure. Security testing readers keep its state, rule, occurrence and sightings."
 		if !act.Into {
-			body = what + " was taken out of its flaw's disclosure and is internal only again."
+			body = what + " was taken out of its flaw's disclosure and is security testing only again."
 		}
 	case CodeFindingReopened:
 		body = what + " is back in the queue: its dismissal was withdrawn."
@@ -65,12 +65,12 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 	productID := act.ProductID
 	var failed error
 	for personID, per := range reach {
-		if personID == act.By || !per[productID].triagesInternal {
+		if personID == act.By || !per[productID].triagesSecurityTesting {
 			continue
 		}
 		if err := NewStore(db).Tell(ctx, Telling{
 			PersonID: personID, Kind: act.Kind, Body: body, Link: link,
-			ProductID: &productID, Private: true, Internal: true,
+			ProductID: &productID, Private: true, SecurityTesting: true,
 			Concerns: ConcerningCodeFinding(productID, act.Occurrence),
 		}); err != nil {
 			// Carried on: an event has no retry, so stopping tells a random

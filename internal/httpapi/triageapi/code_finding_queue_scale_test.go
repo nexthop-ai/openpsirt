@@ -58,7 +58,7 @@ func TestMeasureTheCodeFindingQueueOfOneBuild(t *testing.T) {
 				for _, query := range []string{"", "?state=open"} {
 					path := "/v1/products/mine/code-findings" + query
 					began := time.Now()
-					got := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, path, "")
+					got := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, path, "")
 					took := time.Since(began)
 					if got.Code != http.StatusOK {
 						t.Fatalf("GET %s answered %d: %s", path, got.Code, got.Body.String())

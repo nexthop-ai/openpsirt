@@ -72,13 +72,14 @@ export function Decision({ who }: { who: Who }) {
   // products is two pieces of work with two sets of readers.
   const about = { product: it.occurrence.product, vulnerability: it.occurrence.vulnerability };
   const again = () => void queries.invalidateQueries({ queryKey: ["decision", id] });
-  // Reading a decision about internal material is not arguing it: the flaw's
+  // Reading a decision about security testing material is not arguing it: the flaw's
   // readers read an included code finding's decisions and take no part in them. A comment
   // takes triage or approval there, and a link, a revision and a withdrawal
   // take triage.
   const here = mayOf(who, it.occurrence.product ?? "");
-  const comments = !it.internal || !!(here?.triages_internal || here?.agrees_internal);
-  const links = !it.internal || !!here?.triages_internal;
+  const comments =
+    !it.security_testing || !!(here?.triages_security_testing || here?.agrees_security_testing);
+  const links = !it.security_testing || !!here?.triages_security_testing;
 
   return (
     <>
@@ -122,7 +123,7 @@ export function Decision({ who }: { who: Who }) {
         mine={(wrote) => wrote === who.identity}
         about={about}
         undisclosed={!!it.undisclosed}
-        internal={!!it.internal}
+        securityTesting={!!it.security_testing}
         writes={comments}
       />
     </>
@@ -446,7 +447,7 @@ function Reasoning({
         approved={decision.happened === "approved"}
         about={about}
         undisclosed={!!decision.undisclosed}
-        internal={!!decision.internal}
+        securityTesting={!!decision.security_testing}
         onDone={onChanged}
         writes={writes}
       />
@@ -477,10 +478,10 @@ function Answer({
   // The decision names its product by the name that addresses it, which is what
   // somebody's reach is keyed on.
   const here = mayOf(who.data, decision.occurrence.product ?? "");
-  // Asked at the decision's most careful row: a code finding decision is internal, and
+  // Asked at the decision's most careful row: a code finding decision is at security testing visibility, and
   // agreeing there takes the approver capability.
-  const mayAgree = !!(decision.internal
-    ? here?.agrees_internal
+  const mayAgree = !!(decision.security_testing
+    ? here?.agrees_security_testing
     : decision.undisclosed
       ? here?.agrees_private
       : here?.agrees_public);

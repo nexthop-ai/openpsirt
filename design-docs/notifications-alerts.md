@@ -55,8 +55,8 @@ An upload passes both, each set by the deployment.
 
 ## Analyzer alerts
 
-To everybody who reads the product's internal findings. Each names a series and
-a build and nothing found, and is withheld as internal
+To everybody who reads the product's security testing findings. Each names a series and
+a build and nothing found, and is withheld as security testing work
 (`design-docs/notifications.md` § The notification list).
 
 | Alert | Kind | Says | Clears |
@@ -105,7 +105,7 @@ Each is a condition, sent only when the control fails, to administrators.
 | Rule | Reason |
 |---|---|
 | Does not apply, will not be fixed and already fixed are counted whatever else is recorded | Each closes the question and needs a second person, so a write path clearing its own flag is still caught |
-| A code finding dismissed or called no security issue is counted the same way | The count spans products, so nothing internal reaches the administrator |
+| A code finding dismissed or called no security issue is counted the same way | The count spans products, so no security testing work reaches the administrator |
 | A deferral or promise counts where the gate asked for a second person | Both are approved conditionally, on the date against the deadline |
 | The gate's verdict is read, re-worked against the policy in force when the write landed, never a caller's | |
 | Agreement is asked of the record: an approval from anybody but the proposer, not taken back | A flag is the row's own account of itself |

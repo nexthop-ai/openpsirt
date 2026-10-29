@@ -62,7 +62,7 @@ export function CodeFindings() {
     offset,
   });
   const opener = useRowOpener();
-  const reads = !!mayOf(useWho().data, product)?.reads_internal;
+  const reads = !!mayOf(useWho().data, product)?.reads_security_testing;
 
   const go = (next?: CodeFindingState, unheld = assigned, by = method) => {
     setOffset(0);
@@ -208,7 +208,7 @@ export function CodeFindings() {
           detail={
             reads
               ? undefined
-              : "Code findings are internal. Reading them takes internal-read on the product."
+              : "Code findings are security testing results. Reading them takes security-testing-read on the product."
           }
         />
       ) : (

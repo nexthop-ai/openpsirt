@@ -13,7 +13,7 @@ import (
 )
 
 // heldEverywhere puts one of each kind of work in one party's hands: an
-// undisclosed vulnerability, an internal code finding, a disclosed vulnerability, and
+// undisclosed vulnerability, a security testing code finding, a disclosed vulnerability, and
 // a vulnerability report.
 func (f *fixture) heldEverywhere(t *testing.T, party int64) {
 	t.Helper()
@@ -26,7 +26,7 @@ func (f *fixture) heldEverywhere(t *testing.T, party int64) {
 	}
 	for identifier, set := range map[string][2]string{
 		"CVE-2026-1": {"vulnerability", string(access.Private)},
-		"CVE-2026-2": {"analysis", string(access.Internal)},
+		"CVE-2026-2": {"analysis", string(access.SecurityTesting)},
 	} {
 		if _, err := f.db.DB.NewUpdate().Table("finding").
 			Set(`"kind" = ?`, set[0]).Set(`"visibility" = ?`, set[1]).
@@ -80,13 +80,13 @@ func held(names ...string) []string {
 
 // A person gives up what each withdrawn role let them read, and everything
 // once nothing is left: undisclosed work and reports with the undisclosed
-// role, internal code findings with the internal one, and disclosed work with the
+// role, security testing code findings with the security testing one, and disclosed work with the
 // last role of all.
 func TestAPersonHandsBackWhatTheyMayNoLongerRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.holder(t, "holder@example.com",
-			access.PublicTriage, access.PrivateTriage, access.InternalRead)
+			access.PublicTriage, access.PrivateTriage, access.SecurityTestingRead)
 		party := who.Party()
 		f.heldEverywhere(t, party)
 		rights := access.NewStore(f.db.DB)
@@ -94,9 +94,9 @@ func TestAPersonHandsBackWhatTheyMayNoLongerRead(t *testing.T) {
 			withdrawn access.Role
 			want      []string
 		}{
-			{"", held("internal", "private", "public", "report")},
-			{access.PrivateTriage, held("internal", "public")},
-			{access.InternalRead, held("public")},
+			{"", held("security-testing", "private", "public", "report")},
+			{access.PrivateTriage, held("security-testing", "public")},
+			{access.SecurityTestingRead, held("public")},
 			{access.PublicTriage, nil},
 		} {
 			if step.withdrawn != "" {
@@ -118,14 +118,14 @@ func TestAPersonHandsBackWhatTheyMayNoLongerRead(t *testing.T) {
 // went: a member taken off, a member's role withdrawn, a member deactivated,
 // or the team retired.
 func TestATeamHandsBackWhatNoMemberStillReads(t *testing.T) {
-	type members struct{ product, team, private, internal int64 }
+	type members struct{ product, team, private, securityTesting int64 }
 	for name, c := range map[string]struct {
 		act  func(t *testing.T, rights *access.Store, m members) access.Narrowed
 		want []string
 	}{
 		"nothing changed": {
 			func(*testing.T, *access.Store, members) access.Narrowed { return access.Narrowed{} },
-			held("internal", "private", "public", "report"),
+			held("security-testing", "private", "public", "report"),
 		},
 		"a member taken off": {
 			func(t *testing.T, rights *access.Store, m members) access.Narrowed {
@@ -134,14 +134,14 @@ func TestATeamHandsBackWhatNoMemberStillReads(t *testing.T) {
 				}
 				return access.Narrowed{Teams: []int64{m.team}}
 			},
-			held("internal", "public"),
+			held("security-testing", "public"),
 		},
 		"a member's role withdrawn": {
 			func(t *testing.T, rights *access.Store, m members) access.Narrowed {
-				if err := rights.Withdraw(t.Context(), m.internal, m.product, access.InternalRead); err != nil {
+				if err := rights.Withdraw(t.Context(), m.securityTesting, m.product, access.SecurityTestingRead); err != nil {
 					t.Fatal(err)
 				}
-				return access.Narrowed{People: []int64{m.internal}}
+				return access.Narrowed{People: []int64{m.securityTesting}}
 			},
 			held("private", "public", "report"),
 		},
@@ -152,7 +152,7 @@ func TestATeamHandsBackWhatNoMemberStillReads(t *testing.T) {
 				}
 				return access.Narrowed{People: []int64{m.private}}
 			},
-			held("internal", "public"),
+			held("security-testing", "public"),
 		},
 		"the team retired": {
 			func(t *testing.T, rights *access.Store, m members) access.Narrowed {
@@ -179,7 +179,7 @@ func TestATeamHandsBackWhatNoMemberStillReads(t *testing.T) {
 					roles []access.Role
 				}{
 					{&m.private, "private@example.com", []access.Role{access.PublicRead, access.PrivateRead}},
-					{&m.internal, "internal@example.com", []access.Role{access.PublicRead, access.InternalRead}},
+					{&m.securityTesting, "security-testing@example.com", []access.Role{access.PublicRead, access.SecurityTestingRead}},
 				} {
 					*one.at = f.holder(t, one.name, one.roles...).ID
 					if _, err := rights.AddToTeam(ctx, team.ID, *one.at, *one.at); err != nil {
@@ -213,7 +213,7 @@ func TestASignInThatTakesARoleAwayHandsBackWhatItCovered(t *testing.T) {
 		if _, err := rights.ApplyMappings(ctx, []access.Mapping{
 			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
 			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
-			{Group: "analysts", Grants: string(access.InternalRead), Product: product},
+			{Group: "analysts", Grants: string(access.SecurityTestingRead), Product: product},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -228,8 +228,8 @@ func TestASignInThatTakesARoleAwayHandsBackWhatItCovered(t *testing.T) {
 			groups []string
 			want   []string
 		}{
-			{[]string{"platform", "security", "analysts"}, held("internal", "private", "public", "report")},
-			{[]string{"platform", "analysts"}, held("internal", "public")},
+			{[]string{"platform", "security", "analysts"}, held("security-testing", "private", "public", "report")},
+			{[]string{"platform", "analysts"}, held("security-testing", "public")},
 			{[]string{"platform"}, held("public")},
 		} {
 			if _, err := rights.AdmitByGroups(ctx, who, step.groups); err != nil {
@@ -244,7 +244,7 @@ func TestASignInThatTakesARoleAwayHandsBackWhatItCovered(t *testing.T) {
 
 // modeWorld gives two people accounts a sign-in recognizes and roles an
 // administrator assigned, with the work of heldEverywhere split between them:
-// the public finding and the internal code finding with the first, the undisclosed
+// the public finding and the security testing code finding with the first, the undisclosed
 // finding and the report with the second. Both start in direct mode.
 func (f *fixture) modeWorld(t *testing.T, rights *access.Store, groups []access.Mapping,
 	first, second []access.Role) (access.Subject, access.Subject) {
@@ -307,9 +307,9 @@ func TestSwitchingIntoGroupBoundModeHandsBackAtEachFirstSignIn(t *testing.T) {
 		first, second := f.modeWorld(t, rights, []access.Mapping{
 			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
 			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
-			{Group: "analysts", Grants: string(access.InternalRead), Product: product},
+			{Group: "analysts", Grants: string(access.SecurityTestingRead), Product: product},
 		},
-			[]access.Role{access.PublicTriage, access.InternalRead},
+			[]access.Role{access.PublicTriage, access.SecurityTestingRead},
 			[]access.Role{access.PublicTriage, access.PrivateTriage})
 
 		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
@@ -319,7 +319,7 @@ func TestSwitchingIntoGroupBoundModeHandsBackAtEachFirstSignIn(t *testing.T) {
 			who  access.Subject
 			want []string
 		}{
-			{first, held("internal", "public")},
+			{first, held("security-testing", "public")},
 			{second, held("private", "report")},
 		} {
 			if got := f.stillHeld(t, one.who.Party()); !slices.Equal(got, one.want) {
@@ -360,7 +360,7 @@ func TestSwitchingOutOfGroupBoundModeHandsBackWhatTheAssignedRolesDoNotCover(t *
 		first, second := f.modeWorld(t, rights, []access.Mapping{
 			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
 			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
-			{Group: "analysts", Grants: string(access.InternalRead), Product: product},
+			{Group: "analysts", Grants: string(access.SecurityTestingRead), Product: product},
 		}, nil, []access.Role{access.PublicTriage, access.PrivateTriage})
 
 		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
@@ -372,7 +372,7 @@ func TestSwitchingOutOfGroupBoundModeHandsBackWhatTheAssignedRolesDoNotCover(t *
 				t.Fatal(err)
 			}
 		}
-		if got := f.stillHeld(t, first.Party()); !slices.Equal(got, held("internal", "public")) {
+		if got := f.stillHeld(t, first.Party()); !slices.Equal(got, held("security-testing", "public")) {
 			t.Fatalf("signed in through every group, the first holds %v", got)
 		}
 
@@ -394,7 +394,7 @@ func TestAHandBackMovesNothingStillRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.holder(t, "holder@example.com",
-			access.PublicTriage, access.PrivateTriage, access.InternalRead)
+			access.PublicTriage, access.PrivateTriage, access.SecurityTestingRead)
 		f.heldEverywhere(t, who.Party())
 		before := f.stillHeld(t, who.Party())
 		for _, narrowed := range []access.Narrowed{

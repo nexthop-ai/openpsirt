@@ -221,7 +221,7 @@ func TestADecisionWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	})
 }
 
-func TestADecisionAboutACodeFindingIsToldToItsInternalAudienceAlone(t *testing.T) {
+func TestADecisionAboutACodeFindingIsToldToItsSecurityTestingAudienceAlone(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		s := aSplit(t, w)
@@ -230,20 +230,20 @@ func TestADecisionAboutACodeFindingIsToldToItsInternalAudienceAlone(t *testing.T
 			t.Fatal(err)
 		}
 		s.issue = rule
-		proposer := s.person(t, "proposer", access.InternalTriage)
+		proposer := s.person(t, "proposer", access.SecurityTestingTriage)
 		privateApprover := s.person(t, "private-approver", access.PrivateRead, access.Approver)
-		internalApprover := s.person(t, "internal-approver", access.InternalRead, access.Approver)
+		securityTestingApprover := s.person(t, "security-testing-approver", access.SecurityTestingRead, access.Approver)
 
 		// A dismissal waiting on a second person, and one sent back and
-		// left, each at one internal occurrence.
+		// left, each at one security testing occurrence.
 		dismissed := func(c *triage.Decision) {
 			reason := string(triage.FalsePositive)
 			c.Outcome, c.Justification = triage.Dismissed, &reason
 		}
 		back := time.Now().UTC().Add(-7 * 24 * time.Hour).Truncate(time.Microsecond)
-		internal := func(d *triage.DecisionOccurrence) { d.Visibility = access.Internal }
-		returned := func(d *triage.DecisionOccurrence) { d.Visibility, d.SentBackAt = access.Internal, &back }
-		s.decision(t, proposer, 1, 0, dismissed, internal)
+		securityTesting := func(d *triage.DecisionOccurrence) { d.Visibility = access.SecurityTesting }
+		returned := func(d *triage.DecisionOccurrence) { d.Visibility, d.SentBackAt = access.SecurityTesting, &back }
+		s.decision(t, proposer, 1, 0, dismissed, securityTesting)
 		s.decision(t, proposer, 1, 0, dismissed, returned)
 		sweep(t, db)
 
@@ -253,27 +253,27 @@ func TestADecisionAboutACodeFindingIsToldToItsInternalAudienceAlone(t *testing.T
 			kind notify.Kind
 			told int
 		}{
-			{"the internal approver", internalApprover, notify.DecisionWaiting, 1},
+			{"the security testing approver", securityTestingApprover, notify.DecisionWaiting, 1},
 			{"the proposer", proposer, notify.SentBackWaiting, 1},
 			{"the proposer", proposer, notify.DecisionWaiting, 0},
 			{"an approver of undisclosed work", privateApprover, notify.DecisionWaiting, 0},
 			{"an approver of undisclosed work", privateApprover, notify.SentBackWaiting, 0},
-			{"the internal approver", internalApprover, notify.SentBackWaiting, 0},
+			{"the security testing approver", securityTestingApprover, notify.SentBackWaiting, 0},
 		} {
 			if told := openFor(t, db, want.id, want.kind); len(told) != want.told {
 				t.Errorf("%s was told %s %q; want %d", want.who, want.kind, told, want.told)
 			}
 		}
-		// Marked as internal work, so the list withholds it from a reader of
+		// Marked as security testing work, so the list withholds it from a reader of
 		// undisclosed work.
 		marked, err := db.DB.NewSelect().Model((*notify.Notification)(nil)).
-			Where(`"person_id" IN (?, ?)`, internalApprover, proposer).
-			Where(`"internal" = ?`, true).Count(t.Context())
+			Where(`"person_id" IN (?, ?)`, securityTestingApprover, proposer).
+			Where(`"security_testing" = ?`, true).Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
 		if marked != 2 {
-			t.Errorf("%d of the lines about the code finding are marked internal; want 2", marked)
+			t.Errorf("%d of the lines about the code finding are marked security testing; want 2", marked)
 		}
 	})
 }

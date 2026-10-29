@@ -995,7 +995,7 @@ func orEmpty(stored *string) string {
 //
 // Unset has to read as private, or an occurrence assembled by something that forgot
 // to state it would make a private finding argueable by anybody who can triage
-// the public ones. Internal stays internal: read as private, it would be
+// the public ones. Security testing work stays at its own visibility: read as private, it would be
 // argued by the private team and refused to the people who work it.
 func visibilityOf(at Occurrence) access.Visibility {
 	return access.AsVisibility(string(at.Visibility))

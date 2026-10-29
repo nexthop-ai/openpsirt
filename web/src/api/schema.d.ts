@@ -394,7 +394,7 @@ export interface paths {
          *
          *     Only decisions you may reach are touched, and only agreements you gave: another reviewer's batch of the same name stands.
          *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
+         *     Requires: approver or public-triage or private-triage or security-testing-triage on the product. What you hold decides what comes back rather than whether you may ask. A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
          */
         delete: operations["undo-batch"];
         options?: never;
@@ -474,7 +474,7 @@ export interface paths {
          *
          *     Asked of triage on the product the rating belongs to: taking a rating back is making one.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the rating's own, not one in the path.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. The product is the rating's own, not one in the path.
          */
         delete: operations["withdraw-assessment"];
         options?: never;
@@ -497,7 +497,7 @@ export interface paths {
          *
          *     The second person holds their role on the product the rating belongs to. Agreeing is what puts a milder rating into force, so it moves that product's deadlines and its minimum severity; a rating in a product you hold nothing on answers as one that is not there.
          *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
+         *     Requires: approver or public-triage or private-triage or security-testing-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
          */
         post: operations["agree-assessment"];
         delete?: never;
@@ -672,7 +672,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product. Only the author may edit a comment.
+         *     Requires: approver or public-triage or private-triage or security-testing-triage on the product. Only the author may edit a comment.
          */
         put: operations["edit-comment"];
         post?: never;
@@ -818,7 +818,7 @@ export interface paths {
          * Withdraw a triage decision
          * @description Withdraws the decision so none of it applies to any finding. A decision is one argument however many occurrences it covers, so this takes back all of it; holding part of one back is setting occurrences aside, at `POST /v1/decisions/{id}/approval`. The record is kept — a withdrawn decision reads as proposed, approved, then withdrawn. Requires no approval.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         delete: operations["withdraw-decision"];
         options?: never;
@@ -845,7 +845,7 @@ export interface paths {
          *
          *     Returns 404 for a decision you may not act on every occurrence of, and 409 if you proposed it.
          *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
+         *     Requires: approver or public-triage or private-triage or security-testing-triage on the product. The proposer may not approve their own.
          */
         post: operations["approve-decision"];
         delete?: never;
@@ -905,7 +905,7 @@ export interface paths {
          *
          *     A comment may later be edited by its author only, and editing overwrites it rather than keeping revisions.
          *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product
+         *     Requires: approver or public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["comment-on-decision"];
         delete?: never;
@@ -930,7 +930,7 @@ export interface paths {
          *
          *     Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         put: operations["point-decision-elsewhere"];
         post?: never;
@@ -956,7 +956,7 @@ export interface paths {
          *
          *     `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         put: operations["repromise-upgrade"];
         post?: never;
@@ -991,7 +991,7 @@ export interface paths {
          *
          *     An occurrence that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
-         *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
+         *     Requires: public-triage or private-triage or security-testing-triage, held by a signed-in person and not a pipeline key
          */
         post: operations["reaffirm-decision"];
         delete?: never;
@@ -1016,7 +1016,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         put: operations["revise-decision"];
         post?: never;
@@ -1065,7 +1065,7 @@ export interface paths {
          *
          *     `because` is required and is recorded as a comment on the decision. Needs no approval of its own. You cannot send back a decision whose words are your own.
          *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
+         *     Requires: approver or public-triage or private-triage or security-testing-triage on the product. The proposer may not approve their own.
          */
         post: operations["send-decision-back"];
         delete?: never;
@@ -1091,7 +1091,7 @@ export interface paths {
          *
          *     `because` is required and is recorded as a comment on the new decision. Naming an occurrence that is not part of the decision is refused rather than ignored, and so is naming all of what is still being argued — that is a revision or a withdrawal.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["split-decision"];
         delete?: never;
@@ -1409,7 +1409,7 @@ export interface paths {
          *
          *     Unpaged. A record you may not be told of is left out and counted nowhere.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
+         *     Requires: public-read or public-triage or private-read or private-triage or security-testing-read or security-testing-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
          */
         get: operations["list-incidents"];
         put?: never;
@@ -1438,7 +1438,7 @@ export interface paths {
          *
          *     Asked of triage on the product the record belongs to: clearing one is recording one.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. The product is the record's own, not one in the path.
          */
         delete: operations["clear-incident"];
         options?: never;
@@ -1463,7 +1463,7 @@ export interface paths {
          *
          *     A branch, a retired tag and a cleared record are refused with 422, a tag the product does not have with 422, and a tag the record already names with 409.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. The product is the record's own, not one in the path.
          */
         post: operations["name-fix-release"];
         delete?: never;
@@ -1488,7 +1488,7 @@ export interface paths {
          *
          *     A naming already withdrawn, or never made, answers 404. A cleared record is refused with 422.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. The product is the record's own, not one in the path.
          */
         delete: operations["withdraw-fix-release"];
         options?: never;
@@ -1513,7 +1513,7 @@ export interface paths {
          *
          *     Allowed on a cleared record, because a notice given before the clearing still happened.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. The product is the record's own, not one in the path.
          */
         post: operations["record-told-outside"];
         delete?: never;
@@ -1788,7 +1788,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
          */
         put: operations["edit-issue-note"];
         post?: never;
@@ -2216,7 +2216,7 @@ export interface paths {
          * Withdraw a user's role on a product
          * @description Withdraws one role from one person. Takes effect at their next request; end their sessions to cut them off now.
          *
-         *     What they were dealing with there and may no longer read goes back to the unassigned list: everything, where it was their last role on that product, and otherwise the undisclosed or internal work and vulnerability reports the role let them read. Left with them, that work is in no list at all: not in the shared one because it is assigned, and not in theirs because they can no longer open it. Teams they are on give up work no remaining member reads. `released` says how much moved.
+         *     What they were dealing with there and may no longer read goes back to the unassigned list: everything, where it was their last role on that product, and otherwise the undisclosed or security testing work and vulnerability reports the role let them read. Left with them, that work is in no list at all: not in the shared one because it is assigned, and not in theirs because they can no longer open it. Teams they are on give up work no remaining member reads. `released` says how much moved.
          *
          *     The grant is removed rather than marked as ended. What somebody used to hold is answered by the record of what they did, so this list only ever says what is true today.
          *
@@ -2379,7 +2379,7 @@ export interface paths {
          *
          *     First match wins, and which rule placed a finding is recorded on the finding.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         get: operations["list-assignment-rules"];
         put?: never;
@@ -2391,7 +2391,7 @@ export interface paths {
          *
          *     It places only work nobody holds. A human assignment always wins, and adding a rule never takes something out of somebody's hands.
          *
-         *     It places work only at a visibility one member of the team reads. Undisclosed or internal work nobody on the team reads stays unassigned.
+         *     It places work only at a visibility one member of the team reads. Undisclosed or security testing work nobody on the team reads stays unassigned.
          *
          *     Send `reports` and neither key for a rule placing the product's vulnerability reports nobody holds. A report is placed only where one member of the team reads undisclosed work here, and a report recorded later is placed as it is recorded.
          *
@@ -2423,7 +2423,7 @@ export interface paths {
          *
          *     Send `reports` instead of either key for a rule placing vulnerability reports: `work` is then the product's open reports and `unheld` those nobody holds, counted where you read the product's reports and zero elsewhere.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         get: operations["preview-assignment-rule"];
         put?: never;
@@ -2613,7 +2613,7 @@ export interface paths {
          * List uploaded analyzer runs and their status
          * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see. `refused` is, for each series, the last upload to the build turned away once its sender was admitted, with what the sender was told.
          *
-         *     An API key sees every run on a build it may upload to. A person sees them where they read internal findings in the product.
+         *     An API key sees every run on a build it may upload to. A person sees them where they read security testing findings in the product.
          *
          *     Requires: any recognized credential. Answers only what you may see.
          */
@@ -2629,7 +2629,7 @@ export interface paths {
          *
          *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else.
          *
-         *     Requires: internal-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
+         *     Requires: security-testing-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
          */
         post: operations["upload-analysis"];
         delete?: never;
@@ -2663,7 +2663,7 @@ export interface paths {
          *
          *     `absent` cover nothing here and are left behind.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         get: operations["preview-carried-decisions"];
         put?: never;
@@ -2677,7 +2677,7 @@ export interface paths {
          *
          *     A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["carry-decisions"];
         delete?: never;
@@ -2760,7 +2760,7 @@ export interface paths {
          *
          *     A code finding seen on a build it was not open on when it was assigned starts unassigned there.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. At the code finding's visibility. Giving it to somebody else also needs assigner. Taking a code finding nobody holds, or handing back your own, does not.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. At the code finding's visibility. Giving it to somebody else also needs assigner. Taking a code finding nobody holds, or handing back your own, does not.
          */
         put: operations["assign-code-finding"];
         post?: never;
@@ -2783,7 +2783,7 @@ export interface paths {
          *
          *     A grant reads the code finding's evidence and nothing else of the product, until its flaw is disclosed.
          *
-         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, whether or not the code finding is included in disclosure.
+         *     Requires: security-testing-read or security-testing-triage on the product. Where you read security testing work in the product, whether or not the code finding is included in disclosure.
          */
         get: operations["list-code-finding-collaborators"];
         put?: never;
@@ -2810,7 +2810,7 @@ export interface paths {
          *
          *     Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
          *
-         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, whether or not the code finding is included in disclosure.
+         *     Requires: security-testing-read or security-testing-triage on the product. Where you read security testing work in the product, whether or not the code finding is included in disclosure.
          */
         put: operations["add-code-finding-collaborator"];
         post?: never;
@@ -2820,7 +2820,7 @@ export interface paths {
          *
          *     Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
          *
-         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, whether or not the code finding is included in disclosure.
+         *     Requires: security-testing-read or security-testing-triage on the product. Where you read security testing work in the product, whether or not the code finding is included in disclosure.
          */
         delete: operations["remove-code-finding-collaborator"];
         options?: never;
@@ -2841,11 +2841,11 @@ export interface paths {
          * Record a triage decision for a code finding
          * @description Records what a code finding is: `dismissed`, `not-security` or `confirmed`.
          *
-         *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
+         *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `security-testing-read` on the product agrees; `confirmed` takes effect at once.
          *
          *     The decision covers the code finding on every branch or tag and variant it is seen on, and every code finding another analyzer reports as the same flaw on the build that nothing answers yet, as one decision agreed to once. A code finding that is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw is refused with 409, because its flaw is judged instead.
          *
-         *     Requires: internal-triage on the product
+         *     Requires: security-testing-triage on the product
          */
         post: operations["decide-code-finding"];
         delete?: never;
@@ -2871,7 +2871,7 @@ export interface paths {
          *
          *     A code finding seen again opens anew at the same occurrence.
          *
-         *     Requires: internal-triage on the product
+         *     Requires: security-testing-triage on the product
          */
         post: operations["fix-code-finding"];
         delete?: never;
@@ -2893,7 +2893,7 @@ export interface paths {
          *
          *     A suggestion lists the builds the code finding was seen in that lack it, since recording the flaw against those is refused, and the builds holding it that the code finding's series never analyzed.
          *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         *     Requires: security-testing-triage or private-triage on the product. Both security-testing-triage and private-triage on the product.
          */
         get: operations["get-code-finding-flaw"];
         put?: never;
@@ -2903,11 +2903,11 @@ export interface paths {
          *
          *     `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the code finding's prefix so the next code finding under it is offered the same; leave it out for the build itself.
          *
-         *     `include_in_disclosure` includes the linked code findings in the flaw's disclosure: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the code findings are internal only and linked.
+         *     `include_in_disclosure` includes the linked code findings in the flaw's disclosure: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the code findings are security testing only and linked.
          *
          *     A code finding nobody confirmed, or one already recorded as a flaw, is refused with 409.
          *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         *     Requires: security-testing-triage or private-triage on the product. Both security-testing-triage and private-triage on the product.
          */
         post: operations["record-code-finding-as-flaw"];
         delete?: never;
@@ -2926,11 +2926,11 @@ export interface paths {
         get?: never;
         /**
          * Include a code finding in its flaw's disclosure
-         * @description Includes an internal-only code finding in its flaw's disclosure, with every code finding linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../flaw` lists what that discloses.
+         * @description Includes a security-testing-only code finding in its flaw's disclosure, with every code finding linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../flaw` lists what that discloses.
          *
          *     Recorded in the administration trail. A code finding not recorded as a flaw, one already included, or one whose flaw is disclosed, is refused with 409.
          *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         *     Requires: security-testing-triage or private-triage on the product. Both security-testing-triage and private-triage on the product.
          */
         put: operations["include-code-finding-in-disclosure"];
         post?: never;
@@ -2938,9 +2938,9 @@ export interface paths {
          * Take a code finding out of its flaw's disclosure
          * @description Takes a code finding out of its flaw's disclosure while the flaw is undisclosed, with every code finding linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
          *
-         *     Recorded in the administration trail. A code finding not recorded as a flaw, one that is internal only, or one whose flaw is disclosed, is refused with 409.
+         *     Recorded in the administration trail. A code finding not recorded as a flaw, one that is security testing only, or one whose flaw is disclosed, is refused with 409.
          *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         *     Requires: security-testing-triage or private-triage on the product. Both security-testing-triage and private-triage on the product.
          */
         delete: operations["exclude-code-finding-from-disclosure"];
         options?: never;
@@ -2959,11 +2959,11 @@ export interface paths {
         put?: never;
         /**
          * Undo recording a code finding as a flaw
-         * @description Undoes recording a code finding as a flaw while its flaw is undisclosed, with every code finding linked to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the code finding it was recorded from, marked undone.
+         * @description Undoes recording a code finding as a flaw while its flaw is undisclosed, with every code finding linked to the same flaw. Each is confirmed again and at security testing visibility, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the code finding it was recorded from, marked undone.
          *
          *     `because` is required. Recorded in the administration trail. A code finding not recorded as a flaw, or one whose flaw is disclosed, is refused with 409.
          *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         *     Requires: security-testing-triage or private-triage on the product. Both security-testing-triage and private-triage on the product.
          */
         post: operations["undo-code-finding-flaw"];
         delete?: never;
@@ -3081,7 +3081,7 @@ export interface paths {
          *
          *     Bounded twice, over what the names resolve to: by how many issues one answer may cover, set under `triage.review-issues`, and by how many findings it may write, set under `triage.write-ceiling`. At most 2000 names per request.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["decide-in-bulk"];
         delete?: never;
@@ -3160,7 +3160,7 @@ export interface paths {
          *
          *     Findings arriving later under the same component start unassigned.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
          */
         put: operations["assign-finding"];
         post?: never;
@@ -3195,7 +3195,7 @@ export interface paths {
          *
          *     `patch-needed` is the backport case: a fix is being carried into this build and the version does not move, so it requires `committed_to`, the date the work lands. `upgrade-needed` is not recorded here — an upgrade answers a component and everything open on it, so it is recorded from the component.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["decide-finding"];
         delete?: never;
@@ -3224,7 +3224,7 @@ export interface paths {
          *
          *     Labeling is triage, so it asks for the triage right: a label changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         put: operations["label-finding"];
         post?: never;
@@ -3232,7 +3232,7 @@ export interface paths {
          * Take a label off a finding
          * @description Removes a label. Taking off one that is not there succeeds and changes nothing.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         delete: operations["unlabel-finding"];
         options?: never;
@@ -3303,7 +3303,7 @@ export interface paths {
          *
          *     It also says how many findings this one decision covers, and how many distinct versions of the component sit at this occurrence — more than one means a single decision cannot honestly cover all of them.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["decide"];
         delete?: never;
@@ -3333,7 +3333,7 @@ export interface paths {
          *
          *     `reasoning` is required. "Still true" with nothing behind it is what a re-affirmation becomes when it is made too easy.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["reaffirm-finding-decision"];
         delete?: never;
@@ -3585,7 +3585,7 @@ export interface paths {
          *
          *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
          */
         post: operations["upload-scan"];
         delete?: never;
@@ -3703,7 +3703,7 @@ export interface paths {
          * List upload types and their status
          * @description Returns each kind of upload a build takes, with how many are held and what became of the newest: SBOMs and static analysis runs sent to this build, and VEX documents and supplier advisories uploaded to its product. Each kind's own list carries the uploads themselves.
          *
-         *     A kind the caller may not read is left out. An API key reads the SBOMs and the static analysis runs of a build it may upload to. A person reads static analysis runs where they read internal findings in the product.
+         *     A kind the caller may not read is left out. An API key reads the SBOMs and the static analysis runs of a build it may upload to. A person reads static analysis runs where they read security testing findings in the product.
          *
          *     Requires: any recognized credential. Answers only what you may see.
          */
@@ -3823,9 +3823,9 @@ export interface paths {
          *
          *     Each count is the total the code finding list answers for the same `series` and `state`.
          *
-         *     Refused, with no count, to anybody who does not read internal material in the product.
+         *     Refused, with no count, to anybody who does not read security testing material in the product.
          *
-         *     Requires: any signed-in person, and not a pipeline key. Requires internal-read on the product.
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
          */
         get: operations["list-code-finding-series"];
         put?: never;
@@ -4085,7 +4085,7 @@ export interface paths {
          *
          *     Saying who carries it is part of the act, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a decision one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["plan-upgrade"];
         delete?: never;
@@ -4243,7 +4243,7 @@ export interface paths {
          *
          *     Refused as a whole where any row has not been disclosed and the person or team may not read undisclosed work in the product.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
          */
         post: operations["assign-matching-findings"];
         delete?: never;
@@ -4351,7 +4351,7 @@ export interface paths {
          *
          *     Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
+         *     Requires: public-read or public-triage or private-read or private-triage or security-testing-read or security-testing-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about security testing findings, security-testing-read or security-testing-triage.
          */
         get: operations["list-holders"];
         put?: never;
@@ -4423,7 +4423,7 @@ export interface paths {
          *
          *     The published rating is never overwritten. The product's is what ranks there; the world's stays beside it, because a rating of ours shown where the world's goes reads as the world's.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["assess-issue"];
         delete?: never;
@@ -4459,7 +4459,7 @@ export interface paths {
          *
          *     An upload nothing refers to is removed after a day, so a file attached and then abandoned does not accumulate. Send `evidence=true` where the file hangs off the issue itself — a test case that proves the flaw — rather than off text you are about to write: it is then listed at once and never swept, because the issue is what points at it.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product. A collaborator brought onto this issue may attach to it too.
+         *     Requires: public-triage or private-triage or security-testing-triage on the product. A collaborator brought onto this issue may attach to it too.
          */
         post: operations["upload-attachment"];
         delete?: never;
@@ -4751,7 +4751,7 @@ export interface paths {
          *
          *     One record stands per issue and product. Clear the one standing before recording another.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["record-incident"];
         delete?: never;
@@ -4791,7 +4791,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
         post: operations["note-on-issue"];
         delete?: never;
@@ -4843,7 +4843,7 @@ export interface paths {
          *
          *     Only the words on findings you may read. A label row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Answers only the words on findings you may see.
+         *     Requires: public-read or public-triage or private-read or private-triage or security-testing-read or security-testing-triage on the product. Answers only the words on findings you may see.
          */
         get: operations["list-labels"];
         put?: never;
@@ -4867,9 +4867,9 @@ export interface paths {
          *
          *     Only people who can already see the thing. An autocomplete listing everybody teaches somebody to name a colleague who then cannot open what they were called to — and on an undisclosed finding, the mention itself says a finding exists, which is the disclosure the visibility rule prevents.
          *
-         *     `visibility` says which kind of finding the text is about. Asking about undisclosed or internal findings requires being able to read them.
+         *     `visibility` says which kind of finding the text is about. Asking about undisclosed or security testing findings requires being able to read them.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
+         *     Requires: public-read or public-triage or private-read or private-triage or security-testing-read or security-testing-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about security testing findings, security-testing-read or security-testing-triage.
          */
         get: operations["list-mentionable"];
         put?: never;
@@ -5677,7 +5677,7 @@ export interface paths {
          * List suppression rules
          * @description Returns the product's suppression rules, retired ones included, oldest first, each with how many open code findings it names now.
          *
-         *     Requires: internal-read or internal-triage on the product
+         *     Requires: security-testing-read or security-testing-triage on the product
          */
         get: operations["list-suppression-rules"];
         put?: never;
@@ -5685,9 +5685,9 @@ export interface paths {
          * Propose a suppression rule
          * @description Records a suppression rule dismissing every open code finding of an analyzer rule, every one at or under a path, or every one of a rule under a path. At least one of `rule` and `prefix` is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule finds memory safety or injection flaws, or where no analyzer has reported it.
          *
-         *     It dismisses nothing until somebody other than its author holding `approver` and `internal-read` on the product approves it. Its words do not change: retire it and propose another. Recorded in the administrative trail.
+         *     It dismisses nothing until somebody other than its author holding `approver` and `security-testing-read` on the product approves it. Its words do not change: retire it and propose another. Recorded in the administrative trail.
          *
-         *     Requires: internal-triage on the product
+         *     Requires: security-testing-triage on the product
          */
         post: operations["propose-suppression-rule"];
         delete?: never;
@@ -5710,7 +5710,7 @@ export interface paths {
          * Retire a suppression rule
          * @description Takes a rule out of use. The code findings it covered are open again where nothing else answers them. Recorded in the administrative trail.
          *
-         *     Requires: internal-triage on the product
+         *     Requires: security-testing-triage on the product
          */
         delete: operations["retire-suppression-rule"];
         options?: never;
@@ -5731,7 +5731,7 @@ export interface paths {
          * Approve a suppression rule
          * @description Puts a proposed rule in force, recording how many open code findings it covers as what was approved. An outgrown rule is approved again at its new size; a rule in force is refused with 409.
          *
-         *     Requires `approver` and `internal-read` on the product, and somebody other than the rule's author, which is refused with 409. A rule with no path is refused with 422 where its analyzer rule has since been found to find memory safety or injection flaws. Recorded in the administrative trail.
+         *     Requires `approver` and `security-testing-read` on the product, and somebody other than the rule's author, which is refused with 409. A rule with no path is refused with 422 where its analyzer rule has since been found to find memory safety or injection flaws. Recorded in the administrative trail.
          *
          *     Requires: approver on the product
          */
@@ -5939,7 +5939,7 @@ export interface paths {
          *
          *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no decision goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 decisions per request. `reasoning` is required.
          *
-         *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
+         *     Requires: public-triage or private-triage or security-testing-triage, held by a signed-in person and not a pipeline key
          */
         post: operations["reaffirm-many"];
         delete?: never;
@@ -7917,7 +7917,7 @@ export interface components {
              * @description The role membership of this group grants
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage" | "admin" | "audit";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "security-testing-read" | "public-triage" | "private-triage" | "security-testing-triage" | "admin" | "audit";
         };
         BlockingBody: {
             component: string;
@@ -8108,13 +8108,13 @@ export interface components {
             version: string;
         };
         CanBody: {
-            /** @description Agree to somebody else's decision about internal findings or a suppression rule over them, or send it back: reading them, with the approver capability */
-            agrees_internal: boolean;
             /** @description Agree to somebody else's decision about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage */
             agrees_private: boolean;
             /** @description Agree to somebody else's decision about disclosed findings, or send it back: reading them, with the approver capability or public-triage */
             agrees_public: boolean;
-            /** @description Agree to somebody else's decision, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's decision there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override */
+            /** @description Agree to somebody else's decision about security testing findings or a suppression rule over them, or send it back: reading them, with the approver capability */
+            agrees_security_testing: boolean;
+            /** @description Agree to somebody else's decision, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's decision there, which is the ordinary shape of a small team; security testing work takes the capability. That the two are different people is checked separately and has no override */
             may_agree: boolean;
             /** @description Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work */
             may_approve_rulings: boolean;
@@ -8129,16 +8129,16 @@ export interface components {
             /** @description The label shown for it */
             name: string;
             product: string;
-            /** @description Read internal findings, which are never disclosed */
-            reads_internal: boolean;
             /** @description Read findings nobody has disclosed yet */
             reads_private: boolean;
             /** @description Read findings that have been disclosed */
             reads_public: boolean;
-            /** @description Argue about an internal finding */
-            triages_internal: boolean;
+            /** @description Read security testing findings, which are never disclosed */
+            reads_security_testing: boolean;
             /** @description Argue about a finding that has been disclosed */
             triages_public: boolean;
+            /** @description Argue about a security testing finding */
+            triages_security_testing: boolean;
         };
         CarriedBody: {
             /**
@@ -8439,7 +8439,7 @@ export interface components {
             disclosed: boolean;
             /** @description The identifier the flaw was filed under */
             flaw: string;
-            /** @description Whether the code finding is included in its flaw's disclosure. Otherwise it is internal only, and linked */
+            /** @description Whether the code finding is included in its flaw's disclosure. Otherwise it is security testing only, and linked */
             included_in_disclosure: boolean;
             /** Format: date-time */
             recorded_at: string;
@@ -9009,8 +9009,6 @@ export interface components {
              * @enum {string}
              */
             happened: "waiting" | "sent-back" | "approved" | "withdrawn" | "lapsed" | "undone" | "mixed";
-            /** @description At least one occurrence it covers is about internal material, a static analysis code finding. Agreeing to it takes the approver capability */
-            internal?: boolean;
             /**
              * Format: int64
              * @description The number of distinct issues it covers
@@ -9038,6 +9036,8 @@ export interface components {
              * @description The number of occurrences it covers, counted once for each issue
              */
             rows: number;
+            /** @description At least one occurrence it covers is about security testing material, a static analysis code finding. Agreeing to it takes the approver capability */
+            security_testing?: boolean;
             /** @description At least one occurrence it covers is about a finding nobody has announced */
             undisclosed?: boolean;
             /** @description The moment it became that. Absent while it is waiting: nothing has happened to it */
@@ -9566,7 +9566,7 @@ export interface components {
              * @description Whether it has been disclosed
              * @enum {string}
              */
-            visibility: "public" | "private" | "internal";
+            visibility: "public" | "private" | "security-testing";
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -10243,7 +10243,7 @@ export interface components {
              * @description The rights it carries
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "security-testing-read" | "public-triage" | "private-triage" | "security-testing-triage";
         };
         GrownBody: {
             approved_at: string;
@@ -10296,7 +10296,7 @@ export interface components {
              * @description The rights it carries
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "security-testing-read" | "public-triage" | "private-triage" | "security-testing-triage";
             /**
              * @description Whether an administrator assigned this or a group derived it
              * @enum {string}
@@ -12875,7 +12875,7 @@ export interface components {
              * @description Results the build held open that the run reported again
              */
             seen: number;
-            /** @description Whether the run marked more of the build's open results no longer detected than the deployment expects of one run, which tells the product's internal readers */
+            /** @description Whether the run marked more of the build's open results no longer detected than the deployment expects of one run, which tells the product's security testing readers */
             sharp_drop?: boolean;
             /**
              * Format: int64
@@ -12972,7 +12972,7 @@ export interface components {
             component?: string;
             /** @description The ecosystem, where two components share the name */
             ecosystem?: string;
-            /** @description Whether the code finding is included in its flaw's disclosure. Internal only by default */
+            /** @description Whether the code finding is included in its flaw's disclosure. Security testing only by default */
             include_in_disclosure?: boolean;
             /** @description The namespace, where two share a name and an ecosystem */
             namespace?: string;
@@ -14596,7 +14596,7 @@ export interface components {
             /** @description The moment it stops working */
             expires_at?: string;
             /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none */
-            holds?: ("approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage")[] | null;
+            holds?: ("approver" | "assigner" | "public-read" | "private-read" | "security-testing-read" | "public-triage" | "private-triage" | "security-testing-triage")[] | null;
             /** @description When it was last used, to the hour */
             last_used_at?: string;
             /** @description The lifetime, such as "720h". There is a configured maximum */
@@ -18221,7 +18221,7 @@ export interface operations {
                 /** @description Keep only people holding something on this product, by the name that addresses it */
                 product?: string;
                 /** @description Keep only people holding this role */
-                role?: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage";
+                role?: "approver" | "assigner" | "public-read" | "private-read" | "security-testing-read" | "public-triage" | "private-triage" | "security-testing-triage";
             };
             header?: never;
             path?: never;
@@ -22323,7 +22323,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The visibility of the work being handed over */
-                visibility?: "public" | "private" | "internal";
+                visibility?: "public" | "private" | "security-testing";
                 /** @description Narrow to names containing this, ignoring capitals */
                 q?: string;
                 limit?: number;
@@ -23077,7 +23077,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The kind of finding the text is about */
-                visibility?: "public" | "private" | "internal";
+                visibility?: "public" | "private" | "security-testing";
                 /** @description Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name */
                 q?: string;
                 limit?: number;

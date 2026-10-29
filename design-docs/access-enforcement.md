@@ -83,7 +83,7 @@ package counts as querying.
 | Question | Asked at |
 |---|---|
 | An act on one finding: a decision, a label, giving work to somebody else or taking what they hold | The finding's own visibility |
-| Approving somebody else's decision | Reading at the decision's visibility with the approver capability or triage there; the capability alone at internal visibility |
+| Approving somebody else's decision | Reading at the decision's visibility with the approver capability or triage there; the capability alone at security testing visibility |
 | An act about the product: an assignment rule, a rating, a scan sent by hand, an incident, taking unowned work | Triage at any visibility, narrowed further wherever there is a finding |
 | Taking unowned work, handing back your own | Rows at a visibility they read, and a disclosed row of their own whatever they read |
 | Reading or publishing a VEX document, and what has gone out | Public reading to read, public triage to publish |

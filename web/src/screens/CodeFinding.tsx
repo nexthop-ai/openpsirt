@@ -37,7 +37,7 @@ import { CodeFindingFlaw } from "./CodeFindingFlaw";
 
 // One code finding on one build: what the analyzer said, the path it took, the code findings
 // that are the same flaw, and where the code finding stands. Somebody who triages
-// internal material judges it here, closes it as fixed once a run no longer
+// security testing material judges it here, closes it as fixed once a run no longer
 // sees it, and records a confirmed one as a flaw.
 export function CodeFinding() {
   const {
@@ -49,7 +49,7 @@ export function CodeFinding() {
   const build: Build = { product, branch_or_tag: branchOrTag, variant };
   const codeFinding = useCodeFinding(build, occurrence);
   const may = mayOf(useWho().data, product);
-  const triages = !!may?.triages_internal;
+  const triages = !!may?.triages_security_testing;
   const recordsFlaws = triages && !!may?.may_hide;
 
   if (codeFinding.isPending) return <Loading />;
@@ -435,7 +435,7 @@ function CodeFindingAssignee({
       <div style={{ minWidth: 220 }}>
         <Holder
           product={build.product}
-          internal
+          securityTesting
           value={holder}
           disabled={assign.isPending}
           onPick={(held) => assign.mutate(held)}

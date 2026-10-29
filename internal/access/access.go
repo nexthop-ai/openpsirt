@@ -66,19 +66,19 @@ const (
 	Assigner Role = "assigner"
 
 	// The reading and triage roles, per visibility.
-	PublicRead     Role = "public-read"
-	PrivateRead    Role = "private-read"
-	InternalRead   Role = "internal-read"
-	PublicTriage   Role = "public-triage"
-	PrivateTriage  Role = "private-triage"
-	InternalTriage Role = "internal-triage"
+	PublicRead            Role = "public-read"
+	PrivateRead           Role = "private-read"
+	SecurityTestingRead   Role = "security-testing-read"
+	PublicTriage          Role = "public-triage"
+	PrivateTriage         Role = "private-triage"
+	SecurityTestingTriage Role = "security-testing-triage"
 )
 
 // Roles are the baseline set. It is a floor, not a ceiling.
 func Roles() []Role {
 	return []Role{
 		Approver, Assigner,
-		PublicRead, PrivateRead, InternalRead, PublicTriage, PrivateTriage, InternalTriage,
+		PublicRead, PrivateRead, SecurityTestingRead, PublicTriage, PrivateTriage, SecurityTestingTriage,
 	}
 }
 
@@ -141,14 +141,15 @@ const (
 	Public Visibility = "public"
 	// Private means not yet disclosed.
 	Private Visibility = "private"
-	// Internal is material never disclosed in its own right: results nobody
-	// has judged yet, such as an analyzer's code findings. Disclosure never applies
-	// to it, and it is read and triaged under roles of its own.
-	Internal Visibility = "internal"
+	// SecurityTesting is the results of the deployment's own security testing,
+	// never disclosed in their own right: results nobody has judged yet, such as
+	// an analyzer's code findings. Disclosure never applies to it, and it is read
+	// and triaged under roles of its own.
+	SecurityTesting Visibility = "security-testing"
 )
 
 // Visibilities is every visibility, disclosed first.
-func Visibilities() []Visibility { return []Visibility{Public, Private, Internal} }
+func Visibilities() []Visibility { return []Visibility{Public, Private, SecurityTesting} }
 
 // AsVisibility reads a stored value, treating anything unrecognized as not
 // disclosed. Unset has to read as private, or a column added later defaults
@@ -157,8 +158,8 @@ func AsVisibility(s string) Visibility {
 	switch Visibility(s) {
 	case Public:
 		return Public
-	case Internal:
-		return Internal
+	case SecurityTesting:
+		return SecurityTesting
 	}
 	return Private
 }
@@ -169,8 +170,8 @@ func reading(v Visibility) (read, triage Role) {
 	switch v {
 	case Public:
 		return PublicRead, PublicTriage
-	case Internal:
-		return InternalRead, InternalTriage
+	case SecurityTesting:
+		return SecurityTestingRead, SecurityTestingTriage
 	}
 	return PrivateRead, PrivateTriage
 }
@@ -612,7 +613,7 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 
 // MayApprove is who may agree to somebody else's decision at one visibility: the
 // right to read there, and either the approver capability or the right to
-// triage there. At internal visibility it is the capability alone beside the
+// triage there. At security testing visibility it is the capability alone beside the
 // reading: a decision there is about a code finding, and a dismissed code finding is a result
 // nobody acts on again, so its second person is somebody granted the right to
 // agree.
@@ -623,7 +624,7 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 // which is checked separately. The one spelling of the rule, for a signed-in
 // subject and for the sweeps that work out who to tell.
 func MayApprove(visibility Visibility, approver, reads, triages bool) bool {
-	if visibility == Internal {
+	if visibility == SecurityTesting {
 		return reads && approver
 	}
 	return reads && (approver || triages)
@@ -634,7 +635,7 @@ func MayApprove(visibility Visibility, approver, reads, triages bool) bool {
 //
 // The question an act about the product rather than about one finding asks:
 // an assignment rule, a rating, an incident, taking unowned work. The finding-level
-// question narrows further where there is a finding to ask it of. Internal
+// question narrows further where there is a finding to ask it of. Security testing
 // triage answers no: it is the triage of code findings, and every one of those acts
 // is about what a build ships.
 func (s Subject) TriagesIn(productID int64) bool {
@@ -647,13 +648,13 @@ func (s Subject) TriagesIn(productID int64) bool {
 }
 
 // TriagesAnyIn reports whether this subject triages findings at any
-// visibility in this product: disclosed, undisclosed or internal.
+// visibility in this product: disclosed, undisclosed or security testing.
 //
 // The question reading and previewing the assignment rules ask. A rule places
 // code findings as it places every other finding, so whoever triages the code findings it
 // places reads what it would place.
 func (s Subject) TriagesAnyIn(productID int64) bool {
-	return s.TriagesIn(productID) || s.Triages(Internal, productID)
+	return s.TriagesIn(productID) || s.Triages(SecurityTesting, productID)
 }
 
 // Readings is a set of products sorted by exactly which visibilities a rule
@@ -727,7 +728,7 @@ func VisibleWhere(product, visibility string, r Readings) (string, []any) {
 }
 
 // caseVisibilities is what a case reaches. A case is about undisclosed work
-// and the record it becomes once disclosed, and internal material is not part
+// and the record it becomes once disclosed, and security testing material is not part
 // of one.
 var caseVisibilities = []Visibility{Public, Private}
 

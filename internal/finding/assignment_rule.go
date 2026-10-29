@@ -131,7 +131,7 @@ func (s *Store) insertRule(ctx context.Context, by access.Subject, productID, te
 
 // Rules lists a product's assignment rules, in the order they are tried.
 //
-// Read by whoever triages the product at any visibility, internal included,
+// Read by whoever triages the product at any visibility, security testing included,
 // because a rule places code findings too. The rules are its triage configuration and
 // carry no finding, so there is nothing to narrow: a reader gets the whole
 // precedence order or none of it.
@@ -341,7 +341,7 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule AssignmentRu
 }
 
 // holdableBy is every visibility a team may be handed work at in a product:
-// undisclosed and internal work where one member reads it, and disclosed work
+// undisclosed and security testing work where one member reads it, and disclosed work
 // where one member reads the product at any visibility, because disclosed
 // work travels with the assignment. The rule a hand assignment to the team
 // asks.
@@ -353,7 +353,7 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule AssignmentRu
 func (s *Store) holdableBy(ctx context.Context, teamID, productID int64) ([]access.Visibility, error) {
 	rights := access.NewStore(s.db)
 	var out []access.Visibility
-	for _, v := range []access.Visibility{access.Private, access.Internal} {
+	for _, v := range []access.Visibility{access.Private, access.SecurityTesting} {
 		reads, err := rights.AnyMemberReads(ctx, teamID, productID, v)
 		if err != nil {
 			return nil, err

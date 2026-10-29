@@ -28,13 +28,13 @@ const COLUMNS: CodeFindingState[] = [
 
 // How many code findings each analyzer holds, and how far each has been worked.
 //
-// Internal, like every code finding, so a reader who does not read internal material
-// in the product is told so rather than shown a table of zeros that reads as
-// an analyzer finding nothing.
+// Security testing work, like every code finding, so a reader who does not read
+// security testing material in the product is told so rather than shown a table
+// of zeros that reads as an analyzer finding nothing.
 export function CodeFindingSeries() {
   const at = useScope();
   const product = at.product ?? "";
-  const reads = !!mayOf(useWho().data, product)?.reads_internal;
+  const reads = !!mayOf(useWho().data, product)?.reads_security_testing;
   const counted = useCodeFindingSeries(reads ? product : "");
   const rows = counted.data ?? [];
 
@@ -52,8 +52,8 @@ export function CodeFindingSeries() {
       ) : !reads ? (
         <section className="panel">
           <Empty
-            title="Code findings are internal."
-            detail="Reading them takes internal-read on the product."
+            title="Code findings are security testing results."
+            detail="Reading them takes security-testing-read on the product."
           />
         </section>
       ) : counted.isPending ? (

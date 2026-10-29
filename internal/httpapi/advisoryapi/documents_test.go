@@ -118,7 +118,7 @@ func TestTheDocumentsUploadedToAProductAreReadByWhoSeesIt(t *testing.T) {
 			"/v1/products/mine/vex-documents", "/v1/products/mine/supplier-advisories",
 		} {
 			for who, want := range map[string]int{
-				"reader": http.StatusOK, "internal-reader": http.StatusOK, "admin": http.StatusOK,
+				"reader": http.StatusOK, "security-testing-reader": http.StatusOK, "admin": http.StatusOK,
 				// Somebody who may not know the product exists is told it
 				// does not, the same as for a product nobody declared.
 				"outsider": http.StatusNotFound, "approver": http.StatusNotFound,

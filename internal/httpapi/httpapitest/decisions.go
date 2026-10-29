@@ -482,14 +482,14 @@ func (r *Reach) Undisclosed(t *testing.T) {
 	}
 }
 
-// Internal makes every finding of one issue internal.
+// SecurityTesting makes every finding of one issue security testing work.
 //
-// Written straight to the column: no producer here opens an internal finding,
+// Written straight to the column: no producer here opens a security testing finding,
 // and what is being tested is who reads one rather than how one arrives.
-func (r *Reach) Internal(t *testing.T, identifier string) {
+func (r *Reach) SecurityTesting(t *testing.T, identifier string) {
 	t.Helper()
 	if _, err := r.DB.DB.NewUpdate().Table("finding").
-		Set(`"visibility" = ?`, access.Internal).
+		Set(`"visibility" = ?`, access.SecurityTesting).
 		Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 			identifier).Exec(t.Context()); err != nil {
 		t.Fatal(err)

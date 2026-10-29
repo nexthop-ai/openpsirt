@@ -45,21 +45,24 @@ const MARKS: Mark[] = [
 // of that visibility in that product, so asking as though an undisclosed
 // finding were public offers colleagues who cannot open what they are being
 // called to. Written once because four screens ask it and two of them had
-// started to answer it differently. A decision about a code finding is about internal
+// started to answer it differently. A decision about a code finding is about security testing
 // material until its flaw is disclosed, and the server tells a mention at that
 // visibility.
 export function mentioning(
   product?: string,
   undisclosed?: boolean,
-  internal?: boolean,
+  securityTesting?: boolean,
 ): { product: string; visibility: Visibility } | undefined {
   if (!product) return undefined;
-  return { product, visibility: internal ? "internal" : undisclosed ? "private" : "public" };
+  return {
+    product,
+    visibility: securityTesting ? "security-testing" : undisclosed ? "private" : "public",
+  };
 }
 
 // The visibility of what a piece of text is about, as the mention picker
 // asks it.
-type Visibility = "public" | "private" | "internal";
+type Visibility = "public" | "private" | "security-testing";
 
 // What a file is attached to: an issue, or a vulnerability report. A report's
 // files are held on the report the moment they arrive, and read under its
