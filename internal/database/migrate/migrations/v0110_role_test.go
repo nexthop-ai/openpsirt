@@ -4,17 +4,27 @@
 package migrations_test
 
 import (
+	"slices"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // A role a v0.10.0 database granted keeps its name across the upgrade, and
 // every table holding a role then holds the longest role name there is. Too
 // narrow, a server engine refuses the grant and SQLite takes it.
+//
+// The tables checked are the ones the migrated schema has a role column in,
+// read from the database at the latest migration, so a table a later release
+// adds fails here until it is given a row. SQLite takes any width, so there the
+// comparison of the two sets is what fails.
 func TestEveryRoleColumnHoldsTheLongestRoleAfterTheV0110Upgrade(t *testing.T) {
 	var longest access.Role
 	for _, role := range access.Roles() {
@@ -44,7 +54,9 @@ func TestEveryRoleColumnHoldsTheLongestRoleAfterTheV0110Upgrade(t *testing.T) {
 		exec(`INSERT INTO "role_grant" ("person_id", "product_id", "role", "source", "active", "created_at")
 			VALUES (?, ?, ?, ?, ?, ?)`, person, product, access.PrivateTriage, access.Assigned, true, at)
 
-		dbtest.MigrateTo(t, db, v0110)
+		if err := schema.Up(ctx, db, quiet()); err != nil {
+			t.Fatalf("migrate to the latest: %v", err)
+		}
 
 		var kept string
 		if err := db.DB.NewRaw(`SELECT "role" FROM "role_grant" WHERE "person_id" = ? AND "product_id" = ?`,
@@ -54,25 +66,72 @@ func TestEveryRoleColumnHoldsTheLongestRoleAfterTheV0110Upgrade(t *testing.T) {
 		if kept != string(access.PrivateTriage) {
 			t.Errorf("a grant of %s reads %q after the upgrade", access.PrivateTriage, kept)
 		}
-		exec(`INSERT INTO "role_grant" ("person_id", "product_id", "role", "source", "active", "created_at")
-			VALUES (?, ?, ?, ?, ?, ?)`, person, product, longest, access.Assigned, true, at)
-		exec(`INSERT INTO "role_grant_all" ("person_id", "role", "source", "active", "created_at")
-			VALUES (?, ?, ?, ?, ?)`, person, longest, access.Assigned, true, at)
-		exec(`INSERT INTO "group_role" ("group_name", "product_name", "role", "created_at")
-			VALUES (?, ?, ?, ?)`, "analysts", "sonic", longest, at)
-		exec(`INSERT INTO "group_role_all" ("group_name", "role", "created_at")
-			VALUES (?, ?, ?)`, "analysts", longest, at)
-		var held []string
-		if err := db.DB.NewRaw(`SELECT "role" FROM "role_grant" WHERE "role" = ?
-			UNION ALL SELECT "role" FROM "role_grant_all" WHERE "role" = ?
-			UNION ALL SELECT "role" FROM "group_role" WHERE "role" = ?
-			UNION ALL SELECT "role" FROM "group_role_all" WHERE "role" = ?`,
-			longest, longest, longest, longest).Scan(ctx, &held); err != nil {
-			t.Fatal(err)
+
+		rows := map[string]func(){
+			"role_grant": func() {
+				exec(`INSERT INTO "role_grant" ("person_id", "product_id", "role", "source", "active", "created_at")
+					VALUES (?, ?, ?, ?, ?, ?)`, person, product, longest, access.Assigned, true, at)
+			},
+			"role_grant_all": func() {
+				exec(`INSERT INTO "role_grant_all" ("person_id", "role", "source", "active", "created_at")
+					VALUES (?, ?, ?, ?, ?)`, person, longest, access.Assigned, true, at)
+			},
+			"group_role": func() {
+				exec(`INSERT INTO "group_role" ("group_name", "product_name", "role", "created_at")
+					VALUES (?, ?, ?, ?)`, "analysts", "sonic", longest, at)
+			},
+			"group_role_all": func() {
+				exec(`INSERT INTO "group_role_all" ("group_name", "role", "created_at")
+					VALUES (?, ?, ?)`, "analysts", longest, at)
+			},
 		}
-		if len(held) != 4 {
-			t.Errorf("%d of the four role tables read %s back whole: %q", len(held), longest, held)
+		holding := tablesWithColumn(describe(t, ctx, db), "role")
+		if len(holding) == 0 {
+			t.Fatal("no table in the migrated schema has a role column, so this checked nothing")
 		}
-		leaveAtLatest(t, ctx, db)
+		for _, table := range holding {
+			if rows[table] == nil {
+				t.Errorf("table %s has a role column and this test writes no row to it", table)
+			}
+		}
+		for table := range rows {
+			if !slices.Contains(holding, table) {
+				t.Errorf("this test writes a role to %s, which has no role column", table)
+			}
+		}
+		if t.Failed() {
+			return
+		}
+		for _, table := range holding {
+			rows[table]()
+			var held int
+			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM ? WHERE "role" = ?`,
+				bun.Ident(table), longest).Scan(ctx, &held); err != nil {
+				t.Fatal(err)
+			}
+			if held != 1 {
+				t.Errorf("%s reads %s back whole in %d rows, not one", table, longest, held)
+			}
+		}
+		dbtest.Reset(t, db)
 	})
+}
+
+// tablesWithColumn is each table a schema description has a column of this
+// name in, sorted.
+func tablesWithColumn(described []string, column string) []string {
+	var tables []string
+	for _, line := range described {
+		rest, found := strings.CutPrefix(line, "column ")
+		if !found {
+			continue
+		}
+		name, _, _ := strings.Cut(rest, " ")
+		table, col, _ := strings.Cut(name, ".")
+		if col == column && !slices.Contains(tables, table) {
+			tables = append(tables, table)
+		}
+	}
+	slices.Sort(tables)
+	return tables
 }

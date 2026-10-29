@@ -10,7 +10,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// roleTablesV0110 is each table holding a role's name.
+// roleTablesV0110 is each table v0.11.0 declares a role's name in. A table a
+// later release adds is declared at its own width.
 var roleTablesV0110 = []string{"role_grant", "role_grant_all", "group_role", "group_role_all"}
 
 // roleV0110 is v0.11.0's declaration of the tables holding a role's name:
