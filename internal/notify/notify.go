@@ -278,7 +278,7 @@ const (
 	//
 	// An event, for the reason InventoryMoved is one: the run is applied, and
 	// what it did stays true of that run. A run that analyzed part of the
-	// tree without saying so reads like a fix sweep, so the product's internal
+	// tree without saying so reads like a fix sweep, so the product's security testing
 	// readers hear about it instead of the run being set aside.
 	SecurityTestingDropped Kind = "security-testing-dropped"
 	// SecurityTestingNotComparable is an analyzer series whose newest run on a build
@@ -290,16 +290,16 @@ const (
 	// where there was one. A condition: the next run clears it.
 	SecurityTestingStopped Kind = "security-testing-stopped"
 	// CodeFindingRecordedAsFlaw is a confirmed code finding recorded as a flaw, told to the
-	// product's internal triagers. Recording the flaw tells what recording
+	// product's security testing triagers. Recording the flaw tells what recording
 	// any flaw tells; this is the code finding's side of it.
 	CodeFindingRecordedAsFlaw Kind = "code-finding-recorded-as-flaw"
 	// CodeFindingIncludedInDisclosure is a code finding recorded as a flaw included in its flaw's disclosure or taken back
-	// out, told to the product's internal triagers, whose reading of it
+	// out, told to the product's security testing triagers, whose reading of it
 	// narrows or returns.
 	CodeFindingIncludedInDisclosure Kind = "code-finding-included-in-disclosure"
 	// CodeFindingReopened is a code finding an agreed dismissal held out of the queue, back
 	// in it because the dismissal was withdrawn, told to the product's
-	// internal triagers. An approval tells nobody; a withdrawal puts work
+	// security testing triagers. An approval tells nobody; a withdrawal puts work
 	// back.
 	CodeFindingReopened Kind = "code-finding-reopened"
 	// SuppressionRuleOutgrown is an approved suppression rule covering more than
@@ -361,10 +361,10 @@ type Notification struct {
 	// that leaves this deployment carries a link and nothing else for one
 	// of these ; the area inside it is unaffected.
 	Private bool `bun:"private,notnull"`
-	// Internal says what a withheld row withholds is internal work, which a
-	// reader of internal findings reads in its product and a reader of
+	// SecurityTesting says what a withheld row withholds is security testing work, which a
+	// reader of security testing findings reads in its product and a reader of
 	// undisclosed work does not.
-	Internal bool `bun:"internal,notnull"`
+	SecurityTesting bool `bun:"security_testing,notnull"`
 	// ProductID and VulnerabilityID are what this is about, where it is
 	// about either. Every read of this table narrows by them, so a row
 	// marked private carries a product or is refused.
@@ -433,9 +433,9 @@ type Telling struct {
 	// is said outside this deployment depends on what was true when there
 	// was something to say.
 	Private bool
-	// Internal says what Private withholds is internal work: an analyzer's
+	// SecurityTesting says what Private withholds is security testing work: an analyzer's
 	// code findings. Refused without Private.
-	Internal bool
+	SecurityTesting bool
 	// ProductID and VulnerabilityID say what this is about, and are what
 	// every later read narrows by. Required alongside Private, refused
 	// otherwise: a row nobody can attribute to a product is one no
@@ -457,7 +457,7 @@ func (s *Store) Tell(ctx context.Context, t Telling) error {
 		return refusal.Errorf("%s: an event is about a moment rather than a state, "+
 			"so it takes no subject to clear against", t.Kind)
 	}
-	if err := attributable(t.Kind, t.Private, t.Internal, t.ProductID); err != nil {
+	if err := attributable(t.Kind, t.Private, t.SecurityTesting, t.ProductID); err != nil {
 		return err
 	}
 	// Somebody who has left is told nothing. Their grants and assignments
@@ -474,7 +474,7 @@ func (s *Store) Tell(ctx context.Context, t Telling) error {
 	}
 	row := &Notification{
 		PersonID: t.PersonID, Kind: t.Kind, Lifetime: Event,
-		Body: t.Body, Link: t.Link, Private: t.Private, Internal: t.Internal,
+		Body: t.Body, Link: t.Link, Private: t.Private, SecurityTesting: t.SecurityTesting,
 		ProductID: t.ProductID, VulnerabilityID: t.VulnerabilityID,
 		Concerns: t.Concerns, Together: t.Together, CreatedAt: s.now(),
 	}
@@ -495,9 +495,9 @@ type Holds struct {
 	// Every embargo alert is one; a build that stopped being scanned is not
 	// about a finding at all.
 	Private bool
-	// Internal says what Private withholds is internal work, on the same
+	// SecurityTesting says what Private withholds is security testing work, on the same
 	// terms as a telling.
-	Internal bool
+	SecurityTesting bool
 	// ProductID and VulnerabilityID say what this is about, on the same
 	// terms as a telling: required alongside Private, and what every later
 	// read narrows by.
@@ -536,7 +536,7 @@ func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
 		return 0, 0, refusal.New("a condition needs somebody and a kind")
 	}
 	for _, h := range holding {
-		if err := attributable(kind, h.Private, h.Internal, h.ProductID); err != nil {
+		if err := attributable(kind, h.Private, h.SecurityTesting, h.ProductID); err != nil {
 			return 0, 0, err
 		}
 	}
@@ -578,7 +578,7 @@ func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
 				// disclosed work when the condition opened may hold
 				// undisclosed work under the same key now.
 				if row.Body != still.Body || row.Link != still.Link ||
-					row.Private != still.Private || row.Internal != still.Internal ||
+					row.Private != still.Private || row.SecurityTesting != still.SecurityTesting ||
 					!sameID(row.ProductID, still.ProductID) ||
 					!sameID(row.VulnerabilityID, still.VulnerabilityID) ||
 					!sameID(row.TeamID, still.TeamID) {
@@ -647,7 +647,7 @@ func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
 			fresh = append(fresh, Notification{
 				PersonID: personID, Kind: kind, Lifetime: Condition,
 				About: about, AboutOpen: &key,
-				Body: h.Body, Link: h.Link, Private: h.Private, Internal: h.Internal,
+				Body: h.Body, Link: h.Link, Private: h.Private, SecurityTesting: h.SecurityTesting,
 				ProductID: h.ProductID, VulnerabilityID: h.VulnerabilityID, TeamID: h.TeamID,
 				CreatedAt: now,
 			})
@@ -697,7 +697,7 @@ func restate(ctx context.Context, tx bun.IDB, moved []restated) error {
 			{"body", func(h Holds) any { return h.Body }},
 			{"link", func(h Holds) any { return h.Link }},
 			{"private", func(h Holds) any { return h.Private }},
-			{"internal", func(h Holds) any { return h.Internal }},
+			{"security_testing", func(h Holds) any { return h.SecurityTesting }},
 			{"product_id", func(h Holds) any { return h.ProductID }},
 			{"vulnerability_id", func(h Holds) any { return h.VulnerabilityID }},
 			{"team_id", func(h Holds) any { return h.TeamID }},
@@ -796,9 +796,9 @@ func sameID(a, b *int64) bool {
 // shown to everybody or to nobody, and both are wrong. Refusing at the write
 // makes that a failure where it is written rather than a leak, or a silent
 // disappearance, where it is read.
-func attributable(kind Kind, private, internal bool, productID *int64) error {
-	if internal && !private {
-		return refusal.Errorf("%s: a notification about internal work is withheld outside it", kind)
+func attributable(kind Kind, private, securityTesting bool, productID *int64) error {
+	if securityTesting && !private {
+		return refusal.Errorf("%s: a notification about security testing work is withheld outside it", kind)
 	}
 	if private && (productID == nil || *productID == 0) {
 		return refusal.Errorf("%s: a notification about something undisclosed says "+
@@ -901,35 +901,35 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	if all {
 		return q
 	}
-	private, internal := withheldReaders(subject, products)
+	private, securityTesting := withheldReaders(subject, products)
 	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where(`"private" = ?`, false)
-		return onCases(withheld(q, private, internal), subject)
+		return onCases(withheld(q, private, securityTesting), subject)
 	})
 }
 
 // withheldReaders is the products, of those given, where a subject reads
-// undisclosed work, and those where they read internal work.
-func withheldReaders(subject access.Subject, products []int64) (private, internal []int64) {
+// undisclosed work, and those where they read security testing work.
+func withheldReaders(subject access.Subject, products []int64) (private, securityTesting []int64) {
 	for _, id := range products {
 		if subject.Reads(access.Private, id) {
 			private = append(private, id)
 		}
-		if subject.Reads(access.Internal, id) {
-			internal = append(internal, id)
+		if subject.Reads(access.SecurityTesting, id) {
+			securityTesting = append(securityTesting, id)
 		}
 	}
-	return private, internal
+	return private, securityTesting
 }
 
 // withheld widens a group by the withheld rows a subject reads: undisclosed
-// work in the products they read it in, and internal work in those.
-func withheld(q *bun.SelectQuery, private, internal []int64) *bun.SelectQuery {
+// work in the products they read it in, and security testing work in those.
+func withheld(q *bun.SelectQuery, private, securityTesting []int64) *bun.SelectQuery {
 	if len(private) > 0 {
-		q = q.WhereOr(`("private" = ? AND "internal" = ? AND "product_id" IN (?))`, true, false, bun.List(private))
+		q = q.WhereOr(`("private" = ? AND "security_testing" = ? AND "product_id" IN (?))`, true, false, bun.List(private))
 	}
-	if len(internal) > 0 {
-		q = q.WhereOr(`("private" = ? AND "internal" = ? AND "product_id" IN (?))`, true, true, bun.List(internal))
+	if len(securityTesting) > 0 {
+		q = q.WhereOr(`("private" = ? AND "security_testing" = ? AND "product_id" IN (?))`, true, true, bun.List(securityTesting))
 	}
 	return q
 }
@@ -974,13 +974,13 @@ func inHeldProducts(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery
 	if all {
 		return q
 	}
-	private, internal := withheldReaders(subject, products)
+	private, securityTesting := withheldReaders(subject, products)
 	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("1 = 0")
 		if len(products) > 0 {
 			q = q.WhereOr(`("private" = ? AND "product_id" IN (?))`, false, bun.List(products))
 		}
-		return onCases(withheld(q, private, internal), subject)
+		return onCases(withheld(q, private, securityTesting), subject)
 	})
 }
 
@@ -1117,18 +1117,18 @@ func ConcerningCodeFinding(productID int64, occurrenceIdentity string) string {
 }
 
 // Withholding is the marks a telling about work holding these visibilities
-// carries: withheld where any is other than public, and internal where any is
-// internal. A reader of undisclosed work reads no internal work, so work
-// holding both is read by those who read internal work, as a decision spanning
+// carries: withheld where any is other than public, and security testing where any is
+// at security testing visibility. A reader of undisclosed work reads no security testing work, so work
+// holding both is read by those who read security testing work, as a decision spanning
 // both is.
-func Withholding(visibilities []access.Visibility) (private, internal bool) {
+func Withholding(visibilities []access.Visibility) (private, securityTesting bool) {
 	for _, v := range visibilities {
 		if v != access.Public {
 			private = true
 		}
-		if v == access.Internal {
-			internal = true
+		if v == access.SecurityTesting {
+			securityTesting = true
 		}
 	}
-	return private, internal
+	return private, securityTesting
 }

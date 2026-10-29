@@ -242,12 +242,12 @@ func EnforceDeclarations(api huma.API) {
 // visibility. Any is enough; which decides what is visible rather than what is
 // allowed.
 func TriageRights() []access.Role {
-	return []access.Role{access.PublicTriage, access.PrivateTriage, access.InternalTriage}
+	return []access.Role{access.PublicTriage, access.PrivateTriage, access.SecurityTestingTriage}
 }
 
 // DisclosureTriageRights is the triage roles at the visibilities disclosure
 // applies to, for the operations about disclosing, advisories, recorded flaws
-// and what an upstream says. Internal material is never disclosed.
+// and what an upstream says. Security testing material is never disclosed.
 func DisclosureTriageRights() []access.Role {
 	return []access.Role{access.PublicTriage, access.PrivateTriage}
 }
@@ -257,7 +257,7 @@ func DisclosureTriageRights() []access.Role {
 // checked separately and has no override.
 func ApproveRights() []access.Role {
 	return []access.Role{access.Approver, access.PublicTriage, access.PrivateTriage,
-		access.InternalTriage}
+		access.SecurityTestingTriage}
 }
 
 // ReadRights is the roles that may read findings on a product: the role that
@@ -267,7 +267,7 @@ func ApproveRights() []access.Role {
 func ReadRights() []access.Role {
 	return []access.Role{access.PublicRead, access.PublicTriage,
 		access.PrivateRead, access.PrivateTriage,
-		access.InternalRead, access.InternalTriage}
+		access.SecurityTestingRead, access.SecurityTestingTriage}
 }
 
 // DisclosureReadRights is ReadRights at the visibilities disclosure applies

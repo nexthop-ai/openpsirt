@@ -15,10 +15,10 @@ import (
 //
 // The grant is on the pair of product and occurrence, as a case collaborator's is
 // on the pair of product and issue. It reads the code finding's evidence and nothing
-// else of the product, at the internal and private visibilities, and only
+// else of the product, at the security testing and private visibilities, and only
 // while the code finding's flaw is undisclosed: disclosure ends it, whether or not the
 // code finding was included. An included code finding goes public with its flaw
-// and an internal-only one stays internal.
+// and a security-testing-only one stays at security testing visibility.
 type CodeFindingCollaborator struct {
 	bun.BaseModel `bun:"table:code_finding_collaborator,alias:lc"`
 
@@ -37,9 +37,9 @@ type CodeFindingCollaborator struct {
 }
 
 // codeFindingVisibilities is what a code finding grant reaches while the code finding's flaw is
-// undisclosed. A code finding recorded as a flaw is internal until its flaw is disclosed,
-// internal only or included in disclosure.
-var codeFindingVisibilities = []Visibility{Internal}
+// undisclosed. A code finding recorded as a flaw is at security testing visibility until its flaw is disclosed,
+// security testing only or included in disclosure.
+var codeFindingVisibilities = []Visibility{SecurityTesting}
 
 // CodeFindingGrantVisibilities is what a code finding grant reaches, for a condition over
 // findings.

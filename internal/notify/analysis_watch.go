@@ -100,21 +100,21 @@ func (w *sweep) pastEndOfLife(ctx context.Context) (map[int64]bool, error) {
 	return past, nil
 }
 
-// tellInternal hands a condition to everybody who reads the product's
-// internal findings. What it names is a series and a build, and both are
-// about internal work.
-func (w *sweep) tellInternal(out map[int64][]Holds, productID int64, holds Holds) {
-	holds.Private, holds.Internal = true, true
+// tellSecurityTesting hands a condition to everybody who reads the product's
+// security testing findings. What it names is a series and a build, and both are
+// about security testing work.
+func (w *sweep) tellSecurityTesting(out map[int64][]Holds, productID int64, holds Holds) {
+	holds.Private, holds.SecurityTesting = true, true
 	holds.ProductID = &productID
 	for personID, per := range w.reach {
-		if per[productID].readsInternal {
+		if per[productID].readsSecurityTesting {
 			out[personID] = append(out[personID], holds)
 		}
 	}
 }
 
 // analysesNotComparable is every series whose newest run on a build could not
-// be compared, against the product's internal readers.
+// be compared, against the product's security testing readers.
 //
 // While it holds, nothing that series stops reporting on that build is marked
 // no longer detected, so a fix and a broken pipeline look the same. It clears on
@@ -149,7 +149,7 @@ func (w *sweep) analysesNotComparable(ctx context.Context) (map[int64][]Holds, e
 		if past[row.BranchOrTagID] {
 			continue
 		}
-		w.tellInternal(out, row.ProductID, Holds{
+		w.tellSecurityTesting(out, row.ProductID, Holds{
 			About: identify("security-testing-not-comparable", strconv.FormatInt(row.SeriesID, 10),
 				strconv.FormatInt(row.BuildID, 10)),
 			Body: fmt.Sprintf("%s %s %s: the last run of %s could not be compared, because %s. "+
@@ -183,7 +183,7 @@ func uncomparable(r series.Reason) string {
 }
 
 // analysesQuiet is every series that has stopped arriving on a build it ran
-// on regularly, against the product's internal readers.
+// on regularly, against the product's security testing readers.
 //
 // Measured against the series' own rhythm on that build: three times its
 // usual gap, and never less than a day. A series with fewer than three runs
@@ -252,7 +252,7 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 				"of it was turned away on %s: %s", build.Product, build.BranchOrTag, build.Variant,
 				build.Series, plainly(int(silent.Hours()/24)), day(turned.At), turned.Reason)
 		}
-		w.tellInternal(out, build.ProductID, Holds{
+		w.tellSecurityTesting(out, build.ProductID, Holds{
 			About: identify("security-testing-stopped", strconv.FormatInt(at.series, 10),
 				strconv.FormatInt(at.build, 10)),
 			Body: body,
@@ -353,14 +353,14 @@ func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
 				Body: fmt.Sprintf("A suppression rule in %s dismissing %s covers %d code findings, and was approved "+
 					"over %d. It keeps dismissing them until somebody approves it again.",
 					product.Shown, named, rule.Covering, *rule.ApprovedCovering),
-				Link:      weblink.SuppressionRules(product.Name),
-				Private:   true,
-				Internal:  true,
-				ProductID: &productID,
+				Link:            weblink.SuppressionRules(product.Name),
+				Private:         true,
+				SecurityTesting: true,
+				ProductID:       &productID,
 			}
 			for personID, per := range w.reach {
 				// Approved again by somebody other than its proposer.
-				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{internal: 1}) {
+				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{securityTesting: 1}) {
 					continue
 				}
 				out[personID] = append(out[personID], holds)
@@ -425,14 +425,14 @@ func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 				About: identify("suppression-rule-waiting", strconv.FormatInt(rule.ID, 10)),
 				Body: fmt.Sprintf("A suppression rule in %s dismissing %s is waiting for a second person. "+
 					"It dismisses nothing until somebody approves it.", product.Shown, named),
-				Link:      weblink.SuppressionRules(product.Name),
-				Private:   true,
-				Internal:  true,
-				ProductID: &productID,
+				Link:            weblink.SuppressionRules(product.Name),
+				Private:         true,
+				SecurityTesting: true,
+				ProductID:       &productID,
 			}
 			for personID, per := range w.reach {
 				// Approved by somebody other than its proposer.
-				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{internal: 1}) {
+				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{securityTesting: 1}) {
 					continue
 				}
 				out[personID] = append(out[personID], holds)

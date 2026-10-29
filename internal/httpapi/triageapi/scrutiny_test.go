@@ -261,7 +261,7 @@ func TestAConfirmedCodeFindingIsNoExceptionToTheSecondPersonRule(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		decideCodeFinding(t, r, occurrence, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
-		if got := scrutiny(t, r, "internal-reviewer", ""); len(got.Alone) != 0 {
+		if got := scrutiny(t, r, "security-testing-reviewer", ""); len(got.Alone) != 0 {
 			t.Errorf("a confirmed code finding is reported as standing alone: %+v", got.Alone)
 		}
 	})

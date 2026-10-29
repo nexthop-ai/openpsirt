@@ -71,7 +71,7 @@ func kinOf(t *testing.T, r *httpapitest.Reach, occurrence string) []struct {
 			Same       bool   `json:"same"`
 		} `json:"kin"`
 	}
-	httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence, &got)
+	httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence, &got)
 	return got.Kin
 }
 
@@ -88,7 +88,7 @@ func TestASecondAnalyzerReportingTheSameFlawGroupsItAndSortsItFirst(t *testing.T
 		}
 		// The queue puts the flaw two analyzers report above the one only
 		// one does.
-		queue := codeFindingsOf(t, r, "internal-reader", "")
+		queue := codeFindingsOf(t, r, "security-testing-reader", "")
 		if len(queue.Items) != 4 {
 			t.Fatalf("the queue is %+v; want the leak and three overflows", queue.Items)
 		}
@@ -116,7 +116,7 @@ func TestClangsCheckersRunByClangTidyAreNotASecondAnalyzer(t *testing.T) {
 		httpapitest.ApplyRunIn(t, r, "clang-tidy/analyzer", now.Add(-80*time.Minute),
 			httpapitest.OtherToolRun("clang-tidy", "clang-analyzer-unix.Malloc", "401", "src/c.c", 7))
 		var both []string
-		for _, codeFinding := range codeFindingsOf(t, r, "internal-reader", "").Items {
+		for _, codeFinding := range codeFindingsOf(t, r, "security-testing-reader", "").Items {
 			if codeFinding.Path == "src/c.c" {
 				both = append(both, codeFinding.Occurrence)
 			}
@@ -165,11 +165,11 @@ func TestCodeFindingsInTwoFilesAreNotOneFlaw(t *testing.T) {
 	})
 }
 
-// decideCodeFinding records a decision about a code finding as the internal triager, and the
+// decideCodeFinding records a decision about a code finding as the security testing triager, and the
 // decision it made.
 func decideCodeFinding(t *testing.T, r *httpapitest.Reach, occurrence, body string) core.DecisionOccurrenceBody {
 	t.Helper()
-	got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(codeFindingDecisionAt, occurrence), body)
+	got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, fmt.Sprintf(codeFindingDecisionAt, occurrence), body)
 	if got.Code != http.StatusCreated {
 		t.Fatalf("deciding %s answered %d: %s", occurrence, got.Code, got.Body)
 	}
@@ -201,7 +201,7 @@ func TestOneDecisionAnswersEveryCodeFindingThatIsTheSameFlaw(t *testing.T) {
 		}
 		decided := decideCodeFinding(t, r, occurrence,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the length is checked by the caller"}`)
-		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+		httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`)
 		if got := codeFindingState(t, r, occurrence); got != "dismissed" {
 			t.Errorf("the code finding decided is %q; want dismissed", got)
@@ -228,7 +228,7 @@ func TestACodeFindingOfAGroupAlreadyAnsweredKeepsItsAnswer(t *testing.T) {
 		}
 		decided := decideCodeFinding(t, r, kin[0].Occurrence,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"never reached"}`)
-		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+		httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`)
 		if got := codeFindingState(t, r, occurrence); got != "confirmed" {
 			t.Errorf("the leak confirmed first is %q; want it confirmed still", got)

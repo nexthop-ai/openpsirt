@@ -30,7 +30,7 @@ export type Held = { kind: "person" | "team"; identity: string; name: string };
 export function Holder({
   product,
   undisclosed,
-  internal,
+  securityTesting,
   value,
   onPick,
   disabled,
@@ -41,8 +41,8 @@ export function Holder({
   // The kind of work being handed over, so the people offered are the
   // ones who could open it.
   undisclosed?: boolean;
-  // Internal work, such as a code finding, which only readers of internal work open.
-  internal?: boolean;
+  // Security testing work, such as a code finding, which only readers of security testing work open.
+  securityTesting?: boolean;
   // The present holder, shown when the field is not being typed in.
   value?: { identity: string; name?: string } | null;
   onPick: (held: Held | null) => void;
@@ -79,7 +79,7 @@ export function Holder({
     queryKey: [
       "holders",
       product,
-      internal ? "internal" : undisclosed ? "private" : "",
+      securityTesting ? "security-testing" : undisclosed ? "private" : "",
       typed.trim(),
     ],
     queryFn: async () =>
@@ -88,8 +88,8 @@ export function Holder({
           params: {
             path: { product },
             query: {
-              ...(internal
-                ? { visibility: "internal" as const }
+              ...(securityTesting
+                ? { visibility: "security-testing" as const }
                 : undisclosed
                   ? { visibility: "private" as const }
                   : {}),

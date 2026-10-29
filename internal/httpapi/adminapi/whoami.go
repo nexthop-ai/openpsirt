@@ -31,22 +31,22 @@ import (
 // server's rule, and the copy that drifts is the one that offers a button
 // leading to a refusal.
 type CanBody struct {
-	Product           string `json:"product"`
-	Name              string `json:"name" doc:"The label shown for it"`
-	MaySee            bool   `json:"may_see" doc:"Read findings here at any visibility"`
-	ReadsPublic       bool   `json:"reads_public" doc:"Read findings that have been disclosed"`
-	ReadsPrivate      bool   `json:"reads_private" doc:"Read findings nobody has disclosed yet"`
-	ReadsInternal     bool   `json:"reads_internal" doc:"Read internal findings, which are never disclosed"`
-	MayTriage         bool   `json:"may_triage" doc:"Argue about a disclosed or undisclosed finding here"`
-	TriagesPublic     bool   `json:"triages_public" doc:"Argue about a finding that has been disclosed"`
-	TriagesInternal   bool   `json:"triages_internal" doc:"Argue about an internal finding"`
-	MayAssign         bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
-	MayHide           bool   `json:"may_hide" doc:"Triage a private finding, which nobody has disclosed"`
-	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's decision, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's decision there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override"`
-	AgreesPublic      bool   `json:"agrees_public" doc:"Agree to somebody else's decision about disclosed findings, or send it back: reading them, with the approver capability or public-triage"`
-	AgreesPrivate     bool   `json:"agrees_private" doc:"Agree to somebody else's decision about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"`
-	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's decision about internal findings or a suppression rule over them, or send it back: reading them, with the approver capability"`
-	MayApproveRulings bool   `json:"may_approve_rulings" doc:"Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"`
+	Product                string `json:"product"`
+	Name                   string `json:"name" doc:"The label shown for it"`
+	MaySee                 bool   `json:"may_see" doc:"Read findings here at any visibility"`
+	ReadsPublic            bool   `json:"reads_public" doc:"Read findings that have been disclosed"`
+	ReadsPrivate           bool   `json:"reads_private" doc:"Read findings nobody has disclosed yet"`
+	ReadsSecurityTesting   bool   `json:"reads_security_testing" doc:"Read security testing findings, which are never disclosed"`
+	MayTriage              bool   `json:"may_triage" doc:"Argue about a disclosed or undisclosed finding here"`
+	TriagesPublic          bool   `json:"triages_public" doc:"Argue about a finding that has been disclosed"`
+	TriagesSecurityTesting bool   `json:"triages_security_testing" doc:"Argue about a security testing finding"`
+	MayAssign              bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
+	MayHide                bool   `json:"may_hide" doc:"Triage a private finding, which nobody has disclosed"`
+	MayAgree               bool   `json:"may_agree" doc:"Agree to somebody else's decision, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's decision there, which is the ordinary shape of a small team; security testing work takes the capability. That the two are different people is checked separately and has no override"`
+	AgreesPublic           bool   `json:"agrees_public" doc:"Agree to somebody else's decision about disclosed findings, or send it back: reading them, with the approver capability or public-triage"`
+	AgreesPrivate          bool   `json:"agrees_private" doc:"Agree to somebody else's decision about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"`
+	AgreesSecurityTesting  bool   `json:"agrees_security_testing" doc:"Agree to somebody else's decision about security testing findings or a suppression rule over them, or send it back: reading them, with the approver capability"`
+	MayApproveRulings      bool   `json:"may_approve_rulings" doc:"Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"`
 }
 
 // ChatBody is what somebody is sent in chat.
@@ -217,25 +217,25 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 			}
 			body.Reach = append(body.Reach, CanBody{
 				Product: product.Name, Name: product.DisplayName,
-				MaySee:          subject.ReadsIn(product.ID),
-				ReadsPublic:     subject.Reads(access.Public, product.ID),
-				ReadsPrivate:    subject.Reads(access.Private, product.ID),
-				ReadsInternal:   subject.Reads(access.Internal, product.ID),
-				MayAssign:       triages && subject.Holds(access.Assigner, product.ID),
-				MayTriage:       triages,
-				TriagesPublic:   subject.Triages(access.Public, product.ID),
-				TriagesInternal: subject.Triages(access.Internal, product.ID),
-				MayHide:         subject.Triages(access.Private, product.ID),
+				MaySee:                 subject.ReadsIn(product.ID),
+				ReadsPublic:            subject.Reads(access.Public, product.ID),
+				ReadsPrivate:           subject.Reads(access.Private, product.ID),
+				ReadsSecurityTesting:   subject.Reads(access.SecurityTesting, product.ID),
+				MayAssign:              triages && subject.Holds(access.Assigner, product.ID),
+				MayTriage:              triages,
+				TriagesPublic:          subject.Triages(access.Public, product.ID),
+				TriagesSecurityTesting: subject.Triages(access.SecurityTesting, product.ID),
+				MayHide:                subject.Triages(access.Private, product.ID),
 				// The capability, or a triage role — which is what the
 				// operation accepts, and what makes a two-person team where
 				// neither holds the capability able to review at all. Asked
 				// of the capability alone, a screen drawing its controls
 				// from this hides approve and reject from somebody the
 				// server accepts, with nothing saying why.
-				MayAgree:       mayAgree,
-				AgreesPublic:   agrees(access.Public),
-				AgreesPrivate:  agrees(access.Private),
-				AgreesInternal: agrees(access.Internal),
+				MayAgree:              mayAgree,
+				AgreesPublic:          agrees(access.Public),
+				AgreesPrivate:         agrees(access.Private),
+				AgreesSecurityTesting: agrees(access.SecurityTesting),
 				// Asked as the ruling store asks it: reading the reports, and
 				// a right to agree that reaches undisclosed work.
 				MayApproveRulings: subject.Reads(access.Private, product.ID) &&

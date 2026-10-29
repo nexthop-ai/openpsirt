@@ -248,7 +248,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// the two.
 		if to != nil && *to != subject.Party() &&
 			seenBy(ctx, in, input.Body.Person, product, withheld) {
-			private, internal := notify.Withholding(withheld)
+			private, securityTesting := notify.Withholding(withheld)
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: input.Vulnerability + " in " + input.Component +
@@ -265,8 +265,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 				// announcement an embargo exists to prevent,
 				// so a channel that leaves here carries the
 				// link alone.
-				Private:  private,
-				Internal: internal,
+				Private:         private,
+				SecurityTesting: securityTesting,
 				// The same two as columns. Concerns above is a
 				// string a digest matches on; these are what a
 				// read narrows by.
@@ -652,7 +652,7 @@ func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
 // somebody who may read what has been disclosed and no more is handed the name
 // of a finding nobody has announced, in a product they hold nothing
 // undisclosed on. Seeing that a product exists is not reading its embargoed
-// work, and reading undisclosed work is not reading internal work.
+// work, and reading undisclosed work is not reading security testing work.
 func seenBy(ctx context.Context, in core.Deps, identity string, productID int64,
 	withheld []access.Visibility) bool {
 	them, err := access.NewStore(in.DB.DB).Resolve(ctx, identity)
@@ -683,8 +683,8 @@ func seenBy(ctx context.Context, in core.Deps, identity string, productID int64,
 // teamMayHold reports whether a team may be handed work holding these
 // visibilities other than public: at least one member reads all of it.
 //
-// Undisclosed work needs a member who reads undisclosed work, and internal work
-// a member who reads internal work; work holding both needs one member who
+// Undisclosed work needs a member who reads undisclosed work, and security testing work
+// a member who reads security testing work; work holding both needs one member who
 // reads both. Disclosed work travels with the assignment to whoever holds it,
 // so a member who reads the product at any visibility is enough — a team of
 // people working private reports may be handed a disclosed finding and see it.

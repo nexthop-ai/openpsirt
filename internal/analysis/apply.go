@@ -83,7 +83,7 @@ type Receipt struct {
 	Seen                int            `json:"seen" doc:"Results the build held open that the run reported again"`
 	Returned            int            `json:"returned" doc:"Of those seen again, the ones an earlier run had not reported"`
 	NoLongerDetected    int            `json:"no_longer_detected" doc:"Results the build held open that this comparable run did not report"`
-	SharpDrop           bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results no longer detected than the deployment expects of one run, which tells the product's internal readers"`
+	SharpDrop           bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results no longer detected than the deployment expects of one run, which tells the product's security testing readers"`
 	Probable            int            `json:"probable,omitempty" doc:"Results paired with a code finding on its function or its nearest line rather than its whole key"`
 	Inherited           int            `json:"inherited,omitempty" doc:"Results new to the build carried from a code finding of the branch it was cut from"`
 	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the occurrence of a code finding on the build that was closed"`
@@ -623,5 +623,5 @@ func sharpDrop(ctx context.Context, db bun.IDB, missed, live int) (bool, error) 
 
 // OpensAt is the visibility a code finding opens at unless it was recorded as a flaw, and the
 // one a receipt counting code findings is read at: a result nobody has judged is
-// internal.
-const OpensAt = access.Internal
+// security testing work.
+const OpensAt = access.SecurityTesting

@@ -50,7 +50,7 @@ export function ReasonEditor({
   onDone,
   spaced = false,
   undisclosed,
-  internal,
+  securityTesting,
   writes = true,
 }: {
   decisionId: number;
@@ -68,8 +68,8 @@ export function ReasonEditor({
   // The disclosure of the thing being argued about, which decides who
   // may be offered after an @. This is the same text the decision form writes.
   undisclosed?: boolean;
-  // Whether it is internal material: a code finding's, until its flaw is disclosed.
-  internal?: boolean;
+  // Whether it is security testing material: a code finding's, until its flaw is disclosed.
+  securityTesting?: boolean;
   // Whether the reader may revise and withdraw it, which a reader of a moved
   // code finding's decision through its flaw may not.
   writes?: boolean;
@@ -97,7 +97,7 @@ export function ReasonEditor({
             draftKey={draftKey}
             label="Reasoning"
             attachTo={about}
-            mentions={mentioning(about.product, undisclosed, internal)}
+            mentions={mentioning(about.product, undisclosed, securityTesting)}
           />
           {revise.error != null && <Failed error={revise.error} what="That could not be stored." />}
           <div className="actions" style={{ marginTop: 8 }}>

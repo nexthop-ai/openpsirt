@@ -46,7 +46,10 @@ const RULES = [
   },
 ];
 
-async function drawn(may: { triages_internal?: boolean; agrees_internal?: boolean }) {
+async function drawn(may: {
+  triages_security_testing?: boolean;
+  agrees_security_testing?: boolean;
+}) {
   serve((path) => {
     if (path === "/v1/session/me")
       return {
@@ -54,7 +57,7 @@ async function drawn(may: { triages_internal?: boolean; agrees_internal?: boolea
           identity: "ana",
           name: "Ana",
           kind: "person",
-          reach: [{ product: "sonic", reads_internal: true, ...may }],
+          reach: [{ product: "sonic", reads_security_testing: true, ...may }],
           outcomes: [],
         },
       };
@@ -84,7 +87,7 @@ describe("the suppression rules", () => {
   });
 
   it("offers approval to an approver, for a rule waiting or outgrown that is not theirs", async () => {
-    await drawn({ agrees_internal: true });
+    await drawn({ agrees_security_testing: true });
     expect(buttons("Approve")).toHaveLength(2);
     expect(buttons("Retire")).toHaveLength(0);
     const sent = accept(() => ({ data: RULES[0] }));
@@ -101,7 +104,7 @@ describe("the suppression rules", () => {
   });
 
   it("proposes a rule naming a path alone", async () => {
-    await drawn({ triages_internal: true });
+    await drawn({ triages_security_testing: true });
     const sent = accept(() => ({ status: 201, data: RULES[1] }));
     change(labeled(mount.host(), "Path"), "vendor");
     change(mount.host().querySelector<HTMLSelectElement>("#suppression-rule-reason"), "wont_fix");

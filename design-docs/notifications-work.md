@@ -58,22 +58,22 @@ product's triagers are told, never whoever merged.
 
 A decision on a code finding is told as any decision is: waiting, sent back and
 left, rows set aside, lapsed, an agreement an edit took back, an agreement taken
-back with its batch, a mention in its notes. Each line is withheld as internal
+back with its batch, a mention in its notes. Each line is withheld as security testing work
 (`design-docs/notifications.md` § The notification list).
 
 | Notice | Kind | To | Clears |
 |---|---|---|---|
-| A decision waiting for a second person | condition | Approver capability and `internal-read`, never its proposer | Approved, sent back or withdrawn |
-| A decision sent back and left | condition | Its author, while they read internal work | Revised or withdrawn |
+| A decision waiting for a second person | condition | Approver capability and `security-testing-read`, never its proposer | Approved, sent back or withdrawn |
+| A decision sent back and left | condition | Its author, while they read security testing work | Revised or withdrawn |
 | A dismissal lapsed by a probable pairing | event | Its proposer, once per run after it commits | Acknowledged |
 | An agreement taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
-| Recorded as a flaw | event | The product's internal triagers but the recorder; the flaw tells what any flaw tells | Acknowledged |
-| Included in its flaw's disclosure, or taken out | event | The internal triagers but whoever did it | Acknowledged |
-| An agreed dismissal or not-a-security-issue ruling withdrawn, returning it to the queue | event | The internal triagers but whoever withdrew it | Acknowledged |
+| Recorded as a flaw | event | The product's security testing triagers but the recorder; the flaw tells what any flaw tells | Acknowledged |
+| Included in its flaw's disclosure, or taken out | event | The security testing triagers but whoever did it | Acknowledged |
+| An agreed dismissal or not-a-security-issue ruling withdrawn, returning it to the queue | event | The security testing triagers but whoever withdrew it | Acknowledged |
 | Assigned | event | The assignee, while they read it at every visibility it is open at. Never a team, never the assigner, nobody for a hand-back | Acknowledged |
-| A suppression rule outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or narrower |
+| A suppression rule outgrowing its approval | condition | Whoever may approve at security testing visibility, never its proposer | Approved again at its size, retired, or narrower |
 | A suppression rule waiting for approval | condition | The same, after a decision's waiting period; one per rule, since one approval answers every code finding it names | Approved or retired |
-| Code findings in a team's queue | condition | Members reading the product's internal work, after the queue period | Taken, judged, recorded as a flaw or closed |
+| Code findings in a team's queue | condition | Members reading the product's security testing work, after the queue period | Taken, judged, recorded as a flaw or closed |
 
 | Rule | Reason |
 |---|---|
@@ -81,8 +81,8 @@ back with its batch, a mention in its notes. Each line is withheld as internal
 | A code finding sent back links to the code finding | A rule names no finding page |
 | Agreeing to a dismissal tells nobody; withdrawing tells only where it was agreed | An unagreed dismissal never removed work |
 | A flaw record or inclusion names no flaw, its link answering the flaw to whoever may read it | `design-docs/analysis-flaws.md` § Disclosure inclusion |
-| An assignment names the rule, path, line and the build assigned from, withheld as internal while open at internal visibility | |
-| Queued code findings count one per occurrence per team and product, apart from other queued work, naming the team | `design-docs/kinds.md` § Consumers; apart, a disclosed-only member hears nothing internal |
+| An assignment names the rule, path, line and the build assigned from, withheld as security testing work while open at security testing visibility | |
+| Queued code findings count one per occurrence per team and product, apart from other queued work, naming the team | `design-docs/kinds.md` § Consumers; apart, a disclosed-only member hears nothing of security testing work |
 | One a decision stands on, or recorded as a flaw, is not waiting | |
 | Team assignment reaches a code finding notice through the queue alone | A series alert concerns no team |
 
@@ -96,7 +96,7 @@ They report that no event occurred, which nothing driven by an act can.
 | A ruling on reports waiting for approval | Approver capability or triage of undisclosed work, over reading it, never its proposer. One per ruling, linking to the product's reports narrowed to what waits. Undisclosed | The decision's |
 | A deferral whose end approaches | The proposer | Its own |
 | A decision sent back and untouched | The proposer | Its own |
-| Work sitting in a team queue | The team; code findings to members reading internal work | Its own |
+| Work sitting in a team queue | The team; code findings to members reading security testing work | Its own |
 | A report nobody has answered | § Report audience | None |
 | A claim nobody has judged | § Report audience, with the reference it was minted with, pointing at the report | None |
 

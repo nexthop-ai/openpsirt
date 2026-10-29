@@ -168,10 +168,10 @@ func readableFindingsOn(subject access.Subject, finding, product string) (string
 // orIncluded widens a reading narrowing by the code findings included in an
 // undisclosed flaw's case, for the flaw's readers: somebody who reads
 // undisclosed work in the product, and somebody on the flaw's case. A code finding and
-// the decisions at its occurrence stay internal while the flaw is undisclosed, so the
-// widening is the internal rows at an included code finding's occurrence and nothing else.
+// the decisions at its occurrence stay at security testing visibility while the flaw is undisclosed, so the
+// widening is the security testing rows at an included code finding's occurrence and nothing else.
 //
-// Only where the subject does not read internal work in the product already,
+// Only where the subject does not read security testing work in the product already,
 // for the reason orBrought gives.
 func orIncluded(subject access.Subject, where string, args []any, product, visibility, occurrence string) (string, []any) {
 	if where == "" || subject.Kind != access.Person {
@@ -183,7 +183,7 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 	if !all {
 		var private []int64
 		for _, id := range products {
-			if subject.Sees(id) && subject.Reads(access.Private, id) && !subject.Reads(access.Internal, id) {
+			if subject.Sees(id) && subject.Reads(access.Private, id) && !subject.Reads(access.SecurityTesting, id) {
 				private = append(private, id)
 			}
 		}
@@ -193,7 +193,7 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 		}
 	}
 	for _, id := range subject.CaseProducts() {
-		if subject.Reads(access.Internal, id) {
+		if subject.Reads(access.SecurityTesting, id) {
 			continue
 		}
 		audience = append(audience, `("ilh"."product_id" = ? AND "ilh"."vulnerability_id" IN (SELECT "imv"."id"
@@ -208,7 +208,7 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."occurrence_identity" = ` + occurrence + `
 		  AND "ilh"."included_at" IS NOT NULL AND "ilh"."disclosed_at" IS NULL
 		  AND (` + strings.Join(audience, " OR ") + `)))`
-	args = append(append(append([]any{}, args...), access.Internal), audienceArgs...)
+	args = append(append(append([]any{}, args...), access.SecurityTesting), audienceArgs...)
 	return "(" + where + " OR " + included + ")", args
 }
 

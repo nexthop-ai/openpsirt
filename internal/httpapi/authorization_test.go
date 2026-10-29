@@ -24,7 +24,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 	// and it is why so many rows below expect 404 where 403 would look more
 	// natural.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		// A code finding recorded as a flaw and kept internal, so its collaborators
+		// A code finding recorded as a flaw and kept at security testing visibility, so its collaborators
 		// are a list to reach.
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)
 		var (
@@ -117,9 +117,9 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"triager", http.MethodGet, mine, http.StatusOK},
 			{"triager", http.MethodGet, mineBuilt, http.StatusOK},
 			{"private-triage", http.MethodGet, mine, http.StatusOK},
-			{"internal-reader", http.MethodGet, mine, http.StatusOK},
-			{"internal-reader", http.MethodGet, theirs, http.StatusNotFound},
-			{"internal-triager", http.MethodGet, mineBuilt, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, mine, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, theirs, http.StatusNotFound},
+			{"security-testing-triager", http.MethodGet, mineBuilt, http.StatusOK},
 
 			// A capability is not a way in. Holding one and nothing else
 			// leaves the product invisible, exactly as if it had never been
@@ -136,7 +136,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"private", http.MethodPost, products, http.StatusForbidden},
 			{"triager", http.MethodPost, products, http.StatusForbidden},
 			{"private-triage", http.MethodPost, products, http.StatusForbidden},
-			{"internal-triager", http.MethodPost, products, http.StatusForbidden},
+			{"security-testing-triager", http.MethodPost, products, http.StatusForbidden},
 			{"approver", http.MethodPost, products, http.StatusForbidden},
 			{"assigner-only", http.MethodPost, products, http.StatusForbidden},
 			{"reader", http.MethodPost, mine, http.StatusForbidden},
@@ -189,8 +189,8 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"reader", http.MethodGet, mineFound, http.StatusOK},
 			{"private", http.MethodGet, mineFound, http.StatusOK},
 			{"triager", http.MethodGet, mineFound, http.StatusOK},
-			{"internal-reader", http.MethodGet, mineFound, http.StatusOK},
-			{"internal-reader", http.MethodGet, theirFound, http.StatusNotFound},
+			{"security-testing-reader", http.MethodGet, mineFound, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, theirFound, http.StatusNotFound},
 			// An administrator holds no role on this product, so
 			// they read nothing of it. Administering the catalog
 			// is knowing the build exists, which is why this is
@@ -239,39 +239,39 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"", http.MethodGet, mineUnmatched, http.StatusUnauthorized},
 
 			// The code finding queue, its file, its counts by series and the standing
-			// rules are internal work. The queue and its file answer a reader
+			// rules are security testing work. The queue and its file answer a reader
 			// of the product with what they may read of it, which for a
-			// reader of no internal work is nothing.
+			// reader of no security testing work is nothing.
 			{"", http.MethodGet, codeFindings, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, codeFindings, http.StatusOK},
-			{"internal-triager", http.MethodGet, codeFindings, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, codeFindings, http.StatusOK},
+			{"security-testing-triager", http.MethodGet, codeFindings, http.StatusOK},
 			{"reader", http.MethodGet, codeFindings, http.StatusOK},
 			{"private", http.MethodGet, codeFindings, http.StatusOK},
 			{"approver", http.MethodGet, codeFindings, http.StatusNotFound},
 			{"outsider", http.MethodGet, codeFindings, http.StatusNotFound},
-			{"internal-reader", http.MethodGet, theirCodeFindings, http.StatusNotFound},
+			{"security-testing-reader", http.MethodGet, theirCodeFindings, http.StatusNotFound},
 			{"", http.MethodGet, codeFindingFile, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, codeFindingFile, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, codeFindingFile, http.StatusOK},
 			{"approver", http.MethodGet, codeFindingFile, http.StatusNotFound},
 			{"outsider", http.MethodGet, codeFindingFile, http.StatusNotFound},
 			{"", http.MethodGet, codeFindingSeries, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, codeFindingSeries, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, codeFindingSeries, http.StatusOK},
 			{"reader", http.MethodGet, codeFindingSeries, http.StatusForbidden},
 			{"private-triage", http.MethodGet, codeFindingSeries, http.StatusForbidden},
 			{"approver", http.MethodGet, codeFindingSeries, http.StatusNotFound},
 			{"", http.MethodGet, suppressionRules, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, suppressionRules, http.StatusOK},
-			{"internal-triager", http.MethodGet, suppressionRules, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, suppressionRules, http.StatusOK},
+			{"security-testing-triager", http.MethodGet, suppressionRules, http.StatusOK},
 			{"reader", http.MethodGet, suppressionRules, http.StatusForbidden},
 			{"approver", http.MethodGet, suppressionRules, http.StatusNotFound},
 			{"reader", http.MethodPost, suppressionRules, http.StatusForbidden},
-			{"internal-reader", http.MethodPost, suppressionRules, http.StatusForbidden},
+			{"security-testing-reader", http.MethodPost, suppressionRules, http.StatusForbidden},
 
 			// One code finding's evidence is read where its visibility is, and a code finding
 			// nobody may read there answers as an occurrence holding nothing.
 			{"", http.MethodGet, codeFinding, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, codeFinding, http.StatusOK},
-			{"internal-triager", http.MethodGet, codeFinding, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, codeFinding, http.StatusOK},
+			{"security-testing-triager", http.MethodGet, codeFinding, http.StatusOK},
 			{"code-finding-handler", http.MethodGet, codeFinding, http.StatusOK},
 			{"reader", http.MethodGet, codeFinding, http.StatusNotFound},
 			{"private", http.MethodGet, codeFinding, http.StatusNotFound},
@@ -280,39 +280,39 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"approver", http.MethodGet, codeFinding, http.StatusNotFound},
 			{"outsider", http.MethodGet, codeFinding, http.StatusNotFound},
 			{"admin", http.MethodGet, codeFinding, http.StatusNotFound},
-			{"internal-reader", http.MethodGet, theirCodeFinding, http.StatusNotFound},
+			{"security-testing-reader", http.MethodGet, theirCodeFinding, http.StatusNotFound},
 			// A code finding recorded as a flaw takes no decision, which its readers
 			// are told, since its evidence says it was recorded as a flaw. Closing one
-			// as fixed is internal triage, and a reader who does not hold it is
+			// as fixed is security testing triage, and a reader who does not hold it is
 			// answered as though nothing were open to close.
-			{"internal-reader", http.MethodPost, codeFinding + "/decision", http.StatusConflict},
-			{"internal-triager", http.MethodPost, codeFinding + "/decision", http.StatusConflict},
+			{"security-testing-reader", http.MethodPost, codeFinding + "/decision", http.StatusConflict},
+			{"security-testing-triager", http.MethodPost, codeFinding + "/decision", http.StatusConflict},
 			{"reader", http.MethodPost, codeFinding + "/decision", http.StatusNotFound},
-			{"internal-reader", http.MethodPost, codeFinding + "/fixed", http.StatusNotFound},
+			{"security-testing-reader", http.MethodPost, codeFinding + "/fixed", http.StatusNotFound},
 			{"reader", http.MethodPost, codeFinding + "/fixed", http.StatusNotFound},
-			// A flaw record takes triage of the internal code finding and of the private
+			// A flaw record takes triage of the security testing code finding and of the private
 			// flaw, asked before anything the request names is resolved.
 			{"code-finding-handler", http.MethodGet, codeFinding + "/flaw", http.StatusOK},
-			{"internal-triager", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
+			{"security-testing-triager", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
 			{"private-triage", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
-			{"internal-reader", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
-			{"internal-triager", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
+			{"security-testing-reader", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
+			{"security-testing-triager", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
 			{"private-triage", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
-			{"internal-reader", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
+			{"security-testing-reader", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
 			{"", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusUnauthorized},
 			// The code finding a flaw was recorded from is read by whoever reads both
 			// the flaw and the code finding in full, and answers as no code finding elsewhere.
 			{"code-finding-handler", http.MethodGet, flawCodeFinding, http.StatusOK},
 			{"private-triage", http.MethodGet, flawCodeFinding, http.StatusNotFound},
-			{"internal-reader", http.MethodGet, flawCodeFinding, http.StatusNotFound},
+			{"security-testing-reader", http.MethodGet, flawCodeFinding, http.StatusNotFound},
 			{"outsider", http.MethodGet, flawCodeFinding, http.StatusNotFound},
 			{"", http.MethodGet, flawCodeFinding, http.StatusUnauthorized},
-			{"internal-triager", http.MethodPut, codeFinding + "/flaw/disclosure", http.StatusForbidden},
-			{"internal-triager", http.MethodDelete, codeFinding + "/flaw/disclosure", http.StatusForbidden},
-			// Who is granted an internal-only code finding is managed by whoever reads it at
-			// internal visibility, and by nobody else.
-			{"internal-reader", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
-			{"internal-triager", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
+			{"security-testing-triager", http.MethodPut, codeFinding + "/flaw/disclosure", http.StatusForbidden},
+			{"security-testing-triager", http.MethodDelete, codeFinding + "/flaw/disclosure", http.StatusForbidden},
+			// Who is granted a security-testing-only code finding is managed by whoever reads it at
+			// security testing visibility, and by nobody else.
+			{"security-testing-reader", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
+			{"security-testing-triager", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
 			{"code-finding-handler", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
 			{"private", http.MethodGet, codeFinding + "/collaborators", http.StatusNotFound},
 			{"reader", http.MethodGet, codeFinding + "/collaborators", http.StatusNotFound},
@@ -325,22 +325,22 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"", http.MethodGet, repos, http.StatusUnauthorized},
 			{"admin", http.MethodGet, repos, http.StatusOK},
 			{"reader", http.MethodGet, repos, http.StatusForbidden},
-			{"internal-triager", http.MethodGet, repos, http.StatusForbidden},
+			{"security-testing-triager", http.MethodGet, repos, http.StatusForbidden},
 			{"code-finding-handler", http.MethodGet, repos, http.StatusForbidden},
 			{"reader", http.MethodPut, repos, http.StatusForbidden},
-			{"internal-triager", http.MethodPut, repos, http.StatusForbidden},
+			{"security-testing-triager", http.MethodPut, repos, http.StatusForbidden},
 
-			// A person reads a build's analyzer runs where they read internal
-			// work in the product, since the counts are of internal findings,
+			// A person reads a build's analyzer runs where they read security testing
+			// work in the product, since the counts are of security testing findings,
 			// and anybody else reads them as runs nobody sent.
 			{"", http.MethodGet, runs, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, runs, http.StatusOK},
-			{"internal-triager", http.MethodGet, runs, http.StatusOK},
+			{"security-testing-reader", http.MethodGet, runs, http.StatusOK},
+			{"security-testing-triager", http.MethodGet, runs, http.StatusOK},
 			{"reader", http.MethodGet, runs, http.StatusNotFound},
 			{"private", http.MethodGet, runs, http.StatusNotFound},
 			{"approver", http.MethodGet, runs, http.StatusNotFound},
 			{"outsider", http.MethodGet, runs, http.StatusNotFound},
-			{"internal-reader", http.MethodGet, theirRuns, http.StatusNotFound},
+			{"security-testing-reader", http.MethodGet, theirRuns, http.StatusNotFound},
 
 			// Administration is administration. Holding every product role
 			// there is does not amount to any of it.
@@ -348,7 +348,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"private", http.MethodGet, people, http.StatusForbidden},
 			{"triager", http.MethodGet, people, http.StatusForbidden},
 			{"private-triage", http.MethodGet, people, http.StatusForbidden},
-			{"internal-triager", http.MethodGet, people, http.StatusForbidden},
+			{"security-testing-triager", http.MethodGet, people, http.StatusForbidden},
 			{"approver", http.MethodGet, people, http.StatusForbidden},
 			{"assigner-only", http.MethodGet, people, http.StatusForbidden},
 			{"reader", http.MethodGet, keys, http.StatusForbidden},

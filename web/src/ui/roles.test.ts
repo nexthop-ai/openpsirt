@@ -43,7 +43,7 @@ describe("granting somebody an empty tool", () => {
   it("says nothing when they can already read the product", () => {
     expect(wouldReachNothing("approver", [{ role: "public-read" }])).toBe(false);
     expect(wouldReachNothing("approver", [{ role: "private-triage" }])).toBe(false);
-    expect(wouldReachNothing("approver", [{ role: "internal-read" }])).toBe(false);
+    expect(wouldReachNothing("approver", [{ role: "security-testing-read" }])).toBe(false);
   });
 
   it("does not count a grant that has been withdrawn", () => {

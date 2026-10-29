@@ -38,7 +38,7 @@ async function drawn(at = "/products/sonic/code-findings", rows: object[] = ROWS
           identity: "ana",
           name: "Ana",
           kind: "person",
-          reach: [{ product: "sonic", reads_internal: true }],
+          reach: [{ product: "sonic", reads_security_testing: true }],
           outcomes: [],
         },
       };

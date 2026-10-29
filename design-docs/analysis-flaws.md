@@ -25,7 +25,7 @@ flaws). `GET …/code-findings/{occurrence}/flaw` is the offer; `POST` records i
 |---|---|
 | Only a confirmed code finding, once | |
 | It links every code finding the confirming decision covers and nobody recorded (`design-docs/analysis-queue.md` § Grouped code findings) | One decision, one flaw |
-| It needs `internal-triage` and `private-triage` | It reads internal and writes private |
+| It needs `security-testing-triage` and `private-triage` | It reads security testing work and writes private |
 | The flaw is undisclosed, found here, at no version | |
 | Flaw and link are written in one transaction re-reading that the code finding is confirmed and unrecorded (REQ-71) | |
 | It changes the standing decision's stamp, matched on the stamp read (`design-docs/database-transactions.md` § Reads a write depends on) | A concurrent withdrawn confirmation would leave a flaw nobody confirmed |
@@ -55,32 +55,32 @@ flaws). `GET …/code-findings/{occurrence}/flaw` is the offer; `POST` records i
 
 ## Disclosure inclusion
 
-A recorded code finding is internal only, or included in its flaw's disclosure:
+A recorded code finding is security testing only, or included in its flaw's disclosure:
 off by default, chosen at recording and changeable while undisclosed.
 `PUT …/code-findings/{occurrence}/flaw/disclosure` includes; `DELETE` removes.
 
-| | Internal only | Included |
+| | Security testing only | Included |
 |---|---|---|
-| Visibility of it and its decisions | Internal | Internal |
-| An internal reader | All of it and its decisions, nothing of the case, and is not told its flaw | The same |
+| Visibility of it and its decisions | Security testing | Security testing |
+| A security testing reader | All of it and its decisions, nothing of the case, and is not told its flaw | The same |
 | Somebody granted it | It without its decisions, and its flaw | The same |
 | A reader of undisclosed work | Nothing | It, its decisions, its flaw |
 | A reader on the flaw's case | Nothing unless granted | It, its decisions, its flaw |
-| At disclosure | Stays internal | Public with its decisions (REQ-40) |
-| A later sighting | Internal | Internal, read by both audiences |
+| At disclosure | Stays at security testing visibility | Public with its decisions (REQ-40) |
+| A later sighting | Security testing | Security testing, read by both audiences |
 
 | Rule | Reason |
 |---|---|
 | Inclusion adds the flaw's readers and removes nobody; removal takes back only those, from it and its decisions | |
-| The flaw's readers read it wherever internal readers do: evidence, queue, counts, files, rule coverage, kin | One data-layer rule (REQ-42, REQ-43) |
+| The flaw's readers read it wherever security testing readers do: evidence, queue, counts, files, rule coverage, kin | One data-layer rule (REQ-42, REQ-43) |
 | Reading undisclosed work adds included code findings of undisclosed flaws, nothing else | |
-| They read its decisions while undisclosed: reasoning, revisions, approvals, comments, pages, lists, counts, exports; nothing else internal | The decisions go public with it |
-| Commenting and approving keep the internal triage role | |
+| They read its decisions while undisclosed: reasoning, revisions, approvals, comments, pages, lists, counts, exports; nothing else at security testing visibility | The decisions go public with it |
+| Commenting and approving keep the security testing triage role | |
 | Inclusion publishes every revision, comment, path and analyzer message on the linked code findings | Writers must know from the first word (REQ-40) |
 | The offer shows that writing first, by author, with snippet publication and stripped count, read at the caller's visibilities (REQ-42) | |
 | Disclosed is readable in the portal by everybody signed in with public access; never in VEX or CSAF; never anonymous | |
 | At disclosure kept source is stripped except where its path discloses it, and later runs strip alike (`design-docs/analysis-source.md` § Snippets) | |
-| Disclosure stamps the flaw record of every code finding of the flaw | Internal-only visibility does not show it |
+| Disclosure stamps the flaw record of every code finding of the flaw | Security-testing-only visibility does not show it |
 | Inclusion and removal are refused with 409 once disclosed, take every code finding of the flaw, and need both triage roles | |
 | An inclusion's notice goes to the audience before the change | |
 | A run writes itself onto each flaw record it touches before reading one or writing source | Disclosure then waits or sees the change |
@@ -95,7 +95,7 @@ off by default, chosen at recording and changeable while undisclosed.
 |---|---|
 | It takes every code finding of the flaw, is refused with 409 once disclosed, and requires a reason | |
 | Each is confirmed again: link gone, decision kept, back in held work with its holder | |
-| An included one returns to its internal readers | |
+| An included one returns to its security testing readers | |
 | Every grant ends, each a withdrawal in the trail | No case remains |
 | The flaw's open findings close `invalid` on every build (`design-docs/findings-closure.md` § Affected build sets) | No fix, no fixed release |
 | The flaw keeps the record of its code finding, marked undone with who, when, why | |
@@ -125,7 +125,7 @@ code finding, as case collaborators into a flaw (REQ-43,
 | Rule | Reason |
 |---|---|
 | A grant reaches the evidence while the flaw is undisclosed, never its decisions, the build's tree or its kin; disclosure ends it | One code finding |
-| Managed by readers of the product's internal work | |
+| Managed by readers of the product's security testing work | |
 | Refused with 409 once disclosed; granted in one transaction with the flaw record read | |
 | In the trail, and the person told in a line their grant reaches | |
 | A case reader reads an included one in full | |
@@ -134,4 +134,4 @@ code finding, as case collaborators into a flaw (REQ-43,
 
 | Limit | Detail |
 |---|---|
-| A notice or mention on a decision at an included code finding reaches internal readers alone | Mentions resolve against the decision's internal visibility until disclosure |
+| A notice or mention on a decision at an included code finding reaches security testing readers alone | Mentions resolve against the decision's security testing visibility until disclosure |

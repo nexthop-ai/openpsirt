@@ -66,7 +66,7 @@ own. The catalog screen also holds the files reachable nowhere else.
 | Effort by component | `design-docs/analytics-program.md` § Effort by subject |
 | Deadline compliance | `design-docs/analytics-program.md` § Deadline compliance |
 | Disposition register | `design-docs/analytics-controls.md` § The disposition register, asked for a whole build |
-| Code findings by analyzer | Code findings of each analyzer series of one product per state, across its builds, each opening the code finding list. Only for `internal-read` on the product; anybody else gets no count. `design-docs/analysis-queue.md` § Code findings by series |
+| Code findings by analyzer | Code findings of each analyzer series of one product per state, across its builds, each opening the code finding list. Only for `security-testing-read` on the product; anybody else gets no count. `design-docs/analysis-queue.md` § Code findings by series |
 | Advisories issued | What went out about our own flaws over a period, and what went out twice. A row carries the digest it hashed to, for comparison with what would be generated now, its issue and product counts as stated, and its title; an issue taken off since is still named. An issuance without its bytes counts from the advisory's coverage today |
 
 | Last upload rule | Reason |

@@ -105,7 +105,7 @@ through each kind's own list, so each kind's reader rule holds.
 
 | Rule | Reason |
 |---|---|
-| A kind the caller may not read is left out | A key reads its build's SBOMs and runs; a person reads runs where they read internal findings |
+| A kind the caller may not read is left out | A key reads its build's SBOMs and runs; a person reads runs where they read security testing findings |
 | A turned-away SBOM or run is newest only after the newest taken, and is not counted | Only the last is kept |
 | A turned-away VEX document or advisory is listed and counted | |
 | The list is per build, carrying the product's documents; a product-wide list is not built | |

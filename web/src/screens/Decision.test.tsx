@@ -96,14 +96,14 @@ describe("the stripe on a decision's page", () => {
 
 describe("the answer a second person gives", () => {
   // The decision waits on somebody who agrees to public findings in sonic.
-  function waiting(proposedBy: string, undisclosed = false, internal = false) {
+  function waiting(proposedBy: string, undisclosed = false, securityTesting = false) {
     return {
       decision: { id: 4, proposed_by: proposedBy },
       occurrence: { product: "sonic", vulnerability: "CVE-2026-1" },
       argument: { outcome: "not-applicable" },
       happened: "waiting",
       undisclosed,
-      internal,
+      security_testing: securityTesting,
       issues: 1,
       occurrences: 1,
       age_days: 1,
@@ -152,8 +152,8 @@ describe("the answer a second person gives", () => {
     expect(agree()).toBeUndefined();
   });
 
-  // A code finding decision is internal, and its second person holds the approver
-  // capability: a private triager is refused it, and an internal approver
+  // A code finding decision is at security testing visibility, and its second person holds the approver
+  // capability: a private triager is refused it, and a security testing approver
   // who triages nothing undisclosed is not.
   it("offers no Agree on a code finding decision to a triager of undisclosed work", async () => {
     const privateTriager: Who = {
@@ -164,17 +164,17 @@ describe("the answer a second person gives", () => {
     expect(agree()).toBeUndefined();
   });
 
-  it("offers Agree on a code finding decision to an approver of internal work", async () => {
+  it("offers Agree on a code finding decision to an approver of security testing work", async () => {
     const reviewer: Who = {
       ...BO,
-      reach: [{ product: "sonic", agrees_internal: true }] as unknown as Who["reach"],
+      reach: [{ product: "sonic", agrees_security_testing: true }] as unknown as Who["reach"],
     };
     await drawn(waiting("ana", true, true), reviewer);
     expect(agree()).toBeDefined();
   });
 });
 
-describe("a decision about internal material read by somebody who may not argue it", () => {
+describe("a decision about security testing material read by somebody who may not argue it", () => {
   async function drawn(may: Record<string, boolean>) {
     const reader: Who = {
       ...ANA,
@@ -190,7 +190,7 @@ describe("a decision about internal material read by somebody who may not argue 
             occurrence: { product: "sonic", vulnerability: "clang-tidy/leak" },
             argument: { outcome: "confirmed" },
             happened: "waiting",
-            internal: true,
+            security_testing: true,
             issues: 1,
             occurrences: 1,
             age_days: 1,
@@ -219,12 +219,12 @@ describe("a decision about internal material read by somebody who may not argue 
   });
 
   it("offers a comment box to an approver and every write to a triager", async () => {
-    expect(await drawn({ agrees_internal: true })).toEqual({
+    expect(await drawn({ agrees_security_testing: true })).toEqual({
       comments: true,
       links: false,
       revises: false,
     });
-    expect(await drawn({ triages_internal: true })).toEqual({
+    expect(await drawn({ triages_security_testing: true })).toEqual({
       comments: true,
       links: true,
       revises: true,

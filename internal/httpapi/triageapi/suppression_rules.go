@@ -83,7 +83,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		Description: "Returns the product's suppression rules, retired ones " +
 			"included, oldest first, each with how many open code findings it names now.",
 		Tags: []string{"Triage"},
-	}, core.PerProduct, "", access.InternalRead, access.InternalTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", access.SecurityTestingRead, access.SecurityTestingTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*struct {
 		Body struct {
@@ -122,10 +122,10 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 			"is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule " +
 			"finds memory safety or injection flaws, or where no analyzer has reported it.\n\n" +
 			"It dismisses nothing until somebody other than its author holding `approver` and " +
-			"`internal-read` on the product approves it. Its words do not change: retire it and " +
+			"`security-testing-read` on the product approves it. Its words do not change: retire it and " +
 			"propose another. Recorded in the administrative trail.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
-	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", access.SecurityTestingTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Body    struct {
 			Rule      string                 `json:"rule,omitempty" maxLength:"191" doc:"An analyzer rule, as <tool>/<rule>"`
@@ -163,7 +163,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		Description: "Puts a proposed rule in force, recording how many open code findings it covers as what " +
 			"was approved. An outgrown rule is approved again at its new size; a rule in force is " +
 			"refused with 409.\n\n" +
-			"Requires `approver` and `internal-read` on the product, and somebody other than the " +
+			"Requires `approver` and `security-testing-read` on the product, and somebody other than the " +
 			"rule's author, which is refused with 409. A rule with no path is refused with 422 where its " +
 			"analyzer rule has since been found to find memory safety or injection flaws. " +
 			"Recorded in the administrative trail.",
@@ -205,7 +205,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		Description: "Takes a rule out of use. The code findings it covered are open again where nothing " +
 			"else answers them. Recorded in the administrative trail.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", access.SecurityTestingTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		ID      int64  `path:"id"`
 	}) (*struct{}, error) {

@@ -69,9 +69,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // Reading reports takes reading undisclosed work, which is what reads_private says.
   const reportsAnywhere = (who.reach ?? []).some((each) => each.reads_private);
   const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
-  // A code finding is internal, so the Security testing entry follows reading internal material.
-  const codeFindingsAnywhere = (who.reach ?? []).some((each) => each.reads_internal);
-  const codeFindingsHere = !!product && !!mayOf(who, product)?.reads_internal;
+  // A code finding is security testing work, so the Security testing entry
+  // follows reading security testing material.
+  const codeFindingsAnywhere = (who.reach ?? []).some((each) => each.reads_security_testing);
+  const codeFindingsHere = !!product && !!mayOf(who, product)?.reads_security_testing;
   const scope = [product ?? "all products", branchOrTag, variant].filter(Boolean).join(" · ");
   const build = whole ? { product, branch_or_tag: branchOrTag, variant } : undefined;
   const [uploading, setUploading] = useState(false);
@@ -284,7 +285,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             )}
             {/* A product's code findings from security testing, under the same
               rule as the vulnerability reports: shown to somebody who reads
-              internal material anywhere, and opening on the branch and
+              security testing material anywhere, and opening on the branch and
               variant picked where both are. */}
             {codeFindingsAnywhere && (
               <Rail
@@ -300,7 +301,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 label="Security testing"
                 needs={codeFindingsHere}
                 why={
-                  product ? "You can't read internal material in this product" : "Pick a product"
+                  product
+                    ? "You can't read security testing material in this product"
+                    : "Pick a product"
                 }
               />
             )}

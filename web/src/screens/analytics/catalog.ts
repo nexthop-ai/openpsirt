@@ -123,8 +123,8 @@ export const GROUPS: Group[] = [
         // a vulnerability. Asked of a list typed here, an outcome the server
         // adds would go uncounted while the audit log said none stood alone.
         // Before the server has said, there is nothing to ask. A decision about
-        // a code finding is internal, and the audit log lists it only to somebody who
-        // reads internal material in its product.
+        // a code finding is at security testing visibility, and the audit log lists it only to somebody who
+        // reads security testing material in its product.
         to: (at, gated) =>
           gated.length === 0
             ? null
@@ -166,7 +166,7 @@ export const GROUPS: Group[] = [
         name: "Code findings by analyzer",
         answers:
           "How many static analysis code findings each analyzer holds, and where they stand.",
-        // A series is one product's, and its code findings are internal to it.
+        // A series is one product's, and so are its code findings.
         needs: "product",
       },
       {

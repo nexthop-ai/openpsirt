@@ -207,9 +207,9 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 		case 5:
 			return v == access.Private
 		case 7:
-			return v != access.Internal
+			return v != access.SecurityTesting
 		case 8:
-			return v == access.Internal
+			return v == access.SecurityTesting
 		}
 		return false
 	})
@@ -218,7 +218,7 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 	if where != want {
 		t.Errorf("split into %q; want %q", where, want)
 	}
-	if len(args) != 9 || args[2] != access.Public || args[4] != access.Private || args[8] != access.Internal {
+	if len(args) != 9 || args[2] != access.Public || args[4] != access.Private || args[8] != access.SecurityTesting {
 		t.Errorf("split binds %v", args)
 	}
 	if where, _ := access.VisibleWhere("p", "v", access.Split(nil, nil)); where != "1 = 0" {
@@ -226,52 +226,52 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 	}
 }
 
-// Internal material is read and triaged under roles of its own, and neither
+// Security testing material is read and triaged under roles of its own, and neither
 // of the other visibilities carries it. Anybody at all reading what is
 // published reads none of it.
-func TestReadingInternalIsNotReadingEitherOther(t *testing.T) {
+func TestReadingSecurityTestingIsNotReadingEitherOther(t *testing.T) {
 	analyst := access.NewPerson(8, "analyst", false, map[int64][]access.Role{
-		4: {access.InternalRead},
-		5: {access.InternalTriage},
+		4: {access.SecurityTestingRead},
+		5: {access.SecurityTestingTriage},
 		6: {access.PublicTriage, access.PrivateTriage},
 	}, 80)
 
 	for _, product := range []int64{4, 5} {
-		if !analyst.Reads(access.Internal, product) {
-			t.Errorf("product %d: internal work is not read", product)
+		if !analyst.Reads(access.SecurityTesting, product) {
+			t.Errorf("product %d: security testing work is not read", product)
 		}
 		if analyst.Reads(access.Public, product) || analyst.Reads(access.Private, product) {
-			t.Errorf("product %d: an internal grant read disclosed or undisclosed work", product)
+			t.Errorf("product %d: a security testing grant read disclosed or undisclosed work", product)
 		}
 		if !analyst.ReadsIn(product) || !analyst.Sees(product) {
-			t.Errorf("product %d: an internal grant does not make the product readable", product)
+			t.Errorf("product %d: a security testing grant does not make the product readable", product)
 		}
-		if got := access.Visible(analyst, product); len(got) != 1 || got[0] != access.Internal {
-			t.Errorf("product %d: visible is %v, want only internal work", product, got)
+		if got := access.Visible(analyst, product); len(got) != 1 || got[0] != access.SecurityTesting {
+			t.Errorf("product %d: visible is %v, want only security testing work", product, got)
 		}
 	}
-	if analyst.Triages(access.Internal, 4) || analyst.TriagesIn(4) {
-		t.Error("reading internal work triages it")
+	if analyst.Triages(access.SecurityTesting, 4) || analyst.TriagesIn(4) {
+		t.Error("reading security testing work triages it")
 	}
-	if !analyst.Triages(access.Internal, 5) {
-		t.Error("internal triage does not triage internal work")
+	if !analyst.Triages(access.SecurityTesting, 5) {
+		t.Error("security testing triage does not triage security testing work")
 	}
 	// The acts about a product as a whole are about what its builds ship.
 	if analyst.TriagesIn(5) {
-		t.Error("internal triage triages the product's disclosed or undisclosed work")
+		t.Error("security testing triage triages the product's disclosed or undisclosed work")
 	}
 	if analyst.Triages(access.Private, 5) || analyst.Triages(access.Public, 5) {
-		t.Error("internal triage triages disclosed or undisclosed work too")
+		t.Error("security testing triage triages disclosed or undisclosed work too")
 	}
-	// Triage at both disclosed visibilities is not internal triage.
-	if analyst.Reads(access.Internal, 6) || analyst.Triages(access.Internal, 6) {
-		t.Error("public and private triage reached internal work")
+	// Triage at both disclosed visibilities is not security testing triage.
+	if analyst.Reads(access.SecurityTesting, 6) || analyst.Triages(access.SecurityTesting, 6) {
+		t.Error("public and private triage reached security testing work")
 	}
 
 	published := access.Published([]int64{4, 5, 6})
 	for _, product := range []int64{4, 5, 6} {
-		if published.Reads(access.Internal, product) {
-			t.Errorf("product %d: anybody at all reads internal work", product)
+		if published.Reads(access.SecurityTesting, product) {
+			t.Errorf("product %d: anybody at all reads security testing work", product)
 		}
 		if !published.Reads(access.Public, product) {
 			t.Errorf("product %d: anybody at all does not read disclosed work, so the "+

@@ -104,7 +104,7 @@ func registerAnalyses(api huma.API, in core.Deps) {
 		})},
 		DefaultStatus: http.StatusAccepted,
 	}, core.PerProduct, "A pipeline key covering this product, branch and variant sends without it, "+
-		"and is how a build sends.", access.InternalTriage), func(ctx context.Context, input *AnalysisInput) (*AnalysisOutput, error) {
+		"and is how a build sends.", access.SecurityTestingTriage), func(ctx context.Context, input *AnalysisInput) (*AnalysisOutput, error) {
 		return uploadAnalysis(ctx, in, input)
 	})
 }
@@ -375,7 +375,7 @@ func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, int, string) 
 }
 
 // admittedAnalysis is the sender and the build an analyzer upload names. A
-// person sends where they triage internal findings in the product, which is
+// person sends where they triage security testing findings in the product, which is
 // what every result opens as.
 func admittedAnalysis(ctx context.Context, in core.Deps, product, branchOrTag, variant string) (
 	access.Subject, *catalog.Named, error) {

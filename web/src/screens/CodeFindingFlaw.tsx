@@ -4,7 +4,7 @@
 // Recording a confirmed code finding as a flaw, and the flaw it was recorded as.
 //
 // Recording one records a private flaw, so it is offered to somebody who
-// triages both the internal code finding and undisclosed work. Including the
+// triages both the security testing code finding and undisclosed work. Including the
 // code finding in disclosure makes it part of what is published with the flaw,
 // so what that would publish is listed before the choice is sent.
 
@@ -83,7 +83,7 @@ function RecordedAsFlaw({
 }) {
   const include = useIncludeCodeFinding(build, occurrence);
   const recorded = evidence.recorded_as_flaw;
-  // What including an internal-only code finding publishes, said before the
+  // What including a security-testing-only code finding publishes, said before the
   // button is pressed.
   const offering =
     recordsFlaws &&
@@ -106,7 +106,7 @@ function RecordedAsFlaw({
             {recorded.included_in_disclosure ? (
               <span title="Included in its flaw's disclosure">Included in disclosure</span>
             ) : (
-              "Internal only"
+              "Security testing only"
             )}
             {recorded.disclosed && " · disclosed"}
           </span>
@@ -126,7 +126,7 @@ function RecordedAsFlaw({
             onClick={() => include.mutate(!recorded.included_in_disclosure)}
             title={
               recorded.included_in_disclosure
-                ? "The flaw's readers stop seeing it. Internal readers keep it."
+                ? "The flaw's readers stop seeing it. Security testing readers keep it."
                 : `${INCLUDE_HOVER} ${PUBLISHED_TO}`
             }
           >

@@ -345,7 +345,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	// Any occurrence answers about the kind; disclosure is asked of all of them,
 	// because one undisclosed occurrence among fifty makes the whole of it
 	// undisclosed for anybody deciding what may be said. Anything not public
-	// is undisclosed for that purpose, internal material included.
+	// is undisclosed for that purpose, security testing material included.
 	for _, row := range rows {
 		if access.AsVisibility(row.Visibility) != access.Public {
 			evidence.Undisclosed = true

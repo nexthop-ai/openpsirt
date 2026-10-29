@@ -73,7 +73,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 
 | Document | Covers | Terms |
 |---|---|---|
-| [access](design-docs/access.md) | Who a request is, and the roles and visibilities it reads under | authentication, roles, internal visibility, breadth of view, upward tree, subject kinds, pipeline keys, anybody at all, the deployment itself |
+| [access](design-docs/access.md) | Who a request is, and the roles and visibilities it reads under | authentication, roles, security testing visibility, breadth of view, upward tree, subject kinds, pipeline keys, anybody at all, the deployment itself |
 | [access-enforcement](design-docs/access-enforcement.md) | Where each access check sits, and refusals that disclose nothing | name resolution order, one resolver, enforcement sites, store methods with no subject, visibility questions, rating rights, mentions, notes on an issue |
 | [access-assignment](design-docs/access-assignment.md) | Who holds work and how it moves | assignment rights, assignment by narrowing, teams, team queue, assignment rules, preview, sweep, departure, lost reading, hand-back |
 | [access-grants](design-docs/access-grants.md) | How roles are granted, and an account that ends | role assignment modes, group mappings, administration sources, session lifetime ceiling, group matching, grant grid, role across every product, personal tokens, audit permission, somebody who has left, absent holders |

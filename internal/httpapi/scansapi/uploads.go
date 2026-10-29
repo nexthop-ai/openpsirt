@@ -54,7 +54,7 @@ func registerUploads(api huma.API, in core.Deps) {
 			"carries the uploads themselves.\n\n" +
 			"A kind the caller may not read is left out. An API key reads the SBOMs and the " +
 			"static analysis runs of a build it may upload to. A person reads static analysis " +
-			"runs where they read internal findings in the product.",
+			"runs where they read security testing findings in the product.",
 		Tags: []string{"Ingest"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`

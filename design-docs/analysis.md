@@ -2,8 +2,9 @@
 
 A static analyzer's run over a build arrives as SARIF. Each result is placed in
 the checkout, matched to what the same analysis reported before, and recorded
-as a finding of the analysis kind, a **code finding**, internal until a person
-judges it (`design-docs/access.md` § Internal visibility).
+as a finding of the analysis kind, a **code finding**, visible only to those
+granted security testing until a person judges it (`design-docs/access.md`
+§ Security testing visibility).
 
 Satisfies REQ-06, REQ-08, REQ-13, REQ-14, REQ-21, REQ-42, REQ-66, REQ-69.
 
@@ -42,7 +43,7 @@ POST /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}
 | Rule | Reason |
 |---|---|
 | Its own operation, one run of one analysis against one build | Analysis runs on its own schedule |
-| Sent by a pipeline key covering the build, or a person holding `internal-triage` on the product | Every result opens internal |
+| Sent by a pipeline key covering the build, or a person holding `security-testing-triage` on the product | Every result opens at security testing visibility |
 | The documents are read and results placed at the door, and answered 202; the placed results are stored until the run ends, the documents never; a queued job applies the run (REQ-06) | An unreadable document is refused in the sender's words, and applying waits for the inventory |
 | No file contents, fix or scanner run is written, and a snippet only per `design-docs/analysis-source.md` § Snippets | |
 | A retired product, release or variant takes no run; a queue past its backlog answers 503 | As the scan upload |
@@ -162,7 +163,7 @@ An applied run, in order:
 
 1. Matches each result to a code finding open in the series on the build (`design-docs/analysis-matching.md` § Matching).
 2. Files each rule as an issue of the rule kind, `<tool>/<rule>` in lower-case tool name, with the weaknesses its `external/cwe/cwe-N` tags name (`design-docs/kinds.md` § Name resolution).
-3. Opens an internal code finding for each unmatched result, at the occurrence matching gives and the component placement gives (`design-docs/analysis-source.md` § Placement).
+3. Opens a security testing code finding for each unmatched result, at the occurrence matching gives and the component placement gives (`design-docs/analysis-source.md` § Placement).
 4. Replaces each seen code finding's path, lines, columns, function, call chain, message, fingerprint, flow steps and related places.
 5. Records each as seen; marks each open one unseen as no longer detected, per § Run parameters; counts one seen again as returned.
 6. Records the checkout's repositories.
@@ -173,7 +174,7 @@ An applied run, in order:
 | Two runs of one series apply in turn, each first writing a new value to the series' row | Both would open one result twice; a cluster certifies only written rows (`design-docs/database-transactions.md` § Retryable transactions) |
 | No longer detected is absence, and the code finding stays open (`design-docs/kinds.md` § Kinds) | |
 | A code finding is in the queue from the run opening it, a first run included | |
-| A comparable run marking more no longer detected than the analyzer drop share and floor both allow is a sharp drop: applied, said on its receipt, and told once to internal readers after commit (REQ-21, `design-docs/notifications-alerts.md` § Analyzer alerts) | Partial analysis reads as a fix sweep; set aside, it would supersede every later run |
+| A comparable run marking more no longer detected than the analyzer drop share and floor both allow is a sharp drop: applied, said on its receipt, and told once to security testing readers after commit (REQ-21, `design-docs/notifications-alerts.md` § Analyzer alerts) | Partial analysis reads as a fix sweep; set aside, it would supersede every later run |
 | The share is of what the last comparable run saw; the floor is a count | A small series does not alert on two fixes |
 
 ## Receipts
@@ -194,7 +195,7 @@ An applied run, in order:
 | Each series' last upload turned away after admission is listed: series, time, the sender's words; one per series and build | |
 | One refused before admission is recorded nowhere | It would tell readers somebody without access tried |
 | A receipt counts code findings and names none | |
-| A pipeline key reads its build's receipts; a person reads them where they read internal findings; anybody else is answered as for a build sent nothing, before runs are looked up (REQ-42, `design-docs/access.md` § Subject kinds) | |
+| A pipeline key reads its build's receipts; a person reads them where they read security testing findings; anybody else is answered as for a build sent nothing, before runs are looked up (REQ-42, `design-docs/access.md` § Subject kinds) | |
 
 ## Not built
 

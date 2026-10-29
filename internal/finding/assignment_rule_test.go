@@ -18,7 +18,7 @@ import (
 // team declares a team to assign work to.
 func (f *fixture) team(t *testing.T, name string) int64 {
 	t.Helper()
-	return f.teamReading(t, name, access.PublicRead, access.PrivateRead, access.InternalRead)
+	return f.teamReading(t, name, access.PublicRead, access.PrivateRead, access.SecurityTestingRead)
 }
 
 // teamReading declares a team whose one member holds these roles on the
@@ -531,7 +531,7 @@ func codeFindingsAt(t *testing.T, f *fixture) {
 		t.Fatal(err)
 	}
 	for visibility, identifier := range map[access.Visibility]string{
-		access.Internal: "CVE-2026-2", access.Private: "CVE-2026-1",
+		access.SecurityTesting: "CVE-2026-2", access.Private: "CVE-2026-1",
 	} {
 		if _, err := f.db.DB.NewUpdate().Table("finding").
 			Set(`"kind" = ?`, "analysis").Set(`"visibility" = ?`, visibility).
@@ -591,7 +591,7 @@ func TestAnAssignmentRulePlacesTheCodeFindingsNobodyHolds(t *testing.T) {
 		if others == 0 {
 			t.Error("the rule placed no vulnerability")
 		}
-		for _, v := range []access.Visibility{access.Internal, access.Private} {
+		for _, v := range []access.Visibility{access.SecurityTesting, access.Private} {
 			if codeFindings[v] == 0 {
 				t.Errorf("the rule placed no code finding at %s", v)
 			}
@@ -612,7 +612,7 @@ func TestAnAssignmentRulePlacesNoCodeFindingPastItsEndOfLife(t *testing.T) {
 		}
 		// The preview asks what the sweep asks: the vulnerability is the one
 		// piece left to place.
-		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
+		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.SecurityTestingRead)
 		caught, err := f.store.WouldMatch(t.Context(), who, f.productID, "", "libnl-3-*", 20)
 		if err != nil {
 			t.Fatal(err)
@@ -645,7 +645,7 @@ func TestARulePreviewCountsEachCodeFindingItWouldPlace(t *testing.T) {
 		if codeFindings < 2 {
 			t.Fatalf("the fixture holds %d code findings, so this checked nothing", codeFindings)
 		}
-		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
+		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.SecurityTestingRead)
 		caught, err := f.store.WouldMatch(t.Context(), who, f.productID, "", "libnl-3-*", 20)
 		if err != nil {
 			t.Fatal(err)
@@ -667,14 +667,14 @@ func TestAnAssignmentRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
 		others       bool
 	}{
 		{"disclosed", []access.Role{access.PublicRead}, nil, true},
-		{"internal", []access.Role{access.InternalRead}, []access.Visibility{access.Internal}, true},
+		{"security-testing", []access.Role{access.SecurityTestingRead}, []access.Visibility{access.SecurityTesting}, true},
 		{"nobody", nil, nil, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			each(t, func(t *testing.T, f *fixture) {
 				codeFindingsAt(t, f)
 				codeFindings, others := placedWith(t, f, f.teamReading(t, "desk", c.roles...))
-				for _, v := range []access.Visibility{access.Internal, access.Private} {
+				for _, v := range []access.Visibility{access.SecurityTesting, access.Private} {
 					if want := slices.Contains(c.codeFindings, v); (codeFindings[v] > 0) != want {
 						t.Errorf("the rule placed %d code findings at %s; want them placed: %v", codeFindings[v], v, want)
 					}
@@ -693,10 +693,10 @@ func TestAnAssignmentRulePlacesNoRecordedCodeFinding(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		codeFindingsAt(t, f)
-		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
+		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.SecurityTestingRead)
 		var codeFinding finding.Finding
 		if err := f.db.DB.NewSelect().Model(&codeFinding).
-			Where(`"f"."kind" = ?`, "analysis").Where(`"f"."visibility" = ?`, access.Internal).
+			Where(`"f"."kind" = ?`, "analysis").Where(`"f"."visibility" = ?`, access.SecurityTesting).
 			Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -717,7 +717,7 @@ func TestAnAssignmentRulePlacesNoRecordedCodeFinding(t *testing.T) {
 		}
 		if _, err := f.db.DB.NewInsert().Model(&finding.CodeFindingFlaw{
 			ProductID: f.productID, OccurrenceIdentity: codeFinding.OccurrenceIdentity, VulnerabilityID: codeFinding.VulnerabilityID,
-			Visibility: access.Internal, RecordedBy: person.ID, RecordedAt: time.Now().UTC().Truncate(time.Second),
+			Visibility: access.SecurityTesting, RecordedBy: person.ID, RecordedAt: time.Now().UTC().Truncate(time.Second),
 		}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

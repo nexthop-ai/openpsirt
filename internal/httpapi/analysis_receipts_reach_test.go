@@ -23,8 +23,8 @@ func TestAnalyzerRunsAreRefusedBeforeTheBuildIsLookedUp(t *testing.T) {
 		const sent = "/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses"
 		const unsent = "/v1/products/mine/branches-and-tags/fresh/variants/broadcom/analyses"
 		for _, path := range []string{sent, unsent} {
-			if got := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, path, ""); got.Code != http.StatusOK {
-				t.Errorf("an internal reader asking %s was answered %d: %s", path, got.Code, got.Body)
+			if got := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, path, ""); got.Code != http.StatusOK {
+				t.Errorf("a security testing reader asking %s was answered %d: %s", path, got.Code, got.Body)
 			}
 			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, path, ""), http.StatusNotFound)
 		}

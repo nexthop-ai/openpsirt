@@ -58,10 +58,10 @@ func TestABuildsUploadsListEachKindItsReaderMayRead(t *testing.T) {
 		check := func(when string) {
 			t.Helper()
 			for who, want := range map[string][]string{
-				// Static analysis results open at internal visibility, so a
+				// Static analysis results open at security testing visibility, so a
 				// reader of disclosed findings is not told about the runs.
-				"reader":          {"sbom", "vex", "supplier-advisory"},
-				"internal-reader": {"sbom", "sarif", "vex", "supplier-advisory"},
+				"reader":                  {"sbom", "vex", "supplier-advisory"},
+				"security-testing-reader": {"sbom", "sarif", "vex", "supplier-advisory"},
 				// A key reads what was sent to a build it may send to.
 				"": {"sbom", "sarif"},
 			} {
@@ -83,8 +83,8 @@ func TestABuildsUploadsListEachKindItsReaderMayRead(t *testing.T) {
 		}
 		const fresh = "/v1/products/mine/branches-and-tags/master/variants/declared-by-the-test"
 		for who, want := range map[string][]string{
-			"reader":          {"sbom", "vex", "supplier-advisory"},
-			"internal-reader": {"sbom", "sarif", "vex", "supplier-advisory"},
+			"reader":                  {"sbom", "vex", "supplier-advisory"},
+			"security-testing-reader": {"sbom", "sarif", "vex", "supplier-advisory"},
 		} {
 			code, kinds, order := uploadKindsAt(t, r, fresh, who)
 			if code != http.StatusOK || !slices.Equal(order, want) || kinds["sbom"].Total != 0 {
@@ -117,7 +117,7 @@ func TestABuildsUploadsSayWhatBecameOfTheNewestOfEachKind(t *testing.T) {
 			t.Fatalf("sending a run answered %d: %s", sent.Code, sent.Body.String())
 		}
 
-		_, kinds, _ := uploadKinds(t, r, "internal-reader")
+		_, kinds, _ := uploadKinds(t, r, "security-testing-reader")
 		if sbom := kinds["sbom"]; sbom.Total != 1 || sbom.Latest == nil || sbom.Latest.Status == "refused" {
 			t.Errorf("the SBOMs read %+v; want the one scanned", sbom)
 		}
@@ -143,7 +143,7 @@ func TestABuildsUploadsSayWhatBecameOfTheNewestOfEachKind(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		_, kinds, _ = uploadKinds(t, r, "internal-reader")
+		_, kinds, _ = uploadKinds(t, r, "security-testing-reader")
 		for each, reason := range map[string]string{
 			"sbom": "that is not an inventory", "sarif": "it names no commit",
 		} {
@@ -158,7 +158,7 @@ func TestABuildsUploadsSayWhatBecameOfTheNewestOfEachKind(t *testing.T) {
 
 		// An upload taken after the refusal is the newest again.
 		r.Recorded(t, build, "after-the-refusal")
-		_, kinds, _ = uploadKinds(t, r, "internal-reader")
+		_, kinds, _ = uploadKinds(t, r, "security-testing-reader")
 		if sbom := kinds["sbom"]; sbom.Total != 2 || sbom.Latest == nil || sbom.Latest.Status != "in-progress" {
 			t.Errorf("the SBOMs read %+v; want the upload still being read", sbom.Latest)
 		}

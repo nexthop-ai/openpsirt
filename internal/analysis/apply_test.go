@@ -301,7 +301,7 @@ func TestARunWaitsUntilItsBuildHasAnInventory(t *testing.T) {
 	})
 }
 
-func TestAResultIsAnInternalFindingOnTheComponentItsRepositoryBuilt(t *testing.T) {
+func TestAResultIsAnSecurityTestingFindingOnTheComponentItsRepositoryBuilt(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Build.ID)
 		run, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
@@ -321,8 +321,8 @@ func TestAResultIsAnInternalFindingOnTheComponentItsRepositoryBuilt(t *testing.T
 		}
 		on := map[int64]int{}
 		for _, f := range codeFindings {
-			if f.Visibility != access.Internal {
-				t.Errorf("a finding opened %s; want internal", f.Visibility)
+			if f.Visibility != access.SecurityTesting {
+				t.Errorf("a finding opened %s; want security testing", f.Visibility)
 			}
 			on[f.ComponentID]++
 		}
@@ -673,7 +673,7 @@ func TestASeriesFirstRunPutsEveryCodeFindingInTheQueue(t *testing.T) {
 			document([]sent{inFRR, inSWSS}, 10)); status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
-		reader := w.holding(t, "analyst", access.InternalRead)
+		reader := w.holding(t, "analyst", access.SecurityTestingRead)
 		queue, err := CodeFindingsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -783,7 +783,7 @@ func (w *world) dismissed(t *testing.T, codeFinding finding.Finding, at time.Tim
 	// Any key holding is live; the occurrence identity fits the column.
 	live := codeFinding.OccurrenceIdentity
 	decided := &triage.DecisionOccurrence{DecisionID: decision.ID, ProductID: w.Product.ID, VulnerabilityID: codeFinding.VulnerabilityID,
-		OccurrenceIdentity: codeFinding.OccurrenceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
+		OccurrenceIdentity: codeFinding.OccurrenceIdentity, Visibility: access.SecurityTesting, State: triage.Approved, LiveKey: &live,
 		NeedsApproval: true, ProposedBy: by.ID, ProposedAt: at}
 	if _, err := w.DB.DB.NewInsert().Model(decided).Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -840,8 +840,8 @@ func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 				t.Errorf("code finding %d paired on %q: dismissal %q; want %q", codeFinding.ID, on[codeFinding.ID], got, want)
 			}
 		}
-		// Its proposer is told once, of both, as internal work.
-		if len(heard) != 1 || heard[0].Rows != 2 || !heard[0].Probable || !heard[0].Internal {
+		// Its proposer is told once, of both, as security testing work.
+		if len(heard) != 1 || heard[0].Rows != 2 || !heard[0].Probable || !heard[0].SecurityTesting {
 			t.Errorf("told %+v; want the proposer told once of two lapsed decisions on code findings", heard)
 		}
 	})
@@ -1104,9 +1104,9 @@ func TestACodeFindingsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T)
 		if _, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "public", access.PublicRead), &codeFinding, w.Product.ID); !errors.Is(err, finding.ErrNoOpenFinding) {
 			t.Errorf("a public reader was answered %v; want no code finding", err)
 		}
-		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &codeFinding, w.Product.ID)
+		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.SecurityTestingRead), &codeFinding, w.Product.ID)
 		if err != nil || got.At.Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" {
-			t.Errorf("an internal reader was answered %+v, %v; want the code finding's occurrence", got.At, err)
+			t.Errorf("a security testing reader was answered %+v, %v; want the code finding's occurrence", got.At, err)
 		}
 	})
 }
@@ -1118,7 +1118,7 @@ func TestTheQueueAndEvidenceNameTheComponentACodeFindingIsPlacedOn(t *testing.T)
 			document([]sent{inFRR, inSWSS}, 10)); status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
-		reader := w.holding(t, "analyst", access.InternalRead)
+		reader := w.holding(t, "analyst", access.SecurityTestingRead)
 		queue, err := CodeFindingsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -1156,7 +1156,7 @@ func TestTheQueueAndEvidenceNameTheComponentACodeFindingIsPlacedOn(t *testing.T)
 // build is placed, by path.
 func (w *world) placement(t *testing.T) (map[string][3]string, map[string][3]string) {
 	t.Helper()
-	reader := w.holding(t, "analyst", access.InternalRead)
+	reader := w.holding(t, "analyst", access.SecurityTestingRead)
 	queue, err := CodeFindingsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
 	if err != nil {
 		t.Fatal(err)

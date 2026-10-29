@@ -39,7 +39,7 @@ export function Product() {
   const who = useWho();
   // The vulnerability reports ask what reading a report asks: reading undisclosed work.
   const mayReadReports = !!mayOf(who.data, product)?.reads_private;
-  const mayReadCodeFindings = !!mayOf(who.data, product)?.reads_internal;
+  const mayReadCodeFindings = !!mayOf(who.data, product)?.reads_security_testing;
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
   const overview = useQuery({
     queryKey: ["overview", product],

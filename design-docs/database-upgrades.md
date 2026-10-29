@@ -255,6 +255,7 @@ The stored values the renames reach then take the new words.
 | `report_note`, `report_note_revision` | New: the notes on a report, and each earlier wording |
 | `report_assignment` | New: every change of who holds a report, with the rule that assigned it |
 | `assignment_rule` | Whether it places vulnerability reports, false for every rule, stepped over where present |
+| `role_grant`, `role_grant_all`, `group_role`, `group_role_all` | The role column declared at a short identifier's width, since `security-testing-triage` outgrows a short word's 16 characters. Every row keeps its value. SQLite bounds no text and is left as it stands |
 
 A new table already present gains each of its indexes it lacks.
 
@@ -278,6 +279,7 @@ times on each engine.
 | A rename whose table another session holds, on the servers | It waits, logs the holding session, and runs once released |
 | A bulk decision, a notification and a destination of each renamed kind, a link to a decision's row and one to a claim, a failed job, a kept filter naming renamed words, the bulk action limit, a trail change of the renamed kind | Each value in its v0.11.0 spelling, every value beside it unchanged |
 | The same, stopped after each value-rewriting step in turn | Started again, it leaves what an unstopped upgrade leaves |
+| A v0.10.0 database holding a role grant | The grant keeps its role, and every table holding a role takes the longest role name |
 
 ## Limits
 

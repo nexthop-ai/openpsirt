@@ -717,9 +717,9 @@ func tellTheApprovers(ctx context.Context, in core.Deps, decisionID int64,
 			PersonID: one.PersonID, Kind: notify.ApprovalWithdrawn,
 			Body: what + " of a decision you agreed to was changed, so your agreement no " +
 				"longer counts. It is back in the review queue.",
-			Link:     weblink.Decision(decisionID),
-			Private:  one.Undisclosed,
-			Internal: one.Internal,
+			Link:            weblink.Decision(decisionID),
+			Private:         one.Undisclosed,
+			SecurityTesting: one.SecurityTesting,
 			// The narrowing a later read applies.
 			ProductID:       &one.ProductID,
 			VulnerabilityID: &one.VulnerabilityID,

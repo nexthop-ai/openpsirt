@@ -184,7 +184,7 @@ var administrativeActs = []trailedAct{
 		kind: "setting", about: "repositories of mine",
 	},
 	{
-		id: "propose-suppression-rule", what: "a suppression rule", who: "internal-triager",
+		id: "propose-suppression-rule", what: "a suppression rule", who: "security-testing-triager",
 		method: http.MethodPost, path: "/v1/products/mine/suppression-rules",
 		body: `{"prefix":"tests","reason":"used_in_tests","reasoning":"the tests do not ship"}`,
 		kind: "suppression-rule", about: "mine · {suppression-rule}",
@@ -199,12 +199,12 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
-		id: "approve-suppression-rule", what: "a suppression rule approved", who: "internal-reviewer",
+		id: "approve-suppression-rule", what: "a suppression rule approved", who: "security-testing-reviewer",
 		method: http.MethodPost, path: "/v1/products/mine/suppression-rules/{suppression-rule}/approval", body: `{}`,
 		kind: "suppression-rule", about: "mine · {suppression-rule}",
 	},
 	{
-		id: "retire-suppression-rule", what: "a suppression rule retired", who: "internal-triager",
+		id: "retire-suppression-rule", what: "a suppression rule retired", who: "security-testing-triager",
 		method: http.MethodDelete, path: "/v1/products/mine/suppression-rules/{suppression-rule}",
 		kind: "suppression-rule", about: "mine · {suppression-rule}",
 	},
@@ -426,7 +426,7 @@ var administrativeActs = []trailedAct{
 		kind:   "case", about: "mine · {issue} · reader",
 	},
 	{
-		// An internal-only code finding made part of its flaw's case: who reads it changes.
+		// A security-testing-only code finding made part of its flaw's case: who reads it changes.
 		id: "include-code-finding-in-disclosure", what: "a code finding recorded as a flaw included in its flaw's disclosure", who: "code-finding-handler",
 		kind: "case", about: "mine · {flaw} · clang-tidy/leak",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
@@ -454,7 +454,7 @@ var administrativeActs = []trailedAct{
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
-		// The code finding is internal again, so who reads it changes. With no grant
+		// The code finding is at security testing visibility again, so who reads it changes. With no grant
 		// left standing, the one row is the flaw record's own.
 		id: "undo-code-finding-flaw", what: "a code finding's flaw record undone", who: "code-finding-handler",
 		method: http.MethodPost,

@@ -35,8 +35,8 @@ func TestRecordingAsAFlawAndIncludingInDisclosureTakeBothTriageRoles(t *testing.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, _ := httpapitest.RecordedCodeFinding(t, r, false)
 		var cases []asked
-		// Internal triage alone, private triage alone, and internal reading.
-		for _, who := range []string{"internal-triager", "embargo-triager", "internal-reader"} {
+		// Security testing triage alone, private triage alone, and security testing reading.
+		for _, who := range []string{"security-testing-triager", "embargo-triager", "security-testing-reader"} {
 			cases = append(cases,
 				asked{who, http.MethodGet, "/flaw", "", http.StatusForbidden},
 				asked{who, http.MethodPost, "/flaw", recordAsFlawNamingNoBuild, http.StatusForbidden},
@@ -52,26 +52,26 @@ func TestRecordingAsAFlawAndIncludingInDisclosureTakeBothTriageRoles(t *testing.
 	})
 }
 
-func TestAnInternalOnlyCodeFindingsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
+func TestAnSecurityTestingOnlyCodeFindingsCollaboratorsAreManagedByItsSecurityTestingReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, _ := httpapitest.RecordedCodeFinding(t, r, false)
 		answered(t, r, occurrence, []asked{
-			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
-			{"internal-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
-			{"internal-triager", http.MethodDelete, "/collaborators/outsider", "", http.StatusNoContent},
-			// Undisclosed work alone does not read the internal code finding.
+			{"security-testing-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
+			{"security-testing-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
+			{"security-testing-triager", http.MethodDelete, "/collaborators/outsider", "", http.StatusNoContent},
+			// Undisclosed work alone does not read the security testing code finding.
 			{"embargo-triager", http.MethodGet, "/collaborators", "", http.StatusNotFound},
 			{"embargo-triager", http.MethodPut, "/collaborators/outsider", "", http.StatusNotFound},
 		})
 	})
 }
 
-func TestAnIncludedCodeFindingsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
+func TestAnIncludedCodeFindingsCollaboratorsAreManagedByItsSecurityTestingReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, _ := httpapitest.RecordedCodeFinding(t, r, true)
 		answered(t, r, occurrence, []asked{
-			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
-			{"internal-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
+			{"security-testing-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
+			{"security-testing-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
 			// The flaw's readers read the included code finding, and do not decide
 			// who else does.
 			{"embargo-reader", http.MethodGet, "", "", http.StatusOK},

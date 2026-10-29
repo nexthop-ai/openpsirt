@@ -15,7 +15,7 @@ import (
 )
 
 // A code finding whose rows sit at two withheld visibilities asks its recipient about
-// both. Undisclosed and internal work are read under separate grants, so
+// both. Undisclosed and security testing work are read under separate grants, so
 // neither one is the stricter, and a recipient cleared for one is not cleared
 // for the other.
 func TestACodeFindingOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
@@ -32,7 +32,7 @@ func TestACodeFindingOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 			t.Fatalf("the build holds %d findings; want one at each of two occurrences", len(ids))
 		}
 		for i, id := range ids {
-			visibility := access.Internal
+			visibility := access.SecurityTesting
 			if i == 0 {
 				visibility = access.Private
 			}
@@ -43,7 +43,7 @@ func TestACodeFindingOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		who := f.planner(t, access.InternalTriage, access.PrivateTriage, access.Assigner)
+		who := f.planner(t, access.SecurityTestingTriage, access.PrivateTriage, access.Assigner)
 		colleague, err := access.NewStore(f.db.DB).Ensure(ctx, "colleague@example.com", "Colleague", nil, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -57,7 +57,7 @@ func TestACodeFindingOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		both := []access.Visibility{access.Private, access.Internal}
+		both := []access.Visibility{access.Private, access.SecurityTesting}
 		if !slices.Equal(asked, both) {
 			t.Errorf("the recipient was asked about %v; want both", asked)
 		}

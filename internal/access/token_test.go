@@ -790,15 +790,15 @@ func TestAWithdrawnTokensNameMayBeGivenAgain(t *testing.T) {
 	})
 }
 
-// A token narrowed to an internal role carries that role and no other, and
-// internal triage on it is not the triage a case's write half asks for: a case
+// A token narrowed to a security testing role carries that role and no other, and
+// security testing triage on it is not the triage a case's write half asks for: a case
 // is about disclosed and undisclosed work.
-func TestATokenNarrowsToAnInternalRole(t *testing.T) {
+func TestATokenNarrowsToAnSecurityTestingRole(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		sonic := f.products["sonic"]
 		person := holding(t, f, "analyst", "Analyst", sonic,
-			access.PublicRead, access.InternalRead, access.InternalTriage)
+			access.PublicRead, access.SecurityTestingRead, access.SecurityTestingTriage)
 		issues, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "SONIC-2026-8200", Severity: "high"},
 		})
@@ -811,14 +811,14 @@ func TestATokenNarrowsToAnInternalRole(t *testing.T) {
 		}
 
 		for _, c := range []struct {
-			what           string
-			holds          []access.Role
-			readsPublic    bool
-			readsInternal  bool
-			triageInternal bool
+			what                  string
+			holds                 []access.Role
+			readsPublic           bool
+			readsSecurityTesting  bool
+			triageSecurityTesting bool
 		}{
-			{"narrowed to internal reading", []access.Role{access.InternalRead}, false, true, false},
-			{"narrowed to internal triage", []access.Role{access.InternalTriage}, false, true, true},
+			{"narrowed to security testing reading", []access.Role{access.SecurityTestingRead}, false, true, false},
+			{"narrowed to security testing triage", []access.Role{access.SecurityTestingTriage}, false, true, true},
 			{"narrowed to public reading", []access.Role{access.PublicRead}, true, false, false},
 		} {
 			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
@@ -832,11 +832,11 @@ func TestATokenNarrowsToAnInternalRole(t *testing.T) {
 			if got := subject.Reads(access.Public, sonic); got != c.readsPublic {
 				t.Errorf("a token %s reads disclosed work: %v, want %v", c.what, got, c.readsPublic)
 			}
-			if got := subject.Reads(access.Internal, sonic); got != c.readsInternal {
-				t.Errorf("a token %s reads internal work: %v, want %v", c.what, got, c.readsInternal)
+			if got := subject.Reads(access.SecurityTesting, sonic); got != c.readsSecurityTesting {
+				t.Errorf("a token %s reads security testing work: %v, want %v", c.what, got, c.readsSecurityTesting)
 			}
-			if got := subject.Triages(access.Internal, sonic); got != c.triageInternal {
-				t.Errorf("a token %s triages internal work: %v, want %v", c.what, got, c.triageInternal)
+			if got := subject.Triages(access.SecurityTesting, sonic); got != c.triageSecurityTesting {
+				t.Errorf("a token %s triages security testing work: %v, want %v", c.what, got, c.triageSecurityTesting)
 			}
 			if subject.OnCaseToAct(sonic, issue) {
 				t.Errorf("a token %s writes on a case", c.what)

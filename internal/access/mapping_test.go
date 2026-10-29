@@ -30,15 +30,15 @@ func TestTheGroupRolesVariableReadsAsTheMappingsItStates(t *testing.T) {
 	}
 }
 
-// The internal roles are mapped from groups like every other role.
-func TestTheGroupRolesVariableMapsTheInternalRoles(t *testing.T) {
-	got, err := access.ParseGroupRoles("analysts=internal-read; leads=internal-triage@sonic")
+// The security testing roles are mapped from groups like every other role.
+func TestTheGroupRolesVariableMapsTheSecurityTestingRoles(t *testing.T) {
+	got, err := access.ParseGroupRoles("analysts=security-testing-read; leads=security-testing-triage@sonic")
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []access.Mapping{
-		{Group: "analysts", Grants: "internal-read"},
-		{Group: "leads", Grants: "internal-triage", Product: "sonic"},
+		{Group: "analysts", Grants: "security-testing-read"},
+		{Group: "leads", Grants: "security-testing-triage", Product: "sonic"},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("read\n%+v\nwant\n%+v", got, want)

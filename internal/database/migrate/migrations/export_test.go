@@ -120,6 +120,8 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		"report_note": flawReportV0110(t), "report_note_revision": flawReportV0110(t),
 		"report_message": flawReportV0110(t), "report_assignment": flawReportV0110(t),
 		"assignment_rule": assignmentRuleV0110(t),
+		"role_grant":      roleV0110(t), "role_grant_all": roleV0110(t),
+		"group_role": roleV0110(t), "group_role_all": roleV0110(t),
 	} {
 		made, indexes, err := pick(declared, table)
 		if err != nil {

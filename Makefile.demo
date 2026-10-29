@@ -378,7 +378,7 @@ demo-down:
 #   $(3) the origin a browser there sends   $(4) the product
 seed-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(4) %{http_code}\n" \
 	  -X POST $(2) -H "Origin: $(3)" -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(4)\",\"role\":\"public-triage\"},{\"product\":\"$(4)\",\"role\":\"private-triage\"},{\"product\":\"$(4)\",\"role\":\"assigner\"},{\"product\":\"$(4)\",\"role\":\"approver\"},{\"product\":\"$(4)\",\"role\":\"internal-read\"},{\"product\":\"$(4)\",\"role\":\"internal-triage\"}]}" \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(4)\",\"role\":\"public-triage\"},{\"product\":\"$(4)\",\"role\":\"private-triage\"},{\"product\":\"$(4)\",\"role\":\"assigner\"},{\"product\":\"$(4)\",\"role\":\"approver\"},{\"product\":\"$(4)\",\"role\":\"security-testing-read\"},{\"product\":\"$(4)\",\"role\":\"security-testing-triage\"}]}" \
 	  "$(1)/v1/people"
 demo-grant = $(call seed-grant,$(DEMO_URL),,$(DEMO_URL),$(1))
 

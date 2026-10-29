@@ -140,7 +140,7 @@ names.
 |---|---|
 | It is about nothing undisclosed | |
 | It names a product where this person reads undisclosed work now | The role is why it arrived |
-| It is about internal work, where they read internal work now | An undisclosed reader reads no internal finding |
+| It is about security testing work, where they read security testing work now | An undisclosed reader reads no security testing finding |
 | It names an issue they were brought onto, one case at a time | Widened to the product, a case grant hands over its embargo list |
 | It is about a code finding recorded as a flaw they were granted | That grant reaches its one line |
 | They administer the deployment | The embargo notice names administrators, who grant roles anyway |
@@ -148,7 +148,7 @@ names.
 | Rule | Reason |
 |---|---|
 | Rows are filtered, never deleted; a role granted back returns them | That somebody was told is what an auditor wants after a leak |
-| A private row carries its product or the write is refused; a row about internal work is private | Unattributable, it shows to everybody or nobody |
+| A private row carries its product or the write is refused; a row about security testing work is private | Unattributable, it shows to everybody or nobody |
 | The product and the issue are columns | Never parsed from a digest's match string |
 | Reading another person's list is an administrator's act alone, refused in the store | It exists to investigate a leak |
 | That read includes read and cleared rows, and is narrowed by products the asker holds a role on: disclosed rows in any, undisclosed where they read undisclosed work, case-granted issues; nothing about no product or an unheld one, count included | Granting themselves the product is recorded; this read is not |

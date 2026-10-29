@@ -63,10 +63,10 @@ type Whole struct {
 	// row in the set answers for the whole of it, as it does everywhere else
 	// this question is asked.
 	Undisclosed bool
-	// Internal says at least one row of the decision is about internal
+	// SecurityTesting says at least one row of the decision is about security testing
 	// material, a code finding, which is what decides who may agree to it: at
-	// internal visibility a second person holds the approver capability.
-	Internal bool
+	// security testing visibility a second person holds the approver capability.
+	SecurityTesting bool
 }
 
 // Reach is what a decision covers now, counted the way the findings list counts.
@@ -153,8 +153,8 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, decisionID in
 		if row.Visibility != access.Public {
 			whole.Undisclosed = true
 		}
-		if row.Visibility == access.Internal {
-			whole.Internal = true
+		if row.Visibility == access.SecurityTesting {
+			whole.SecurityTesting = true
 		}
 	}
 	whole.Issues, whole.Occurrences = len(issues), len(occurrences)

@@ -50,11 +50,11 @@ describe("a code finding in the work somebody holds", () => {
 describe("nobody else holding anything in a product", () => {
   afterEach(() => window.sessionStorage.clear());
 
-  async function linked(reads_internal: boolean) {
+  async function linked(reads_security_testing: boolean) {
     remember({ product: "sonic" });
     serve((path) => {
       if (path === "/v1/session/me")
-        return { data: { ...me, reach: [{ product: "sonic", reads_internal }] } };
+        return { data: { ...me, reach: [{ product: "sonic", reads_security_testing }] } };
       if (path === "/v1/assignments") return { data: [] };
       return { data: { items: [], total: 0 } };
     });
@@ -70,7 +70,7 @@ describe("nobody else holding anything in a product", () => {
     expect(link?.getAttribute("href")).toBe("/products/sonic/code-findings?assigned=nobody");
   });
 
-  it("links no code findings for somebody who reads no internal material", async () => {
+  it("links no code findings for somebody who reads no security testing material", async () => {
     expect(await linked(false)).toBeUndefined();
   });
 });

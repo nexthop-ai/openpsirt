@@ -75,13 +75,13 @@ func TestAConfirmedCodeFindingIsRecordedAsFlawAsAFlawOnce(t *testing.T) {
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)
 		got := evidenceAs(t, r, "code-finding-handler", occurrence)
 		if got.State != "recorded-as-flaw" || got.RecordedAsFlaw == nil || got.RecordedAsFlaw.Flaw != flaw || got.RecordedAsFlaw.IncludedInDisclosure {
-			t.Fatalf("the code finding reads %s with %+v; want recorded as a flaw, internal only, as %s", got.State, got.RecordedAsFlaw, flaw)
+			t.Fatalf("the code finding reads %s with %+v; want recorded as a flaw, security testing only, as %s", got.State, got.RecordedAsFlaw, flaw)
 		}
 		again := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
 			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"again"}`)
 		httpapitest.RefusedWith(t, again, http.StatusConflict)
 		// The flaw is judged now, not the code finding.
-		decided := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+		decided := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"still real"}`)
 		httpapitest.RefusedWith(t, decided, http.StatusConflict)
 	})
@@ -93,12 +93,12 @@ func TestOnlyAConfirmedCodeFindingIsRecordedAsFlawBySomebodyWorkingBothHalves(t 
 		body := `{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost,
 			codeFindingAt(occurrence)+"/flaw", body), http.StatusConflict)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
-		// Internal triage alone does not record a private flaw.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
+		// Security testing triage alone does not record a private flaw.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost,
 			codeFindingAt(occurrence)+"/flaw", body), http.StatusForbidden)
 	})
 }
@@ -134,15 +134,15 @@ func decisionAt(t *testing.T, r *httpapitest.Reach, occurrence string) string {
 func TestAnIncludedCodeFindingStaysWholeToEverybodyWhoReadIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, _ := httpapitest.RecordedCodeFinding(t, r, true)
-		got := evidenceAs(t, r, "internal-reader", occurrence)
+		got := evidenceAs(t, r, "security-testing-reader", occurrence)
 		if got.At.Message != "p is leaked" || got.At.Snippet == "" || got.DecisionOccurrence == nil || got.RecordedAsFlaw != nil {
-			t.Errorf("an internal reader read %+v; want the whole code finding and its decision, and nothing of the flaw", got)
+			t.Errorf("a security testing reader read %+v; want the whole code finding and its decision, and nothing of the flaw", got)
 		}
-		if said := recordedAsFlawItems(t, r, "internal-reader"); len(said) != 1 || said[0] != "p is leaked" {
-			t.Errorf("an internal reader listed %q; want the included code finding, whole", said)
+		if said := recordedAsFlawItems(t, r, "security-testing-reader"); len(said) != 1 || said[0] != "p is leaked" {
+			t.Errorf("a security testing reader listed %q; want the included code finding, whole", said)
 		}
-		if decision := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, decisionAt(t, r, occurrence), ""); decision.Code != http.StatusOK {
-			t.Errorf("an internal reader reading the decision at the included code finding answered %d: %s", decision.Code, decision.Body)
+		if decision := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, decisionAt(t, r, occurrence), ""); decision.Code != http.StatusOK {
+			t.Errorf("a security testing reader reading the decision at the included code finding answered %d: %s", decision.Code, decision.Body)
 		}
 	})
 }
@@ -165,21 +165,21 @@ func TestTheFlawsReadersReadACodeFindingOnlyOnceItIsIncluded(t *testing.T) {
 		if said := recordedAsFlawItems(t, r, "private"); len(said) != 1 || said[0] != "p is leaked" {
 			t.Errorf("a reader of undisclosed work listed %q; want the included code finding, whole", said)
 		}
-		// Reading undisclosed work is not reading internal work: the code finding
-		// reaches them, and no other internal code finding does.
+		// Reading undisclosed work is not reading security testing work: the code finding
+		// reaches them, and no other security testing code finding does.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/products/mine/code-finding-series", ""),
 			http.StatusForbidden)
 	})
 }
 
-func TestAnInternalOnlyCodeFindingNamesItsFlawOnlyToThePeopleOnTheCase(t *testing.T) {
+func TestAnSecurityTestingOnlyCodeFindingNamesItsFlawOnlyToThePeopleOnTheCase(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)
-		internal := evidenceAs(t, r, "internal-reader", occurrence)
-		if internal.At.Message != "p is leaked" || internal.RecordedAsFlaw != nil {
-			t.Errorf("an internal reader read %+v; want the whole code finding and nothing of the case", internal)
+		securityTesting := evidenceAs(t, r, "security-testing-reader", occurrence)
+		if securityTesting.At.Message != "p is leaked" || securityTesting.RecordedAsFlaw != nil {
+			t.Errorf("a security testing reader read %+v; want the whole code finding and nothing of the case", securityTesting)
 		}
-		// An internal-only code finding is internal, which reading undisclosed work does not
+		// A security-testing-only code finding is at security testing visibility, which reading undisclosed work does not
 		// reach.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, codeFindingAt(occurrence), ""),
 			http.StatusNotFound)
@@ -191,7 +191,7 @@ func TestAnInternalOnlyCodeFindingNamesItsFlawOnlyToThePeopleOnTheCase(t *testin
 		if granted.At.Message != "p is leaked" || granted.RecordedAsFlaw == nil || granted.RecordedAsFlaw.Flaw != flaw {
 			t.Errorf("somebody granted the code finding read %+v; want the code finding and its flaw", granted)
 		}
-		// The grant is the code finding and nothing else of the internal work.
+		// The grant is the code finding and nothing else of the security testing work.
 		var listed struct {
 			Items []json.RawMessage `json:"items"`
 		}
@@ -255,8 +255,8 @@ func TestTakingACodeFindingOutOfDisclosureTakesBackOnlyTheFlawsReaders(t *testin
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodDelete, codeFindingAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("taking it out of disclosure answered %d: %s", got.Code, got.Body)
 		}
-		if got := evidenceAs(t, r, "internal-reader", occurrence); got.At.Message != "p is leaked" {
-			t.Errorf("an internal reader read %+v; want the whole code finding still", got)
+		if got := evidenceAs(t, r, "security-testing-reader", occurrence); got.At.Message != "p is leaked" {
+			t.Errorf("a security testing reader read %+v; want the whole code finding still", got)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, codeFindingAt(occurrence), ""),
 			http.StatusNotFound)
@@ -284,10 +284,10 @@ func TestALaterSightingOfAnIncludedCodeFindingOpensReadableByBothAudiences(t *te
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
-		if len(held) != 2 || held[0] != "internal" || held[1] != "internal" {
-			t.Errorf("the code finding's findings are %v; want the reopened one internal beside the closed one", held)
+		if len(held) != 2 || held[0] != "security-testing" || held[1] != "security-testing" {
+			t.Errorf("the code finding's findings are %v; want the reopened one at security testing visibility beside the closed one", held)
 		}
-		for _, who := range []string{"internal-reader", "private"} {
+		for _, who := range []string{"security-testing-reader", "private"} {
 			if got := evidenceAs(t, r, who, occurrence); !got.Open || got.At.Message != "p is leaked" {
 				t.Errorf("%s read the reopened code finding as %+v; want it open and whole", who, got)
 			}
@@ -298,7 +298,7 @@ func TestALaterSightingOfAnIncludedCodeFindingOpensReadableByBothAudiences(t *te
 func TestARecordAsFlawOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
@@ -308,7 +308,7 @@ func TestARecordAsFlawOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		if offer.Prefix != "src" || len(offer.Seen) != 1 || last.From != "build" || last.Component != "" {
 			t.Fatalf("offered %+v; want the build last, for the prefix src", offer)
 		}
-		if d := offer.Discloses; len(d.Authors) != 1 || d.Authors[0].Identity != "internal-triager" ||
+		if d := offer.Discloses; len(d.Authors) != 1 || d.Authors[0].Identity != "security-testing-triager" ||
 			len(d.Authors[0].Notes) != 1 || d.Authors[0].Notes[0].Body != "p leaks on the early return" ||
 			d.Stripped != 1 || d.Snippets != 0 {
 			t.Errorf("an inclusion discloses %+v; want the one author's reasoning and the stripped snippet", d)
@@ -329,7 +329,7 @@ func TestARecordAsFlawOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 			Scan(t.Context(), &other); err != nil {
 			t.Fatal(err)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(other)+"/decision",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(other)+"/decision",
 			`{"outcome":"confirmed","reasoning":"n overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming the second code finding answered %d: %s", got.Code, got.Body)
 		}
@@ -387,7 +387,7 @@ func TestSomebodyGrantedOnlyACodeFindingReadsItAndIsToldSo(t *testing.T) {
 	})
 }
 
-func TestAnInternalOnlyCodeFindingStaysInternalOnceItsFlawIsDisclosed(t *testing.T) {
+func TestAnSecurityTestingOnlyCodeFindingStaysSecurityTestingOnceItsFlawIsDisclosed(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut,
@@ -397,11 +397,11 @@ func TestAnInternalOnlyCodeFindingStaysInternalOnceItsFlawIsDisclosed(t *testing
 		disclosed(t, r, flaw)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut,
 			codeFindingAt(occurrence)+"/flaw/disclosure", ""), http.StatusConflict)
-		if got := evidenceAs(t, r, "internal-reader", occurrence); got.At.Message != "p is leaked" {
-			t.Errorf("an internal reader read %+v; want the internal-only code finding, internal still", got)
+		if got := evidenceAs(t, r, "security-testing-reader", occurrence); got.At.Message != "p is leaked" {
+			t.Errorf("a security testing reader read %+v; want the security-testing-only code finding, security testing still", got)
 		}
 		if got := evidenceAs(t, r, "code-finding-handler", occurrence); got.RecordedAsFlaw == nil || !got.RecordedAsFlaw.Disclosed || got.RecordedAsFlaw.IncludedInDisclosure {
-			t.Errorf("the flaw record reads %+v; want it internal only, and its flaw disclosed", got.RecordedAsFlaw)
+			t.Errorf("the flaw record reads %+v; want it security testing only, and its flaw disclosed", got.RecordedAsFlaw)
 		}
 		// The grant ends with the disclosure.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, codeFindingAt(occurrence), ""),
@@ -418,9 +418,9 @@ func TestARecordedCodeFindingsDecisionIsNeitherRevisedNorWithdrawn(t *testing.T)
 			t.Fatal(err)
 		}
 		at := fmt.Sprintf("/v1/decisions/%d", decision)
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at+"/reasoning",
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at+"/reasoning",
 			`{"reasoning":"p leaks, and more besides"}`), http.StatusConflict)
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, at, ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodDelete, at, ""),
 			http.StatusConflict)
 	})
 }
@@ -454,7 +454,7 @@ func TestADisclosureLandingWhileARunAppliesStripsWhatTheRunWrote(t *testing.T) {
 func TestAnUndoneBatchLeavesTheConfirmationARecordAsFlawRestsOn(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+		got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
@@ -465,7 +465,7 @@ func TestAnUndoneBatchLeavesTheConfirmationARecordAsFlawRestsOn(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing to the confirmation answered %d: %s", got.Code, got.Body)
 		}
@@ -473,7 +473,7 @@ func TestAnUndoneBatchLeavesTheConfirmationARecordAsFlawRestsOn(t *testing.T) {
 			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
-		got = httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodDelete, "/v1/approval-batches/tuesday", "")
+		got = httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodDelete, "/v1/approval-batches/tuesday", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("undoing the batch answered %d: %s", got.Code, got.Body)
 		}
@@ -524,8 +524,8 @@ func TestAnInclusionLandingWhileARunAppliesReachesTheSightingTheRunOpened(t *tes
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
-		if len(held) != 2 || held[0] != "internal" || held[1] != "internal" {
-			t.Errorf("the code finding's findings are %v; want the one the run opened internal with the other", held)
+		if len(held) != 2 || held[0] != "security-testing" || held[1] != "security-testing" {
+			t.Errorf("the code finding's findings are %v; want the one the run opened at security testing visibility with the other", held)
 		}
 		if got := evidenceAs(t, r, "private", occurrence); !got.Open || got.RecordedAsFlaw == nil || !got.RecordedAsFlaw.IncludedInDisclosure {
 			t.Errorf("a reader of undisclosed work read %+v; want the sighting the run opened, in its flaw's disclosure", got)
@@ -552,14 +552,14 @@ func toldOf(t *testing.T, r *httpapitest.Reach, who, kind string) []string {
 	return out
 }
 
-func TestARecordAsFlawAndAnInclusionAreToldToTheProductsInternalTriagersWithoutTheFlawAndNotToTheirAuthor(t *testing.T) {
+func TestARecordAsFlawAndAnInclusionAreToldToTheProductsSecurityTestingTriagersWithoutTheFlawAndNotToTheirAuthor(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)
-		if got := toldOf(t, r, "internal-triager", "code-finding-recorded-as-flaw"); len(got) != 1 ||
+		if got := toldOf(t, r, "security-testing-triager", "code-finding-recorded-as-flaw"); len(got) != 1 ||
 			!strings.Contains(got[0], "recorded as a flaw") || strings.Contains(got[0], flaw) {
-			t.Errorf("the internal triager was told %q; want the flaw record without its flaw", got)
+			t.Errorf("the security testing triager was told %q; want the flaw record without its flaw", got)
 		}
-		for _, who := range []string{"code-finding-handler", "internal-reader", "private-triage"} {
+		for _, who := range []string{"code-finding-handler", "security-testing-reader", "private-triage"} {
 			if got := toldOf(t, r, who, "code-finding-recorded-as-flaw"); len(got) != 0 {
 				t.Errorf("%s was told %q; want nothing", who, got)
 			}
@@ -567,9 +567,9 @@ func TestARecordAsFlawAndAnInclusionAreToldToTheProductsInternalTriagersWithoutT
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut, codeFindingAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("the inclusion answered %d: %s", got.Code, got.Body)
 		}
-		if got := toldOf(t, r, "internal-triager", "code-finding-included-in-disclosure"); len(got) != 1 ||
+		if got := toldOf(t, r, "security-testing-triager", "code-finding-included-in-disclosure"); len(got) != 1 ||
 			!strings.Contains(got[0], "included in its flaw's disclosure") || strings.Contains(got[0], flaw) {
-			t.Errorf("the internal triager was told %q; want the inclusion without its flaw", got)
+			t.Errorf("the security testing triager was told %q; want the inclusion without its flaw", got)
 		}
 	})
 }
@@ -621,7 +621,7 @@ func TestTheDecisionsAtACodeFindingAreReadByTheFlawsReadersOnlyWhileItIsIncluded
 			t.Fatal(err)
 		}
 		occurrenceAt := fmt.Sprintf("/v1/decision-occurrences/%d", row)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, decision+"/comments",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, decision+"/comments",
 			`{"body":"the early return is the only path"}`); got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body)
 		}
@@ -629,7 +629,7 @@ func TestTheDecisionsAtACodeFindingAreReadByTheFlawsReadersOnlyWhileItIsIncluded
 		expect := func(when string, flawsReaders string) {
 			t.Helper()
 			for who, want := range map[string]string{
-				"internal-reader": whole, "private": flawsReaders, "outsider": flawsReaders,
+				"security-testing-reader": whole, "private": flawsReaders, "outsider": flawsReaders,
 			} {
 				got, listed := decisionReads(t, r, who, decision, occurrenceAt)
 				if got != want || listed != (want == whole) {
@@ -637,12 +637,12 @@ func TestTheDecisionsAtACodeFindingAreReadByTheFlawsReadersOnlyWhileItIsIncluded
 				}
 			}
 		}
-		expect("while the code finding was internal only", none)
+		expect("while the code finding was security testing only", none)
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut, codeFindingAt(occurrence)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("including the code finding answered %d: %s", got.Code, got.Body)
 		}
 		expect("while the code finding was included", whole)
-		for _, who := range []string{"internal-reader", "private", "outsider"} {
+		for _, who := range []string{"security-testing-reader", "private", "outsider"} {
 			if got := evidenceAs(t, r, who, occurrence); got.DecisionOccurrence == nil {
 				t.Errorf("%s read the included code finding without its decision", who)
 			}
@@ -661,29 +661,29 @@ func TestTheDecisionsAtACodeFindingAreReadByTheFlawsReadersOnlyWhileItIsIncluded
 func dismissedCodeFinding(t *testing.T, r *httpapitest.Reach) (string, string) {
 	t.Helper()
 	occurrence := httpapitest.SeededCodeFinding(t, r)
-	if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+	if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
 		`{"outcome":"dismissed","reason":"false_positive","reasoning":"freed by the caller"}`); got.Code != http.StatusCreated {
 		t.Fatalf("dismissing answered %d: %s", got.Code, got.Body)
 	}
 	return occurrence, decisionAt(t, r, occurrence)
 }
 
-func TestAWithdrawnDismissalOfACodeFindingIsToldToTheInternalTriagersAndAnApprovalIsNot(t *testing.T) {
+func TestAWithdrawnDismissalOfACodeFindingIsToldToTheSecurityTestingTriagersAndAnApprovalIsNot(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		_, decision := dismissedCodeFinding(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, decision+"/approval", `{}`); got.Code != http.StatusOK {
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost, decision+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "code-finding-handler", "code-finding-reopened"); len(got) != 0 {
-			t.Errorf("an internal triager was told %q of an approval; want nothing", got)
+			t.Errorf("a security testing triager was told %q of an approval; want nothing", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, decision, ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodDelete, decision, ""); got.Code != http.StatusNoContent {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "code-finding-handler", "code-finding-reopened"); len(got) != 1 || !strings.Contains(got[0], "back in the queue") {
-			t.Errorf("an internal triager was told %q; want the code finding back in the queue", got)
+			t.Errorf("a security testing triager was told %q; want the code finding back in the queue", got)
 		}
-		if got := toldOf(t, r, "internal-triager", "code-finding-reopened"); len(got) != 0 {
+		if got := toldOf(t, r, "security-testing-triager", "code-finding-reopened"); len(got) != 0 {
 			t.Errorf("whoever withdrew it was told %q; want nothing", got)
 		}
 		if got := toldOf(t, r, "private-triage", "code-finding-reopened"); len(got) != 0 {
@@ -695,11 +695,11 @@ func TestAWithdrawnDismissalOfACodeFindingIsToldToTheInternalTriagersAndAnApprov
 func TestAWithdrawnDismissalNobodyAgreedToTellsNobody(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		_, decision := dismissedCodeFinding(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, decision, ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodDelete, decision, ""); got.Code != http.StatusNoContent {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "code-finding-handler", "code-finding-reopened"); len(got) != 0 {
-			t.Errorf("an internal triager was told %q of a dismissal that never held the code finding out; want nothing", got)
+			t.Errorf("a security testing triager was told %q of a dismissal that never held the code finding out; want nothing", got)
 		}
 	})
 }

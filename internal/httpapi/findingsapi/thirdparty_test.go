@@ -68,7 +68,7 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			if occurrence == "" {
 				t.Fatalf("no code finding was opened at %s: %v", path, occurrenceOf)
 			}
-			if got := evidenceAs(t, r, "internal-reader", occurrence); got.ThirdParty != want.third {
+			if got := evidenceAs(t, r, "security-testing-reader", occurrence); got.ThirdParty != want.third {
 				t.Errorf("the code finding at %s says third-party: %v; want %v", path, got.ThirdParty, want.third)
 			}
 			var offer findingsapi.FlawOfferBody
@@ -86,8 +86,8 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 				ThirdParty bool   `json:"third_party"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings", &listed)
-		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet,
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/code-findings", &listed)
+		file := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet,
 			"/v1/products/mine/code-findings.csv", "")
 		records, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
 		if err != nil {
@@ -122,7 +122,7 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			}
 		}
 
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrenceOf[deep])+"/decision",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrenceOf[deep])+"/decision",
 			`{"outcome":"confirmed","reasoning":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
@@ -163,7 +163,7 @@ func TestTheCodeFindingQueueReadsThirdPartyFromTheNewestRunThatSawTheCodeFinding
 				ThirdParty bool   `json:"third_party"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings", &listed)
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/code-findings", &listed)
 		seen := false
 		for _, item := range listed.Items {
 			if item.Path != vendored {
@@ -177,7 +177,7 @@ func TestTheCodeFindingQueueReadsThirdPartyFromTheNewestRunThatSawTheCodeFinding
 		if !seen {
 			t.Fatalf("the queue lists no code finding at %s: %+v", vendored, listed.Items)
 		}
-		if got := evidenceAs(t, r, "internal-reader", occurrenceAt(t, r, vendored)); got.ThirdParty {
+		if got := evidenceAs(t, r, "security-testing-reader", occurrenceAt(t, r, vendored)); got.ThirdParty {
 			t.Errorf("the code finding at %s says third-party from an older run; the newest run declared nothing", vendored)
 		}
 	})

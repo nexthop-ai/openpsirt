@@ -25,13 +25,13 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 		r.Scanned(t)
 		hidden := r.Embargoed(t)
 		r.ScannedTwoIssues(t)
-		const internal, shown = "CVE-2026-1000", "CVE-2026-9999"
+		const securityTesting, shown = "CVE-2026-1000", "CVE-2026-9999"
 		codeFinding := func(identifier, visibility string) {
 			t.Helper()
 			r.PatchedRows(t, `UPDATE "finding" SET "kind" = 'analysis', "visibility" = '`+visibility+`'
 				WHERE "vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = '`+identifier+`')`)
 		}
-		codeFinding(internal, "internal")
+		codeFinding(securityTesting, "security-testing")
 		codeFinding(hidden, "private")
 
 		type listed struct {
@@ -41,14 +41,14 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 			Total int `json:"total"`
 		}
 		for _, path := range []string{"/v1/products/mine/findings", "/v1/findings"} {
-			for _, who := range []string{"private", "internal-triager"} {
+			for _, who := range []string{"private", "security-testing-triager"} {
 				var out listed
 				httpapitest.Read(t, r, who, path, &out)
 				seen := map[string]bool{}
 				for _, item := range out.Items {
 					seen[item.Vulnerability] = true
 				}
-				if seen[internal] || seen[hidden] {
+				if seen[securityTesting] || seen[hidden] {
 					t.Errorf("%s: %s reads an analysis result: %v", path, who, seen)
 				}
 				if out.Total != len(out.Items) {
@@ -66,12 +66,12 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 
 		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 		for _, path := range []string{"/v1/products/mine/findings.csv", build + "/register.csv"} {
-			for _, who := range []string{"private", "internal-triager"} {
+			for _, who := range []string{"private", "security-testing-triager"} {
 				got := httpapitest.AsPerson(t, r, who, http.MethodGet, path, "")
 				if got.Code != http.StatusOK {
 					t.Fatalf("%s: %s exporting answered %d: %s", path, who, got.Code, got.Body.String())
 				}
-				if body := got.Body.String(); strings.Contains(body, internal) || strings.Contains(body, hidden) {
+				if body := got.Body.String(); strings.Contains(body, securityTesting) || strings.Contains(body, hidden) {
 					t.Errorf("%s: %s exports an analysis result:\n%s", path, who, body)
 				}
 			}

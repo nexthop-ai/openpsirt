@@ -617,7 +617,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// transaction open across the estate.
 	assigning := finding.NewSweeper(db, work, logger, name)
 	// Applies what an analyzer reported against a build, once the build has
-	// an inventory to place the results on, and tells the product's internal
+	// an inventory to place the results on, and tells the product's security testing
 	// readers of a run that dropped sharply.
 	analyze := analysis.NewWorker(analysis.NewApplier(db).TellingDrops(notify.AnalysisDrops(db.DB, logger)).
 		TellingLapses(notify.Lapses(db.DB, logger)),

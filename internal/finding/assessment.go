@@ -236,7 +236,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 	// role on this claim's own product — is asked below, once the claim is in
 	// hand, and it answers in the same words as a claim that is not there.
 	if !subject.HoldsAnywhere(access.Approver, access.PublicTriage, access.PrivateTriage,
-		access.InternalTriage) {
+		access.SecurityTestingTriage) {
 		return nil, access.Denied("agree to a rating")
 	}
 	var agreed *Assessment
@@ -303,7 +303,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		return nil, refusal.New("withdrawing is something a person does")
 	}
 	// Before the identifier is resolved, for the reason Agree gives.
-	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage, access.InternalTriage) {
+	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage, access.SecurityTestingTriage) {
 		return nil, access.Denied("take a rating back")
 	}
 	claim := new(Assessment)

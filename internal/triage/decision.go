@@ -407,8 +407,8 @@ type DecisionApproved struct {
 	// row holds the product — so it is read off the rows that moved,
 	// for whoever has to say what the telling about them is about.
 	ReturnedIn int64
-	// ReturnedInternal says at least one row set aside is internal work.
-	ReturnedInternal bool
+	// ReturnedSecurityTesting says at least one row set aside is security testing work.
+	ReturnedSecurityTesting bool
 }
 
 // ApproveDecision records a second person agreeing to a decision: every row in
@@ -509,7 +509,7 @@ func (s *Store) approveDecision(ctx context.Context, subject access.Subject, dec
 
 	var approving, returning []int64
 	var returnedIn int64
-	var returnedInternal bool
+	var returnedSecurityTesting bool
 	for _, row := range rows {
 		if row.State != Proposed {
 			continue
@@ -524,8 +524,8 @@ func (s *Store) approveDecision(ctx context.Context, subject access.Subject, dec
 			}
 			returning = append(returning, row.ID)
 			returnedIn = row.ProductID
-			if row.Visibility == access.Internal {
-				returnedInternal = true
+			if row.Visibility == access.SecurityTesting {
+				returnedSecurityTesting = true
 			}
 			continue
 		}
@@ -562,7 +562,7 @@ func (s *Store) approveDecision(ctx context.Context, subject access.Subject, dec
 		}
 		result.Returned = returned
 		result.ReturnedIn = returnedIn
-		result.ReturnedInternal = returnedInternal
+		result.ReturnedSecurityTesting = returnedSecurityTesting
 	}
 	return result, nil
 }
@@ -828,8 +828,8 @@ type SentBack struct {
 	// row being public says nothing about the rest, and what may leave
 	// this deployment is decided by the most careful row in the set.
 	Undisclosed bool
-	// Internal says at least one row is internal work, on the same terms.
-	Internal bool
+	// SecurityTesting says at least one row is security testing work, on the same terms.
+	SecurityTesting bool
 }
 
 // SendBackDecision asks the author for more before agreeing to any of a decision.
@@ -882,8 +882,8 @@ func (s *Store) SendBackDecision(ctx context.Context, subject access.Subject, de
 			if row.Visibility != access.Public {
 				result.Undisclosed = true
 			}
-			if row.Visibility == access.Internal {
-				result.Internal = true
+			if row.Visibility == access.SecurityTesting {
+				result.SecurityTesting = true
 			}
 			ids = append(ids, row.ID)
 		}

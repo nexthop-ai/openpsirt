@@ -144,12 +144,12 @@ type Proposal struct {
 }
 
 // ProposeRule records a suppression rule in a product. It covers nothing until
-// somebody else approves it. The subject has to triage internal findings in
+// somebody else approves it. The subject has to triage security testing findings in
 // the product.
 func ProposeRule(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
 	in Proposal, now time.Time) (*SuppressionRule, error) {
 
-	if !subject.Triages(access.Internal, productID) {
+	if !subject.Triages(access.SecurityTesting, productID) {
 		return nil, access.Denied(fmt.Sprintf("propose a suppression rule in product %d", productID))
 	}
 	row := suppressionRule{ProductID: productID, Reason: string(in.Reason),
@@ -205,11 +205,11 @@ func ProposeRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 // ApproveRule approves a suppression rule, recording how many code findings it covers as
 // what the approver was shown. A rule in force is refused; an outgrown one is
 // approved again at its new size. The subject has to hold the approver right
-// and read internal findings in the product, and cannot be the rule's author.
+// and read security testing findings in the product, and cannot be the rule's author.
 func ApproveRule(ctx context.Context, db bun.IDB, subject access.Subject, productID, ruleID int64,
 	now time.Time) (*SuppressionRule, error) {
 
-	if !subject.Holds(access.Approver, productID) || !subject.Reads(access.Internal, productID) {
+	if !subject.Holds(access.Approver, productID) || !subject.Reads(access.SecurityTesting, productID) {
 		return nil, access.Denied(fmt.Sprintf("approve a suppression rule in product %d", productID))
 	}
 	var out *SuppressionRule
@@ -253,12 +253,12 @@ func ApproveRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 }
 
 // RetireRule takes a suppression rule out of use. The code findings it covered are open
-// again where nothing else answers them. The subject has to triage internal
+// again where nothing else answers them. The subject has to triage security testing
 // findings in the product.
 func RetireRule(ctx context.Context, db bun.IDB, subject access.Subject, productID, ruleID int64,
 	now time.Time) (*SuppressionRule, error) {
 
-	if !subject.Triages(access.Internal, productID) {
+	if !subject.Triages(access.SecurityTesting, productID) {
 		return nil, access.Denied(fmt.Sprintf("retire a suppression rule in product %d", productID))
 	}
 	var out *SuppressionRule
@@ -284,10 +284,10 @@ func RetireRule(ctx context.Context, db bun.IDB, subject access.Subject, product
 
 // SuppressionRules is the suppression rules of a product, retired ones included,
 // in the order they were proposed, each with the code findings it covers that the
-// subject may read. The subject has to read internal findings in the
+// subject may read. The subject has to read security testing findings in the
 // product.
 func SuppressionRules(ctx context.Context, db bun.IDB, subject access.Subject, productID int64) ([]SuppressionRule, error) {
-	if !subject.Reads(access.Internal, productID) {
+	if !subject.Reads(access.SecurityTesting, productID) {
 		return nil, access.Denied(fmt.Sprintf("read the suppression rules of product %d", productID))
 	}
 	var rows []suppressionRule

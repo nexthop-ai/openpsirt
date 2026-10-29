@@ -18,8 +18,8 @@ func asking(f *fixture, visibility access.Visibility) access.Subject {
 	switch visibility {
 	case access.Private:
 		role = access.PrivateRead
-	case access.Internal:
-		role = access.InternalRead
+	case access.SecurityTesting:
+		role = access.SecurityTestingRead
 	}
 	return access.NewPerson(0, "asking", false,
 		map[int64][]access.Role{f.products["sonic"]: {role}}, 0)
@@ -283,24 +283,24 @@ func identities(found []access.Mentionable) []string {
 	return out
 }
 
-// The picker at internal visibility offers people who read internal work, and
+// The picker at security testing visibility offers people who read security testing work, and
 // nobody who reads only the other two.
-func TestThePickerOffersInternalReadersForInternalWork(t *testing.T) {
+func TestThePickerOffersSecurityTestingReadersForSecurityTestingWork(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		sonic := f.products["sonic"]
-		holding(t, f, "analyst", "Analyst", sonic, access.InternalTriage)
+		holding(t, f, "analyst", "Analyst", sonic, access.SecurityTestingTriage)
 		holding(t, f, "everything-else", "Everything Else", sonic,
 			access.PublicTriage, access.PrivateTriage)
 
-		internal := mentionable(t, f, access.Internal)
-		if !has(internal, "analyst") {
-			t.Errorf("somebody who reads internal work was not offered: %v", internal)
+		securityTesting := mentionable(t, f, access.SecurityTesting)
+		if !has(securityTesting, "analyst") {
+			t.Errorf("somebody who reads security testing work was not offered: %v", securityTesting)
 		}
-		if has(internal, "everything-else") {
-			t.Errorf("somebody reading only disclosed and undisclosed work was offered: %v", internal)
+		if has(securityTesting, "everything-else") {
+			t.Errorf("somebody reading only disclosed and undisclosed work was offered: %v", securityTesting)
 		}
 		if private := mentionable(t, f, access.Private); has(private, "analyst") {
-			t.Errorf("an internal reader was offered for undisclosed work: %v", private)
+			t.Errorf("a security testing reader was offered for undisclosed work: %v", private)
 		}
 	})
 }

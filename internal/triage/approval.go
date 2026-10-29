@@ -319,10 +319,10 @@ type ForPerson struct {
 	ProductID       int64
 	VulnerabilityID int64
 	Rows            int
-	// Undisclosed says any of the rows is withheld: undisclosed or internal.
-	// Internal says any is internal work.
-	Undisclosed bool
-	Internal    bool
+	// Undisclosed says any of the rows is withheld: undisclosed or security testing.
+	// SecurityTesting says any is security testing work.
+	Undisclosed     bool
+	SecurityTesting bool
 	// Probable says the rows were decisions on code findings a run paired only
 	// probably, rather than decisions the code moved under.
 	Probable bool
@@ -540,14 +540,14 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 		Scan(ctx, &approvers); err != nil {
 		return nil, fmt.Errorf("read who agreed to this: %w", err)
 	}
-	undisclosed, internal := false, false
+	undisclosed, securityTesting := false, false
 	first := rows[0]
 	for _, row := range rows {
 		if row.Visibility != access.Public {
 			undisclosed = true
 		}
-		if row.Visibility == access.Internal {
-			internal = true
+		if row.Visibility == access.SecurityTesting {
+			securityTesting = true
 		}
 		if row.ID < first.ID {
 			first = row
@@ -558,7 +558,7 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 		told = append(told, ForPerson{
 			PersonID: person, DecisionOccurrenceID: first.ID,
 			ProductID: first.ProductID, VulnerabilityID: first.VulnerabilityID,
-			Rows: len(rows), Undisclosed: undisclosed, Internal: internal,
+			Rows: len(rows), Undisclosed: undisclosed, SecurityTesting: securityTesting,
 		})
 	}
 	return told, nil
@@ -586,7 +586,7 @@ func (s *Store) proposersOfAll(ctx context.Context, ids []int64, chunk int) ([]F
 			}
 			told[i].Rows += one.Rows
 			told[i].Undisclosed = told[i].Undisclosed || one.Undisclosed
-			told[i].Internal = told[i].Internal || one.Internal
+			told[i].SecurityTesting = told[i].SecurityTesting || one.SecurityTesting
 		}
 	}
 	return told, nil
@@ -616,8 +616,8 @@ func (s *Store) proposersOf(ctx context.Context, ids []int64) ([]ForPerson, erro
 		if row.Visibility != access.Public {
 			told[i].Undisclosed = true
 		}
-		if row.Visibility == access.Internal {
-			told[i].Internal = true
+		if row.Visibility == access.SecurityTesting {
+			told[i].SecurityTesting = true
 		}
 	}
 	return told, nil

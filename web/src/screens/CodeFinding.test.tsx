@@ -44,7 +44,12 @@ async function drawn(triages: boolean, evidence: object = EVIDENCE, hides = fals
           name: "Ana",
           kind: "person",
           reach: [
-            { product: "sonic", reads_internal: true, triages_internal: triages, may_hide: hides },
+            {
+              product: "sonic",
+              reads_security_testing: true,
+              triages_security_testing: triages,
+              may_hide: hides,
+            },
           ],
           outcomes: [],
         },
@@ -213,13 +218,13 @@ describe("a code finding", () => {
     expect(text()).not.toContain("Third-party");
   });
 
-  it("gives it to a team, across the product, from among readers of internal work", async () => {
+  it("gives it to a team, across the product, from among readers of security testing work", async () => {
     const searched = await drawn(true);
     const sent = answer("PUT", () => ({ status: 204 }));
     await holderBox();
     await press(mount.host(), "Kernel team");
     await settle();
-    expect(searched()[0]).toBe("internal");
+    expect(searched()[0]).toBe("security-testing");
     const [path, init] = sent()[0] ?? [];
     expect(path).toBe(
       "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment",
@@ -227,7 +232,7 @@ describe("a code finding", () => {
     expect((init as { body: unknown }).body).toEqual({ team: "kernel" });
   });
 
-  it("offers no holder once it is recorded as a flaw and internal only", async () => {
+  it("offers no holder once it is recorded as a flaw and security testing only", async () => {
     await drawn(
       true,
       {

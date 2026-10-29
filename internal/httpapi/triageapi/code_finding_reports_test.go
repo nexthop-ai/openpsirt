@@ -29,13 +29,13 @@ type codeFindingSeries struct {
 
 const codeFindingSeriesAt = "/v1/products/mine/code-finding-series"
 
-// The counts by series are internal however they are narrowed. An internal
+// The counts by series are at security testing visibility however they are narrowed. A security testing
 // reader reads them; anybody else is refused, and the refusal names neither a
 // series nor a number.
-func TestCodeFindingCountsBySeriesAreReadOnlyUnderInternalRead(t *testing.T) {
+func TestCodeFindingCountsBySeriesAreReadOnlyUnderSecurityTestingRead(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededCodeFinding(t, r)
-		for _, who := range []string{"internal-reader", "internal-triager", "internal-reviewer"} {
+		for _, who := range []string{"security-testing-reader", "security-testing-triager", "security-testing-reviewer"} {
 			var got codeFindingSeries
 			httpapitest.Read(t, r, who, codeFindingSeriesAt, &got)
 			if len(got.Items) != 1 || got.Items[0].Series != "clang-tidy/default" || got.Items[0].States["open"] != 1 {
@@ -43,7 +43,7 @@ func TestCodeFindingCountsBySeriesAreReadOnlyUnderInternalRead(t *testing.T) {
 			}
 		}
 		// Reading the product at every other visibility, triaging it or
-		// administering the deployment is not reading internal material, and
+		// administering the deployment is not reading security testing material, and
 		// is refused as such. Somebody who reads nothing in the product is not
 		// told it exists.
 		for who, want := range map[string]int{
@@ -73,16 +73,16 @@ func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 		// the other series' two stay open.
 		decided := decideCodeFinding(t, r, occurrence,
 			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
-		if other := codeFindingsOf(t, r, "internal-reader", "?series=SEMGREP/default"); len(other.Items) != 2 {
+		if other := codeFindingsOf(t, r, "security-testing-reader", "?series=SEMGREP/default"); len(other.Items) != 2 {
 			t.Fatalf("the other series' queue is %+v; want its two code findings", other.Items)
 		}
 
 		var counted codeFindingSeries
-		httpapitest.Read(t, r, "internal-reader", codeFindingSeriesAt, &counted)
+		httpapitest.Read(t, r, "security-testing-reader", codeFindingSeriesAt, &counted)
 		want := map[string]map[string]int{
 			"clang-tidy/default": {"dismissed": 1},
 			"semgrep/default":    {"open": 2},
@@ -95,7 +95,7 @@ func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 				if n != want[each.Series][state] {
 					t.Errorf("%s holds %d %s; want %d", each.Series, n, state, want[each.Series][state])
 				}
-				listed := codeFindingsOf(t, r, "internal-reader",
+				listed := codeFindingsOf(t, r, "security-testing-reader",
 					"?"+url.Values{"series": {each.Series}, "state": {state}}.Encode())
 				if listed.Total != n {
 					t.Errorf("%s counts %d %s and its list holds %d", each.Series, n, state, listed.Total)
@@ -104,7 +104,7 @@ func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 		}
 		// A name no series holds lists nothing, where the product's code findings
 		// stand in the state asked for.
-		if got := codeFindingsOf(t, r, "internal-reader", "?series=nobody&state=open"); got.Total != 0 || len(got.Items) != 0 {
+		if got := codeFindingsOf(t, r, "security-testing-reader", "?series=nobody&state=open"); got.Total != 0 || len(got.Items) != 0 {
 			t.Errorf("a series nobody holds lists %+v", got)
 		}
 	})
@@ -141,16 +141,16 @@ func codeFindingFile(t *testing.T, r *httpapitest.Reach, who, query string) (int
 }
 
 // The code finding queue's file holds what the list holds for the same reader: a code finding
-// included in its flaw's case is whole to its internal readers and to the
+// included in its flaw's case is whole to its security testing readers and to the
 // flaw's readers, and no row carries source text.
 func TestTheCodeFindingFileHoldsWhatTheListHolds(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, _ := httpapitest.RecordedCodeFinding(t, r, true)
 		const message, snippet = "p is leaked", "return;"
 
-		_, rows, body := codeFindingFile(t, r, "internal-reader", "?state=recorded-as-flaw")
+		_, rows, body := codeFindingFile(t, r, "security-testing-reader", "?state=recorded-as-flaw")
 		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != message || rows[0][13] != occurrence {
-			t.Fatalf("an internal reader's file holds %q; want the included code finding whole", rows)
+			t.Fatalf("a security testing reader's file holds %q; want the included code finding whole", rows)
 		}
 		if strings.Contains(body, snippet) {
 			t.Errorf("the file carries source text:\n%s", body)
@@ -188,7 +188,7 @@ func TestTheCodeFindingFileHoldsWhatTheListHolds(t *testing.T) {
 func TestTheCodeFindingFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		_, rows, body := codeFindingFile(t, r, "internal-reader", "")
+		_, rows, body := codeFindingFile(t, r, "security-testing-reader", "")
 		if !strings.Contains(body, "the queue") {
 			t.Errorf("the file with no state does not say it is the queue:\n%s", body)
 		}
@@ -196,13 +196,13 @@ func TestTheCodeFindingFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 			t.Errorf("the queue's file holds %q; want the seeded code finding, open at line 12", rows)
 		}
 		// Whoever holds a code finding is a column of the file, as the list names them.
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut,
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+occurrence+"/assignment",
-			`{"person":"internal-triager"}`); got.Code >= 300 {
+			`{"person":"security-testing-triager"}`); got.Code >= 300 {
 			t.Fatalf("taking the code finding answered %d: %s", got.Code, got.Body)
 		}
-		if _, rows, _ := codeFindingFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][10] != "internal-triager" {
-			t.Errorf("the queue's file holds %q; want the code finding held by the internal triager", rows)
+		if _, rows, _ := codeFindingFile(t, r, "security-testing-reader", ""); len(rows) != 1 || rows[0][10] != "security-testing-triager" {
+			t.Errorf("the queue's file holds %q; want the code finding held by the security testing triager", rows)
 		}
 	})
 }
@@ -213,9 +213,9 @@ const exceptionReport = "/v1/audit/decisions?alone=true&outcome=not-applicable&o
 	"&outcome=wont-fix&outcome=already-fixed&outcome=dismissed&outcome=not-security"
 
 // The exception report covers every kind. A code finding dismissed with no second
-// person agreeing is in it for a reader of internal material, and in it for
+// person agreeing is in it for a reader of security testing material, and in it for
 // nobody else, the count included.
-func TestTheExceptionReportListsACodeFindingDismissalNobodyAgreedToOnlyToInternalReaders(t *testing.T) {
+func TestTheExceptionReportListsACodeFindingDismissalNobodyAgreedToOnlyToSecurityTestingReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		decided := decideCodeFinding(t, r, occurrence,
@@ -228,9 +228,9 @@ func TestTheExceptionReportListsACodeFindingDismissalNobodyAgreedToOnlyToInterna
 			Total int `json:"total"`
 		}
 		var got record
-		httpapitest.Read(t, r, "internal-reader", exceptionReport, &got)
+		httpapitest.Read(t, r, "security-testing-reader", exceptionReport, &got)
 		if got.Total != 1 || len(got.Items) != 1 || got.Items[0].Decision != decided.DecisionID {
-			t.Fatalf("an internal reader's exception report is %+v; want the code finding's decision alone", got)
+			t.Fatalf("a security testing reader's exception report is %+v; want the code finding's decision alone", got)
 		}
 		for _, who := range []string{"private", "reader", "embargo-reader"} {
 			var other record
@@ -240,11 +240,11 @@ func TestTheExceptionReportListsACodeFindingDismissalNobodyAgreedToOnlyToInterna
 			}
 		}
 		// Agreed to by a second person, it leaves.
-		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
-		httpapitest.Read(t, r, "internal-reader", exceptionReport, &got)
+		httpapitest.Read(t, r, "security-testing-reader", exceptionReport, &got)
 		if got.Total != 0 {
 			t.Errorf("a code finding's dismissal two people made is still in the exception report: %+v", got)
 		}

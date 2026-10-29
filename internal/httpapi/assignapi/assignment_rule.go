@@ -188,7 +188,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 			"It places only work nobody holds. A human assignment always wins, and " +
 			"adding a rule never takes something out of somebody's hands.\n\n" +
 			"It places work only at a visibility one member of the team reads. Undisclosed " +
-			"or internal work nobody on the team reads stays unassigned.\n\n" +
+			"or security testing work nobody on the team reads stays unassigned.\n\n" +
 			"Send `reports` and neither key for a rule placing the product's vulnerability " +
 			"reports nobody holds. A report is placed only where one member of the team reads " +
 			"undisclosed work here, and a report recorded later is placed as it is recorded.\n\n" +

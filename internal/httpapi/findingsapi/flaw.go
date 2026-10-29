@@ -157,8 +157,8 @@ func registerFlaw(api huma.API, in core.Deps) {
 			"flaw against those is refused, and the builds holding it that the code finding's series never " +
 			"analyzed.",
 		Tags: []string{"Findings"},
-	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
-		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
+		access.SecurityTestingTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`
@@ -201,11 +201,11 @@ func registerFlaw(api huma.API, in core.Deps) {
 			"code finding under it is offered the same; leave it out for the build itself.\n\n" +
 			"`include_in_disclosure` includes the linked code findings in the flaw's disclosure: everybody " +
 			"who reads them keeps reading them, the flaw's readers read them too, and they are disclosed " +
-			"with the flaw. Left out, the code findings are internal only and linked.\n\n" +
+			"with the flaw. Left out, the code findings are security testing only and linked.\n\n" +
 			"A code finding nobody confirmed, or one already recorded as a flaw, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
-		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
+		access.SecurityTestingTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`
@@ -216,7 +216,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 			Ecosystem string             `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
 			Namespace string             `json:"namespace,omitempty" doc:"The namespace, where two share a name and an ecosystem"`
 			FlawFields
-			IncludeInDisclosure bool `json:"include_in_disclosure,omitempty" doc:"Whether the code finding is included in its flaw's disclosure. Internal only by default"`
+			IncludeInDisclosure bool `json:"include_in_disclosure,omitempty" doc:"Whether the code finding is included in its flaw's disclosure. Security testing only by default"`
 		}
 	}) (*struct {
 		Status int
@@ -305,26 +305,26 @@ func registerFlaw(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "include-code-finding-in-disclosure", Method: http.MethodPut, Path: codeFindingPath + "/flaw/disclosure",
 		Summary: "Include a code finding in its flaw's disclosure",
-		Description: "Includes an internal-only code finding in its flaw's disclosure, with every code finding linked to the " +
+		Description: "Includes a security-testing-only code finding in its flaw's disclosure, with every code finding linked to the " +
 			"same flaw: everybody who reads them keeps reading them, the flaw's readers read them " +
 			"too, and they are disclosed with the flaw. `GET .../flaw` lists what that " +
 			"discloses.\n\n" +
 			"Recorded in the administration trail. A code finding not recorded as a flaw, one already included, or " +
 			"one whose flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
-		access.InternalTriage, access.PrivateTriage), including(true))
+	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
+		access.SecurityTestingTriage, access.PrivateTriage), including(true))
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "exclude-code-finding-from-disclosure", Method: http.MethodDelete, Path: codeFindingPath + "/flaw/disclosure",
 		Summary: "Take a code finding out of its flaw's disclosure",
 		Description: "Takes a code finding out of its flaw's disclosure while the flaw is undisclosed, with " +
 			"every code finding linked to the same flaw. The flaw's readers no longer read them, everybody " +
 			"else who read them still does, and they stay linked to the flaw.\n\n" +
-			"Recorded in the administration trail. A code finding not recorded as a flaw, one that is internal only, or one whose " +
+			"Recorded in the administration trail. A code finding not recorded as a flaw, one that is security testing only, or one whose " +
 			"flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
-		access.InternalTriage, access.PrivateTriage), including(false))
+	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
+		access.SecurityTestingTriage, access.PrivateTriage), including(false))
 }
 
 // codeFindingBuilds is builds as an answer states them.
@@ -386,8 +386,8 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		Identity    string `path:"identity"`
 	}
 	// recorded is the flaw record of the code finding a route names, where the reader
-	// reads internal work in the product: who is on a code finding is managed by its
-	// internal readers, whether or not it is included in disclosure.
+	// reads security testing work in the product: who is on a code finding is managed by its
+	// security testing readers, whether or not it is included in disclosure.
 	recorded := func(ctx context.Context, db bun.IDB, at *codeFindingAt, occurrence string) (*finding.CodeFindingFlaw, error) {
 		if _, err := finding.NewStore(db).CodeFindingAt(ctx, at.subject, at.build, occurrence); err != nil {
 			return nil, core.Absent(in.Logger, err, "that code finding could not be looked up", core.NoSuchFinding)
@@ -399,7 +399,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		if h == nil {
 			return nil, huma.Error404NotFound(analysis.ErrNotRecordedAsFlaw.Error())
 		}
-		if !at.subject.Reads(access.Internal, at.named.ProductID) {
+		if !at.subject.Reads(access.SecurityTesting, at.named.ProductID) {
 			return nil, core.NoSuchFinding()
 		}
 		return h, nil
@@ -428,7 +428,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 			"A grant reads the code finding's evidence and nothing else of the product, until its flaw " +
 			"is disclosed.",
 		Tags: []string{"Findings"},
-	}, core.PerProduct, "Where you read internal work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
+	}, core.PerProduct, "Where you read security testing work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *codeFindingInput) (*core.ListOutput[CodeFindingCollaboratorBody], error) {
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
@@ -461,7 +461,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 			"Adding somebody who already holds it succeeds and changes nothing. Once the flaw is " +
 			"disclosed, a grant is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Where you read internal work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
+	}, core.PerProduct, "Where you read security testing work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
@@ -525,7 +525,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 			"Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the " +
 			"flaw is disclosed, a withdrawal is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Where you read internal work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
+	}, core.PerProduct, "Where you read security testing work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
@@ -587,7 +587,7 @@ func codeFindingCollaboratorBodies(ctx context.Context, in core.Deps, rows []acc
 }
 
 // codeFindingReaders is the roles that manage who is granted a code finding recorded as a flaw:
-// internal work, which the code finding is until its flaw is disclosed.
+// security testing work, which the code finding is until its flaw is disclosed.
 func codeFindingReaders() []access.Role {
-	return []access.Role{access.InternalRead, access.InternalTriage}
+	return []access.Role{access.SecurityTestingRead, access.SecurityTestingTriage}
 }

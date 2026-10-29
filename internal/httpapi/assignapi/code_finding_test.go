@@ -74,7 +74,7 @@ func TestACodeFindingIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		at := codeFindingAt(occurrence) + "/assignment"
 		// Reading the code finding, and triaging disclosed work alone.
-		granted(t, r, "internal-reviewer", access.PublicTriage)
+		granted(t, r, "security-testing-reviewer", access.PublicTriage)
 		for _, c := range []struct {
 			who, body string
 			want      int
@@ -82,48 +82,48 @@ func TestACodeFindingIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
 			{"reader", `{"person":"reader"}`, http.StatusNotFound},
 			{"triager", `{"person":"triager"}`, http.StatusNotFound},
 			{"private-triage", `{"person":"private-triage"}`, http.StatusNotFound},
-			{"internal-reader", `{"person":"internal-reader"}`, http.StatusNotFound},
-			{"internal-reviewer", `{"person":"internal-reviewer"}`, http.StatusNotFound},
+			{"security-testing-reader", `{"person":"security-testing-reader"}`, http.StatusNotFound},
+			{"security-testing-reviewer", `{"person":"security-testing-reviewer"}`, http.StatusNotFound},
 			{"assigner-only", `{"person":"assigner-only"}`, http.StatusNotFound},
-			{"internal-triager", `{"person":"internal-reader"}`, http.StatusUnprocessableEntity},
-			{"internal-triager", `{"team":"anybody"}`, http.StatusUnprocessableEntity},
-			{"internal-triager", `{"person":"internal-triager"}`, http.StatusNoContent},
+			{"security-testing-triager", `{"person":"security-testing-reader"}`, http.StatusUnprocessableEntity},
+			{"security-testing-triager", `{"team":"anybody"}`, http.StatusUnprocessableEntity},
+			{"security-testing-triager", `{"person":"security-testing-triager"}`, http.StatusNoContent},
 		} {
 			if got := httpapitest.AsPerson(t, r, c.who, http.MethodPut, at, c.body); got.Code != c.want {
 				t.Errorf("%s sending %s answered %d, want %d: %s", c.who, c.body, got.Code, c.want, got.Body)
 			}
 		}
-		page, queue := holderOf(t, r, "internal-reader", occurrence)
-		if page.AssignedTo != "internal-triager" || queue.AssignedTo != "internal-triager" {
+		page, queue := holderOf(t, r, "security-testing-reader", occurrence)
+		if page.AssignedTo != "security-testing-triager" || queue.AssignedTo != "security-testing-triager" {
 			t.Errorf("the code finding page names %+v and the queue %+v; want the triager who took it", page, queue)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{}`); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at, `{}`); got.Code != http.StatusNoContent {
 			t.Fatalf("handing it back answered %d: %s", got.Code, got.Body)
 		}
-		if page, queue := holderOf(t, r, "internal-reader", occurrence); page.AssignedTo != "" || queue.AssignedTo != "" {
+		if page, queue := holderOf(t, r, "security-testing-reader", occurrence); page.AssignedTo != "" || queue.AssignedTo != "" {
 			t.Errorf("a code finding handed back is named as held by %+v and %+v", page, queue)
 		}
 	})
 }
 
 // A code finding given to somebody is given only where they read it, and the line
-// telling them is withheld as internal work: a reader of undisclosed work is
-// refused the code finding and told nothing, and the holder losing internal reading
+// telling them is withheld as security testing work: a reader of undisclosed work is
+// refused the code finding and told nothing, and the holder losing security testing reading
 // loses the line with it, though they still read the product's undisclosed
 // work.
-func TestACodeFindingAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
+func TestACodeFindingAssignedIsToldToItsHolderAsSecurityTestingWork(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		at := codeFindingAt(occurrence) + "/assignment"
-		granted(t, r, "internal-triager", access.Assigner)
-		granted(t, r, "internal-reader", access.PrivateRead)
+		granted(t, r, "security-testing-triager", access.Assigner)
+		granted(t, r, "security-testing-reader", access.PrivateRead)
 
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at,
 			`{"person":"private"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("handing a code finding to a reader of undisclosed work answered %d: %s", got.Code, got.Body)
 		}
 		// Asked of what was stored rather than of what they read: the area
-		// narrows a line about internal work away from them, and a line
+		// narrows a line about security testing work away from them, and a line
 		// written for them at all is the defect.
 		written, err := r.DB.DB.NewSelect().TableExpr(`"notification" AS "n"`).
 			Join(`JOIN "person" AS "p" ON "p"."id" = "n"."person_id"`).
@@ -136,19 +136,19 @@ func TestACodeFindingAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
 			t.Error("a reader of undisclosed work was told about a code finding")
 		}
 
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
-			`{"person":"internal-reader"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("handing the code finding to a reader of internal work answered %d: %s", got.Code, got.Body)
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at,
+			`{"person":"security-testing-reader"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("handing the code finding to a reader of security testing work answered %d: %s", got.Code, got.Body)
 		}
-		if !toldAbout(t, r, "internal-reader", "clang-tidy/leak at src/a.c:12") {
+		if !toldAbout(t, r, "security-testing-reader", "clang-tidy/leak at src/a.c:12") {
 			t.Fatal("the reader handed the code finding was not told")
 		}
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
-			"/v1/people/internal-reader/roles/mine/internal-read", ""); got.Code != http.StatusOK {
-			t.Fatalf("withdrawing internal reading answered %d: %s", got.Code, got.Body)
+			"/v1/people/security-testing-reader/roles/mine/security-testing-read", ""); got.Code != http.StatusOK {
+			t.Fatalf("withdrawing security testing reading answered %d: %s", got.Code, got.Body)
 		}
-		if toldAbout(t, r, "internal-reader", "clang-tidy/leak") {
-			t.Error("somebody who no longer reads internal work still reads the line about a code finding")
+		if toldAbout(t, r, "security-testing-reader", "clang-tidy/leak") {
+			t.Error("somebody who no longer reads security testing work still reads the line about a code finding")
 		}
 	})
 }
@@ -158,15 +158,15 @@ func TestACodeFindingAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
 func TestLosingTheLastRoleHandsBackTheCodeFindingsItCarried(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
-			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
+			`{"person":"security-testing-triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the code finding answered %d: %s", got.Code, got.Body)
 		}
 		var withdrawn struct {
 			Released int64 `json:"released"`
 		}
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
-			"/v1/people/internal-triager/roles/mine/internal-triage", "")
+			"/v1/people/security-testing-triager/roles/mine/security-testing-triage", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("withdrawing the role answered %d: %s", got.Code, got.Body)
 		}
@@ -176,7 +176,7 @@ func TestLosingTheLastRoleHandsBackTheCodeFindingsItCarried(t *testing.T) {
 		if withdrawn.Released == 0 {
 			t.Error("the last role went and the code finding it carried was not handed back")
 		}
-		if page, _ := holderOf(t, r, "internal-reader", occurrence); page.AssignedTo != "" {
+		if page, _ := holderOf(t, r, "security-testing-reader", occurrence); page.AssignedTo != "" {
 			t.Errorf("the code finding is still held by %q", page.AssignedTo)
 		}
 	})
@@ -188,24 +188,24 @@ func TestATeamHoldsACodeFindingOneOfItsMembersReads(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		at := codeFindingAt(occurrence) + "/assignment"
-		granted(t, r, "internal-triager", access.Assigner)
+		granted(t, r, "security-testing-triager", access.Assigner)
 		for _, team := range []string{
 			`{"name":"private-desk","members":["private"]}`,
-			`{"name":"analysis-desk","members":["internal-reader"]}`,
+			`{"name":"analysis-desk","members":["security-testing-reader"]}`,
 		} {
 			if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams", team); made.Code != http.StatusCreated {
 				t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 			}
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at,
 			`{"team":"private-desk"}`); got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("a team nobody on which reads internal work was handed a code finding: %d %s", got.Code, got.Body)
+			t.Errorf("a team nobody on which reads security testing work was handed a code finding: %d %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at,
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("a team with a reader of internal work answered %d: %s", got.Code, got.Body)
+			t.Fatalf("a team with a reader of security testing work answered %d: %s", got.Code, got.Body)
 		}
-		page, queue := holderOf(t, r, "internal-reader", occurrence)
+		page, queue := holderOf(t, r, "security-testing-reader", occurrence)
 		if page.AssignedTo != "analysis-desk" || !page.AssignedTeam || !queue.AssignedTeam {
 			t.Errorf("the code finding page names %+v and the queue %+v; want the team's queue", page, queue)
 		}
@@ -218,16 +218,16 @@ func TestATeamHoldsACodeFindingOneOfItsMembersReads(t *testing.T) {
 func TestTheCodeFindingFileNamesAHolderAsTheListDoes(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		granted(t, r, "internal-triager", access.Assigner)
+		granted(t, r, "security-testing-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
-			`{"name":"analysis-desk","members":["internal-reader"]}`); made.Code != http.StatusCreated {
+			`{"name":"analysis-desk","members":["security-testing-reader"]}`); made.Code != http.StatusCreated {
 			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("queueing the code finding with the team answered %d: %s", got.Code, got.Body)
 		}
-		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, "/v1/products/mine/code-findings.csv?state=open", "")
+		file := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, "/v1/products/mine/code-findings.csv?state=open", "")
 		records, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
 		if err != nil {
 			t.Fatalf("the file is not CSV a strict reader reads: %v\n%s", err, file.Body)
@@ -272,8 +272,8 @@ func TestACodeFindingPastItsEndOfLifeIsNotAssigned(t *testing.T) {
 			Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
-			`{"person":"internal-triager"}`); got.Code != http.StatusConflict {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
+			`{"person":"security-testing-triager"}`); got.Code != http.StatusConflict {
 			t.Errorf("taking a code finding past its end of life answered %d: %s", got.Code, got.Body)
 		}
 	})
@@ -285,7 +285,7 @@ func TestACodeFindingPastItsEndOfLifeIsNotAssigned(t *testing.T) {
 func TestTheUnassignedListLeavesOutACodeFindingPastItsEndOfLife(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != occurrence {
+		if got, _ := heldItems(t, r, "security-testing-reader", "/v1/unassigned"); len(got) != 1 || got[0] != occurrence {
 			t.Fatalf("the unassigned list holds code findings %v; want the seeded code finding, or this checks nothing", got)
 		}
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
@@ -293,29 +293,29 @@ func TestTheUnassignedListLeavesOutACodeFindingPastItsEndOfLife(t *testing.T) {
 			Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 0 {
+		if got, _ := heldItems(t, r, "security-testing-reader", "/v1/unassigned"); len(got) != 0 {
 			t.Errorf("the unassigned list holds code findings %v past their end of life", got)
 		}
 	})
 }
 
 // Handing everything one person holds to somebody else moves their code findings too,
-// and is refused where the recipient may not read internal work.
+// and is refused where the recipient may not read security testing work.
 func TestHandingOverSomebodysWorkMovesTheirCodeFindingsToAReaderOfThem(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
-			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
+			`{"person":"security-testing-triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the code finding answered %d: %s", got.Code, got.Body)
 		}
-		at := "/v1/people/internal-triager/assignments/hand-back"
+		at := "/v1/people/security-testing-triager/assignments/hand-back"
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, at, `{"to":"private"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("handing a code finding to a reader of undisclosed work answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, at, `{"to":"internal-reader"}`); got.Code != http.StatusOK {
-			t.Fatalf("handing a code finding to a reader of internal work answered %d: %s", got.Code, got.Body)
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, at, `{"to":"security-testing-reader"}`); got.Code != http.StatusOK {
+			t.Fatalf("handing a code finding to a reader of security testing work answered %d: %s", got.Code, got.Body)
 		}
-		if page, _ := holderOf(t, r, "internal-reader", occurrence); page.AssignedTo != "internal-reader" {
+		if page, _ := holderOf(t, r, "security-testing-reader", occurrence); page.AssignedTo != "security-testing-reader" {
 			t.Errorf("the code finding is held by %q; want the reader it was handed to", page.AssignedTo)
 		}
 	})
@@ -341,29 +341,29 @@ func heldItems(t *testing.T, r *httpapitest.Reach, who, path string) (occurrence
 }
 
 // The unassigned list, one person's work and the totals behind them list a
-// code finding to whoever reads internal work, as one piece of work, and to nobody
+// code finding to whoever reads security testing work, as one piece of work, and to nobody
 // else.
 func TestTheListsOfHeldWorkListACodeFindingToItsReadersAlone(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != occurrence {
+		if got, _ := heldItems(t, r, "security-testing-reader", "/v1/unassigned"); len(got) != 1 || got[0] != occurrence {
 			t.Errorf("the unassigned list holds code findings %v; want the seeded code finding", got)
 		}
 		if got, _ := heldItems(t, r, "reader", "/v1/unassigned"); len(got) != 0 {
 			t.Errorf("a reader of disclosed work was listed code findings %v", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
-			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
+			`{"person":"security-testing-triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the code finding answered %d: %s", got.Code, got.Body)
 		}
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 0 {
+		if got, _ := heldItems(t, r, "security-testing-reader", "/v1/unassigned"); len(got) != 0 {
 			t.Errorf("the unassigned list holds the code finding taken: %v", got)
 		}
-		const theirs = "/v1/people/internal-triager/assignments"
-		if got, n := heldItems(t, r, "internal-reader", theirs); len(got) != 1 || got[0] != occurrence || n != 1 {
+		const theirs = "/v1/people/security-testing-triager/assignments"
+		if got, n := heldItems(t, r, "security-testing-reader", theirs); len(got) != 1 || got[0] != occurrence || n != 1 {
 			t.Errorf("their work holds code findings %v of %d items; want the seeded code finding alone", got, n)
 		}
-		if got, _ := heldItems(t, r, "internal-triager", "/v1/people/me/assignments"); len(got) != 1 {
+		if got, _ := heldItems(t, r, "security-testing-triager", "/v1/people/me/assignments"); len(got) != 1 {
 			t.Errorf("the holder's own work holds code findings %v; want the seeded code finding", got)
 		}
 		if got, n := heldItems(t, r, "reader", theirs); len(got) != 0 || n != 0 {
@@ -378,13 +378,13 @@ func TestTheListsOfHeldWorkListACodeFindingToItsReadersAlone(t *testing.T) {
 			}
 			httpapitest.Read(t, r, who, "/v1/assignments", &got)
 			for _, row := range got.Items {
-				if row.Person == "internal-triager" {
+				if row.Person == "security-testing-triager" {
 					return row.Open
 				}
 			}
 			return 0
 		}
-		if n := holding("internal-reader"); n != 1 {
+		if n := holding("security-testing-reader"); n != 1 {
 			t.Errorf("the totals count %d pieces held by the code finding's holder; want one", n)
 		}
 		if n := holding("reader"); n != 0 {
@@ -393,21 +393,21 @@ func TestTheListsOfHeldWorkListACodeFindingToItsReadersAlone(t *testing.T) {
 	})
 }
 
-// A team's queue lists a code finding it holds to whoever reads internal work.
+// A team's queue lists a code finding it holds to whoever reads security testing work.
 func TestATeamsQueueListsACodeFindingItHolds(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		granted(t, r, "internal-triager", access.Assigner)
+		granted(t, r, "security-testing-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
-			`{"name":"analysis-desk","members":["internal-reader"]}`); made.Code != http.StatusCreated {
+			`{"name":"analysis-desk","members":["security-testing-reader"]}`); made.Code != http.StatusCreated {
 			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, codeFindingAt(occurrence)+"/assignment",
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("queueing the code finding with the team answered %d: %s", got.Code, got.Body)
 		}
 		const queue = "/v1/teams/analysis-desk/assignments"
-		if got, _ := heldItems(t, r, "internal-reader", queue); len(got) != 1 || got[0] != occurrence {
+		if got, _ := heldItems(t, r, "security-testing-reader", queue); len(got) != 1 || got[0] != occurrence {
 			t.Errorf("the team's queue holds code findings %v; want the seeded code finding", got)
 		}
 		if got, n := heldItems(t, r, "reader", queue); len(got) != 0 || n != 0 {
@@ -416,9 +416,9 @@ func TestATeamsQueueListsACodeFindingItHolds(t *testing.T) {
 	})
 }
 
-// A code finding recorded as a flaw leaves the lists of held work, internal only or included in disclosure:
+// A code finding recorded as a flaw leaves the lists of held work, security testing only or included in disclosure:
 // its flaw is held and listed as itself.
-func TestAnInternalOnlyRecordedCodeFindingLeavesTheListsOfHeldWork(t *testing.T) {
+func TestAnSecurityTestingOnlyRecordedCodeFindingLeavesTheListsOfHeldWork(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) { recordedAsFlawUnlisted(t, r, false) })
 }
 
@@ -426,12 +426,12 @@ func TestAnIncludedRecordedCodeFindingLeavesTheListsOfHeldWork(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) { recordedAsFlawUnlisted(t, r, true) })
 }
 
-// recordedAsFlawUnlisted hands the seeded code finding off, internal only or included in disclosure, and checks no
+// recordedAsFlawUnlisted hands the seeded code finding off, security testing only or included in disclosure, and checks no
 // reader of it is listed it as unassigned work, while its flaw is.
 func recordedAsFlawUnlisted(t *testing.T, r *httpapitest.Reach, included bool) {
 	t.Helper()
 	occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, included)
-	for _, who := range []string{"internal-reader", "embargo-reader", "code-finding-handler"} {
+	for _, who := range []string{"security-testing-reader", "embargo-reader", "code-finding-handler"} {
 		if got, _ := heldItems(t, r, who, "/v1/unassigned"); len(got) != 0 {
 			t.Errorf("%s is listed the code finding recorded as a flaw %v", who, got)
 		}
@@ -451,10 +451,10 @@ func recordedAsFlawUnlisted(t *testing.T, r *httpapitest.Reach, included bool) {
 	}
 }
 
-// A code finding its holder took and then recorded as a flaw, internal only or included in disclosure, leaves
+// A code finding its holder took and then recorded as a flaw, security testing only or included in disclosure, leaves
 // their work and the totals, is not assigned again, and stays where it is when
 // their work is handed over: it is closed work for its holder.
-func TestAnInternalOnlyRecordedCodeFindingLeavesItsHoldersWork(t *testing.T) {
+func TestAnSecurityTestingOnlyRecordedCodeFindingLeavesItsHoldersWork(t *testing.T) {
 	recordedAsFlawHeld(t, false)
 }
 
@@ -517,7 +517,7 @@ func TestEachCodeFindingIsOnePieceOfHeldWork(t *testing.T) {
 		httpapitest.SeededCodeFinding(t, r)
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),
 			httpapitest.OtherToolRun("cppcheck", "overflow", "787", "src/c.c", 3, 40))
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 3 {
+		if got, _ := heldItems(t, r, "security-testing-reader", "/v1/unassigned"); len(got) != 3 {
 			t.Errorf("the unassigned list holds code findings %v; want the seeded code finding and both overflows", got)
 		}
 	})
@@ -539,24 +539,24 @@ func TestTheQueueNarrowedToNobodyLeavesOutACodeFindingSomebodyHolds(t *testing.T
 		}
 		unheld := func() narrowed {
 			var got narrowed
-			httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings?assigned=nobody", &got)
+			httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/code-findings?assigned=nobody", &got)
 			return got
 		}
 		if got := unheld(); len(got.Items) != 1 || got.Items[0].Occurrence != occurrence || got.Total != 1 || got.States["open"] != 1 {
 			t.Fatalf("the unheld code findings are %+v; want the seeded code finding, listed and counted", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at, `{"person":"security-testing-triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the code finding answered %d: %s", got.Code, got.Body)
 		}
 		if got := unheld(); len(got.Items) != 0 || got.Total != 0 || got.States["open"] != 0 {
 			t.Errorf("a held code finding is in the unheld code findings as %+v", got)
 		}
 		var all narrowed
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings", &all)
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/code-findings", &all)
 		if len(all.Items) != 1 {
 			t.Errorf("the queue unnarrowed is %+v; want the held code finding in it", all)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{}`); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut, at, `{}`); got.Code != http.StatusNoContent {
 			t.Fatalf("handing it back answered %d: %s", got.Code, got.Body)
 		}
 		if got := unheld(); len(got.Items) != 1 || got.States["open"] != 1 {

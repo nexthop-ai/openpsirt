@@ -13,11 +13,11 @@ database built by a release candidate or any other earlier build is recreated.
 | Build and validation | The pipeline, and a gate that runs the checks a change touches |
 | Database | PostgreSQL, MySQL, MariaDB and SQLite, with the schema created and migrated at startup |
 | Catalog and graph | Products, branches and tags, variants, and the dependency graph. Each is renamed and retired in place |
-| Ingest | CycloneDX as JSON or XML, SPDX 2.x and SPDX 3.x, with the suppressions a build carries, and a receipt per upload naming what it moved. Static analyzer runs as SARIF, recorded as internal findings and counted on a receipt per run, and an upload client that sends clang, cppcheck and any SARIF from Linux, macOS and Windows |
+| Ingest | CycloneDX as JSON or XML, SPDX 2.x and SPDX 3.x, with the suppressions a build carries, and a receipt per upload naming what it moved. Static analyzer runs as SARIF, recorded as security testing findings and counted on a receipt per run, and an upload client that sends clang, cppcheck and any SARIF from Linux, macOS and Windows |
 | Scanning | Run here on a schedule, findings tracked over intervals, CVSS 3 and 4.0 ratings kept side by side |
 | Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default. A supplier's statement that its own product is not affected closes the finding inside that product |
 | Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |
-| Access | Roles per product or across every product, public, private and internal as separate grants, enforced in the data layer |
+| Access | Roles per product or across every product, public, private and security testing as separate grants, enforced in the data layer |
 | Triage | Decisions, approval, revision history, comments, bulk decisions, standing corrections, and a review queue listed by the reason each decision waits. Static analysis code findings in a queue of their own, ordered by what is likely real, with their evidence and source links, suppression rules that dismiss by rule or path, grouping across analyzers, and flaw record of a confirmed code finding as a flaw recorded here |
 | Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public. A report from outside ruled a duplicate of a flaw found here starts the flaw's disclosure date |
 | Vulnerability reports | One form for every report, a list of them per product, and rulings that judge many reports in one act |

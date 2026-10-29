@@ -15,7 +15,7 @@ each check sits), `design-docs/access-assignment.md`,
 
 - [Authentication and authorization](#authentication-and-authorization)
 - [Roles](#roles)
-- [Internal visibility](#internal-visibility)
+- [Security testing visibility](#security-testing-visibility)
 - [Breadth of view](#breadth-of-view)
 - [The upward tree](#the-upward-tree)
 - [Subject kinds](#subject-kinds)
@@ -41,7 +41,7 @@ Authenticating says who somebody is, never whether they should be here.
 
 | Kind | Roles |
 |---|---|
-| Read and triage, per visibility | `public-read`, `private-read`, `internal-read`, `public-triage`, `private-triage`, `internal-triage` |
+| Read and triage, per visibility | `public-read`, `private-read`, `security-testing-read`, `public-triage`, `private-triage`, `security-testing-triage` |
 | Capabilities | `assigner`, `approver` |
 | Global | `admin`, and the audit permission (`design-docs/access-grants.md` § The audit permission) |
 
@@ -60,30 +60,30 @@ resolves to, holding no role. A narrowing by a reading rule lets every row
 through for it, and one by a rule about acting lets none. The demo's
 administrator grants itself roles while seeding.
 
-## Internal visibility
+## Security testing visibility
 
-The third visibility, for unconfirmed results never disclosed in their own right,
-such as an analyzer's code findings (REQ-14).
+The third visibility, for the results of the deployment's own security testing,
+such as an analyzer's code findings, never disclosed in their own right (REQ-14).
 
 | Visibility | Holds | Read under | Triaged under |
 |---|---|---|---|
 | Public | Disclosed work | `public-read` | `public-triage` |
 | Private | Work not yet disclosed, which a disclosure opens | `private-read` | `private-triage` |
-| Internal | Unconfirmed results, never disclosed | `internal-read` | `internal-triage` |
+| Security testing | Unconfirmed results, never disclosed | `security-testing-read` | `security-testing-triage` |
 
 | Rule | Reason |
 |---|---|
 | Disclosure never applies to it | It has no disclosure date and nothing of it is published |
 | Its roles are granted like every read and triage role: per product, across every product, or from a group mapping | |
-| `internal-read` alone lists the product, with nothing open but internal findings | A capability beside it then reaches something |
-| The anonymous subject reads no internal work | § Anybody at all |
-| A case reaches public and private work only | A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A code finding included in a flaw's disclosure stays internal; the case reaches it and the decisions at its occurrence as one of the flaw's readers (`design-docs/analysis-flaws.md` § Disclosure inclusion) |
+| `security-testing-read` alone lists the product, with nothing open but security testing findings | A capability beside it then reaches something |
+| The anonymous subject reads no security testing work | § Anybody at all |
+| A case reaches public and private work only | A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A code finding included in a flaw's disclosure stays at security testing visibility; the case reaches it and the decisions at its occurrence as one of the flaw's readers (`design-docs/analysis-flaws.md` § Disclosure inclusion) |
 | A code finding included in its flaw's disclosure is read whole by everybody who read it before, and with the decisions at its occurrence by the flaw's readers while the flaw is undisclosed | Inclusion adds readers; taking it out takes back only those (`design-docs/analysis-flaws.md` § Disclosure inclusion) |
 | A code finding collaborator is granted one code finding recorded as a flaw while its flaw is undisclosed, and reads its evidence alone | No list, tree or inventory; the flaw's disclosure ends it, included or not (`design-docs/analysis-flaws.md` § Code finding collaborators) |
-| `internal-triage` triages nothing about a product as a whole: an assignment rule, assignment, a rating, an incident, a response window, an inventory upload | Each is about what the builds ship |
-| Approving at internal visibility needs internal reading and the approver capability; the session answer states it per visibility | Internal triage alone agrees to nothing (`design-docs/analysis-triage.md` § Code finding triage) |
+| `security-testing-triage` triages nothing about a product as a whole: an assignment rule, assignment, a rating, an incident, a response window, an inventory upload | Each is about what the builds ship |
+| Approving at security testing visibility needs security testing reading and the approver capability; the session answer states it per visibility | Security testing triage alone agrees to nothing (`design-docs/analysis-triage.md` § Code finding triage) |
 | A message leaving the deployment carries no detail of a row that is not public | "Any row not public" is asked apart from "any row undisclosed" |
-| A person sends an analyzer run where they hold `internal-triage` on the product; a pipeline sends under its key's scope | Every result opens internal |
+| A person sends an analyzer run where they hold `security-testing-triage` on the product; a pipeline sends under its key's scope | Every result opens at security testing visibility |
 
 No consumer of vulnerability findings reads analysis results: the findings
 lists, reports, exports, published documents and screens read none, and the code
@@ -140,7 +140,7 @@ What a request may do is decided in one place.
 | A key's scope is constraints: the product always, release and variant each pinned or not, every one present matching | |
 | A mismatch is refused, never redirected | An upload states its whole build |
 | A key reads back the receipts, documents and inventory changes of the builds it may upload to, whichever key sent them, and nothing else | The pipeline can fix its producer, and a rotated or second key re-sending bytes gets the other sender's scan. Narrowed in the query, since a count before filtering says how many builds exist |
-| A key reads back the receipts of analyzer runs sent to those builds; a person reads them where they read internal findings in the product | A receipt counts code findings and names none (`design-docs/analysis.md` § Receipts) |
+| A key reads back the receipts of analyzer runs sent to those builds; a person reads them where they read security testing findings in the product | A receipt counts code findings and names none (`design-docs/analysis.md` § Receipts) |
 | The secret is generated here, stored hashed, shown once | A readable store gives up every key with the database |
 | A key's name is stored folded and matched exactly; other capitals are refused as taken, and only spaces as naming nothing | It is typed to make and to withdraw the key |
 | A key's name is unique among keys in force; a receipt credits the key's row | A withdrawn key's name may be reused, and withdrawing by name reaches the key in force |

@@ -77,7 +77,7 @@ analyzer series by state, drawn as Code findings by analyzer
 | Each count is the list's total for that series and state | One population |
 | Counted over every build | Narrowed, a series never run there shows zeros like a clean one |
 | A series with no code finding is listed with zeros | |
-| Only `internal-read` on the product reads it; anybody else is refused naming no count or series | Counts are internal; a flaw's reader reads one code finding, not the figures |
+| Only `security-testing-read` on the product reads it; anybody else is refused naming no count or series | Counts are at security testing visibility; a flaw's reader reads one code finding, not the figures |
 | Ordered by series name | |
 
 ## Weakness families

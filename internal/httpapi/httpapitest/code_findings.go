@@ -170,7 +170,7 @@ func SeededCodeFinding(t *testing.T, r *Reach) string {
 }
 
 // RecordedCodeFinding is the seeded code finding confirmed and recorded as a flaw against
-// the seeded build, internal only or included in disclosure, with its occurrence and the flaw's
+// the seeded build, security testing only or included in disclosure, with its occurrence and the flaw's
 // identifier.
 func RecordedCodeFinding(t *testing.T, r *Reach, included bool) (string, string) {
 	t.Helper()
@@ -179,7 +179,7 @@ func RecordedCodeFinding(t *testing.T, r *Reach, included bool) (string, string)
 
 // RecordedCodeFindingHeldBy is RecordedCodeFinding with the code finding taken by one of the cast
 // before it is recorded as a flaw, where one is named. They take it themselves, so
-// they triage internal work.
+// they triage security testing work.
 func RecordedCodeFindingHeldBy(t *testing.T, r *Reach, included bool, holder string) (string, string) {
 	t.Helper()
 	occurrence := SeededCodeFinding(t, r)
@@ -189,7 +189,7 @@ func RecordedCodeFindingHeldBy(t *testing.T, r *Reach, included bool, holder str
 			t.Fatalf("%s did not take the code finding: %d %s", holder, w.Code, w.Body.String())
 		}
 	}
-	if w := AsPerson(t, r, "internal-triager", "POST", at+"/decision",
+	if w := AsPerson(t, r, "security-testing-triager", "POST", at+"/decision",
 		`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); w.Code != 201 {
 		t.Fatalf("the code finding was not confirmed: %d %s", w.Code, w.Body.String())
 	}

@@ -194,7 +194,7 @@ func TestAPairIsNotRaisedInATeamTooSmallForItToBeAChoice(t *testing.T) {
 	})
 }
 
-func TestSomebodyTriagingOnlyInternalFindingsIsNotCountedAsAnApprover(t *testing.T) {
+func TestSomebodyTriagingOnlySecurityTestingFindingsIsNotCountedAsAnApprover(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		tm := aTeam(t, w, "ana", "ben")
 		rights := access.NewStore(w.DB.DB)
@@ -202,7 +202,7 @@ func TestSomebodyTriagingOnlyInternalFindingsIsNotCountedAsAnApprover(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := rights.GrantRole(t.Context(), dee.ID, tm.product, access.InternalTriage); err != nil {
+		if err := rights.GrantRole(t.Context(), dee.ID, tm.product, access.SecurityTestingTriage); err != nil {
 			t.Fatal(err)
 		}
 		tm.agreed(t, "ana", "ben", 10, 3)

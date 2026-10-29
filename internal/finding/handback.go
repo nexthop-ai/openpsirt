@@ -94,7 +94,7 @@ type narrowedHolder struct {
 
 // reads is every visibility this holder may keep work at in one product.
 //
-// A person keeps undisclosed and internal work where they read it, and
+// A person keeps undisclosed and security testing work where they read it, and
 // disclosed work while they hold any role there, because disclosed work
 // travels with the assignment. A team keeps what one member reads, and
 // disclosed work while one member reads the product at any visibility: the
@@ -108,7 +108,7 @@ func (h narrowedHolder) reads(ctx context.Context, rights *access.Store, product
 			return nil, err
 		}
 		kept = append(kept, access.Public)
-		for _, v := range []access.Visibility{access.Private, access.Internal} {
+		for _, v := range []access.Visibility{access.Private, access.SecurityTesting} {
 			reads, err := rights.PersonReads(ctx, h.person, productID, v)
 			if err != nil {
 				return nil, err
@@ -119,7 +119,7 @@ func (h narrowedHolder) reads(ctx context.Context, rights *access.Store, product
 		}
 		return kept, nil
 	}
-	for _, v := range []access.Visibility{access.Private, access.Internal} {
+	for _, v := range []access.Visibility{access.Private, access.SecurityTesting} {
 		reads, err := rights.AnyMemberReads(ctx, h.team, productID, v)
 		if err != nil {
 			return nil, err

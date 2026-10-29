@@ -98,7 +98,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 
 		// Told on the terms a finding's assignment is: to a person and never
 		// a team, never for handing back, and only where they read the code finding
-		// at every visibility it holds. The line is internal work, so it is
+		// at every visibility it holds. The line is security testing work, so it is
 		// withheld as such, and nothing leaving the deployment names the code finding.
 		if to == nil || *to == subject.Party() || !seenBy(ctx, in, input.Body.Person, product, withheld) {
 			return &struct{}{}, nil
@@ -120,7 +120,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		} else {
 			in.Log().ErrorContext(ctx, "could not say which code finding was assigned", "error", err)
 		}
-		private, internal := notify.Withholding(withheld)
+		private, securityTesting := notify.Withholding(withheld)
 		core.Tell(ctx, in, "could not say that a code finding was assigned", notify.Telling{
 			PersonID: whoToTell, Kind: notify.Assigned,
 			Body: said + ", in " + input.Product + " " + input.BranchOrTag + " " + input.Variant,
@@ -128,7 +128,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 			// Withheld at every visibility it holds, so a read narrows the
 			// line by the grant the code finding is read under, and a role lost is a
 			// line no longer read.
-			Private: private, Internal: internal,
+			Private: private, SecurityTesting: securityTesting,
 			ProductID:       &product,
 			VulnerabilityID: &codeFinding.VulnerabilityID,
 		}, "person", whoToTell)
@@ -161,7 +161,7 @@ func locateCodeFinding(ctx context.Context, in core.Deps, subject access.Subject
 }
 
 // triagesAny reports whether a subject triages a product at any visibility: a
-// code finding is triaged at internal visibility, and a code finding included in its flaw's disclosure at the
+// code finding is triaged at security testing visibility, and a code finding included in its flaw's disclosure at the
 // case's.
 func triagesAny(subject access.Subject, productID int64) bool {
 	for _, v := range access.Visibilities() {

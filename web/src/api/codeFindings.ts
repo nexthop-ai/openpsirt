@@ -234,7 +234,7 @@ export type FlawOffer = Body<"FlawOfferBody">;
 type Recording = Body<"Record-code-finding-as-flawRequest">;
 
 // What recording a confirmed code finding as a flaw is offered. Refused to somebody who does
-// not triage both the internal code finding and the private flaw, which the screen
+// not triage both the security testing code finding and the private flaw, which the screen
 // asks before it reads this.
 export function useFlawOffer(build: Build, occurrence: string, wanted: boolean) {
   return useQuery({

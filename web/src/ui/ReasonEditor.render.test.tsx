@@ -77,7 +77,7 @@ describe("revising and withdrawing a decision's reasoning", () => {
 });
 
 describe("naming somebody in a decision's reasoning", () => {
-  it("offers readers of internal work on a decision about a code finding", async () => {
+  it("offers readers of security testing work on a decision about a code finding", async () => {
     const reads = serve((path) =>
       path === "/v1/products/{product}/mentionable" ? { data: { items: [] } } : { data: {} },
     );
@@ -89,7 +89,7 @@ describe("naming somebody in a decision's reasoning", () => {
           state="waiting"
           approved={false}
           about={{ product: "sonic", vulnerability: "clang/unix.Malloc" }}
-          internal
+          securityTesting
           onDone={vi.fn()}
         />,
       ),
@@ -101,6 +101,6 @@ describe("naming somebody in a decision's reasoning", () => {
     const asked = (reads.mock.calls as unknown as [string, { params: { query: object } }][])
       .filter(([path]) => path === "/v1/products/{product}/mentionable")
       .at(-1);
-    expect(asked?.[1].params.query).toMatchObject({ visibility: "internal", q: "an" });
+    expect(asked?.[1].params.query).toMatchObject({ visibility: "security-testing", q: "an" });
   });
 });

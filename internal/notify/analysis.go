@@ -18,7 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// AnalysisDrops tells the internal readers of a product about an analyzer run
+// AnalysisDrops tells the security testing readers of a product about an analyzer run
 // that marked much of a build's code findings no longer detected at once.
 //
 // Returned as a function for the applier to call, on the terms Movements is:
@@ -35,7 +35,7 @@ func AnalysisDrops(db *bun.DB, logger *slog.Logger) func(context.Context, analys
 	}
 }
 
-// dropped tells everybody who reads internal findings in the product.
+// dropped tells everybody who reads security testing findings in the product.
 func dropped(ctx context.Context, db *bun.DB, drop analysis.Drop) error {
 	placed, err := catalog.NewStore(db).Describe(ctx, drop.BuildID)
 	if err != nil {
@@ -58,15 +58,15 @@ func dropped(ctx context.Context, db *bun.DB, drop analysis.Drop) error {
 	productID := placed.ProductID
 	var failed error
 	for personID, per := range reach {
-		// The code findings named are internal, so reading internal findings is the
+		// The code findings named are at security testing visibility, so reading security testing findings is the
 		// question, and the link answers for exactly that.
-		if !per[productID].readsInternal {
+		if !per[productID].readsSecurityTesting {
 			continue
 		}
 		if err := NewStore(db).Tell(ctx, Telling{
 			PersonID: personID, Kind: SecurityTestingDropped,
 			Body: body, Link: where, ProductID: &productID,
-			Together: together, Private: true, Internal: true,
+			Together: together, Private: true, SecurityTesting: true,
 		}); err != nil {
 			// Carried on for the reason Movements carries on: an event has no
 			// retry, so stopping tells a random subset.

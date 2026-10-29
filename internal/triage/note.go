@@ -281,12 +281,12 @@ func (s *Store) NoteVisibility(ctx context.Context, productID,
 }
 
 // noteVisibility is private where any of the issue's findings in the product
-// is, internal where none is and any is internal, and public otherwise.
-// Internal is never read as public: it is material never disclosed at all.
+// is, security testing where none is and any is at security testing visibility, and public
+// otherwise. Security testing work is never read as public: it is material never disclosed at all.
 func noteVisibility(ctx context.Context, db bun.IDB, productID,
 	vulnerabilityID int64) (access.Visibility, error) {
 
-	for _, v := range []access.Visibility{access.Private, access.Internal} {
+	for _, v := range []access.Visibility{access.Private, access.SecurityTesting} {
 		held, err := db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).

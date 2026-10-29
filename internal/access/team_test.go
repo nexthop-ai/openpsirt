@@ -202,27 +202,27 @@ func TestDeclaringARetiredTeamsNameBringsItBack(t *testing.T) {
 	})
 }
 
-// Who may be handed internal work is asked at internal visibility: somebody
-// reading undisclosed work is not cleared for it, and somebody reading internal
+// Who may be handed security testing work is asked at security testing visibility: somebody
+// reading undisclosed work is not cleared for it, and somebody reading security testing
 // work is.
-func TestInternalWorkIsHeldOnlyByThoseWhoReadIt(t *testing.T) {
+func TestSecurityTestingWorkIsHeldOnlyByThoseWhoReadIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		sonic := f.products["sonic"]
 		embargo := holding(t, f, "embargo", "Embargo", sonic, access.PrivateTriage)
-		analyst := holding(t, f, "analyst", "Analyst", sonic, access.InternalRead)
+		analyst := holding(t, f, "analyst", "Analyst", sonic, access.SecurityTestingRead)
 		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		for who, want := range map[int64]bool{embargo.ID: false, analyst.ID: true} {
-			reads, err := f.store.PersonReads(ctx, who, sonic, access.Internal)
+			reads, err := f.store.PersonReads(ctx, who, sonic, access.SecurityTesting)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if reads != want {
-				t.Errorf("person %d reads internal work: %v, want %v", who, reads, want)
+				t.Errorf("person %d reads security testing work: %v, want %v", who, reads, want)
 			}
 		}
 
@@ -233,26 +233,26 @@ func TestInternalWorkIsHeldOnlyByThoseWhoReadIt(t *testing.T) {
 		if _, err := f.store.AddToTeam(ctx, team.ID, embargo.ID, admin.ID); err != nil {
 			t.Fatal(err)
 		}
-		reads, err := f.store.AnyMemberReads(ctx, team.ID, sonic, access.Internal)
+		reads, err := f.store.AnyMemberReads(ctx, team.ID, sonic, access.SecurityTesting)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if reads {
-			t.Error("a team of undisclosed readers may hold internal work")
+			t.Error("a team of undisclosed readers may hold security testing work")
 		}
 		if _, err := f.store.AddToTeam(ctx, team.ID, analyst.ID, admin.ID); err != nil {
 			t.Fatal(err)
 		}
-		if reads, err = f.store.AnyMemberReads(ctx, team.ID, sonic, access.Internal); err != nil {
+		if reads, err = f.store.AnyMemberReads(ctx, team.ID, sonic, access.SecurityTesting); err != nil {
 			t.Fatal(err)
 		}
 		if !reads {
-			t.Error("a team with an internal reader on it may not hold internal work")
+			t.Error("a team with a security testing reader on it may not hold security testing work")
 		}
 	})
 }
 
-// Work holding undisclosed and internal rows both is held by a team only where
+// Work holding undisclosed and security testing rows both is held by a team only where
 // one member reads both. Two members reading one half each are two people
 // neither of whom may open all of it.
 func TestWorkOfTwoVisibilitiesIsHeldByAMemberWhoReadsBoth(t *testing.T) {
@@ -260,8 +260,8 @@ func TestWorkOfTwoVisibilitiesIsHeldByAMemberWhoReadsBoth(t *testing.T) {
 		ctx := t.Context()
 		sonic := f.products["sonic"]
 		embargo := holding(t, f, "embargo", "Embargo", sonic, access.PrivateTriage)
-		analyst := holding(t, f, "analyst", "Analyst", sonic, access.InternalRead)
-		both := holding(t, f, "both", "Both", sonic, access.PrivateRead, access.InternalRead)
+		analyst := holding(t, f, "analyst", "Analyst", sonic, access.SecurityTestingRead)
+		both := holding(t, f, "both", "Both", sonic, access.PrivateRead, access.SecurityTestingRead)
 		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
@@ -270,7 +270,7 @@ func TestWorkOfTwoVisibilitiesIsHeldByAMemberWhoReadsBoth(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		withheld := []access.Visibility{access.Private, access.Internal}
+		withheld := []access.Visibility{access.Private, access.SecurityTesting}
 		for _, member := range []int64{embargo.ID, analyst.ID} {
 			if _, err := f.store.AddToTeam(ctx, team.ID, member, admin.ID); err != nil {
 				t.Fatal(err)

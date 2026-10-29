@@ -29,35 +29,37 @@ deployment.
 |---|---|
 | `public-read` | Read findings that have been disclosed |
 | `private-read` | Read findings nobody has announced yet, and no others |
-| `internal-read` | Read internal findings, and no others |
+| `security-testing-read` | Read security testing findings, and no others |
 | `public-triage` | Argue about disclosed findings: decide, revise, withdraw, comment. Take work nobody owns, and hand back your own |
 | `private-triage` | The same for findings nobody has announced yet, including recording one and moving its disclosure date. Disclosed findings take `public-triage` |
-| `internal-triage` | The same for internal findings. Disclosed and undisclosed findings take their own triage roles |
+| `security-testing-triage` | The same for security testing findings. Disclosed and undisclosed findings take their own triage roles |
 | `approver` | Agree to somebody else's decision, at a visibility its holder reads. A triager may also approve, and the proposer may never approve their own |
 | `assigner` | Give work to somebody else, or take what they are holding |
 | administrator | The deployment: people, roles, credentials, settings, and the catalog |
 
 Seeing is never changing. A read role reaches no act, and every act is a
 role of its own. That is why there is a read role per visibility: what has
-been announced, what has not been yet, and what is internal are different
-populations, and a great many people should see the first without seeing the
-others.
+been announced, what has not been yet, and what our own security testing
+found are different populations, and a great many people should see the first
+without seeing the others.
 
 | Visibility | Holds |
 |---|---|
 | Public | Findings that have been disclosed |
 | Private | Findings nobody has announced yet, which are disclosed in time |
-| Internal | Unconfirmed results nobody has judged, such as an analyzer's code findings. They are never disclosed and never published |
+| Security testing | Results of our own security testing nobody has judged, such as an analyzer's code findings. They are never disclosed and never published |
 
 The three visibilities are separate grants. A private role reaches findings
 nobody has announced and no others, so somebody working private reports is not
 handed every public finding as well, and reading private findings does not read
-internal ones. Somebody who works more than one holds each. A triage role
-carries reading at its own visibility. Somebody holding `internal-read` alone
-sees the product listed with nothing open against it but internal findings.
+security testing ones. Somebody who works more than one holds each. A triage
+role carries reading at its own visibility. Somebody holding
+`security-testing-read` alone sees the product listed with nothing open against
+it but security testing findings.
 
 The findings lists, screens and reports show no analysis result, and analysis
-results are the only internal findings. Analysis results reach none of them.
+results are the only security testing findings. Analysis results reach none of
+them.
 
 A disclosed finding assigned to somebody is listed among their work whatever
 they read, drawn in the tree of what they hold, and theirs to hand back, because

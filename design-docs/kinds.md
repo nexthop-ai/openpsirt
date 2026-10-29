@@ -29,7 +29,7 @@ Satisfies REQ-06, REQ-14, REQ-17, REQ-18, REQ-19, REQ-21, REQ-25, REQ-43, REQ-50
 | Occurrence identity | Component and consumer (`design-docs/data-model-graph.md` § Occurrence identity, REQ-17) | Component and consumer | Minted at first sighting, carried by matching |
 | Carry across builds | Version and chain match (REQ-25) | Stated by a person | Matching (`design-docs/analysis-matching.md` § Carrying) |
 | Absence | The run closes it with a reason (REQ-21) | Nothing; a person closes it | No longer detected; it stays open |
-| Visibilities | Public, private | Private, public | Internal, public once its flaw is disclosed |
+| Visibilities | Public, private | Private, public | Security testing, public once its flaw is disclosed |
 
 | Rule | Reason |
 |---|---|
@@ -103,7 +103,7 @@ holds the screens.
 | Kinds are named as inclusions, never exclusions | Exclusion lists go unextended |
 | A statement reading identifiers a kind-narrowed statement chose names none again | |
 | Indexes answering without the table carry the kind beside the visibility | Otherwise a table row per finding |
-| The kind is the first boundary, internal visibility the second (REQ-43) | Only kind keeps a disclosed code finding out of vulnerability documents and figures |
+| The kind is the first boundary, security testing visibility the second (REQ-43) | Only kind keeps a disclosed code finding out of vulnerability documents and figures |
 
 ## Runs and series
 
