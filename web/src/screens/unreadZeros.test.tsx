@@ -22,6 +22,8 @@ import { Backlog } from "./analytics/Backlog";
 import { Compliance } from "./analytics/Compliance";
 import { Register } from "./analytics/Register";
 import { Support } from "./analytics/Support";
+import { Scrutiny } from "./analytics/Scrutiny";
+import { Effort } from "./analytics/Effort";
 import { remember } from "../app/scope";
 import { Incidents } from "./Incidents";
 import { Uploads } from "./Uploads";
@@ -60,6 +62,8 @@ const ELSEWHERE = who([
 ]);
 // A release manager reading disclosed findings in sonic alone.
 const DISCLOSED = who([reaching("sonic", { may_see: true, reads_public: true })]);
+// A reader of dependency findings in edge alone, with a role in sonic too.
+const OTHER_PRODUCT = who([readingDependencies("edge"), reaching("sonic")]);
 // An auditor: the audit permission and no product read.
 const AUDITOR = who([reaching("sonic")], { audits: true });
 
@@ -512,8 +516,48 @@ describe("analytics", () => {
   it("draws no decision figure in the program overview for a reader of no finding", async () => {
     const spy = await report(<Overview />, AUDITOR);
     expect(text()).not.toContain("Triage times");
+    expect(text()).toContain("Nothing to list.");
+    expect(text()).toContain("You don't read findings in any product.");
     expect(asked(spy)).not.toContain("/v1/measures");
     expect(asked(spy)).not.toContain("/v1/audit");
+  });
+
+  it("draws no decision figure in the program overview for a reader of findings in another product", async () => {
+    const spy = await report(<Overview />, OTHER_PRODUCT);
+    expect(text()).not.toContain("Triage times");
+    expect(text()).not.toContain("Dismissals");
+    expect(text()).toContain("Nothing to list.");
+    expect(text()).toContain("You don't read findings in sonic.");
+    expect(asked(spy)).not.toContain("/v1/measures");
+    expect(asked(spy)).not.toContain("/v1/audit");
+  });
+
+  it.each([
+    [
+      "approval quality",
+      <Scrutiny key="scrutiny" />,
+      "/v1/approvals/scrutiny",
+      "No dismissal stands",
+    ],
+    ["effort", <Effort key="effort" />, "/v1/effort", "Nothing was argued"],
+  ])(
+    "draws no %s, and asks for none, for a reader of findings in another product",
+    async (_, node, path, clean) => {
+      const spy = await report(node, OTHER_PRODUCT);
+      expect(text()).not.toContain(clean);
+      expect(text()).toContain("Nothing to list.");
+      expect(text()).toContain("You don't read findings in sonic.");
+      expect(asked(spy)).not.toContain(path);
+    },
+  );
+
+  it.each([
+    ["approval quality", <Scrutiny key="scrutiny" />, "/v1/approvals/scrutiny"],
+    ["effort", <Effort key="effort" />, "/v1/effort"],
+  ])("asks for %s for a reader of code findings alone", async (_, node, path) => {
+    const spy = await report(node, DEVELOPER);
+    expect(text()).not.toContain("Nothing to list.");
+    expect(asked(spy)).toContain(path);
   });
 
   it("draws no backlog and asks for no trend", async () => {

@@ -101,6 +101,22 @@ export function readsNothing(who: Who | null | undefined): boolean {
   );
 }
 
+// Whether the reader reads either family at the scope, which is where a report
+// on triage decisions means anything: a decision is on a dependency finding or
+// a code finding, and the server narrows each to the reader.
+export function decidesAt(who: Who | null | undefined, product?: string): boolean {
+  return counted(holding(who, "dependency", product)) || counted(holding(who, "code", product));
+}
+
+// The line a report on decisions shows in place of its body where the reader
+// reads neither family at the scope. Empty where they read either.
+export function decidesLine(who: Who | null | undefined, product?: string): string {
+  if (decidesAt(who, product)) return "";
+  return product && !readsNothing(who)
+    ? `You don't read findings in ${product}.`
+    : "You don't read findings in any product.";
+}
+
 const NOUN: Record<Family, string> = {
   dependency: "dependency findings",
   code: "code findings",

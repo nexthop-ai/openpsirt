@@ -29,7 +29,7 @@ import {
 } from "./Window";
 import { useRowOpener } from "../../ui/opens";
 import { useWho } from "../../app/session";
-import { counted, holding, readsNothing } from "../../app/families";
+import { counted, decidesAt, decidesLine, holding } from "../../app/families";
 import { HeldLine } from "../../ui/HeldLine";
 import { Wide } from "../../ui/Wide";
 import { decisionOccurrenceAt } from "../../app/routes";
@@ -102,11 +102,11 @@ export function Overview() {
   // Keeping pace and repeated deferrals count dependency findings, drawn and
   // asked only where the reader reads them at the scope. Triage times and
   // dismissals are decisions on either family, and mean nothing to a reader
-  // of neither.
+  // of neither at the scope.
   const who = useWho().data;
   const dependencies = holding(who, "dependency", at.product);
   const figures = counted(dependencies);
-  const decides = !readsNothing(who);
+  const decides = decidesAt(who, at.product);
 
   const pace = useQuery({
     queryKey: ["remediation", scope, when],
@@ -187,7 +187,11 @@ export function Overview() {
     >
       <WindowPicker offered={WINDOWS} days={days} />
       <PeriodPicker period={period} />
-      <HeldLine at={dependencies} whole={!decides} />
+      {decides ? (
+        <HeldLine at={dependencies} />
+      ) : (
+        <Empty title="Nothing to list." detail={decidesLine(who, at.product)} />
+      )}
 
       {figures && (
         <section className="panel" style={{ marginTop: 14 }}>

@@ -136,6 +136,7 @@ zero for work they cannot see reads as nothing open.
 | One helper decides it, and every screen counting a family asks it | Decided per screen, the answers drift apart |
 | A table spanning products draws a dash, with the line on hover, in a row whose product the reader does not read the family in | A zero in one row reads as that product being clean |
 | A screen whose subject is the family (the findings list, release comparison, a report on it) shows "Nothing to list." and the line in place of its body, the line included for a reader holding it in no product | Reached by a kept link, its empty body reads as nothing open |
+| A report on decisions (the overview's triage times and dismissals, approval quality, effort) is asked and drawn where the reader reads either family at the report's product; elsewhere it shows "Nothing to list." and "You don't read findings in sonic.", or "in any product" for a reader of neither anywhere | Decisions are on either family and narrowed to the reader; an empty exception report reads as a clean one |
 | The line names a product only where the session lists it; a product it does not list, a retired one most often, keeps its figures | A product somebody holds no role on is never named to them (REQ-42), and the server has narrowed a retired product's counts already (REQ-43) |
 | Security testing work is never disclosed, so the code family has no halves | |
 | A count not drawn is not asked for | A request whose answer is never shown is load for nothing |
