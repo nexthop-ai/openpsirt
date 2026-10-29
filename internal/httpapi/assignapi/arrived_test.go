@@ -81,7 +81,7 @@ func TestARulePlacesAFlawRecordedFromACodeFinding(t *testing.T) {
 		r.Swept(t)
 
 		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at+"/decision",
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, at+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body.String())
 		}
