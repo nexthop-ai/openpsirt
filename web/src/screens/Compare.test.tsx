@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Compare } from "./Compare";
 import { press, tick } from "../test/controls";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -25,9 +26,18 @@ const comparison = {
   ],
 };
 
+const READER = {
+  identity: "ana",
+  name: "Ana",
+  admin: false,
+  kind: "person",
+  reach: [readingDependencies("sonic")],
+};
+
 // The reads the screen makes, answered, and every one it asked for.
 function serving() {
   return serve((path) => {
+    if (path === "/v1/session/me") return { data: READER };
     if (path === "/v1/products/{product}/comparison") return { data: comparison };
     if (path === "/v1/products/{product}/comparison/notes") return { data: "## Fixed\n" };
     if (path === "/v1/products/{product}/releases") return { data: { items: [] } };

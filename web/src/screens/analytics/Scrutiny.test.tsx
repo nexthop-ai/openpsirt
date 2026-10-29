@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Scrutiny } from "./Scrutiny";
 import { PUBLISHED } from "../../test/outcomes";
 import { mounted, screen, serve, settle } from "../../test/mount";
+import { reaching } from "../../test/reach";
 
 const mount = mounted();
 
@@ -20,7 +21,14 @@ describe("risk standing on one person", () => {
             name: "Ana",
             admin: true,
             kind: "person",
-            reach: [],
+            reach: [
+              reaching("sonic", {
+                may_see: true,
+                reads_public: true,
+                reads_private: true,
+                reads_security_testing: true,
+              }),
+            ],
             outcomes: PUBLISHED,
           },
         };

@@ -52,6 +52,17 @@ carries) and the act hangs off it.
 | What the product's upstream says about the component is a card: every standing statement about a component of this name at any version, with issue, version, status, mark, link and decline control; drawn only where it says something | |
 | A container image lists the versions each build stated for it, newest first, with the dates each was stated across; the first five shown and the rest counted | An image carries no version of its own (`design-docs/data-model-components.md` § Container images) |
 
+Every count on the page is of dependency findings, drawn under
+`design-docs/interface.md` § Families a reader holds.
+
+| Rule | Reason |
+|---|---|
+| Where the reader does not read dependency findings in the product, no count, open button, severity band, fix card or twelve weeks is drawn, and nothing calls the component clean | A zero over open code findings reads as a clean component |
+| Where they read them in another product, one line says so | |
+| Where nothing is open, the chip says "no dependency findings open" | The page counts one family, and its zero names it |
+| A reader of one half alone has its counts carry the line saying which half | |
+| The page is drawn either way: the package, where it sits and the builds shipping it | They are the inventory, which the product's readers hold |
+
 An upgrade is promised here on the terms `design-docs/triage-promises.md` § Promised work sets: the
 releases, the version, the date, the reason, and who carries it.
 
@@ -104,6 +115,7 @@ as on it, worked out when read, never stored, because findings move.
 | A row is keyed by name, version, package kind and namespace: what is open, what was drawn, what sits under it, and the request for children; a request naming two things is refused | A component shipped twice must open |
 | A component's name opens the component; the node name selects, so the link is the row's own control and the names in the two lists beside the tree | |
 | There is no pane over the tree | The component screen answers it |
+| For a reader not reading dependency findings in the product, rows carry no count or band and search hits are not said to be ordered by findings; one line says where they are read elsewhere (`design-docs/interface.md` § Families a reader holds) | A tree of zeros reads as a clean build |
 
 ## Tree search
 

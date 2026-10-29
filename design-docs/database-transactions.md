@@ -68,7 +68,7 @@ back.
 |---|---|
 | Parsing an upload | Refuses the upload with 503, storing nothing |
 | Applying a saved assignment rule to what is open | Refuses the rule with 503, recording nothing. Work arriving in the product also sweeps |
-| Placing work a scan, an analyzer run or a recorded flaw opened | Not the arrival's failure. The next arrival or rule in the product sweeps (`design-docs/access-assignment.md` § The sweep) |
+| Placing work a scan, an analyzer run or a recorded flaw opened | Not the arrival's failure. The next arrival or rule in the product sweeps, and the daily sweep of every ruled product within a day (`design-docs/access-assignment.md` § The sweep) |
 | Scanning an inventory a read stored | Not the read's failure. The periodic pass asks again once the queue drains |
 
 | Outside the act | Reason |

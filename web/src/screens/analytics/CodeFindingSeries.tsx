@@ -4,7 +4,8 @@
 import { Link } from "react-router-dom";
 import { useCodeFindingSeries, type CodeFindingState } from "../../api/codeFindings";
 import { codeFindingsAt } from "../../app/routes";
-import { mayOf, useWho } from "../../app/session";
+import { useWho } from "../../app/session";
+import { counted as reading, heldLine, holding } from "../../app/families";
 import { useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
@@ -34,7 +35,8 @@ const COLUMNS: CodeFindingState[] = [
 export function CodeFindingSeries() {
   const at = useScope();
   const product = at.product ?? "";
-  const reads = !!mayOf(useWho().data, product)?.reads_security_testing;
+  const code = holding(useWho().data, "code", product || undefined);
+  const reads = reading(code);
   const counted = useCodeFindingSeries(reads ? product : "");
   const rows = counted.data ?? [];
 
@@ -51,10 +53,7 @@ export function CodeFindingSeries() {
         </section>
       ) : !reads ? (
         <section className="panel">
-          <Empty
-            title="Code findings are security testing results."
-            detail="Reading them takes security-testing-read on the product."
-          />
+          <Empty title="Nothing to list." detail={heldLine(code)} />
         </section>
       ) : counted.isPending ? (
         <Loading />

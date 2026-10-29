@@ -61,6 +61,21 @@ func NewLeases(db *bun.DB) *Leases {
 // while the work runs, which is why `until` has to cover a cycle of the work
 // rather than an instant of it.
 func (l *Leases) Take(ctx context.Context, name, holder string, until time.Duration) (bool, error) {
+	return l.take(ctx, name, holder, until, true)
+}
+
+// TakeLapsed takes a lease only where nobody holds it, the asking holder
+// included, reporting whether this holder now has it.
+//
+// For work that runs once a period on whichever replica asks first: the lease
+// is taken for the period and left to lapse rather than handed back, so its
+// expiry records when the work is next due, and a replica that restarts or
+// loses the race asks again on its next tick rather than a period later.
+func (l *Leases) TakeLapsed(ctx context.Context, name, holder string, until time.Duration) (bool, error) {
+	return l.take(ctx, name, holder, until, false)
+}
+
+func (l *Leases) take(ctx context.Context, name, holder string, until time.Duration, renew bool) (bool, error) {
 	var mine bool
 	err := database.InTransaction(ctx, l.db, func(ctx context.Context, tx bun.Tx) error {
 		// Every attempt starts from nothing: an attempt that was rolled back
@@ -77,7 +92,7 @@ func (l *Leases) Take(ctx context.Context, name, holder string, until time.Durat
 		if err := database.InBatchesKeeping(ctx, tx, []Lease{{Name: name}}); err != nil {
 			return fmt.Errorf("record the lease on %s: %w", name, err)
 		}
-		taken, err := l.takeIn(ctx, tx, name, holder, now, until)
+		taken, err := l.takeIn(ctx, tx, name, holder, now, until, renew)
 		if err != nil {
 			return err
 		}
@@ -88,17 +103,18 @@ func (l *Leases) Take(ctx context.Context, name, holder string, until time.Durat
 }
 
 func (l *Leases) takeIn(ctx context.Context, tx bun.Tx,
-	name, holder string, now time.Time, until time.Duration) (bool, error) {
+	name, holder string, now time.Time, until time.Duration, renew bool) (bool, error) {
 
 	res, err := tx.NewUpdate().Model((*Lease)(nil)).
 		Set(`"held_by" = ?`, holder).
 		Set(`"held_until" = ?`, now.Add(until)).
 		Where(`"name" = ?`, name).
 		WhereGroup(" AND ", func(u *bun.UpdateQuery) *bun.UpdateQuery {
-			return u.
-				WhereOr(`"held_by" IS NULL`).
-				WhereOr(`"held_by" = ?`, holder).
-				WhereOr(`"held_until" < ?`, now)
+			u = u.WhereOr(`"held_by" IS NULL`).WhereOr(`"held_until" < ?`, now)
+			if renew {
+				u = u.WhereOr(`"held_by" = ?`, holder)
+			}
+			return u
 		}).
 		Exec(ctx)
 	if err != nil {

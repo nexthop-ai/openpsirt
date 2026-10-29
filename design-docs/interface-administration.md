@@ -38,6 +38,8 @@ role on.
 | A list report exports CSV and JSON; a figures report prints, every figure linking its list | An aggregate has no stream; the list is the traceable form |
 | A figure is the response's, never recounted from the page beneath it; each list says its total | |
 | A page past a list's end says so and keeps its footer | The register holds its position when the build under it changes, and Previous must be reachable |
+| A report counting dependency findings follows `design-docs/interface.md` § Families a reader holds at the scope picked, and asks for nothing it does not draw: backlog over time, deadline compliance and the disposition register show "Nothing to list." and the line; the program overview drops keeping pace and repeated deferrals; releases out of support keep their rows and draw what is open only in a product whose dependency findings are read | A report of zeros reads as a clean program |
+| The program overview's triage times and dismissals are decisions on either family, and are absent for a reader of neither | |
 
 ## The audit log
 
@@ -45,6 +47,8 @@ role on.
 |---|---|
 | One card per decision: issue, outcome, state in one word, what it is about or how many components, occurrences covered, states counted where they differ. The issue opens the decision page; "Findings there now" opens the findings list narrowed to the decision and states (`design-docs/analytics-controls.md` § Dismissals and last uploads) | |
 | Report rulings sit beside the decisions over its products and period, taking none of their filters, printed without controls | A ruling is accountable and about a report (REQ-28) |
+| A reader of no finding in any product, an auditor most often, is shown the change history alone, with one line saying they read no findings, where the decision record holds nothing for them | A record of zero decisions reads as nothing decided |
+| The decision record is asked of every reader, one of no finding included, and drawn wherever it answers with a decision | A case collaborator reads no product and is served their own case's decisions |
 | The change history sits below over its period, narrowed to one kind (roles, keys and tokens, settings), the kind in the address and the file | The question an access review asks |
 
 ## Settings

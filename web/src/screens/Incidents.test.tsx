@@ -5,6 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Incidents } from "./Incidents";
 import { accept, screen, serve, settle, mounted, type Sent } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -50,7 +51,9 @@ function shelf() {
       };
     }
     if (asked === "/v1/session/me") {
-      return { data: { identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] } };
+      // A reader of dependency findings in both products, whose shelf it is.
+      const reach = ["sonic", "edge"].map((product) => readingDependencies(product));
+      return { data: { identity: "ana", name: "Ana", admin: false, kind: "person", reach } };
     }
     return { data: { items: [], total: 0 } };
   });
@@ -84,10 +87,10 @@ describe("the Incidents screen", () => {
   });
 });
 
+// A reader of the product's dependency findings, who may triage there or not.
 const can = (product: string, mayTriage: boolean) => ({
-  product,
+  ...readingDependencies(product),
   name: product.toUpperCase(),
-  may_see: true,
   may_triage: mayTriage,
 });
 

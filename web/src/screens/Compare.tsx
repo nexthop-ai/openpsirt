@@ -19,6 +19,9 @@ import { Across } from "../ui/Charts";
 import { PickPair, useBuildPair } from "../ui/PickBuild";
 import { inventoryComparisonAt, runAt, type Build } from "../app/routes";
 import { fileAt } from "../api/links";
+import { useWho } from "../app/session";
+import { counted, heldLine, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 
 // The rows of each column shown before it says how many more there are.
 const SHOWN = 8;
@@ -32,7 +35,16 @@ export function Compare() {
   const { product = "" } = useParams();
   const builds = useBuildPair(product);
   const { from, fromVariant, to, toVariant, ready, pair, set } = builds;
-  const undisclosed = builds.params.get("undisclosed") === "yes";
+  // Every column, the chart and the notes are dependency findings, asked and
+  // drawn only where the reader reads them in this product. The builds stay
+  // pickable, because comparing their components is inventory.
+  const dependencies = holding(useWho().data, "dependency", product);
+  const figures = counted(dependencies);
+  // A reader of undisclosed work alone here is asked for it without a chip,
+  // since the disclosed findings the default asks for are ones they do not
+  // read.
+  const undisclosedOnly = dependencies.held === "partial" && dependencies.disclosed.length === 0;
+  const undisclosed = undisclosedOnly || builds.params.get("undisclosed") === "yes";
 
   // The question, built once: the columns, the prose and the files are asked
   // it alike, so a comparison somebody exports or reads as notes is the one in
@@ -56,7 +68,7 @@ export function Compare() {
   const [copied, setCopied] = useState<"" | "done" | "refused">("");
   const notes = useQuery({
     queryKey: ["release-notes", product, from, fromVariant, to, toVariant, undisclosed],
-    enabled: wanted && ready,
+    enabled: figures && wanted && ready,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/comparison/notes", {
@@ -80,7 +92,7 @@ export function Compare() {
           },
         }),
       ),
-    enabled: ready,
+    enabled: figures && ready,
   });
 
   // Every build, not the two being compared. The comparison answers "what
@@ -88,6 +100,7 @@ export function Compare() {
   // which is the question a release note cannot.
   const releases = useQuery({
     queryKey: ["releases", product],
+    enabled: figures,
     queryFn: async () =>
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
   });
@@ -102,8 +115,9 @@ export function Compare() {
         </p>
       </div>
 
+      {figures && <HeldLine at={dependencies} />}
       <Unread of={releases} what="The releases could not be read." />
-      {(releases.data?.items ?? []).length > 1 && (
+      {figures && (releases.data?.items ?? []).length > 1 && (
         <div className="card">
           <header>
             <h3>Open findings by release</h3>
@@ -133,25 +147,31 @@ export function Compare() {
                 Compare components
               </Link>
             )}
-            <button
-              type="button"
-              className="chip"
-              aria-pressed={undisclosed}
-              onClick={() => set("undisclosed", undisclosed ? "" : "yes")}
-            >
-              Include undisclosed
-            </button>
+            {figures && !undisclosedOnly && (
+              <button
+                type="button"
+                className="chip"
+                aria-pressed={undisclosed}
+                onClick={() => set("undisclosed", undisclosed ? "" : "yes")}
+              >
+                Include undisclosed
+              </button>
+            )}
           </span>
         </header>
 
         {/* Its destination is usually a public document, so including
             something embargoed should be a deliberate act rather than a paste
             nobody checked. */}
-        <p className="reading" style={{ marginBottom: 12 }}>
-          Public findings only, unless you say otherwise.
-        </p>
+        {figures && !undisclosedOnly && (
+          <p className="reading" style={{ marginBottom: 12 }}>
+            Public findings only, unless you say otherwise.
+          </p>
+        )}
 
-        {!ready ? (
+        {!figures ? (
+          <Empty title="Nothing to list." detail={heldLine(dependencies)} />
+        ) : !ready ? (
           <Empty title="Pick two builds." detail="Any two compare, not only adjacent ones." />
         ) : comparison.isPending ? (
           <Loading />

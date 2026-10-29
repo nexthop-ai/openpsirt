@@ -33,7 +33,7 @@ product page.
 | A series in the address narrows it and is named in the heading; each figure of Code findings by analyzer opens its series and state | |
 | Unassigned only narrows to code findings nobody holds, in the address and heading, across tabs, counts and the file (`design-docs/analysis-queue.md` § Code finding queue) | The findings list holds no code finding |
 | The list is offered as CSV and JSON with the narrowing on screen, every row (`design-docs/analysis-queue.md` § Queue file) | |
-| Code findings by analyzer asks no count from a non-reader of security testing material, and says code findings are security testing results | A table of zeros reads as an analyzer finding nothing |
+| The screen and Code findings by analyzer are about the code family, under `design-docs/interface.md` § Families a reader holds: for a reader not reading it in the product, neither is asked, and each shows "Nothing to list." and the family's line | A queue or table of zeros reads as an analyzer finding nothing |
 
 ## A code finding
 

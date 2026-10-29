@@ -14,6 +14,7 @@ import { Decide } from "../ui/Decide";
 import { PUBLISHED } from "../test/outcomes";
 import { Notices } from "../ui/Notices";
 import { screen, serve, settle, mounted } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 // A secondary read that fails is said, on the screens that read one beside
 // their main list. Drawn as its empty answer, a failure states something
@@ -50,7 +51,7 @@ const ANA: Who = {
   name: "Ana",
   admin: false,
   kind: "person",
-  reach: [],
+  reach: [readingDependencies("sonic")],
   outcomes: [],
 };
 
@@ -196,7 +197,7 @@ describe("a secondary read that fails", () => {
             name: "Ana",
             admin: false,
             kind: "person",
-            reach: [],
+            reach: [readingDependencies("sonic")],
             outcomes: [],
           }}
         />,

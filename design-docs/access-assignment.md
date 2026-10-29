@@ -114,7 +114,7 @@ Turning a rule on is a bulk write counted on rows written. How many one pass
 places is a setting: too large holds a connection, too small re-queues a large
 product many times.
 
-A product's sweep is queued when a rule is written and when work arrives.
+A product's sweep is queued when a rule is written, when work arrives, and for every ruled product once a day.
 
 | Arrival | Queued by |
 |---|---|
@@ -128,6 +128,12 @@ A product's sweep is queued when a rule is written and when work arrives.
 | An arrival queues its sweep in the transaction that opened the work | Queued after, a sweep can be claimed before the work exists |
 | An arrival queues a sweep only where the product holds a rule in force that places findings | A product with no rule queues nothing per scan |
 | A full sweep queue leaves the arrival to the next one and refuses nothing | A refused scan loses its findings; an unqueued sweep only delays placing them |
+| Every product a rule in force places findings in is swept once a day, by one replica holding a lease | Catches an arrival a full queue skipped, and work left unheld before arrivals queued sweeps, in a product nothing scans again |
+| Every replica asks every five minutes whether the daily sweep is due | A replica losing the race or stopping is replaced within minutes; asked once a day, rolling deploys can starve it |
+| The daily sweep's lease is taken for a day and left to lapse, never handed back; its holder is refused like any other replica until it lapses | The lease's expiry is the durable record of the last run; handed back, every restart runs it again |
+| A deployment's first start runs the daily sweep | The lease does not exist yet, so nothing records a run |
+| The daily sweep stops at a full queue, keeps the lease, and asks again the next day | Asked again within minutes, it adds to a queue refusing work |
+| A daily sweep failing for any other reason hands the lease back | The next replica asking runs it again |
 | Every arrival queues its own sweep, never skipping one already waiting | A waiting sweep can be claimed and read before the arrival commits |
 | A pass claims sweeps until none is waiting, one placing nothing included | Most arrivals find their work already placed; a pass ending there drains one sweep per interval and fills the queue |
 | Queued work in bounded batches; a full batch queues the next, never loops in the worker | |
@@ -186,5 +192,4 @@ work it leaves with a holder who cannot open it.
 |---|---|
 | A rule naming a component with a letter outside ASCII matches on the three servers and not on SQLite | SQLite folds ASCII only. No deployment runs SQLite; agreement needs a stored folded name, a schema change |
 | The batch-fullness rule is reasoned, never pinned by a test | The divergence needs a write between a batch's read and write; what is pinned is that a sweep spanning several batches routes everything it matches |
-| Work arriving while the sweep queue is full waits for the next arrival or rule in its product | The queue's cap is per kind; nothing retries the skipped sweep |
 | After a switch into group-bound mode, work held by somebody who never signs in again stays with them until they do, are deactivated, or it is handed back by hand | Their set-aside roles grant nothing, so the work is in no list. A person whose groups derive no role is asked about on every sign-in |

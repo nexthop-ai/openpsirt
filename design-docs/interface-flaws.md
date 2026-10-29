@@ -99,6 +99,7 @@ is and § Dispositions what a ruling does.
 | The screen answers for the scope picked, sent with the request and named in the subtitle, or every product | |
 | It offers "Record a reported flaw" to whoever may record undisclosed in the scope's product, or any where none is picked, never labeled as starting a disclosure | An outside report starts a date; Disclose makes an issue public |
 | The empty screen says a flaw gets a date when sent in from outside or when an outside report is ruled its duplicate | |
+| A reader of no undisclosed work at the scope picked is shown "Nothing to list." and "You don't read undisclosed findings in sonic." (or "in any product."), and the list is not asked | An empty list of embargoes reads as nothing due |
 | Disclosing is offered in the notice and on this screen to whoever triages undisclosed work there; it says it cannot be undone, then whether it took effect or waits | |
 | The act is chosen before the date, the reason labeled for it | Extending and bringing forward are different events |
 | The window opens on this deployment's embargo length; the server answers over it where none is named, and the picker's first option says so | A thirty-day window under a ninety-day policy reads "nothing is coming" |
@@ -167,6 +168,7 @@ One card per standing incident; `design-docs/incidents.md` holds the parts.
 
 | Rule | Reason |
 |---|---|
+| The shelf is asked for every reader and holds what each may be told of, a collaborator's own case included. Its count is of dependency findings, drawn under `design-docs/interface.md` § Families a reader holds at the product the address names, or across products: a reader not reading them there sees the records the shelf holds for them with no count, or, where it holds none, "Nothing to list." and the line; the response windows stay | "No incidents are recorded." reads as no attack; the shelf is one of a collaborator's two ways to their case |
 | A window's row shows its end, or "Not started" and what it waits on: a named window, or the release date of a named fix release, or when that date comes | |
 | The response window form's Counted from offers three starts in one control: when it became known, the fix's release, the first notice for each other window in force | A window counts from one moment |
 | Fix releases are listed under the windows with release date ("no release date" starts nothing) and latest scans: "not scanned", "open in its latest scans", "not found in its latest scans"; no word says fixed | |

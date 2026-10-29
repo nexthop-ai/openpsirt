@@ -3,6 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mounted, screen, serve, settle } from "../../test/mount";
+import { readingDependencies } from "../../test/reach";
 import { Effort } from "./Effort";
 import { Overview } from "./Overview";
 import { Scrutiny } from "./Scrutiny";
@@ -47,9 +48,19 @@ describe("a printed sheet's header", () => {
       deferred: 0,
     };
     serve((path) =>
-      path === "/v1/effort"
-        ? { data: { items: Array.from({ length: 50 }, () => row), total: 80 } }
-        : { data: { items: [], total: 0 } },
+      path === "/v1/session/me"
+        ? {
+            data: {
+              identity: "ana",
+              name: "Ana",
+              admin: false,
+              kind: "person",
+              reach: [readingDependencies("sonic")],
+            },
+          }
+        : path === "/v1/effort"
+          ? { data: { items: Array.from({ length: 50 }, () => row), total: 80 } }
+          : { data: { items: [], total: 0 } },
     );
     mount.render(screen(<Effort />, "/analytics/effort-by-component"));
     await settle();

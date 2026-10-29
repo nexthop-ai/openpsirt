@@ -36,6 +36,7 @@ import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
 import { activates, meansFor, moved, typingIn } from "./keys";
 import { useWho } from "../app/session";
+import { counted, heldLine, holding } from "../app/families";
 import { useWeaknessNames } from "../ui/cwe";
 // The page sizes, the orders, the filters and where a row goes all live beside
 // the list rather than in it, because the finding screen asks the same
@@ -210,6 +211,11 @@ export function Findings() {
   const [stayed, setStayed] = useState(0);
   const everyMatching = everyFor !== null && everyFor === questionIn(asked);
   const me = useWho();
+  // Whether this list's total means what it says: the line names a list the
+  // reader reads only disclosed findings in, or one they read none of.
+  const dependencies = holding(me.data, "dependency", product || undefined);
+  const heldSaid = heldLine(dependencies);
+  const reads = counted(dependencies);
   const [handing, setHanding] = useState("");
   // The list somebody has turned down a prepared decision for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
@@ -351,6 +357,7 @@ export function Findings() {
     query,
     selection,
     view,
+    reads,
   });
 
   // The place somebody was, restored when they come back. This is the screen
@@ -807,6 +814,29 @@ export function Findings() {
     return <Navigate replace to={allFindingsAt(asking)} />;
   }
 
+  const where = spanning ? (
+    <>Every product you can read</>
+  ) : (
+    <>
+      {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
+    </>
+  );
+
+  // A list of findings the reader does not read at its scope: no total, no
+  // view counts and no controls over rows there are none of, and none of it
+  // asked, in every view a kept link names. The line says why it is empty.
+  if (!reads) {
+    return (
+      <>
+        <div className="screen-head">
+          <h2>Findings</h2>
+          <p>{where}</p>
+        </div>
+        <Empty title="Nothing to list." detail={heldSaid} />
+      </>
+    );
+  }
+
   if (view === "bumps") {
     return (
       <>
@@ -943,16 +973,9 @@ export function Findings() {
             {findings.isPending ? "…" : total.toLocaleString()}
           </span>
         </h2>
-        <p>
-          {spanning ? (
-            <>Every product you can read</>
-          ) : (
-            <>
-              {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
-            </>
-          )}
-        </p>
+        <p>{where}</p>
       </div>
+      {heldSaid && <p className="hint">{heldSaid}</p>}
 
       {controls}
 

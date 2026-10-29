@@ -14,7 +14,7 @@ afterEach(() => {
   window.sessionStorage.clear();
 });
 
-const may = (product: string) => ({ product, may_hide: true });
+const may = (product: string) => ({ product, may_hide: true, reads_private: true });
 const me = {
   identity: "ana",
   name: "Ana",

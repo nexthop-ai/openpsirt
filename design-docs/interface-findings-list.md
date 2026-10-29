@@ -28,6 +28,7 @@ on the component they are 7,648.
 |---|---|
 | A row says how many packages and consumers it covers | The units somebody acts in |
 | The occurrence count is stored, sorted on, and shown as the row's title | It is what the ceiling on one action is measured against and what the disposition register expands to |
+| For a reader not reading dependency findings at its scope, the list is "Nothing to list." and the line `design-docs/interface.md` § Families a reader holds gives, with no total, view count or control, and none of them asked; a reader of one half alone has its line under the heading | Its total is narrowed to the reader |
 | The row previews in place: its plus opens, under the row, the description, where the component sits, and the finding screen's decision form, with one link to the finding | What a decision requires and writes is unchanged |
 
 ### Row content

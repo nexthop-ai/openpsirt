@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Home } from "./Home";
 import type { Who } from "../app/session";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -13,7 +14,7 @@ const ANA = {
   name: "Ana",
   admin: false,
   kind: "person",
-  reach: [],
+  reach: [readingDependencies("sonic")],
   outcomes: [],
 } as unknown as Who;
 

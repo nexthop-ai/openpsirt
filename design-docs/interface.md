@@ -3,7 +3,7 @@
 The web interface: how it is built, served and routed, how it reaches the
 server, and the rules every screen follows for failure, dates and copy.
 
-Satisfies REQ-41, REQ-42, REQ-54, REQ-59, REQ-60, REQ-61.
+Satisfies REQ-41, REQ-42, REQ-43, REQ-54, REQ-59, REQ-60, REQ-61.
 
 Each screen family has an `interface-` document of its own, listed in `DESIGN.md`.
 The markdown rules are in `design-docs/text.md`.
@@ -14,6 +14,7 @@ The markdown rules are in `design-docs/text.md`.
 - [Path routing](#path-routing)
 - [The generated client](#the-generated-client)
 - [Capabilities before drawing](#capabilities-before-drawing)
+- [Families a reader holds](#families-a-reader-holds)
 - [A read that failed](#a-read-that-failed)
 - [A render that threw](#a-render-that-threw)
 - [An expired session](#an-expired-session)
@@ -109,6 +110,40 @@ they reach.
 | `GET /v1/sign-in` is answered without a credential, listing the providers an operator configured (REQ-41); a test asserts it says nothing about whether any account exists | It is what somebody sees before they have a credential |
 | A 401 from `session/me` is an answer: nobody is signed in | A fresh browser |
 | Markdown is rendered and sanitized in the browser; the server returns markdown only | Preview and published text are one renderer, with no round trip per keystroke |
+
+## Families a reader holds
+
+A reader holds each family of finding apart: dependency findings (a scan's
+matches and the flaws recorded beside them, disclosed or not) and code findings
+(security testing work). A count of a family is drawn only where the reader
+reads it, because the server narrows every count to the reader (REQ-43) and a
+zero for work they cannot see reads as nothing open.
+
+| Reader, at the screen's scope | Screen shows |
+|---|---|
+| Holds the family in no product | No entry, section, tile or count for it |
+| Holds it in another product, not this one | One line, "You don't read code findings in sonic.", and no count |
+| Holds it here, nothing open | A real zero, naming what it counts (REQ-60) |
+| Reads only disclosed work here | The counts, with "Counting disclosed findings, the ones you read here." |
+| Reads only undisclosed work here | The counts, with "Counting undisclosed findings, the ones you read here." |
+| Reads one half alone in some products, across products | The counts, with each half's products named |
+| Reads no finding of either family in any product | The deployment's records: the change history, access and settings where the audit permission or administration allows, beside the work they hold |
+
+| Rule | Reason |
+|---|---|
+| The holding is worked out in the browser from the session's answer (§ Capabilities before drawing): reading disclosed or undisclosed work is the dependency family, reading security testing work the code family | The answer already says what each product lets the reader read; nothing new is asked of the server |
+| Either half of the dependency family may be read without the other, and each read alone is said | Reading is granted per visibility (`design-docs/access.md` § Roles) |
+| One helper decides it, and every screen counting a family or listing undisclosed work alone asks it, never the session's read flags directly | Decided per screen, the answers drift apart |
+| A table spanning products draws a dash, with the line on hover, in a row whose product the reader does not read the family in | A zero in one row reads as that product being clean |
+| A screen whose subject is the family (the findings list, release comparison, a report on it) shows "Nothing to list." and the line in place of its body, the line included for a reader holding it in no product | Reached by a kept link, its empty body reads as nothing open |
+| A report on decisions (the overview's triage times and dismissals, approval quality, effort) is asked and drawn where the reader reads either family at the report's product; elsewhere it shows "Nothing to list." and "You don't read findings in sonic.", or "in any product" for a reader of neither anywhere | Decisions are on either family and narrowed to the reader; an empty exception report reads as a clean one |
+| The line names a product only where the session lists it; a product it does not list, a retired one most often, keeps its figures | A product somebody holds no role on is never named to them (REQ-42), and the server has narrowed a retired product's counts already (REQ-43) |
+| Security testing work is never disclosed, so the code family has no halves | |
+| A count not drawn is not asked for | A request whose answer is never shown is load for nothing |
+| Until the session answers, figures are drawn as for a reader holding the family here | The server has narrowed them already; hiding them first and drawing them after moves the page under the reader |
+| A case collaborator's single issue is not a product holding | Their reach is one issue, named on the issue itself |
+| A count of the reader's own work, or of decisions they may make or approve, is drawn whatever they read: assigned to them, sent back, their proposals, what they reaffirm, and the review queue's lists | It counts what they hold or may act on, which no family narrows away |
+| A record or a scan's metadata stays where its findings are not counted: an upload's receipt, a run's scanner and timing, the response windows | It is not a count of findings |
 
 ## A read that failed
 
@@ -309,5 +344,6 @@ a text file that reads as binary, which every text tool skips silently.
 
 | Limit | Detail |
 |---|---|
+| Code findings are counted on no shared screen | The code family's rule reaches the rail and the product page's link alone; home, the component screen, the tree and the product figures count dependency findings |
 | No component library | Built from the mockup's tokens and components written here; a packaged data grid owning its markup cannot become cards on a phone (REQ-55) |
 | Dependencies are pinned exactly | A range resolves at build time; `npm ci` installs the lockfile |

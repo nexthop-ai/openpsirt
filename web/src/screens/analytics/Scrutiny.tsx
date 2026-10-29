@@ -6,6 +6,8 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
+import { decidesAt, decidesLine } from "../../app/families";
+import { useWho } from "../../app/session";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
@@ -60,9 +62,15 @@ export function Scrutiny() {
   // log's list from midnight, so the list held rows the figure did not count.
   const when = stated(period) ? askedFor(period, days) : { from: windowStart(days) };
   const product = at.product ?? "";
+  // Approvals are of decisions on either family, narrowed by the server to
+  // the reader: for a reader of neither at the scope, an empty exception
+  // report reads as a clean one, so it is neither asked nor drawn.
+  const who = useWho().data;
+  const decides = decidesAt(who, at.product);
 
   const got = useQuery({
     queryKey: ["scrutiny", product, when],
+    enabled: decides,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/approvals/scrutiny", {
@@ -97,7 +105,7 @@ export function Scrutiny() {
 
   return (
     <Sheet
-      settled={got.isSuccess}
+      settled={!decides || got.isSuccess}
       name="Approval quality"
       answers="how much a second pair of eyes actually did."
       of={byProduct(at.product)}
@@ -106,7 +114,9 @@ export function Scrutiny() {
       <WindowPicker offered={WINDOWS} days={days} />
       <PeriodPicker period={period} />
 
-      {got.isPending ? (
+      {!decides ? (
+        <Empty title="Nothing to list." detail={decidesLine(who, at.product)} />
+      ) : got.isPending ? (
         <Loading />
       ) : got.isError ? (
         <Failed error={got.error} what="The state of approvals could not be read." />

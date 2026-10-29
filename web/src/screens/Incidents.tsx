@@ -9,6 +9,8 @@ import { api, type Body } from "../api/client";
 import { useProducts, useBranchesAndTags } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
+import { counted, heldLine, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { AddButton } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -51,6 +53,12 @@ export function Incidents() {
   const [params] = useSearchParams();
   const product = params.get("product") ?? "";
   const [recording, setRecording] = useState(false);
+  // A record is against an issue of the dependency family, so it is counted
+  // only where the reader reads those findings at the scope the address
+  // names. The shelf is read for everybody: it holds what each reader may be
+  // told of, and a collaborator's own case is on it whatever they read.
+  const dependencies = holding(who.data, "dependency", product || undefined);
+  const shown = counted(dependencies);
   const shelf = useQuery({
     queryKey: ["incidents"],
     queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
@@ -81,9 +89,7 @@ export function Incidents() {
   return (
     <>
       <div className="screen-head">
-        <h2>
-          Incidents <span className="n">{items.length.toLocaleString()}</span>
-        </h2>
+        <h2>Incidents {shown && <span className="n">{items.length.toLocaleString()}</span>}</h2>
         <p>
           {product ? (
             <>
@@ -106,7 +112,10 @@ export function Incidents() {
         <p className="hint">No windows are declared. An administrator declares them.</p>
       )}
 
-      {items.length === 0 ? (
+      {shown && <HeldLine at={dependencies} />}
+      {!shown && items.length === 0 ? (
+        <Empty title="Nothing to list." detail={heldLine(dependencies)} />
+      ) : items.length === 0 ? (
         <Empty
           title={product ? `${productName} has no incidents.` : "No incidents are recorded."}
           detail={

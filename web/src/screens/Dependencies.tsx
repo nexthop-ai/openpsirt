@@ -17,7 +17,9 @@ import { Failed } from "../ui/Failed";
 import { sharedVersion } from "../ui/versions";
 import { Crumbs } from "../ui/Crumbs";
 import { Icon } from "../ui/Icons";
-import { mayOf, useWho } from "../app/session";
+import { mayOf, useWho, type Who } from "../app/session";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { useReseed } from "../ui/reseed";
 
 // The counts beneath a node, worst first, as one bar whose widths are them.
@@ -90,7 +92,7 @@ export function Dependencies() {
     return <Failed error={who.error} what="Your reach here could not be read." />;
   }
   if (who.data && !mayOf(who.data, product)) return <Yours />;
-  return <Whole />;
+  return <Whole who={who.data} />;
 }
 
 // The chains somebody's own findings sit on.
@@ -213,8 +215,13 @@ function Yours() {
   );
 }
 
-function Whole() {
+function Whole({ who }: { who: Who | null | undefined }) {
   const { product = "", branch_or_tag: branchOrTag = "", variant = "" } = useParams();
+  // A node's counts are the reader's dependency findings beneath it. Where they
+  // read none here the counts are zeros that mean nothing, so the tree is drawn
+  // as the inventory alone.
+  const dependencies = holding(who, "dependency", product);
+  const counts = counted(dependencies);
   const at = useMemo(
     () => ({ product, branch_or_tag: branchOrTag, variant }),
     [product, branchOrTag, variant],
@@ -375,6 +382,7 @@ function Whole() {
           )}
         </p>
       </div>
+      <HeldLine at={dependencies} />
 
       {/* Searching is the way in, and browsing is for answering "what else is
           under this" once somebody is already somewhere. Eight thousand
@@ -434,7 +442,7 @@ function Whole() {
                   detail="Part of a name, ignoring case. Components not in this build will not appear."
                 />
               ) : (
-                <Matches at={at} found={found} focus={focus} onSelect={select} />
+                <Matches at={at} found={found} focus={focus} counts={counts} onSelect={select} />
               ))}
             {!searching && root && (
               <Branches
@@ -445,12 +453,13 @@ function Whole() {
                 widened={widened}
                 onPath={onPath}
                 focus={focus}
+                counts={counts}
                 onToggle={toggle}
                 onSelect={select}
                 onWiden={(key) => setWidened((prev) => new Set(prev).add(key))}
               />
             )}
-            {searching && (
+            {searching && counts && (
               <p className="hint" style={{ margin: "12px 0 0" }}>
                 Most findings first
               </p>
@@ -469,11 +478,13 @@ function Matches({
   at,
   found,
   focus,
+  counts,
   onSelect,
 }: {
   at: At;
   found: Node[];
   focus: string;
+  counts: boolean;
   onSelect: (name: string, version?: string, ecosystem?: string, namespace?: string) => void;
 }) {
   return (
@@ -492,13 +503,15 @@ function Matches({
             {node.component}
           </button>
           <span className="ver">{node.version}</span>
-          <Strip by={node.beneath_by_severity} />
-          <span
-            className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
-            title={`${node.beneath.toLocaleString()} distinct issues beneath this`}
-          >
-            {node.beneath.toLocaleString()}
-          </span>
+          {counts && <Strip by={node.beneath_by_severity} />}
+          {counts && (
+            <span
+              className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
+              title={`${node.beneath.toLocaleString()} distinct issues beneath this`}
+            >
+              {node.beneath.toLocaleString()}
+            </span>
+          )}
           {/* The same way through a tree row offers: what pulls it in, what it
               pulls in and what is open against it, on the component's own
               screen. Search is how anything is found in a build of thousands,
@@ -559,6 +572,7 @@ function Branches({
   widened,
   onPath,
   focus,
+  counts,
   onToggle,
   onSelect,
   onWiden,
@@ -570,6 +584,7 @@ function Branches({
   widened: Set<string>;
   onPath: Set<string>;
   focus: string;
+  counts: boolean;
   onToggle: (key: string) => void;
   onSelect: (name: string, version?: string, ecosystem?: string, namespace?: string) => void;
   onWiden: (key: string) => void;
@@ -666,20 +681,22 @@ function Branches({
             six different depths, bands that start wherever the name ends are
             five numbers a reader cannot compare, which is the one thing they
             are for. */}
-        <Strip by={node.beneath_by_severity} />
+        {counts && <Strip by={node.beneath_by_severity} />}
         {/* What is open in everything under it, not only on it. A container
             holds none of its own, so counting only itself said every one of
             them was clean while the packages inside held thousands. */}
-        <span
-          className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
-          title={
-            node.children > 0
-              ? `${node.beneath.toLocaleString()} distinct issues in here, ${node.findings.toLocaleString()} on this component`
-              : `${node.beneath.toLocaleString()} distinct issues`
-          }
-        >
-          {node.beneath.toLocaleString()}
-        </span>
+        {counts && (
+          <span
+            className={`count${node.beneath > HOT ? " hot" : node.beneath === 0 ? " none" : ""}`}
+            title={
+              node.children > 0
+                ? `${node.beneath.toLocaleString()} distinct issues in here, ${node.findings.toLocaleString()} on this component`
+                : `${node.beneath.toLocaleString()} distinct issues`
+            }
+          >
+            {node.beneath.toLocaleString()}
+          </span>
+        )}
         {/* What pulls it in, what it pulls in, its history and what is open
             against it, on the component's own screen rather than a second
             copy of that page drawn over the tree. */}

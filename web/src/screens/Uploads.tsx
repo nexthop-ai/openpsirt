@@ -19,6 +19,9 @@ import { Wide } from "../ui/Wide";
 import { sizeSaid } from "../ui/size";
 import { inventoryChangesAt, runAt, uploadsAt, type Build, type UploadType } from "../app/routes";
 import { linkTo } from "../api/links";
+import { useWho } from "../app/session";
+import { counted as familyCounted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { AnalysisRuns, Documents } from "./UploadLists";
 
 // How often a page holding an unsettled upload is asked for again.
@@ -139,6 +142,10 @@ export function Uploads() {
 function SBOMs({ build }: { build: Build }) {
   const { product, branch_or_tag: branchOrTag, variant } = build;
   const at = build;
+  // What a run opened and closed are dependency findings, narrowed to the
+  // reader: a reader who does not read them here would see a zero on every row.
+  const dependencies = holding(useWho().data, "dependency", product);
+  const changes = familyCounted(dependencies);
   const scans = useQuery({
     queryKey: ["scans", product, branchOrTag, variant],
     queryFn: async () =>
@@ -222,6 +229,8 @@ function SBOMs({ build }: { build: Build }) {
         </p>
       )}
 
+      {items.length > 0 && <HeldLine at={dependencies} />}
+
       {items.length === 0 ? (
         <Empty
           title="Nothing has been uploaded here."
@@ -235,8 +244,8 @@ function SBOMs({ build }: { build: Build }) {
                 <th>Received</th>
                 <th>Built</th>
                 <th>State</th>
-                <th className="num">Opened</th>
-                <th className="num">Closed</th>
+                {changes && <th className="num">Opened</th>}
+                {changes && <th className="num">Closed</th>}
                 <th>Sent</th>
                 <th className="num">Placed</th>
                 <th>Inventory moved</th>
@@ -291,8 +300,8 @@ function SBOMs({ build }: { build: Build }) {
                       yet. Drawn as a dash, both of those read as "this upload
                       opened nothing", which is a statement about a scan that
                       never read it. */}
-                  <td className="num">{counted(scan.opened)}</td>
-                  <td className="num">{counted(scan.closed)}</td>
+                  {changes && <td className="num">{counted(scan.opened)}</td>}
+                  {changes && <td className="num">{counted(scan.closed)}</td>}
                   <td>
                     <Sent at={at} scan={scan.scan_id ?? 0} sent={scan.sent ?? []} />
                   </td>

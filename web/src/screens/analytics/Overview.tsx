@@ -28,6 +28,9 @@ import {
   useSheetWindow,
 } from "./Window";
 import { useRowOpener } from "../../ui/opens";
+import { useWho } from "../../app/session";
+import { counted, decidesAt, decidesLine, holding } from "../../app/families";
+import { HeldLine } from "../../ui/HeldLine";
 import { Wide } from "../../ui/Wide";
 import { decisionOccurrenceAt } from "../../app/routes";
 
@@ -96,8 +99,18 @@ export function Overview() {
   // over all time beside a figure that counts one window.
   const began = stated(period) ? period.from : windowStart(days);
 
+  // Keeping pace and repeated deferrals count dependency findings, drawn and
+  // asked only where the reader reads them at the scope. Triage times and
+  // dismissals are decisions on either family, and mean nothing to a reader
+  // of neither at the scope.
+  const who = useWho().data;
+  const dependencies = holding(who, "dependency", at.product);
+  const figures = counted(dependencies);
+  const decides = decidesAt(who, at.product);
+
   const pace = useQuery({
     queryKey: ["remediation", scope, when],
+    enabled: figures,
     queryFn: async () =>
       unwrap(await api.GET("/v1/remediation", { params: { query: { ...when, ...scope } } })),
   });
@@ -117,7 +130,7 @@ export function Overview() {
   const argued = useQuery({
     // Asked once the server has said which outcomes dismiss: asked before, the
     // list of them is empty and the answer is about none of them.
-    enabled: known,
+    enabled: decides && known,
     queryKey: ["dismissals", at.product ?? "", when, dismissing],
     queryFn: async () =>
       unwrap(
@@ -143,6 +156,7 @@ export function Overview() {
   });
   const measures = useQuery({
     queryKey: ["measures", when, at.product ?? ""],
+    enabled: decides,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/measures", {
@@ -152,6 +166,7 @@ export function Overview() {
   });
   const repeated = useQuery({
     queryKey: ["repeated", at.product ?? ""],
+    enabled: figures,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/deferrals/repeated", {
@@ -162,400 +177,418 @@ export function Overview() {
 
   return (
     <Sheet
-      settled={pace.isSuccess && measures.isSuccess && repeated.isSuccess && argued.isSuccess}
+      settled={
+        (!figures || (pace.isSuccess && repeated.isSuccess)) &&
+        (!decides || (measures.isSuccess && argued.isSuccess))
+      }
       name="Program overview"
       answers="how the work is going, rather than what it is."
       asked={coveringPeriod(period, days)}
     >
       <WindowPicker offered={WINDOWS} days={days} />
       <PeriodPicker period={period} />
+      {decides ? (
+        <HeldLine at={dependencies} />
+      ) : (
+        <Empty title="Nothing to list." detail={decidesLine(who, at.product)} />
+      )}
 
-      <section className="panel" style={{ marginTop: 14 }}>
-        <h3>Keeping pace</h3>
-        {pace.isPending ? (
-          <Loading />
-        ) : pace.isError ? (
-          <Failed error={pace.error} what="The remediation rate could not be read." />
-        ) : (
-          <>
-            <div className="kpis" style={{ marginTop: 8 }}>
-              {/* Neither opens a list. "Fixed" counts what closed, and
+      {figures && (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <h3>Keeping pace</h3>
+          {pace.isPending ? (
+            <Loading />
+          ) : pace.isError ? (
+            <Failed error={pace.error} what="The remediation rate could not be read." />
+          ) : (
+            <>
+              <div className="kpis" style={{ marginTop: 8 }}>
+                {/* Neither opens a list. "Fixed" counts what closed, and
                   "Appeared" counts what closed since as well as what is still
                   open, and the findings list holds only what is open. */}
-              <div className="kpi">
-                <span className="l">Fixed</span>
-                <span className="n">{(pace.data?.fixed ?? 0).toLocaleString()}</span>
-                <span className="d">
-                  distinct issues that went away · a version carrying the issue forward is not a fix
-                </span>
+                <div className="kpi">
+                  <span className="l">Fixed</span>
+                  <span className="n">{(pace.data?.fixed ?? 0).toLocaleString()}</span>
+                  <span className="d">
+                    distinct issues that went away · a version carrying the issue forward is not a
+                    fix
+                  </span>
+                </div>
+                <div className="kpi">
+                  <span className="l">Appeared</span>
+                  <span className="n">{(pace.data?.opened ?? 0).toLocaleString()}</span>
+                  <span className="d">distinct issues, same window and unit as fixed</span>
+                </div>
               </div>
-              <div className="kpi">
-                <span className="l">Appeared</span>
-                <span className="n">{(pace.data?.opened ?? 0).toLocaleString()}</span>
-                <span className="d">distinct issues, same window and unit as fixed</span>
-              </div>
-            </div>
 
-            <h4 style={{ marginTop: 14 }}>Average time to fix</h4>
-            {Object.keys(pace.data?.time_to_fix ?? {}).length === 0 ? (
-              <p className="hint">Nothing closed in this window.</p>
-            ) : (
-              <ul className="files">
-                {Object.entries(pace.data?.time_to_fix ?? {})
-                  // Worst first, the way every other list here orders them.
-                  // A bare sort is alphabetical, which printed low above
-                  // medium under a heading the aging table forty lines down
-                  // orders correctly.
-                  .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
-                  .map(([band, hours]) => (
-                    <li key={band}>
-                      <Severity word={band} /> <b>{Math.round((hours as number) / 24)}</b> days
-                    </li>
-                  ))}
-              </ul>
-            )}
+              <h4 style={{ marginTop: 14 }}>Average time to fix</h4>
+              {Object.keys(pace.data?.time_to_fix ?? {}).length === 0 ? (
+                <p className="hint">Nothing closed in this window.</p>
+              ) : (
+                <ul className="files">
+                  {Object.entries(pace.data?.time_to_fix ?? {})
+                    // Worst first, the way every other list here orders them.
+                    // A bare sort is alphabetical, which printed low above
+                    // medium under a heading the aging table forty lines down
+                    // orders correctly.
+                    .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
+                    .map(([band, hours]) => (
+                      <li key={band}>
+                        <Severity word={band} /> <b>{Math.round((hours as number) / 24)}</b> days
+                      </li>
+                    ))}
+                </ul>
+              )}
 
-            <h4 style={{ marginTop: 14 }}>Aging work</h4>
-            {/* One number per bucket says a hundred things are over three
+              <h4 style={{ marginTop: 14 }}>Aging work</h4>
+              {/* One number per bucket says a hundred things are over three
                 months old and neither whether any of them matters nor
                 whether anybody has looked. A bucket of lows that were all
                 argued and dismissed is a tidy record; a bucket with four
                 criticals nobody has read is a backlog. */}
-            <Wide>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Open for</th>
-                    <th className="num">Issues</th>
-                    <th>By severity</th>
-                    <th className="num">Nobody has said</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(pace.data?.aging ?? []).map((bucket) => (
-                    <tr key={bucket.label}>
-                      {/* Every figure opens the list it counts. A number
-                          nobody can act on from where they read it sends
-                          somebody to build the same question by hand, and the
-                          question they build is not always the same one. */}
-                      <td>
-                        <Link to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0)}>
-                          {bucket.label}
-                        </Link>
-                      </td>
-                      <td className="num">
-                        <Link to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0)}>
-                          {(bucket.open ?? 0).toLocaleString()}
-                        </Link>
-                      </td>
-                      <td>
-                        {Object.entries(bucket.by_severity ?? {})
-                          .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
-                          .map(([band, n]) => (
-                            <span key={band} style={{ marginRight: 8 }}>
-                              {band === "unrated" ? (
-                                <span className="hint">unrated</span>
-                              ) : (
-                                <Severity word={band} />
-                              )}{" "}
-                              {n.toLocaleString()}
-                            </span>
-                          ))}
-                        {Object.keys(bucket.by_severity ?? {}).length === 0 && (
-                          <span className="hint">—</span>
-                        )}
-                      </td>
-                      <td className="num">
-                        {(bucket.undecided ?? 0) > 0 ? (
-                          <Link
-                            to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0, {
-                              state: "undecided",
-                            })}
-                            className="state open"
-                          >
-                            {(bucket.undecided ?? 0).toLocaleString()}
-                          </Link>
-                        ) : (
-                          <span className="hint">none</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Wide>
-            <p className="hint">
-              &ldquo;Nobody has said&rdquo; includes decisions still waiting for approval.
-            </p>
-          </>
-        )}
-      </section>
-
-      {/* How long it takes and who is doing it. Every one of these was in
-          the record and none was added up: a queue of the same size is a
-          different place depending on whether things sit in it for a day or a
-          quarter. */}
-      <section className="panel" style={{ marginTop: 14 }}>
-        <h3>Triage times</h3>
-        {/* Said inside the printing area rather than behind noprint: the
-            printed header states the sheet's scope over every section, and
-            this one is counted by product alone. */}
-        <p className="hint" style={{ marginTop: 0 }}>
-          {byProduct(at.product)}.
-        </p>
-        {measures.isPending ? (
-          <Loading />
-        ) : measures.isError ? (
-          <Failed error={measures.error} what="The state of triage could not be read." />
-        ) : (measures.data?.sampled ?? 0) === 0 ? (
-          <p className="hint">Nothing was proposed in this window.</p>
-        ) : (
-          <>
-            <p className="reading">
-              Three figures rather than an average, which would describe neither a busy day nor a
-              slow quarter.
-            </p>
-            <Wide>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Wait</th>
-                    <th>Severity</th>
-                    <th className="num">Count</th>
-                    <th className="num">Middle</th>
-                    <th className="num">9 in 10 under</th>
-                    <th className="num">Longest</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    ["Before anybody decided", measures.data?.time_to_decide ?? []],
-                    ["Waiting for a second person", measures.data?.time_to_agree ?? []],
-                  ].map(([what, bands]) =>
-                    (bands as { band?: string }[]).length === 0 ? (
-                      <tr key={what as string}>
-                        <td>{what as string}</td>
-                        <td colSpan={5} className="hint">
-                          nothing yet
-                        </td>
-                      </tr>
-                    ) : (
-                      (
-                        bands as {
-                          band?: string;
-                          count?: number;
-                          median_days?: number;
-                          p90_days?: number;
-                          worst_days?: number;
-                        }[]
-                      ).map((row, i) => (
-                        <tr key={`${what as string} ${row.band}`}>
-                          <td>{i === 0 ? (what as string) : ""}</td>
-                          <td>
-                            {row.band === "unrated" ? (
-                              <span className="hint">unrated</span>
-                            ) : (
-                              <Severity word={row.band} />
-                            )}
-                          </td>
-                          <td className="num">{(row.count ?? 0).toLocaleString()}</td>
-                          <td className="num">{row.median_days} d</td>
-                          <td className="num">{row.p90_days} d</td>
-                          <td className="num">{row.worst_days} d</td>
-                        </tr>
-                      ))
-                    ),
-                  )}
-                </tbody>
-              </table>
-            </Wide>
-            <p className="hint">
-              Measured over {(measures.data?.sampled ?? 0).toLocaleString()}{" "}
-              {(measures.data?.sampled ?? 0) === 1 ? "decision" : "decisions"}
-              {measures.data?.capped
-                ? " — the most recent part of the window rather than all of it"
-                : ""}
-              . {(measures.data?.sent_back ?? 0).toLocaleString()}{" "}
-              {(measures.data?.sent_back ?? 0) === 1 ? "decision was" : "decisions were"} sent back.
-            </p>
-
-            <h4 style={{ marginTop: 14 }}>Throughput by person</h4>
-            {(measures.data?.throughput ?? []).length === 0 ? (
-              <p className="hint">Nobody in this window.</p>
-            ) : (
               <Wide>
                 <table>
                   <thead>
                     <tr>
-                      <th>Person</th>
-                      <th className="num">Proposed</th>
-                      <th className="num">Agreed to</th>
-                      <th className="num">Withdrawn</th>
+                      <th>Open for</th>
+                      <th className="num">Issues</th>
+                      <th>By severity</th>
+                      <th className="num">Nobody has said</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(measures.data?.throughput ?? []).map((row) => (
-                      <tr key={row.person}>
-                        <td className="id">{row.person}</td>
-                        <td className="num">{(row.proposed ?? 0).toLocaleString()}</td>
-                        <td className="num">{(row.approved ?? 0).toLocaleString()}</td>
-                        <td className="num">{(row.withdrawn ?? 0).toLocaleString()}</td>
+                    {(pace.data?.aging ?? []).map((bucket) => (
+                      <tr key={bucket.label}>
+                        {/* Every figure opens the list it counts. A number
+                          nobody can act on from where they read it sends
+                          somebody to build the same question by hand, and the
+                          question they build is not always the same one. */}
+                        <td>
+                          <Link to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0)}>
+                            {bucket.label}
+                          </Link>
+                        </td>
+                        <td className="num">
+                          <Link to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0)}>
+                            {(bucket.open ?? 0).toLocaleString()}
+                          </Link>
+                        </td>
+                        <td>
+                          {Object.entries(bucket.by_severity ?? {})
+                            .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
+                            .map(([band, n]) => (
+                              <span key={band} style={{ marginRight: 8 }}>
+                                {band === "unrated" ? (
+                                  <span className="hint">unrated</span>
+                                ) : (
+                                  <Severity word={band} />
+                                )}{" "}
+                                {n.toLocaleString()}
+                              </span>
+                            ))}
+                          {Object.keys(bucket.by_severity ?? {}).length === 0 && (
+                            <span className="hint">—</span>
+                          )}
+                        </td>
+                        <td className="num">
+                          {(bucket.undecided ?? 0) > 0 ? (
+                            <Link
+                              to={openFor(at, bucket.days ?? 0, bucket.to_days ?? 0, {
+                                state: "undecided",
+                              })}
+                              className="state open"
+                            >
+                              {(bucket.undecided ?? 0).toLocaleString()}
+                            </Link>
+                          ) : (
+                            <span className="hint">none</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </Wide>
-            )}
-            <p className="hint">
-              Dated by when the approval happened. Narrowed to what you may read.
-            </p>
-          </>
-        )}
-      </section>
+              <p className="hint">
+                &ldquo;Nobody has said&rdquo; includes decisions still waiting for approval.
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
-      <section className="panel" style={{ marginTop: 14 }}>
-        <h3>Repeated deferrals</h3>
-        <p className="hint">
-          {byProduct(at.product)}, all time.{" "}
-          {/* The one list on this sheet rather than a figure, so it is the one
-              thing here that exports. A review argues over the rows. */}
-          <a href={repeatsFile(at.product ?? "", "csv")}>CSV</a> ·{" "}
-          <a href={repeatsFile(at.product ?? "", "json")}>JSON</a>
-        </p>
-        {repeated.isPending ? (
-          <Loading />
-        ) : repeated.isError ? (
-          <Failed error={repeated.error} what="Repeat deferrals could not be read." />
-        ) : (repeated.data?.items ?? []).length === 0 ? (
-          <Empty
-            title="Nothing has been put off more than once."
-            detail="Deferrals are recorded either way; this lists only the ones that repeat."
-          />
-        ) : (
-          <Wide>
-            <table>
-              <thead>
-                <tr>
-                  <th>Issue</th>
-                  <th>Product</th>
-                  <th className="num">Times</th>
-                  <th className="num">Total days</th>
-                  <th>State</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(repeated.data?.items ?? []).map((row) => (
-                  <tr key={`${row.product} ${row.vulnerability} ${row.occurrence}`}>
-                    <td>
-                      <Severity word={row.severity} />{" "}
-                      <span className="id">{row.vulnerability}</span>
-                    </td>
-                    <td>{row.product_name || row.product}</td>
-                    <td className="num">{row.times}</td>
-                    <td className="num">{row.total_days}</td>
-                    <td>
-                      {row.standing ? (
-                        <span className="state waiting">Still deferred</span>
+      {/* How long it takes and who is doing it. Every one of these was in
+          the record and none was added up: a queue of the same size is a
+          different place depending on whether things sit in it for a day or a
+          quarter. */}
+      {decides && (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <h3>Triage times</h3>
+          {/* Said inside the printing area rather than behind noprint: the
+            printed header states the sheet's scope over every section, and
+            this one is counted by product alone. */}
+          <p className="hint" style={{ marginTop: 0 }}>
+            {byProduct(at.product)}.
+          </p>
+          {measures.isPending ? (
+            <Loading />
+          ) : measures.isError ? (
+            <Failed error={measures.error} what="The state of triage could not be read." />
+          ) : (measures.data?.sampled ?? 0) === 0 ? (
+            <p className="hint">Nothing was proposed in this window.</p>
+          ) : (
+            <>
+              <p className="reading">
+                Three figures rather than an average, which would describe neither a busy day nor a
+                slow quarter.
+              </p>
+              <Wide>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Wait</th>
+                      <th>Severity</th>
+                      <th className="num">Count</th>
+                      <th className="num">Middle</th>
+                      <th className="num">9 in 10 under</th>
+                      <th className="num">Longest</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["Before anybody decided", measures.data?.time_to_decide ?? []],
+                      ["Waiting for a second person", measures.data?.time_to_agree ?? []],
+                    ].map(([what, bands]) =>
+                      (bands as { band?: string }[]).length === 0 ? (
+                        <tr key={what as string}>
+                          <td>{what as string}</td>
+                          <td colSpan={5} className="hint">
+                            nothing yet
+                          </td>
+                        </tr>
                       ) : (
-                        <span className="hint">ran out</span>
-                      )}
-                    </td>
+                        (
+                          bands as {
+                            band?: string;
+                            count?: number;
+                            median_days?: number;
+                            p90_days?: number;
+                            worst_days?: number;
+                          }[]
+                        ).map((row, i) => (
+                          <tr key={`${what as string} ${row.band}`}>
+                            <td>{i === 0 ? (what as string) : ""}</td>
+                            <td>
+                              {row.band === "unrated" ? (
+                                <span className="hint">unrated</span>
+                              ) : (
+                                <Severity word={row.band} />
+                              )}
+                            </td>
+                            <td className="num">{(row.count ?? 0).toLocaleString()}</td>
+                            <td className="num">{row.median_days} d</td>
+                            <td className="num">{row.p90_days} d</td>
+                            <td className="num">{row.worst_days} d</td>
+                          </tr>
+                        ))
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </Wide>
+              <p className="hint">
+                Measured over {(measures.data?.sampled ?? 0).toLocaleString()}{" "}
+                {(measures.data?.sampled ?? 0) === 1 ? "decision" : "decisions"}
+                {measures.data?.capped
+                  ? " — the most recent part of the window rather than all of it"
+                  : ""}
+                . {(measures.data?.sent_back ?? 0).toLocaleString()}{" "}
+                {(measures.data?.sent_back ?? 0) === 1 ? "decision was" : "decisions were"} sent
+                back.
+              </p>
+
+              <h4 style={{ marginTop: 14 }}>Throughput by person</h4>
+              {(measures.data?.throughput ?? []).length === 0 ? (
+                <p className="hint">Nobody in this window.</p>
+              ) : (
+                <Wide>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Person</th>
+                        <th className="num">Proposed</th>
+                        <th className="num">Agreed to</th>
+                        <th className="num">Withdrawn</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(measures.data?.throughput ?? []).map((row) => (
+                        <tr key={row.person}>
+                          <td className="id">{row.person}</td>
+                          <td className="num">{(row.proposed ?? 0).toLocaleString()}</td>
+                          <td className="num">{(row.approved ?? 0).toLocaleString()}</td>
+                          <td className="num">{(row.withdrawn ?? 0).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Wide>
+              )}
+              <p className="hint">
+                Dated by when the approval happened. Narrowed to what you may read.
+              </p>
+            </>
+          )}
+        </section>
+      )}
+
+      {figures && (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <h3>Repeated deferrals</h3>
+          <p className="hint">
+            {byProduct(at.product)}, all time.{" "}
+            {/* The one list on this sheet rather than a figure, so it is the one
+              thing here that exports. A review argues over the rows. */}
+            <a href={repeatsFile(at.product ?? "", "csv")}>CSV</a> ·{" "}
+            <a href={repeatsFile(at.product ?? "", "json")}>JSON</a>
+          </p>
+          {repeated.isPending ? (
+            <Loading />
+          ) : repeated.isError ? (
+            <Failed error={repeated.error} what="Repeat deferrals could not be read." />
+          ) : (repeated.data?.items ?? []).length === 0 ? (
+            <Empty
+              title="Nothing has been put off more than once."
+              detail="Deferrals are recorded either way; this lists only the ones that repeat."
+            />
+          ) : (
+            <Wide>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Issue</th>
+                    <th>Product</th>
+                    <th className="num">Times</th>
+                    <th className="num">Total days</th>
+                    <th>State</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </Wide>
-        )}
-        {/* How many there are, not how many are listed. A capped list drawn as
+                </thead>
+                <tbody>
+                  {(repeated.data?.items ?? []).map((row) => (
+                    <tr key={`${row.product} ${row.vulnerability} ${row.occurrence}`}>
+                      <td>
+                        <Severity word={row.severity} />{" "}
+                        <span className="id">{row.vulnerability}</span>
+                      </td>
+                      <td>{row.product_name || row.product}</td>
+                      <td className="num">{row.times}</td>
+                      <td className="num">{row.total_days}</td>
+                      <td>
+                        {row.standing ? (
+                          <span className="state waiting">Still deferred</span>
+                        ) : (
+                          <span className="hint">ran out</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Wide>
+          )}
+          {/* How many there are, not how many are listed. A capped list drawn as
             the whole of it is how "forty repeat deferrals" reads as the whole
             shape of a program that has two hundred — and the endpoint now says
             what the whole is, so the footer says it too. */}
-        <Paged
-          shown={(repeated.data?.items ?? []).length}
-          total={repeated.data?.total}
-          limit={REPEATS}
-          what="listed"
-        />
-      </section>
-
-      <section className="panel" style={{ marginTop: 14 }}>
-        <h3>Dismissals</h3>
-        <p className="hint">
-          Approved in this window, newest first. {byProduct(at.product)}, one row per occurrence.{" "}
-          <Link to="/audit-log">The audit log</Link> groups them by decision.
-        </p>
-        {argued.isPending ? (
-          <Loading />
-        ) : argued.isError ? (
-          <Failed error={argued.error} what="The findings argued away could not be read." />
-        ) : (argued.data?.items ?? []).length === 0 ? (
-          <Empty
-            title="Nothing has been argued away in this window."
-            detail="A dismissal appears here once a second person has agreed to it."
+          <Paged
+            shown={(repeated.data?.items ?? []).length}
+            total={repeated.data?.total}
+            limit={REPEATS}
+            what="listed"
           />
-        ) : (
-          <Wide>
-            <table>
-              <thead>
-                <tr>
-                  <th>Issue</th>
-                  {/* Which of the three, because they are read together and
+        </section>
+      )}
+
+      {decides && (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <h3>Dismissals</h3>
+          <p className="hint">
+            Approved in this window, newest first. {byProduct(at.product)}, one row per occurrence.{" "}
+            <Link to="/audit-log">The audit log</Link> groups them by decision.
+          </p>
+          {argued.isPending ? (
+            <Loading />
+          ) : argued.isError ? (
+            <Failed error={argued.error} what="The findings argued away could not be read." />
+          ) : (argued.data?.items ?? []).length === 0 ? (
+            <Empty
+              title="Nothing has been argued away in this window."
+              detail="A dismissal appears here once a second person has agreed to it."
+            />
+          ) : (
+            <Wide>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Issue</th>
+                    {/* Which of the three, because they are read together and
                       are not the same decision. */}
-                  <th>Dismissed as</th>
-                  <th>Component</th>
-                  {/* Which occurrence. Without it a decision covering forty of them
+                    <th>Dismissed as</th>
+                    <th>Component</th>
+                    {/* Which occurrence. Without it a decision covering forty of them
                       draws forty rows that differ in nothing a reader can
                       see, which reads as the same dismissal recorded forty
                       times. */}
-                  <th>Where</th>
-                  <th>Because</th>
-                  <th>Reasoning</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(argued.data?.items ?? []).map((row) => (
-                  <tr
-                    key={row.id}
-                    className="row opens"
-                    onClick={opener(decisionOccurrenceAt(row.id))}
-                  >
-                    <td>
-                      <Link to={decisionOccurrenceAt(row.id)} className="id">
-                        {row.issue}
-                      </Link>
-                    </td>
-                    <td>
-                      <Outcome outcome={row.outcome} />
-                    </td>
-                    <td className="id">{row.component}</td>
-                    <td className="id">
-                      {row.consumer || <span className="hint">the build itself</span>}
-                    </td>
-                    <td>
-                      {row.justification ? (
-                        <Because code={row.justification} />
-                      ) : (
-                        <span className="hint">—</span>
-                      )}
-                    </td>
-                    <td className="hint" style={{ maxWidth: "42ch" }}>
-                      {(row.reasoning ?? "").split("\n")[0]?.slice(0, 140)}
-                    </td>
+                    <th>Where</th>
+                    <th>Because</th>
+                    <th>Reasoning</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </Wide>
-        )}
-        {/* The audit log says how many there are; the sheet shows the newest
+                </thead>
+                <tbody>
+                  {(argued.data?.items ?? []).map((row) => (
+                    <tr
+                      key={row.id}
+                      className="row opens"
+                      onClick={opener(decisionOccurrenceAt(row.id))}
+                    >
+                      <td>
+                        <Link to={decisionOccurrenceAt(row.id)} className="id">
+                          {row.issue}
+                        </Link>
+                      </td>
+                      <td>
+                        <Outcome outcome={row.outcome} />
+                      </td>
+                      <td className="id">{row.component}</td>
+                      <td className="id">
+                        {row.consumer || <span className="hint">the build itself</span>}
+                      </td>
+                      <td>
+                        {row.justification ? (
+                          <Because code={row.justification} />
+                        ) : (
+                          <span className="hint">—</span>
+                        )}
+                      </td>
+                      <td className="hint" style={{ maxWidth: "42ch" }}>
+                        {(row.reasoning ?? "").split("\n")[0]?.slice(0, 140)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Wide>
+          )}
+          {/* The audit log says how many there are; the sheet shows the newest
             page of them. Without this the heading "approved dismissals in this
             window" stands over twenty rows of ninety. */}
-        <Paged
-          shown={(argued.data?.items ?? []).length}
-          total={argued.data?.total}
-          limit={NEWEST}
-        />
-      </section>
+          <Paged
+            shown={(argued.data?.items ?? []).length}
+            total={argued.data?.total}
+            limit={NEWEST}
+          />
+        </section>
+      )}
     </Sheet>
   );
 }

@@ -14,6 +14,9 @@ import { Empty } from "../../ui/Empty";
 import { Sheet } from "./Sheet";
 import { Segments, boundedAsked } from "./Window";
 import { Wide } from "../../ui/Wide";
+import { useWho } from "../../app/session";
+import { counted, heldLine, holding } from "../../app/families";
+import { HeldLine } from "../../ui/HeldLine";
 // The ladder, written down once. The columns are fixed rather than read off
 // the data: ones that appear and vanish with the rows are columns nobody can
 // build a spreadsheet against.
@@ -42,8 +45,13 @@ export function Backlog() {
   // to its whole number of weeks.
   const weeks = boundedAsked(params.get("weeks"), 104, 13);
 
+  // The backlog is dependency findings, asked and drawn only where the reader
+  // reads them at the scope.
+  const dependencies = holding(useWho().data, "dependency", at.product);
+  const figures = counted(dependencies);
   const trend = useQuery({
     queryKey: ["backlog", scope, weeks],
+    enabled: figures,
     queryFn: async () =>
       unwrap(await api.GET("/v1/trend", { params: { query: { ...scope, weeks } } })),
   });
@@ -57,7 +65,7 @@ export function Backlog() {
 
   return (
     <Sheet
-      settled={trend.isSuccess}
+      settled={!figures || trend.isSuccess}
       name="Backlog over time"
       answers="whether the backlog is growing, and what kind of thing is making it grow."
       asked={`${weeks} weeks`}
@@ -70,17 +78,22 @@ export function Backlog() {
           chosen={weeks}
           words={(n) => (n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`)}
         />
-        <span style={{ marginLeft: "auto" }} className="noprint">
-          <a className="btn quiet" href={file("csv")}>
-            CSV
-          </a>{" "}
-          <a className="btn quiet" href={file("json")}>
-            JSON
-          </a>
-        </span>
+        {figures && (
+          <span style={{ marginLeft: "auto" }} className="noprint">
+            <a className="btn quiet" href={file("csv")}>
+              CSV
+            </a>{" "}
+            <a className="btn quiet" href={file("json")}>
+              JSON
+            </a>
+          </span>
+        )}
       </div>
 
-      {trend.isPending ? (
+      {figures && <HeldLine at={dependencies} />}
+      {!figures ? (
+        <Empty title="Nothing to list." detail={heldLine(dependencies)} />
+      ) : trend.isPending ? (
         <Loading />
       ) : trend.isError ? (
         <Failed error={trend.error} what="The backlog could not be read." />

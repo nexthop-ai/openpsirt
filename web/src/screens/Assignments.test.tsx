@@ -54,7 +54,13 @@ describe("nobody else holding anything in a product", () => {
     remember({ product: "sonic" });
     serve((path) => {
       if (path === "/v1/session/me")
-        return { data: { ...me, reach: [{ product: "sonic", reads_security_testing }] } };
+        // A reader of disclosed findings there, so who else holds what is drawn.
+        return {
+          data: {
+            ...me,
+            reach: [{ product: "sonic", reads_public: true, reads_security_testing }],
+          },
+        };
       if (path === "/v1/assignments") return { data: [] };
       return { data: { items: [], total: 0 } };
     });

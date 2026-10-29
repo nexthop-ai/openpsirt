@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
+import { decidesAt, decidesLine } from "../../app/families";
+import { useWho } from "../../app/session";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Unread } from "../../ui/Reading";
@@ -51,8 +53,15 @@ export function Effort() {
     retry: false,
   });
 
+  // Decisions on either family, narrowed by the server to the reader: for a
+  // reader of neither at the scope, an empty report reads as a quiet period,
+  // so it is neither asked nor drawn.
+  const who = useWho().data;
+  const decides = decidesAt(who, at.product);
+
   const spent = useQuery({
     queryKey: ["effort", when, product, team],
+    enabled: decides,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/effort", {
@@ -72,7 +81,7 @@ export function Effort() {
 
   return (
     <Sheet
-      settled={spent.isSuccess}
+      settled={!decides || spent.isSuccess}
       name="Effort by component"
       answers="what the decisions in this period were about."
       of={byProduct(at.product)}
@@ -106,7 +115,9 @@ export function Effort() {
         </div>
       )}
 
-      {spent.isPending ? (
+      {!decides ? (
+        <Empty title="Nothing to list." detail={decidesLine(who, at.product)} />
+      ) : spent.isPending ? (
         <Loading />
       ) : spent.isError ? (
         <Failed error={spent.error} what="The destination of the work could not be read." />

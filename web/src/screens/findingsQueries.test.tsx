@@ -30,6 +30,7 @@ function Views({ spanning, view }: { spanning: boolean; view: string }) {
     query: withinVariant(listQuery(new URLSearchParams("page=50")), false),
     selection: {},
     view,
+    reads: true,
   });
   return null;
 }

@@ -3,7 +3,7 @@
 The frame every screen sits in: the rail, the top bar, the scope picker, home,
 and the search box.
 
-Satisfies REQ-05, REQ-25, REQ-58, REQ-64.
+Satisfies REQ-05, REQ-25, REQ-58, REQ-60, REQ-64.
 
 ## Contents
 
@@ -34,6 +34,23 @@ is waiting on the reader, and who they are.
 | The bar's search is the findings list's search; "/" focuses it unless somebody is typing | |
 | Upload is in the bar on every screen (REQ-05), and on Uploads | The form picks its own build; Uploads is where the result appears |
 | On a narrow screen the rail gives way to a tab bar: home, findings, queue, and a fourth tab and a bar control opening the whole rail as a panel | What somebody reviews and responds from on a phone |
+
+### Rail entries by holding
+
+Each entry follows `design-docs/interface.md` § Families a reader holds, or the
+right its screen asks for.
+
+| Entry | Drawn for |
+|---|---|
+| Dependency findings, Unassigned, the phone tab Findings | A reader of dependency findings in some product |
+| Dependency findings with a product picked | Declines where the reader holds them in another product, saying so on hover; its count is asked only where they are read here |
+| The Dependency findings and Unassigned badges | A reader of one half alone has the unit say which half the count is of (REQ-60) |
+| Security testing | A reader of security testing work in some product; declines in a product where it is not read, with the code family's line on hover |
+| Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
+| Record a flaw | A reader who may triage undisclosed or disclosed work in some product |
+| Incidents | Everybody: the shelf holds what each reader may be told of, a collaborator's own case included, and an administrator declares the response windows there |
+| Analytics | Everybody: the coverage reports answer what is scanned to anybody who sees a build, and a report counting a family the reader does not hold shows the line |
+| Access, Settings | An administrator or a holder of the audit permission |
 
 ### The folded rail
 
@@ -96,6 +113,11 @@ are the slowest read.
 
 | Rule | Reason |
 |---|---|
+| The estate's figures (open, known exploited, overdue, due soon), the trends and release readiness count dependency findings, and are drawn under `design-docs/interface.md` § Families a reader holds at the picked scope | A zero for work the reader cannot see reads as nothing open |
+| Lapsed decisions are drawn for a reader of either family at the picked scope; its line counting findings with a lapsed decision is asked only where dependency findings are counted there | A decision lapses on either family; the findings line counts dependency findings |
+| The work figures (assigned, sent back, pending approval) and in progress stay for every reader of either family | They hold both families' work |
+| A reader of no finding in any product has a Records panel in place of the estate's figures, opening the audit log, access and settings where they may read them; the work figures and panels stay; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records, and a capability held without a read role still brings assigned work (`design-docs/access.md` § Breadth of view) |
+| The line under the greeting counts the products the reader reads | |
 | Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
 | What became of decisions is counted from a page read, and the tile says where the page was cut | It is derived, with no count to ask for |
 | Every figure opens the list it counts, narrowed as counted, the aging buckets included (`design-docs/interface-administration.md` § Analytics) | |
@@ -105,7 +127,7 @@ are the slowest read.
 |---|---|
 | Release readiness | The picked branch against the last release cut from it, band by band, the move shown as a direction colored by meaning (fewer is better). Drawn only for a whole build on a branch |
 | Quiet builds | A build no longer scanned, named one at a time. Also on the scans screen. It reports nothing new and fails nothing, so looks healthy |
-| Incidents | Standing incidents, one per issue and product, from the shelf, narrowed to the picked product, opening the shelf narrowed so. Its own tile beside known exploited, because the feed's count says nothing about this product. Drawn only where there is one. A branch or variant scope counts the whole product and says so, since an incident is against a product |
+| Incidents | Standing incidents, one per issue and product, from the shelf, narrowed to the picked product, opening the shelf narrowed so. Its own tile beside known exploited, because the feed's count says nothing about this product. Drawn only where there is one, and the shelf asked of every reader, since it holds what each may be told of, a collaborator's own case included. A branch or variant scope counts the whole product and says so, since an incident is against a product |
 | Overdue and due soon | One read of the deadline list, each tile opening the list it counts. The read is capped and ordered soonest first, so a cut page holding a row still due holds every overdue row. Overdue is a floor only where the whole cut page is overdue; due soon wherever the page is cut. The all-products figure follows the same rule over its own read |
 | Review queue count | One count per product: the rail's badge, the pending figure and the across-products figure are one request under one key, polled once a minute by the rail |
 | Assigned to you | What the reader and their teams hold, in the list's unit, with the reports they hold beside it, never among them: a report is against a product and no build |
@@ -130,3 +152,4 @@ chosen (REQ-64).
 | Limit | Detail |
 |---|---|
 | A known-exploited tile needs a product | Nothing counts exploited findings without one to narrow inside |
+| A case collaborator's home lists none of their cases | Their Records panel opens nothing they hold. Their case is reached from the notice that brought them in and from Incidents |

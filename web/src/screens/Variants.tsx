@@ -9,6 +9,8 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { buildFindingsAt } from "../app/routes";
 import { AddButton, Declare, FacingField, Field } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
@@ -33,23 +35,27 @@ export function Variants() {
   const [renameTo, setRenameTo] = useState("");
   const [editFacing, setEditFacing] = useState(true);
 
+  // The Open column counts dependency findings: drawn and asked for only
+  // where the reader reads them in this product.
+  const dependencies = holding(who.data, "dependency", product);
+  const counts = counted(dependencies);
   const ofRelease = useQuery({
-    queryKey: ["variants", product, branchOrTag, "counts"],
+    queryKey: ["variants", product, branchOrTag, "counts", counts],
     enabled: !!branchOrTag,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants", {
-          params: { path: { product, branch_or_tag: branchOrTag }, query: { counts: true } },
+          params: { path: { product, branch_or_tag: branchOrTag }, query: { counts } },
         }),
       ),
   });
   const ofProduct = useQuery({
-    queryKey: ["variants", product, "counts"],
+    queryKey: ["variants", product, "counts", counts],
     enabled: !branchOrTag,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/variants", {
-          params: { path: { product }, query: { counts: true } },
+          params: { path: { product }, query: { counts } },
         }),
       ),
   });
@@ -130,6 +136,7 @@ export function Variants() {
         </p>
         {who.data?.admin && <AddButton label="Add variant" onClick={() => setAdding(true)} />}
       </div>
+      <HeldLine at={dependencies} />
 
       <div className="alert info" style={{ marginBottom: 14 }}>
         <strong>A variant is a different way of building the same source</strong>
@@ -155,7 +162,7 @@ export function Variants() {
               <tr>
                 <th>Name</th>
                 <th>Ships to customers</th>
-                <th className="num">Open</th>
+                {counts && <th className="num">Open</th>}
                 <th />
               </tr>
             </thead>
@@ -178,7 +185,7 @@ export function Variants() {
                       {variant.customer_facing === false ? "No — internal only" : "Yes"}
                     </span>
                   </td>
-                  <td className="num">{(variant.open ?? 0).toLocaleString()}</td>
+                  {counts && <td className="num">{(variant.open ?? 0).toLocaleString()}</td>}
                   <td className="rowacts">
                     {branchOrTag ? (
                       <Link

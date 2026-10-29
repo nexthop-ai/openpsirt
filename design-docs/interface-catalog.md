@@ -26,6 +26,7 @@ action, both opening a drawer; the table is the screen.
 |---|---|
 | The catalog says what each entry holds: a product its branch, tag and variant counts, what is open and when last scanned; a branch or tag what it came from; a variant whether it ships to customers. Every count is issues at components | |
 | What is open is counted only where asked: the three screens drawing the column ask; the pickers do not. Absent, never zero, where not asked | It is the whole cost of a catalog read (`design-docs/interface-measurements.md` § Catalog reads) |
+| What is open is dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: the products table draws the column for a reader of them in some product, with a dash in a product's row where they are not read there; a product's branches, tags and variants draw it, and ask for it, only where they are read in the product, with the line otherwise | A zero over work the reader cannot see reads as a clean product |
 | A product row says what it triages from, "deployment's" where it follows the deployment, never the deployment's current word; an administrator changes it there | It explains a number; following and stating differ |
 | A product row says whether its documents are published: a box for an administrator, a word for others (`design-docs/publishing.md`) | |
 | An administrator's row action opens the trusted upstream drawer: the upstream as trusted, how reading it goes, a key it offers in place of the trusted one, stop trusting, and a field to name one. Naming is check, then trust, showing the key before anything is read (`design-docs/upstream.md`) | |
@@ -76,6 +77,7 @@ changed.
 | It says what each run changed and what it measured against: scanner, version, vulnerability database (REQ-13) | A clean build and a stale database read alike |
 | Where one run answers several uploads, the numbers sit on the newest and the rest are blank | A run covers a build |
 | A run that changed nothing says 0; a row with nothing to report is blank, and the wire tells them apart | A superseded upload must not read as a clean scan |
+| Opened and Closed are dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: no column for a reader not reading them in the product, with the line where they are read in another; the receipts stay | Every row would read 0 |
 | Each receipt says what its upload did to the build's contents and opens the names: removals marked and first; an upload that moved nothing says so; a build's first upload says nothing | A removal looks like a stopped dependency |
 | What a new line inherits: the line it carries from, how many reach this one, how many are past their date, how many cover nothing here, the rest a list to tick. A promised upgrade that moved is a line of its own saying to plan again from the component. Two of the six groups are questions, and it says which | Asked when a line has its first scan |
 
@@ -132,6 +134,8 @@ products table is administration; this page is reading how something goes.
 | The product's totals are counted again over the product, never summed from builds | A sum put 15,231 over a list of 7,629 |
 | "Undecided" and "agreed" are the findings list's words, from the same expression | |
 | A build never scanned is a row; one out of support says so | |
+| The figures and each build's counts are dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: absent for a reader not reading them here, with one line where they are read in another product; the builds and their last scans stay | Zeros for a reader holding security testing alone read as a clean product |
+| Waiting on a second person is drawn for every reader | The server counts it by the right to approve, across both families |
 
 A scan run's page, Known vulnerability scan, is reached from the upload's state,
 its breadcrumb under Uploads, and release comparison's "the known vulnerability
@@ -145,9 +149,16 @@ exploited.
 | What it opened is a list reached from the count: the findings list narrowed to the run by identifier, as a self-removing chip | Two runs can land one day |
 | What it closed is not a list | The list is of what is open |
 | How long it took is said; a run still going says when it started | |
+| What it opened and closed are dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: absent for a reader not reading them in the product, with the line where they are read in another; the scanner, its data and its timing stay | "Nothing changed" reads as a clean run |
 
 Release comparison carries a chart across every build (REQ-54), in bars, because
-the builds are separate points and a line draws a trend through a gap.
+the builds are separate points and a line draws a trend through a gap. The chart,
+the columns and the notes are dependency findings: for a reader not reading them
+in the product, the comparison's body is "Nothing to list." and the line from
+`design-docs/interface.md` § Families a reader holds, none of them is asked, and
+the builds stay pickable for comparing components. A reader of undisclosed
+findings alone in the product is asked for them by default and offered no
+chip, since the disclosed findings asked otherwise are ones they do not read.
 
 ## A release, gathered
 
@@ -170,6 +181,7 @@ a branch what it is built as nightly.
 | It is cut from the same branch, where both say so | Two branches are two pieces of software |
 | Advisories are not narrowed to the release | An advisory goes out once |
 | The per-variant count comes from the answer the severity split is added from | The variant list fills no count |
+| The per-variant count and Open now are dependency findings, drawn and asked only where the reader reads them in the product, with the line from `design-docs/interface.md` § Families a reader holds otherwise | |
 
 ## Limits
 

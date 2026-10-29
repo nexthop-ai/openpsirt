@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { Home } from "./Home";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -35,7 +36,7 @@ describe("the front page's coverage figure", () => {
             name: "Ana",
             admin: false,
             kind: "person",
-            reach: [],
+            reach: [readingDependencies("sonic")],
             outcomes: [],
           }}
         />,

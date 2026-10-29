@@ -177,3 +177,31 @@ func contextWithin(t *testing.T, d time.Duration) (context.Context, context.Canc
 	t.Helper()
 	return context.WithTimeout(t.Context(), d)
 }
+
+func TestALeaseLeftToLapseIsTakenAgainOnlyOnceItLapses(t *testing.T) {
+	// Work run once a period takes the lease for the period and leaves it to
+	// lapse, so its expiry is when the work is next due. The holder asking
+	// again before then is refused like anybody else, or it runs every tick.
+	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, _ *queue.Queue) {
+		ctx := t.Context()
+		leases := queue.NewLeases(db.DB)
+		moment := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+		queue.SetLeaseClock(leases, func() time.Time { return moment })
+
+		if mine, err := leases.TakeLapsed(ctx, "daily", "first", 24*time.Hour); err != nil || !mine {
+			t.Fatalf("first take: %v %v", mine, err)
+		}
+		moment = moment.Add(5 * time.Minute)
+		if mine, err := leases.TakeLapsed(ctx, "daily", "first", 24*time.Hour); err != nil || mine {
+			t.Errorf("the holder took a lease it holds again before it lapsed: %v %v", mine, err)
+		}
+		if mine, err := leases.TakeLapsed(ctx, "daily", "second", 24*time.Hour); err != nil || mine {
+			t.Errorf("another replica took a lease that is still held: %v %v", mine, err)
+		}
+
+		moment = moment.Add(24 * time.Hour)
+		if mine, err := leases.TakeLapsed(ctx, "daily", "second", 24*time.Hour); err != nil || !mine {
+			t.Errorf("a lapsed lease was not taken: %v %v", mine, err)
+		}
+	})
+}
