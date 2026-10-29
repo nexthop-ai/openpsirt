@@ -229,7 +229,7 @@ func (r *Runner) scan(ctx context.Context, reference string, records *cverecord.
 		return nil, err
 	}
 
-	findings := finding.NewStore(r.db.DB)
+	findings := finding.NewStore(r.db.DB).Sweeping(r.queue)
 
 	run, err := findings.Begin(ctx, finding.Run{
 		BuildID: buildID, Scanner: r.scanner.Name(), RanHere: true,

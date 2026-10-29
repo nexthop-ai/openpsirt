@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
@@ -36,6 +37,8 @@ type Applier struct {
 	// whose decisions on code findings a run lapsed, once its transaction has committed.
 	drops  func(context.Context, Drop)
 	lapses func(context.Context, []triage.ForPerson)
+	// sweeps is the queue a run opening code findings asks to place them on.
+	sweeps *queue.Queue
 }
 
 // told is what an applied run has to say once it commits.
@@ -69,6 +72,13 @@ func (a *Applier) TellingDrops(tell func(context.Context, Drop)) *Applier {
 // run lapsed, on the terms TellingDrops tells.
 func (a *Applier) TellingLapses(tell func(context.Context, []triage.ForPerson)) *Applier {
 	a.lapses = tell
+	return a
+}
+
+// Sweeping has a run that opens code findings queue its product's assignment
+// sweep on q, in the run's transaction (finding.Arrived).
+func (a *Applier) Sweeping(q *queue.Queue) *Applier {
+	a.sweeps = q
 	return a
 }
 
@@ -408,6 +418,11 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	opened, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
 	if err != nil {
 		return "", err
+	}
+	if len(opened) > 0 {
+		if err := finding.Arrived(ctx, tx, a.sweeps, set.ProductID); err != nil {
+			return "", err
+		}
 	}
 	if err := describeAgain(ctx, tx, matched); err != nil {
 		return "", err

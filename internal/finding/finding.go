@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // FixState is what upstream has done about an issue.
@@ -544,12 +545,22 @@ type Store struct {
 	// waiting for two callers to land in it by themselves is a test that
 	// passes by not racing.
 	afterReadingReport func()
+	// sweeps is the queue a write opening work asks to place it on, or nothing
+	// where the caller places nothing: a tool or a test applying a fixture.
+	sweeps *queue.Queue
 }
 
 // NewStore returns a store over db.
 func NewStore(db bun.IDB) *Store {
 	pool, _ := database.Handle(db)
 	return &Store{db: db, pool: pool, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// Sweeping has every write that opens work queue its product's assignment
+// sweep on q (Arrived).
+func (s *Store) Sweeping(q *queue.Queue) *Store {
+	s.sweeps = q
+	return s
 }
 
 // Begin records that a scanner is about to run.

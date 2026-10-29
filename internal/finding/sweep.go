@@ -5,16 +5,55 @@ package finding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
+
+// Arrived queues the assignment sweep of a product that work has just opened
+// in, inside the transaction that opened it, so the sweep cannot be claimed
+// before the work it is for exists.
+//
+// A rule places what nobody holds whenever its product's sweep runs, so a
+// sweep runs when a rule is written and when work arrives.
+//
+// Queued only where the product has a rule placing findings, so a deployment
+// with no rules queues nothing. A full sweep queue leaves this arrival to the
+// next one rather than failing what brought it: refusing a scan loses its
+// findings, where an unqueued sweep only delays placing them.
+func Arrived(ctx context.Context, tx bun.IDB, q *queue.Queue, productID int64) error {
+	if q == nil {
+		return nil
+	}
+	ruled, err := tx.NewSelect().Model((*AssignmentRule)(nil)).
+		Where(`"product_id" = ?`, productID).
+		Where(`"retired_at" IS NULL`).
+		Where(`"reports" = ?`, false).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("ask whether a rule places work in product %d: %w", productID, err)
+	}
+	if !ruled {
+		return nil
+	}
+	_, err = q.AddTx(ctx, tx, queue.AssignmentSweep, strconv.FormatInt(productID, 10))
+	if errors.Is(err, queue.ErrBacklogFull) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("queue the assignment sweep of product %d: %w", productID, err)
+	}
+	return nil
+}
 
 // Sweeper applies standing assignment rules to work nobody holds.
 //

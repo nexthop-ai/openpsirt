@@ -619,7 +619,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// Applies what an analyzer reported against a build, once the build has
 	// an inventory to place the results on, and tells the product's internal
 	// readers of a run that dropped sharply.
-	analyze := analysis.NewWorker(analysis.NewApplier(db).TellingDrops(notify.AnalysisDrops(db.DB, logger)).
+	analyze := analysis.NewWorker(analysis.NewApplier(db).Sweeping(work).TellingDrops(notify.AnalysisDrops(db.DB, logger)).
 		TellingLapses(notify.Lapses(db.DB, logger)),
 		work, logger, name)
 	// The tool's own health. It needs nothing configured, which is the point:

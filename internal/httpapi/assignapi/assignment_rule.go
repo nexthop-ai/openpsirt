@@ -316,8 +316,8 @@ func ruleWriter(ctx context.Context, in core.Deps, name string) (access.Subject,
 // transaction that records the rule.
 //
 // The rule and its sweep commit together. A rule recorded without its sweep
-// leaves every open finding it covers unrouted until another rule is saved, so
-// a full queue refuses the rule and the caller sends it again.
+// leaves every open finding it covers unrouted until another rule is saved or
+// work arrives, so a full queue refuses the rule and the caller sends it again.
 func queueSweep(ctx context.Context, in core.Deps, tx bun.Tx, productID int64) error {
 	_, err := in.Queue.AddTx(ctx, tx, queue.AssignmentSweep, strconv.FormatInt(productID, 10))
 	switch {
