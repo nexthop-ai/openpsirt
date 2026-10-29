@@ -18,6 +18,8 @@ import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { productAt, repositoriesAt, branchesAndTagsAt } from "../app/routes";
 import { UpstreamDrawer } from "./Upstream";
+import { holding } from "../app/families";
+import { HeldCell } from "../ui/HeldLine";
 
 // You pick a product first, and everything below is bound to it. What each one
 // holds is on the row, so the list answers the question it exists to answer
@@ -38,10 +40,13 @@ export function Products({ who }: { who: Who }) {
   // rather than always done, and a read that asked shares nothing with one
   // that did not — keyed the same, the picker's uncounted answer and this
   // screen's would be one cache entry and whichever arrived first would win.
+  //
+  // The open count is of dependency findings: asked only of a reader of them
+  // in some product, and drawn only in the rows they read them in.
+  const counts = holding(who, "dependency").held !== "nowhere";
   const products = useQuery({
-    queryKey: ["products", "counts"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products", { params: { query: { counts: true } } })),
+    queryKey: ["products", "counts", counts],
+    queryFn: async () => unwrap(await api.GET("/v1/products", { params: { query: { counts } } })),
   });
   // How long a build may go unscanned before it counts as quiet: the
   // deployment's own setting, which the coverage read reports beside its rows.
@@ -215,9 +220,11 @@ export function Products({ who }: { who: Who }) {
                     counted once per build it is in. The rail's own number is
                     the same unit and the tree's is not, so the column says
                     which. */}
-                <th className="num" title="Open findings — an issue at a component, per build">
-                  Open findings
-                </th>
+                {counts && (
+                  <th className="num" title="Open findings — an issue at a component, per build">
+                    Open findings
+                  </th>
+                )}
                 <th>Minimum severity</th>
                 <th title="Raised when one proposer and approver pair makes this share of agreements, with at least this many approvers">
                   One pair
@@ -258,7 +265,11 @@ export function Products({ who }: { who: Who }) {
                     <td className="num">{product.branches ?? 0}</td>
                     <td className="num">{product.tags ?? 0}</td>
                     <td className="num">{product.variants ?? 0}</td>
-                    <td className="num">{(product.open ?? 0).toLocaleString()}</td>
+                    {counts && (
+                      <HeldCell at={holding(who, "dependency", product.name)}>
+                        {(product.open ?? 0).toLocaleString()}
+                      </HeldCell>
+                    )}
                     <td>
                       <MinimumSeverity
                         product={product.name ?? ""}

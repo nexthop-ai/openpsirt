@@ -4,7 +4,7 @@ The catalog, uploading an inventory, the Uploads screen and its receipts, an
 upload's changes, the repositories screen, the product page, a scan run's page,
 release comparison, and a tag's release page.
 
-Satisfies REQ-05, REQ-13, REQ-15, REQ-42, REQ-54, REQ-60.
+Satisfies REQ-05, REQ-13, REQ-15, REQ-54, REQ-60.
 
 ## Contents
 
@@ -26,6 +26,7 @@ action, both opening a drawer; the table is the screen.
 |---|---|
 | The catalog says what each entry holds: a product its branch, tag and variant counts, what is open and when last scanned; a branch or tag what it came from; a variant whether it ships to customers. Every count is issues at components | |
 | What is open is counted only where asked: the three screens drawing the column ask; the pickers do not. Absent, never zero, where not asked | It is the whole cost of a catalog read (`design-docs/interface-measurements.md` § Catalog reads) |
+| What is open is dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: the products table draws the column for a reader of them in some product, with a dash in a product's row where they are not read there; a product's branches, tags and variants draw it, and ask for it, only where they are read in the product, with the line otherwise | A zero over work the reader cannot see reads as a clean product |
 | A product row says what it triages from, "deployment's" where it follows the deployment, never the deployment's current word; an administrator changes it there | It explains a number; following and stating differ |
 | A product row says whether its documents are published: a box for an administrator, a word for others (`design-docs/publishing.md`) | |
 | An administrator's row action opens the trusted upstream drawer: the upstream as trusted, how reading it goes, a key it offers in place of the trusted one, stop trusting, and a field to name one. Naming is check, then trust, showing the key before anything is read (`design-docs/upstream.md`) | |
@@ -148,7 +149,11 @@ exploited.
 | How long it took is said; a run still going says when it started | |
 
 Release comparison carries a chart across every build (REQ-54), in bars, because
-the builds are separate points and a line draws a trend through a gap.
+the builds are separate points and a line draws a trend through a gap. The chart,
+the columns and the notes are dependency findings: for a reader not reading them
+in the product, the screen shows the line from `design-docs/interface.md` § Families
+a reader holds and asks for none of them, and the builds stay pickable for
+comparing components.
 
 ## A release, gathered
 
@@ -171,6 +176,7 @@ a branch what it is built as nightly.
 | It is cut from the same branch, where both say so | Two branches are two pieces of software |
 | Advisories are not narrowed to the release | An advisory goes out once |
 | The per-variant count comes from the answer the severity split is added from | The variant list fills no count |
+| The per-variant count and Open now are dependency findings, drawn and asked only where the reader reads them in the product, with the line from `design-docs/interface.md` § Families a reader holds otherwise | |
 
 ## Limits
 

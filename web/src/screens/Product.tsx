@@ -13,7 +13,8 @@ import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 import { mayOf, useWho } from "../app/session";
 import { useRulings } from "../api/intake";
-import { counted, heldLine, holding } from "../app/families";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import {
   buildFindingsAt,
   vulnerabilityReportsAt,
@@ -40,13 +41,12 @@ export function Product() {
   const who = useWho();
   // The vulnerability reports ask what reading a report asks: reading undisclosed work.
   const mayReadReports = !!mayOf(who.data, product)?.reads_private;
-  const mayReadCodeFindings = !!mayOf(who.data, product)?.reads_security_testing;
+  const mayReadCodeFindings = !!who.data && counted(holding(who.data, "code", product));
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
   // The overview counts dependency findings. Where the reader does not read
   // them here, its figures are zeros that mean nothing, so they are not drawn.
   const dependencies = holding(who.data, "dependency", product);
   const figures = counted(dependencies);
-  const line = heldLine(dependencies);
   const overview = useQuery({
     queryKey: ["overview", product],
     queryFn: async () =>
@@ -150,7 +150,7 @@ export function Product() {
           </Link>
         </div>
       )}
-      {line && dependencies.held !== "nowhere" && <p className="hint">{line}</p>}
+      <HeldLine at={dependencies} />
 
       <div className="card" style={{ marginTop: 14 }}>
         <h3>Builds</h3>

@@ -3,7 +3,7 @@
 The frame every screen sits in: the rail, the top bar, the scope picker, home,
 and the search box.
 
-Satisfies REQ-05, REQ-25, REQ-42, REQ-58, REQ-60, REQ-64.
+Satisfies REQ-05, REQ-25, REQ-58, REQ-60, REQ-64.
 
 ## Contents
 
@@ -44,10 +44,11 @@ right its screen asks for.
 |---|---|
 | Dependency findings, Unassigned, the phone tab Findings | A reader of dependency findings in some product |
 | Dependency findings with a product picked | Declines where the reader holds them in another product, saying so on hover; its count is asked only where they are read here |
-| The Dependency findings and Unassigned badges | A disclosed-only reader's unit says the count is of disclosed findings |
-| Security testing | A reader of security testing work in some product; declines in a product where it is not read |
+| The Dependency findings and Unassigned badges | A reader of one half alone has the unit say which half the count is of (REQ-60) |
+| Security testing | A reader of security testing work in some product; declines in a product where it is not read, with the code family's line on hover |
 | Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
 | Record a flaw | A reader who may triage undisclosed or disclosed work in some product |
+| Analytics | A reader of either family in some product; every report counts findings or the decisions on them |
 | Access, Settings | An administrator or a holder of the audit permission |
 
 ### The folded rail
@@ -113,8 +114,8 @@ are the slowest read.
 |---|---|
 | The estate's figures (open, known exploited, overdue, due soon), the trends, lapsed decisions and release readiness count dependency findings, and are drawn under `design-docs/interface.md` § Families a reader holds at the picked scope | A zero for work the reader cannot see reads as nothing open |
 | The work figures (assigned, sent back, pending approval) and in progress stay for every reader of either family | They hold both families' work |
-| A reader of no finding in any product lands on a Records panel opening the audit log, access and settings, where they may read them; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records |
-| The line under the greeting counts products the reader reads, never those reached only to administer or audit | |
+| A reader of no finding in any product has a Records panel in place of the estate's figures, opening the audit log, access and settings where they may read them; the work figures and panels stay; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records, and a capability held without a read role still brings assigned work (`design-docs/access.md` § Breadth of view) |
+| The line under the greeting counts the products the reader reads | |
 | Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
 | What became of decisions is counted from a page read, and the tile says where the page was cut | It is derived, with no count to ask for |
 | Every figure opens the list it counts, narrowed as counted, the aging buckets included (`design-docs/interface-administration.md` § Analytics) | |

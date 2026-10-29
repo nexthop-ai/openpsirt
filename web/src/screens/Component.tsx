@@ -26,7 +26,8 @@ import { Wide } from "../ui/Wide";
 import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
 import { useUpstreamSaid } from "../api/upstream";
 import { mayOf, useWho } from "../app/session";
-import { counted, heldLine, holding } from "../app/families";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
 
 // One source package, and the one piece of work it is.
@@ -93,7 +94,6 @@ export function Component() {
   const who = useWho();
   const dependencies = holding(who.data, "dependency", product);
   const counts = counted(dependencies);
-  const line = heldLine(dependencies);
 
   const builds = useQuery({
     queryKey: ["component", product, component],
@@ -197,7 +197,7 @@ export function Component() {
           {worst && <Severity word={worst} />}
           {here.due_at && <span className="vchip differs">due {on(here.due_at)}</span>}
         </p>
-        {line && dependencies.held !== "nowhere" && <p className="hint">{line}</p>}
+        <HeldLine at={dependencies} />
       </div>
 
       {versions.length > 1 && (

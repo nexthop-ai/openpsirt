@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { mayOf, useWho } from "../app/session";
+import { undisclosedLine } from "../app/families";
 import { unwrap } from "../api/queries";
 import { Editor } from "../ui/Editor";
 import { Empty } from "../ui/Empty";
@@ -90,8 +91,12 @@ export function DisclosureDeadlines() {
   // A list moved to another scope starts at its own beginning.
   useReseed(JSON.stringify(scope), () => setOffset(0));
 
+  // Every row is undisclosed work. A reader of none at the scope is told so,
+  // and the list is not asked, because its empty answer reads as nothing due.
+  const unread = undisclosedLine(who, scope.product);
   const rows = useQuery({
     queryKey: ["disclosure-deadlines", scope, days, offset],
+    enabled: !unread,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/disclosure-deadlines", {
@@ -143,6 +148,16 @@ export function DisclosureDeadlines() {
     },
   });
 
+  if (unread) {
+    return (
+      <>
+        <div className="screen-head">
+          <h2>Disclosure deadlines</h2>
+        </div>
+        <Empty title="Nothing to list." detail={unread} />
+      </>
+    );
+  }
   if (rows.isPending) return <Loading />;
   if (rows.isError) {
     return (

@@ -11,6 +11,9 @@ import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Severity } from "../../ui/Severity";
 import { Sheet } from "./Sheet";
+import { useWho } from "../../app/session";
+import { counted, heldLine, holding } from "../../app/families";
+import { HeldLine } from "../../ui/HeldLine";
 import { PeriodPicker, asked, coveringPeriod, periodAsked, stated } from "./Window";
 import { Wide } from "../../ui/Wide";
 
@@ -43,8 +46,12 @@ export function Compliance() {
   const period = periodAsked(params);
   const when = asked(period, 0);
 
+  // Every rate is of dependency findings, asked and drawn only where the
+  // reader reads them in the product.
+  const dependencies = holding(useWho().data, "dependency", product || undefined);
+  const figures = counted(dependencies);
   const rates = useQuery({
-    enabled: product !== "",
+    enabled: figures && product !== "",
     queryKey: ["compliance", scope, when],
     queryFn: async () =>
       unwrap(await api.GET("/v1/compliance", { params: { query: { ...when, ...scope } } })),
@@ -64,13 +71,16 @@ export function Compliance() {
 
   return (
     <Sheet
-      settled={rates.isSuccess}
+      settled={!figures || rates.isSuccess}
       name="Deadline compliance"
       answers="whether work met the dates policy set for it."
       asked={stated(period) ? coveringPeriod(period, 0) : undefined}
     >
-      {product !== "" && <PeriodPicker period={period} />}
-      {product === "" ? (
+      {figures && product !== "" && <PeriodPicker period={period} />}
+      {figures && <HeldLine at={dependencies} />}
+      {!figures ? (
+        <Empty title="Nothing to list." detail={heldLine(dependencies)} />
+      ) : product === "" ? (
         <section className="panel">
           <Empty
             title="Pick a product."

@@ -23,7 +23,7 @@ import {
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
 import { mayOf, signedOutBy, signOut } from "./session";
-import { counted, heldLine, holding } from "./families";
+import { counted, heldLine, holding, readsNothing } from "./families";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -67,13 +67,14 @@ const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const { product, branch_or_tag: branchOrTag, variant } = useScope();
   const whole = !!(product && branchOrTag && variant);
-  // Reading reports takes reading undisclosed work, which is what reads_private says.
-  const reportsAnywhere = (who.reach ?? []).some((each) => each.reads_private);
+  // Reading reports and disclosure deadlines takes reading undisclosed work,
+  // which is what reads_private says; the server narrows both to products
+  // where the reader reads it.
+  const undisclosedAnywhere = (who.reach ?? []).some((each) => each.reads_private);
   const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
-  // A code finding is security testing work, so the Security testing entry
-  // follows reading security testing material.
-  const codeFindingsAnywhere = (who.reach ?? []).some((each) => each.reads_security_testing);
-  const codeFindingsHere = !!product && !!mayOf(who, product)?.reads_security_testing;
+  // A code finding is security testing work, held as the code family.
+  const codeFindingsAnywhere = holding(who, "code").held !== "nowhere";
+  const codeFindingsHere = product ? holding(who, "code", product) : undefined;
   // Dependency findings, across products and at the product picked. Held
   // nowhere, the entries and the tab that open them are absent; held elsewhere,
   // the entry declines and its count is not asked, so no zero stands for work
@@ -81,9 +82,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const dependencies = holding(who, "dependency");
   const dependenciesAnywhere = dependencies.held !== "nowhere";
   const dependenciesHere = product ? holding(who, "dependency", product) : dependencies;
-  // Disclosure deadlines are undisclosed work, and the server narrows the list
-  // to products where the reader reads it.
-  const embargoesAnywhere = (who.reach ?? []).some((each) => each.reads_private);
   // Recording a flaw is triage at the visibility it is recorded at.
   const recordsAnywhere = (who.reach ?? []).some((each) => each.may_hide || each.triages_public);
   const scope = [product ?? "all products", branchOrTag, variant].filter(Boolean).join(" · ");
@@ -249,8 +247,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* The catalog of named reports, and the one place a report is
               built by hand. Here rather than under a build because a report
               spans whatever the picker has selected, up to every product a
-              reader can see. */}
-            <Rail to="/analytics" icon="chart" label="Analytics" />
+              reader can see. Every report counts findings or decisions on
+              them, so a reader of neither family has nothing there. */}
+            {!readsNothing(who) && <Rail to="/analytics" icon="chart" label="Analytics" />}
           </>
         )}
         <Group name="scope" label={scope} shut={shut} onToggle={toggleGroup} />
@@ -296,7 +295,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* What people outside have sent a product. Only for somebody who may
               read vulnerability reports somewhere, and it needs a product
               picked because a product's reports belong to it. */}
-            {reportsAnywhere && (
+            {undisclosedAnywhere && (
               <Rail
                 to={product ? vulnerabilityReportsAt(product) : ""}
                 icon="letter"
@@ -325,12 +324,8 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 }
                 icon="triage"
                 label="Security testing"
-                needs={codeFindingsHere}
-                why={
-                  product
-                    ? "You can't read security testing material in this product"
-                    : "Pick a product"
-                }
+                needs={!!codeFindingsHere && counted(codeFindingsHere)}
+                why={codeFindingsHere ? heldLine(codeFindingsHere) : "Pick a product"}
               />
             )}
             {/* Its own screen rather than an action on the findings list: what is
@@ -341,7 +336,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* What is running out of embargo. The list is itself a disclosure,
               so a product somebody may not read undisclosed work in contributes
               nothing to it — the server narrows it. */}
-            {embargoesAnywhere && (
+            {undisclosedAnywhere && (
               <Rail to="/disclosure-deadlines" icon="bell" label="Disclosure deadlines" />
             )}
             {/* Incidents: the standing attacks and the response windows

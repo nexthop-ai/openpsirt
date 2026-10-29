@@ -215,6 +215,7 @@ export function Findings() {
   // reader reads only disclosed findings in, or one they read none of.
   const dependencies = holding(me.data, "dependency", product || undefined);
   const heldSaid = heldLine(dependencies);
+  const reads = counted(dependencies);
   const [handing, setHanding] = useState("");
   // The list somebody has turned down a prepared decision for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
@@ -356,6 +357,7 @@ export function Findings() {
     query,
     selection,
     view,
+    reads,
   });
 
   // The place somebody was, restored when they come back. This is the screen
@@ -880,6 +882,29 @@ export function Findings() {
     );
   }
 
+  const where = spanning ? (
+    <>Every product you can read</>
+  ) : (
+    <>
+      {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
+    </>
+  );
+
+  // A list of findings the reader does not read at its scope: no total, no
+  // view counts and no controls over rows there are none of, and none of it
+  // asked. The line says why it is empty.
+  if (!reads) {
+    return (
+      <>
+        <div className="screen-head">
+          <h2>Findings</h2>
+          <p>{where}</p>
+        </div>
+        <Empty title="Nothing to list." detail={heldSaid} />
+      </>
+    );
+  }
+
   if (findings.isError) {
     return <Failed error={findings.error} what="The findings could not be read." />;
   }
@@ -948,17 +973,9 @@ export function Findings() {
             {findings.isPending ? "…" : total.toLocaleString()}
           </span>
         </h2>
-        <p>
-          {spanning ? (
-            <>Every product you can read</>
-          ) : (
-            <>
-              {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
-            </>
-          )}
-        </p>
+        <p>{where}</p>
       </div>
-      {heldSaid && counted(dependencies) && <p className="hint">{heldSaid}</p>}
+      {heldSaid && <p className="hint">{heldSaid}</p>}
 
       {controls}
 
@@ -1071,24 +1088,20 @@ export function Findings() {
           // that produced it are scrolled off above, and the reader is looking
           // at a panel that says so and offers nothing. What is on, and the
           // way to take it all off.
-          !counted(dependencies) ? (
-            <Empty title="Nothing to list." detail={heldSaid} />
-          ) : (
-            <Empty
-              title="Nothing matches these filters."
-              detail={
-                advanced > 0
-                  ? `${advanced.toLocaleString()} ${advanced === 1 ? "filter is" : "filters are"} narrowing this list.`
-                  : "Nothing is open here at all."
-              }
-            >
-              {advanced > 0 && (
-                <button type="button" className="btn quiet" onClick={() => ask(withoutAny(asked))}>
-                  Clear every filter
-                </button>
-              )}
-            </Empty>
-          )
+          <Empty
+            title="Nothing matches these filters."
+            detail={
+              advanced > 0
+                ? `${advanced.toLocaleString()} ${advanced === 1 ? "filter is" : "filters are"} narrowing this list.`
+                : "Nothing is open here at all."
+            }
+          >
+            {advanced > 0 && (
+              <button type="button" className="btn quiet" onClick={() => ask(withoutAny(asked))}>
+                Clear every filter
+              </button>
+            )}
+          </Empty>
         ) : (
           <FindingsTable
             rows={rows}

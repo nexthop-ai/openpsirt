@@ -19,7 +19,8 @@ import { SOON_DAYS } from "./FindingsFilters";
 import { paceReading, mixReading } from "../ui/trend";
 import { decisionOf, useQueueCount } from "../api/decisions";
 import type { Who } from "../app/session";
-import { counted, heldLine, holding, readsNothing, type Holding } from "../app/families";
+import { counted, holding, readsNothing, type Holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
 import {
@@ -67,13 +68,9 @@ export function blockingPath(at: Parameters<typeof findingsPath>[0]): string {
 // work — what is pending, what is in progress, what lapsed — then the trends,
 // then the system's own state. Somebody opening this most days wants the size
 // of the day before its contents. A reader of no finding in any product is
-// shown the deployment's records instead.
+// shown the deployment's records in place of the estate's figures, beside the
+// work they hold.
 export function Home({ who }: { who: Who }) {
-  if (readsNothing(who)) return <Records who={who} />;
-  return <Estate who={who} />;
-}
-
-function Estate({ who }: { who: Who }) {
   const at = useScope();
   const scope = scopeQuery(at);
   const counting = at.product
@@ -83,7 +80,6 @@ function Estate({ who }: { who: Who }) {
   // they say; elsewhere one line stands in for them.
   const dependencies = holding(who, "dependency", at.product);
   const figures = counted(dependencies);
-  const line = heldLine(dependencies);
 
   const trend = useQuery({
     queryKey: ["home", "trend", scope],
@@ -118,9 +114,10 @@ function Estate({ who }: { who: Who }) {
       </div>
 
       <Figures counting={counting} points={points} trend={trend} dependencies={dependencies} />
-      {line && dependencies.held !== "nowhere" && <p className="hint">{line}</p>}
+      <HeldLine at={dependencies} />
 
       <div className="panels">
+        {readsNothing(who) && <Records who={who} />}
         <Pending />
         <InProgress me={who.identity} />
         {figures && <Lapsed />}
@@ -746,42 +743,32 @@ function greeting(): string {
   return "Good evening";
 }
 
-// Home for a reader holding no finding in any product: an auditor, or an
-// administrator with no role on a product. Their work is the deployment's own
-// records, so those are what it opens, never a page of figures that are zero
-// because none of them is theirs to count.
+// The panel standing for the estate's figures for a reader holding no finding
+// in any product: an auditor, an administrator with no role on a product, or
+// somebody holding a capability alone. The deployment's records are what they
+// may open, never figures that are zero because none of them is theirs.
 function Records({ who }: { who: Who }) {
   const keeps = who.admin || !!who.audits;
   return (
-    <>
-      <div className="screen-head">
-        <h2>
-          {greeting()}, {who.name.replace(/^[a-z]+:/, "")}
-        </h2>
-        <p>{holdings(who)}</p>
-      </div>
-      <div className="panels">
-        <div className="panel">
-          <header>
-            <h3>Records</h3>
-          </header>
-          <p className="reading">You don&rsquo;t read findings in any product.</p>
-          {keeps && (
-            <footer>
-              <Link to="/audit-log" className="linkish">
-                Change history →
-              </Link>
-              <Link to="/access" className="linkish">
-                Access →
-              </Link>
-              <Link to="/settings" className="linkish">
-                Settings →
-              </Link>
-            </footer>
-          )}
-        </div>
-      </div>
-    </>
+    <div className="panel">
+      <header>
+        <h3>Records</h3>
+      </header>
+      <p className="reading">You don&rsquo;t read findings in any product.</p>
+      {keeps && (
+        <footer>
+          <Link to="/audit-log" className="linkish">
+            Change history →
+          </Link>
+          <Link to="/access" className="linkish">
+            Access →
+          </Link>
+          <Link to="/settings" className="linkish">
+            Settings →
+          </Link>
+        </footer>
+      )}
+    </div>
   );
 }
 

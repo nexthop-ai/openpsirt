@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { counted, heldLine, holding, readsNothing } from "./families";
+import { counted, heldLine, holding, readsNothing, undisclosedLine } from "./families";
 import type { Who } from "./session";
 import { reaching, readingDependencies } from "../test/reach";
 
@@ -53,9 +53,40 @@ describe("how a reader holds a family of findings", () => {
       "dependency",
       "sonic",
     );
-    expect(at.held).toBe("disclosed");
+    expect(at.held).toBe("partial");
     expect(counted(at)).toBe(true);
     expect(heldLine(at)).toBe("Counting disclosed findings, the ones you read here.");
+  });
+
+  it("says a count is of undisclosed findings where only those are read here", () => {
+    const at = holding(
+      who([reaching("sonic", { may_see: true, reads_private: true })]),
+      "dependency",
+      "sonic",
+    );
+    expect(at.held).toBe("partial");
+    expect(counted(at)).toBe(true);
+    expect(heldLine(at)).toBe("Counting undisclosed findings, the ones you read here.");
+  });
+
+  it("names each half read alone, across products", () => {
+    const at = holding(
+      who([
+        readingDependencies("edge"),
+        reaching("sonic", { may_see: true, reads_public: true }),
+        reaching("core", { may_see: true, reads_private: true }),
+      ]),
+      "dependency",
+    );
+    expect(heldLine(at)).toBe(
+      "Counting only disclosed findings in sonic, and only undisclosed findings in core.",
+    );
+  });
+
+  it("draws the counts of a product the session does not list", () => {
+    const at = holding(who([readingDependencies("edge")]), "dependency", "old");
+    expect(at.held).toBe("here");
+    expect(counted(at)).toBe(true);
   });
 
   it("names the products read disclosed only, across products where others are read whole", () => {
@@ -77,7 +108,10 @@ describe("how a reader holds a family of findings", () => {
 
   it("names code findings read in another product", () => {
     const at = holding(
-      who([reaching("edge", { may_see: true, reads_security_testing: true })]),
+      who([
+        reaching("edge", { may_see: true, reads_security_testing: true }),
+        readingDependencies("sonic"),
+      ]),
       "code",
       "sonic",
     );
@@ -95,5 +129,27 @@ describe("how a reader holds a family of findings", () => {
   it("holds every figure until the session answers", () => {
     expect(counted(holding(undefined, "dependency", "sonic"))).toBe(true);
     expect(readsNothing(undefined)).toBe(false);
+  });
+});
+
+describe("a list of undisclosed work alone", () => {
+  it("says the reader reads no undisclosed work in any product", () => {
+    expect(undisclosedLine(who([reaching("sonic", { reads_public: true })]))).toBe(
+      "You don't read undisclosed findings in any product.",
+    );
+  });
+
+  it("names the product undisclosed work is not read in", () => {
+    const reader = who([
+      reaching("edge", { reads_private: true }),
+      reaching("sonic", { reads_public: true }),
+    ]);
+    expect(undisclosedLine(reader, "sonic")).toBe("You don't read undisclosed findings in sonic.");
+    expect(undisclosedLine(reader, "edge")).toBe("");
+    expect(undisclosedLine(reader)).toBe("");
+  });
+
+  it("says nothing of a product the session does not list", () => {
+    expect(undisclosedLine(who([reaching("edge", { reads_public: true })]), "old")).toBe("");
   });
 });

@@ -16,13 +16,15 @@ type Family = "dependency" | "code";
 // - elsewhere: they read it in another product and not this one; one line says
 //   so, because a zero there reads as nothing being open.
 // - here: they read all of it here; a zero is a real zero.
-// - disclosed: they read only what has been disclosed in the products named;
-//   every count is of those alone and says so.
+// - partial: they read one half of the family alone, disclosed or undisclosed,
+//   in the products named; every count is of what they read and says so.
+//   `all` says every product counted is read that way.
+type Half = "disclosed" | "undisclosed";
 export type Holding =
   | { held: "nowhere"; family: Family }
   | { held: "elsewhere"; family: Family; product: string }
   | { held: "here"; family: Family }
-  | { held: "disclosed"; family: Family; only: string[]; all: boolean };
+  | { held: "partial"; family: Family; disclosed: string[]; undisclosed: string[]; all: boolean };
 
 type Can = NonNullable<Who["reach"]>[number];
 
@@ -30,10 +32,13 @@ function reads(can: Can, family: Family): boolean {
   return family === "code" ? can.reads_security_testing : can.reads_public || can.reads_private;
 }
 
-// Security testing work is never disclosed, so only the dependency family has
-// a disclosed half to be held alone.
-function disclosedOnly(can: Can, family: Family): boolean {
-  return family === "dependency" && can.reads_public && !can.reads_private;
+// The half of the dependency family read alone, where only one is. Reading
+// undisclosed work does not carry reading disclosed work, so either half may
+// be held without the other. Security testing work is never disclosed, so the
+// code family has no halves.
+function halfOnly(can: Can, family: Family): Half | undefined {
+  if (family !== "dependency" || can.reads_public === can.reads_private) return undefined;
+  return can.reads_public ? "disclosed" : "undisclosed";
 }
 
 // holding answers for one family at a product, or across every product the
@@ -49,21 +54,41 @@ export function holding(who: Who | null | undefined, family: Family, product?: s
   if (readers.length === 0) return { held: "nowhere", family };
   if (product) {
     const named = product.toLowerCase();
-    const can = readers.find((each) => each.product.toLowerCase() === named);
-    if (!can) return { held: "elsewhere", family, product };
-    return disclosedOnly(can, family)
-      ? { held: "disclosed", family, only: [can.product], all: true }
-      : { held: "here", family };
+    // A product with no row is one the session does not list, a retired one
+    // reached by a kept link most often: the server has narrowed its counts
+    // already, so they stand.
+    const row = reach.find((each) => each.product.toLowerCase() === named);
+    if (!row) return { held: "here", family };
+    if (!reads(row, family)) return { held: "elsewhere", family, product };
+    const half = halfOnly(row, family);
+    if (!half) return { held: "here", family };
+    return {
+      held: "partial",
+      family,
+      disclosed: half === "disclosed" ? [row.product] : [],
+      undisclosed: half === "undisclosed" ? [row.product] : [],
+      all: true,
+    };
   }
-  const only = readers.filter((can) => disclosedOnly(can, family)).map((can) => can.product);
-  if (only.length === 0) return { held: "here", family };
-  return { held: "disclosed", family, only, all: only.length === readers.length };
+  const halves = (half: Half) =>
+    readers.filter((can) => halfOnly(can, family) === half).map((can) => can.product);
+  const disclosed = halves("disclosed");
+  const undisclosed = halves("undisclosed");
+  if (disclosed.length + undisclosed.length === 0) return { held: "here", family };
+  return {
+    held: "partial",
+    family,
+    disclosed,
+    undisclosed,
+    // One half read alone in every product counted, so the line need name none.
+    all: disclosed.length === readers.length || undisclosed.length === readers.length,
+  };
 }
 
 // Whether a screen draws this family's counts at all. A count is drawn where
-// it means what it says: everything here, or disclosed work said to be that.
+// it means what it says: everything here, or one half said to be that.
 export function counted(at: Holding): boolean {
-  return at.held === "here" || at.held === "disclosed";
+  return at.held === "here" || at.held === "partial";
 }
 
 // Whether the reader reads no finding of either family in any product: an
@@ -89,11 +114,36 @@ export function heldLine(at: Holding): string {
       return `You don't read ${NOUN[at.family]} in any product.`;
     case "elsewhere":
       return `You don't read ${NOUN[at.family]} in ${at.product}.`;
-    case "disclosed":
-      return at.all
-        ? "Counting disclosed findings, the ones you read here."
-        : `Counting only disclosed findings in ${at.only.join(", ")}.`;
+    case "partial":
+      if (at.all) {
+        return at.disclosed.length > 0
+          ? "Counting disclosed findings, the ones you read here."
+          : "Counting undisclosed findings, the ones you read here.";
+      }
+      return `Counting ${[
+        at.disclosed.length > 0 && `only disclosed findings in ${at.disclosed.join(", ")}`,
+        at.undisclosed.length > 0 && `only undisclosed findings in ${at.undisclosed.join(", ")}`,
+      ]
+        .filter(Boolean)
+        .join(", and ")}.`;
     case "here":
       return "";
   }
+}
+
+// The line a list of undisclosed work alone shows in place of its rows, such
+// as the embargoes running out: empty where the reader reads undisclosed work
+// at the scope. A product the session does not list is read as its rows,
+// which the server has narrowed already.
+export function undisclosedLine(who: Who | null | undefined, product?: string): string {
+  if (!who) return "";
+  const reach = who.reach ?? [];
+  if (product) {
+    const named = product.toLowerCase();
+    const row = reach.find((each) => each.product.toLowerCase() === named);
+    return !row || row.reads_private ? "" : `You don't read undisclosed findings in ${product}.`;
+  }
+  return reach.some((each) => each.reads_private)
+    ? ""
+    : "You don't read undisclosed findings in any product.";
 }

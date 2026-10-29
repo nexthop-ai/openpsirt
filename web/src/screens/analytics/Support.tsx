@@ -13,6 +13,9 @@ import { Loading } from "../../ui/Loading";
 import { Sheet } from "./Sheet";
 import { Segments, boundedAsked } from "./Window";
 import { Wide } from "../../ui/Wide";
+import { useWho } from "../../app/session";
+import { counted, holding } from "../../app/families";
+import { HeldCell, HeldLine } from "../../ui/HeldLine";
 
 // The releases still shipped and no longer maintained.
 //
@@ -33,6 +36,12 @@ export function Support() {
   // about what has already gone and a second population appearing unasked would
   // change what the figures at the top of it count.
   const within = boundedAsked(params.get("within"), FURTHEST, 0);
+  // The releases are the catalog; what is open on them is dependency findings,
+  // drawn only where the reader reads them, row by row across products.
+  const who = useWho().data;
+  const dependencies = holding(who, "dependency", at.product);
+  const figures = counted(dependencies);
+  const readsIn = (product: string) => holding(who, "dependency", product);
   const ended = useQuery({
     queryKey: ["out-of-support", scope, within],
     queryFn: async () =>
@@ -75,12 +84,13 @@ export function Support() {
         <section className="panel">
           <h3>
             {(ended.data?.total ?? 0).toLocaleString()}{" "}
-            {(ended.data?.total ?? 0) === 1 ? "release" : "releases"}, with{" "}
-            {(ended.data?.open ?? 0).toLocaleString()} open
+            {(ended.data?.total ?? 0) === 1 ? "release" : "releases"}
+            {figures && <>, with {(ended.data?.open ?? 0).toLocaleString()} open</>}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Issues at components. Nothing past end of life has a deadline.
+            {figures ? "Issues at components. " : ""}Nothing past end of life has a deadline.
           </p>
+          <HeldLine at={dependencies} />
           {rows.length === 0 ? (
             <Empty
               title="Nothing is out of support."
@@ -100,7 +110,7 @@ export function Support() {
                       <th>Release</th>
                       <th>Support ended</th>
                       <th className="num">Ago</th>
-                      <th className="num">Open</th>
+                      {figures && <th className="num">Open</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -120,20 +130,22 @@ export function Support() {
                         <td className="num">
                           {row.ended_days.toLocaleString()} {row.ended_days === 1 ? "day" : "days"}
                         </td>
-                        <td className="num">
-                          {/* Every figure opens the list it counts, and this
+                        {figures && (
+                          <HeldCell at={readsIn(row.product)}>
+                            {/* Every figure opens the list it counts, and this
                               one has to say so twice over: the list keeps
                               itself to branches in support by default, which
                               is exactly the population this report is not
                               about. Linked without both, every row here opens
                               an empty list under a number that is not zero. */}
-                          <Link
-                            to={openAt(row.product, row.branch_or_tag, row.kind)}
-                            className={row.open > 0 ? "state open" : undefined}
-                          >
-                            {row.open.toLocaleString()}
-                          </Link>
-                        </td>
+                            <Link
+                              to={openAt(row.product, row.branch_or_tag, row.kind)}
+                              className={row.open > 0 ? "state open" : undefined}
+                            >
+                              {row.open.toLocaleString()}
+                            </Link>
+                          </HeldCell>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -153,12 +165,14 @@ export function Support() {
       {ending.length > 0 && (
         <section className="panel" style={{ marginTop: 14 }}>
           <h3>
-            {ending.length.toLocaleString()} about to go, with{" "}
-            {(ended.data?.ending_open ?? 0).toLocaleString()} open
+            {ending.length.toLocaleString()} about to go
+            {figures && <>, with {(ended.data?.ending_open ?? 0).toLocaleString()} open</>}
           </h3>
-          <p className="hint" style={{ marginTop: 0 }}>
-            When one crosses, what is open on it loses its deadline.
-          </p>
+          {figures && (
+            <p className="hint" style={{ marginTop: 0 }}>
+              When one crosses, what is open on it loses its deadline.
+            </p>
+          )}
           <Wide>
             <table>
               <thead>
@@ -167,7 +181,7 @@ export function Support() {
                   <th>Release</th>
                   <th>Support ends</th>
                   <th className="num">Left</th>
-                  <th className="num">Open</th>
+                  {figures && <th className="num">Open</th>}
                 </tr>
               </thead>
               <tbody>
@@ -185,16 +199,18 @@ export function Support() {
                       {Math.abs(row.ended_days).toLocaleString()}{" "}
                       {Math.abs(row.ended_days) === 1 ? "day" : "days"}
                     </td>
-                    <td className="num">
-                      {/* Still in support, so this one links as the list's own
+                    {figures && (
+                      <HeldCell at={readsIn(row.product)}>
+                        {/* Still in support, so this one links as the list's own
                           default would read it rather than past end of life. */}
-                      <Link
-                        to={endingAt(row.product, row.branch_or_tag, row.kind)}
-                        className={row.open > 0 ? "state open" : undefined}
-                      >
-                        {row.open.toLocaleString()}
-                      </Link>
-                    </td>
+                        <Link
+                          to={endingAt(row.product, row.branch_or_tag, row.kind)}
+                          className={row.open > 0 ? "state open" : undefined}
+                        >
+                          {row.open.toLocaleString()}
+                        </Link>
+                      </HeldCell>
+                    )}
                   </tr>
                 ))}
               </tbody>

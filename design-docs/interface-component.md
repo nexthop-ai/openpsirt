@@ -3,7 +3,7 @@
 The component screen, the reads behind it, and the dependency tree with its
 counts and search.
 
-Satisfies REQ-42, REQ-56, REQ-60.
+Satisfies REQ-56, REQ-60.
 
 ## Contents
 
@@ -60,7 +60,7 @@ Every count on the page is of dependency findings, drawn under
 | Where the reader does not read dependency findings in the product, no count, open button, severity band, fix card or twelve weeks is drawn, and nothing calls the component clean | A zero over open code findings reads as a clean component |
 | Where they read them in another product, one line says so | |
 | Where nothing is open, the chip says "no dependency findings open" | The page counts one family, and its zero names it |
-| A disclosed-only reader's counts carry the line saying they are of disclosed findings | |
+| A reader of one half alone has its counts carry the line saying which half | |
 | The page is drawn either way: the package, where it sits and the builds shipping it | They are the inventory, which the product's readers hold |
 
 An upgrade is promised here on the terms `design-docs/triage-promises.md` § Promised work sets: the

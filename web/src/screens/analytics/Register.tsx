@@ -16,6 +16,9 @@ import { Paged } from "../../ui/Paged";
 import { Severity } from "../../ui/Severity";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { useWho } from "../../app/session";
+import { counted, heldLine, holding } from "../../app/families";
+import { HeldLine } from "../../ui/HeldLine";
 import { STATES, type Stands, drawn, said } from "../../ui/states";
 import { Wide } from "../../ui/Wide";
 
@@ -78,8 +81,12 @@ export function Register() {
     setOffset(0);
   }
 
+  // The register is dependency findings, asked and drawn only where the reader
+  // reads them in the product.
+  const dependencies = holding(useWho().data, "dependency", at.product);
+  const figures = counted(dependencies);
   const register = useQuery({
-    enabled: whole,
+    enabled: figures && whole,
     queryKey: ["register", where, narrowed, offset],
     queryFn: async () =>
       unwrap(
@@ -107,7 +114,7 @@ export function Register() {
 
   return (
     <Sheet
-      settled={register.isSuccess}
+      settled={!figures || register.isSuccess}
       name="Disposition register"
       answers="every vulnerability known in one build, and what became of it."
       asked={
@@ -120,7 +127,10 @@ export function Register() {
           .join(", ") || undefined
       }
     >
-      {!whole ? (
+      {figures && <HeldLine at={dependencies} />}
+      {!figures ? (
+        <Empty title="Nothing to list." detail={heldLine(dependencies)} />
+      ) : !whole ? (
         <section className="panel">
           <Empty
             title="Pick a product, a branch or tag, and a variant."

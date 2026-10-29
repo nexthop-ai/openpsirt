@@ -124,15 +124,20 @@ zero for work they cannot see reads as nothing open.
 | Holds the family in no product | No entry, section, tile or count for it |
 | Holds it in another product, not this one | One line, "You don't read code findings in sonic.", and no count |
 | Holds it here, nothing open | A real zero, naming what it counts (REQ-60) |
-| Reads only disclosed work here | The counts, with "Counting disclosed findings, the ones you read here." (REQ-42) |
-| Reads disclosed work only in some products, across products | The counts, with the products read disclosed only named |
-| Reads no finding of either family in any product | The deployment's records: the change history, access and settings where the audit permission or administration allows |
+| Reads only disclosed work here | The counts, with "Counting disclosed findings, the ones you read here." |
+| Reads only undisclosed work here | The counts, with "Counting undisclosed findings, the ones you read here." |
+| Reads one half alone in some products, across products | The counts, with each half's products named |
+| Reads no finding of either family in any product | The deployment's records: the change history, access and settings where the audit permission or administration allows, beside the work they hold |
 
 | Rule | Reason |
 |---|---|
 | The holding is worked out in the browser from the session's answer (§ Capabilities before drawing): reading disclosed or undisclosed work is the dependency family, reading security testing work the code family | The answer already says what each product lets the reader read; nothing new is asked of the server |
-| One helper decides it, and every screen asks it | Decided per screen, the four answers drift apart |
-| Security testing work is never disclosed, so the code family has no disclosed-only reader | |
+| Either half of the dependency family may be read without the other, and each read alone is said | Reading is granted per visibility (`design-docs/access.md` § Roles) |
+| One helper decides it, and every screen counting a family asks it, apart from those § Limits names | Decided per screen, the answers drift apart |
+| A table spanning products draws a dash, with the line on hover, in a row whose product the reader does not read the family in | A zero in one row reads as that product being clean |
+| A screen whose subject is the family (the findings list, release comparison, a report on it) shows "Nothing to list." and the line in place of its body, the line included for a reader holding it in no product | Reached by a kept link, its empty body reads as nothing open |
+| The line names a product only where the session lists it; a product it does not list, a retired one most often, keeps its figures | A product somebody holds no role on is never named to them (REQ-42), and the server has narrowed a retired product's counts already (REQ-43) |
+| Security testing work is never disclosed, so the code family has no halves | |
 | A count not drawn is not asked for | A request whose answer is never shown is load for nothing |
 | Until the session answers, figures are drawn as for a reader holding the family here | The server has narrowed them already; hiding them first and drawing them after moves the page under the reader |
 | A case collaborator's single issue is not a product holding | Their reach is one issue, named on the issue itself |
@@ -337,5 +342,6 @@ a text file that reads as binary, which every text tool skips silently.
 | Limit | Detail |
 |---|---|
 | Code findings are counted on no shared screen | The code family's rule reaches the rail and the product page's link alone; home, the component screen, the tree and the product figures count dependency findings |
+| Some screens draw counts without the families helper | Incidents, the review queue, assignments, uploads and a scan run's page; each counts the reader's own work or a record, and draws a zero for a reader of neither family |
 | No component library | Built from the mockup's tokens and components written here; a packaged data grid owning its markup cannot become cards on a phone (REQ-55) |
 | Dependencies are pinned exactly | A range resolves at build time; `npm ci` installs the lockfile |

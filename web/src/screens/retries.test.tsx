@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { Findings } from "./Findings";
 import { IssueAdvisory } from "./IssueAdvisory";
+import { readingDependencies } from "../test/reach";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
@@ -61,7 +62,15 @@ describe("the findings search box", () => {
   it("empties when the term leaves the address", async () => {
     serve((path) =>
       path === "/v1/session/me"
-        ? { data: { identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] } }
+        ? {
+            data: {
+              identity: "ana",
+              name: "Ana",
+              admin: false,
+              kind: "person",
+              reach: [readingDependencies("sonic")],
+            },
+          }
         : { data: { items: [], total: 0 } },
     );
     mount.render(screen(<Findings />, "/findings?q=openssl", "/findings"));

@@ -12,7 +12,9 @@ import { acrossProducts, findingsPageKey, type withinVariant } from "./list";
 //
 // `spanning` is the list across every product the reader may see, which has
 // no view by component or by upgrade. `selection` is the branch and variant
-// the list is narrowed to, beside the filters in `query`.
+// the list is narrowed to, beside the filters in `query`. `reads` is whether
+// the reader reads the list's findings at its scope; where they do not, none
+// of it is asked.
 export function useFindingsViews({
   product,
   branch_or_tag: branchOrTag,
@@ -21,6 +23,7 @@ export function useFindingsViews({
   query,
   selection,
   view,
+  reads,
 }: {
   product: string;
   branch_or_tag: string;
@@ -29,6 +32,7 @@ export function useFindingsViews({
   query: ReturnType<typeof withinVariant>;
   selection: { branch_or_tag?: string; variant?: string };
   view: string;
+  reads: boolean;
 }) {
   const findings = useQuery({
     queryKey: findingsPageKey(product, branchOrTag, variant, query),
@@ -40,7 +44,7 @@ export function useFindingsViews({
               params: { path: { product }, query: { ...query, ...selection } },
             }),
       ),
-    enabled: view === "issues",
+    enabled: reads && view === "issues",
     // The rows on screen stay there while the next answer is read, so changing
     // one filter keeps the search box, the chips, the count and the controls
     // drawn and the cursor where it was.
@@ -61,7 +65,7 @@ export function useFindingsViews({
   // one: the findings list has no count-only answer.
   const byIssue = useQuery({
     queryKey: ["findings", "count", product, branchOrTag, variant, query],
-    enabled: view !== "issues",
+    enabled: reads && view !== "issues",
     queryFn: async () =>
       unwrap(
         spanning
@@ -78,7 +82,7 @@ export function useFindingsViews({
   });
   const byComponent = useQuery({
     queryKey: ["findings-by-component", "count", product, selection, query],
-    enabled: !spanning,
+    enabled: reads && !spanning,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/findings/components", {
@@ -96,7 +100,7 @@ export function useFindingsViews({
   });
   const byUpgrade = useQuery({
     queryKey: ["planned-upgrades", "count", product, selection, query],
-    enabled: !spanning,
+    enabled: reads && !spanning,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/planned-upgrades", {

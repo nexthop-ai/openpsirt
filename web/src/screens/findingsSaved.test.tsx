@@ -3,6 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readingDependencies } from "../test/reach";
 import { Findings } from "./Findings";
 import { answer, location, mounted, screen, serve, settle } from "../test/mount";
 
@@ -10,7 +11,13 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const me = { identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] };
+const me = {
+  identity: "ana",
+  name: "Ana",
+  admin: false,
+  kind: "person",
+  reach: [readingDependencies("sonic")],
+};
 
 // Two filters keeping one query, which only their names tell apart.
 const kept = [

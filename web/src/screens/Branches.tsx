@@ -10,6 +10,8 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
@@ -34,14 +36,18 @@ export function Branches() {
   // closed, so one piece of state answers both which row and whether.
   const [editing, setEditing] = useState("");
   const [renameTo, setRenameTo] = useState("");
+  // The Open column counts dependency findings: drawn and asked for only
+  // where the reader reads them in this product.
+  const dependencies = holding(who.data, "dependency", product);
+  const counts = counted(dependencies);
   const branchesAndTags = useQuery({
     // Keyed as counted, so this and the picker's uncounted read of the same
     // list are two cache entries rather than a race between them.
-    queryKey: ["branches_and_tags", product, "counts"],
+    queryKey: ["branches_and_tags", product, "counts", counts],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/branches-and-tags", {
-          params: { path: { product }, query: { counts: true } },
+          params: { path: { product }, query: { counts } },
         }),
       ),
   });
@@ -150,6 +156,7 @@ export function Branches() {
         <p>The releases of {product}, past and in progress. A branch moves; a tag never does.</p>
         {who.data?.admin && <AddButton label="Add branch or tag" onClick={() => setAdding(true)} />}
       </div>
+      <HeldLine at={dependencies} />
 
       {/* A refused write is said. Without this the select snaps back to what
           it held, the administrator reads that as their own mis-click, and
@@ -175,12 +182,14 @@ export function Branches() {
                 <th>Kind</th>
                 <th>Cut from</th>
                 <th>Released</th>
-                <th
-                  className="num"
-                  title="Issues open against it, counted at components rather than at every occurrence they sit"
-                >
-                  Open
-                </th>
+                {counts && (
+                  <th
+                    className="num"
+                    title="Issues open against it, counted at components rather than at every occurrence they sit"
+                  >
+                    Open
+                  </th>
+                )}
                 <th>Out of support</th>
                 <th>Last inventory</th>
                 <th />
@@ -264,7 +273,7 @@ export function Branches() {
                       </span>
                     )}
                   </td>
-                  <td className="num">{(branchOrTag.open ?? 0).toLocaleString()}</td>
+                  {counts && <td className="num">{(branchOrTag.open ?? 0).toLocaleString()}</td>}
                   <td>
                     <EndOfLife
                       what={`${branchOrTag.name} goes out of support`}

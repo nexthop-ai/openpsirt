@@ -12,6 +12,9 @@ import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
 import { BANDS } from "../ui/severities";
 import { Wide } from "../ui/Wide";
+import { useWho } from "../app/session";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import {
   buildFindingsAt,
   comparisonAt,
@@ -51,9 +54,15 @@ export function Release({
   // rather than added as an endpoint: a release is built two or three ways,
   // and an answer worked out when it is asked for beats a total kept somewhere
   // that can go stale.
+  //
+  // They count dependency findings, so they are asked and drawn only where the
+  // reader reads them in this product.
+  const dependencies = holding(useWho().data, "dependency", product);
+  const figures = counted(dependencies);
   const counts = useQueries({
     queries: variants.map((variant) => ({
       queryKey: ["release-counts", product, branchOrTag, variant.name],
+      enabled: figures,
       queryFn: async () =>
         unwrap(
           await api.GET(
@@ -133,6 +142,7 @@ export function Release({
           <span>No scan is accepted for it. What is here stays.</span>
         </div>
       )}
+      <HeldLine at={dependencies} />
 
       <section className="panel">
         <h3>The variants</h3>
@@ -150,7 +160,7 @@ export function Release({
               <thead>
                 <tr>
                   <th>Variant</th>
-                  <th>Open</th>
+                  {figures && <th>Open</th>}
                   <th>Reaches customers</th>
                   <th />
                 </tr>
@@ -168,15 +178,17 @@ export function Release({
                       <td className="id">
                         <Link to={buildFindingsAt(at)}>{variant.name}</Link>
                       </td>
-                      <td>
-                        {counts[at_]?.isPending ? (
-                          <span className="hint">…</span>
-                        ) : counts[at_]?.isError ? (
-                          <span className="hint">could not be read</span>
-                        ) : (
-                          (mine?.total ?? 0).toLocaleString()
-                        )}
-                      </td>
+                      {figures && (
+                        <td>
+                          {counts[at_]?.isPending ? (
+                            <span className="hint">…</span>
+                          ) : counts[at_]?.isError ? (
+                            <span className="hint">could not be read</span>
+                          ) : (
+                            (mine?.total ?? 0).toLocaleString()
+                          )}
+                        </td>
+                      )}
                       <td>{variant.customer_facing === false ? "No" : "Yes"}</td>
                       <td>
                         <Link className="linkish" to={dependenciesAt(at)}>
@@ -192,43 +204,46 @@ export function Release({
         )}
       </section>
 
-      <section className="panel" style={{ marginTop: 14 }}>
-        <h3>Open now</h3>
-        <p className="hint" style={{ marginTop: 0 }}>
-          Open across every variant, by severity. Tags never change, so nothing here has a deadline.
-        </p>
-        {counts.some((one) => one.isPending) ? (
-          <p className="hint">…</p>
-        ) : !settled ? (
-          <Failed
-            error={counts.find((one) => one.isError)?.error}
-            what={
-              unread === counts.length
-                ? "The findings open here could not be read."
-                : `${unread} of these variants could not be read, so there is no total to give.`
-            }
-          />
-        ) : (
-          <ul className="files catalog">
-            {BANDS.map((band) => (
-              <li key={band}>
+      {figures && (
+        <section className="panel" style={{ marginTop: 14 }}>
+          <h3>Open now</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Open across every variant, by severity. Tags never change, so nothing here has a
+            deadline.
+          </p>
+          {counts.some((one) => one.isPending) ? (
+            <p className="hint">…</p>
+          ) : !settled ? (
+            <Failed
+              error={counts.find((one) => one.isError)?.error}
+              what={
+                unread === counts.length
+                  ? "The findings open here could not be read."
+                  : `${unread} of these variants could not be read, so there is no total to give.`
+              }
+            />
+          ) : (
+            <ul className="files catalog">
+              {BANDS.map((band) => (
+                <li key={band}>
+                  <div>
+                    <b>{bands[band].toLocaleString()}</b> {band}
+                  </div>
+                </li>
+              ))}
+              <li>
                 <div>
-                  <b>{bands[band].toLocaleString()}</b> {band}
+                  <b>{bands.total.toLocaleString()}</b> open in all
+                </div>
+                <div className="hint">
+                  Issues at components, added across the variants above, so one flaw in two variants
+                  counts twice.
                 </div>
               </li>
-            ))}
-            <li>
-              <div>
-                <b>{bands.total.toLocaleString()}</b> open in all
-              </div>
-              <div className="hint">
-                Issues at components, added across the variants above, so one flaw in two variants
-                counts twice.
-              </div>
-            </li>
-          </ul>
-        )}
-      </section>
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Changes</h3>

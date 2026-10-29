@@ -83,11 +83,12 @@ describe("the code findings entry", () => {
   });
 
   it("declines and says so where the reader may not read security testing material", async () => {
-    await railAt("/products/other", [{ product: "sonic", reads_security_testing: true }]);
+    await railAt("/products/other", [
+      { product: "sonic", reads_security_testing: true },
+      { product: "other", reads_public: true },
+    ]);
     expect(entry("Security testing")?.tagName).toBe("BUTTON");
-    expect(entry("Security testing")?.title).toBe(
-      "You can't read security testing material in this product",
-    );
+    expect(entry("Security testing")?.title).toBe("You don't read code findings in other.");
   });
 
   it("opens the product's queue on the branch and variant picked", async () => {
@@ -181,6 +182,21 @@ describe("the rail for a reader without dependency findings", () => {
     ]);
     expect(entry("Disclosure deadlines")).toBeDefined();
     expect(entry("Record a flaw")).toBeDefined();
+  });
+
+  it("draws no Analytics for a reader of no finding in any product", async () => {
+    await railAt("/start", [{ product: "sonic" }]);
+    expect(entry("Analytics")).toBeUndefined();
+    await railAt("/start", [{ product: "sonic", reads_security_testing: true }]);
+    expect(entry("Analytics")).toBeDefined();
+  });
+
+  it("offers Record a flaw to a triager of disclosed work alone, and no Disclosure deadlines", async () => {
+    await railAt("/start", [
+      { product: "sonic", may_see: true, reads_public: true, triages_public: true },
+    ]);
+    expect(entry("Record a flaw")).toBeDefined();
+    expect(entry("Disclosure deadlines")).toBeUndefined();
   });
 
   it("says on the Unassigned badge that a disclosed-only reader's count is of disclosed findings", async () => {

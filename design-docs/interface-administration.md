@@ -38,6 +38,8 @@ role on.
 | A list report exports CSV and JSON; a figures report prints, every figure linking its list | An aggregate has no stream; the list is the traceable form |
 | A figure is the response's, never recounted from the page beneath it; each list says its total | |
 | A page past a list's end says so and keeps its footer | The register holds its position when the build under it changes, and Previous must be reachable |
+| A report counting dependency findings follows `design-docs/interface.md` § Families a reader holds at the scope picked, and asks for nothing it does not draw: backlog over time, deadline compliance and the disposition register show "Nothing to list." and the line; the program overview drops keeping pace and repeated deferrals; releases out of support keep their rows and draw what is open only in a product whose dependency findings are read | A report of zeros reads as a clean program |
+| The program overview's triage times and dismissals are decisions on either family, and are absent for a reader of neither | |
 
 ## The audit log
 

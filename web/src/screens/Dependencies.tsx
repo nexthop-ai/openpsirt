@@ -18,7 +18,8 @@ import { sharedVersion } from "../ui/versions";
 import { Crumbs } from "../ui/Crumbs";
 import { Icon } from "../ui/Icons";
 import { mayOf, useWho, type Who } from "../app/session";
-import { counted, heldLine, holding } from "../app/families";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { useReseed } from "../ui/reseed";
 
 // The counts beneath a node, worst first, as one bar whose widths are them.
@@ -221,7 +222,6 @@ function Whole({ who }: { who: Who | null | undefined }) {
   // as the inventory alone.
   const dependencies = holding(who, "dependency", product);
   const counts = counted(dependencies);
-  const line = heldLine(dependencies);
   const at = useMemo(
     () => ({ product, branch_or_tag: branchOrTag, variant }),
     [product, branchOrTag, variant],
@@ -382,7 +382,7 @@ function Whole({ who }: { who: Who | null | undefined }) {
           )}
         </p>
       </div>
-      {line && dependencies.held !== "nowhere" && <p className="hint">{line}</p>}
+      <HeldLine at={dependencies} />
 
       {/* Searching is the way in, and browsing is for answering "what else is
           under this" once somebody is already somewhere. Eight thousand

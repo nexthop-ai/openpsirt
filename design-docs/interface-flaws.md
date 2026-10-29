@@ -99,6 +99,7 @@ is and § Dispositions what a ruling does.
 | The screen answers for the scope picked, sent with the request and named in the subtitle, or every product | |
 | It offers "Record a reported flaw" to whoever may record undisclosed in the scope's product, or any where none is picked, never labeled as starting a disclosure | An outside report starts a date; Disclose makes an issue public |
 | The empty screen says a flaw gets a date when sent in from outside or when an outside report is ruled its duplicate | |
+| A reader of no undisclosed work at the scope picked is shown "Nothing to list." and "You don't read undisclosed findings in sonic." (or "in any product."), and the list is not asked | An empty list of embargoes reads as nothing due |
 | Disclosing is offered in the notice and on this screen to whoever triages undisclosed work there; it says it cannot be undone, then whether it took effect or waits | |
 | The act is chosen before the date, the reason labeled for it | Extending and bringing forward are different events |
 | The window opens on this deployment's embargo length; the server answers over it where none is named, and the picker's first option says so | A thirty-day window under a ninety-day policy reads "nothing is coming" |
