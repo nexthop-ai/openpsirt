@@ -4,6 +4,8 @@
 package analysis
 
 import (
+	"io"
+	"log/slog"
 	"strconv"
 	"testing"
 	"time"
@@ -39,12 +41,19 @@ func TestARunOpeningCodeFindingsUnderARuleQueuesItsSweep(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Applied by the worker a deployment runs, which queues sweeps on the
+		// queue its runs come from.
 		work := queue.New(w.DB, queue.DefaultOptions())
-		w.applier.Sweeping(work)
-		run, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
-			document([]sent{inFRR}, 10))
-		if status != series.Applied {
-			t.Fatalf("status %s (%s); want applied", status, run.Failure)
+		run := w.receive(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		if _, err := work.Add(ctx, queue.Analyze, strconv.FormatInt(run.ID, 10)); err != nil {
+			t.Fatal(err)
+		}
+		applied, err := NewWorker(w.applier, work, slog.New(slog.NewTextHandler(io.Discard, nil)), "test").Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied == nil || applied.Status != series.Applied {
+			t.Fatalf("the worker applied %+v; want the run applied", applied)
 		}
 
 		n, err := w.DB.DB.NewSelect().Model((*queue.Job)(nil)).

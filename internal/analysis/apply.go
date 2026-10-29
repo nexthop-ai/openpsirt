@@ -37,7 +37,8 @@ type Applier struct {
 	// whose decisions on code findings a run lapsed, once its transaction has committed.
 	drops  func(context.Context, Drop)
 	lapses func(context.Context, []triage.ForPerson)
-	// sweeps is the queue a run opening code findings asks to place them on.
+	// sweeps is the queue a run opening code findings asks, in the run's
+	// transaction, to place them on (finding.Arrived): the worker's own.
 	sweeps *queue.Queue
 }
 
@@ -72,13 +73,6 @@ func (a *Applier) TellingDrops(tell func(context.Context, Drop)) *Applier {
 // run lapsed, on the terms TellingDrops tells.
 func (a *Applier) TellingLapses(tell func(context.Context, []triage.ForPerson)) *Applier {
 	a.lapses = tell
-	return a
-}
-
-// Sweeping has a run that opens code findings queue its product's assignment
-// sweep on q, in the run's transaction (finding.Arrived).
-func (a *Applier) Sweeping(q *queue.Queue) *Applier {
-	a.sweeps = q
 	return a
 }
 

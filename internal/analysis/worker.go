@@ -23,8 +23,10 @@ type Worker struct {
 	name    string
 }
 
-// NewWorker returns a worker applying runs with applier.
+// NewWorker returns a worker applying runs with applier, which queues the
+// assignment sweep of what a run opens on q, the queue the runs come from.
 func NewWorker(applier *Applier, q *queue.Queue, logger *slog.Logger, name string) *Worker {
+	applier.sweeps = q
 	return &Worker{applier: applier, queue: q, logger: logger, name: name}
 }
 
