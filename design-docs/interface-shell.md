@@ -48,7 +48,7 @@ right its screen asks for.
 | Security testing | A reader of security testing work in some product; declines in a product where it is not read, with the code family's line on hover |
 | Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
 | Record a flaw | A reader who may triage undisclosed or disclosed work in some product |
-| Analytics | A reader of either family in some product; every report counts findings or the decisions on them |
+| Analytics | Everybody: the coverage reports answer what is scanned to anybody who sees a build, and a report counting a family the reader does not hold shows the line |
 | Access, Settings | An administrator or a holder of the audit permission |
 
 ### The folded rail

@@ -184,10 +184,8 @@ describe("the rail for a reader without dependency findings", () => {
     expect(entry("Record a flaw")).toBeDefined();
   });
 
-  it("draws no Analytics for a reader of no finding in any product", async () => {
+  it("offers Analytics to a reader of no finding, for the coverage reports", async () => {
     await railAt("/start", [{ product: "sonic" }]);
-    expect(entry("Analytics")).toBeUndefined();
-    await railAt("/start", [{ product: "sonic", reads_security_testing: true }]);
     expect(entry("Analytics")).toBeDefined();
   });
 

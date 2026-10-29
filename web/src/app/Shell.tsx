@@ -23,7 +23,7 @@ import {
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
 import { mayOf, signedOutBy, signOut } from "./session";
-import { counted, heldLine, holding, readsNothing } from "./families";
+import { counted, heldLine, holding } from "./families";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -247,9 +247,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* The catalog of named reports, and the one place a report is
               built by hand. Here rather than under a build because a report
               spans whatever the picker has selected, up to every product a
-              reader can see. Every report counts findings or decisions on
-              them, so a reader of neither family has nothing there. */}
-            {!readsNothing(who) && <Rail to="/analytics" icon="chart" label="Analytics" />}
+              reader can see. Offered to everybody: the coverage reports
+              answer what is scanned to anybody who sees a build, and a report
+              counting a family the reader does not hold says so itself. */}
+            <Rail to="/analytics" icon="chart" label="Analytics" />
           </>
         )}
         <Group name="scope" label={scope} shut={shut} onToggle={toggleGroup} />
