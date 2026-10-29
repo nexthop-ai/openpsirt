@@ -23,6 +23,10 @@ import { Compliance } from "./analytics/Compliance";
 import { Register } from "./analytics/Register";
 import { Support } from "./analytics/Support";
 import { remember } from "../app/scope";
+import { Incidents } from "./Incidents";
+import { Uploads } from "./Uploads";
+import { Run } from "./Run";
+import { Assignments } from "./Assignments";
 
 // Each screen counting dependency findings, drawn for a reader who does not
 // read them where the screen is: none of its zeros may stand for "nothing
@@ -541,5 +545,190 @@ describe("analytics", () => {
     expect(sonic?.querySelector("td.hint")?.getAttribute("title")).toBe(
       "You don't read dependency findings in sonic.",
     );
+  });
+});
+
+describe("the home page's incidents", () => {
+  const SHELF = {
+    "/v1/incidents": { items: [{ id: 1, product: "sonic", standing: true, issue: "CVE-2026-1" }] },
+  };
+  const tiles = () =>
+    Array.from(mount.host().querySelectorAll(".kpi .l")).map((each) => each.textContent ?? "");
+
+  it("draws no incidents tile, and asks for no shelf, where dependency findings are not read", async () => {
+    const spy = serving(ELSEWHERE, SHELF);
+    mount.render(screen(<Home who={ELSEWHERE} />, "/products/sonic", "/products/:product"));
+    await settle();
+    expect(tiles().some((each) => each.includes("Incidents"))).toBe(false);
+    expect(asked(spy)).not.toContain("/v1/incidents");
+  });
+
+  it("draws no incidents tile from a shelf another screen read", async () => {
+    serving(ELSEWHERE, SHELF);
+    const queries = signedIn(ELSEWHERE);
+    queries.setQueryData(["incidents"], SHELF["/v1/incidents"]);
+    mount.render(
+      screen(<Home who={ELSEWHERE} />, "/products/sonic", "/products/:product", queries),
+    );
+    await settle();
+    expect(tiles().some((each) => each.includes("Incidents"))).toBe(false);
+  });
+
+  it("counts the incidents of a reader of dependency findings here", async () => {
+    const reader = who([readingDependencies("sonic")]);
+    serving(reader, SHELF);
+    mount.render(screen(<Home who={reader} />, "/products/sonic", "/products/:product"));
+    await settle();
+    expect(tiles().some((each) => each.includes("Incidents"))).toBe(true);
+  });
+});
+
+describe("the incidents screen", () => {
+  async function shelf(as: Who, at: string) {
+    const spy = serving(as);
+    mount.render(screen(<Incidents />, at, "/incidents", signedIn(as)));
+    await settle();
+    return spy;
+  }
+
+  it("says the reader reads no dependency findings, never that none are recorded", async () => {
+    const spy = await shelf(DEVELOPER, "/incidents");
+    expect(text()).not.toContain("No incidents are recorded.");
+    expect(text()).toContain("You don't read dependency findings in any product.");
+    expect(mount.host().querySelector(".screen-head .n")).toBeNull();
+    expect(asked(spy)).not.toContain("/v1/incidents");
+  });
+
+  it("says in one line that dependency findings are read in another product", async () => {
+    const spy = await shelf(ELSEWHERE, "/incidents?product=sonic");
+    expect(text()).not.toContain("has no incidents");
+    expect(text()).toContain("You don't read dependency findings in sonic.");
+    expect(mount.host().querySelector(".screen-head .n")).toBeNull();
+    expect(asked(spy)).not.toContain("/v1/incidents");
+  });
+
+  it("names what its zero counts for a reader of dependency findings here", async () => {
+    const spy = await shelf(who([readingDependencies("sonic")]), "/incidents?product=sonic");
+    expect(text()).toContain("sonic has no incidents.");
+    expect(mount.host().querySelector(".screen-head .n")?.textContent).toBe("0");
+    expect(asked(spy)).toContain("/v1/incidents");
+  });
+
+  it("says a disclosed-only reader's shelf is of disclosed findings", async () => {
+    await shelf(DISCLOSED, "/incidents?product=sonic");
+    expect(text()).toContain("Counting disclosed findings, the ones you read here.");
+  });
+});
+
+describe("a build's uploads", () => {
+  const BUILD = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}";
+  const UPLOADS = {
+    [`${BUILD}/uploads`]: { items: [{ type: "sbom", total: 1 }] },
+    [`${BUILD}/sboms`]: {
+      items: [
+        { scan_id: 1, received_at: "2026-10-01T00:00:00Z", state: "scanned", opened: 0, closed: 0 },
+      ],
+      total: 1,
+    },
+  };
+
+  async function uploads(as: Who) {
+    serving(as, UPLOADS);
+    mount.render(
+      screen(
+        <Uploads />,
+        "/products/sonic/branches-and-tags/master/variants/arm/uploads",
+        "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads",
+        signedIn(as),
+      ),
+    );
+    await settle();
+  }
+
+  it("draws no opened or closed count where dependency findings are not read", async () => {
+    await uploads(ELSEWHERE);
+    expect(text()).toContain("Received");
+    expect(headers()).not.toContain("Opened");
+    expect(headers()).not.toContain("Closed");
+    expect(text()).toContain("You don't read dependency findings in sonic.");
+  });
+
+  it("draws them for a reader of dependency findings here", async () => {
+    await uploads(who([readingDependencies("sonic")]));
+    expect(headers()).toContain("Opened");
+    expect(headers()).toContain("Closed");
+  });
+});
+
+describe("a scan run's page", () => {
+  const RUN = {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/runs/{run}": {
+      run_id: 7,
+      scanner: "grype",
+      finished_at: "2026-10-01T00:00:00Z",
+      opened: { total: 0 },
+      closed: { total: 0 },
+    },
+  };
+
+  async function run(as: Who) {
+    serving(as, RUN);
+    mount.render(
+      screen(
+        <Run />,
+        "/products/sonic/branches-and-tags/master/variants/arm/runs/7",
+        "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/runs/:run",
+        signedIn(as),
+      ),
+    );
+    await settle();
+  }
+
+  it("draws no opened or closed count, and nothing called unchanged, where the reader does not read them", async () => {
+    await run(ELSEWHERE);
+    expect(text()).toContain("grype");
+    expect(text()).not.toContain("The findings it opened");
+    expect(text()).not.toContain("Nothing changed.");
+    expect(text()).toContain("You don't read dependency findings in sonic.");
+  });
+
+  it("draws them for a reader of dependency findings here", async () => {
+    await run(who([readingDependencies("sonic")]));
+    expect(text()).toContain("The findings it opened");
+    expect(text()).toContain("Nothing changed.");
+  });
+});
+
+describe("assignments", () => {
+  async function assignments(as: Who, at = "/assignments?tab=people") {
+    const spy = serving(as);
+    mount.render(screen(<Assignments />, at, "/assignments", signedIn(as)));
+    await settle();
+    return spy;
+  }
+
+  it("draws no one else's holdings, and asks for none, for a reader of no finding", async () => {
+    const spy = await assignments(AUDITOR);
+    expect(text()).not.toContain("Assigned to others");
+    expect(text()).not.toContain("Nobody else is holding anything.");
+    expect(text()).toContain("Assigned to me");
+    expect(asked(spy)).not.toContain("/v1/assignments");
+  });
+
+  it("says in one line which families are read in another product", async () => {
+    remember({ product: "sonic" });
+    const spy = await assignments(
+      who([readingDependencies("edge"), reaching("sonic", { may_see: true })]),
+    );
+    expect(text()).not.toContain("Assigned to others");
+    expect(text()).toContain("You don't read dependency findings in sonic.");
+    expect(asked(spy)).not.toContain("/v1/assignments");
+  });
+
+  it("counts who else holds what for a reader of either family", async () => {
+    const spy = await assignments(DEVELOPER);
+    expect(text()).toContain("Assigned to others");
+    expect(text()).toContain("Nobody else is holding anything.");
+    expect(asked(spy)).toContain("/v1/assignments");
   });
 });

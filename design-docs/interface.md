@@ -133,7 +133,7 @@ zero for work they cannot see reads as nothing open.
 |---|---|
 | The holding is worked out in the browser from the session's answer (§ Capabilities before drawing): reading disclosed or undisclosed work is the dependency family, reading security testing work the code family | The answer already says what each product lets the reader read; nothing new is asked of the server |
 | Either half of the dependency family may be read without the other, and each read alone is said | Reading is granted per visibility (`design-docs/access.md` § Roles) |
-| One helper decides it, and every screen counting a family asks it, apart from those § Limits names | Decided per screen, the answers drift apart |
+| One helper decides it, and every screen counting a family asks it | Decided per screen, the answers drift apart |
 | A table spanning products draws a dash, with the line on hover, in a row whose product the reader does not read the family in | A zero in one row reads as that product being clean |
 | A screen whose subject is the family (the findings list, release comparison, a report on it) shows "Nothing to list." and the line in place of its body, the line included for a reader holding it in no product | Reached by a kept link, its empty body reads as nothing open |
 | The line names a product only where the session lists it; a product it does not list, a retired one most often, keeps its figures | A product somebody holds no role on is never named to them (REQ-42), and the server has narrowed a retired product's counts already (REQ-43) |
@@ -141,6 +141,8 @@ zero for work they cannot see reads as nothing open.
 | A count not drawn is not asked for | A request whose answer is never shown is load for nothing |
 | Until the session answers, figures are drawn as for a reader holding the family here | The server has narrowed them already; hiding them first and drawing them after moves the page under the reader |
 | A case collaborator's single issue is not a product holding | Their reach is one issue, named on the issue itself |
+| A count of the reader's own work, or of decisions they may make or approve, is drawn whatever they read: assigned to them, sent back, their proposals, what they reaffirm, and the review queue's lists | It counts what they hold or may act on, which no family narrows away |
+| A record or a scan's metadata stays where its findings are not counted: an upload's receipt, a run's scanner and timing, the response windows | It is not a count of findings |
 
 ## A read that failed
 
@@ -342,6 +344,5 @@ a text file that reads as binary, which every text tool skips silently.
 | Limit | Detail |
 |---|---|
 | Code findings are counted on no shared screen | The code family's rule reaches the rail and the product page's link alone; home, the component screen, the tree and the product figures count dependency findings |
-| Some screens draw counts without the families helper | Incidents, the review queue, assignments, uploads and a scan run's page; each counts the reader's own work or a record, and draws a zero for a reader of neither family |
 | No component library | Built from the mockup's tokens and components written here; a packaged data grid owning its markup cannot become cards on a phone (REQ-55) |
 | Dependencies are pinned exactly | A range resolves at build time; `npm ci` installs the lockfile |

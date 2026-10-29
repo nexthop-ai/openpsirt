@@ -449,8 +449,11 @@ function Figures({
   // Standing records that a product was attacked through an issue. The shelf
   // is unpaged and narrowed record by record, so its length is the count, and
   // the scope is applied here: a record belongs to a product and no build.
+  // A record is against an issue of the dependency family, so the shelf is
+  // asked only where those findings are counted.
   const shelf = useQuery({
     queryKey: ["incidents"],
+    enabled: figures,
     queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
   });
   // This person's holdings, and what has come back to them: Home answers
@@ -617,7 +620,7 @@ function Figures({
           product, so the two are never one number. Drawn only where there is
           a record, and counted in records: one is against an issue and a
           product. It opens the shelf narrowed to the product it counted. */}
-      {(shelf.isError || attacked > 0) && (
+      {figures && (shelf.isError || attacked > 0) && (
         <button
           type="button"
           className="kpi urgent"

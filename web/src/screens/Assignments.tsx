@@ -18,6 +18,8 @@ import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
 import { findingOf, vulnerabilityReportAt, codeFindingAt, codeFindingsAt } from "../app/routes";
 import { useHandBack, useHeldReports } from "../api/intake";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { on } from "../ui/when";
 
 // One page of what somebody holds. The answer carries a total, so this is a
@@ -36,16 +38,24 @@ const PAGE = 50;
 export function Assignments() {
   const [params, setParams] = useSearchParams();
   const who = useWho();
-  const tab = params.get("tab") ?? "due";
-
   const at = useScope();
   const scope = scopeQuery(at);
+  // Who else holds what is counted in findings of both families, narrowed to
+  // the reader. A reader of neither at the scope would read "nobody else is
+  // holding anything", so the tab is drawn, and its totals asked for, only
+  // where one family is read; what the reader holds is theirs and always
+  // counted.
+  const dependencies = holding(who.data, "dependency", scope.product);
+  const code = holding(who.data, "code", scope.product);
+  const othersCounted = counted(dependencies) || counted(code);
+  const tab = othersCounted ? (params.get("tab") ?? "due") : "due";
   const { offset, go: goTo } = usePaging();
   // The product the picker is on, which is the whole of what this answers for:
   // somebody scoped to one product is shown and counted work from that product
   // alone.
   const holdings = useQuery({
     queryKey: ["holdings", scope.product ?? ""],
+    enabled: othersCounted,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/assignments", {
@@ -141,15 +151,26 @@ export function Assignments() {
         >
           Assigned to me <span className="n">{(mine.data?.total ?? myCount).toLocaleString()}</span>
         </button>
-        <button
-          type="button"
-          className="tab2"
-          aria-selected={tab === "people"}
-          onClick={() => go("people")}
-        >
-          Assigned to others <span className="n">{others.length}</span>
-        </button>
+        {othersCounted && (
+          <button
+            type="button"
+            className="tab2"
+            aria-selected={tab === "people"}
+            onClick={() => go("people")}
+          >
+            Assigned to others <span className="n">{others.length}</span>
+          </button>
+        )}
       </div>
+
+      {/* Who else holds what is said to be of the families read here, and
+          where neither is, that neither is. */}
+      {(tab === "people" || !othersCounted) && (
+        <>
+          <HeldLine at={dependencies} />
+          <HeldLine at={code} />
+        </>
+      )}
 
       {/* Said rather than discovered. Who holds what is answered per product,
           so a branch or a variant in the picker narrows the other two tabs and

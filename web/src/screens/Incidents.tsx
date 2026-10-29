@@ -9,6 +9,8 @@ import { api, type Body } from "../api/client";
 import { useProducts, useBranchesAndTags } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
+import { counted, heldLine, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 import { AddButton } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -51,8 +53,14 @@ export function Incidents() {
   const [params] = useSearchParams();
   const product = params.get("product") ?? "";
   const [recording, setRecording] = useState(false);
+  // A record is against an issue of the dependency family, so the shelf is
+  // read and counted only where the reader reads those findings at the scope
+  // the address names.
+  const dependencies = holding(who.data, "dependency", product || undefined);
+  const shown = counted(dependencies);
   const shelf = useQuery({
     queryKey: ["incidents"],
+    enabled: shown,
     queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
   });
   const windows = useQuery({
@@ -65,11 +73,11 @@ export function Incidents() {
   // silent-read: the identity read, whose failure the frame draws in place of every screen.
   const triaged = (who.data?.reach ?? []).filter((each) => each.may_triage);
 
-  if (shelf.isPending || windows.isPending) return <Loading />;
-  if (shelf.isError) {
+  if ((shown && shelf.isPending) || windows.isPending) return <Loading />;
+  if (shown && shelf.isError) {
     return <Failed error={shelf.error} what="The incidents could not be read." />;
   }
-  const items = (shelf.data?.items ?? []).filter(
+  const items = (shown ? (shelf.data?.items ?? []) : []).filter(
     (incident) => !product || incident.product === product,
   );
   const productName = items[0]?.product_name || product;
@@ -81,9 +89,7 @@ export function Incidents() {
   return (
     <>
       <div className="screen-head">
-        <h2>
-          Incidents <span className="n">{items.length.toLocaleString()}</span>
-        </h2>
+        <h2>Incidents {shown && <span className="n">{items.length.toLocaleString()}</span>}</h2>
         <p>
           {product ? (
             <>
@@ -106,7 +112,10 @@ export function Incidents() {
         <p className="hint">No windows are declared. An administrator declares them.</p>
       )}
 
-      {items.length === 0 ? (
+      {shown && <HeldLine at={dependencies} />}
+      {!shown ? (
+        <Empty title="Nothing to list." detail={heldLine(dependencies)} />
+      ) : items.length === 0 ? (
         <Empty
           title={product ? `${productName} has no incidents.` : "No incidents are recorded."}
           detail={

@@ -8,6 +8,7 @@ import { Run } from "./Run";
 import { PlannedUpgrades } from "./PlannedUpgrades";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import { press, type Init } from "../test/controls";
+import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -39,7 +40,12 @@ describe("an occurrence row's address", () => {
 
 describe("one scan run", () => {
   async function drawn(run: Answer) {
-    serve(() => run);
+    // A reader of the product's dependency findings, whose counts these are.
+    serve((path) =>
+      path === "/v1/session/me"
+        ? { data: { identity: "ana", reach: [readingDependencies("sonic")] } }
+        : run,
+    );
     mount.render(screen(<Run />, `${BUILD}/runs/7`, `${BUILT}/runs/:run`));
     await settle();
   }

@@ -10,6 +10,9 @@ import { Failed } from "../ui/Failed";
 import { BANDS } from "../ui/severities";
 import { lasted, on } from "../ui/when";
 import { buildFindingsAt, uploadsAt } from "../app/routes";
+import { useWho } from "../app/session";
+import { counted, holding } from "../app/families";
+import { HeldLine } from "../ui/HeldLine";
 
 type Changed = {
   total?: number;
@@ -29,6 +32,9 @@ export function Run() {
   const { product = "", branch_or_tag: branchOrTag = "", variant = "", run = "" } = useParams();
   const at = { product, branch_or_tag: branchOrTag, variant, run: Number(run) };
   const build = { product, branch_or_tag: branchOrTag, variant };
+  // What the run opened and closed are dependency findings, narrowed to the
+  // reader: one who does not read them here would read "Nothing changed".
+  const dependencies = holding(useWho().data, "dependency", product);
 
   const ran = useQuery({
     queryKey: ["run", at],
@@ -125,23 +131,28 @@ export function Run() {
         </p>
       </div>
 
-      <div className="detail" style={{ marginTop: 14 }}>
-        {/* The list this card is a count of. A run saying it opened four
-            thousand findings and offering no way to read them is the exact
-            problem this screen exists to fix, and "opened after a date" is the
-            wrong question when two runs landed the same day. */}
-        <Shape
-          title="The findings it opened"
-          changed={it.opened}
-          exploited={it.opened_exploited}
-          to={buildFindingsAt(build, { opened_by_run: run })}
-        />
-        <Shape title="The findings it closed" changed={it.closed} />
-      </div>
+      <HeldLine at={dependencies} />
+      {counted(dependencies) && (
+        <>
+          <div className="detail" style={{ marginTop: 14 }}>
+            {/* The list this card is a count of. A run saying it opened four
+                thousand findings and offering no way to read them is the
+                exact problem this screen exists to fix, and "opened after a
+                date" is the wrong question when two runs landed the same day. */}
+            <Shape
+              title="The findings it opened"
+              changed={it.opened}
+              exploited={it.opened_exploited}
+              to={buildFindingsAt(build, { opened_by_run: run })}
+            />
+            <Shape title="The findings it closed" changed={it.closed} />
+          </div>
 
-      <p className="hint" style={{ marginTop: 10 }}>
-        Issues at components. Worked out when this page is read.
-      </p>
+          <p className="hint" style={{ marginTop: 10 }}>
+            Issues at components. Worked out when this page is read.
+          </p>
+        </>
+      )}
     </div>
   );
 }

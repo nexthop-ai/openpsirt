@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Incident } from "./FindingIncident";
 import { Incidents, placesTyped } from "./Incidents";
 import { accept, mounted, screen, serve, settle } from "../test/mount";
+import { readingDependencies } from "../test/reach";
+
+// A reader of sonic's dependency findings, whose shelf the forms are on.
+const READER = { admin: false, reach: [readingDependencies("sonic")] };
 
 const mount = mounted();
 
@@ -67,7 +71,7 @@ describe("moments typed on the incident forms", () => {
 
   it("sends the minute typed as Told at as that minute in UTC", async () => {
     serve((path) => {
-      if (path === "/v1/session/me") return { data: { admin: false } };
+      if (path === "/v1/session/me") return { data: READER };
       if (path === "/v1/response-windows") return { data: { items: [] } };
       if (path === "/v1/incidents") {
         return {
@@ -109,7 +113,7 @@ describe("who was told about an attack", () => {
   it("offers the windows counted for this record and no other product's", async () => {
     const counted = { id: 1, name: "Regulator, 24 hours" };
     serve((path) => {
-      if (path === "/v1/session/me") return { data: { admin: false } };
+      if (path === "/v1/session/me") return { data: READER };
       if (path === "/v1/response-windows") {
         return { data: { items: [counted, { id: 2, name: "Elsewhere only" }] } };
       }
