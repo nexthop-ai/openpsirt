@@ -4,8 +4,10 @@
 package finding_test
 
 import (
+	"context"
 	"io"
 	"log/slog"
+	"strconv"
 	"testing"
 	"time"
 
@@ -61,7 +63,7 @@ func TestARulePlacesWorkAScanOpensAfterTheRuleWasWritten(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		placed, err := finding.NewSweeper(f.db, work,
+		_, placed, err := finding.NewSweeper(f.db, work,
 			slog.New(slog.NewTextHandler(io.Discard, nil)), "test").Once(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -105,6 +107,86 @@ func TestAScanQueuesNoSweepWhereNoRulePlacesWork(t *testing.T) {
 		}
 		if n := f.sweeps(t); n != 0 {
 			t.Errorf("a product whose one rule is retired has %d sweeps queued", n)
+		}
+
+		// A rule placing reports places no finding, so it queues nothing.
+		if _, err := f.store.AddReportRule(ctx, who, f.productID, f.team(t, "intake"),
+			"reports to intake"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Sweeping(work).Apply(ctx, f.build, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if n := f.sweeps(t); n != 0 {
+			t.Errorf("a product whose one rule places reports has %d sweeps queued", n)
+		}
+	})
+}
+
+func TestAPassRunsEverySweepWaitingThoughOnePlacesNothing(t *testing.T) {
+	// Most arrivals find their work already placed by an earlier sweep. A
+	// pass ending at the first that places nothing drains one sweep per
+	// interval, and the queue fills behind scans that queue at work speed.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.foundOnLibnl(t)
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		if _, err := f.store.AddRule(ctx, who, f.productID, f.team(t, "platform"),
+			"libnl to platform", "", "libnl-3-*"); err != nil {
+			t.Fatal(err)
+		}
+		work := queue.New(f.db, queue.DefaultOptions())
+		const waiting = 3
+		for range waiting {
+			if _, err := work.Add(ctx, queue.AssignmentSweep, strconv.FormatInt(f.productID, 10)); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// An hour's interval leaves only the first pass, which runs at once.
+		sweeper := finding.NewSweeper(f.db, work, slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
+		running, stop := context.WithCancel(ctx)
+		defer stop()
+		ended := make(chan struct{})
+		go func() {
+			defer close(ended)
+			sweeper.Run(running, time.Hour)
+		}()
+		deadline := time.Now().Add(15 * time.Second)
+		for {
+			n, err := f.db.DB.NewSelect().Model((*queue.Job)(nil)).
+				Where(`"kind" = ?`, queue.AssignmentSweep).
+				Where(`"state" = ?`, queue.Done).
+				Count(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n == waiting {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("one pass ran %d of %d waiting sweeps", n, waiting)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		for _, row := range f.open(t) {
+			if row.AssignedTo == nil {
+				t.Errorf("finding %d on libnl is unheld after the pass", row.ID)
+			}
+		}
+
+		// Claiming nothing is what ends the pass.
+		stop()
+		<-ended
+		claimed, _, err := sweeper.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if claimed {
+			t.Error("an empty queue reported a sweep claimed, so a pass never ends")
 		}
 	})
 }

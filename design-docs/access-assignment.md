@@ -129,6 +129,7 @@ A product's sweep is queued when a rule is written and when work arrives.
 | An arrival queues a sweep only where the product holds a rule in force that places findings | A product with no rule queues nothing per scan |
 | A full sweep queue leaves the arrival to the next one and refuses nothing | A refused scan loses its findings; an unqueued sweep only delays placing them |
 | Every arrival queues its own sweep, never skipping one already waiting | A waiting sweep can be claimed and read before the arrival commits |
+| A pass claims sweeps until none is waiting, one placing nothing included | Most arrivals find their work already placed; a pass ending there drains one sweep per interval and fills the queue |
 | Queued work in bounded batches; a full batch queues the next, never loops in the worker | |
 | The next batch is queued before the batch's own job is settled, and a failure to queue fails the job, which is retried | Settled first, a failed queue ends the sweep as a success |
 | A batch run twice places only what nobody holds | |
