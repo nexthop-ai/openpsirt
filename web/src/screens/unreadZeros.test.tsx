@@ -347,7 +347,44 @@ describe("the audit log", () => {
     await settle();
     expect(text()).toContain("You don’t read findings in any product.");
     expect(asked(spy)).toContain("/v1/administration/changes");
-    expect(asked(spy)).not.toContain("/v1/audit/decisions");
+    expect(mount.host().querySelector(".audited")).toBeNull();
+  });
+
+  it("lists a case collaborator's own decisions though they read no finding", async () => {
+    const collaborator = who([]);
+    serving(collaborator, {
+      "/v1/audit/decisions": {
+        total: 1,
+        items: [
+          {
+            decision: 7,
+            issue: "CVE-2026-1",
+            issues: 1,
+            product: "sonic",
+            products: 1,
+            component: "libnl",
+            version: "3.7",
+            components: 1,
+            rows: 1,
+            occurrences: 1,
+            outcome: "not-affected",
+            reasoning: "Never reached.",
+            state: "approved",
+            states: { proposed: 0, approved: 1, withdrawn: 0, lapsed: 0 },
+            standing: 1,
+            proposed_by: "bob",
+            proposed_at: "2026-09-01T00:00:00Z",
+            approvals: [],
+            two_people: false,
+          },
+        ],
+      },
+    });
+    mount.render(screen(<AuditLog />, "/audit-log", "*", signedIn(collaborator)));
+    await settle();
+    expect(mount.host().querySelectorAll(".audited").length).toBe(1);
+    expect(text()).toContain("CVE-2026-1");
+    expect(text()).not.toContain("You don’t read findings in any product.");
   });
 });
 

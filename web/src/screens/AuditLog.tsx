@@ -138,12 +138,14 @@ export function AuditLog() {
 
   const declared = useProducts();
   // A reader holding no finding in any product, an auditor most often, has no
-  // decision record to read: the deployment's change history is theirs, and it
-  // is drawn alone rather than under a record of zero decisions.
+  // decision record of their own: the deployment's change history is theirs,
+  // and it is drawn alone rather than under a record of zero decisions. The
+  // record is still asked, because a case collaborator holds no product read
+  // and is served their own case's decisions.
   const who = useWho();
   const recordsOnly = !!who.data && readsNothing(who.data);
   const record = useQuery({
-    enabled: !who.isPending && !recordsOnly,
+    enabled: !who.isPending,
     queryKey: ["audit", products, outcomes, states, sent.from, sent.to, alone, inForce, offset],
     queryFn: async () =>
       unwrap(
@@ -205,10 +207,11 @@ export function AuditLog() {
     .filter(Boolean)
     .join(" · ");
 
-  // Which of the two pages this is turns on the session, so nothing is asked
-  // or drawn before it answers.
-  if (who.isPending) return <Loading />;
-  if (recordsOnly) {
+  // Which of the two pages this is turns on the session and, for a reader of
+  // no finding, on whether the record holds anything for them, so nothing is
+  // drawn before both answer.
+  if (who.isPending || (recordsOnly && record.isPending)) return <Loading />;
+  if (recordsOnly && record.isSuccess && total === 0) {
     return (
       <>
         <div className="screen-head">

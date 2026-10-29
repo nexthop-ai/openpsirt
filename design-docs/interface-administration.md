@@ -47,7 +47,8 @@ role on.
 |---|---|
 | One card per decision: issue, outcome, state in one word, what it is about or how many components, occurrences covered, states counted where they differ. The issue opens the decision page; "Findings there now" opens the findings list narrowed to the decision and states (`design-docs/analytics-controls.md` § Dismissals and last uploads) | |
 | Report rulings sit beside the decisions over its products and period, taking none of their filters, printed without controls | A ruling is accountable and about a report (REQ-28) |
-| A reader of no finding in any product, an auditor most often, is shown the change history alone, with one line saying they read no findings; the decision record is not asked | A record of zero decisions reads as nothing decided |
+| A reader of no finding in any product, an auditor most often, is shown the change history alone, with one line saying they read no findings, where the decision record holds nothing for them | A record of zero decisions reads as nothing decided |
+| The decision record is asked of every reader, one of no finding included, and drawn wherever it answers with a decision | A case collaborator reads no product and is served their own case's decisions |
 | The change history sits below over its period, narrowed to one kind (roles, keys and tokens, settings), the kind in the address and the file | The question an access review asks |
 
 ## Settings
