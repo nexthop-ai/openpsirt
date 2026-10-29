@@ -57,26 +57,36 @@ func Arrived(ctx context.Context, tx bun.IDB, q *queue.Queue, productID int64) e
 }
 
 // CatchUpLease names the work of queuing every ruled product's sweep, so that
-// one replica does it.
+// one replica does it. Taken for a day and left to lapse, its expiry is when
+// the next catch-up is due.
 const CatchUpLease = "assignment.catch-up"
 
 // betweenCatchUps is how often every ruled product is swept whatever arrived.
 // A day: what it catches is work an arrival could not queue a sweep for, and
-// a deployment's start, which places what was unheld before it.
+// a deployment's upgrade, which places what was unheld before it.
 const betweenCatchUps = 24 * time.Hour
 
-// CatchUp queues every ruled product's sweep as the process starts and once a
-// day after, until the context ends, and hands the lease back then.
+// betweenCatchUpChecks is how often a replica asks whether a catch-up is due.
+// Minutes rather than the day itself, so a replica losing the race or
+// stopping is replaced by another within one tick rather than one day.
+const betweenCatchUpChecks = 5 * time.Minute
+
+// CatchUp asks every few minutes whether a day has passed since the last
+// catch-up on any replica, and queues every ruled product's sweep when it has,
+// until the context ends.
 //
 // Arrivals and rule writes queue a sweep, and neither covers two cases: an
 // arrival while the sweep queue is full, and work left unheld before this
 // deployment queued sweeps on arrival. A product nobody scans again would
 // keep either forever.
+//
+// The lease is never handed back on the way out: its expiry is the record of
+// when the catch-up last ran, and handing it back would run it again on every
+// restart.
 func (s *Sweeper) CatchUp(ctx context.Context, interval time.Duration) {
 	leases := queue.NewLeases(s.db.DB)
-	defer leases.Handback(ctx, CatchUpLease, s.name, s.logger)
-	background.Every(ctx, interval, betweenCatchUps, func(ctx context.Context) {
-		queued, err := s.CatchUpOnce(ctx, leases, interval)
+	background.Every(ctx, interval, betweenCatchUpChecks, func(ctx context.Context) {
+		queued, err := s.CatchUpOnce(ctx, leases)
 		if err != nil {
 			if ctx.Err() == nil {
 				s.logger.Error("queuing the sweep of every ruled product", "error", err)
@@ -90,19 +100,26 @@ func (s *Sweeper) CatchUp(ctx context.Context, interval time.Duration) {
 }
 
 // CatchUpOnce queues the sweep of every product a rule in force places
-// findings in, where this replica holds the lease, reporting how many it
-// queued. A full queue stops the pass; the next one asks again.
-func (s *Sweeper) CatchUpOnce(ctx context.Context, leases *queue.Leases, interval time.Duration) (int, error) {
-	if interval <= 0 {
-		interval = betweenCatchUps
-	}
-	// Held a little past a cycle, so the holder keeps it by asking each
-	// cycle and a replica that stops without handing it back holds it for
-	// one cycle at most.
-	mine, err := leases.Take(ctx, CatchUpLease, s.name, interval+time.Hour)
+// findings in, where a day has passed since the last catch-up and this
+// replica takes the lease first, reporting how many it queued.
+//
+// A full queue stops the pass and keeps the lease, so the rest waits a day
+// rather than adding to a queue that refuses work. Any other failure hands
+// the lease back, so the next tick on any replica runs the pass again.
+func (s *Sweeper) CatchUpOnce(ctx context.Context, leases *queue.Leases) (queued int, err error) {
+	mine, err := leases.TakeLapsed(ctx, CatchUpLease, s.name, betweenCatchUps)
 	if err != nil || !mine {
 		return 0, err
 	}
+	defer func() {
+		if err != nil {
+			settled, done := queue.Settling(ctx)
+			defer done()
+			if handback := leases.Release(settled, CatchUpLease, s.name); handback != nil {
+				err = errors.Join(err, handback)
+			}
+		}
+	}()
 	var products []int64
 	if err := s.db.DB.NewSelect().Model((*AssignmentRule)(nil)).
 		Distinct().Column("product_id").
@@ -112,7 +129,6 @@ func (s *Sweeper) CatchUpOnce(ctx context.Context, leases *queue.Leases, interva
 		Scan(ctx, &products); err != nil {
 		return 0, fmt.Errorf("list the products a rule places work in: %w", err)
 	}
-	queued := 0
 	for _, productID := range products {
 		_, err := s.queue.Add(ctx, queue.AssignmentSweep, strconv.FormatInt(productID, 10))
 		if errors.Is(err, queue.ErrBacklogFull) {
