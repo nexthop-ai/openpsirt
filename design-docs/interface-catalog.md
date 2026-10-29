@@ -154,9 +154,11 @@ exploited.
 Release comparison carries a chart across every build (REQ-54), in bars, because
 the builds are separate points and a line draws a trend through a gap. The chart,
 the columns and the notes are dependency findings: for a reader not reading them
-in the product, the screen shows the line from `design-docs/interface.md` § Families
-a reader holds and asks for none of them, and the builds stay pickable for
-comparing components.
+in the product, the comparison's body is "Nothing to list." and the line from
+`design-docs/interface.md` § Families a reader holds, none of them is asked, and
+the builds stay pickable for comparing components. A reader of undisclosed
+findings alone in the product is asked for them by default and offered no
+chip, since the disclosed findings asked otherwise are ones they do not read.
 
 ## A release, gathered
 

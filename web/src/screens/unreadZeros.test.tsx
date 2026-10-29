@@ -545,10 +545,30 @@ describe("release comparison", () => {
       ),
     );
     await settle();
+    expect(text()).toContain("Nothing to list.");
     expect(text()).toContain("You don't read dependency findings in sonic.");
     expect(mount.host().querySelector(".col")).toBeNull();
     expect(asked(spy)).not.toContain("/v1/products/{product}/comparison");
     expect(asked(spy)).not.toContain("/v1/products/{product}/releases");
+  });
+
+  it("asks an undisclosed-only reader's comparison of undisclosed findings, offering no chip", async () => {
+    const reader = who([reaching("sonic", { may_see: true, reads_private: true })]);
+    const spy = serving(reader);
+    mount.render(
+      screen(
+        <Compare />,
+        "/products/sonic/compare?from=v1&from_variant=arm&to=v2&to_variant=arm",
+        "/products/:product/compare",
+        signedIn(reader),
+      ),
+    );
+    await settle();
+    expect(text()).toContain("Counting undisclosed findings, the ones you read here.");
+    expect(text()).not.toContain("Include undisclosed");
+    const comparisons = queriesAt(spy, "/v1/products/{product}/comparison");
+    expect(comparisons.length).toBeGreaterThan(0);
+    expect(comparisons.every((query) => query?.include_undisclosed === true)).toBe(true);
   });
 });
 
