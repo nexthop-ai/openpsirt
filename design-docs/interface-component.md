@@ -3,7 +3,7 @@
 The component screen, the reads behind it, and the dependency tree with its
 counts and search.
 
-Satisfies REQ-42, REQ-56, REQ-60, REQ-64.
+Satisfies REQ-42, REQ-56, REQ-60.
 
 ## Contents
 
@@ -84,7 +84,11 @@ links here, and what the analyzers hold on it sits beside the issues
 | The families are never summed: no total, line or column adds code findings to issues | A rule at a place and an advisory at a component are different units |
 | Drawn and asked for only where the reader reads security testing material in the product, once the session says so; held elsewhere, the card is the family's one line; held nowhere, nothing is drawn (`design-docs/interface.md` § Families a reader holds) | A count not drawn is not asked for, and a zero here reads as clean code |
 | The card's counts are over every build of the product | The card answers for the source package; the build column answers per build |
-| A count of zero is drawn, never linked | The list it would open is empty |
+| A count of zero is drawn, never linked: the header, the state cells and the build column | The list it would open is empty |
+| Every count is asked, and every link opens the queue, by the name in the address, which may be a binary's | A binary's name reaches only the versions that binary ships, a source's every one, so counting by one and linking by the other opens a different list |
+| The build column and the trend are drawn from the counts' answer alone: not while they load, not where they failed | A column drawn before the answer reads as zeros |
+| A product the session does not list is asked; a refusal of the counts is the family's one line, with no column or trend | A retired product has no row in the session, and only the server says whether its code findings are read |
+| On a build's root, which no build row ships, the card is drawn alone where its counts hold any code finding; where they hold none, the screen says no build ships the name | Code findings no repository holds sit on the root, and the tree links its name here |
 | The card is drawn whether or not the reader reads dependency findings | A developer reading code findings alone arrives here from the queue |
 
 ## Component screen reads

@@ -51,13 +51,17 @@ const buildCodeKey = (branchOrTag = "", variant = "", version = "") =>
 
 // One build row's open code findings on the source package at the row's
 // version, opening the queue at that build and version. A zero opens nothing.
+// The queue is asked by the name the counts were asked by: a binary's name
+// reaches only the versions that binary ships, and the source's every one.
 export function BuildCodeCell({
   product,
+  source,
   row,
   code,
 }: {
   product: string;
-  row: { source?: string; version?: string; branch_or_tag?: string; variant?: string };
+  source: string;
+  row: { version?: string; branch_or_tag?: string; variant?: string };
   code: Map<string, number>;
 }) {
   const open = code.get(buildCodeKey(row.branch_or_tag, row.variant, row.version)) ?? 0;
@@ -66,7 +70,7 @@ export function BuildCodeCell({
       {open > 0 ? (
         <Link
           to={codeFindingsAt(product, {
-            component: row.source,
+            component: source,
             component_version: row.version,
             branch_or_tag: row.branch_or_tag,
             variant: row.variant,
@@ -79,6 +83,14 @@ export function BuildCodeCell({
         <span className="hint">0</span>
       )}
     </td>
+  );
+}
+
+// Whether the counts hold any code finding in any state, which is what draws
+// the card on a component no build row ships: the build's own root.
+export function holdsAny(counts?: ComponentCodeCounts): boolean {
+  return (counts?.series ?? []).some(
+    (each) => each.unplaced > 0 || Object.values(each.states).some((n) => (n ?? 0) > 0),
   );
 }
 
@@ -111,16 +123,21 @@ export function SecurityTesting({
     <div className="card" style={{ marginBottom: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
         <h3>Security testing</h3>
-        {counts.data && (
-          <Link
-            className="eyebrow"
-            style={{ marginLeft: "auto" }}
-            to={codeFindingsAt(product, { component: source, state: "open" })}
-            title="Open code findings on this source package, across every build"
-          >
-            {open.toLocaleString()} {open === 1 ? "code finding" : "code findings"} open
-          </Link>
-        )}
+        {counts.data &&
+          (open > 0 ? (
+            <Link
+              className="eyebrow"
+              style={{ marginLeft: "auto" }}
+              to={codeFindingsAt(product, { component: source, state: "open" })}
+              title="Open code findings on this source package, across every build"
+            >
+              {open.toLocaleString()} {open === 1 ? "code finding" : "code findings"} open
+            </Link>
+          ) : (
+            <span className="eyebrow" style={{ marginLeft: "auto" }}>
+              0 code findings open
+            </span>
+          ))}
       </div>
       <HeldLine at={code} />
       {counts.isPending ? (

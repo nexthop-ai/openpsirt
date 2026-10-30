@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { holding } from "../app/families";
+import { answeredAt, holding } from "../app/families";
 import { componentAt } from "../app/routes";
 import { findingsPath, scopeQuery, useScope } from "../app/scope";
 import { useWho } from "../app/session";
@@ -80,11 +80,25 @@ export function Components() {
                       </Link>
                     </td>
                     <td>{row.product}</td>
-                    <HeldCell at={holding(who.data, "dependency", row.product)}>
-                      {(row.issues ?? 0).toLocaleString()}
+                    {/* A count the server left out is a family the reader
+                        does not read in that product, never a zero. */}
+                    <HeldCell
+                      at={answeredAt(
+                        holding(who.data, "dependency", row.product),
+                        row.issues !== undefined,
+                        row.product,
+                      )}
+                    >
+                      {row.issues?.toLocaleString()}
                     </HeldCell>
-                    <HeldCell at={holding(who.data, "code", row.product)}>
-                      {(row.code_findings ?? 0).toLocaleString()}
+                    <HeldCell
+                      at={answeredAt(
+                        holding(who.data, "code", row.product),
+                        row.code_findings !== undefined,
+                        row.product,
+                      )}
+                    >
+                      {row.code_findings?.toLocaleString()}
                     </HeldCell>
                   </tr>
                 ))}

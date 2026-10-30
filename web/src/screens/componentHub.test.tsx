@@ -43,6 +43,16 @@ const CODE_ELSEWHERE = who([
 ]);
 // Dependency findings in sonic, and code findings nowhere.
 const DEPENDENCIES = who([readingDependencies("sonic")]);
+// Both families in edge, and sonic unlisted, as a retired product is: the
+// session cannot say what is read there until the server is asked.
+const UNLISTED = who([
+  reaching("edge", {
+    may_see: true,
+    reads_public: true,
+    reads_private: true,
+    reads_security_testing: true,
+  }),
+]);
 
 const text = () => mount.host().textContent ?? "";
 const links = () => Array.from(mount.host().querySelectorAll("a"));
@@ -91,37 +101,54 @@ const SHIPPED = {
   ],
 };
 
-async function component(as: Who, more: Record<string, unknown> = {}) {
-  const asked = serving(as, {
-    "/v1/products/{product}/components/{component}": SHIPPED,
-    [COUNTS]: {
-      series: [
-        {
-          series: "clang-tidy/default",
-          states: { ...STATES, open: 3, fixed: 1 },
-          waiting: 0,
-          ruled: 0,
-          unplaced: 0,
-        },
-        { series: "semgrep/default", states: STATES, waiting: 0, ruled: 0, unplaced: 0 },
-      ],
-      builds: [{ branch_or_tag: "master", variant: "arm", version: "3.7", open: 3 }],
-    },
-    [TREND]: {
-      items: [
-        { at: "2026-10-15", not_fixed: 4, opened: 0, fixed: 0 },
-        { at: "2026-10-22", not_fixed: 3, opened: 0, fixed: 1 },
-      ],
-    },
-    ...more,
+// Every read answered from the table given, a status in place of an answer
+// where one is named, and each request kept.
+function servingWith(as: Who, answers: Record<string, unknown>, statuses: Record<string, number>) {
+  const asked: [string, unknown][] = [];
+  serve((path, init) => {
+    asked.push([path, init]);
+    if (path in statuses) return { status: statuses[path] };
+    if (path === "/v1/session/me") return { data: as };
+    if (path in answers) return { data: answers[path] };
+    return { data: { items: [], total: 0 } };
   });
-  mount.render(
-    screen(
-      <Component />,
-      "/products/sonic/components/libnl",
-      "/products/:product/components/:component",
-    ),
+  return asked;
+}
+
+async function component(
+  as: Who,
+  more: Record<string, unknown> = {},
+  at = "/products/sonic/components/libnl",
+  statuses: Record<string, number> = {},
+) {
+  const asked = servingWith(
+    as,
+    {
+      "/v1/products/{product}/components/{component}": SHIPPED,
+      [COUNTS]: {
+        series: [
+          {
+            series: "clang-tidy/default",
+            states: { ...STATES, open: 3, fixed: 1 },
+            waiting: 0,
+            ruled: 0,
+            unplaced: 0,
+          },
+          { series: "semgrep/default", states: STATES, waiting: 0, ruled: 0, unplaced: 0 },
+        ],
+        builds: [{ branch_or_tag: "master", variant: "arm", version: "3.7", open: 3 }],
+      },
+      [TREND]: {
+        items: [
+          { at: "2026-10-15", not_fixed: 4, opened: 0, fixed: 0 },
+          { at: "2026-10-22", not_fixed: 3, opened: 0, fixed: 1 },
+        ],
+      },
+      ...more,
+    },
+    statuses,
   );
+  mount.render(screen(<Component />, at, "/products/:product/components/:component"));
   await settle();
   return asked.map(([path]) => path);
 }
@@ -190,6 +217,89 @@ describe("the component screen's security testing", () => {
     expect(asked).not.toContain(TREND);
   });
 
+  it("counts and links by the name in the address, which may be a binary's", async () => {
+    await component(BOTH, {}, "/products/sonic/components/libnl3");
+    expect(hrefOf("3 code findings open")).toBe(
+      "/products/sonic/code-findings?component=libnl3&state=open",
+    );
+    expect(hrefOf("1")).toBe(
+      "/products/sonic/code-findings?component=libnl3&series=clang-tidy%2Fdefault&state=fixed",
+    );
+    const cell = links().find((each) =>
+      each.getAttribute("href")?.includes("component_version=3.7"),
+    );
+    expect(cell?.getAttribute("href")).toBe(
+      "/products/sonic/code-findings?component=libnl3&component_version=3.7&branch_or_tag=master&variant=arm&state=open",
+    );
+  });
+
+  it("draws no build column while the counts have not answered", async () => {
+    await component(BOTH, {}, undefined, { [COUNTS]: 500 });
+    expect(mount.host().querySelector("th[title^='Open code findings']")).toBeNull();
+    expect(text()).toContain("The code findings could not be counted.");
+    expect(text()).not.toContain("Code findings · 12 weeks");
+  });
+
+  it("reads a refused count in a product the session does not list as held elsewhere", async () => {
+    const asked = await component(UNLISTED, {}, undefined, { [COUNTS]: 403 });
+    expect(text()).toContain("You don't read code findings in sonic.");
+    expect(text()).not.toContain("could not be counted");
+    expect(mount.host().querySelector("th[title^='Open code findings']")).toBeNull();
+    expect(text()).not.toContain("Code findings · 12 weeks");
+    expect(asked).not.toContain(TREND);
+  });
+
+  it("draws the header unlinked where nothing is open", async () => {
+    await component(BOTH, {
+      [COUNTS]: {
+        series: [{ series: "semgrep/default", states: STATES, waiting: 0, ruled: 0, unplaced: 0 }],
+        builds: [],
+      },
+    });
+    expect(text()).toContain("0 code findings open");
+    expect(links().find((each) => each.textContent === "0 code findings open")).toBeUndefined();
+  });
+
+  it("draws the card on the build's root, which no build row ships, with its unplaced line", async () => {
+    await component(
+      BOTH,
+      {
+        "/v1/products/{product}/components/{component}": { items: [] },
+        [COUNTS]: {
+          series: [
+            {
+              series: "semgrep/default",
+              states: { ...STATES, open: 2 },
+              waiting: 0,
+              ruled: 0,
+              unplaced: 2,
+            },
+          ],
+          builds: [],
+        },
+      },
+      "/products/sonic/components/sonic-image",
+    );
+    expect(text()).toContain("Security testing");
+    expect(text()).toContain("2 of those open are unplaced");
+    expect(hrefOf("2 code findings open")).toBe(
+      "/products/sonic/code-findings?component=sonic-image&state=open",
+    );
+    expect(text()).not.toContain("No build of this product ships it.");
+  });
+
+  it("says no build ships a name whose counts hold nothing", async () => {
+    await component(BOTH, {
+      "/v1/products/{product}/components/{component}": { items: [] },
+      [COUNTS]: {
+        series: [{ series: "semgrep/default", states: STATES, waiting: 0, ruled: 0, unplaced: 0 }],
+        builds: [],
+      },
+    });
+    expect(text()).toContain("No build of this product ships it.");
+    expect(text()).not.toContain("Security testing");
+  });
+
   it("draws nothing of security testing for a reader holding it nowhere, asking for none", async () => {
     const asked = await component(DEPENDENCIES);
     expect(text()).not.toContain("Security testing");
@@ -212,13 +322,23 @@ describe("the dependency tree's code findings", () => {
   });
 
   async function tree(as: Who) {
-    const asked = serving(as, {
-      [`${BUILD}/components`]: {
-        components: 2,
-        edges: 1,
-        root: { ...node("sonic", { on: 2, beneath: 5 }), children: 1 },
-        items: [node("libnl", { on: 3, beneath: 3 })],
-      },
+    const asked: [string, unknown][] = [];
+    serve((path, init) => {
+      asked.push([path, init]);
+      if (path === "/v1/session/me") return { data: as };
+      if (path !== `${BUILD}/components`) return { data: { items: [], total: 0 } };
+      const query = (init as { params: { query: Record<string, unknown> } }).params.query;
+      return {
+        data: {
+          components: 2,
+          edges: 1,
+          root: {
+            ...node("sonic", query.code_findings ? { on: 2, beneath: 5 } : undefined),
+            children: 1,
+          },
+          items: [node("libnl", query.code_findings ? { on: 3, beneath: 3 } : undefined)],
+        },
+      };
     });
     mount.render(
       screen(
@@ -343,6 +463,18 @@ describe("the component chooser", () => {
     expect(cells(sonic)[3]?.getAttribute("title")).toBe("You don't read code findings in sonic.");
     expect(cells(edge)[2]?.textContent).toBe("—");
     expect(cells(edge)[3]?.textContent).toBe("1");
+  });
+
+  it("draws a dash for a count the server left out in a product the session does not list", async () => {
+    serving(UNLISTED, {
+      "/v1/components": { items: [{ product: "sonic", component: "libnl", issues: 4 }] },
+    });
+    mount.render(screen(<Components />, "/search/libnl", "/search/:term"));
+    await settle();
+    const cells = Array.from(mount.host().querySelectorAll("tbody tr td"));
+    expect(cells[2]?.textContent).toBe("4");
+    expect(cells[3]?.textContent).toBe("—");
+    expect(cells[3]?.getAttribute("title")).toBe("You don't read code findings in sonic.");
   });
 
   it("offers the findings list's search for the same term", async () => {
