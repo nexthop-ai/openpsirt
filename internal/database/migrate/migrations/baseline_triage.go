@@ -263,6 +263,14 @@ func triageBaseline(t *columnTypes) []string {
 		`CREATE INDEX "decision_applies_idx" ON "decision" ("product_id", "vulnerability_id", "place_identity", "component_upstream_version", "consumer_upstream_version")`,
 		`CREATE INDEX "decision_claim_idx" ON "decision" ("claim_id")`,
 
+		// The decisions waiting for a second person, by claim. The review
+		// queue groups the waiting decisions by claim, and the waiting ones
+		// are a fraction of a table holding every decision ever made. Measured
+		// on PostgreSQL with one processor, 33,150 waiting among 133,549, with
+		// this index and without it: the queue's page 22 ms and 81 ms, and its
+		// count 22 ms and 40 ms.
+		`CREATE INDEX "decision_state_claim_idx" ON "decision" ("state", "claim_id")`,
+
 		// The reasoning, revised and never overwritten.
 		//
 		// A second person approves specific words. If those words can change
@@ -389,6 +397,16 @@ func triageBaseline(t *columnTypes) []string {
 	}
 }
 
+// decisionV080 is the baseline's declaration of the decision table, and the
+// indexes it makes, under the name v0.11.0's declaration of the table reads.
+func decisionV080(t *columnTypes) []string {
+	made, indexes, err := pick(triageBaseline(t), "decision")
+	if err != nil {
+		panic(err)
+	}
+	return append([]string{made}, indexes...)
+}
+
 // What a comment said before it was changed.
 //
 // **An edit overwrote and recorded only that it happened.** A reasoning's
@@ -492,6 +510,28 @@ func claimBuildBaseline(t *columnTypes) []string {
 			CONSTRAINT "claim_build_once" UNIQUE ("claim_id", "target_id"),
 			CONSTRAINT "claim_build_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
 			CONSTRAINT "claim_build_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+		)` + t.suffix,
+	}
+}
+
+// statementTextBaseline declares the table a claim's reasoning is stored in,
+// once.
+//
+// A statement naming five thousand components is five thousand claim rows,
+// and each gave the same reasoning. The rows point here instead of carrying a
+// copy each, and two documents giving the same reasoning share one row.
+func statementTextBaseline(t *columnTypes) []string {
+	return []string{
+		`CREATE TABLE "statement_text" (
+			"id"           ` + t.id + `,
+			-- The digest of the words, which is what a writer finds the
+			-- stored copy by. The words are longer than an index key may be
+			-- on some engines.
+			"words_digest" ` + t.hash + ` NOT NULL,
+			-- What the statement says, cut to the bound a markdown field typed
+			-- here is held to.
+			"words"        ` + t.text + ` NOT NULL,
+			CONSTRAINT "statement_text_digest_unique" UNIQUE ("words_digest")
 		)` + t.suffix,
 	}
 }

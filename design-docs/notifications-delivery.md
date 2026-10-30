@@ -89,7 +89,7 @@ reached anywhere; these controls govern it:
 | A sweep reads what this destination has not settled | Read as "not cleared", events never clear, and past two hundred the same window is re-read forever |
 | A destination's kind is a kind some notification is, or every kind; a mistyped one is refused naming the kinds | It would list as working and receive nothing |
 | A destination's reason is why the last settled delivery failed, and nothing once one has gone since | |
-| A destination's name is matched folded to lower case, its typed spelling kept for the listing | Migration 43 folded v0.8.0's names; two folding to one key under one kind stay two, the second under a numbered key (`design-docs/database-upgrades.md` § The v0.9.0 upgrade) |
+| A destination's name is matched folded to lower case, its typed spelling kept for the listing | An administrator types it, and a typed name matches regardless of capitals |
 | A destination's kind is normalized where written | Compared loosely, a retired one keeps receiving |
 | Destinations are read and changed through the data layer, field by field | REQ-42 and REQ-43; an embedded row leaks the secret |
 

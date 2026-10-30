@@ -132,7 +132,7 @@ limit, and the kernel kills the larger on excess.
 |---|---|
 | Everything contacted before serving is under one deadline, each step logged first | A silent hang looks like a slow image pull |
 | Migrating is outside the deadline, which restarts after it | A large schema change outlasts any start |
-| With automatic migration on, the port opens after the database connects and before the schema is applied | Health checks are answered throughout: 873 s for migration 43 on a production-shaped PostgreSQL database |
+| With automatic migration on, the port opens after the database connects and before the schema is applied | Health checks are answered throughout: 873 s for the v0.9.0 upgrade on a production-shaped PostgreSQL database |
 | Until the start completes, `/healthz` answers 200, `/readyz` 503, and every other path 503 with `Retry-After` | The API answers in the refusal shape, a browser gets a page, anything else "OpenPSIRT is upgrading its database". Nothing reads the database |
 | The router replaces the upgrading answer in one step, last; background passes start after | A request reaches one or the other whole |
 | With automatic migration off, the port opens after every start-up check | |

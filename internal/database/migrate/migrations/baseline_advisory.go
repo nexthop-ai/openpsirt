@@ -469,7 +469,11 @@ func vexBaseline(t *columnTypes) []string {
 			"justification" ` + t.name + ` NULL,
 			-- The reasoning, which is the part worth having: the status is in
 			-- the fix state already.
-			"statement"   ` + t.text + ` NULL,
+			-- The reasoning the claim gives, stored once however many
+			-- subjects its statement names. Null where it gave none. A plain
+			-- reference without a foreign key: stored reasoning is never
+			-- deleted, so the reference cannot dangle.
+			"statement_id" ` + t.refNull + ` NULL,
 			-- The file it arrived as and what it hashed to, so that a
 			-- revision can be noticed rather than silently replacing what an
 			-- approval was granted against. A file name is what a client
@@ -510,6 +514,12 @@ func vexBaseline(t *columnTypes) []string {
 		`CREATE INDEX "vex_statement_from_idx"
 			ON "vex_statement" ("product_id", "publisher", "source", "document_id", "superseded_at")`,
 	}
+}
+
+// vexStatementsV090 is the baseline's declaration of a supplier's statements,
+// under the name v0.10.0's declaration of the table reads.
+func vexStatementsV090(t *columnTypes) []string {
+	return vexBaseline(t)
 }
 
 // A generated VEX document going out.

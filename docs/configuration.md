@@ -1322,7 +1322,7 @@ deleting by surprise.
 
 A database is upgraded in place, at startup or by `openpsirt migrate up`,
 through each later release's upgrade on the way. A database built by the
-release the [oldest section below](#from-v060) names, or by an earlier one, is
+release the [oldest section below](#from-v080) names, or by an earlier one, is
 refused, and that section says how to bring it forward. A database built by a
 release candidate
 or any build between releases is recreated.
@@ -1344,51 +1344,27 @@ database a later release upgraded and serves it, failing on what changed, so
 redeploying one, `helm rollback` included, is not going back: restore the
 backup first.
 
-### From v0.6.0
-
-A database v0.6.0 or an earlier release built is refused at startup and by
-`openpsirt migrate up`, naming the version it holds. This release makes
-v0.7.0's schema in one step and carries none of the upgrades before it.
-
-1. Back the database up.
-2. Read v0.8.0's [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.8.0/configuration/#upgrading)
-   from the section for your release on, and do what they say before upgrading
-   as well as after: the upgrade from v0.5.0 removes group mappings that have to
-   be carried into `OPENPSIRT_GROUP_ROLES` first.
-3. For a database v0.4.0 or an earlier release built, run `openpsirt migrate up`
-   with v0.6.0 against it. v0.8.0 refuses such a database, as this release does.
-4. Run `openpsirt migrate up` with v0.8.0 against it.
-5. Deploy this release, reading the sections from v0.8.0 on.
-
-A database v0.7.0 built needs none of this, and reads the sections from v0.8.0
-on.
-
 ### From v0.8.0
 
-| Change | What to do |
-|---|---|
-| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a decision made beneath it stands | The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 decision occurrences, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check `/healthz` for whether to keep the process, as the chart does ([Health checks](#health-checks)), or set `autoMigrate: false` and run `openpsirt migrate up` before deploying |
-| On PostgreSQL the upgrade indexes each column pointing at an image's components and nodes while it merges them, and removes those indexes when it is done. v0.10.1 and earlier read the whole finding table for every component the merge removed, which stalled the upgrade on a database larger than the server's memory | Nothing. An index made by hand on `finding.component_id`, `finding.consumer_id`, `finding_tag.component_id`, `graph_node.component_id` or `graph_edge.parent_id` to get past a stalled upgrade is harmless, and may be dropped once the upgrade is done |
-| A live decision beneath an image is keyed on the image with no version | Nothing. Where two live decisions at one occurrence differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed |
-| Findings a rebuild closed before the upgrade stay closed | Nothing. They are history, listed in the register with the reason they closed |
-| A name some build held at two versions at once is not merged in any build, and a build holding two images of one name at once keeps them apart by version, as before | Nothing. A build that holds such a name once moves it to the name on its next upload, once: the image's node closes and opens, the findings beneath it close and open again, and judgments beneath it lapse and are asked again |
-| An image the inventory states with no package identifier is not found by the upgrade | Nothing. The next upload of each build stores it by name, which closes the old node and opens the new one once, as a version moving would |
-| The upgrade also stores each claim's and each supplier statement's explanation once, keys every claim on it, and keys every reference on its whole address. It reads every claim, statement and reference a batch at a time | Allow for it beside the image rewrite above: the time grows with the claims and statements held. The same health-check advice applies |
-| A scan file, a VEX document or a supplier advisory with anything but whitespace after its document is refused. v0.8.0 read the first document and ignored the rest | Upload one document per file. A pipeline that appends output to the file it sends sees the scan fail, or the import refused, with the reason |
-| An SPDX 3 file carrying several document elements that its imports do not settle is refused. v0.8.0 took the last one read | Nothing for a file with one document. A file inlining documents it imports names each in the importing document's imports |
-| An upload waits for a place among the uploads one server reads at once, `upload.max-concurrent`, four by default. Past it the request is answered 503 with `Retry-After`. v0.8.0 read every upload as it arrived | Retry on a 503, as `curl --retry 5` does ([Build pipelines](pipeline.md#the-upload)). The temporary directory must hold that many of the largest requests a route takes. The chart's `tmp.sizeLimit` default is 3Gi, from 1Gi, for the shipped values; a value set in your own values file stays as it was and needs raising to match |
-| A team name or display spelling past 191 characters is refused when a team is declared. v0.8.0 stored one on SQLite and failed on the other engines | Nothing for an existing team. A script declaring teams keeps names within 191 characters |
-| A claim in a build is keyed on its explanation. A build that changes only the explanation closes the claim and opens a new one. v0.8.0 kept the first explanation and wrote nothing | Nothing. The upgrade keys every stored claim on its explanation, so nothing closes on the first scan after it |
-| A NUL character in a query parameter, a path value, a form field, or a string or key in a JSON body is refused with a 400 naming the input. v0.8.0 dropped it from most inputs | A client sending one sends the text without it. The contents of an uploaded file are not checked |
-| The query of a PostgreSQL `OPENPSIRT_DATABASE_URL` is read the way `libpq` reads it. A `+` is a plus sign, where v0.8.0 read it as a space. A raw space, an `=` inside a value, or a `%` not followed by two hex digits is refused at startup, where v0.8.0 dropped the pair or read it. A key given twice takes its last value, where v0.8.0 took its first | Percent-encode each of them in a value: a space as `%20`, `=` as `%3D`, `%` as `%25`. `options=-c%20statement_timeout%3D5000`, not `options=-c+statement_timeout=5000`, and a base64 password parameter ending `==` as `%3D%3D`. Give each key once |
-| A component's name, version and package identifier are held without control characters. A stored component with one in any of them is a different component on the next scan | Nothing. Its findings close and reopen once, on the next scan of each build holding it, and decisions beneath it are asked again |
-| A build's scanner is given the distribution, the source package and the other package-identifier qualifiers that builds of its own product stated for a component. v0.8.0 filled them onto the component row every product shares, from whichever product stated them first | State each component's distribution and source package in every build's inventory. On a branch's first scan after the upgrade, a component its own product never described that way loses the matches another product's description gave it, and those findings close as unexplained. A tag is not scanned from a new inventory, and keeps the description the upgrade copied onto its nodes, which on v0.8.0 may be another product's |
-| Compliance, cumulative deferral, the triage measures and time to fix are worked out again. A deferral counts for the time it held, with overlaps once; a send-back and a wait count once per decision; an issue fixed in two products is one fix | Nothing. A figure read before the upgrade may differ from the same period read after it |
-| Every day and moment the API answers is in UTC. v0.8.0 answered some in the database server's zone | Nothing where the database server runs in UTC. Otherwise a due date or a disclosure date near midnight reads one day off from what v0.8.0 answered |
-| A CSAF document states the base vector inside the vector held, in the specification's order. v0.8.0 published the vector as held, metrics outside the base set included | Nothing. An advisory v0.8.0 issued from such a vector reads as changed since it went out; issue it again to send the corrected document |
-| A flaw recorded here is rated by the product that recorded it, and its rating is no longer on the issue every product holding it reads. The upgrade moves it there | Nothing. Where another product holds the same issue, its findings read no severity word from the record, and keep the deadline v0.8.0 worked out from it until the next scan reporting the issue with a word works it out again |
-| `attachment.max-size` takes no value above 512 MiB, and a larger value is refused when set. v0.8.0 took any size | Nothing. A larger value v0.8.0 stored is read as 512 MiB, so a file past it is refused at upload. Set it again at 512 MiB or below, so the settings screen shows the size that applies |
-| `triage.deferral-threshold` and `scanning.quiet-after` are whole numbers of days, and a part-day value is refused when set | Nothing. A value v0.8.0 stored between two days is read as the later whole day everywhere: `12h` is one day |
+A database v0.8.0 or an earlier release built is refused at startup and by
+`openpsirt migrate up`, naming the version it holds. This release makes
+v0.9.0's schema in one step and carries none of the upgrades before it.
+
+1. Back the database up.
+2. Read v0.10.2's [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.10.2/configuration/#upgrading)
+   from the section for your release on, and do what they say before upgrading
+   as well as after. The upgrade from v0.8.0 rewrites every finding beneath a
+   container image and takes as long as the nightly history held, and the
+   upgrade from v0.5.0 removes group mappings that have to be carried into
+   `OPENPSIRT_GROUP_ROLES` first.
+3. For a database v0.6.0 or an earlier release built, run `openpsirt migrate up`
+   with v0.8.0 against it, and for one v0.4.0 or an earlier release built, with
+   v0.6.0 before that. v0.10.2 refuses such a database, as this release does.
+4. Run `openpsirt migrate up` with v0.10.2 against it.
+5. Deploy this release, reading the sections from v0.9.0 on.
+
+A database v0.9.0 built needs none of this, and reads the sections from v0.9.0
+on.
 
 ### From v0.9.0
 
@@ -1407,8 +1383,7 @@ on.
 
 ### From v0.10.1
 
-Nothing changes for a database v0.9.0 or a later release built. This release
-changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
+Nothing changes. v0.10.2 changes only the upgrade from v0.8.0.
 
 ### From v0.10.2
 

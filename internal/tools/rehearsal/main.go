@@ -4,14 +4,17 @@
 // Command rehearsal carries a database a tagged release built through an
 // upgrade to this tree, and checks what arrives.
 //
-//	rehearsal -from v0.7.0 -engine postgres -dir .demo/rehearsal
+//	rehearsal -from v0.9.0 -engine postgres -dir .demo/rehearsal
 //
 // A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
 // the test suite reads, so the password is never on the command line.
 //
 // The release seeds its own database: its image is built from its own tag,
 // and its own demo targets declare the products, upload the inventories, let
-// the scans land and record the VEX document, the judgments and the flaw. That
+// the scans land and record the VEX document, the judgments and the flaw. Below
+// v0.11.0 the rehearsal then acknowledges every report through the release's
+// API, since migration 45 turns each acknowledgement into a message sent and
+// no release's seed acknowledges one. That
 // is the data a deployment of that release actually holds, which no fixture
 // written today can stand in for. The tag's targets run unedited; only the
 // docker command they call is wrapped, so its containers, network and ports
@@ -21,9 +24,9 @@
 //
 //  1. The row count of every table, with the release stopped.
 //  2. The migrations, applied on their own, and the version they reach.
-//  3. The counts again: a table the release held keeps its count, and a
-//     table the upgrade adds starts empty, except where an upgrade merges
-//     rows or fills a table from rows the release held.
+//  3. The counts again: a table the release held keeps its count plus what
+//     the upgrade fills it with from the release's other rows, and a table
+//     the upgrade adds holds only what it is filled with.
 //  4. The server started on it with the configuration the release's demo
 //     started its own with, the open findings of every build against what
 //     the release showed, and every GET its API document lists asked once,
@@ -36,7 +39,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -97,7 +99,7 @@ func main() {
 	var r run
 	var dir string
 	var keep bool
-	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.7.0")
+	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.9.0")
 	flag.StringVar(&r.engine, "engine", "", "sqlite, postgres, mysql or mariadb")
 	flag.StringVar(&dir, "dir", ".demo/rehearsal", "where the run keeps what it makes")
 	flag.StringVar(&r.grype, "grype", "", "the scanner's database directory, shared between runs")
@@ -227,11 +229,17 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-up", "demo-seed"}, overrides...)...); err != nil {
 		return nil, err
 	}
-	if _, err := r.settle(ctx, overrides, env); err != nil {
+	seeded, err := r.settle(ctx, overrides, env)
+	if err != nil {
 		return nil, err
 	}
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-vex", "demo-triage", "demo-flaw"}, overrides...)...); err != nil {
 		return nil, err
+	}
+	if record.Last < renamesV0110 {
+		if err := r.answer(ctx, seeded); err != nil {
+			return nil, err
+		}
 	}
 	before, err := r.settle(ctx, overrides, env)
 	if err != nil {
@@ -251,33 +259,22 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	var acknowledged int64
+	if record.Last < renamesV0110 {
+		if acknowledged, err = r.acknowledged(ctx); err != nil {
+			return nil, err
+		}
+	}
+	filled := FilledV0110(record.Last, acknowledged)
 	// Every count below is under the name this tree gives its table.
 	held = AsRenamed(record.Last, held, migrations.TablesRenamedV0110())
 	r.note("%d tables, %d findings, %d decisions, %d decision occurrences", len(held), held["finding"],
 		held["decision"], held["decision_occurrence"])
 	// An upgrade of an empty database passes every check here, so a seed
 	// that filled nothing is a failed rehearsal rather than a clean one.
-	var empty []string
-	for _, table := range []string{"finding", "decision", "decision_occurrence", "received_vex_statement", "flaw_report"} {
-		if held[table] == 0 {
-			empty = append(empty, table)
-		}
-	}
-	if len(empty) > 0 {
+	if empty := Unseeded(record.Last, held, acknowledged); len(empty) > 0 {
 		return nil, fmt.Errorf("%s's seed left nothing in %s, so an upgrade of it would check nothing",
 			r.from, strings.Join(empty, ", "))
-	}
-
-	images, err := r.images(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var words Words
-	var rated Ratings
-	if record.Last < wordsAndRatings {
-		if words, rated, err = r.heldWordsAndRatings(ctx); err != nil {
-			return nil, err
-		}
 	}
 
 	r.step("migrated to %d by this tree", current)
@@ -294,17 +291,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	moved := Moved(record.Last, images)
-	if record.Last < wordsAndRatings {
-		left, err := r.ratings(ctx)
-		if err != nil {
-			return nil, err
-		}
-		restated, wrong := Restated(record.Last, words, rated, left)
-		maps.Copy(moved, restated)
-		faults = append(faults, prefix("upgrade", wrong)...)
-	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded, moved))...)
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded, filled))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -504,169 +491,65 @@ func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
 	return counts, nil
 }
 
-// images counts the rows the release held for container images: components
-// whose package identifier is of type oci or docker, their nodes, and the
-// edges at those nodes. Matched on the identifier's prefix in its lowest
-// spelling, which is the one every recorded producer writes.
-func (r *run) images(ctx context.Context) (Images, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return Images{}, err
+// answer acknowledges every report the release holds against a product it
+// reported a build of, through the release's own API as the administrator.
+func (r *run) answer(ctx context.Context, builds Totals) error {
+	products := map[string]bool{}
+	for build := range builds {
+		products[strings.SplitN(build, "/", 2)[0]] = true
 	}
-	defer func() { _ = db.Close() }()
-	const image = `SELECT "id" FROM "component" WHERE "purl" LIKE 'pkg:oci/%' OR "purl" LIKE 'pkg:docker/%'`
-	const nodes = `SELECT "id" FROM "graph_node" WHERE "component_id" IN (` + image + `)`
-	var out Images
-	for _, each := range []struct {
-		query string
-		into  *int64
-	}{
-		{`SELECT COUNT(*) FROM (` + image + `) AS "i"`, &out.Components},
-		{`SELECT COUNT(*) FROM (` + nodes + `) AS "n"`, &out.Nodes},
-		{`SELECT COUNT(*) FROM "graph_edge" WHERE "parent_id" IN (` + nodes + `) OR "child_id" IN (` + nodes + `)`, &out.Edges},
-	} {
-		if err := db.QueryRowContext(ctx, each.query).Scan(each.into); err != nil {
-			return Images{}, fmt.Errorf("count the release's images: %w", err)
-		}
-	}
-	return out, nil
-}
-
-// heldWordsAndRatings reads what the release held that the upgrade stores
-// reasoning and recorded ratings from.
-func (r *run) heldWordsAndRatings(ctx context.Context) (Words, Ratings, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return Words{}, Ratings{}, err
-	}
-	defer func() { _ = db.Close() }()
-	words, err := distinctWords(ctx, db)
-	if err != nil {
-		return Words{}, Ratings{}, err
-	}
-	rated, err := ratingsOf(ctx, db, false)
-	if err != nil {
-		return Words{}, Ratings{}, err
-	}
-	// A recorded flaw on an issue rated by a word or by a score naming no
-	// publisher, and whether the issue holds a scanned finding and absorbed
-	// another in a merge.
-	const recorded = `SELECT DISTINCT "v"."id", "st"."product_id" FROM "finding" AS "f"
-		JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"
-		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
-		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
-		WHERE "f"."kind" = 'entered' AND `
-	// A scanned issue kept in a merge, as the upgrade tells one apart.
-	const kept = `(EXISTS (SELECT 1 FROM "finding" AS "scanned"
-			WHERE "scanned"."vulnerability_id" = "v"."id" AND "scanned"."kind" = 'vulnerability')
-		AND EXISTS (SELECT 1 FROM "vulnerability_merge" AS "vm" WHERE "vm"."kept_id" = "v"."id"))`
-	for _, each := range []struct {
-		query string
-		into  *int64
-	}{
-		{`SELECT COUNT(*) FROM (` + recorded + `NOT ` + kept + ` AND (COALESCE("v"."severity", '') <> ''
-			OR (COALESCE("v"."score_source", '') = '' AND "v"."score_centi" IS NOT NULL))) AS "p"`, &rated.Plain},
-		{`SELECT COUNT(*) FROM (` + recorded + kept + `) AS "k"`, &rated.Kept},
-	} {
-		if err := db.QueryRowContext(ctx, each.query).Scan(each.into); err != nil {
-			return Words{}, Ratings{}, fmt.Errorf("count the release's recorded flaws: %w", err)
-		}
-	}
-	return words, rated, nil
-}
-
-// distinctWords counts the reasoning the release held across every claim and
-// every supplier statement, compared byte for byte once kept as the upgrade
-// keeps it. A comparison in SQL follows the column's collation, which on
-// MySQL and MariaDB ignores trailing spaces.
-func distinctWords(ctx context.Context, db *database.DB) (Words, error) {
-	rows, err := db.QueryContext(ctx, `SELECT "statement" FROM "suppression" WHERE "statement" IS NOT NULL
-		UNION ALL
-		SELECT "statement" FROM "vex_statement" WHERE "statement" IS NOT NULL`)
-	if err != nil {
-		return Words{}, fmt.Errorf("read the release's reasoning: %w", err)
-	}
-	seen := map[[sha256.Size]byte]bool{}
-	for rows.Next() {
-		var said string
-		if err := rows.Scan(&said); err != nil {
-			_ = rows.Close()
-			return Words{}, err
-		}
-		if kept := KeptWords(said); kept != "" {
-			seen[sha256.Sum256([]byte(kept))] = true
-		}
-	}
-	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-		return Words{}, fmt.Errorf("read the release's reasoning: %w", err)
-	}
-	return Words{Distinct: int64(len(seen))}, nil
-}
-
-// ratings reads the ratings the upgrade moved, on the upgraded database.
-func (r *run) ratings(ctx context.Context) (Ratings, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return Ratings{}, err
-	}
-	defer func() { _ = db.Close() }()
-	return ratingsOf(ctx, db, true)
-}
-
-// ratingsOf reads each issue's unsourced ratings, the sourced ones, and the
-// words in force, and after the upgrade the recorded ratings too.
-func ratingsOf(ctx context.Context, db *database.DB, upgraded bool) (Ratings, error) {
-	out := Ratings{Unsourced: map[int64]int64{}, InForce: map[Pair]bool{}, Recorded: map[Pair]bool{}}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "vulnerability_rating"
-		WHERE COALESCE("score_source", '') <> ''`).Scan(&out.Sourced); err != nil {
-		return Ratings{}, fmt.Errorf("count the sourced ratings: %w", err)
-	}
-	rows, err := db.QueryContext(ctx, `SELECT "vulnerability_id", COUNT(*) FROM "vulnerability_rating"
-		WHERE COALESCE("score_source", '') = '' GROUP BY "vulnerability_id"`)
-	if err != nil {
-		return Ratings{}, fmt.Errorf("count the unsourced ratings: %w", err)
-	}
-	for rows.Next() {
-		var issue, n int64
-		if err := rows.Scan(&issue, &n); err != nil {
-			_ = rows.Close()
-			return Ratings{}, err
-		}
-		out.Unsourced[issue] = n
-	}
-	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-		return Ratings{}, err
-	}
-	pairs := []struct {
-		query string
-		into  map[Pair]bool
-	}{{`SELECT "vulnerability_id", "product_id", 1 FROM "issue_rating"`, out.InForce}}
-	if upgraded {
-		pairs = append(pairs, struct {
-			query string
-			into  map[Pair]bool
-		}{`SELECT "vulnerability_id", "product_id", CASE WHEN "severity" IS NULL THEN 0 ELSE 1 END
-			FROM "recorded_rating"`, out.Recorded})
-	}
-	for _, each := range pairs {
-		rows, err := db.QueryContext(ctx, each.query)
+	answered := 0
+	for _, product := range slices.Sorted(maps.Keys(products)) {
+		at := "/v1/products/" + url.PathEscape(product) + "/reports"
+		status, body, err := r.get(ctx, at+"?limit=200")
 		if err != nil {
-			return Ratings{}, fmt.Errorf("read the ratings by issue and product: %w", err)
+			return err
 		}
-		for rows.Next() {
-			var p Pair
-			var worded int
-			if err := rows.Scan(&p.Issue, &p.Product, &worded); err != nil {
-				_ = rows.Close()
-				return Ratings{}, err
+		if status != http.StatusOK {
+			return fmt.Errorf("%s's reports for %s: %d %s", r.from, product, status, head(body))
+		}
+		var page struct {
+			Items []struct {
+				Reference    string `json:"reference"`
+				Acknowledged string `json:"acknowledged"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(body, &page); err != nil {
+			return fmt.Errorf("%s's reports for %s: %w", r.from, product, err)
+		}
+		for _, report := range page.Items {
+			if report.Acknowledged != "" {
+				continue
 			}
-			each.into[p] = worded == 1
-		}
-		if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-			return Ratings{}, err
+			status, body, err := r.post(ctx, at+"/"+url.PathEscape(report.Reference)+"/acknowledgement")
+			if err != nil {
+				return err
+			}
+			if status != http.StatusNoContent {
+				return fmt.Errorf("acknowledge %s in %s: %d %s", report.Reference, product, status, head(body))
+			}
+			answered++
 		}
 	}
-	return out, nil
+	r.note("acknowledged %d reports", answered)
+	return nil
+}
+
+// acknowledged reads how many reports a release before v0.11.0 recorded as
+// acknowledged, each of which the upgrade writes as a message sent. A stamp
+// missing who made it is stepped over by the upgrade, and here.
+func (r *run) acknowledged(ctx context.Context) (int64, error) {
+	db, err := connect(ctx, r.hostURL)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = db.Close() }()
+	var n int64
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "flaw_report"
+		WHERE "acknowledged_at" IS NOT NULL AND "acknowledged_by" IS NOT NULL`).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count the acknowledged reports: %w", err)
+	}
+	return n, nil
 }
 
 // container is what every run of this tree's image shares: the release's
@@ -865,6 +748,25 @@ func (r *run) get(ctx context.Context, path string) (int, []byte, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	res, err := (&http.Client{Transport: &http.Transport{Proxy: nil}}).Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	body, err := io.ReadAll(res.Body)
+	return res.StatusCode, body, err
+}
+
+// post sends a request with no body, from the origin the proxy answers on,
+// which a state-changing request has to name.
+func (r *run) post(ctx context.Context, path string) (int, []byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.base+path, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	req.Header.Set("Origin", r.base)
 	res, err := (&http.Client{Transport: &http.Transport{Proxy: nil}}).Do(req)
 	if err != nil {
 		return 0, nil, err

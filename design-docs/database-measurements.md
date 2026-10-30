@@ -7,7 +7,6 @@ it and points here for the run.
 
 - [Statement preparation modes](#statement-preparation-modes)
 - [Bulk insert statements](#bulk-insert-statements)
-- [The v0.9.0 upgrade](#the-v090-upgrade)
 - [The v0.11.0 upgrade](#the-v0110-upgrade)
 - [Index reads](#index-reads)
 
@@ -42,22 +41,6 @@ with one processor over a 1 ms, 100 Mbit link.
 | A list of rows, described, nothing read back | 55 µs |
 | Arrays, nothing read back | 42 to 43 µs |
 | Arrays, on the table without its four foreign keys | 17 to 20 µs |
-
-## The v0.9.0 upgrade
-
-On PostgreSQL 16: ten nightly builds of 34 images restamped every night over
-600 packages, 1,632,000 findings and 204,000 edges beneath them, and 122,400
-live decision occurrences keyed on the last stamp. `make measure` re-runs it.
-`design-docs/database-upgrades.md` § The v0.9.0 upgrade holds the rules.
-
-| Run | Time |
-|---|---|
-| Unlimited memory | 2 min 41 s, leaving 34 image components, 340 image versions and 20,400 edges |
-| 400 MB of memory, beside a 470 MB finding table, without the merge's indexes | 10 min 21 s. The two statements removing components take most of it and read about 200 GB from disk |
-| 400 MB, with the merge's indexes | 2 min 56 s |
-| 1 GB, the table in memory, without and with the indexes | 2 min 25 s and 1 min 38 s |
-
-The time is mostly rewriting findings, which grow with images times stamps.
 
 ## The v0.11.0 upgrade
 

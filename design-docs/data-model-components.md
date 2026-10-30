@@ -160,6 +160,5 @@ product.
 |---|---|
 | A component's row and fold are what its first report stated | A later source package or distribution reaches that product's scanner, claims and closure explanations from the node, never the fold, a decision's expiry, an assignment rule or a search by name. A package first described without its source folds on its own name everywhere |
 | Two artifacts distinguished only by a qualifier are one component | |
-| An image with no package identifier in a database v0.8.0 built is not recognized by the upgrade | Its next upload stores it by name once, as a version moving would (`design-docs/database-upgrades.md` § The v0.9.0 upgrade) |
 | An image's version is shown on the component screen alone | |
 | Where an issue sits, and the disclosure queue, link to a finding by name and version alone | Two components of that name and version land on the choice |

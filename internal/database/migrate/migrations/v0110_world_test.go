@@ -70,17 +70,3 @@ func declareBeforeV0110(ctx context.Context, db *database.DB) (world.Declared, e
 	}
 	return d, nil
 }
-
-// recordScanBeforeV0110 files an accepted scan against a build in a database
-// a release before v0.11.0 built, where the scan names its build as a target.
-func recordScanBeforeV0110(ctx context.Context, db *database.DB, build int64, hash string, builtAt time.Time) (int64, error) {
-	if _, err := db.DB.NewRaw(`INSERT INTO "scan" ("target_id", "content_hash", "built_at", "received_at",
-		"parser_version", "status") VALUES (?, ?, ?, ?, ?, ?)`,
-		build, hash, builtAt, builtAt, "test", "accepted").Exec(ctx); err != nil {
-		return 0, fmt.Errorf("record a scan: %w", err)
-	}
-	var id int64
-	err := db.DB.NewRaw(`SELECT "id" FROM "scan" WHERE "target_id" = ? AND "content_hash" = ?`, build, hash).
-		Scan(ctx, &id)
-	return id, err
-}
