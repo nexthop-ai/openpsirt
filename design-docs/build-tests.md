@@ -77,8 +77,10 @@ need, such as an identifier or a secret shown once.
 | The API package's fixture is a seeded template | Two products, eighteen people, their decisions and grants: per test it was 27% of the package's processor time under the detector |
 
 A test needing a product, its branches and tags, its variants and a build takes
-them from one shared default world, seeded per test or into a template. A test
-needing a second product declares it on that world.
+them from one shared default world, a seeded template of its own or part of a
+package's. A test needing a second product declares it on that world. Each test
+gets its own copy of the world's rows as values, so changing one reaches no
+other test.
 
 | The default world holds | So that |
 |---|---|

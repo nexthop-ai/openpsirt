@@ -91,12 +91,31 @@ const (
 	PersonDisplayName  = "Thea Example"
 )
 
+// world is the default world as a seeded template: declared once per binary
+// on every engine rather than once per test.
+var world = dbtest.Seed(Declare)
+
 // Each runs fn against the seeded world on every engine, as dbtest.Each does.
 func Each(t *testing.T, fn func(t *testing.T, w *World)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		fn(t, New(t, db))
+	world.Each(t, func(t *testing.T, db *database.DB, declared Declared) {
+		fn(t, &World{
+			DB:       db,
+			Catalog:  catalog.NewStore(db.DB),
+			Access:   access.NewStore(db.DB),
+			Declared: declared.own(),
+			t:        t,
+		})
 	})
+}
+
+// own is a copy of the declared rows a test may change without reaching the
+// seed's, which every test in the binary shares.
+func (d Declared) own() Declared {
+	product, branch, tag := *d.Product, *d.Branch, *d.Tag
+	customer, internal, build, person := *d.Customer, *d.Internal, *d.Build, *d.Person
+	return Declared{Product: &product, Branch: &branch, Tag: &tag, Customer: &customer,
+		Internal: &internal, Build: &build, Person: &person}
 }
 
 // New seeds the default world in db, which the harness hands over migrated
