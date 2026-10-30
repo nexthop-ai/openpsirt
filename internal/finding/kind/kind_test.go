@@ -3,7 +3,10 @@
 
 package kind
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 	all := consumers()
@@ -95,23 +98,22 @@ func TestEveryKindIsInOneFamily(t *testing.T) {
 }
 
 func TestAFamilyNarrowsAConsumerToItsKinds(t *testing.T) {
+	const column = `"f"."kind"`
 	for _, c := range []struct {
 		consumer Consumer
 		family   Family
-		where    string
-		args     []any
+		kinds    []Kind
 	}{
-		{Assignment, "", `"f"."kind" IN (?)`, nil},
-		{Assignment, Code, `"f"."kind" = ?`, []any{Analysis}},
-		{Assignment, Dependency, `"f"."kind" IN (?)`, nil},
-		{Notifications, Code, "1 = 0", nil},
+		{Assignment, "", Assignment.Kinds()},
+		{Assignment, Code, []Kind{Analysis}},
+		{Assignment, Dependency, []Kind{Vulnerability, Entered}},
+		{Notifications, Code, nil},
 	} {
-		where, args := c.consumer.WhereIn(`"f"."kind"`, c.family)
-		if where != c.where {
-			t.Errorf("%s in the %q family: %q; want %q", c.consumer, c.family, where, c.where)
-		}
-		if c.args != nil && (len(args) != 1 || args[0] != c.args[0]) {
-			t.Errorf("%s in the %q family binds %v; want %v", c.consumer, c.family, args, c.args)
+		where, args := c.consumer.WhereIn(column, c.family)
+		wantWhere, wantArgs := In(column, c.kinds)
+		if where != wantWhere || !reflect.DeepEqual(args, wantArgs) {
+			t.Errorf("%s in the %q family keeps %q %v; want %v, %q %v",
+				c.consumer, c.family, where, args, c.kinds, wantWhere, wantArgs)
 		}
 	}
 }
