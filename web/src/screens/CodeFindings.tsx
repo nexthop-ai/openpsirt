@@ -215,7 +215,15 @@ export function CodeFindings() {
             <>
               <Link
                 className="btn quiet"
-                to={codeTrendAt({ branch_or_tag: branchOrTag, variant, series, method, ...placed })}
+                to={codeTrendAt({
+                  // Sent empty for every build, so the picker's build does not
+                  // narrow what this queue does not.
+                  branch_or_tag: branchOrTag ?? "",
+                  variant: variant ?? "",
+                  series,
+                  method,
+                  ...placed,
+                })}
               >
                 Over time
               </Link>{" "}

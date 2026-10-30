@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 const trendOf = "/v1/products/mine/code-finding-trend"
@@ -34,7 +37,7 @@ type codeTrend struct {
 		Reason string `json:"reason"`
 		From   string `json:"from"`
 		To     string `json:"to"`
-		Runs   int    `json:"runs"`
+		Builds int    `json:"builds"`
 	} `json:"markers"`
 	NoLongerDetected int `json:"no_longer_detected"`
 }
@@ -118,8 +121,8 @@ func TestATrendCountsWhatIsNotFixedBySplitAndMarksWhatChanged(t *testing.T) {
 		marked := map[string]string{}
 		for _, m := range got.Markers {
 			marked[m.Series+" "+m.Change] = m.Reason + "|" + m.From + "|" + m.To
-			if m.Runs != 1 || m.At != now.At {
-				t.Errorf("marker %+v; want one run, today", m)
+			if m.Builds != 1 || m.At != now.At {
+				t.Errorf("marker %+v; want one build, today", m)
 			}
 		}
 		want := map[string]string{
@@ -157,6 +160,129 @@ func TestATrendNarrowsAsTheQueueDoes(t *testing.T) {
 			if len(got.Points) != 2 || got.Points[0].NotFixed != c.before || got.Points[1].NotFixed != c.now ||
 				len(got.Markers) != c.markers {
 				t.Errorf("%s is %+v; want %d then %d not fixed and %d markers", c.query, got, c.before, c.now, c.markers)
+			}
+		}
+	})
+}
+
+// A run late on a week's last day opens a code finding and is not
+// comparable: its marker and its opening are in the same week, because a week
+// ends at the midnight its markers' days end at.
+func TestAMarkerIsInTheWeekItsRunOpenedIn(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.HubCodeFindings(t, r)
+		ctx := t.Context()
+		now := time.Now().UTC()
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"opened_at" = ?`, now.Add(-30*24*time.Hour)).
+			Where(`"kind" = ?`, kind.Analysis).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		short := strings.Replace(httpapitest.OtherToolRun("codeql", "overflow", "787", "src/x.c", 5),
+			`"openpsirt/unitsAnalyzed":1`, `"openpsirt/unitsAnalyzed":0`, 1)
+		httpapitest.ApplyRunIn(t, r, "codeql/default", now.Add(-time.Hour), short)
+		// The last second of the day a week ago, the last day of the week
+		// before this one.
+		weekAgo := now.Truncate(24 * time.Hour).Add(-7 * 24 * time.Hour)
+		late := weekAgo.Add(24*time.Hour - time.Second)
+		recent := now.Add(-24 * time.Hour)
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).Set(`"opened_at" = ?`, late).
+			Where(`"opened_at" > ?`, recent).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"series_run"`).Set(`"applied_at" = ?`, late).
+			Where(`"applied_at" > ?`, recent).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		got := readTrend(t, r, "security-testing-reader", "?weeks=3")
+		var marked string
+		for _, m := range got.Markers {
+			if m.Series == "codeql/default" {
+				marked = m.At
+			}
+		}
+		if want := late.Format(time.DateOnly); marked != want {
+			t.Fatalf("CodeQL is marked on %q; want %s (all: %+v)", marked, want, got.Markers)
+		}
+		for _, p := range got.Points {
+			if p.Opened != 0 && p.At != marked {
+				t.Errorf("the week ending %s opened %d, and the marker is in the week ending %s", p.At, p.Opened, marked)
+			}
+			if p.At == marked && p.Opened != 1 {
+				t.Errorf("the week ending %s holds the marker and opened %d; want CodeQL's one (all: %+v)", p.At, p.Opened, got.Points)
+			}
+		}
+	})
+}
+
+// unitsShort is semgrep's run analyzing none of the units it expected, so its
+// absences are no evidence.
+func unitsShort() string {
+	return strings.Replace(httpapitest.RunInRepository("semgrep", "https://github.com/acme/elsewhere", "main.go", 7),
+		`"openpsirt/unitsAnalyzed":1`, `"openpsirt/unitsAnalyzed":0`, 1)
+}
+
+// shippedFor ships a build of the seeded product with nothing but its root,
+// declaring its branch or variant where it is new, so a run has a build to
+// place its results in.
+func shippedFor(t *testing.T, r *httpapitest.Reach, b httpapitest.Build) {
+	t.Helper()
+	names := catalog.NewStore(r.DB.DB)
+	mine, err := names.ProductByName(t.Context(), b.Product)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := names.VariantByName(t.Context(), mine.ID, b.Variant); err != nil {
+		if _, err := names.DeclareVariant(t.Context(), mine.ID, b.Variant, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := names.BranchOrTagByName(t.Context(), mine.ID, b.BranchOrTag); err != nil {
+		if _, err := names.DeclareBranchOrTag(t.Context(), mine.ID, b.BranchOrTag, catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root := graph.Described{Purl: "pkg:generic/mine-" + b.BranchOrTag + "-" + b.Variant + "@1.0",
+		Name: "mine-" + b.BranchOrTag + "-" + b.Variant, Version: "1.0"}
+	_, scan := r.Shipped(t, b, "markers-"+b.BranchOrTag+"-"+b.Variant, graph.Snapshot{Root: root})
+	if err := ingest.NewStore(r.DB.DB).Made(t.Context(), scan, 1, 1, root.Name); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// semgrep short of its units on two more builds, one on another variant and
+// one on another branch, twice on the second: a marker counts each build once,
+// and narrows by branch, variant and the build beneath names.
+func TestATrendsMarkersNarrowToTheBuildsAsked(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		trendSeeded(t, r)
+		otherVariant := httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: "mellanox"}
+		otherBranch := httpapitest.Build{Product: "mine", BranchOrTag: "v1", Variant: "broadcom"}
+		shippedFor(t, r, otherVariant)
+		shippedFor(t, r, otherBranch)
+		hour := time.Now().UTC().Add(-time.Hour)
+		httpapitest.ApplyRunAt(t, r, otherVariant, "semgrep/default", hour, unitsShort())
+		httpapitest.ApplyRunAt(t, r, otherBranch, "semgrep/default", hour, unitsShort())
+		httpapitest.ApplyRunAt(t, r, otherBranch, "semgrep/default", hour.Add(10*time.Minute), unitsShort())
+		for _, c := range []struct {
+			query  string
+			builds int
+		}{
+			{"?weeks=1", 3},
+			{"?weeks=1&variant=broadcom", 2},
+			{"?weeks=1&branch_or_tag=master", 2},
+			{"?weeks=1&branch_or_tag=master&variant=broadcom&beneath=sonic-image", 1},
+		} {
+			got := readTrend(t, r, "security-testing-reader", c.query)
+			builds := 0
+			for _, m := range got.Markers {
+				if m.Series == "semgrep/default" && m.Change == "not-comparable" {
+					builds += m.Builds
+				}
+			}
+			if builds != c.builds {
+				t.Errorf("%s marks semgrep short of its units on %d builds (%+v); want %d", c.query, builds, got.Markers, c.builds)
 			}
 		}
 	})
@@ -234,7 +360,7 @@ func TestWhoMayTrendCodeFindings(t *testing.T) {
 		w := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, file+"?weeks=1", "")
 		if strings.Contains(w.Body.String(), "series,semgrep/default") ||
 			!strings.Contains(w.Body.String(), "series,cppcheck/default,1") ||
-			!strings.Contains(w.Body.String(), "clang-tidy/default tool-version to 19.1") {
+			!strings.Contains(w.Body.String(), "clang-tidy/default tool-version from not stated to 19.1") {
 			t.Errorf("the file reads %s; want semgrep's disclosed code finding left out and the version change said", w.Body.String())
 		}
 	})

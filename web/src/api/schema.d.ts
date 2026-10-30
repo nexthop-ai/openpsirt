@@ -2699,7 +2699,7 @@ export interface paths {
          *
          *     Returns 202 once the documents are read and their results placed and stored, before any result is applied. The documents themselves are not stored. Poll `GET .../analyses` for what the run did. The same documents for the same series and build answer 200 with the run they match.
          *
-         *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else.
+         *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else. A result at an http or https address is dropped and counted as `web-address`; an upload whose every result is at one, a web scanner's, is refused.
          *
          *     Requires: security-testing-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
          */
@@ -3917,7 +3917,7 @@ export interface paths {
         };
         /**
          * Trend code findings
-         * @description Returns, per week, the code findings of a product that are not fixed at the end of the week, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it. Weeks end now and every seven days before; a code finding is dated by when the run that opened it was applied, and counted once however many builds hold it.
+         * @description Returns, per week, the code findings of a product that are not fixed at the end of the week, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it. Weeks end at the coming midnight UTC and every seven days before, each point dated by its last day; a code finding is dated by when the run that opened it was applied, and counted once however many builds hold it.
          *
          *     A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing. `no_longer_detected` is how many a comparable run did not see, now, and has no weekly history.
          *
@@ -8646,24 +8646,25 @@ export interface components {
              */
             at: string;
             /**
+             * Format: int64
+             * @description How many builds the change was made on that day
+             */
+            builds: number;
+            /**
              * @description What changed from the run applied before on the same build: the tool, its version or its rules; or not-comparable, a run whose absences are no evidence for another reason
              * @enum {string}
              */
             change: "not-comparable" | "rules" | "tool" | "tool-version";
-            /** @description The tool, the version or the number of rules before, where the run before stated one */
+            /** @description The tool, the version or the number of rules before. Left out on a tool, version or rules change where the run before stated none */
             from?: string;
             /**
              * @description Why the runs were not comparable. Only on not-comparable
              * @enum {string}
              */
             reason?: "exit-status" | "incomplete" | "failure-signal" | "no-coverage" | "units-short" | "tool-changed" | "rules-changed";
-            /**
-             * Format: int64
-             * @description How many runs, one per build, made the change that day
-             */
-            runs: number;
+            /** @description The analyzer series whose runs made the change, by name */
             series: string;
-            /** @description The tool, the version or the number of rules after, where the run states one */
+            /** @description The tool, the version or the number of rules after. Left out on a tool, version or rules change where the run stated none */
             to?: string;
         };
         CodeFindingOccurrence: {
@@ -8711,7 +8712,7 @@ export interface components {
         CodeFindingPointBody: {
             /**
              * Format: date
-             * @description The day the week ends
+             * @description The last day of the week, which ends at midnight UTC after it
              */
             at: string;
             /** @description not_fixed by testing method, each named */
@@ -21684,15 +21685,15 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under counts nothing */
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
                 series?: string;
                 /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
                 method?: "sast";
-                /** @description Limit to the code findings placed on one source package the selected builds ship, as the code finding list reads the name */
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
                 component?: string;
                 /** @description Limit component to the source package at this version. Ignored without component */
                 component_version?: string;
-                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. This needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -21700,7 +21701,7 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
-                /** @description The number of weeks, ending now */
+                /** @description The number of weeks, ending at the coming midnight UTC */
                 weeks?: number;
             };
             header?: never;
@@ -21738,15 +21739,15 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under counts nothing */
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
                 series?: string;
                 /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
                 method?: "sast";
-                /** @description Limit to the code findings placed on one source package the selected builds ship, as the code finding list reads the name */
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
                 component?: string;
                 /** @description Limit component to the source package at this version. Ignored without component */
                 component_version?: string;
-                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. This needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -21754,7 +21755,7 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
-                /** @description The number of weeks, ending now */
+                /** @description The number of weeks, ending at the coming midnight UTC */
                 weeks?: number;
             };
             header?: never;
@@ -21787,18 +21788,18 @@ export interface operations {
     "list-code-findings": {
         parameters: {
             query?: {
+                /** @description List the code findings in one state. Left out, the queue */
+                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
+                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
+                assigned?: "nobody";
                 /** @description Limit to one branch or tag. Left out, every one under the product */
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
                 series?: string;
-                /** @description List the code findings in one state. Left out, the queue */
-                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
                 /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
                 method?: "sast";
-                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
-                assigned?: "nobody";
                 /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
                 component?: string;
                 /** @description Limit component to the source package at this version. Ignored without component */
@@ -21847,18 +21848,18 @@ export interface operations {
     "export-code-findings": {
         parameters: {
             query?: {
+                /** @description List the code findings in one state. Left out, the queue */
+                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
+                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
+                assigned?: "nobody";
                 /** @description Limit to one branch or tag. Left out, every one under the product */
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
                 series?: string;
-                /** @description List the code findings in one state. Left out, the queue */
-                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
                 /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
                 method?: "sast";
-                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
-                assigned?: "nobody";
                 /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
                 component?: string;
                 /** @description Limit component to the source package at this version. Ignored without component */

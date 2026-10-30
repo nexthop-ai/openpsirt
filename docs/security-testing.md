@@ -83,7 +83,7 @@ in a file of its own, the analyzer's name before the extension.
 
 #### Scanners this upload refuses
 
-This upload takes static analysis of the product's own code. Three kinds of
+This upload takes static analysis of the product's own code. These kinds of
 tool that write SARIF are sent elsewhere or not at all:
 
 | Tool | Where its results go |

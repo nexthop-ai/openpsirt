@@ -9,12 +9,10 @@ import type { PaceMark } from "../ui/Charts";
 const CODE_TREND = "code-findings-over-time";
 
 // The page with a narrowing carried, as the queue and a component name one.
-// A branch and a variant named here stand over the picker's.
+// A branch and a variant named here stand over the picker's, an empty one
+// meaning every one; one left out leaves the picker's.
 export function codeTrendAt(query: Record<string, string | undefined> = {}): string {
-  const asked = new URLSearchParams(
-    Object.entries(query).filter((entry): entry is [string, string] => !!entry[1]),
-  ).toString();
-  return analyticsReportAt(CODE_TREND) + (asked ? `?${asked}` : "");
+  return analyticsReportAt(CODE_TREND, query);
 }
 
 // What a trend of code findings is split by, as the server names each part.
@@ -39,20 +37,25 @@ const REASONS: Record<string, string> = {
   "units-short": "analyzed fewer units than expected",
 };
 
-// One marker as a line: which series, what moved, and how many runs.
+// What a marker names where a run stated no tool, version or rule count.
+const NOT_STATED = "not stated";
+
+// One marker as a line: which series, what moved, and on how many builds.
 export function markerSaid(m: CodeFindingMarker): string {
-  const runs = m.runs === 1 ? "" : ` (${m.runs.toLocaleString()} builds)`;
+  const builds = m.builds === 1 ? "" : ` (${m.builds.toLocaleString()} builds)`;
+  const side = (value: string | undefined, unit: string) =>
+    value ? `${value}${unit}` : NOT_STATED;
   const between = (unit = "") =>
-    m.from && m.to ? ` from ${m.from}${unit} to ${m.to}${unit}` : m.to ? ` to ${m.to}${unit}` : "";
+    m.from || m.to ? ` from ${side(m.from, unit)} to ${side(m.to, unit)}` : "";
   switch (m.change) {
     case "tool":
-      return `${m.series}: tool changed${between()}${runs}`;
+      return `${m.series}: tool changed${between()}${builds}`;
     case "tool-version":
-      return `${m.series}: new version${between()}${runs}`;
+      return `${m.series}: new version${between()}${builds}`;
     case "rules":
-      return `${m.series}: rule set changed${between(" rules")}${runs}`;
+      return `${m.series}: rule set changed${between(" rules")}${builds}`;
     case "not-comparable":
-      return `${m.series}: not comparable, ${REASONS[m.reason ?? ""] ?? "for another reason"}${runs}`;
+      return `${m.series}: not comparable, ${REASONS[m.reason ?? ""] ?? "for another reason"}${builds}`;
   }
 }
 

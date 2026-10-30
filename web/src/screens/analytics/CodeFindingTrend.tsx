@@ -100,7 +100,8 @@ export function CodeFindingTrend() {
     beneath_namespace: params.get("beneath_namespace") ?? undefined,
   };
   // A branch and a variant the address names stand over the picker's, so a
-  // link from a queue on one build opens on it.
+  // link from a queue opens on the builds it lists; one named empty is every
+  // one, as a queue over every build sends it.
   const branchOrTag = params.get("branch_or_tag") ?? at.branch_or_tag;
   const variant = params.get("variant") ?? at.variant;
   const asked = {

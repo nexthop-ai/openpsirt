@@ -16,7 +16,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
@@ -37,61 +36,41 @@ func (CodeFindingChange) Schema(huma.Registry) *huma.Schema {
 // the chart and for its file: the queue's own, but for the state and the
 // holder, which a line of what is not fixed does not read.
 type CodeFindingTrendAsked struct {
-	Product          string            `path:"product"`
-	BranchOrTag      string            `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
-	Variant          string            `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
-	Series           string            `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under counts nothing"`
-	Method           CodeFindingMethod `query:"method" doc:"Limit to the code findings one testing method reported. Left out, every method. sast is static analysis"`
-	Component        string            `query:"component" maxLength:"200" doc:"Limit to the code findings placed on one source package the selected builds ship, as the code finding list reads the name"`
-	ComponentVersion string            `query:"component_version" maxLength:"200" doc:"Limit component to the source package at this version. Ignored without component"`
-	Beneath          string            `query:"beneath" maxLength:"200" doc:"Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. This needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
-	BeneathVersion   string            `query:"beneath_version" maxLength:"200" doc:"The version, where the build holds that name at several"`
-	BeneathEcosystem string            `query:"beneath_ecosystem" maxLength:"200" doc:"The ecosystem, for the few names a build holds at one version as two components"`
-	BeneathNamespace string            `query:"beneath_namespace" maxLength:"200" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
-	Weeks            int               `query:"weeks" default:"12" minimum:"1" maximum:"104" doc:"The number of weeks, ending now"`
+	Product string `path:"product"`
+	CodeFindingNarrowing
+	Weeks int `query:"weeks" default:"12" minimum:"1" maximum:"104" doc:"The number of weeks, ending at the coming midnight UTC"`
 }
 
 // scoped resolves what is asked for against what the reader may see. The
 // reader is refused before any component name is resolved, so a name held and
 // a name not held are refused alike.
 func (a CodeFindingTrendAsked) scoped(ctx context.Context, in core.Deps) (access.Subject, analysis.Scope, error) {
-	subject, err := core.Reading(ctx)
-	if err != nil {
-		return subject, analysis.Scope{}, err
-	}
-	scope, err := core.Scoped(ctx, in, subject, core.ScopeQuery{
-		Product: a.Product, BranchOrTag: a.BranchOrTag, Variant: a.Variant,
-	})
+	subject, scope, err := a.selected(ctx, in, a.Product)
 	if err != nil {
 		return subject, analysis.Scope{}, err
 	}
 	if err := analysis.MayCount(subject, *scope.ProductID, "trend the code findings"); err != nil {
 		return subject, analysis.Scope{}, core.Refused(in.Logger, err, "cannot trend the code findings")
 	}
-	out := analysis.Scope{
-		ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
-		Series: strings.TrimSpace(a.Series), Method: analysis.Method(a.Method),
-	}
-	if out.Component = strings.TrimSpace(a.Component); out.Component != "" {
-		out.ComponentVersion = strings.TrimSpace(a.ComponentVersion)
-	}
-	build, beneath, err := core.BeneathAt(ctx, in, scope, strings.TrimSpace(a.Beneath), graph.Choice{
-		Version: a.BeneathVersion, Ecosystem: a.BeneathEcosystem, Namespace: a.BeneathNamespace,
-	})
-	if err != nil {
-		return subject, analysis.Scope{}, err
-	}
-	out.BuildID, out.Beneath = build, beneath
-	return subject, out, nil
+	out, err := a.narrowed(ctx, in, scope)
+	return subject, out, err
 }
 
-// trended works the trend out over the weeks asked, ending now.
+// trended works the trend out over the weeks asked. The weeks end at
+// midnight UTC, the last at the coming one, so a week holds whole days and a
+// marker, dated by its day, is in the week its runs moved the line.
 func (a CodeFindingTrendAsked) trended(ctx context.Context, in core.Deps, subject access.Subject,
 	scope analysis.Scope) (*analysis.Trended, error) {
 
 	const week = 7 * 24 * time.Hour
-	since := time.Now().UTC().Add(-time.Duration(a.Weeks) * week)
+	until := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
+	since := until.Add(-time.Duration(a.Weeks) * week)
 	return analysis.Trend(ctx, in.DB.DB, subject, scope, since, week, a.Weeks)
+}
+
+// lastDay is the day a week ending at a midnight ends on.
+func lastDay(end time.Time) string {
+	return end.Add(-time.Nanosecond).UTC().Format(time.DateOnly)
 }
 
 // CodeFindingTrendBody is code findings over time.
@@ -103,7 +82,7 @@ type CodeFindingTrendBody struct {
 
 // CodeFindingPointBody is the code findings at the end of one week.
 type CodeFindingPointBody struct {
-	At       string         `json:"at" format:"date" doc:"The day the week ends"`
+	At       string         `json:"at" format:"date" doc:"The last day of the week, which ends at midnight UTC after it"`
 	NotFixed int            `json:"not_fixed" doc:"Code findings opened and not closed as fixed by the end of the week, whatever was decided about them"`
 	Opened   int            `json:"opened" doc:"Code findings not fixed at the end of the week that were not at the end of the one before. Zero on the first week"`
 	Fixed    int            `json:"fixed" doc:"Code findings closed as fixed in the week. Zero on the first week"`
@@ -116,12 +95,12 @@ type CodeFindingPointBody struct {
 // the trend compares.
 type CodeFindingMarkerBody struct {
 	At     string            `json:"at" format:"date" doc:"The day the runs were applied"`
-	Series string            `json:"series"`
+	Series string            `json:"series" doc:"The analyzer series whose runs made the change, by name"`
 	Change CodeFindingChange `json:"change" doc:"What changed from the run applied before on the same build: the tool, its version or its rules; or not-comparable, a run whose absences are no evidence for another reason"`
 	Reason core.RunReason    `json:"reason,omitempty" doc:"Why the runs were not comparable. Only on not-comparable"`
-	From   string            `json:"from,omitempty" doc:"The tool, the version or the number of rules before, where the run before stated one"`
-	To     string            `json:"to,omitempty" doc:"The tool, the version or the number of rules after, where the run states one"`
-	Runs   int               `json:"runs" doc:"How many runs, one per build, made the change that day"`
+	From   string            `json:"from,omitempty" doc:"The tool, the version or the number of rules before. Left out on a tool, version or rules change where the run before stated none"`
+	To     string            `json:"to,omitempty" doc:"The tool, the version or the number of rules after. Left out on a tool, version or rules change where the run stated none"`
+	Builds int               `json:"builds" doc:"How many builds the change was made on that day"`
 }
 
 func registerCodeFindingTrend(api huma.API, in core.Deps) {
@@ -131,7 +110,8 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 		Summary: "Trend code findings",
 		Description: "Returns, per week, the code findings of a product that are not fixed at the end of the " +
 			"week, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and " +
-			"how many were opened and fixed in it. Weeks end now and every seven days before; a code finding " +
+			"how many were opened and fixed in it. Weeks end at the coming midnight UTC and every seven days " +
+			"before, each point dated by its last day; a code finding " +
 			"is dated by when the run that opened it was applied, and counted once however many builds hold it.\n\n" +
 			"A code finding stays counted until somebody closes it as fixed: a decision answers it without " +
 			"closing it, and a run missing it closes nothing. `no_longer_detected` is how many a comparable run " +
@@ -156,7 +136,7 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 		out.Body.Points = make([]CodeFindingPointBody, 0, len(trended.Points))
 		for _, p := range trended.Points {
 			out.Body.Points = append(out.Body.Points, CodeFindingPointBody{
-				At: p.At.UTC().Format(time.DateOnly), NotFixed: p.NotFixed, Opened: p.Opened, Fixed: p.Fixed,
+				At: lastDay(p.At), NotFixed: p.NotFixed, Opened: p.Opened, Fixed: p.Fixed,
 				ByTier: p.ByTier, BySeries: p.BySeries, ByMethod: p.ByMethod,
 			})
 		}
@@ -164,7 +144,7 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 		for _, m := range trended.Markers {
 			out.Body.Markers = append(out.Body.Markers, CodeFindingMarkerBody{
 				At: m.At.UTC().Format(time.DateOnly), Series: m.Series, Change: CodeFindingChange(m.Change),
-				Reason: core.RunReason(m.Reason), From: m.From, To: m.To, Runs: m.Runs,
+				Reason: core.RunReason(m.Reason), From: m.From, To: m.To, Builds: m.Builds,
 			})
 		}
 		return out, nil
@@ -217,13 +197,13 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 func trendRows(trended *analysis.Trended) [][]string {
 	var rows [][]string
 	for i, p := range trended.Points {
-		end := p.At.UTC().Format(time.DateOnly)
+		end := lastDay(p.At)
 		// A marker is dated by day, so it is in the week whose last day is
 		// its day or after it, and the week before ended before its day.
 		var changes []string
 		for _, m := range trended.Markers {
 			day := m.At.UTC().Format(time.DateOnly)
-			if day > end || (i > 0 && day <= trended.Points[i-1].At.UTC().Format(time.DateOnly)) {
+			if day > end || (i > 0 && day <= lastDay(trended.Points[i-1].At)) {
 				continue
 			}
 			changes = append(changes, markerWords(m))
@@ -254,15 +234,20 @@ func markerWords(m analysis.Marker) string {
 	if m.Change == analysis.NotComparable {
 		said += " (" + string(m.Reason) + ")"
 	}
-	if m.From != "" {
-		said += " from " + m.From
+	if m.Change != analysis.NotComparable && (m.From != "" || m.To != "") {
+		said += " from " + stated(m.From) + " to " + stated(m.To)
 	}
-	if m.To != "" {
-		said += " to " + m.To
+	builds := "builds"
+	if m.Builds == 1 {
+		builds = "build"
 	}
-	runs := "runs"
-	if m.Runs == 1 {
-		runs = "run"
+	return said + fmt.Sprintf(" on %s, %d %s", m.At.UTC().Format(time.DateOnly), m.Builds, builds)
+}
+
+// stated is a tool, version or rule count a run may leave unstated, as words.
+func stated(value string) string {
+	if value == "" {
+		return "not stated"
 	}
-	return said + fmt.Sprintf(" on %s, %d %s", m.At.UTC().Format(time.DateOnly), m.Runs, runs)
+	return value
 }

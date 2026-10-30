@@ -32,21 +32,28 @@ const ANSWER = {
       change: "rules",
       from: "2",
       to: "3",
-      runs: 1,
+      builds: 1,
     },
     {
       at: "2026-10-30",
       series: "semgrep/default",
       change: "not-comparable",
       reason: "units-short",
-      runs: 2,
+      builds: 2,
     },
   ],
   no_longer_detected: 1,
 };
 
-async function drawn(readsSecurityTesting: boolean, at = "/analytics/code-findings-over-time") {
-  window.sessionStorage.setItem("openpsirt.scope", JSON.stringify({ product: "sonic" }));
+const PICKED = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
+
+async function drawn(
+  readsSecurityTesting: boolean,
+  at = "/analytics/code-findings-over-time",
+  answer: object = ANSWER,
+  picked: object = { product: "sonic" },
+) {
+  window.sessionStorage.setItem("openpsirt.scope", JSON.stringify(picked));
   const session = {
     identity: "ana",
     name: "Ana",
@@ -58,7 +65,7 @@ async function drawn(readsSecurityTesting: boolean, at = "/analytics/code-findin
   queries.setQueryData(["whoami"], session);
   const spy = serve((path) => {
     if (path === "/v1/session/me") return { data: session };
-    if (path === TREND) return { data: ANSWER };
+    if (path === TREND) return { data: answer };
     return undefined;
   });
   mount.render(screen(<CodeFindingTrend />, at, "*", queries));
@@ -89,6 +96,43 @@ describe("code findings over time", () => {
     );
     expect(rows[0]).not.toContain("cppcheck");
     expect(mount.host().querySelectorAll(".chart .mark").length).toBe(1);
+  });
+
+  it("names a version a run did not state", async () => {
+    await drawn(true, undefined, {
+      ...ANSWER,
+      markers: [
+        {
+          at: "2026-10-29",
+          series: "clang-tidy/default",
+          change: "tool-version",
+          to: "19.1",
+          builds: 1,
+        },
+      ],
+    });
+    const rows = [...mount.host().querySelectorAll("tbody tr")].map((each) => each.textContent);
+    expect(rows[1]).toContain("clang-tidy/default: new version from not stated to 19.1");
+  });
+
+  it("reads the picker's branch and variant where the address names none", async () => {
+    const spy = await drawn(true, undefined, ANSWER, PICKED);
+    expect(paths(spy).at(-1)?.[1].params?.query).toMatchObject({
+      branch_or_tag: "master",
+      variant: "broadcom",
+    });
+  });
+
+  it("reads an empty branch and variant in the address as every build", async () => {
+    const spy = await drawn(
+      true,
+      "/analytics/code-findings-over-time?branch_or_tag=&variant=",
+      ANSWER,
+      PICKED,
+    );
+    const query = paths(spy).at(-1)?.[1].params?.query ?? {};
+    expect(query.branch_or_tag).toBeUndefined();
+    expect(query.variant).toBeUndefined();
   });
 
   it("splits by tier until another split is picked, and the file asks what the screen asked", async () => {

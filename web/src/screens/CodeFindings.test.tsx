@@ -169,6 +169,18 @@ describe("the code findings", () => {
     expect(asked.at(-1)).not.toHaveProperty("method");
   });
 
+  it("opens Over time on every build from a queue over every build", async () => {
+    await drawn("/products/sonic/code-findings?series=semgrep%2Fdefault");
+    const link = Array.from(mount.host().querySelectorAll("a")).find(
+      (each) => each.textContent === "Over time",
+    );
+    const at = new URL(link?.getAttribute("href") ?? "", "http://x");
+    expect(at.pathname).toBe("/analytics/code-findings-over-time");
+    expect(at.searchParams.get("branch_or_tag")).toBe("");
+    expect(at.searchParams.get("variant")).toBe("");
+    expect(at.searchParams.get("series")).toBe("semgrep/default");
+  });
+
   it("asks for the build the address names", async () => {
     const asked = await drawn(
       "/products/sonic/code-findings?branch_or_tag=master&variant=broadcom",

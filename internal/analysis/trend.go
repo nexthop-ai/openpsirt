@@ -73,8 +73,8 @@ type Marker struct {
 	// From and To are the tool, the version or the count of rules before
 	// and after, empty where a run states none. Empty on NotComparable.
 	From, To string
-	// Runs is how many runs, one per build, made the change that day.
-	Runs int
+	// Builds is how many builds the change was made on that day.
+	Builds int
 }
 
 // Trended is code findings over time.
@@ -91,7 +91,8 @@ type Trended struct {
 // at the end of each step, split by tier, series and method, how many were
 // opened and fixed in it, the runs that changed the tool, its version or its
 // rules or were not comparable, and how many are no longer detected now.
-// Plotted on when a run was applied, as the dependency trend is.
+// Plotted on when a run was applied, as the dependency trend is. A step holds
+// its start and not its end, so a moment is in one step alone.
 //
 // A code finding is not fixed from when it opened until a person closes it as
 // fixed: absence closes nothing, and a decision answers a code finding
@@ -170,9 +171,9 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		ColumnExpr(`"f"."opened_at", "f"."closed_at"`).
 		Where(kinds, kindArgs...).
 		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
-		Where(`"f"."opened_at" <= ?`, until).
+		Where(`"f"."opened_at" < ?`, until).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr(`"f"."closed_at" IS NULL`).WhereOr(`"f"."closed_at" > ?`, since)
+			return q.WhereOr(`"f"."closed_at" IS NULL`).WhereOr(`"f"."closed_at" >= ?`, since)
 		})
 	if err := scope.narrow(db, scope.inScope(q), kind.SecurityTestingStatistics).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the code findings of product %d over time: %w", scope.ProductID, err)
@@ -198,7 +199,7 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		}
 		for i := 0; i < steps; i++ {
 			to := since.Add(time.Duration(i+1) * step)
-			if row.OpenedAt.After(to) || (row.ClosedAt != nil && !row.ClosedAt.After(to)) {
+			if !row.OpenedAt.Before(to) || (row.ClosedAt != nil && row.ClosedAt.Before(to)) {
 				continue
 			}
 			one.open[i/64] |= 1 << (i % 64)
@@ -284,7 +285,8 @@ func seriesNames(ctx context.Context, db bun.IDB, productID int64) (map[int64]st
 }
 
 // trendMarkers is the runs applied in the range that changed what the trend
-// compares, one marker per day, series and change.
+// compares, one marker per day, series and change, with how many builds it was
+// made on.
 //
 // A run by another tool, version or rule set than the series' run before it
 // on the build is never comparable, so the runs read are the ones that are
@@ -295,6 +297,7 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 	named, namedArgs := kind.SecurityTestingStatistics.Where(`"se"."kind"`)
 	var runs []struct {
 		Series      string        `bun:"series"`
+		BuildID     int64         `bun:"build_id"`
 		AppliedAt   time.Time     `bun:"applied_at"`
 		Reason      series.Reason `bun:"not_comparable"`
 		Tool        *string       `bun:"tool_name"`
@@ -318,7 +321,7 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 			AND "pr"."built_at" = (SELECT MAX("pb"."built_at") FROM "series_run" AS "pb"
 				WHERE "pb"."series_id" = "sr"."series_id" AND "pb"."build_id" = "sr"."build_id"
 				  AND "pb"."status" = ? AND "pb"."built_at" < "sr"."built_at")`, applied, applied).
-		ColumnExpr(`"se"."name" AS "series", "sr"."applied_at", "sr"."not_comparable"`).
+		ColumnExpr(`"se"."name" AS "series", "sr"."build_id", "sr"."applied_at", "sr"."not_comparable"`).
 		ColumnExpr(`"sr"."tool_name", "sr"."tool_version", "sr"."rules_digest", "sr"."rules_count"`).
 		ColumnExpr(`"pr"."id" AS "before_id", "pr"."tool_name" AS "was_tool_name"`).
 		ColumnExpr(`"pr"."tool_version" AS "was_tool_version", "pr"."rules_digest" AS "was_rules_digest"`).
@@ -327,16 +330,15 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 		Where(named, namedArgs...).
 		Where(`"sr"."status" = ?`, applied).
 		Where(`"sr"."comparable" = FALSE`).
-		Where(`"sr"."applied_at" > ?`, since).
-		Where(`"sr"."applied_at" <= ?`, until)
+		Where(`"sr"."applied_at" >= ?`, since).
+		Where(`"sr"."applied_at" < ?`, until)
 	if scope.BranchOrTagID != nil {
 		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
 	}
+	// Beneath takes a branch and a variant naming its build, and a branch and
+	// a variant have one build, so these two narrow the markers to it.
 	if scope.VariantID != nil {
 		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
-	}
-	if scope.BuildID != nil {
-		q = q.Where(`"sr"."build_id" = ?`, *scope.BuildID)
 	}
 	if scope.Method != "" {
 		q = q.Where(`"se"."kind" = ?`, methodKinds[scope.Method])
@@ -355,11 +357,16 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 		reason   series.Reason
 		from, to string
 	}
-	counted := map[key]int{}
+	// A series re-run on one build in a day is one change there.
+	counted := map[key]map[int64]bool{}
 	for _, run := range runs {
 		day := run.AppliedAt.UTC().Truncate(24 * time.Hour)
 		mark := func(change Change, reason series.Reason, from, to string) {
-			counted[key{at: day, series: run.Series, change: change, reason: reason, from: from, to: to}]++
+			k := key{at: day, series: run.Series, change: change, reason: reason, from: from, to: to}
+			if counted[k] == nil {
+				counted[k] = map[int64]bool{}
+			}
+			counted[k][run.BuildID] = true
 		}
 		if run.Before != nil {
 			switch {
@@ -377,9 +384,10 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 		}
 	}
 	out := make([]Marker, 0, len(counted))
-	for k, n := range counted {
+	for k, builds := range counted {
 		out = append(out, Marker{
-			At: k.at, Series: k.series, Change: k.change, Reason: k.reason, From: k.from, To: k.to, Runs: n,
+			At: k.at, Series: k.series, Change: k.change, Reason: k.reason, From: k.from, To: k.to,
+			Builds: len(builds),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

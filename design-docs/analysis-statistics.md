@@ -22,12 +22,12 @@ Satisfies REQ-17, REQ-42, REQ-43, REQ-50, REQ-54, REQ-74, REQ-87.
 
 Security testing statistics is the consumer every security testing figure over
 time reads (`design-docs/kinds.md` § Consumers). It names the analysis kind,
-and a later testing method's kinds join it by inclusion.
+and another testing method's kinds join it by inclusion.
 
 | Rule | Reason |
 |---|---|
 | Security testing results are counted per testing method and never added to dependency vulnerability counts (REQ-87) | A rule at a place and an advisory at a component are different units, and one total would misstate both |
-| Statistics keeps the vulnerability and entered kinds alone, and every vulnerability figure is unchanged | A code finding in the backlog trend reads as a vulnerability |
+| Statistics names the vulnerability and entered kinds alone | A code finding in the backlog trend reads as a vulnerability |
 | No consumer counting figures spans the two families: Statistics names dependency kinds alone, Security testing statistics code kinds alone; a test holds both | A shared consumer is how one total forms |
 | Every trend of security testing work is this consumer's, a component's included | One grant reads every chart of the family |
 | Current standing (counts by series and state, a component's counts, the tree's) stays Code findings' | Those counts are the queue's length, and the queue is Code findings' read |
@@ -40,7 +40,7 @@ GET /v1/products/{product}/code-finding-trend?weeks=12
 
 | Part | Holds |
 |---|---|
-| A point per week | Its last moment; the code findings not fixed then; those opened and fixed in the week |
+| A point per week | Its last day; the code findings not fixed at its end; those opened and fixed in the week |
 | Not fixed by tier | Memory safety, input, resource, other: the tier of the rule's weaknesses (`design-docs/analysis-queue.md` § Weakness families), every tier named, zero included |
 | Not fixed by series | Each series with a code finding counted anywhere in the window, zero in the weeks it has none |
 | Not fixed by method | Every testing method, zero included |
@@ -53,6 +53,8 @@ GET /v1/products/{product}/code-finding-trend?weeks=12
 | Opened and fixed are the difference between one week's set and the one before, so the three numbers agree; the first week has no difference | |
 | Counted by occurrence, once however many builds in the scope hold it, and not fixed while any of them holds it unfixed (REQ-17) | A code finding carried to the next build is one piece of work |
 | Plotted on when a run was applied, the time a code finding opened, as the dependency trend is | A built-time axis would differ from every other chart |
+| Weeks end at midnight UTC, the last at the coming one; a week holds its start and not its end | A marker is dated by its UTC day, so it falls in the week its runs moved the line |
+| A code finding open only in releases past their end of life counts, as the backlog trend counts a vulnerability | End of life is a state of today; applied to past weeks it rewrites them |
 | On calendar weeks, the axis REQ-54 gives a branch; release over release for tags is Code findings by release (`design-docs/analysis.md` § Not built) | |
 | The tier is the rule's as rated now | No rating history is stored, as for the vulnerability trend |
 | No table of presence spans; every week is worked out from opening and closing times (REQ-74) | A return after absence is mostly analyzer nondeterminism, and absence closes nothing |
@@ -67,7 +69,7 @@ nothing. A move in the line beside one comes from the analyzer.
 | Change | Said where a run, against the run applied before it on its build |
 |---|---|
 | `tool` | Names another tool; from and to are the two names |
-| `tool-version` | Names the same tool at another version; from and to are the two versions, either empty where a run stated none |
+| `tool-version` | Names the same tool at another version; from and to are the two versions |
 | `rules` | Has another rule set; from and to are the two rule counts |
 | `not-comparable` | Is not comparable for another reason: exit status, incomplete, a failure of its own, no coverage, units short; the reason is named |
 
@@ -76,8 +78,9 @@ nothing. A move in the line beside one comes from the analyzer.
 | Read from the runs not comparable, applied in the window | A tool, version or rule change already makes a run not comparable (`design-docs/analysis.md` § Run parameters) |
 | The run before is the series' newest applied run on the build built before it | It is the run it was compared with |
 | A tool change and a rule change on one run are two markers; a failed run on a new version is two | A run records its first reason alone |
-| One marker per day, series, change and the values it names, with how many runs, one per build, made it | A nightly series over forty builds is one change |
+| One marker per day, series, change and the values it names, with how many builds it was made on; a series run twice on one build counts it once | A nightly series over forty builds is one change |
 | A first run has no run before it and marks nothing unless it is not comparable for its own reason | |
+| A tool, version or rule count a run did not state is left out of the answer, and the page and the file say "not stated" | A blank reads as a value lost |
 
 ## No longer detected
 
@@ -97,11 +100,11 @@ a figure narrowed alike counts the list it opens
 
 | Narrowing | Detail |
 |---|---|
-| Branch, variant | Builds of that branch or variant |
+| Branch, variant | Builds of that branch or variant; markers too |
 | Series | One series, its name matched ignoring capitals; markers too |
 | Method | One testing method; markers too |
 | Component, version | Code findings on the source package or binary named |
-| Beneath | At or under a component on one build, which takes branch and variant; a replaced component counts at the build's live one of its name, as in the queue; markers narrow to that build |
+| Beneath | At or under a component on one build, which takes branch and variant; a replaced component counts at the build's live one of its name, as in the queue; markers narrow to that build by its branch and variant |
 
 ## Access
 
@@ -123,7 +126,7 @@ GET /v1/products/{product}/code-finding-trend.json
 | Rule | Reason |
 |---|---|
 | The page's own read, narrowing and access, as a file (REQ-50) | A list and its file are one read |
-| CSV is long-format: week ending, split, part, not fixed, opened, fixed, and the week's changes in words; a row for the whole, then one per tier, series and method | A spreadsheet pivots one table |
+| CSV is long-format: week ending, split, part, not fixed, opened, fixed, and the week's changes in words; a row for the whole, then one per tier, method and series | A spreadsheet pivots one table |
 | JSON is the trend's own answer | |
 
 ## The page
@@ -145,7 +148,7 @@ from the rail, the Security testing screen and a component's trend panel
 | Rule | Reason |
 |---|---|
 | Needs a product | A series is one product's |
-| A branch and variant in the address stand over the picker's | A link from a queue on one build opens on it |
+| A branch and variant in the address stand over the picker's; one named empty is every one | A link from a queue opens on the builds it lists |
 | Beneath with no build picked says it needs one and offers the picker, asking nothing | At or under a component is read on one build |
 | A reader not reading security testing material in the product is shown "Nothing to list." and the code family's line, and nothing is asked (`design-docs/interface.md` § Families a reader holds) | A chart of zeros reads as clean code |
 | The page states that the tier is as rated now, and that only fixing takes a code finding off the line | |
@@ -157,4 +160,4 @@ from the rail, the Security testing screen and a component's trend panel
 | Limit | Detail |
 |---|---|
 | A tier reads as rated now | A rule rated anew moves every week it counted in |
-| A marker's from and to are empty where a run stated no tool version | A tool stating none at both ends marks no version change |
+| A version change is unseen where a tool states no version at both ends | Its runs read as one version |

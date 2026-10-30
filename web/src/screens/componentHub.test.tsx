@@ -151,7 +151,7 @@ async function component(
             change: "tool-version",
             from: "18.1",
             to: "19.1",
-            runs: 1,
+            builds: 1,
           },
         ],
         no_longer_detected: 0,

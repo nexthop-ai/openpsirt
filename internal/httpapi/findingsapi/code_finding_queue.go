@@ -55,25 +55,68 @@ type CodeFindingsOutput struct {
 	}
 }
 
+// CodeFindingNarrowing is the narrowing of one product's code findings the
+// queue and the trend both take, so a figure narrowed alike counts the list it
+// opens.
+type CodeFindingNarrowing struct {
+	BranchOrTag      string            `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+	Variant          string            `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+	Series           string            `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing"`
+	Method           CodeFindingMethod `query:"method" doc:"Limit to the code findings one testing method reported. Left out, every method. sast is static analysis"`
+	Component        string            `query:"component" maxLength:"200" doc:"Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"`
+	ComponentVersion string            `query:"component_version" maxLength:"200" doc:"Limit component to the source package at this version. Ignored without component"`
+	Beneath          string            `query:"beneath" maxLength:"200" doc:"Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
+	BeneathVersion   string            `query:"beneath_version" maxLength:"200" doc:"The version, where the build holds that name at several"`
+	BeneathEcosystem string            `query:"beneath_ecosystem" maxLength:"200" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+	BeneathNamespace string            `query:"beneath_namespace" maxLength:"200" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
+}
+
+// selected is the reader and the product, branch and variant asked, resolved
+// against what the reader may see. A product the reader may not see is
+// refused here.
+func (n CodeFindingNarrowing) selected(ctx context.Context, in core.Deps, product string) (access.Subject, finding.Scope, error) {
+	subject, err := core.Reading(ctx)
+	if err != nil {
+		return subject, finding.Scope{}, err
+	}
+	scope, err := core.Scoped(ctx, in, subject, core.ScopeQuery{
+		Product: product, BranchOrTag: n.BranchOrTag, Variant: n.Variant,
+	})
+	return subject, scope, err
+}
+
+// narrowed is the narrowing as the data layer takes it. Its caller has checked
+// the reader's grant on the product first: a component name is looked up only
+// in a build the reader may read, so a held and an unheld name are refused
+// alike.
+func (n CodeFindingNarrowing) narrowed(ctx context.Context, in core.Deps, scope finding.Scope) (analysis.Scope, error) {
+	out := analysis.Scope{
+		ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
+		Series: strings.TrimSpace(n.Series), Method: analysis.Method(n.Method),
+	}
+	if out.Component = strings.TrimSpace(n.Component); out.Component != "" {
+		out.ComponentVersion = strings.TrimSpace(n.ComponentVersion)
+	}
+	build, beneath, err := core.BeneathAt(ctx, in, scope, strings.TrimSpace(n.Beneath), graph.Choice{
+		Version: n.BeneathVersion, Ecosystem: n.BeneathEcosystem, Namespace: n.BeneathNamespace,
+	})
+	if err != nil {
+		return analysis.Scope{}, err
+	}
+	out.BuildID, out.Beneath = build, beneath
+	return out, nil
+}
+
 // CodeFindingsAsked is the narrowing the code finding queue takes, for the screen and for
 // its file. One struct, because a file taking fewer filters than its list
 // answers a different question under the same name.
 type CodeFindingsAsked struct {
-	Product     string            `path:"product"`
-	BranchOrTag string            `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
-	Variant     string            `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
-	Series      string            `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing"`
-	State       CodeFindingState  `query:"state" doc:"List the code findings in one state. Left out, the queue"`
-	Method      CodeFindingMethod `query:"method" doc:"Limit to the code findings one testing method reported. Left out, every method. sast is static analysis"`
+	Product string           `path:"product"`
+	State   CodeFindingState `query:"state" doc:"List the code findings in one state. Left out, the queue"`
 	// Assigned is the findings list's parameter and value for work nobody
 	// holds, so the two read alike.
-	Assigned         CodeFindingAssignee `query:"assigned" doc:"Limit to the code findings with no holder on the build each row names. Every count is then of those code findings"`
-	Component        string              `query:"component" maxLength:"200" doc:"Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"`
-	ComponentVersion string              `query:"component_version" maxLength:"200" doc:"Limit component to the source package at this version. Ignored without component"`
-	Beneath          string              `query:"beneath" maxLength:"200" doc:"Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
-	BeneathVersion   string              `query:"beneath_version" maxLength:"200" doc:"The version, where the build holds that name at several"`
-	BeneathEcosystem string              `query:"beneath_ecosystem" maxLength:"200" doc:"The ecosystem, for the few names a build holds at one version as two components"`
-	BeneathNamespace string              `query:"beneath_namespace" maxLength:"200" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
+	Assigned CodeFindingAssignee `query:"assigned" doc:"Limit to the code findings with no holder on the build each row names. Every count is then of those code findings"`
+	CodeFindingNarrowing
 }
 
 // CodeFindingsAcrossAsked is the narrowing the code finding queue across products
@@ -125,36 +168,18 @@ func (a CodeFindingsAcrossAsked) scoped(ctx context.Context, in core.Deps) (acce
 // scoped resolves what is asked for against what the reader may see. A
 // product the reader may not read is refused here, before anything is read.
 func (a CodeFindingsAsked) scoped(ctx context.Context, in core.Deps) (access.Subject, analysis.Scope, error) {
-	subject, err := core.Reading(ctx)
-	if err != nil {
-		return subject, analysis.Scope{}, err
-	}
-	scope, err := core.Scoped(ctx, in, subject, core.ScopeQuery{
-		Product: a.Product, BranchOrTag: a.BranchOrTag, Variant: a.Variant,
-	})
+	subject, scope, err := a.selected(ctx, in, a.Product)
 	if err != nil {
 		return subject, analysis.Scope{}, err
 	}
 	if _, err := access.Readable(subject, *scope.ProductID); err != nil {
 		return subject, analysis.Scope{}, core.Refused(in.Logger, err, "cannot read the code findings")
 	}
-	out := analysis.Scope{
-		ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
-		Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
-		Method: analysis.Method(a.Method),
-	}
-	if out.Component = strings.TrimSpace(a.Component); out.Component != "" {
-		out.ComponentVersion = strings.TrimSpace(a.ComponentVersion)
-	}
-	// Resolved after the product is authorized: a name is looked up only in
-	// a build the reader may read.
-	build, beneath, err := core.BeneathAt(ctx, in, scope, strings.TrimSpace(a.Beneath), graph.Choice{
-		Version: a.BeneathVersion, Ecosystem: a.BeneathEcosystem, Namespace: a.BeneathNamespace,
-	})
+	out, err := a.narrowed(ctx, in, scope)
 	if err != nil {
 		return subject, analysis.Scope{}, err
 	}
-	out.BuildID, out.Beneath = build, beneath
+	out.Unassigned = a.Assigned == finding.HeldByNobody
 	return subject, out, nil
 }
 
