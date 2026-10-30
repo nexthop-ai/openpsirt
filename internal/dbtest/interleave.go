@@ -48,12 +48,12 @@ func writes(verb string) bool {
 //
 // The handle arms once a statement reading the first table has run, and the
 // first statement after it that writes the second starts rival on another
-// goroutine and
-// waits up to wait for it to finish before it goes on. That is the
-// interleaving a conditional write or a lost-race retry exists for: the
+// goroutine and waits up to wait for it to finish before it goes on. That is
+// the interleaving a conditional write or a lost-race retry exists for: the
 // transaction has read the row and is about to write it, and somebody else's
 // write lands in between. A rival that has to wait on a lock the transaction
-// holds does not finish in that time, and lands once the transaction commits.
+// holds lands once the transaction commits, and the handle goes on as soon as
+// the server reports a session of this database waiting on a lock.
 //
 // The rival runs on db, never on the returned handle, so its own statements
 // do not fire the seam. A test whose rival never ran fails, because nothing
@@ -66,7 +66,8 @@ func RivalAfterRead(t *testing.T, db *database.DB, read, write string, wait time
 	if db.Stats().MaxOpenConnections == 1 {
 		t.Skip("one connection: nothing lands between a read and a write")
 	}
-	hook := &afterRead{read: read, write: write, wait: wait, rival: rival, done: make(chan error, 1)}
+	hook := &afterRead{read: read, write: write, wait: wait, rival: rival, done: make(chan error, 1),
+		blocked: lockWaiter(db)}
 	hooked := bun.NewDB(db.DB.DB, db.Dialect()).WithQueryHook(hook)
 	var answer error
 	var waited sync.Once
@@ -85,11 +86,12 @@ func RivalAfterRead(t *testing.T, db *database.DB, read, write string, wait time
 }
 
 type afterRead struct {
-	read  string
-	write string
-	wait  time.Duration
-	rival func() error
-	done  chan error
+	read    string
+	write   string
+	wait    time.Duration
+	rival   func() error
+	done    chan error
+	blocked func(context.Context) bool
 
 	mu    sync.Mutex
 	armed bool
@@ -118,16 +120,85 @@ func (h *afterRead) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.
 	}
 	landed := make(chan error, 1)
 	go func() { landed <- h.rival() }()
-	select {
-	case err := <-landed:
+	if err, ok := awaitRival(ctx, landed, h.wait, h.blocked); ok {
 		h.done <- err
-	case <-time.After(h.wait):
+	} else {
 		go func() { h.done <- <-landed }()
 	}
 	return ctx
 }
 
 func (h *afterRead) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// rivalPoll is how often a wait for a rival asks whether it is held on a lock.
+const rivalPoll = 10 * time.Millisecond
+
+// awaitRival waits up to wait for a rival to land, and answers what it
+// returned and true where it did. It answers false at once where blocked
+// reports a session waiting on a lock, because only the transaction the rival
+// was started inside holds one, and the rival lands once that commits.
+func awaitRival(ctx context.Context, landed <-chan error, wait time.Duration,
+	blocked func(context.Context) bool) (error, bool) {
+
+	deadline := time.NewTimer(wait)
+	defer deadline.Stop()
+	poll := time.NewTicker(rivalPoll)
+	defer poll.Stop()
+	for {
+		select {
+		case err := <-landed:
+			return err, true
+		case <-deadline.C:
+			return nil, false
+		case <-poll.C:
+			if blocked(ctx) {
+				return nil, false
+			}
+		}
+	}
+}
+
+// UntilLockWait returns once ready is closed, once a session of db's database
+// waits on a lock, or once wait has passed, whichever comes first. It is for a
+// hook holding one writer until a second arrives, where the second may instead
+// be waiting on a lock the first holds and will not arrive until it goes on.
+func UntilLockWait(ctx context.Context, db *database.DB, ready <-chan struct{}, wait time.Duration) {
+	landed := make(chan error, 1)
+	go func() {
+		select {
+		case <-ready:
+			landed <- nil
+		case <-ctx.Done():
+		}
+	}()
+	_, _ = awaitRival(ctx, landed, wait, lockWaiter(db))
+}
+
+// lockWaiter answers whether a session connected to db's database waits on a
+// lock, which is the rival a seam started, held by the transaction it was
+// started inside. A question the server cannot answer reads as no, which
+// leaves the wait to its bound. SQLite never reaches it: a seam skips there.
+//
+// Asked of the server's own catalog, because no portable statement reports
+// another session's lock wait: PostgreSQL's activity view names the wait, and
+// InnoDB lists a transaction waiting, which is joined to its session for the
+// database it is in, because other binaries hold databases on the same server.
+func lockWaiter(db *database.DB) func(context.Context) bool {
+	query := `SELECT COUNT(*) FROM "pg_stat_activity" WHERE "datname" = current_database() ` +
+		`AND "wait_event_type" = 'Lock'`
+	if db.Server.Engine != database.Postgres {
+		query = `SELECT COUNT(*) FROM "information_schema"."INNODB_TRX" AS "t" ` +
+			`JOIN "information_schema"."PROCESSLIST" AS "p" ON "p"."ID" = "t"."trx_mysql_thread_id" ` +
+			`WHERE "t"."trx_state" = 'LOCK WAIT' AND "p"."DB" = DATABASE()`
+	}
+	return func(ctx context.Context) bool {
+		var waiting int
+		if err := db.DB.DB.QueryRowContext(ctx, query).Scan(&waiting); err != nil {
+			return false
+		}
+		return waiting > 0
+	}
+}
 
 // RivalAfterSelect returns a handle over db's connections on which a rival
 // writer lands right after the first read of one table, before whatever
@@ -145,7 +216,8 @@ func RivalAfterSelect(t *testing.T, db *database.DB, read string, wait time.Dura
 	if db.Stats().MaxOpenConnections == 1 {
 		t.Skip("one connection: nothing lands between two reads")
 	}
-	hook := &afterSelect{read: read, wait: wait, rival: rival, done: make(chan error, 1)}
+	hook := &afterSelect{read: read, wait: wait, rival: rival, done: make(chan error, 1),
+		blocked: lockWaiter(db)}
 	hooked := bun.NewDB(db.DB.DB, db.Dialect()).WithQueryHook(hook)
 	var answer error
 	var waited sync.Once
@@ -167,10 +239,11 @@ func RivalAfterSelect(t *testing.T, db *database.DB, read string, wait time.Dura
 }
 
 type afterSelect struct {
-	read  string
-	wait  time.Duration
-	rival func() error
-	done  chan error
+	read    string
+	wait    time.Duration
+	rival   func() error
+	done    chan error
+	blocked func(context.Context) bool
 
 	mu    sync.Mutex
 	armed bool
@@ -189,10 +262,9 @@ func (h *afterSelect) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) contex
 	}
 	landed := make(chan error, 1)
 	go func() { landed <- h.rival() }()
-	select {
-	case err := <-landed:
+	if err, ok := awaitRival(ctx, landed, h.wait, h.blocked); ok {
 		h.done <- err
-	case <-time.After(h.wait):
+	} else {
 		go func() { h.done <- <-landed }()
 	}
 	return ctx
