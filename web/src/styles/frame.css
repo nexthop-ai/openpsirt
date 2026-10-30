@@ -188,6 +188,10 @@ button {
 .nav .count.quiet {
   opacity: 0.85;
 }
+/* A second badge sits beside the first, each family's count apart. */
+.nav .count + .count {
+  margin-left: 4px;
+}
 .nav[disabled] {
   opacity: 0.4;
   cursor: not-allowed;

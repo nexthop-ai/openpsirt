@@ -10,6 +10,7 @@ Satisfies REQ-25, REQ-27, REQ-28, REQ-29, REQ-34.
 - [The review queue](#the-review-queue)
 - [The decision page](#the-decision-page)
 - [Assignments and assignment rules](#assignments-and-assignment-rules)
+- [Work nobody holds](#work-nobody-holds)
 - [Limits](#limits)
 
 ## The review queue
@@ -126,6 +127,20 @@ order is precedence: the first matching rule places the work.
 | Saving says the sweep has started | One rule can place thousands, so it is queued |
 | The finding names the rule that placed it on the holder card, and says taking it picks up unheld work the rule will not take back | |
 | Both are read off the occurrences the reader may read, the ones the card shows | Read off an unreadable one, the holder names who works undisclosed work |
+
+## Work nobody holds
+
+Work nobody holds is one list per family, opened from the rail's Unassigned
+entry: the findings list under nobody assigned and nothing decided, and the
+code finding queue across products under nobody assigned.
+
+| Rule | Reason |
+|---|---|
+| The two lists stay apart, each with its own count, never summed | An unjudged code result must never reach a published statement, and a rule at a place and an advisory at a component are different units |
+| `/unassigned` offers one card per family to a reader counting both, each with its count and the line for a family read in half, opening its list | |
+| A reader counting one family is taken from `/unassigned` straight to that family's list | A bookmark or an old digest's link lands on work |
+| The dependency count is asked from the list's address through the list's own query, its three silent-address narrowings included; the code count is the queue's total under the same filter | A count is of what its list shows |
+| A family's count is asked only where the family is counted (`design-docs/interface.md` § Families a reader holds) | A count not drawn is not asked for |
 
 ## Limits
 

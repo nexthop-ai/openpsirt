@@ -122,10 +122,14 @@ describe("the rail for a reader without dependency findings", () => {
     },
   ];
 
-  it("draws no Dependency findings or Unassigned entry for a reader holding them nowhere", async () => {
+  it("draws no Dependency findings entry for a reader holding them nowhere", async () => {
     await railAt("/products/sonic", securityTestingOnly);
     expect(entry("Dependency findings")).toBeUndefined();
-    expect(entry("Unassigned")).toBeUndefined();
+  });
+
+  it("opens the code findings nobody holds from Unassigned for a reader of code findings alone", async () => {
+    await railAt("/products/sonic", securityTestingOnly);
+    expect(entry("Unassigned")?.getAttribute("href")).toBe("/code-findings?assigned=nobody");
   });
 
   it("draws no phone findings tab for a reader holding dependency findings nowhere", async () => {
@@ -216,5 +220,68 @@ describe("the rail for a reader without dependency findings", () => {
     expect(badge?.getAttribute("title")).toContain(
       "Counting disclosed findings, the ones you read here.",
     );
+  });
+});
+
+describe("the Unassigned entry, one count per family", () => {
+  // The rail with work nobody holds answered per family: four dependency
+  // findings and three code findings.
+  async function unassigned(reach: Record<string, unknown>[]) {
+    window.sessionStorage.clear();
+    const asked: string[] = [];
+    serve((path) => {
+      asked.push(path);
+      if (path === "/v1/findings") return { data: { items: [], total: 4 } };
+      if (path === "/v1/code-findings") return { data: { items: [], total: 3 } };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(
+      screen(
+        <Shell who={{ ...who, reach: reach as unknown as Who["reach"] }}>{null}</Shell>,
+        "/start",
+      ),
+    );
+    await settle();
+    const link = [...mount.host().querySelectorAll<HTMLElement>("a")].find((each) =>
+      each.textContent?.startsWith("Unassigned"),
+    );
+    const badges = [...(link?.querySelectorAll(".count") ?? [])].map((each) => [
+      each.textContent,
+      each.getAttribute("title"),
+    ]);
+    return { href: link?.getAttribute("href"), badges, asked };
+  }
+
+  it("draws each family's badge apart for a reader of both, opening the screen offering both", async () => {
+    const got = await unassigned([
+      {
+        product: "sonic",
+        may_see: true,
+        reads_public: true,
+        reads_private: true,
+        reads_security_testing: true,
+      },
+    ]);
+    expect(got.href).toBe("/unassigned");
+    expect(got.badges).toEqual([
+      ["4", "4 dependency findings nobody holds and nobody has decided"],
+      ["3", "3 code findings nobody holds"],
+    ]);
+  });
+
+  it("asks no code count for a reader of no code finding", async () => {
+    const got = await unassigned([
+      { product: "sonic", may_see: true, reads_public: true, reads_private: true },
+    ]);
+    expect(got.asked).not.toContain("/v1/code-findings");
+    expect(got.badges.map(([n]) => n)).toEqual(["4"]);
+    expect(got.href).toContain("/findings?");
+  });
+
+  it("asks no dependency count for a reader of code findings alone", async () => {
+    const got = await unassigned([{ product: "sonic", reads_security_testing: true }]);
+    expect(got.asked).not.toContain("/v1/findings");
+    expect(got.badges.map(([n]) => n)).toEqual(["3"]);
+    expect(got.href).toBe("/code-findings?assigned=nobody");
   });
 });

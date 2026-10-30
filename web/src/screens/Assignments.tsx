@@ -27,9 +27,9 @@ import { on } from "../ui/when";
 const PAGE = 50;
 
 // Assignments: what is running out of time undecided, and what each person
-// holds. What nobody holds has its own entry in the rail, which opens the
-// findings list under that narrowing, so the third tab links across rather
-// than drawing a list twice.
+// holds. What nobody holds has its own entry in the rail, which opens each
+// family's list of unheld work, so this screen links across rather than
+// drawing a list twice.
 //
 // Work assigned to somebody who has gone is invisible twice over: not in the
 // shared queue because it is assigned, and not in anybody's list because they
@@ -347,7 +347,7 @@ function ByPerson({
     return (
       <Empty
         title="Nobody else is holding anything."
-        detail="What is waiting for nobody is the findings list under Unassigned; this one is about work somebody has taken on."
+        detail="What is waiting for nobody is under Unassigned; this one is about work somebody has taken on."
       >
         {codeFindingsIn && (
           <Link to={codeFindingsAt(codeFindingsIn, { assigned: "nobody" })}>

@@ -42,9 +42,11 @@ right its screen asks for.
 
 | Entry | Drawn for |
 |---|---|
-| Dependency findings, Unassigned, the phone tab Findings | A reader of dependency findings in some product |
+| Dependency findings, the phone tab Findings | A reader of dependency findings in some product |
+| Unassigned | A reader of either family in some product. It opens `/unassigned` where both families are counted, and the one family's list of unheld work where one is: the findings list under nobody assigned and nothing decided, or the code finding queue across products under nobody assigned (`design-docs/interface-review.md` § Work nobody holds) |
 | Dependency findings with a product picked | Declines where the reader holds them in another product, saying so on hover; its count is asked only where they are read here |
 | The Dependency findings and Unassigned badges | A reader of one half alone has the unit say which half the count is of (REQ-60) |
+| The Unassigned badges | One per family counted, side by side, each with its unit on hover and never summed; a family not counted is not asked (`design-docs/kinds.md` § Consumers) |
 | Security testing | A reader of security testing work in some product; declines in a product where it is not read, with the code family's line on hover |
 | Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
 | Record a flaw | A reader who may triage undisclosed or disclosed work in some product |
