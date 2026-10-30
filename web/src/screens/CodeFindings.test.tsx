@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodeFindings } from "./CodeFindings";
-import { location, mounted, screen, serve, settle } from "../test/mount";
+import { client, location, mounted, screen, serve, settle } from "../test/mount";
 import { change, press, tick } from "../test/controls";
 
 const mount = mounted();
@@ -174,5 +174,101 @@ describe("the code findings", () => {
       "/products/sonic/code-findings?branch_or_tag=master&variant=broadcom",
     );
     expect(asked[0]).toMatchObject({ branch_or_tag: "master", variant: "broadcom" });
+  });
+});
+
+describe("the code findings of every product read", () => {
+  // The queue at `/code-findings`, for a reader of security testing material
+  // in the products named.
+  async function across(at: string, reads: string[]) {
+    const asked: { path: string; query: unknown }[] = [];
+    serve((path, init) => {
+      if (path === "/v1/session/me")
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            kind: "person",
+            reach: reads.map((product) => ({ product, reads_security_testing: true })),
+            outcomes: [],
+          },
+        };
+      if (path.includes("code-findings")) {
+        asked.push({ path, query: (init as { params: { query: unknown } }).params.query });
+        return {
+          data: {
+            items: [
+              { ...ROW, product: "sonic", product_name: "SONiC" },
+              { ...ROW, product: "edge" },
+            ],
+            total: 2,
+            states: { open: 2 },
+            waiting: 0,
+            ruled: 1,
+            past_end_of_life: 0,
+          },
+        };
+      }
+      return undefined;
+    });
+    // Signed in already, as the application is by the time a screen draws.
+    const queries = client();
+    queries.setQueryData(["whoami"], {
+      identity: "ana",
+      name: "Ana",
+      kind: "person",
+      reach: reads.map((product) => ({ product, reads_security_testing: true })),
+      outcomes: [],
+    });
+    mount.render(screen(<CodeFindings />, at, "/code-findings", queries));
+    await settle();
+    return asked;
+  }
+
+  it("asks the queue across products and opens each row in its own product", async () => {
+    const asked = await across("/code-findings?state=open&assigned=nobody", ["sonic", "edge"]);
+    expect(asked).toEqual([
+      {
+        path: "/v1/code-findings",
+        query: { limit: 50, offset: 0, state: "open", assigned: "nobody" },
+      },
+    ]);
+    const hrefs = Array.from(mount.host().querySelectorAll("td a")).map((each) =>
+      each.getAttribute("href"),
+    );
+    expect(hrefs).toContain(
+      "/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc",
+    );
+    expect(hrefs).toContain(
+      "/products/edge/branches-and-tags/master/variants/broadcom/code-findings/abc",
+    );
+    expect(hrefs).toContain("/products/sonic");
+    expect(text()).toContain("SONiC");
+    expect(text()).toContain("Code findings in every product you read");
+  });
+
+  it("offers the file across products and no suppression rules, which are one product's", async () => {
+    await across("/code-findings", ["sonic"]);
+    const files = Array.from(mount.host().querySelectorAll("a.btn")).map((each) =>
+      each.getAttribute("href"),
+    );
+    expect(files.some((each) => each?.startsWith("/v1/code-findings.csv"))).toBe(true);
+    expect(text()).not.toContain("Suppression rules");
+    const ruled = Array.from(mount.host().querySelectorAll("a")).find((each) =>
+      each.textContent?.includes("dismissed by a rule"),
+    );
+    expect(ruled?.getAttribute("href")).toBe("/code-findings?state=dismissed");
+  });
+
+  it("says a subtree needs one build and asks nothing", async () => {
+    const asked = await across("/code-findings?beneath=frr", ["sonic"]);
+    expect(asked).toEqual([]);
+    expect(text()).toContain("This needs one build.");
+  });
+
+  it("says the reader reads code findings nowhere and asks nothing", async () => {
+    const asked = await across("/code-findings", []);
+    expect(asked).toEqual([]);
+    expect(text()).toContain("You don't read code findings in any product.");
   });
 });

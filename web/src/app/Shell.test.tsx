@@ -76,10 +76,9 @@ describe("the code findings entry", () => {
     expect(entry("Security testing")).toBeUndefined();
   });
 
-  it("declines and says so where no product is picked", async () => {
+  it("opens the queue across products where no product is picked", async () => {
     await railAt("/start", [{ product: "sonic", reads_security_testing: true }]);
-    expect(entry("Security testing")?.tagName).toBe("BUTTON");
-    expect(entry("Security testing")?.title).toBe("Pick a product");
+    expect(entry("Security testing")?.getAttribute("href")).toBe("/code-findings");
   });
 
   it("declines and says so where the reader may not read security testing material", async () => {

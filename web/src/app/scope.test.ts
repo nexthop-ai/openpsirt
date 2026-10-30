@@ -173,6 +173,15 @@ describe("changing scope stays on the screen", () => {
     ).toBe(`${BUILD}/findings`);
   });
 
+  it("moves between the security testing queue across products and one product's", () => {
+    expect(rescoped("/code-findings", { product: "sonic" })).toBe("/products/sonic/code-findings");
+    expect(
+      rescoped("/code-findings", { product: "sonic", branch_or_tag: "master", variant: "x86" }),
+    ).toBe("/products/sonic/code-findings?branch_or_tag=master&variant=x86");
+    expect(rescoped("/code-findings", {})).toBe(null);
+    expect(rescoped("/products/sonic/code-findings", {})).toBe("/code-findings");
+  });
+
   it("leaves anything else where it is", () => {
     expect(
       rescoped("/review-queue", { product: "sonic", branch_or_tag: "master", variant: "broadcom" }),

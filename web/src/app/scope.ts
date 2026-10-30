@@ -8,6 +8,8 @@ import {
   BUILD,
   ROUTES,
   allFindingsAt,
+  codeFindingsAt,
+  codeFindingsAcrossAt,
   buildFindingsAt,
   uploadsAt,
   productAt,
@@ -293,6 +295,17 @@ export function rescoped(pathname: string, to: Scoped): string | null {
   }
   // The wider list carries the whole selection in its own address.
   if (matchPath(LIST, pathname)) return findingsPath(to);
+  // The security testing queue across products becomes the product's queue,
+  // on the branch and variant picked, and the product's queue the one across
+  // products where every product is chosen.
+  if (matchPath(ROUTES.codeFindingsAcross, pathname)) {
+    if (!to.product) return null;
+    return codeFindingsAt(to.product, {
+      branch_or_tag: to.branch_or_tag,
+      variant: to.variant,
+    });
+  }
+  if (!to.product && matchPath(ROUTES.codeFindings, pathname)) return codeFindingsAcrossAt();
   for (const { shape, carries } of UNDER_PRODUCT) {
     const hit = matchPath(shape, pathname);
     if (!hit) continue;

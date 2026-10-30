@@ -164,6 +164,10 @@
       "beneath_namespace"
     ]
   },
+  "codeFindingsAcross": {
+    "path": "/code-findings",
+    "query": ["state", "series", "method", "assigned", "component", "component_version"]
+  },
   "codeFinding": {
     "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/code-findings/:occurrence"
   },

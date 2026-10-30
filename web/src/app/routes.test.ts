@@ -39,6 +39,11 @@ const SAMPLES: Record<string, () => string[]> = {
       beneath_namespace: odd,
     }),
   ],
+  codeFindingsAcrossAt: () => [
+    routes.codeFindingsAcrossAt(),
+    routes.codeFindingsAcrossAt({ assigned: "nobody", state: "dismissed", series: odd }),
+    routes.codeFindingsAcrossAt({ component: odd, component_version: odd, method: odd }),
+  ],
   codeFindingAt: () => [routes.codeFindingAt(build, odd)],
   suppressionRulesAt: () => [routes.suppressionRulesAt(odd)],
   repositoriesAt: () => [routes.repositoriesAt(odd)],

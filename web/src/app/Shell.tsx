@@ -14,6 +14,7 @@ import {
   vulnerabilityReportsAt,
   uploadsAt,
   codeFindingsAt,
+  codeFindingsAcrossAt,
   issueAt,
   componentSearchAt,
   branchesAndTagsAt,
@@ -309,10 +310,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 }
               />
             )}
-            {/* A product's code findings from security testing, under the same
-              rule as the vulnerability reports: shown to somebody who reads
-              security testing material anywhere, and opening on the branch and
-              variant picked where both are. */}
+            {/* Code findings from security testing, shown to somebody who
+              reads security testing material anywhere: a product's, opening
+              on the branch and variant picked where both are, and with no
+              product picked, every product's they read. */}
             {codeFindingsAnywhere && (
               <Rail
                 to={
@@ -321,12 +322,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                         product,
                         whole ? { branch_or_tag: branchOrTag, variant } : undefined,
                       )
-                    : ""
+                    : codeFindingsAcrossAt()
                 }
                 icon="triage"
                 label="Security testing"
-                needs={!!codeFindingsHere && counted(codeFindingsHere)}
-                why={codeFindingsHere ? heldLine(codeFindingsHere) : "Pick a product"}
+                needs={!codeFindingsHere || counted(codeFindingsHere)}
+                why={codeFindingsHere ? heldLine(codeFindingsHere) : undefined}
               />
             )}
             {/* Its own screen rather than an action on the findings list: what is

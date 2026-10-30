@@ -215,6 +215,9 @@ export function App() {
               <Route path={ROUTES.vulnerabilityReports} element={<VulnerabilityReports />} />
               <Route path={ROUTES.vulnerabilityReport} element={<VulnerabilityReport />} />
               <Route path={ROUTES.codeFindings} element={<CodeFindings />} />
+              {/* The same queue over every product the reader reads security
+                testing material in. */}
+              <Route path={ROUTES.codeFindingsAcross} element={<CodeFindings />} />
               <Route path={ROUTES.codeFinding} element={<CodeFinding />} />
               <Route path={ROUTES.suppressionRules} element={<SuppressionRules />} />
               <Route path={ROUTES.repositories} element={<Repositories />} />

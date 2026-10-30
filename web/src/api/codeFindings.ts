@@ -70,6 +70,9 @@ export function codeFindingsQuery(asked: CodeFindingsAsked): Record<string, stri
   );
 }
 
+// A product's code findings, or with no product named, those of every product
+// the reader reads security testing material in. Across products a build is
+// named by no product, so the build's narrowings are not sent.
 export function useCodeFindings(
   product: string,
   asked: CodeFindingsAsked & { offset?: number },
@@ -78,8 +81,26 @@ export function useCodeFindings(
   return useQuery({
     enabled,
     queryKey: ["code-findings", product, asked],
-    queryFn: async () =>
-      unwrap(
+    queryFn: async () => {
+      if (!product) {
+        return unwrap(
+          await api.GET("/v1/code-findings", {
+            params: {
+              query: {
+                limit: PAGE,
+                offset: asked.offset ?? 0,
+                ...(asked.series ? { series: asked.series } : {}),
+                ...(asked.method ? { method: asked.method } : {}),
+                ...(asked.state ? { state: asked.state } : {}),
+                ...(asked.assigned ? { assigned: asked.assigned } : {}),
+                ...(asked.component ? { component: asked.component } : {}),
+                ...(asked.component_version ? { component_version: asked.component_version } : {}),
+              },
+            },
+          }),
+        );
+      }
+      return unwrap(
         await api.GET("/v1/products/{product}/code-findings", {
           params: {
             path: { product },
@@ -101,7 +122,8 @@ export function useCodeFindings(
             },
           },
         }),
-      ),
+      );
+    },
   });
 }
 

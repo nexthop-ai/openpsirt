@@ -18,12 +18,17 @@ Satisfies REQ-19, REQ-40.
 ## Security testing
 
 The Security testing screen lists a product's code findings, reached from the
-product page.
+product page, and with no product picked, the code findings of every product
+the reader reads security testing material in.
 
 | Rule | Reason |
 |---|---|
 | The link appears only for a reader of security testing material in the product | A code finding is at security testing visibility |
-| The rail carries it under the scope beside Dependency findings and Vulnerability reports, for a reader of security testing material anywhere, declining where no product is picked or the reader may not read security testing material there. It opens on the picked branch and variant where both are, else every build | |
+| The rail carries it under the scope beside Dependency findings and Vulnerability reports, for a reader of security testing material anywhere, declining in a product where the reader may not read security testing material. With a product picked it opens on the picked branch and variant where both are, else every build; with none, the queue across products | |
+| Across products, the queue lists every product the reader reads security testing material in, with the per-product screen's tabs, counts, filters and file, each row naming its product and opening the code finding, its component and its product in that product (`design-docs/analysis-queue.md` § Queue across products) | |
+| Across products, suppression rules are not offered, and a rule's dismissals open the dismissed tab across products | A suppression rule is one product's |
+| Across products, an address naming a subtree says it needs one build and offers the scope picker, asking nothing | At or under a component is read on one build |
+| Picking a product in the scope bar moves the queue across products to that product's, on the branch and variant picked; picking every product moves a product's queue to the one across products | The picker's choice is the scope of the queue |
 | It opens on the queue, with one tab per state: the queue is open code findings with nothing waiting; each state's tab carries its count, the queue's none | |
 | Above the queue: how many wait for approval, how many a suppression rule dismisses (opening the dismissed tab), how many are past end of life | |
 | A row opens the code finding on its build, naming that build and how many others hold it in the listed state; build and opening date do not wrap | Evidence is per build |
