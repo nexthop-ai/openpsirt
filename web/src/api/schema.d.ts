@@ -13129,7 +13129,7 @@ export interface components {
             discarded?: {
                 [key: string]: number;
             };
-            /** @description Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent */
+            /** @description Results left out, by reason: advisory-identifier, outside-the-checkout, web-address, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent */
             dropped?: {
                 [key: string]: number;
             };

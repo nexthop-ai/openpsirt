@@ -287,8 +287,8 @@ func TestAddressesResolveThroughTheirStartingPoints(t *testing.T) {
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"https://example.com/z.c"}}}]}]`)
 	r := read(t, doc).Runs[0]
 	placed, dropped := Prepare(&r, "")
-	if dropped.Outside != 3 {
-		t.Errorf("dropped %+v; want the escape, the undefined name and the web address", dropped)
+	if dropped.Outside != 2 || dropped.Web != 1 {
+		t.Errorf("dropped %+v; want the escape and the undefined name outside, and the web address", dropped)
 	}
 	want := []struct {
 		path, within string

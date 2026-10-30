@@ -4,6 +4,7 @@
 package sarif
 
 import (
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -115,6 +116,9 @@ type Dropped struct {
 	// line, column and message. A header's result recurs once per unit that
 	// includes it.
 	Repeats int
+	// Web is the results whose place is a web address: a web scanner's,
+	// which no file in the checkout holds.
+	Web int
 }
 
 // Placer places the results of one upload's runs in the checkout, leaving
@@ -126,6 +130,9 @@ type Placer struct {
 	dropped  Dropped
 	keep     func(path string) bool
 	snippets int
+	// results is every result offered, and web those whose first place is
+	// a web address, whatever else left them out.
+	results, web int
 }
 
 // NewPlacer is a placer that has seen nothing. keep is whether source under
@@ -133,6 +140,11 @@ type Placer struct {
 func NewPlacer(keep func(path string) bool) *Placer {
 	return &Placer{seen: map[string]bool{}, keep: keep}
 }
+
+// WebOnly is whether every result offered so far, and at least one, is placed
+// at a web address: a web scanner's output, which places nothing in the
+// checkout.
+func (pl *Placer) WebOnly() bool { return pl.results > 0 && pl.web == pl.results }
 
 // Dropped is what the placer has left out so far.
 func (pl *Placer) Dropped() Dropped { return pl.dropped }
@@ -160,6 +172,11 @@ func (pl *Placer) Place(run *Run, root string) []Placed {
 	paths := PathsOf(run, root)
 	var out []Placed
 	for _, res := range run.Results {
+		pl.results++
+		atWeb := len(res.Locations) > 0 && web(res.Locations[0].URI)
+		if atWeb {
+			pl.web++
+		}
 		switch {
 		case advisory.MatchString(res.RuleID):
 			pl.dropped.Advisory++
@@ -175,6 +192,10 @@ func (pl *Placer) Place(run *Run, root string) []Placed {
 			continue
 		case res.Absent:
 			pl.dropped.Absent++
+			continue
+		}
+		if atWeb {
+			pl.dropped.Web++
 			continue
 		}
 		if len(res.Locations) == 0 {
@@ -219,6 +240,17 @@ func Prepare(run *Run, root string) ([]Placed, Dropped) {
 	pl := NewPlacer(nil)
 	placed := pl.Place(run, root)
 	return placed, pl.Dropped()
+}
+
+// web is whether an address is a web address, as a web scanner places a
+// result at the page it requested.
+func web(uri string) bool {
+	u, err := url.Parse(strings.TrimSpace(uri))
+	if err != nil {
+		return false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	return scheme == "http" || scheme == "https"
 }
 
 // failureSignals is the rules whose results say the analyzer failed on part

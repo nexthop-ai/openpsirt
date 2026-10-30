@@ -57,7 +57,7 @@ POST /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}
 |---|---|
 | 202 `queued` | Stored and waiting |
 | 200 `already_held` | The same documents for the same series, build and build time, answered as the run repeated |
-| 422 | A document or field unreadable, no analyzer run that ran, placed results past the byte bound, or a series name too long; the detail names which |
+| 422 | A document or field unreadable, no analyzer run that ran, every result at a web address, placed results past the byte bound, or a series name too long; the detail names which |
 | 409 | Product, release or variant retired |
 | 503 | Queue past its backlog |
 
@@ -95,6 +95,7 @@ and entries are bounded across the upload as memory: placed results take about
 | Rule | Reason |
 |---|---|
 | A dependency or secret scanner's run is left out and named on the receipt; an upload of only those is refused, naming them | Inventories go to the scan upload |
+| A result whose first location is an `http` or `https` address is dropped, counted as `web-address`; an upload whose every result is one is refused: "web scanner results are not supported" | A web scanner's result is at an endpoint, and no placement holds one |
 | A run whose `results` is absent or null refuses the upload | Absent is a tool that did not start |
 | A result's rule is found by identifier, whole then by leading `/` components, within the tool component it names; a rule index only where no identifier is stated, within its component or the driver | Extensions number rules from zero; `CA5350/md5` is `CA5350` |
 | A rule that is an advisory's identifier drops the result, counted | |

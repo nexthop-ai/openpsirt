@@ -10435,7 +10435,7 @@ components:
           additionalProperties:
             format: int64
             type: integer
-          description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent"
+          description: "Results left out, by reason: advisory-identifier, outside-the-checkout, web-address, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent"
           type: object
         fingerprints_changed:
           description: Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another branch or tag, from the last run on that branch or tag's build

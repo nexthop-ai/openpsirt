@@ -89,7 +89,7 @@ type Receipt struct {
 	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the occurrence of a code finding on the build that was closed"`
 	Uncompared          int            `json:"uncompared,omitempty" doc:"Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set"`
 	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another branch or tag, from the last run on that branch or tag's build"`
-	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent"`
+	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, web-address, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent"`
 	Scanners            []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
 	Discarded           map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
 }
@@ -106,6 +106,9 @@ const (
 	DroppedSuppressed  = "suppressed-by-the-tool"
 	// DroppedAbsent is a result the tool says is no longer found.
 	DroppedAbsent = "absent"
+	// DroppedWeb is a result placed at a web address: a web scanner's, which
+	// no file in the checkout holds.
+	DroppedWeb = "web-address"
 )
 
 // inventoryWait is how long a run waits for its build's inventory before it
@@ -218,12 +221,15 @@ func Place(logs []sarif.Log, root string, most int64, keep func(path string) boo
 		return Placed{}, refusal.Errorf("every run is a dependency or secret scanner's (%s), and this upload takes neither",
 			strings.Join(out.Receipt.Scanners, ", "))
 	}
+	if placer.WebOnly() {
+		return Placed{}, refusal.New("every result is at a web address, and web scanner results are not supported")
+	}
 	d := placer.Dropped()
 	out.Signals += d.Failure
 	for reason, n := range map[string]int{
 		DroppedAdvisory: d.Advisory, DroppedOutside: d.Outside, DroppedRepeat: d.Repeats,
 		DroppedFailure: d.Failure, DroppedNotAProblem: d.NotAProblem,
-		DroppedSuppressed: d.Suppressed, DroppedAbsent: d.Absent,
+		DroppedSuppressed: d.Suppressed, DroppedAbsent: d.Absent, DroppedWeb: d.Web,
 	} {
 		if n > 0 {
 			out.Receipt.Dropped[reason] += n
