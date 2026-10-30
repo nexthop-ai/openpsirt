@@ -461,10 +461,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#dependency-and-secret-scanners" class="md-nav__link">
+  <a href="#scanners-this-upload-refuses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dependency and secret scanners
+        Scanners this upload refuses
       
     </span>
   </a>
@@ -923,10 +923,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#dependency-and-secret-scanners" class="md-nav__link">
+  <a href="#scanners-this-upload-refuses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dependency and secret scanners
+        Scanners this upload refuses
       
     </span>
   </a>
@@ -1293,8 +1293,8 @@ series of its own, named once per analyzer as <code>--series TOOL=NAME</code>: f
 example <code>--series clang=clang-sa --series cppcheck=cppcheck-all</code>. The tool is
 the name its output gives it, in any case. <code>write</code> stores each analyzer's run
 in a file of its own, the analyzer's name before the extension.</p>
-<h4 id="dependency-and-secret-scanners">Dependency and secret scanners<a class="headerlink" href="#dependency-and-secret-scanners" title="Permanent link">&para;</a></h4>
-<p>This upload takes static analysis of the product's own code. Two kinds of
+<h4 id="scanners-this-upload-refuses">Scanners this upload refuses<a class="headerlink" href="#scanners-this-upload-refuses" title="Permanent link">&para;</a></h4>
+<p>This upload takes static analysis of the product's own code. These kinds of
 tool that write SARIF are sent elsewhere or not at all:</p>
 <table>
 <thead>
@@ -1312,10 +1312,17 @@ tool that write SARIF are sent elsewhere or not at all:</p>
 <td>A secret scanner: gitleaks, TruffleHog, detect-secrets, ggshield, Secretlint, Nosey Parker, Kingfisher</td>
 <td>Nowhere. Its results carry the secret itself, and this deployment does not store one</td>
 </tr>
+<tr>
+<td>A web scanner, such as ZAP</td>
+<td>Nowhere. Web scanner results are not supported: its results are at web addresses, which no file in the checkout holds</td>
+</tr>
 </tbody>
 </table>
-<p>A run from one of these is left out whole and named on the receipt, and an
-upload holding nothing else is refused. A result whose rule is an advisory's
+<p>A run from a dependency or secret scanner is left out whole and named on the
+receipt, and an upload holding nothing else is refused. An upload whose results
+are all at web addresses is refused, saying web scanner results are not
+supported; a result at a web address beside results in files is dropped and
+counted on the receipt as <code>web-address</code>. A result whose rule is an advisory's
 identifier, such as <code>CVE-2026-12345</code> or <code>GHSA-…</code>, is dropped and counted on the
 receipt, whatever tool wrote it.</p>
 <h3 id="the-upload">The upload<a class="headerlink" href="#the-upload" title="Permanent link">&para;</a></h3>
