@@ -100,8 +100,8 @@ only what follows. A fresh install applies it and every migration after it.
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
 | On PostgreSQL the baseline also sets the finding table's vacuum settings | They are storage settings, which no declaration holds (`design-docs/database-schema.md` § Indexes) |
 | A release's declaration may derive from a baseline declaration | v0.10.0's finding and supplier statement tables, and several of v0.11.0's, are the baseline's with columns or indexes added |
-| A baseline declaration a later migration reads keeps its name and its statements | Migrations 44 and 45 read declarations by the names v0.9.0 gave them, and get v0.9.0's statements byte for byte |
-| A database at versions 1 to 42 is refused | A release before v0.9.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.10.2 upgrades from version 41; v0.8.0 upgrades 39 and 40 to it, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
+| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations 44 and 45 read declarations by the names v0.9.0 gave them, and get v0.9.0's statements byte for byte for every table they pick |
+| A database at versions 1 to 42 is refused | A release before v0.9.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.10.2 upgrades from version 41; v0.8.0 upgrades 39 and 40 into one v0.10.2 upgrades, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
 
 ## Forward only
 
@@ -192,7 +192,7 @@ the demo's inventories, so it runs locally, outside the gate.
 
 | Stage | What it does |
 |---|---|
-| The release's database | The release's image, built from its tag, runs its own demo targets unedited against the rehearsal's empty database: products, inventories, scans, a VEX document, decisions and an approval, an assignment, and a recorded flaw |
+| The release's database | The release's image, built from its tag, runs its own demo targets unedited against the rehearsal's empty database: products, inventories, scans, a VEX document, decisions and an approval, an assignment, and a recorded flaw. Below v0.11.0 the rehearsal then acknowledges every report through the release's API as the administrator, since no release's seed acknowledges one |
 | What it held | Open findings per build from its status report, and every table's row count with it stopped. A build with no count is not settled, and the wait refuses naming it |
 | The upgrade | This tree's image applies the migrations alone, reaching this tree's last migration |
 | The rows | A table holds what it held plus what the upgrade fills it with from the release's other rows; a table only the upgrade holds holds only what it is filled with; a renamed table is counted under its new name on both sides. The one fill is the v0.11.0 upgrade's: each report a release before it recorded as acknowledged, with who acknowledged it, becomes one message sent |
@@ -202,6 +202,7 @@ the demo's inventories, so it runs locally, outside the gate.
 |---|---|
 | The release seeds itself | A fixture written today records what this tree thinks the release wrote |
 | Only the docker command is wrapped | Containers, network and ports are renamed so a running demo is untouched, and the application points at the rehearsal's database |
+| A seed that left a counted table empty is refused | An upgrade of an empty table checks nothing. The counted tables hold findings, decisions, their occurrences, received VEX statements and reports; below v0.11.0 an acknowledged report is counted too, since the v0.11.0 fill of none checks nothing |
 | Counts are taken with nothing running | A server's passes write rows |
 | This tree is served with the release's configuration | The environment the release's server started with, less its image's own and the database URL, reaches every container of this tree |
 | An engine `make engines-up` made joins the rehearsal's network | It publishes on loopback, which no container reaches. The container publishing the URL's port joins and is addressed by name, on Docker Desktop, rootless Docker and Podman. A failing docker command, or two containers publishing the port, refuses with docker's words. Another host, or a port no container publishes, is reached through `host.docker.internal` |

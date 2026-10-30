@@ -4,6 +4,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -98,5 +99,26 @@ func TestAReleasePastTheUpgradeKeepsItsMessages(t *testing.T) {
 	faults := Compare(before, after, FilledV0110(renamesV0110, 4))
 	if len(faults) != 1 || !strings.HasPrefix(faults[0], "report_message") {
 		t.Errorf("messages a later release held were counted as filled again: %v", faults)
+	}
+}
+
+func TestASeedThatLeftATableEmptyIsRefused(t *testing.T) {
+	held := Counts{"finding": 3, "decision": 2, "decision_occurrence": 2, "received_vex_statement": 1, "flaw_report": 1}
+	if empty := Unseeded(renamesV0110, held, 0); len(empty) != 0 {
+		t.Errorf("a full seed was refused: %v", empty)
+	}
+	delete(held, "received_vex_statement")
+	if empty := Unseeded(renamesV0110, held, 0); !slices.Equal(empty, []string{"received_vex_statement"}) {
+		t.Errorf("want received_vex_statement reported, got %v", empty)
+	}
+}
+
+func TestASeedBelowTheRenamesWithNoAcknowledgedReportIsRefused(t *testing.T) {
+	held := Counts{"finding": 3, "decision": 2, "decision_occurrence": 2, "received_vex_statement": 1, "flaw_report": 1}
+	if empty := Unseeded(renamesV0110-1, held, 1); len(empty) != 0 {
+		t.Errorf("a seed with an acknowledged report was refused: %v", empty)
+	}
+	if empty := Unseeded(renamesV0110-1, held, 0); len(empty) != 1 {
+		t.Errorf("want the missing acknowledgement reported, got %v", empty)
 	}
 }

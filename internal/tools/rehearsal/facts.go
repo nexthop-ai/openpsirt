@@ -44,6 +44,26 @@ func FilledV0110(fromLast, acknowledged int64) Counts {
 	return Counts{"report_message": acknowledged}
 }
 
+// seededTables are the tables a release's seed has to leave rows in for an
+// upgrade of it to check anything.
+var seededTables = []string{"finding", "decision", "decision_occurrence", "received_vex_statement", "flaw_report"}
+
+// Unseeded is every table a release's seed left empty, and the acknowledged
+// reports below the upgrade that turns them into messages sent, since
+// migration 45's fill of none checks nothing.
+func Unseeded(fromLast int64, held Counts, acknowledged int64) []string {
+	var empty []string
+	for _, table := range seededTables {
+		if held[table] == 0 {
+			empty = append(empty, table)
+		}
+	}
+	if fromLast < renamesV0110 && acknowledged == 0 {
+		empty = append(empty, "an acknowledged report")
+	}
+	return empty
+}
+
 // Compare reports every table whose count moved across an upgrade. before is
 // what the release held, after is what the upgrade left, and filled is the
 // rows the upgrade writes into a table from what the release held elsewhere. A

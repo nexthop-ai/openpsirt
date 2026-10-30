@@ -11,7 +11,10 @@
 //
 // The release seeds its own database: its image is built from its own tag,
 // and its own demo targets declare the products, upload the inventories, let
-// the scans land and record the VEX document, the judgments and the flaw. That
+// the scans land and record the VEX document, the judgments and the flaw. Below
+// v0.11.0 the rehearsal then acknowledges every report through the release's
+// API, since migration 45 turns each acknowledgement into a message sent and
+// no release's seed acknowledges one. That
 // is the data a deployment of that release actually holds, which no fixture
 // written today can stand in for. The tag's targets run unedited; only the
 // docker command they call is wrapped, so its containers, network and ports
@@ -21,8 +24,9 @@
 //
 //  1. The row count of every table, with the release stopped.
 //  2. The migrations, applied on their own, and the version they reach.
-//  3. The counts again: a table the release held keeps its count, and a
-//     table the upgrade adds starts empty.
+//  3. The counts again: a table the release held keeps its count plus what
+//     the upgrade fills it with from the release's other rows, and a table
+//     the upgrade adds holds only what it is filled with.
 //  4. The server started on it with the configuration the release's demo
 //     started its own with, the open findings of every build against what
 //     the release showed, and every GET its API document lists asked once,
@@ -40,6 +44,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -224,11 +229,17 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-up", "demo-seed"}, overrides...)...); err != nil {
 		return nil, err
 	}
-	if _, err := r.settle(ctx, overrides, env); err != nil {
+	seeded, err := r.settle(ctx, overrides, env)
+	if err != nil {
 		return nil, err
 	}
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-vex", "demo-triage", "demo-flaw"}, overrides...)...); err != nil {
 		return nil, err
+	}
+	if record.Last < renamesV0110 {
+		if err := r.answer(ctx, seeded); err != nil {
+			return nil, err
+		}
 	}
 	before, err := r.settle(ctx, overrides, env)
 	if err != nil {
@@ -261,13 +272,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 		held["decision"], held["decision_occurrence"])
 	// An upgrade of an empty database passes every check here, so a seed
 	// that filled nothing is a failed rehearsal rather than a clean one.
-	var empty []string
-	for _, table := range []string{"finding", "decision", "decision_occurrence", "received_vex_statement", "flaw_report"} {
-		if held[table] == 0 {
-			empty = append(empty, table)
-		}
-	}
-	if len(empty) > 0 {
+	if empty := Unseeded(record.Last, held, acknowledged); len(empty) > 0 {
 		return nil, fmt.Errorf("%s's seed left nothing in %s, so an upgrade of it would check nothing",
 			r.from, strings.Join(empty, ", "))
 	}
@@ -486,6 +491,50 @@ func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
 	return counts, nil
 }
 
+// answer acknowledges every report the release holds against a product it
+// reported a build of, through the release's own API as the administrator.
+func (r *run) answer(ctx context.Context, builds Totals) error {
+	products := map[string]bool{}
+	for build := range builds {
+		products[strings.SplitN(build, "/", 2)[0]] = true
+	}
+	answered := 0
+	for _, product := range slices.Sorted(maps.Keys(products)) {
+		at := "/v1/products/" + url.PathEscape(product) + "/reports"
+		status, body, err := r.get(ctx, at+"?limit=200")
+		if err != nil {
+			return err
+		}
+		if status != http.StatusOK {
+			return fmt.Errorf("%s's reports for %s: %d %s", r.from, product, status, head(body))
+		}
+		var page struct {
+			Items []struct {
+				Reference    string `json:"reference"`
+				Acknowledged string `json:"acknowledged"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(body, &page); err != nil {
+			return fmt.Errorf("%s's reports for %s: %w", r.from, product, err)
+		}
+		for _, report := range page.Items {
+			if report.Acknowledged != "" {
+				continue
+			}
+			status, body, err := r.post(ctx, at+"/"+url.PathEscape(report.Reference)+"/acknowledgement")
+			if err != nil {
+				return err
+			}
+			if status != http.StatusNoContent {
+				return fmt.Errorf("acknowledge %s in %s: %d %s", report.Reference, product, status, head(body))
+			}
+			answered++
+		}
+	}
+	r.note("acknowledged %d reports", answered)
+	return nil
+}
+
 // acknowledged reads how many reports a release before v0.11.0 recorded as
 // acknowledged, each of which the upgrade writes as a message sent. A stamp
 // missing who made it is stepped over by the upgrade, and here.
@@ -699,6 +748,25 @@ func (r *run) get(ctx context.Context, path string) (int, []byte, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	res, err := (&http.Client{Transport: &http.Transport{Proxy: nil}}).Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	body, err := io.ReadAll(res.Body)
+	return res.StatusCode, body, err
+}
+
+// post sends a request with no body, from the origin the proxy answers on,
+// which a state-changing request has to name.
+func (r *run) post(ctx context.Context, path string) (int, []byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.base+path, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	req.Header.Set("Origin", r.base)
 	res, err := (&http.Client{Transport: &http.Transport{Proxy: nil}}).Do(req)
 	if err != nil {
 		return 0, nil, err
