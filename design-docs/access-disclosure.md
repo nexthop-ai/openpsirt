@@ -129,7 +129,7 @@ notification the grant sends and from their own cases.
 `GET /v1/session/me/cases` lists what the caller was granted one at a time:
 each case, one issue in one product, and each code finding recorded as a flaw,
 one occurrence in one product (`design-docs/analysis-flaws.md` § Code finding collaborators). The session
-says whether they hold any such grant, so a screen asks only then.
+says whether the list holds anything, so a screen asks only then.
 
 | Rule | Reason |
 |---|---|
@@ -138,6 +138,7 @@ says whether they hold any such grant, so a screen asks only then.
 | A code finding is listed while its flaw is undisclosed | Disclosure ends that grant |
 | A code finding names the build it was last seen in, its rule, its file and its flaw | Its page is reached through a build |
 | Newest grant first | |
+| The session's flag is the list's own read: true exactly where the list holds a row | A code finding grant outlives its flaw's disclosure, and a flag counting grants opens an empty panel |
 | A pipeline key is refused | It holds no grant |
 
 ## Limits

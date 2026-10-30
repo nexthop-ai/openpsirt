@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -136,7 +137,6 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		body := WhoBody{
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{}, Outcomes: outcomeBodies(),
-			Collaborates: len(subject.CaseProducts()) > 0 || len(subject.CodeFindingProducts()) > 0,
 		}
 		// Each of these fails the answer rather than being left out. Omitted, a
 		// limit reads to the interface as no limit at all.
@@ -184,6 +184,13 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 				}
 				body.Chat = &ChatBody{Platforms: in.Chats, Direct: chose.Direct, Shared: chose.Shared}
 			}
+		}
+
+		// Asked as the list of their own cases is, so a screen asks for the
+		// list only where it holds something.
+		body.Collaborates, err = finding.NewStore(in.DB.DB).Collaborates(ctx, subject)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "your cases could not be read", err)
 		}
 
 		// The display name, where one is recorded. Falls back to the identity

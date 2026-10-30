@@ -33,7 +33,9 @@ func ownCasesOf(t *testing.T, r *httpapitest.Reach, who string) findingsapi.OwnC
 }
 
 // A person's own cases are the grants they hold, and nobody else's: a case
-// stands until it is withdrawn, and a code finding until its flaw is disclosed.
+// stands until it is withdrawn, and a code finding until it is withdrawn or
+// its flaw is disclosed. The session says there are cases to ask for exactly
+// where the list holds one.
 func TestAPersonListsTheCasesAndCodeFindingsTheyWereGrantedAlone(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
@@ -85,9 +87,31 @@ func TestAPersonListsTheCasesAndCodeFindingsTheyWereGrantedAlone(t *testing.T) {
 		if got := ownCasesOf(t, r, "outsider"); len(got.Cases) != 0 || len(got.CodeFindings) != 1 {
 			t.Errorf("after the case grant was withdrawn they list %+v; want the code finding alone", got)
 		}
+		codeFindingGrant := codeFindingAt(occurrence) + "/collaborators/outsider"
+		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodDelete, codeFindingGrant, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("taking them off the code finding answered %d: %s", got.Code, got.Body)
+		}
+		if got := ownCasesOf(t, r, "outsider"); len(got.Cases)+len(got.CodeFindings) != 0 {
+			t.Errorf("after both grants were withdrawn they list %+v; want nothing", got)
+		}
+		if collaborates(t, r, "outsider") {
+			t.Error("the session says somebody whose grants were all withdrawn has cases to ask for")
+		}
+
+		// A code finding grant outlives its flaw's disclosure and lists
+		// nothing, so the session says there is nothing to ask for.
+		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut, codeFindingGrant, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("granting the code finding again answered %d: %s", got.Code, got.Body)
+		}
+		if got := ownCasesOf(t, r, "outsider"); len(got.CodeFindings) != 1 || !collaborates(t, r, "outsider") {
+			t.Fatalf("granted the code finding again they list %+v; want it, and the session to say so", got)
+		}
 		disclosed(t, r, flaw)
 		if got := ownCasesOf(t, r, "outsider"); len(got.Cases)+len(got.CodeFindings) != 0 {
 			t.Errorf("after the flaw was disclosed they list %+v; want nothing", got)
+		}
+		if collaborates(t, r, "outsider") {
+			t.Error("the session says somebody whose one grant is on a disclosed flaw has cases to ask for")
 		}
 	})
 }

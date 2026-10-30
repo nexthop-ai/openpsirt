@@ -95,3 +95,14 @@ func (s *Store) OwnCases(ctx context.Context, subject access.Subject) ([]OwnCase
 	}
 	return cases, codeFindings, nil
 }
+
+// Collaborates is whether OwnCases lists anything for the subject, asked as
+// the list asks it: a code finding grant whose flaw was disclosed stands,
+// and lists nothing.
+func (s *Store) Collaborates(ctx context.Context, subject access.Subject) (bool, error) {
+	if len(subject.CaseProducts())+len(subject.CodeFindingProducts()) == 0 {
+		return false, nil
+	}
+	cases, codeFindings, err := s.OwnCases(ctx, subject)
+	return len(cases)+len(codeFindings) > 0, err
+}
