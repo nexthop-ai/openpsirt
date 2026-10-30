@@ -58,21 +58,77 @@ type Scope struct {
 	Method Method
 	// Component keeps the code findings placed on one source package: every
 	// binary built from a source of this name, or of the source a binary of
-	// this name was built from, compared without regard to capitals, as the
-	// component screen reads a name. ComponentVersion keeps the source at one
-	// version. Empty, every component.
+	// this name was built from, compared without regard to capitals, in the
+	// builds the scope covers, as the component screen reads a name. A name
+	// naming a build's root reaches every root the build has had.
+	// ComponentVersion keeps the source at one version. Empty, every
+	// component.
 	Component        string
 	ComponentVersion string
 	// Beneath keeps the code findings on the build BuildID names that are
 	// placed at this component or anywhere under it, by the walk the
-	// dependency tree counts with. Nil, no narrowing.
+	// dependency tree counts with. Under the build's root it is the whole
+	// build. Nil, no narrowing.
 	Beneath *int64
 	BuildID *int64
 	// on keeps the code findings on BuildID placed on these components, for
 	// counting what sits on each.
 	on []int64
-	// placing reads whether each code finding is placed on the build itself.
-	placing bool
+	// reached is what Component reaches, read once by resolved and bound as
+	// values. Nil where no component is named.
+	reached *finding.Reached
+}
+
+// resolved is the scope with the names in it read once, as values: what the
+// component named reaches in the builds the scope covers, and whether the
+// component beneath which it narrows is its build's root, under which it is
+// the whole build. Read after the reader is authorized.
+func (scope Scope) resolved(ctx context.Context, db bun.IDB) (Scope, error) {
+	if name := graph.Folded(strings.TrimSpace(scope.Component)); name != "" && scope.reached == nil {
+		builds, err := scope.builds(ctx, db)
+		if err != nil {
+			return scope, err
+		}
+		reached, err := finding.ReachedByName(ctx, db, builds, []string{name}, scope.ComponentVersion)
+		if err != nil {
+			return scope, err
+		}
+		one := reached[name]
+		scope.reached = &one
+	}
+	if scope.Beneath != nil && scope.BuildID != nil {
+		root, err := graph.IsRoot(ctx, db, *scope.BuildID, *scope.Beneath)
+		if err != nil {
+			return scope, err
+		}
+		if root {
+			scope.Beneath = nil
+		}
+	}
+	return scope, nil
+}
+
+// builds is every build the scope covers, retired ones included, as the queue
+// reads them.
+func (scope Scope) builds(ctx context.Context, db bun.IDB) ([]int64, error) {
+	if scope.BuildID != nil {
+		return []int64{*scope.BuildID}, nil
+	}
+	q := db.NewSelect().TableExpr(`"build" AS "t"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		ColumnExpr(`"t"."id"`).
+		Where(`"s"."product_id" = ?`, scope.ProductID)
+	if scope.BranchOrTagID != nil {
+		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
+	}
+	if scope.VariantID != nil {
+		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
+	}
+	var out []int64
+	if err := q.OrderExpr(`"t"."id"`).Scan(ctx, &out); err != nil {
+		return nil, fmt.Errorf("read the builds of product %d: %w", scope.ProductID, err)
+	}
+	return out, nil
 }
 
 // Method is a way of testing our own code, by the word people search for it
@@ -182,6 +238,9 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 
 	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
 	if err != nil {
+		return nil, err
+	}
+	if scope, err = scope.resolved(ctx, db); err != nil {
 		return nil, err
 	}
 	perFinding := func() *bun.SelectQuery { return codeFindingFindings(db, subject, scope, visible) }
@@ -353,30 +412,26 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 	if scope.Method != "" {
 		q = q.Where(`"f"."kind" = ?`, methodKinds[scope.Method])
 	}
-	if name := graph.Folded(scope.Component); name != "" {
-		// The fold keys the name reaches, matched as the component screen
-		// matches it, so a binary's name reaches every binary of its source.
-		folds := db.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`"c"."fold_key"`).
-			Where(`("c"."name_folded" = ? OR "c"."upstream_folded" = ?)`, name, name)
-		if version := strings.TrimSpace(scope.ComponentVersion); version != "" {
-			folds = folds.Where(finding.SourceVersion+` = ?`, version)
+	if scope.reached != nil {
+		// The folds the name reaches, as values: a binary's name reaches
+		// every binary of its source.
+		if len(scope.reached.Folds) == 0 {
+			q = q.Where("1 = 0")
+		} else {
+			q = q.Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
+				Where(`"pc"."fold_key" IN (?)`, bun.List(scope.reached.Folds))
 		}
-		q = q.Where(`"f"."component_id" IN (?)`, db.NewSelect().TableExpr(`"component" AS "pc"`).
-			ColumnExpr(`"pc"."id"`).Where(`"pc"."fold_key" IN (?)`, folds))
 	}
 	if scope.BuildID != nil {
 		q = q.Where(`"f"."build_id" = ?`, *scope.BuildID)
 		if scope.Beneath != nil {
-			// The subtree as the engine walks it: under a build's root it is
-			// the whole build.
+			// The subtree as the engine walks it. Under the build's root it
+			// is the whole build, which resolved has made no narrowing.
 			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAny(db, *scope.BuildID, []int64{*scope.Beneath}))
 		}
 		if scope.on != nil {
 			q = q.Where(`"f"."component_id" IN (?)`, bun.List(scope.on))
 		}
-	}
-	if scope.placing {
-		q = q.ColumnExpr(`CASE WHEN `+wasRoot(`"f"."build_id"`, `"f"."component_id"`)+` THEN 1 ELSE 0 END AS "unplaced"`, true)
 	}
 	if scope.Series != "" {
 		named, namedArgs := kind.CodeFindings.Where(`"sn"."kind"`)

@@ -32,8 +32,8 @@ type NeighborBody struct {
 	Children  int            `json:"children" doc:"The number of components it pulls in. Zero means nothing to open"`
 	// The code findings are asked for apart, by a reader who reads them, so a
 	// tree drawn for anybody else does not count them.
-	CodeFindings *int `json:"code_findings,omitempty" doc:"Open code findings placed on this component itself, where code_findings was asked for. On the build's own root these are the code findings in files no repository of the build holds"`
-	CodeBeneath  *int `json:"code_findings_beneath,omitempty" doc:"Open code findings placed on it and everything under it, each once, where code_findings was asked for"`
+	CodeFindings *int `json:"code_findings,omitempty" doc:"Open code findings placed on this component itself, where code_findings was asked for. On the build's own root these are the code findings in files no repository of the build holds, on every root the build has had"`
+	CodeBeneath  *int `json:"code_findings_beneath,omitempty" doc:"Open code findings placed on it and everything under it, each once, where code_findings was asked for. On the build's own root, every open code finding of the build"`
 	// Ecosystem is what tells two components of one name and one version
 	// apart. The endpoint that answers about one refuses a name the build
 	// holds twice and says to send this; a list that did not carry it left
@@ -207,17 +207,15 @@ func registerGraph(api huma.API, in core.Deps) {
 }
 
 // countingCode is the graph store, counting code findings where they were
-// asked for. A reader who does not read security testing material in the
-// product is refused: a count of code findings is at that visibility, and a
-// flaw's reader reads one code finding, not the figures.
+// asked for, refused before any name is resolved to a reader who may not
+// count them.
 func countingCode(in core.Deps, subject access.Subject, productID int64, asked bool) (*graph.Store, error) {
 	store := graph.NewStore(in.DB.DB)
 	if !asked {
 		return store, nil
 	}
-	if !subject.Reads(access.SecurityTesting, productID) {
-		return nil, core.Refused(in.Logger, access.Denied("count the code findings in the tree"),
-			"code finding counts need security-testing-read on the product")
+	if err := analysis.MayCount(subject, productID, "count the code findings in the tree"); err != nil {
+		return nil, core.Refused(in.Logger, err, "code finding counts need security-testing-read on the product")
 	}
 	return store.CountingCode(func(ctx context.Context, buildID int64, components []int64) (map[int64][]string, error) {
 		return analysis.OpenOn(ctx, in.DB.DB, subject, productID, buildID, components)

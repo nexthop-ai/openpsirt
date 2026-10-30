@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -355,6 +356,162 @@ func TestTheChooserCountsEachFamilyOnlyWhereTheReaderReadsIt(t *testing.T) {
 		httpapitest.Read(t, r, "approver", "/v1/components?q=mine", &got)
 		if len(got.Items) != 0 {
 			t.Errorf("somebody reading nothing finds %+v", got.Items)
+		}
+	})
+}
+
+// hubTree is the tree's first screen with code findings counted.
+func hubTree(t *testing.T, r *httpapitest.Reach) (hubNode, map[string][2]int) {
+	t.Helper()
+	var top struct {
+		Root  hubNode   `json:"root"`
+		Items []hubNode `json:"items"`
+	}
+	httpapitest.Read(t, r, "security-testing-reader", hubBuild+"/components?code_findings=true", &top)
+	items := map[string][2]int{}
+	for _, node := range top.Items {
+		items[node.Component] = node.counts()
+	}
+	return top.Root, items
+}
+
+// hubNotFixed is the code findings not fixed this week at and under a
+// component, by the trend.
+func hubNotFixed(t *testing.T, r *httpapitest.Reach, component string) int {
+	t.Helper()
+	var trend struct {
+		Items []struct {
+			NotFixed int `json:"not_fixed"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, "security-testing-reader", hubBuild+"/components/"+component+"/code-finding-trend?weeks=1", &trend)
+	if len(trend.Items) != 1 {
+		t.Fatalf("one week is %d points", len(trend.Items))
+	}
+	return trend.Items[0].NotFixed
+}
+
+func TestUnderTheRootIsTheWholeBuildWhereNoEdgeLeavesTheRoot(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// No edge from the root: the library and its tools hang from
+		// nothing, and the root adopts them.
+		httpapitest.HubCodeFindingsUnder(t, r, []graph.Dependency{
+			{Parent: httpapitest.HubLib, Child: httpapitest.HubZlib},
+		})
+		all := []string{"clang-tidy/leak", "cppcheck/bad", "semgrep/bad"}
+		root, items := hubTree(t, r)
+		if got := root.counts(); got != [2]int{1, 3} {
+			t.Errorf("the root carries %v; want 1 on it and the build's 3 beneath", got)
+		}
+		if got := items["libmine1"]; got != [2]int{1, 2} {
+			t.Errorf("the adopted library carries %v; want 1 on it and 2 beneath", got)
+		}
+		got := hubQueueOf(t, r, "security-testing-reader", "?beneath=sonic-image&branch_or_tag=master&variant=broadcom")
+		if !sameRules(got.rules(), all) || got.Total != 3 {
+			t.Errorf("beneath the root lists %v, %d in all; want the build's three, as its badge counts", got.rules(), got.Total)
+		}
+		if got := hubNotFixed(t, r, "sonic-image"); got != 3 {
+			t.Errorf("the root's trend counts %d not fixed; want the build's three", got)
+		}
+	})
+}
+
+func TestACodeFindingOnAFormerRootIsOnTheBuild(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.HubCodeFindings(t, r)
+		// The root is scanned again at a new version and no run has placed
+		// anything since: semgrep's code finding stays on sonic-image 1.0.
+		httpapitest.HubRootRescanned(t, r)
+		root, _ := hubTree(t, r)
+		if got := root.counts(); got != [2]int{1, 3} {
+			t.Errorf("the rescanned root carries %v; want its former root's 1 on it and the build's 3 beneath", got)
+		}
+		build := "&branch_or_tag=master&variant=broadcom"
+		got := hubQueueOf(t, r, "security-testing-reader", "?beneath=sonic-image"+build)
+		if !sameRules(got.rules(), []string{"clang-tidy/leak", "cppcheck/bad", "semgrep/bad"}) {
+			t.Errorf("beneath the rescanned root lists %v; want the build's three", got.rules())
+		}
+		if got := hubQueueOf(t, r, "security-testing-reader", "?component=sonic-image"); !sameRules(got.rules(), []string{"semgrep/bad"}) {
+			t.Errorf("the rescanned root's own lists %v; want semgrep's, on the former root", got.rules())
+		}
+		var counted hubCounted
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/components/sonic-image/code-finding-counts", &counted)
+		for _, each := range counted.Series {
+			want := 0
+			if each.Series == "semgrep/default" {
+				want = 1
+			}
+			if each.States["open"] != want || each.Unplaced != want {
+				t.Errorf("the rescanned root in %s counts %d open and %d unplaced; want %d of each",
+					each.Series, each.States["open"], each.Unplaced, want)
+			}
+		}
+		var found struct {
+			Items []hubMatch `json:"items"`
+		}
+		httpapitest.Read(t, r, "code-finding-handler", "/v1/components?q=sonic", &found)
+		if len(found.Items) != 1 || found.Items[0].CodeFindings == nil || *found.Items[0].CodeFindings != 1 {
+			t.Errorf("the chooser finds %+v for the rescanned root; want its one code finding", found.Items)
+		}
+		if got := hubNotFixed(t, r, "sonic-image"); got != 3 {
+			t.Errorf("the rescanned root's trend counts %d not fixed; want the build's three", got)
+		}
+	})
+}
+
+func TestANameReachesOnlyWhatTheProductsBuildsShip(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.HubCodeFindings(t, r)
+		// The other product ships the hub library's source under a binary
+		// name this product never ships.
+		httpapitest.HubTheirsShipsTheSource(t, r)
+		if got := hubQueueOf(t, r, "security-testing-reader", "?component=libtheirs"); got.Total != 0 || len(got.Items) != 0 {
+			t.Errorf("a name only another product ships lists %v here; want nothing", got.rules())
+		}
+		var counted hubCounted
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/components/libtheirs/code-finding-counts", &counted)
+		for _, each := range counted.Series {
+			if each.States["open"] != 0 {
+				t.Errorf("a name only another product ships counts %d open in %s; want none", each.States["open"], each.Series)
+			}
+		}
+		if got := hubQueueOf(t, r, "security-testing-reader", "?component=mine-src"); !sameRules(got.rules(), []string{"clang-tidy/leak"}) {
+			t.Errorf("the source's own name lists %v; want the library's code finding", got.rules())
+		}
+	})
+}
+
+func TestUnplacedCountsOnlyWhatIsOnTheBuildItself(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.HubCodeFindings(t, r)
+		// A binary built from a source named as the root is, from a
+		// repository of its own: the root's name reaches it, and a code
+		// finding on it is placed, never on the build itself.
+		tools := graph.Described{
+			Purl: "pkg:deb/debian/sonic-tools@1.0", Name: "sonic-tools", Version: "1.0",
+			UpstreamName: "sonic-image", UpstreamVersion: "1.0", Repository: "https://github.com/acme/sonic",
+		}
+		root := httpapitest.HubRoot
+		r.ScanAt(t, httpapitest.SeededBuild, "hub-sonic-tools", graph.Snapshot{
+			Root: root,
+			Components: []graph.Described{
+				httpapitest.HubLib, httpapitest.HubTools, httpapitest.HubZlib, tools,
+			},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: httpapitest.HubLib}, {Parent: root, Child: httpapitest.HubTools},
+				{Parent: httpapitest.HubLib, Child: httpapitest.HubZlib}, {Parent: root, Child: tools},
+			},
+		}, nil)
+		httpapitest.ApplyRunIn(t, r, "gcc/default", time.Now().UTC().Add(-time.Hour),
+			httpapitest.RunInRepository("gcc", "https://github.com/acme/sonic", "tool.c", 3))
+		var counted hubCounted
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/components/sonic-image/code-finding-counts", &counted)
+		want := map[string][2]int{"semgrep/default": {1, 1}, "gcc/default": {1, 0}}
+		for _, each := range counted.Series {
+			if got := [2]int{each.States["open"], each.Unplaced}; got != want[each.Series] {
+				t.Errorf("the root's name in %s counts %d open and %d unplaced; want %v",
+					each.Series, got[0], got[1], want[each.Series])
+			}
 		}
 	})
 }

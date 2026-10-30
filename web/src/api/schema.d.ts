@@ -3123,7 +3123,7 @@ export interface paths {
         };
         /**
          * Trend a component's code findings
-         * @description Returns, per week, the code findings one build places at a component or anywhere under it that are not fixed at the end of the week, and how many were opened and fixed in it. The walk under the component is the one the dependency tree counts with. Weeks end on when runs were applied.
+         * @description Returns, per week, the code findings one build places at a component or anywhere under it that are not fixed at the end of the week, and how many were opened and fixed in it. The walk under the component is the one the dependency tree counts with, and under the build's root it is every code finding of the build. Weeks end now and every seven days before; a code finding is dated by when the run that opened it was applied.
          *
          *     A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing.
          *
@@ -4127,9 +4127,9 @@ export interface paths {
          * Count a component's code findings
          * @description Returns the code findings the product places on one source package: per analyzer series and state across every build, and the open ones per build and source version.
          *
-         *     `component` is a binary name or a source package name, matched without regard to capitals, as the component page reads it. Each count is the total the code finding list answers for the same `component`, `series` and `state`.
+         *     `component` is a binary name or a source package name a build of the product ships, matched without regard to capitals, as the component page reads it. Each count is the total the code finding list answers for the same `component`, `series` and `state`.
          *
-         *     `unplaced` counts the open code findings placed on the build itself, which only a build's own root holds.
+         *     `unplaced` counts the open code findings placed on the build itself: on a name that is a build's root, those on every root the build has had, and zero on any other name.
          *
          *     Refused, with no count, to anybody who does not read security testing material in the product.
          *
@@ -11787,12 +11787,12 @@ export interface components {
             children: number;
             /**
              * Format: int64
-             * @description Open code findings placed on this component itself, where code_findings was asked for. On the build's own root these are the code findings in files no repository of the build holds
+             * @description Open code findings placed on this component itself, where code_findings was asked for. On the build's own root these are the code findings in files no repository of the build holds, on every root the build has had
              */
             code_findings?: number;
             /**
              * Format: int64
-             * @description Open code findings placed on it and everything under it, each once, where code_findings was asked for
+             * @description Open code findings placed on it and everything under it, each once, where code_findings was asked for. On the build's own root, every open code finding of the build
              */
             code_findings_beneath?: number;
             component: string;
@@ -21448,11 +21448,11 @@ export interface operations {
                 method?: "sast";
                 /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
                 assigned?: "nobody";
-                /** @description Limit to the code findings placed on one source package: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name */
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
                 component?: string;
                 /** @description Limit component to the source package at this version. Ignored without component */
                 component_version?: string;
-                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -21508,11 +21508,11 @@ export interface operations {
                 method?: "sast";
                 /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
                 assigned?: "nobody";
-                /** @description Limit to the code findings placed on one source package: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name */
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
                 component?: string;
                 /** @description Limit component to the source package at this version. Ignored without component */
                 component_version?: string;
-                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;

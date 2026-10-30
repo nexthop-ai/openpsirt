@@ -11,7 +11,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -106,11 +105,11 @@ func registerComponentCodeFindings(api huma.API, in core.Deps) {
 		Summary: "Count a component's code findings",
 		Description: "Returns the code findings the product places on one source package: per analyzer " +
 			"series and state across every build, and the open ones per build and source version.\n\n" +
-			"`component` is a binary name or a source package name, matched without regard to " +
-			"capitals, as the component page reads it. Each count is the total the code finding " +
-			"list answers for the same `component`, `series` and `state`.\n\n" +
-			"`unplaced` counts the open code findings placed on the build itself, which only a " +
-			"build's own root holds.\n\n" +
+			"`component` is a binary name or a source package name a build of the product ships, matched " +
+			"without regard to capitals, as the component page reads it. Each count is the total the code " +
+			"finding list answers for the same `component`, `series` and `state`.\n\n" +
+			"`unplaced` counts the open code findings placed on the build itself: on a name that is a " +
+			"build's root, those on every root the build has had, and zero on any other name.\n\n" +
 			"Refused, with no count, to anybody who does not read security testing material in the product.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Requires security-testing-read on the product."), func(ctx context.Context, input *struct {
@@ -154,8 +153,9 @@ func registerComponentCodeFindings(api huma.API, in core.Deps) {
 		Summary: "Trend a component's code findings",
 		Description: "Returns, per week, the code findings one build places at a component or anywhere " +
 			"under it that are not fixed at the end of the week, and how many were opened and fixed in it. " +
-			"The walk under the component is the one the dependency tree counts with. Weeks end on when " +
-			"runs were applied.\n\n" +
+			"The walk under the component is the one the dependency tree counts with, and under the " +
+			"build's root it is every code finding of the build. Weeks end now and every seven days " +
+			"before; a code finding is dated by when the run that opened it was applied.\n\n" +
 			"A code finding stays counted until somebody closes it as fixed: a decision answers it " +
 			"without closing it, and a run missing it closes nothing.\n\n" +
 			"A component name is not unique within a build. `version` says which where it ships at " +
@@ -179,9 +179,8 @@ func registerComponentCodeFindings(api huma.API, in core.Deps) {
 		}
 		// Authorized before the name is resolved, so a name held and a name
 		// not held are refused alike.
-		if !subject.Reads(access.SecurityTesting, product) {
-			return nil, core.Refused(in.Logger, access.Denied("trend the code findings of a component"),
-				"cannot trend the component's code findings")
+		if err := analysis.MayCount(subject, product, "trend the code findings of a component"); err != nil {
+			return nil, core.Refused(in.Logger, err, "cannot trend the component's code findings")
 		}
 		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, build, input.Component, graph.Choice{
 			Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,

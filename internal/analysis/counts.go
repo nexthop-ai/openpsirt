@@ -43,7 +43,7 @@ type SeriesCount struct {
 // A series holding no code finding is listed with every count zero. An analyzer that
 // runs and finds nothing is a fact about the product.
 func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, productID int64) ([]SeriesCount, error) {
-	if err := readsSecurityTesting(subject, productID, "read the code finding counts"); err != nil {
+	if err := MayCount(subject, productID, "read the code finding counts"); err != nil {
 		return nil, err
 	}
 	visible, err := finding.CodeFindingVisible(subject, productID)

@@ -53,13 +53,21 @@ func RunInRepository(tool, repository, file string, line int) string {
 // repository nothing in the build is built from, so on the build itself.
 func HubCodeFindings(t *testing.T, r *Reach) {
 	t.Helper()
+	HubCodeFindingsUnder(t, r, []graph.Dependency{
+		{Parent: HubRoot, Child: HubLib}, {Parent: HubRoot, Child: HubTools},
+		{Parent: HubLib, Child: HubZlib},
+	})
+}
+
+// HubCodeFindingsUnder is HubCodeFindings with the build's edges given: an
+// inventory stating no edge from its root leaves what it holds hanging from
+// nothing.
+func HubCodeFindingsUnder(t *testing.T, r *Reach, edges []graph.Dependency) {
+	t.Helper()
 	_, scan := r.ScanAt(t, SeededBuild, "hub", graph.Snapshot{
-		Root:       HubRoot,
-		Components: []graph.Described{HubLib, HubTools, HubZlib},
-		Dependencies: []graph.Dependency{
-			{Parent: HubRoot, Child: HubLib}, {Parent: HubRoot, Child: HubTools},
-			{Parent: HubLib, Child: HubZlib},
-		},
+		Root:         HubRoot,
+		Components:   []graph.Described{HubLib, HubTools, HubZlib},
+		Dependencies: edges,
 	}, []finding.Reported{{
 		Issue: finding.Named{Identifier: "CVE-2026-4242", Severity: "high"}, Component: HubLib, FixState: finding.NoFix,
 	}})
@@ -74,4 +82,39 @@ func HubCodeFindings(t *testing.T, r *Reach) {
 		RunInRepository("cppcheck", "https://github.com/acme/zlib", "inflate.cpp", 40))
 	ApplyRunIn(t, r, "semgrep/default", built,
 		RunInRepository("semgrep", "https://github.com/acme/elsewhere", "main.go", 7))
+}
+
+// HubRootRescanned scans the hub's build again with its root at a new
+// version, so the code finding on the build itself stays on the root it
+// opened on, which the build no longer holds.
+func HubRootRescanned(t *testing.T, r *Reach) {
+	t.Helper()
+	root := HubRoot
+	root.Purl, root.Version = "pkg:generic/sonic-image@1.1", "1.1"
+	r.ScanAt(t, SeededBuild, "hub-rescanned", graph.Snapshot{
+		Root:       root,
+		Components: []graph.Described{HubLib, HubTools, HubZlib},
+		Dependencies: []graph.Dependency{
+			{Parent: root, Child: HubLib}, {Parent: root, Child: HubTools},
+			{Parent: HubLib, Child: HubZlib},
+		},
+	}, []finding.Reported{{
+		Issue: finding.Named{Identifier: "CVE-2026-4242", Severity: "high"}, Component: HubLib, FixState: finding.NoFix,
+	}})
+}
+
+// HubTheirsShipsTheSource ships, in the other product, a binary of a name
+// the hub's product never ships, built from the hub library's source at its
+// version: one fold, reached by a name only the other product holds.
+func HubTheirsShipsTheSource(t *testing.T, r *Reach) {
+	t.Helper()
+	root := graph.Described{Purl: "pkg:generic/theirs-image@1.0", Name: "theirs-image", Version: "1.0"}
+	theirs := graph.Described{
+		Purl: "pkg:deb/debian/libtheirs@2.0-1", Name: "libtheirs", Version: "2.0-1",
+		UpstreamName: "mine-src", UpstreamVersion: "2.0",
+	}
+	r.Shipped(t, Build{"theirs", "master", "mellanox"}, "hub-theirs", graph.Snapshot{
+		Root: root, Components: []graph.Described{theirs},
+		Dependencies: []graph.Dependency{{Parent: root, Child: theirs}},
+	})
 }

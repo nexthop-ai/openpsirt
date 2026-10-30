@@ -579,36 +579,71 @@ type codeCounts struct {
 // codeBeneath counts the open code findings on and beneath each start of a
 // walk, by the components it reached, where the store counts code findings.
 // Nil where it does not.
+//
+// The build's root is the build itself: on it are the code findings on every
+// component that was ever its root, and beneath it every code finding the
+// build holds, as the queue beneath the root lists them. A code finding keeps
+// the component it opened on, so one on a root a rescan replaced is still on
+// the build, and the walk from the present root reaches no closed node.
 func (s *Store) codeBeneath(ctx context.Context, buildID int64, reached []reaching) (*codeCounts, error) {
 	if s.code == nil {
 		return nil, nil
 	}
 	out := &codeCounts{on: map[int64]int{}, beneath: map[int64]int{}}
+	root, roots, err := s.rootsOf(ctx, buildID)
+	if err != nil {
+		return nil, err
+	}
 	seen := map[int64]bool{}
 	var all []int64
+	rooted := false
 	for _, row := range reached {
+		rooted = rooted || row.Start == root
 		if !seen[row.Reached] {
 			seen[row.Reached] = true
 			all = append(all, row.Reached)
 		}
+	}
+	// Asked for the root, every component of the build is read, which holds
+	// everything any other start reaches.
+	if rooted {
+		all = nil
 	}
 	on, err := s.code(ctx, buildID, all)
 	if err != nil {
 		return nil, err
 	}
 	under := map[int64]map[string]bool{}
+	gather := func(start int64, occurrences []string) {
+		if len(occurrences) == 0 {
+			return
+		}
+		if under[start] == nil {
+			under[start] = map[string]bool{}
+		}
+		for _, occurrence := range occurrences {
+			under[start][occurrence] = true
+		}
+	}
 	for _, row := range reached {
+		if row.Start == root {
+			continue
+		}
 		if row.Start == row.Reached {
 			out.on[row.Start] = len(on[row.Start])
 		}
-		if len(on[row.Reached]) == 0 {
-			continue
+		gather(row.Start, on[row.Reached])
+	}
+	if rooted {
+		placed := map[string]bool{}
+		for _, id := range roots {
+			for _, occurrence := range on[id] {
+				placed[occurrence] = true
+			}
 		}
-		if under[row.Start] == nil {
-			under[row.Start] = map[string]bool{}
-		}
-		for _, occurrence := range on[row.Reached] {
-			under[row.Start][occurrence] = true
+		out.on[root] = len(placed)
+		for _, occurrences := range on {
+			gather(root, occurrences)
 		}
 	}
 	for start, occurrences := range under {

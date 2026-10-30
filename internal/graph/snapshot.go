@@ -115,8 +115,9 @@ type Store struct {
 }
 
 // CodeCounter reads the open code findings one build places on each of these
-// components, by occurrence, narrowed to the reader. The graph cannot read
-// them itself: their state is the analysis package's, which reads the graph.
+// components, by occurrence, narrowed to the reader; nil components is every
+// component of the build. The graph cannot read them itself: their state is
+// the analysis package's, which reads the graph.
 type CodeCounter func(ctx context.Context, buildID int64, components []int64) (map[int64][]string, error)
 
 // CountingCode is the store with every neighbor it answers carrying the open
@@ -904,6 +905,47 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, buildID int64
 	root.CodeFindings, root.CodeBeneath = top[0].CodeFindings, top[0].CodeBeneath
 	ordered(kids)
 	return root, kids, nil
+}
+
+// IsRoot is whether a component is a build's root now.
+func IsRoot(ctx context.Context, db bun.IDB, buildID, componentID int64) (bool, error) {
+	root, err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."component_id" = ?`, componentID).
+		Where(`"n"."is_root" = ?`, true).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("ask whether component %d is the root of build %d: %w", componentID, buildID, err)
+	}
+	return root, nil
+}
+
+// rootsOf is a build's root now, zero where nothing has been applied, and
+// every component that was ever its root, the present one included.
+func (s *Store) rootsOf(ctx context.Context, buildID int64) (int64, []int64, error) {
+	var rows []struct {
+		ComponentID int64 `bun:"component_id"`
+		Live        int   `bun:"live"`
+	}
+	if err := s.db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."component_id"`).
+		ColumnExpr(`MAX(CASE WHEN "n"."closed_scan_id" IS NULL THEN 1 ELSE 0 END) AS "live"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."is_root" = ?`, true).
+		GroupExpr(`"n"."component_id"`).
+		Scan(ctx, &rows); err != nil {
+		return 0, nil, fmt.Errorf("read every root of build %d: %w", buildID, err)
+	}
+	var live int64
+	ever := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		ever = append(ever, row.ComponentID)
+		if row.Live == 1 {
+			live = row.ComponentID
+		}
+	}
+	return live, ever, nil
 }
 
 // describe reads one component as a neighbor of nothing, for the root.

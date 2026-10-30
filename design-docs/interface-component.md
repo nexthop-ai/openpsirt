@@ -141,8 +141,8 @@ as on it, worked out when read, never stored, because findings move.
 | A component's name opens the component; the node name selects, so the link is the row's own control and the names in the two lists beside the tree | |
 | There is no pane over the tree | The component screen answers it |
 | For a reader not reading dependency findings in the product, rows carry no count or band and search hits are not said to be ordered by findings; one line says where they are read elsewhere (`design-docs/interface.md` § Families a reader holds) | A tree of zeros reads as a clean build |
-| For a reader of security testing material in the product, each row and search hit carries a code findings badge of its own: open code findings at it and under it, opening the queue beneath it on the build. Asked for only then; held elsewhere, one line says so | The families are different units, so the badge sits beside the issue count, never added to it |
-| Under the root row, a line states how many open code findings are unplaced, on the build itself, with a link to Repositories, zero included | Code findings in files no repository holds sit on the root; a repository's settings are what place them |
+| For a reader of security testing material in the product, each row and search hit carries a code findings badge of its own: open code findings at it and under it, the whole build's on the root, opening the queue beneath it on the build. Asked for only then; held elsewhere, one line says so | The families are different units, so the badge sits beside the issue count, never added to it |
+| Under the root row, a line states how many open code findings are unplaced, on the build itself, every root it has had included, with a link to Repositories, zero included | Code findings in files no repository holds sit on the root; a repository's settings are what place them |
 
 ## Tree search
 

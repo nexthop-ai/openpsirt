@@ -6,6 +6,8 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -123,23 +125,204 @@ func (s *Store) Matching(ctx context.Context, subject access.Subject, scope Scop
 	return out, nil
 }
 
-// NamedFolds is the fold keys each of these names reaches, as the component
-// page reaches them: a component of the name, or one built from a source of
-// the name. A derived table of the name, as "asked", and the fold key, joined
-// as "nf"; the arguments follow the statement.
-func NamedFolds(names []string) (string, []any) {
-	return `(SELECT "cn"."name_folded" AS "asked", "cn"."fold_key" AS "fold_key"
-		FROM "component" AS "cn" WHERE "cn"."name_folded" IN (?)
-		UNION ALL
-		SELECT "cu"."upstream_folded", "cu"."fold_key"
-		FROM "component" AS "cu" WHERE "cu"."upstream_folded" IN (?)) AS "nf"`,
-		[]any{bun.List(names), bun.List(names)}
+// Reached is what one name reaches in some builds: the folds it names, and
+// the components that were ever the root of a build whose root it names.
+type Reached struct {
+	// Folds is every fold the name reaches, the former roots' included.
+	Folds []string
+	// Roots is the components that were ever the root of a build the name
+	// names the root of. A component that was ever a build's root is the build
+	// itself, so a code finding placed on one is on the build.
+	Roots []int64
+}
+
+// ReachedByName is what each of these names reaches in these builds, keyed by
+// the name folded, as the component screen reaches a name: a live component of
+// the name in one of the builds, or one built from a source of the name, and
+// the fold each is in. A version narrows to what was built at it. A name that
+// names a build's root reaches every component that was ever its root as
+// well, at that version where one is named. A blank name reaches nothing.
+//
+// Read on its own and answered as values, for the reason FoldsNamed is: as a
+// subquery its size is the planner's estimate, and on MySQL the estimate
+// probed the fold index once per code finding.
+func ReachedByName(ctx context.Context, db bun.IDB, buildIDs []int64, names []string,
+	version string) (map[string]Reached, error) {
+
+	out := map[string]Reached{}
+	asked := map[string]bool{}
+	for _, name := range names {
+		if folded := graph.Folded(strings.TrimSpace(name)); folded != "" {
+			asked[folded] = true
+		}
+	}
+	if len(asked) == 0 || len(buildIDs) == 0 {
+		return out, nil
+	}
+	list := make([]string, 0, len(asked))
+	for name := range asked {
+		list = append(list, name)
+	}
+	sort.Strings(list)
+	version = strings.TrimSpace(version)
+
+	var rows []struct {
+		Name     string `bun:"name_folded"`
+		Upstream string `bun:"upstream_folded"`
+		Fold     string `bun:"fold_key"`
+		BuildID  int64  `bun:"build_id"`
+		Root     bool   `bun:"is_root"`
+	}
+	q := db.NewSelect().TableExpr(`"component" AS "cn"`).
+		Join(`JOIN "graph_node" AS "nn" ON "nn"."component_id" = "cn"."id"`).
+		ColumnExpr(`"cn"."name_folded", COALESCE("cn"."upstream_folded", '') AS "upstream_folded"`).
+		ColumnExpr(`"cn"."fold_key", "nn"."build_id", "nn"."is_root"`).
+		Where(`"nn"."build_id" IN (?)`, bun.List(buildIDs)).
+		Where(`"nn"."closed_scan_id" IS NULL`).
+		Where(`("cn"."name_folded" IN (?) OR "cn"."upstream_folded" IN (?))`, bun.List(list), bun.List(list)).
+		Distinct()
+	if version != "" {
+		q = q.Where(sourceVersionOf+" = ?", version)
+	}
+	if err := q.Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what %d names reach in these builds: %w", len(list), err)
+	}
+
+	folds := map[string]map[string]bool{}
+	rooted := map[string]map[int64]bool{}
+	add := func(name, fold string) {
+		if folds[name] == nil {
+			folds[name] = map[string]bool{}
+		}
+		folds[name][fold] = true
+	}
+	for _, row := range rows {
+		for _, name := range []string{row.Name, row.Upstream} {
+			if !asked[name] {
+				continue
+			}
+			add(name, row.Fold)
+			if row.Root {
+				if rooted[name] == nil {
+					rooted[name] = map[int64]bool{}
+				}
+				rooted[name][row.BuildID] = true
+			}
+		}
+	}
+
+	// The builds whose root a name names, and every root each has had.
+	var rootBuilds []int64
+	seen := map[int64]bool{}
+	for _, builds := range rooted {
+		for build := range builds {
+			if !seen[build] {
+				seen[build] = true
+				rootBuilds = append(rootBuilds, build)
+			}
+		}
+	}
+	var roots []struct {
+		BuildID     int64  `bun:"build_id"`
+		ComponentID int64  `bun:"component_id"`
+		Fold        string `bun:"fold_key"`
+	}
+	if len(rootBuilds) > 0 {
+		q := db.NewSelect().TableExpr(`"graph_node" AS "nn"`).
+			Join(`JOIN "component" AS "cn" ON "cn"."id" = "nn"."component_id"`).
+			ColumnExpr(`"nn"."build_id", "nn"."component_id", "cn"."fold_key"`).
+			Where(`"nn"."build_id" IN (?)`, bun.List(rootBuilds)).
+			Where(`"nn"."is_root" = ?`, true).
+			Distinct()
+		if version != "" {
+			q = q.Where(sourceVersionOf+" = ?", version)
+		}
+		if err := q.Scan(ctx, &roots); err != nil {
+			return nil, fmt.Errorf("read every root of %d builds: %w", len(rootBuilds), err)
+		}
+	}
+	for name, builds := range rooted {
+		ids := map[int64]bool{}
+		for _, root := range roots {
+			if builds[root.BuildID] {
+				add(name, root.Fold)
+				ids[root.ComponentID] = true
+			}
+		}
+		reached := out[name]
+		for id := range ids {
+			reached.Roots = append(reached.Roots, id)
+		}
+		slices.Sort(reached.Roots)
+		out[name] = reached
+	}
+	for name, set := range folds {
+		reached := out[name]
+		for fold := range set {
+			reached.Folds = append(reached.Folds, fold)
+		}
+		sort.Strings(reached.Folds)
+		out[name] = reached
+	}
+	return out, nil
+}
+
+// OpenByName is how many distinct keys open findings hold on what each name
+// reaches, where the reach of each name is given and the findings are a
+// statement answering "fold_key" and "key", one row per distinct pair; a key
+// is a string or an identifier, which scans as its digits. The union per name
+// is taken here: one key on two folds of a name, at two versions in two
+// builds, is counted once.
+func OpenByName(ctx context.Context, keyed *bun.SelectQuery, reached map[string]Reached) (map[string]int, error) {
+	out := map[string]int{}
+	var rows []struct {
+		Fold string `bun:"fold_key"`
+		Key  string `bun:"key"`
+	}
+	if err := keyed.Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	byFold := map[string][]string{}
+	for _, row := range rows {
+		byFold[row.Fold] = append(byFold[row.Fold], row.Key)
+	}
+	for name, r := range reached {
+		keys := map[string]bool{}
+		for _, fold := range r.Folds {
+			for _, key := range byFold[fold] {
+				keys[key] = true
+			}
+		}
+		out[name] = len(keys)
+	}
+	return out, nil
+}
+
+// FoldsOf is every fold these names reach, each once.
+func FoldsOf(reached map[string]Reached) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, r := range reached {
+		for _, fold := range r.Folds {
+			if !seen[fold] {
+				seen[fold] = true
+				out = append(out, fold)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // OpenIssuesOf is the distinct issues open on each matched source package in
 // its product's builds in scope, of what the subject reads there: the
 // findings lists' kinds, at the visibilities they read. A match in a product
 // where they read no dependency finding has no entry.
+//
+// What each name reaches is read first and bound as values, and the issues
+// are read once per fold and issue: a fold of ten binaries carries each issue
+// ten times, and joined per binary the engine sorted every copy, 1.28 million
+// rows for 128 thousand on a kernel of ten binaries.
 func (s *Store) OpenIssuesOf(ctx context.Context, subject access.Subject, matches []SourceMatch) (map[int]int, error) {
 	out := map[int]int{}
 	byProduct := map[int64][]int{}
@@ -152,30 +335,29 @@ func (s *Store) OpenIssuesOf(ctx context.Context, subject access.Subject, matche
 			continue
 		}
 		visible := access.Visible(subject, productID)
+		builds := matches[at[0]].Builds
 		names := make([]string, 0, len(at))
 		for _, i := range at {
 			names = append(names, matches[i].Folded)
 		}
-		folds, foldArgs := NamedFolds(names)
-		var counted []struct {
-			Asked  string `bun:"asked"`
-			Issues int    `bun:"issues"`
-		}
-		if err := s.db.NewSelect().TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
-			Join(`JOIN `+folds+` ON "nf"."fold_key" = "pc"."fold_key"`, foldArgs...).
-			ColumnExpr(`"nf"."asked", COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
-			Where(`"f"."build_id" IN (?)`, bun.List(matches[at[0]].Builds)).
-			Where(`"f"."closed_at" IS NULL`).
-			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			Where(kinds, kindArgs...).
-			GroupExpr(`"nf"."asked"`).
-			Scan(ctx, &counted); err != nil {
-			return nil, fmt.Errorf("count the open issues on components of product %d: %w", productID, err)
+		reached, err := ReachedByName(ctx, s.db, builds, names, "")
+		if err != nil {
+			return nil, err
 		}
 		issues := map[string]int{}
-		for _, c := range counted {
-			issues[c.Asked] = c.Issues
+		if folds := FoldsOf(reached); len(folds) > 0 {
+			keyed := s.db.NewSelect().TableExpr(`"finding" AS "f"`).
+				Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
+				ColumnExpr(`"pc"."fold_key", "f"."vulnerability_id" AS "key"`).
+				Where(`"f"."build_id" IN (?)`, bun.List(builds)).
+				Where(`"pc"."fold_key" IN (?)`, bun.List(folds)).
+				Where(`"f"."closed_at" IS NULL`).
+				Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+				Where(kinds, kindArgs...).
+				Distinct()
+			if issues, err = OpenByName(ctx, keyed, reached); err != nil {
+				return nil, fmt.Errorf("count the open issues on components of product %d: %w", productID, err)
+			}
 		}
 		for _, i := range at {
 			out[i] = issues[matches[i].Folded]

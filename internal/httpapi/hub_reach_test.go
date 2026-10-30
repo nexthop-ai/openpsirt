@@ -18,16 +18,17 @@ func TestWhoMayCountCodeFindingsAtAComponent(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.HubCodeFindings(t, r)
 		const (
-			counts      = "/v1/products/mine/components/mine-src/code-finding-counts"
-			theirCounts = "/v1/products/theirs/components/mine-src/code-finding-counts"
-			trend       = hubBuild + "/components/libmine1/code-finding-trend"
-			absentTrend = hubBuild + "/components/nosuch/code-finding-trend"
-			tree        = hubBuild + "/components?code_findings=true"
-			plainTree   = hubBuild + "/components"
-			around      = hubBuild + "/components/libmine1/around?code_findings=true"
-			queue       = hubQueue + "?component=mine-src"
-			beneath     = hubQueue + "?beneath=libmine1&branch_or_tag=master&variant=broadcom"
-			chooser     = "/v1/components?q=mine"
+			counts       = "/v1/products/mine/components/mine-src/code-finding-counts"
+			theirCounts  = "/v1/products/theirs/components/mine-src/code-finding-counts"
+			trend        = hubBuild + "/components/libmine1/code-finding-trend"
+			absentTrend  = hubBuild + "/components/nosuch/code-finding-trend"
+			tree         = hubBuild + "/components?code_findings=true"
+			plainTree    = hubBuild + "/components"
+			around       = hubBuild + "/components/libmine1/around?code_findings=true"
+			absentAround = hubBuild + "/components/nosuch/around?code_findings=true"
+			queue        = hubQueue + "?component=mine-src"
+			beneath      = hubQueue + "?beneath=libmine1&branch_or_tag=master&variant=broadcom"
+			chooser      = "/v1/components?q=mine"
 		)
 		for _, c := range []struct {
 			who  string
@@ -59,6 +60,8 @@ func TestWhoMayCountCodeFindingsAtAComponent(t *testing.T) {
 			{"reader", tree, http.StatusForbidden},
 			{"reader", plainTree, http.StatusOK},
 			{"private", around, http.StatusForbidden},
+			// Authorized before the name is resolved, as the trend is.
+			{"private", absentAround, http.StatusForbidden},
 			{"security-testing-triager", around, http.StatusOK},
 			{"approver", tree, http.StatusNotFound},
 
