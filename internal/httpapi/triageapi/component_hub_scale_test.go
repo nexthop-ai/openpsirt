@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -142,36 +144,108 @@ func TestMeasureTheComponentHub(t *testing.T) {
 					"/v1/components?q=linux",
 					"/v1/components?q=pkg-1",
 				}
-				// Once on the statistics the load leaves behind, and once
-				// after they are refreshed, as a server's own refresh does.
-				for _, stats := range []string{"as loaded", "refreshed"} {
-					if stats == "refreshed" {
-						if err := database.RefreshStatistics(t.Context(), r.DB); err != nil {
-							t.Fatal(err)
-						}
-					}
-					for _, path := range paths {
-						// The first read warms the connection and the caches;
-						// the median of the next three is the figure.
-						var took []time.Duration
-						var body string
-						for i := range 4 {
-							began := time.Now()
-							got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodGet, path, "")
-							if i > 0 {
-								took = append(took, time.Since(began))
-							}
-							if got.Code != http.StatusOK {
-								t.Fatalf("GET %s answered %d: %s", path, got.Code, got.Body.String())
-							}
-							body = got.Body.String()
-						}
-						slices.Sort(took)
-						t.Logf("%d components, %s, GET %s: %s, %s", n, stats, path, took[1].Round(time.Millisecond), said(body))
-					}
-				}
+				timed(t, r, fmt.Sprintf("%d components", n), paths)
 			})
 		})
+	}
+}
+
+// hubHistory is how many times the history measurement copies a build's live
+// nodes as closed ones: a node is never deleted, so a build rescanned that
+// often at moving versions holds that many of each.
+const hubHistory = 100
+
+// TestMeasureTheComponentHubOverAHistory times the reads that ask for every
+// root a build has had, or every version of a name, on a build of 4,000
+// components holding a hundred closed copies of each node.
+func TestMeasureTheComponentHubOverAHistory(t *testing.T) {
+	const n = 4000
+	const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		began := time.Now()
+		hubSeeded(t, r, n, 4000)
+		for range hubHistory {
+			if _, err := r.DB.DB.NewRaw(`INSERT INTO "graph_node" ("build_id", "component_id", "is_root",
+					"opened_scan_id", "closed_scan_id", "purl", "cpe", "upstream_name", "upstream_version", "repository")
+				SELECT "build_id", "component_id", "is_root", "opened_scan_id", "opened_scan_id", "purl", "cpe",
+					"upstream_name", "upstream_version", "repository"
+				FROM "graph_node" WHERE "build_id" = ? AND "closed_scan_id" IS NULL`, r.BuildOf(t, httpapitest.SeededBuild)).
+				Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Logf("%d components, %d closed copies of each node: seeded in %s", n, hubHistory, time.Since(began).Round(time.Second))
+		if err := database.RefreshStatistics(t.Context(), r.DB); err != nil {
+			t.Fatal(err)
+		}
+		// The read of every root the build has had, on its own: the median of
+		// three after one to warm.
+		var took []time.Duration
+		for i := range 4 {
+			var rows []struct {
+				BuildID     int64 `bun:"build_id"`
+				ComponentID int64 `bun:"component_id"`
+				Live        int   `bun:"live"`
+			}
+			began := time.Now()
+			if err := r.DB.DB.NewRaw(`SELECT "n"."build_id", "n"."component_id",
+					MAX(CASE WHEN "n"."closed_scan_id" IS NULL THEN 1 ELSE 0 END) AS "live"
+				FROM "graph_node" AS "n" WHERE "n"."build_id" IN (?) AND "n"."is_root" = ?
+				GROUP BY "n"."build_id", "n"."component_id"`,
+				bun.List([]int64{r.BuildOf(t, httpapitest.SeededBuild)}), true).Scan(t.Context(), &rows); err != nil {
+				t.Fatal(err)
+			}
+			if i > 0 {
+				took = append(took, time.Since(began))
+			}
+		}
+		slices.Sort(took)
+		t.Logf("%d components over a history, every root the build has had: %s", n, took[1].Round(10*time.Microsecond))
+		timed(t, r, fmt.Sprintf("%d components over a history", n), []string{
+			"/v1/products/mine/code-findings?component=sonic-image",
+			"/v1/products/mine/code-findings?component=pkg-17&state=open",
+			"/v1/products/mine/code-findings?component=linux",
+			"/v1/products/mine/components/sonic-image/code-finding-counts",
+			"/v1/products/mine/components/pkg-17/code-finding-counts",
+			build + "/components?code_findings=true",
+			build + "/components/pkg-17/around?code_findings=true",
+			build + "/components?q=pkg-1&code_findings=true",
+			"/v1/products/mine/code-findings?beneath=pkg-17&branch_or_tag=master&variant=broadcom",
+			build + "/components/pkg-17/code-finding-trend",
+			"/v1/components?q=sonic",
+			"/v1/components?q=pkg-1",
+		})
+	})
+}
+
+// timed logs the median of three reads of each path, once on the statistics
+// the load leaves behind and once after they are refreshed, as a server's own
+// refresh does. The first read warms the connection and the caches.
+func timed(t *testing.T, r *httpapitest.Reach, label string, paths []string) {
+	t.Helper()
+	for _, stats := range []string{"as loaded", "refreshed"} {
+		if stats == "refreshed" {
+			if err := database.RefreshStatistics(t.Context(), r.DB); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, path := range paths {
+			var took []time.Duration
+			var body string
+			for i := range 4 {
+				began := time.Now()
+				got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodGet, path, "")
+				if i > 0 {
+					took = append(took, time.Since(began))
+				}
+				if got.Code != http.StatusOK {
+					t.Fatalf("GET %s answered %d: %s", path, got.Code, got.Body.String())
+				}
+				body = got.Body.String()
+			}
+			slices.Sort(took)
+			t.Logf("%s, %s, GET %s: %s, %s", label, stats, path, took[1].Round(time.Millisecond), said(body))
+		}
 	}
 }
 

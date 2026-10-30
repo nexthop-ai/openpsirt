@@ -150,102 +150,96 @@ func ReachedByName(ctx context.Context, db bun.IDB, buildIDs []int64, names []st
 	version string) (map[string]Reached, error) {
 
 	out := map[string]Reached{}
-	asked := map[string]bool{}
-	for _, name := range names {
-		if folded := graph.Folded(strings.TrimSpace(name)); folded != "" {
-			asked[folded] = true
-		}
-	}
-	if len(asked) == 0 || len(buildIDs) == 0 {
+	list := namedOnce(names)
+	if len(list) == 0 || len(buildIDs) == 0 {
 		return out, nil
 	}
-	list := make([]string, 0, len(asked))
-	for name := range asked {
-		list = append(list, name)
+	asked := map[string]bool{}
+	for _, name := range list {
+		asked[name] = true
 	}
-	sort.Strings(list)
 	version = strings.TrimSpace(version)
+	narrowed := func(q *bun.SelectQuery) *bun.SelectQuery {
+		if version != "" {
+			return q.Where(sourceVersionOf+" = ?", version)
+		}
+		return q
+	}
 
-	var rows []struct {
+	var live []struct {
 		Name     string `bun:"name_folded"`
 		Upstream string `bun:"upstream_folded"`
 		Fold     string `bun:"fold_key"`
 		BuildID  int64  `bun:"build_id"`
 		Root     bool   `bun:"is_root"`
 	}
-	q := db.NewSelect().TableExpr(`"component" AS "cn"`).
-		Join(`JOIN "graph_node" AS "nn" ON "nn"."component_id" = "cn"."id"`).
+	if err := narrowed(foldsNamed(db, buildIDs, list...).
 		ColumnExpr(`"cn"."name_folded", COALESCE("cn"."upstream_folded", '') AS "upstream_folded"`).
 		ColumnExpr(`"cn"."fold_key", "nn"."build_id", "nn"."is_root"`).
-		Where(`"nn"."build_id" IN (?)`, bun.List(buildIDs)).
-		Where(`"nn"."closed_scan_id" IS NULL`).
-		Where(`("cn"."name_folded" IN (?) OR "cn"."upstream_folded" IN (?))`, bun.List(list), bun.List(list)).
-		Distinct()
-	if version != "" {
-		q = q.Where(sourceVersionOf+" = ?", version)
-	}
-	if err := q.Scan(ctx, &rows); err != nil {
+		Distinct()).
+		Scan(ctx, &live); err != nil {
 		return nil, fmt.Errorf("read what %d names reach in these builds: %w", len(list), err)
 	}
-
 	folds := map[string]map[string]bool{}
-	rooted := map[string]map[int64]bool{}
 	add := func(name, fold string) {
 		if folds[name] == nil {
 			folds[name] = map[string]bool{}
 		}
 		folds[name][fold] = true
 	}
-	for _, row := range rows {
+	rooted := map[string]map[int64]bool{}
+	var rootBuilds []int64
+	seen := map[int64]bool{}
+	for _, row := range live {
 		for _, name := range []string{row.Name, row.Upstream} {
 			if !asked[name] {
 				continue
 			}
 			add(name, row.Fold)
-			if row.Root {
-				if rooted[name] == nil {
-					rooted[name] = map[int64]bool{}
-				}
-				rooted[name][row.BuildID] = true
+			if !row.Root {
+				continue
+			}
+			if rooted[name] == nil {
+				rooted[name] = map[int64]bool{}
+			}
+			rooted[name][row.BuildID] = true
+			if !seen[row.BuildID] {
+				seen[row.BuildID] = true
+				rootBuilds = append(rootBuilds, row.BuildID)
 			}
 		}
 	}
-
-	// The builds whose root a name names, and every root each has had.
-	var rootBuilds []int64
-	seen := map[int64]bool{}
-	for _, builds := range rooted {
-		for build := range builds {
-			if !seen[build] {
-				seen[build] = true
-				rootBuilds = append(rootBuilds, build)
-			}
-		}
+	// Every root each build whose root a name names has had, at the version
+	// asked for.
+	roots, err := graph.RootsOf(ctx, db, rootBuilds)
+	if err != nil {
+		return nil, err
 	}
-	var roots []struct {
-		BuildID     int64  `bun:"build_id"`
-		ComponentID int64  `bun:"component_id"`
-		Fold        string `bun:"fold_key"`
-	}
-	if len(rootBuilds) > 0 {
-		q := db.NewSelect().TableExpr(`"graph_node" AS "nn"`).
-			Join(`JOIN "component" AS "cn" ON "cn"."id" = "nn"."component_id"`).
-			ColumnExpr(`"nn"."build_id", "nn"."component_id", "cn"."fold_key"`).
-			Where(`"nn"."build_id" IN (?)`, bun.List(rootBuilds)).
-			Where(`"nn"."is_root" = ?`, true).
-			Distinct()
-		if version != "" {
-			q = q.Where(sourceVersionOf+" = ?", version)
+	foldOf := map[int64]string{}
+	if len(roots) > 0 {
+		ids := make([]int64, 0, len(roots))
+		for _, root := range roots {
+			ids = append(ids, root.ComponentID)
 		}
-		if err := q.Scan(ctx, &roots); err != nil {
-			return nil, fmt.Errorf("read every root of %d builds: %w", len(rootBuilds), err)
+		var rows []struct {
+			ID   int64  `bun:"id"`
+			Fold string `bun:"fold_key"`
+		}
+		if err := narrowed(db.NewSelect().TableExpr(`"component" AS "cn"`).
+			ColumnExpr(`"cn"."id", "cn"."fold_key"`).
+			Where(`"cn"."id" IN (?)`, bun.List(ids))).
+			Scan(ctx, &rows); err != nil {
+			return nil, fmt.Errorf("read the folds of %d roots: %w", len(ids), err)
+		}
+		for _, row := range rows {
+			foldOf[row.ID] = row.Fold
 		}
 	}
 	for name, builds := range rooted {
 		ids := map[int64]bool{}
 		for _, root := range roots {
-			if builds[root.BuildID] {
-				add(name, root.Fold)
+			if fold, ok := foldOf[root.ComponentID]; ok && builds[root.BuildID] {
+				add(name, fold)
 				ids[root.ComponentID] = true
 			}
 		}

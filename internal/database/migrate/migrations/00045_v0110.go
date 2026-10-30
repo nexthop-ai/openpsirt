@@ -66,7 +66,7 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A product records the repository hosts its links may point at, and
 //     what it says about the code under a path prefix.
 //   - A build's node records the repository the build stated a component is
-//     built from.
+//     built from, and every root a build has had is indexed.
 //   - A product records the suppression rules that dismiss code findings.
 //   - An analyzer's rule records the tool's own rating of its results and
 //     the weakness families it finds, and a result the last place it names.
@@ -119,7 +119,7 @@ func changeV0110(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
-		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createCodeFindingV0110,
+		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, graphNodeRootIndexV0110, createCodeFindingV0110,
 		notificationSecurityTestingV0110, createDecisionStampV0110, createDocumentUploadV0110,
 		reportCaseV0110, reportedProblemFromFlawV0110, roleWidthV0110,
 	} {

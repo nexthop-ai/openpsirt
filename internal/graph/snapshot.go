@@ -921,28 +921,59 @@ func IsRoot(ctx context.Context, db bun.IDB, buildID, componentID int64) (bool, 
 	return root, nil
 }
 
-// rootsOf is a build's root now, zero where nothing has been applied, and
-// every component that was ever its root, the present one included.
-func (s *Store) rootsOf(ctx context.Context, buildID int64) (int64, []int64, error) {
+// Root is a component that was ever a build's root.
+type Root struct {
+	BuildID     int64 `bun:"build_id"`
+	ComponentID int64 `bun:"component_id"`
+	// Live is whether it is the build's root now.
+	Live bool `bun:"live"`
+}
+
+// RootsOf is every component that was ever the root of one of these builds,
+// the present ones included, each once per build.
+//
+// Read from the root index, which holds a build's roots apart from its other
+// nodes: a node is never deleted, so the build's whole history is otherwise
+// what the read walks.
+func RootsOf(ctx context.Context, db bun.IDB, buildIDs []int64) ([]Root, error) {
+	if len(buildIDs) == 0 {
+		return nil, nil
+	}
 	var rows []struct {
+		BuildID     int64 `bun:"build_id"`
 		ComponentID int64 `bun:"component_id"`
 		Live        int   `bun:"live"`
 	}
-	if err := s.db.NewSelect().TableExpr(`"graph_node" AS "n"`).
-		ColumnExpr(`"n"."component_id"`).
+	if err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."build_id", "n"."component_id"`).
 		ColumnExpr(`MAX(CASE WHEN "n"."closed_scan_id" IS NULL THEN 1 ELSE 0 END) AS "live"`).
-		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"n"."is_root" = ?`, true).
-		GroupExpr(`"n"."component_id"`).
+		GroupExpr(`"n"."build_id", "n"."component_id"`).
+		OrderExpr(`"n"."build_id", "n"."component_id"`).
 		Scan(ctx, &rows); err != nil {
-		return 0, nil, fmt.Errorf("read every root of build %d: %w", buildID, err)
+		return nil, fmt.Errorf("read every root of %d builds: %w", len(buildIDs), err)
+	}
+	out := make([]Root, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, Root{BuildID: row.BuildID, ComponentID: row.ComponentID, Live: row.Live == 1})
+	}
+	return out, nil
+}
+
+// rootsOf is a build's root now, zero where nothing has been applied, and
+// every component that was ever its root, the present one included.
+func (s *Store) rootsOf(ctx context.Context, buildID int64) (int64, []int64, error) {
+	roots, err := RootsOf(ctx, s.db, []int64{buildID})
+	if err != nil {
+		return 0, nil, err
 	}
 	var live int64
-	ever := make([]int64, 0, len(rows))
-	for _, row := range rows {
-		ever = append(ever, row.ComponentID)
-		if row.Live == 1 {
-			live = row.ComponentID
+	ever := make([]int64, 0, len(roots))
+	for _, root := range roots {
+		ever = append(ever, root.ComponentID)
+		if root.Live {
+			live = root.ComponentID
 		}
 	}
 	return live, ever, nil

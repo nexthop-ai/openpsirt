@@ -43,6 +43,7 @@ closed it.
 | Rule | Reason |
 |---|---|
 | Rows are closed, never deleted | What a release shipped is asked years later |
+| Every root a build has had is read from an index of the build's roots | Rows are never deleted, so the read otherwise walks the build's whole history: 19.5 ms on PostgreSQL and 374 ms on MySQL 8.4 against 1.2 ms and 0.5 ms indexed, at 4,000 components a build with a hundred closed copies of each node |
 | An unchanged build writes nothing | Storage grows with change, not the calendar (REQ-20). A test asserts it and was watched to fail with the comparison broken |
 | One transaction | A half-applied graph reads as components removed |
 

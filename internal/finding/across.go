@@ -267,17 +267,35 @@ func FoldsNamed(ctx context.Context, db bun.IDB, buildIDs []int64, name, version
 // sourceVersionOf is SourceVersion over the component joined as "cn".
 var sourceVersionOf = upstreamVersionOf("cn")
 
-func foldsNamed(db bun.IDB, buildIDs []int64, name string) *bun.SelectQuery {
+// foldsNamed is the live components in these builds of any of these names, or
+// built from a source of one, joined as "cn" with its node as "nn". A blank
+// name names nothing.
+func foldsNamed(db bun.IDB, buildIDs []int64, names ...string) *bun.SelectQuery {
 	q := db.NewSelect().
 		TableExpr(`"component" AS "cn"`).
-		Join(`JOIN "graph_node" AS "nn" ON "nn"."component_id" = "cn"."id"`).
-		Where(`"nn"."build_id" IN (?)`, bun.List(buildIDs)).
-		Where(`"nn"."closed_scan_id" IS NULL`)
-	folded := graph.Folded(strings.TrimSpace(name))
-	if folded == "" {
+		Join(`JOIN "graph_node" AS "nn" ON "nn"."component_id" = "cn"."id"`)
+	folded := namedOnce(names)
+	if len(folded) == 0 || len(buildIDs) == 0 {
 		return q.Where("1 = 0")
 	}
-	return q.Where(`("cn"."name_folded" = ? OR "cn"."upstream_folded" = ?)`, folded, folded)
+	return q.Where(`"nn"."build_id" IN (?)`, bun.List(buildIDs)).
+		Where(`"nn"."closed_scan_id" IS NULL`).
+		Where(`("cn"."name_folded" IN (?) OR "cn"."upstream_folded" IN (?))`, bun.List(folded), bun.List(folded))
+}
+
+// namedOnce is these names folded, each once and sorted, the blank ones
+// left out.
+func namedOnce(names []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, name := range names {
+		if folded := graph.Folded(strings.TrimSpace(name)); folded != "" && !seen[folded] {
+			seen[folded] = true
+			out = append(out, folded)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // OneFoldNamed is FoldsNamed for an act that writes: where no version was
