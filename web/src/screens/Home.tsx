@@ -781,16 +781,17 @@ function greeting(): string {
   return "Good evening";
 }
 
-// The panel standing for the estate's figures for a reader holding no finding
-// in any product: an auditor, an administrator with no role on a product, or
-// somebody holding a capability alone. The deployment's records are what they
-// may open, never figures that are zero because none of them is theirs.
 // Whether the reader keeps the deployment's records: an administrator or an
 // auditor, whose work the Records panel opens.
 function keepsRecords(who: Who): boolean {
   return who.admin || !!who.audits;
 }
 
+// The panel standing for the estate's figures for a reader holding no finding
+// in any product: an auditor, an administrator with no role on a product, or
+// somebody holding a capability alone and collaborating on nothing, whose
+// home Your cases fills instead. The deployment's records are what they may
+// open, never figures that are zero because none of them is theirs.
 function Records({ who }: { who: Who }) {
   const keeps = keepsRecords(who);
   return (

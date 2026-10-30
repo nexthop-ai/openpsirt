@@ -157,4 +157,4 @@ deleted (REQ-15); when that is is `design-docs/data-model.md` § End of support.
 
 | Limit | Detail |
 |---|---|
-| A code finding sorts after every finding in a list of held work asked for both families | They order by urgency, which it lacks. Every screen asks each family apart, and unheld code findings are found in the code finding queue |
+| A code finding sorts after every finding in a list of held work asked for both families | They order by urgency, which it lacks. The reader's own lists and the lists of unheld work ask each family apart, and unheld code findings are found in the code finding queue |
