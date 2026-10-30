@@ -4,7 +4,7 @@
 // Command rehearsal carries a database a tagged release built through an
 // upgrade to this tree, and checks what arrives.
 //
-//	rehearsal -from v0.7.0 -engine postgres -dir .demo/rehearsal
+//	rehearsal -from v0.9.0 -engine postgres -dir .demo/rehearsal
 //
 // A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
 // the test suite reads, so the password is never on the command line.
@@ -22,8 +22,7 @@
 //  1. The row count of every table, with the release stopped.
 //  2. The migrations, applied on their own, and the version they reach.
 //  3. The counts again: a table the release held keeps its count, and a
-//     table the upgrade adds starts empty, except where an upgrade merges
-//     rows or fills a table from rows the release held.
+//     table the upgrade adds starts empty.
 //  4. The server started on it with the configuration the release's demo
 //     started its own with, the open findings of every build against what
 //     the release showed, and every GET its API document lists asked once,
@@ -36,13 +35,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -97,7 +94,7 @@ func main() {
 	var r run
 	var dir string
 	var keep bool
-	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.7.0")
+	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.9.0")
 	flag.StringVar(&r.engine, "engine", "", "sqlite, postgres, mysql or mariadb")
 	flag.StringVar(&dir, "dir", ".demo/rehearsal", "where the run keeps what it makes")
 	flag.StringVar(&r.grype, "grype", "", "the scanner's database directory, shared between runs")
@@ -268,18 +265,6 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 			r.from, strings.Join(empty, ", "))
 	}
 
-	images, err := r.images(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var words Words
-	var rated Ratings
-	if record.Last < wordsAndRatings {
-		if words, rated, err = r.heldWordsAndRatings(ctx); err != nil {
-			return nil, err
-		}
-	}
-
 	r.step("migrated to %d by this tree", current)
 	if err := r.migrate(ctx, "up"); err != nil {
 		return nil, err
@@ -294,17 +279,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	moved := Moved(record.Last, images)
-	if record.Last < wordsAndRatings {
-		left, err := r.ratings(ctx)
-		if err != nil {
-			return nil, err
-		}
-		restated, wrong := Restated(record.Last, words, rated, left)
-		maps.Copy(moved, restated)
-		faults = append(faults, prefix("upgrade", wrong)...)
-	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded, moved))...)
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -502,171 +477,6 @@ func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
 		counts[table] = n
 	}
 	return counts, nil
-}
-
-// images counts the rows the release held for container images: components
-// whose package identifier is of type oci or docker, their nodes, and the
-// edges at those nodes. Matched on the identifier's prefix in its lowest
-// spelling, which is the one every recorded producer writes.
-func (r *run) images(ctx context.Context) (Images, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return Images{}, err
-	}
-	defer func() { _ = db.Close() }()
-	const image = `SELECT "id" FROM "component" WHERE "purl" LIKE 'pkg:oci/%' OR "purl" LIKE 'pkg:docker/%'`
-	const nodes = `SELECT "id" FROM "graph_node" WHERE "component_id" IN (` + image + `)`
-	var out Images
-	for _, each := range []struct {
-		query string
-		into  *int64
-	}{
-		{`SELECT COUNT(*) FROM (` + image + `) AS "i"`, &out.Components},
-		{`SELECT COUNT(*) FROM (` + nodes + `) AS "n"`, &out.Nodes},
-		{`SELECT COUNT(*) FROM "graph_edge" WHERE "parent_id" IN (` + nodes + `) OR "child_id" IN (` + nodes + `)`, &out.Edges},
-	} {
-		if err := db.QueryRowContext(ctx, each.query).Scan(each.into); err != nil {
-			return Images{}, fmt.Errorf("count the release's images: %w", err)
-		}
-	}
-	return out, nil
-}
-
-// heldWordsAndRatings reads what the release held that the upgrade stores
-// reasoning and recorded ratings from.
-func (r *run) heldWordsAndRatings(ctx context.Context) (Words, Ratings, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return Words{}, Ratings{}, err
-	}
-	defer func() { _ = db.Close() }()
-	words, err := distinctWords(ctx, db)
-	if err != nil {
-		return Words{}, Ratings{}, err
-	}
-	rated, err := ratingsOf(ctx, db, false)
-	if err != nil {
-		return Words{}, Ratings{}, err
-	}
-	// A recorded flaw on an issue rated by a word or by a score naming no
-	// publisher, and whether the issue holds a scanned finding and absorbed
-	// another in a merge.
-	const recorded = `SELECT DISTINCT "v"."id", "st"."product_id" FROM "finding" AS "f"
-		JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"
-		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
-		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
-		WHERE "f"."kind" = 'entered' AND `
-	// A scanned issue kept in a merge, as the upgrade tells one apart.
-	const kept = `(EXISTS (SELECT 1 FROM "finding" AS "scanned"
-			WHERE "scanned"."vulnerability_id" = "v"."id" AND "scanned"."kind" = 'vulnerability')
-		AND EXISTS (SELECT 1 FROM "vulnerability_merge" AS "vm" WHERE "vm"."kept_id" = "v"."id"))`
-	for _, each := range []struct {
-		query string
-		into  *int64
-	}{
-		{`SELECT COUNT(*) FROM (` + recorded + `NOT ` + kept + ` AND (COALESCE("v"."severity", '') <> ''
-			OR (COALESCE("v"."score_source", '') = '' AND "v"."score_centi" IS NOT NULL))) AS "p"`, &rated.Plain},
-		{`SELECT COUNT(*) FROM (` + recorded + kept + `) AS "k"`, &rated.Kept},
-	} {
-		if err := db.QueryRowContext(ctx, each.query).Scan(each.into); err != nil {
-			return Words{}, Ratings{}, fmt.Errorf("count the release's recorded flaws: %w", err)
-		}
-	}
-	return words, rated, nil
-}
-
-// distinctWords counts the reasoning the release held across every claim and
-// every supplier statement, compared byte for byte once kept as the upgrade
-// keeps it. A comparison in SQL follows the column's collation, which on
-// MySQL and MariaDB ignores trailing spaces.
-func distinctWords(ctx context.Context, db *database.DB) (Words, error) {
-	rows, err := db.QueryContext(ctx, `SELECT "statement" FROM "suppression" WHERE "statement" IS NOT NULL
-		UNION ALL
-		SELECT "statement" FROM "vex_statement" WHERE "statement" IS NOT NULL`)
-	if err != nil {
-		return Words{}, fmt.Errorf("read the release's reasoning: %w", err)
-	}
-	seen := map[[sha256.Size]byte]bool{}
-	for rows.Next() {
-		var said string
-		if err := rows.Scan(&said); err != nil {
-			_ = rows.Close()
-			return Words{}, err
-		}
-		if kept := KeptWords(said); kept != "" {
-			seen[sha256.Sum256([]byte(kept))] = true
-		}
-	}
-	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-		return Words{}, fmt.Errorf("read the release's reasoning: %w", err)
-	}
-	return Words{Distinct: int64(len(seen))}, nil
-}
-
-// ratings reads the ratings the upgrade moved, on the upgraded database.
-func (r *run) ratings(ctx context.Context) (Ratings, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return Ratings{}, err
-	}
-	defer func() { _ = db.Close() }()
-	return ratingsOf(ctx, db, true)
-}
-
-// ratingsOf reads each issue's unsourced ratings, the sourced ones, and the
-// words in force, and after the upgrade the recorded ratings too.
-func ratingsOf(ctx context.Context, db *database.DB, upgraded bool) (Ratings, error) {
-	out := Ratings{Unsourced: map[int64]int64{}, InForce: map[Pair]bool{}, Recorded: map[Pair]bool{}}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "vulnerability_rating"
-		WHERE COALESCE("score_source", '') <> ''`).Scan(&out.Sourced); err != nil {
-		return Ratings{}, fmt.Errorf("count the sourced ratings: %w", err)
-	}
-	rows, err := db.QueryContext(ctx, `SELECT "vulnerability_id", COUNT(*) FROM "vulnerability_rating"
-		WHERE COALESCE("score_source", '') = '' GROUP BY "vulnerability_id"`)
-	if err != nil {
-		return Ratings{}, fmt.Errorf("count the unsourced ratings: %w", err)
-	}
-	for rows.Next() {
-		var issue, n int64
-		if err := rows.Scan(&issue, &n); err != nil {
-			_ = rows.Close()
-			return Ratings{}, err
-		}
-		out.Unsourced[issue] = n
-	}
-	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-		return Ratings{}, err
-	}
-	pairs := []struct {
-		query string
-		into  map[Pair]bool
-	}{{`SELECT "vulnerability_id", "product_id", 1 FROM "issue_rating"`, out.InForce}}
-	if upgraded {
-		pairs = append(pairs, struct {
-			query string
-			into  map[Pair]bool
-		}{`SELECT "vulnerability_id", "product_id", CASE WHEN "severity" IS NULL THEN 0 ELSE 1 END
-			FROM "recorded_rating"`, out.Recorded})
-	}
-	for _, each := range pairs {
-		rows, err := db.QueryContext(ctx, each.query)
-		if err != nil {
-			return Ratings{}, fmt.Errorf("read the ratings by issue and product: %w", err)
-		}
-		for rows.Next() {
-			var p Pair
-			var worded int
-			if err := rows.Scan(&p.Issue, &p.Product, &worded); err != nil {
-				_ = rows.Close()
-				return Ratings{}, err
-			}
-			each.into[p] = worded == 1
-		}
-		if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-			return Ratings{}, err
-		}
-	}
-	return out, nil
 }
 
 // container is what every run of this tree's image shares: the release's

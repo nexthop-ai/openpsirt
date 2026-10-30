@@ -21,7 +21,7 @@ import (
 // shape the release declares. Each release's migration supplies the order,
 // the rows and its declarations, and calls these.
 
-// inV020 runs a release's upgrade in one transaction. Migration 42 calls it
+// inV020 runs a release's upgrade in one transaction. Migration 44 calls it
 // by this name, and a tagged release froze that file.
 //
 // On PostgreSQL and SQLite a failure leaves the schema as it was. On MySQL and
@@ -505,4 +505,39 @@ func withColumn(statement, after, column string) string {
 	}
 	at += len(after)
 	return statement[:at] + "\n\t\t\t" + column + statement[at:]
+}
+
+// withIndex replaces the statement creating the named index.
+func withIndex(statements []string, name, stmt string) []string {
+	for i, each := range statements {
+		if m := createsIndex.FindStringSubmatch(each); m != nil && m[1] == name {
+			out := append([]string(nil), statements...)
+			out[i] = stmt
+			return out
+		}
+	}
+	panic(fmt.Sprintf("the declaration being changed makes no index %s", name))
+}
+
+// hasColumn reports whether a table already holds a column of this name.
+func (u *upgrader) hasColumn(table, column string) (bool, error) {
+	if u.engine == database.SQLite {
+		columns, err := u.sqliteColumns(table)
+		return columns[column], err
+	}
+	query := `SELECT 1 FROM "information_schema"."columns"
+		WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?`
+	if u.engine != database.Postgres {
+		query = `SELECT 1 FROM "information_schema"."COLUMNS"
+			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ? LIMIT 1`
+	}
+	var probe int
+	err := u.tx.QueryRowContext(u.ctx, query, table, column).Scan(&probe)
+	if database.IsNoRows(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("ask whether %s has column %s: %w", table, column, err)
+	}
+	return true, nil
 }

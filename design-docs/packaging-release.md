@@ -151,7 +151,7 @@ workflow does the rest.
 
    ```
    make engines-up
-   for from in v0.7.0 v0.8.0; do for engine in sqlite postgres mysql mariadb; do
+   for from in v0.9.0 v0.10.0 v0.10.1 v0.10.2; do for engine in sqlite postgres mysql mariadb; do
      make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
    done; done
    ```

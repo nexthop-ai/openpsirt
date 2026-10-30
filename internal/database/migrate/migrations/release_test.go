@@ -17,9 +17,9 @@ import (
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
-// v070 is the migration that makes v0.7.0's schema, the version a database
-// v0.7.0 built records.
-const v070 = migrations.Baseline
+// v090 is the migration that makes v0.9.0's schema, the version a database
+// v0.9.0 built records.
+const v090 = migrations.Baseline
 
 // records is where each tagged release's record of its migrations is kept,
 // from this package's directory.

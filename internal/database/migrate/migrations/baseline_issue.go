@@ -412,3 +412,30 @@ func issueNoteBaseline(t *columnTypes) []string {
 		)` + t.suffix,
 	}
 }
+
+// recordedRatingBaseline declares the rating a product records a flaw at.
+//
+// One row per issue and product, held apart from the issue row every product
+// reads, and apart from the rating in force, which a rating claim replaces and
+// a withdrawal returns to this.
+func recordedRatingBaseline(t *columnTypes) []string {
+	return []string{
+		`CREATE TABLE "recorded_rating" (
+			"id"               ` + t.id + `,
+			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			"product_id"       ` + t.ref + ` NOT NULL,
+			-- The word it was recorded at, where one was given.
+			"severity"         ` + t.kind + ` NULL,
+			-- The CVSS rating it was recorded with, where a vector was worked
+			-- out: the score derived from it, and its scheme's version.
+			"score_centi"      ` + t.refNull + ` NULL,
+			"vector"           ` + t.free + ` NULL,
+			"score_version"    ` + t.free + ` NULL,
+			CONSTRAINT "recorded_rating_unique" UNIQUE ("vulnerability_id", "product_id"),
+			CONSTRAINT "recorded_rating_vulnerability_fk" FOREIGN KEY ("vulnerability_id")
+				REFERENCES "vulnerability"("id"),
+			CONSTRAINT "recorded_rating_product_fk" FOREIGN KEY ("product_id")
+				REFERENCES "product"("id")
+		)` + t.suffix,
+	}
+}

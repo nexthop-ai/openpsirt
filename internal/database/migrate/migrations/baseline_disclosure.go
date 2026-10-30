@@ -306,6 +306,10 @@ func patchBranchBaseline(t *columnTypes) []string {
 			"fetched_at"   ` + t.timestamp + ` NULL,
 			"reached_at"   ` + t.timestamp + ` NULL,
 			"failed"       ` + t.free + ` NULL,
+			-- When the last visit ended, whether it reached the repository or
+			-- not. With when it began, how long the visit held the pass,
+			-- which is what each host's share of the pass is counted in.
+			"ended_at"     ` + t.timestamp + ` NULL,
 			-- How large the copy was when the last visit finished, in bytes.
 			-- What an operator sizing the cache reads.
 			"held_bytes"   ` + t.refNull + ` NULL,

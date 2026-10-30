@@ -71,9 +71,7 @@ The chain is the baseline, then one migration per release.
 
 | Migration | What it is |
 |---|---|
-| 41 | The baseline: v0.7.0's schema, made at once on an empty database (§ The baseline) |
-| 42 | v0.7.0's schema into v0.8.0's |
-| 43 | v0.8.0's schema into v0.9.0's |
+| 43 | The baseline: v0.9.0's schema, made at once on an empty database (§ The baseline) |
 | 44 | v0.9.0's schema into v0.10.0's |
 | 45 | v0.10.0's schema into v0.11.0's, the untagged release's own |
 
@@ -91,18 +89,19 @@ first.
 
 ## The baseline
 
-Migration 41 makes v0.7.0's schema directly. It is numbered as v0.7.0's last
-migration, so a database v0.7.0 or v0.8.0 built has it recorded and applies only
-what follows. A fresh install applies it and every migration after it.
+Migration 43 makes v0.9.0's schema directly. It is numbered as v0.9.0's last
+migration, so a database v0.9.0 or v0.10.x built has it recorded and applies
+only what follows. A fresh install applies it and every migration after it.
 
 | Rule | Reason |
 |---|---|
 | Each table is made by one declaration, beside the migration, grouped by area with the reasoning for its shape | The migration names every table after every table it points at |
-| v0.7.0's record of its schema holds the baseline | On each engine it builds exactly v0.7.0's columns, constraints and indexes, and the schema test fails on any line either side lacks |
+| v0.9.0's record of its schema holds the baseline | On each engine it builds exactly v0.9.0's columns, constraints and indexes, and the schema test fails on any line either side lacks |
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
-| A release's declaration may derive from a baseline declaration | v0.8.0's finding, decision occurrence and notification tables are the baseline's with indexes added; most of v0.9.0's add columns to the baseline's or v0.8.0's |
-| A baseline declaration a tagged migration reads keeps its name and its statements | Migration 42 reads the finding table's declaration by the name v0.7.0 gave it, and gets v0.7.0's statements byte for byte |
-| A database at versions 1 to 40 is refused | A release before v0.7.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.8.0 upgrades from version 39; below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
+| On PostgreSQL the baseline also sets the finding table's vacuum settings | They are storage settings, which no declaration holds (`design-docs/database-schema.md` § Indexes) |
+| A release's declaration may derive from a baseline declaration | v0.10.0's finding and supplier statement tables, and several of v0.11.0's, are the baseline's with columns or indexes added |
+| A baseline declaration a later migration reads keeps its name and its statements | Migrations 44 and 45 read declarations by the names v0.9.0 gave them, and get v0.9.0's statements byte for byte |
+| A database at versions 1 to 42 is refused | A release before v0.9.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.10.2 upgrades from version 41; v0.8.0 upgrades 39 and 40 to it, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
 
 ## Forward only
 
@@ -143,7 +142,7 @@ schema they build on each of the four engines, captured from the tag.
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | An edit changes a schema deployments hold without changing their version |
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files read column spellings and widths from helpers a later change may edit. On SQLite the description includes whether each key is `AUTOINCREMENT` and each index partial, which its listings omit |
 | The migration library's bookkeeping table is left out of the compared schema, and a record listing it is compared without it | The library chooses its column types, and its releases change them |
-| A release the baseline replaced lists no file | Its files are gone. v0.7.0's schema on each engine holds the baseline |
+| A release the baseline replaced lists no file | Its files are gone. v0.9.0's schema on each engine holds the baseline |
 
 A file a release owns is a migration numbered after the previous release's last
 up to its own, or a declaration named for it. A release changing no schema owns
@@ -188,7 +187,7 @@ refuses a tag whose release is not frozen, before building anything.
 
 `make upgrade-rehearsal FROM=<release> ENGINE=<engine>` upgrades a database an
 earlier release built and filled itself. It is step 2 of § Release records, run
-from every release from v0.7.0 on, on each engine. It builds images and scans
+from every release from v0.9.0 on, on each engine. It builds images and scans
 the demo's inventories, so it runs locally, outside the gate.
 
 | Stage | What it does |
@@ -196,15 +195,8 @@ the demo's inventories, so it runs locally, outside the gate.
 | The release's database | The release's image, built from its tag, runs its own demo targets unedited against the rehearsal's empty database: products, inventories, scans, a VEX document, decisions and an approval, an assignment, and a recorded flaw |
 | What it held | Open findings per build from its status report, and every table's row count with it stopped. A build with no count is not settled, and the wait refuses naming it |
 | The upgrade | This tree's image applies the migrations alone, reaching this tree's last migration |
-| The rows | A table both sides hold keeps its count; a table only the upgrade holds starts empty; a renamed table is counted under its new name on both sides. From a release before v0.9.0, components, nodes and edges may hold fewer, by no more than the release held for container images, and image versions start with no more rows than it held image nodes |
+| The rows | A table both sides hold keeps its count; a table only the upgrade holds starts empty; a renamed table is counted under its new name on both sides |
 | Served | This tree's server, started with the release's demo configuration, reports the same open findings per build, and no GET in the API document answers 5xx. The sweep names the build that sorts first. A GET whose path parameter the seed has no name for is skipped |
-
-| Table, from a release before v0.9.0 | Reconciles against |
-|---|---|
-| `statement_text` | One row per distinct reasoning, word for word, across the build claims and supplier statements the release held |
-| `recorded_rating` | One row per issue and product holding a recorded flaw rated by a word or by a score naming no publisher. An issue that absorbed another in a merge may add one |
-| `issue_rating` | Gains exactly the recorded words whose issue and product held no word in force, and keeps every word that was |
-| `vulnerability_rating` | Loses exactly the unsourced ratings of issues now holding a recorded rating. No other issue's unsourced ratings move, none is gained, and no rating naming a publisher moves |
 
 | Rule | Reason |
 |---|---|
@@ -232,7 +224,7 @@ One instance migrates at a time (REQ-72).
 | The advisory lock is taken on a pinned connection | A session lock released through the pool can land on another connection, and fails to release silently |
 | The release result is read | PostgreSQL and the MySQL-protocol servers report "you did not hold this" as a value |
 | A lock not held at its release fails the migration | The session was lost part way and another instance may have migrated alongside |
-| A waiter waits as long as the lock is held, on every engine, in attempts of five seconds, checking between them whether to stop | Migration 43 took 873 s on a production-shaped PostgreSQL database, and a five-minute bound gave up at 300 s |
+| A waiter waits as long as the lock is held, on every engine, in attempts of five seconds, checking between them whether to stop | The v0.9.0 upgrade took 873 s on a production-shaped PostgreSQL database, and a five-minute bound gave up at 300 s |
 | A waiting process answers its health check | A replica started beside a long migration waits it out |
 | A waiter names the holder at its first timed-out attempt and about once a minute after | A holder wedged part way holds every replacement behind it |
 | A holder that dies releases the lock | Session locks go with the session and a file lock with the process. The waiter takes it and applies the schema from where the rolled-back migration left it |

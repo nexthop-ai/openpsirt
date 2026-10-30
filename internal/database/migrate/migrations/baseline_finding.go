@@ -114,7 +114,6 @@ func findingBaseline(t *columnTypes) []string {
 			-- for the reason above: the table is declared later, and a rule is
 			-- retired rather than deleted.
 			"routed_by"        ` + t.refNull + ` NULL,
-			"last_changed_at"  ` + t.timestamp + ` NOT NULL,
 			-- How the scanner reached this, and where that match came from.
 			--
 			-- A distribution backports fixes without moving the upstream
@@ -222,7 +221,13 @@ func findingBaseline(t *columnTypes) []string {
 			CONSTRAINT "finding_closed_run_id_fk" FOREIGN KEY ("closed_run_id") REFERENCES "scan_run"("id")
 		)` + t.suffix,
 
-		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at")`,
+		// What is open in a build, with its deadline. The deadline report for
+		// one build reads the deadline as a range at the end of this prefix,
+		// so the rows of other builds and outside the window are never
+		// fetched. Measured on PostgreSQL with one processor, a build of
+		// 183,788 open findings in a deployment of 367,577: 256 ms a page
+		// through the deployment-wide deadline index, 205 ms through this one.
+		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at", "due_at")`,
 
 		// Open findings per component under one target, which the dependency
 		// graph walk counts for every component one step below the current
@@ -280,13 +285,22 @@ func findingBaseline(t *columnTypes) []string {
 		// its own and cannot say which, so every list that names one of them
 		// aggregates its column, and a column outside the index is a table
 		// row fetched per open finding.
-		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_exploited_here")`,
+		//
+		// Then when each finding opened and why it closed, then who holds it.
+		// The backlog trend reads only the first two beside the issue and the
+		// build, so it is answered from the index without the table. Measured
+		// on PostgreSQL with one processor over 375,843 findings, with those
+		// two columns and without them: 578 pages read and 16,500, the trend
+		// grouped in the database 88 ms and 172 ms, and the index 4.6 MB and
+		// 4.2 MB. The holder is read by every list asking who holds a group,
+		// and last because nothing narrows on it through this index.
+		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_exploited_here", "opened_at", "closed_because", "assigned_to")`,
 	}
 }
 
-// findingV070 is the baseline's declaration of the finding table, under the
-// name v0.8.0's declaration of it reads.
-func findingV070(t *columnTypes) []string {
+// findingV090 is the baseline's declaration of the finding table, under the
+// name v0.10.0's declaration of it reads.
+func findingV090(t *columnTypes) []string {
 	return findingBaseline(t)
 }
 
@@ -305,7 +319,11 @@ func suppressionBaseline(t *columnTypes) []string {
 			-- column allows. Whatever it adds next is not ours to bound.
 			"status"         ` + t.name + ` NOT NULL,
 			"justification"  ` + t.free + ` NULL,
-			"statement"      ` + t.text + ` NULL,
+			-- The reasoning the claim gives, stored once however many
+			-- subjects its statement names. Null where it gave none. A plain
+			-- reference without a foreign key: stored reasoning is never
+			-- deleted, so the reference cannot dangle.
+			"statement_id" ` + t.refNull + ` NULL,
 			"origin"         ` + t.kind + ` NOT NULL,
 			"subject_purl"   ` + t.text + ` NULL,
 			"subject_name"   ` + t.free + ` NULL,
@@ -342,6 +360,12 @@ func suppressionBaseline(t *columnTypes) []string {
 
 		`CREATE INDEX "suppression_open_idx" ON "suppression" ("target_id", "closed_scan_id")`,
 	}
+}
+
+// suppressionV090 is the baseline's declaration of a build's own claims, under
+// the name v0.11.0's declaration of the table reads.
+func suppressionV090(t *columnTypes) []string {
+	return suppressionBaseline(t)
 }
 
 // assessmentBaseline declares the assessment table, with the reason a claim was

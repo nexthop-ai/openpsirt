@@ -47,9 +47,9 @@ rest.
 |---|---|
 | The widest key is the notification index's, about 780 bytes on MySQL and MariaDB | Their row format allows 3,072 |
 | The grouping index has eleven columns | MySQL allows sixteen |
-| The two wider v0.8.0 indexes cost a write nothing measurable | Copying 375,843 findings took 6.5 to 8.6 s against 6.1 to 7.9 s with v0.7.0's |
+| The deadline and grouping indexes' last columns cost a write nothing measurable | Copying 375,843 findings took 6.5 to 8.6 s against 6.1 to 7.9 s without them |
 | On PostgreSQL the finding table is vacuumed after a fiftieth of it changes and analyzed after a hundredth | An index-only scan reads the table for every page changed since the last vacuum, and the default fifth is more than a nightly scan rewrites. With 46,980 of 375,843 rewritten, the package-kind count read the table 413,331 times in 246 ms at the default, and not at all in 64 ms at a fiftieth |
-| The vacuum settings are written once, by migration 42 | Values an operator sets on the table afterwards stay. The other engines have no such setting |
+| The vacuum settings are written once, by the baseline | Values an operator sets on the table afterwards stay. The other engines have no such setting |
 
 ## Planner statistics
 

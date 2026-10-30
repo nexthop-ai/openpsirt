@@ -133,7 +133,28 @@ func notificationBaseline(t *columnTypes) []string {
 		// the same property this relies on to let cleared rows accumulate.
 		`CREATE UNIQUE INDEX "notification_condition_idx"
 			ON "notification" ("person_id", "kind", "about_open")`,
+
+		// Who holds an open condition of one kind. Every sweep asks it once per
+		// kind, and the other indexes on the table lead with the person, so
+		// without this one each asking reads the whole table. The kind and the
+		// open rows are the prefix on all four engines, and the person last
+		// answers the read from the index alone. Measured with 152,859 open
+		// conditions over 204 people, without it and with it: 46 ms and
+		// 0.33 ms a read on PostgreSQL, averaged over every kind, and every
+		// kind once 2.9 s and 18 ms on MySQL.
+		`CREATE INDEX "notification_kind_open_idx" ON "notification" ("kind", "cleared_at", "person_id")`,
 	}
+}
+
+// notificationV080 is the baseline's declaration of the notification table,
+// and the indexes it makes, under the name v0.11.0's declaration of the table
+// reads.
+func notificationV080(t *columnTypes) []string {
+	made, indexes, err := pick(notificationBaseline(t), "notification")
+	if err != nil {
+		panic(err)
+	}
+	return append([]string{made}, indexes...)
 }
 
 // outboundBaseline declares where this deployment sends what it has to say. A
@@ -143,8 +164,12 @@ func outboundBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "outbound" (
 			"id"         ` + t.id + `,
-			-- What it is called, so a screen and a log line can name it.
+			-- What it is called, folded to lower case: the key that is
+			-- unique and that a retirement matches. A name is typed by an
+			-- administrator, so it is matched without regard to capitals.
 			"name"       ` + t.name + ` NOT NULL,
+			-- The name as it was typed, for a screen and a log line.
+			"display_name" ` + t.name + ` NOT NULL,
 			-- Which kinds go here. A name matches one kind; "*" matches every
 			-- one. A row per kind rather than a list in a column, because
 			-- "which destinations take this kind" is the question the sweep
@@ -223,6 +248,10 @@ func outboundDeliveryBaseline(t *columnTypes) []string {
 			-- string concatenation the four engines spell differently.
 			"notification_id" ` + t.ref + ` NOT NULL,
 			"attempts"    ` + t.ref + ` NOT NULL,
+			-- When the latest attempt began. An attempt that began a moment
+			-- ago and has neither gone nor failed is in flight, and is not
+			-- taken again beside it.
+			"attempted_at" ` + t.timestamp + ` NULL,
 			"sent_at"     ` + t.timestamp + ` NULL,
 			"failed"      ` + t.free + ` NULL,
 			"first_seen"  ` + t.timestamp + ` NOT NULL,
