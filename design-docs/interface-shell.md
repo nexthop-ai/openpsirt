@@ -119,7 +119,8 @@ are the slowest read.
 | Lapsed decisions are drawn for a reader of either family at the picked scope; its line counting findings with a lapsed decision is asked only where dependency findings are counted there | A decision lapses on either family; the findings line counts dependency findings |
 | The work figures (sent back, pending approval) and in progress stay for every reader of either family | They hold both families' work |
 | What is assigned to the reader is one figure per family, under the rule for the reader's own lists in `design-docs/interface-review.md` § Assignments and assignment rules; held in another product and holding none, the figure is a dash with the family's line | One figure over both families counts two units as one |
-| A reader of no finding in any product has a Records panel in place of the estate's figures, opening the audit log, access and settings where they may read them; the work figures and panels stay; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records, and a capability held without a read role still brings assigned work (`design-docs/access.md` § Breadth of view) |
+| A reader of no finding in any product who administers, audits or collaborates on nothing has a Records panel in place of the estate's figures, opening the audit log, access and settings where they may read them; the work figures and panels stay; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records, and a capability held without a read role still brings assigned work (`design-docs/access.md` § Breadth of view) |
+| A reader the session says collaborates has a Your cases panel, whatever else they read: each case by its issue and product, opening the product's findings list searched for the issue, and each code finding granted by its rule, file, flaw and product, opening it on the build it was last seen in (`design-docs/access-disclosure.md` § Own cases). The list is asked only for them, and the panel is absent where every grant has ended | A grant reaches one thing, and the notice that brought them in scrolls away |
 | The line under the greeting counts the products the reader reads | |
 | Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
 | What became of decisions is counted from a page read, and the tile says where the page was cut | It is derived, with no count to ask for |
@@ -159,4 +160,3 @@ chosen (REQ-64).
 | Limit | Detail |
 |---|---|
 | A known-exploited tile needs a product | Nothing counts exploited findings without one to narrow inside |
-| A case collaborator's home lists none of their cases | Their Records panel opens nothing they hold. Their case is reached from the notice that brought them in and from Incidents |

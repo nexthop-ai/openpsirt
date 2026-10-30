@@ -30,6 +30,7 @@ import {
   uploadsAt,
   incidentsAt,
   productFindingsAt,
+  codeFindingAt,
   reviewQueueAt,
 } from "../app/routes";
 
@@ -124,7 +125,8 @@ export function Home({ who }: { who: Who }) {
       <HeldLine at={dependencies} />
 
       <div className="panels">
-        {readsNothing(who) && <Records who={who} />}
+        {readsNothing(who) && (keepsRecords(who) || !who.collaborates) && <Records who={who} />}
+        {who.collaborates && <YourCases />}
         <Pending />
         <InProgress me={who.identity} />
         {/* Lapsed decisions are on either family; the lapsed findings line
@@ -783,8 +785,14 @@ function greeting(): string {
 // in any product: an auditor, an administrator with no role on a product, or
 // somebody holding a capability alone. The deployment's records are what they
 // may open, never figures that are zero because none of them is theirs.
+// Whether the reader keeps the deployment's records: an administrator or an
+// auditor, whose work the Records panel opens.
+function keepsRecords(who: Who): boolean {
+  return who.admin || !!who.audits;
+}
+
 function Records({ who }: { who: Who }) {
-  const keeps = who.admin || !!who.audits;
+  const keeps = keepsRecords(who);
   return (
     <div className="panel">
       <header>
@@ -804,6 +812,69 @@ function Records({ who }: { who: Who }) {
           </Link>
         </footer>
       )}
+    </div>
+  );
+}
+
+// The cases the reader was brought into and the code findings they were
+// granted, each opening the one thing the grant reaches. Drawn only for a
+// collaborator, and only where a grant still reaches something: a code
+// finding's grant ends with its flaw's disclosure.
+function YourCases() {
+  const own = useQuery({
+    queryKey: ["session", "cases"],
+    queryFn: async () => unwrap(await api.GET("/v1/session/me/cases", {})),
+  });
+  if (own.isPending) return null;
+  if (own.isError) {
+    return (
+      <div className="panel">
+        <header>
+          <h3>Your cases</h3>
+        </header>
+        <Failed error={own.error} what="Your cases could not be read." />
+      </div>
+    );
+  }
+  const cases = own.data.cases ?? [];
+  const codeFindings = own.data.code_findings ?? [];
+  if (cases.length + codeFindings.length === 0) return null;
+  return (
+    <div className="panel">
+      <header>
+        <h3>Your cases</h3>
+      </header>
+      <ul>
+        {cases.map((each) => (
+          <li key={`case ${each.product} ${each.issue}`}>
+            <Link className="id" to={productFindingsAt(each.product, { q: each.issue })}>
+              {each.issue}
+            </Link>{" "}
+            <span className="what">in {each.product_name || each.product}</span>
+          </li>
+        ))}
+        {codeFindings.map((each) => (
+          <li key={`code ${each.product} ${each.occurrence}`}>
+            <Link
+              className="id"
+              to={codeFindingAt(
+                {
+                  product: each.product,
+                  branch_or_tag: each.branch_or_tag,
+                  variant: each.variant,
+                },
+                each.occurrence,
+              )}
+            >
+              {each.rule}
+            </Link>{" "}
+            <span className="what">
+              code finding at {each.path}, recorded as {each.flaw} in{" "}
+              {each.product_name || each.product}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
