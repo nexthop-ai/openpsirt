@@ -19,6 +19,7 @@ import { usePaging } from "./list";
 import { findingOf, vulnerabilityReportAt, codeFindingAt, codeFindingsAt } from "../app/routes";
 import { useHandBack, useHeldReports } from "../api/intake";
 import { counted, holding } from "../app/families";
+import { useOwnWork, type WorkFamily } from "../app/ownWork";
 import { HeldLine } from "../ui/HeldLine";
 import { on } from "../ui/when";
 
@@ -50,6 +51,10 @@ export function Assignments() {
   const othersCounted = counted(dependencies) || counted(code);
   const tab = othersCounted ? (params.get("tab") ?? "due") : "due";
   const { offset, go: goTo } = usePaging();
+  // What the reader holds is two lists, one per family, each paged on its
+  // own: a rule at a place and an advisory at a component are different
+  // units, so neither page nor total spans both.
+  const codePaging = usePaging(CODE_OFFSET);
   // The product the picker is on, which is the whole of what this answers for:
   // somebody scoped to one product is shown and counted work from that product
   // alone.
@@ -72,15 +77,10 @@ export function Assignments() {
   const person = params.get("person") ?? "";
   const team = params.get("team") ?? "";
   const holder = team || person;
-  const mine = useQuery({
-    queryKey: ["assigned", "me", scope, offset],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/people/{identity}/assignments", {
-          params: { path: { identity: "me" }, query: { limit: PAGE, offset, ...scope } },
-        }),
-      ),
-  });
+  const mine = [
+    useOwnWork(who.data, "dependency", scope, { limit: PAGE, offset }),
+    useOwnWork(who.data, "code", scope, { limit: PAGE, offset: codePaging.offset }),
+  ];
   // Another holder's list is drawn on the Assigned to others tab alone, so it
   // is asked only there: a kept link naming somebody, followed by a reader the
   // tab is not drawn for, asks nothing.
@@ -113,6 +113,7 @@ export function Assignments() {
     if (next === "due") now.delete("tab");
     else now.set("tab", next);
     now.delete("offset");
+    now.delete(CODE_OFFSET);
     setParams(now);
   }
 
@@ -126,7 +127,6 @@ export function Assignments() {
   const own = (row: { person?: string; team?: boolean }) =>
     !row.team && row.person === who.data?.identity;
   const others = peopleRows.filter((row) => !own(row));
-  const myCount = peopleRows.find(own)?.open ?? 0;
   // Code findings are left out of the findings list, so the unheld ones of the
   // product in scope are linked where this screen points at unheld work.
   const codeFindingsIn = scope.product && counted(code) ? scope.product : undefined;
@@ -149,7 +149,7 @@ export function Assignments() {
           aria-selected={tab === "due"}
           onClick={() => go("due")}
         >
-          Assigned to me <span className="n">{(mine.data?.total ?? myCount).toLocaleString()}</span>
+          Assigned to me
         </button>
         {othersCounted && (
           <button
@@ -163,9 +163,9 @@ export function Assignments() {
         )}
       </div>
 
-      {/* Who else holds what is said to be of the families read here, and
-          where neither is, that neither is. */}
-      {(tab === "people" || !othersCounted) && (
+      {/* Who else holds what is said to be of the families read here. On
+          the reader's own tab each family says it for itself. */}
+      {tab === "people" && (
         <>
           <HeldLine at={dependencies} />
           <HeldLine at={code} />
@@ -184,15 +184,24 @@ export function Assignments() {
 
       {tab === "due" ? (
         <>
-          <Held
-            rows={mine.data?.items ?? []}
-            total={mine.data?.total ?? 0}
-            query={mine}
-            offset={offset}
-            onGo={goTo}
-            empty="Nothing is assigned to you."
-            detail="Work you take on from a finding, or that somebody hands you, appears here."
-          />
+          {/* A reader of neither family anywhere, holding nothing: both
+              lists answered empty, which is the one thing there is to say. */}
+          {mine.every(
+            (work) => work.at.held === "nowhere" && work.query.isSuccess && !work.drawn,
+          ) && (
+            <Empty
+              title="Nothing is assigned to you."
+              detail="Work somebody hands you appears here."
+            />
+          )}
+          {mine.map((work) => (
+            <OwnFamily
+              key={work.family}
+              work={work}
+              onGo={work.family === "code" ? codePaging.go : goTo}
+              offset={work.family === "code" ? codePaging.offset : offset}
+            />
+          ))}
           <Reports whose={{ person: "me" }} product={scope.product} />
         </>
       ) : holder ? (
@@ -244,6 +253,64 @@ export function Assignments() {
       {tab === "people" && !holder && (
         <Reports whose="nobody" product={scope.product} title="Reports nobody holds" />
       )}
+    </>
+  );
+}
+
+// The parameter the reader's own code findings are paged by, beside the
+// dependency findings' `offset`.
+const CODE_OFFSET = "code_offset";
+
+const OWN: Record<WorkFamily, { title: string; empty: string; detail: string }> = {
+  dependency: {
+    title: "Dependency findings",
+    empty: "No dependency findings are assigned to you.",
+    detail: "Work you take on from a finding, or that somebody hands you, appears here.",
+  },
+  code: {
+    title: "Code findings",
+    empty: "No code findings are assigned to you.",
+    detail: "Code findings you take on from the security testing queue appear here.",
+  },
+};
+
+// One family of the reader's own work: its count and its rows where the
+// count says what it counts, and the line saying why not where it does not.
+function OwnFamily({
+  work,
+  offset,
+  onGo,
+}: {
+  work: ReturnType<typeof useOwnWork>;
+  offset: number;
+  onGo: (offset: number) => void;
+}) {
+  const said = OWN[work.family];
+  if (!work.drawn) {
+    // Held nowhere, a family the reader holds nothing of is not drawn.
+    if (work.at.held === "nowhere") return null;
+    return (
+      <>
+        <h3 style={{ margin: "18px 0 8px" }}>{said.title}</h3>
+        <HeldLine at={work.at} />
+      </>
+    );
+  }
+  return (
+    <>
+      <h3 style={{ margin: "18px 0 8px" }}>
+        {said.title} <span className="n">{(work.query.data?.total ?? 0).toLocaleString()}</span>
+      </h3>
+      <HeldLine at={work.at} />
+      <Held
+        rows={work.query.data?.items ?? []}
+        total={work.query.data?.total ?? 0}
+        query={work.query}
+        offset={offset}
+        onGo={onGo}
+        empty={said.empty}
+        detail={said.detail}
+      />
     </>
   );
 }

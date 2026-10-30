@@ -19,7 +19,8 @@ import { SOON_DAYS } from "./FindingsFilters";
 import { paceReading, mixReading } from "../ui/trend";
 import { decisionOf, useQueueCount } from "../api/decisions";
 import type { Who } from "../app/session";
-import { counted, holding, readsNothing, type Holding } from "../app/families";
+import { counted, heldLine, holding, readsNothing, type Holding } from "../app/families";
+import { useOwnWork } from "../app/ownWork";
 import { HeldLine } from "../ui/HeldLine";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
@@ -113,7 +114,13 @@ export function Home({ who }: { who: Who }) {
         </p>
       </div>
 
-      <Figures counting={counting} points={points} trend={trend} dependencies={dependencies} />
+      <Figures
+        who={who}
+        counting={counting}
+        points={points}
+        trend={trend}
+        dependencies={dependencies}
+      />
       <HeldLine at={dependencies} />
 
       <div className="panels">
@@ -406,11 +413,13 @@ function reading(now: number, shipped: number, release: string): string {
 // selection makes is on screen rather than inferred. Unscoped the twin is not
 // drawn: it would be the same number said twice.
 function Figures({
+  who,
   counting,
   points,
   trend,
   dependencies,
 }: {
+  who: Who;
   counting: string;
   points: { open?: number; by_severity?: Record<string, number> }[];
   trend: Readable;
@@ -460,15 +469,12 @@ function Figures({
   });
   // This person's holdings, and what has come back to them: Home answers
   // "what do I do next" as well as "how much is there".
-  const assigned = useQuery({
-    queryKey: ["home", "assigned", "me", scope],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/people/{identity}/assignments", {
-          params: { path: { identity: "me" }, query: { limit: 1, ...scope } },
-        }),
-      ),
-  });
+  // One figure per family, never their sum: a rule at a place and an
+  // advisory at a component are different units.
+  const own = [
+    useOwnWork(who, "dependency", scope, { limit: 1, offset: 0 }),
+    useOwnWork(who, "code", scope, { limit: 1, offset: 0 }),
+  ];
   // The open vulnerability reports this person and their teams hold. A report
   // belongs to a product and no build, so it is counted beside the findings
   // rather than among them.
@@ -577,17 +583,42 @@ function Figures({
     <div className="kpis">
       {/* Hers first. What somebody opening this most days has to decide is
           what to pick up, and a count of the estate does not answer it. */}
-      <button type="button" className="kpi" onClick={() => navigate("/assignments")}>
-        <span className="l">Assigned to you · {counting}</span>
-        <span className="n">
-          <Count of={assigned}>{() => (assigned.data?.total ?? 0).toLocaleString()}</Count>
-        </span>
-        <span className="d">
-          yours and your teams&rsquo;
-          {(reports.data?.total ?? 0) > 0 &&
-            `, and ${reports.data?.total?.toLocaleString()} ${reports.data?.total === 1 ? "report" : "reports"}`}
-        </span>
-      </button>
+      {own.map(
+        (work) =>
+          (work.drawn || work.at.held !== "nowhere") && (
+            <button
+              key={work.family}
+              type="button"
+              className="kpi"
+              onClick={() => navigate("/assignments")}
+            >
+              <span className="l">
+                {work.family === "code" ? "Code findings" : "Dependency findings"} assigned to you ·{" "}
+                {counting}
+              </span>
+              <span className="n">
+                {work.drawn ? (
+                  <Count of={work.query}>
+                    {() => (work.query.data?.total ?? 0).toLocaleString()}
+                  </Count>
+                ) : (
+                  "—"
+                )}
+              </span>
+              <span className="d">
+                {!work.drawn
+                  ? heldLine(work.at)
+                  : work.family === "code"
+                    ? "yours and your teams’"
+                    : `yours and your teams’${
+                        (reports.data?.total ?? 0) > 0
+                          ? `, and ${reports.data?.total?.toLocaleString()} ${reports.data?.total === 1 ? "report" : "reports"}`
+                          : ""
+                      }`}
+              </span>
+            </button>
+          ),
+      )}
       <button
         type="button"
         className={`kpi${sentBack > 0 ? " urgent" : ""}`}

@@ -107,15 +107,12 @@ Assignments is two tabs: what is due soon and undecided, and who holds what.
 | A picker nobody can use says so in the box, "Pick a product to assign", and is drawn disabled | |
 | Offering work to somebody needs a product picked, and says so; taking it does not | The list spans products |
 | A team's row opens the team's queue | A team holds work as a person does |
-| What the reader and their teams hold is counted for every reader; who else holds what counts findings of both families, so its tab is drawn, and its totals and any one holder's list asked, only where the reader reads one at the scope, with the line for a family read in another product (`design-docs/interface.md` § Families a reader holds) | "Nobody else is holding anything" reads as no open work |
+| What the reader and their teams hold is two lists, dependency findings and code findings, each with its own count and pages, never one summed figure (`design-docs/kinds.md` § Consumers) | A rule at a place and an advisory at a component are different units |
+| Each of the reader's own lists is asked for every reader and drawn where the family is counted at the scope or the reader holds some of it; held in another product and holding none, the family's line stands in its place; held nowhere and holding none, it is absent | Work handed to somebody stays theirs where it is disclosed, so a reader of nothing can still hold some |
+| Who else holds what counts findings of both families, so its tab is drawn, and its totals and any one holder's list asked, only where the reader reads one at the scope, with the line for a family read in another product (`design-docs/interface.md` § Families a reader holds) | "Nobody else is holding anything" reads as no open work |
 | Where nobody else holds anything in a picked product, it links that product's unassigned code findings where the code family is counted there | The findings list holds no code finding |
 | A holder's list carries the reports they hold below their findings, and the people tab the reports nobody holds, drawn only where there are any; the people table counts each holder's open reports in a column; the narrowing is the product picked | Most people read no reports |
 | A holder nothing matches holds nothing, never refused; the read is narrowed by what the caller may see | A refusal would answer whether a team exists |
-
-Work nobody holds is the findings list under two filters (nobody assigned,
-nothing decided), keeping the rail entry's label, icon and place. Its badge is
-counted from that address through the list's own query, the list's three
-silent-address narrowings included. `/unassigned` still resolves to it.
 
 The assignment rules screen (REQ-34) is per product, a numbered list because
 order is precedence: the first matching rule places the work.

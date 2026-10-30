@@ -319,7 +319,10 @@ describe("the home page", () => {
     expect(asked(spy)).not.toContain("/v1/trend/releases");
     expect(asked(spy)).not.toContain("/v1/running-out");
     expect(asked(spy)).not.toContain("/v1/products/{product}/findings");
-    expect(tiles().some((each) => each.startsWith("Assigned to you"))).toBe(true);
+    expect(tiles().some((each) => each.startsWith("Code findings assigned to you"))).toBe(true);
+    expect(tiles().some((each) => each.startsWith("Dependency findings assigned to you"))).toBe(
+      false,
+    );
   });
 
   const panels = () =>
@@ -370,10 +373,24 @@ describe("the home page of a capability without a read role", () => {
       (each) => each.textContent,
     );
     expect(panels).toContain("Pending your approval");
+    // Holding nothing of a family read nowhere draws no figure of it, so no
+    // zero stands for work they cannot be handed.
     const labels = Array.from(mount.host().querySelectorAll(".kpi .l")).map(
       (each) => each.textContent ?? "",
     );
-    expect(labels.some((each) => each.startsWith("Assigned to you"))).toBe(true);
+    expect(labels.some((each) => each.includes("assigned to you"))).toBe(false);
+  });
+
+  it("counts the work handed to them, though they read neither family", async () => {
+    const approver = who([reaching("sonic", { may_agree: true, agrees_private: true })]);
+    serving(approver, { "/v1/people/{identity}/assignments": { items: [], total: 2 } });
+    mount.render(screen(<Home who={approver} />, "/", "*"));
+    await settle();
+    const labels = Array.from(mount.host().querySelectorAll(".kpi")).map(
+      (each) =>
+        `${each.querySelector(".l")?.textContent?.split(" · ")[0]} ${each.querySelector(".n")?.textContent}`,
+    );
+    expect(labels).toContain("Dependency findings assigned to you 2");
   });
 });
 
