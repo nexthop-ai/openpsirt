@@ -6,10 +6,13 @@
 package dbtest_test
 
 import (
+	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -53,35 +56,59 @@ func TestARaceBetweenOurCodeAndTheDatabaseLayerIsReported(t *testing.T) {
 	}
 }
 
+// raceRounds is how many times the child races, each over a variable of its
+// own. On two loaded processors one race went unreported in 4 runs of 60,
+// and in 3 of 100 with the two goroutines overlapping throughout; a report
+// needs only one round seen.
+const raceRounds = 8
+
 // raceAcrossAQuery scans query results into a variable on one goroutine while
-// another reads it. The reader touches nothing else, so nothing it does orders
-// it against the writer.
+// another reads it, in rounds. The reader touches nothing else between its
+// reads, so nothing it does orders a read against a write.
 func raceAcrossAQuery(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		var shared string
-		var scanned error
-		read := 0
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			for range 50 {
-				if scanned = db.QueryRowContext(ctx, `SELECT 'scanned'`).Scan(&shared); scanned != nil {
-					return
-				}
+		for range raceRounds {
+			if err := raceOnce(t.Context(), db); err != nil {
+				t.Fatal(err)
 			}
-		}()
-		go func() {
-			defer wg.Done()
-			for range 50 {
-				read += len(shared)
-			}
-		}()
-		wg.Wait()
-		if scanned != nil {
-			t.Fatal(scanned)
 		}
-		t.Logf("read %d bytes", read)
 	})
+}
+
+// raceOnce is one round. The two overlap by construction: the writer waits
+// until the reader has begun and the reader reads until the writer has
+// finished, each told through an atomic flag, so the reads run throughout the
+// scans however the two are scheduled, and neither flag orders a read against
+// a write.
+func raceOnce(ctx context.Context, db *database.DB) error {
+	shared := new(string)
+	var scanned error
+	var reading, scanning atomic.Bool
+	scanning.Store(true)
+	read := 0
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		defer scanning.Store(false)
+		for !reading.Load() {
+			runtime.Gosched()
+		}
+		for range 50 {
+			if scanned = db.QueryRowContext(ctx, `SELECT 'scanned'`).Scan(shared); scanned != nil {
+				return
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		reading.Store(true)
+		for scanning.Load() {
+			read += len(*shared)
+			runtime.Gosched()
+		}
+	}()
+	wg.Wait()
+	_ = read
+	return scanned
 }
