@@ -20,8 +20,8 @@ func TestWhoMayCountCodeFindingsAtAComponent(t *testing.T) {
 		const (
 			counts       = "/v1/products/mine/components/mine-src/code-finding-counts"
 			theirCounts  = "/v1/products/theirs/components/mine-src/code-finding-counts"
-			trend        = hubBuild + "/components/libmine1/code-finding-trend"
-			absentTrend  = hubBuild + "/components/nosuch/code-finding-trend"
+			trend        = hubTrendOf + "&beneath=libmine1"
+			absentTrend  = hubTrendOf + "&beneath=nosuch"
 			tree         = hubBuild + "/components?code_findings=true"
 			plainTree    = hubBuild + "/components"
 			around       = hubBuild + "/components/libmine1/around?code_findings=true"

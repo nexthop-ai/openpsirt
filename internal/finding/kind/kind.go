@@ -168,10 +168,18 @@ const (
 	Evidence Consumer = "evidence"
 	// CodeFindings is the code finding queue: the code findings a product holds, by where they stand,
 	// with how many each list leaves out, the queue's file, the code findings a
-	// findings list's file carries, and the counts by analyzer series. The
-	// counts are here rather than under Statistics, which feeds the
+	// findings list's file carries, and the counts by analyzer series. A
+	// count here is the length of the list it opens, so it is the queue's
+	// own read rather than a figure of Statistics, which feeds the
 	// vulnerability figures.
 	CodeFindings Consumer = "code-findings"
+	// SecurityTestingStatistics is every figure about security testing
+	// results over time: code findings not fixed week by week, what opened and
+	// what was fixed, and the analyzer changes marked beside them. Kept apart
+	// from Statistics, so a security testing result is never added to a
+	// dependency vulnerability figure (REQ-87): a rule at a place and an
+	// advisory at a component are different units.
+	SecurityTestingStatistics Consumer = "security-testing-statistics"
 )
 
 // consumers is every consumer of findings.
@@ -179,6 +187,7 @@ func consumers() []Consumer {
 	return []Consumer{
 		Closure, VersionCarry, Ranking, Triage, Assignment, Decisions, Inventory, Statistics,
 		Exports, Register, VEX, Advisories, Notifications, Evidence, CodeFindings,
+		SecurityTestingStatistics,
 	}
 }
 
@@ -200,7 +209,7 @@ func (c Consumer) Kinds() []Kind {
 		return []Kind{Vulnerability, Entered}
 	case Assignment, Decisions, Exports:
 		return []Kind{Vulnerability, Entered, Analysis}
-	case Evidence, CodeFindings:
+	case Evidence, CodeFindings, SecurityTestingStatistics:
 		return []Kind{Analysis}
 	}
 	return nil

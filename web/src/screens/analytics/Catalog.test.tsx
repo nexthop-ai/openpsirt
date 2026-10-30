@@ -83,6 +83,35 @@ describe("a catalog entry that needs a scope", () => {
   });
 });
 
+describe("the security testing reports", () => {
+  const session = (reads: boolean) => ({
+    identity: "ana",
+    name: "Ana",
+    kind: "person",
+    reach: [{ product: "sonic", reads_public: true, reads_security_testing: reads }],
+    outcomes: [],
+  });
+
+  it("are listed to a reader of security testing material in some product", async () => {
+    serve((path) => (path === "/v1/session/me" ? { data: session(true) } : undefined));
+    mount.render(screen(<Catalog />, "/products/sonic"));
+    await settle();
+    expect(row("Code findings over time").getAttribute("href")).toBe(
+      "/analytics/code-findings-over-time",
+    );
+    expect(row("Code findings by analyzer").tagName).toBe("A");
+  });
+
+  it("are absent for a reader holding it nowhere", async () => {
+    serve((path) => (path === "/v1/session/me" ? { data: session(false) } : undefined));
+    mount.render(screen(<Catalog />, "/products/sonic"));
+    await settle();
+    expect(mount.host().textContent).not.toContain("Code findings over time");
+    expect(mount.host().textContent).not.toContain("Security testing");
+    expect(mount.host().textContent).toContain("Release comparison");
+  });
+});
+
 describe("a report reached at the name it had before", () => {
   // A link to it sits in messages already sent and notifications already
   // stored, and the window it asked for is what makes the page hold what

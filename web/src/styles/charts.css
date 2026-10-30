@@ -44,6 +44,14 @@
 .chart .bar-res {
   fill: var(--ok);
 }
+.chart .mark line {
+  stroke: var(--faint);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.chart .mark path {
+  fill: var(--faint);
+}
 .chart .zero {
   stroke: var(--line-strong);
   stroke-width: 1;

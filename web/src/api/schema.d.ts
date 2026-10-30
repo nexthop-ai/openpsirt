@@ -3162,34 +3162,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/code-finding-trend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Trend a component's code findings
-         * @description Returns, per week, the code findings one build places at a component or anywhere under it that are not fixed at the end of the week, and how many were opened and fixed in it. The walk under the component is the one the dependency tree counts with, and under the build's root it is every code finding of the build. Weeks end now and every seven days before; a code finding is dated by when the run that opened it was applied.
-         *
-         *     A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing.
-         *
-         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices.
-         *
-         *     Refused, with no count, to anybody who does not read security testing material in the product.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
-         */
-        get: operations["trend-component-code-findings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues": {
         parameters: {
             query?: never;
@@ -3928,6 +3900,56 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
          */
         get: operations["list-code-finding-series"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trend code findings
+         * @description Returns, per week, the code findings of a product that are not fixed at the end of the week, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it. Weeks end now and every seven days before; a code finding is dated by when the run that opened it was applied, and counted once however many builds hold it.
+         *
+         *     A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing. `no_longer_detected` is how many a comparable run did not see, now, and has no weekly history.
+         *
+         *     `markers` are the runs that changed what the trend compares: another tool, version or rule set than the run before on the same build, and runs whose absences are no evidence.
+         *
+         *     Takes the code finding list's narrowings but the state and the holder. Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["trend-code-findings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-trend.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the code finding trend
+         * @description The code finding trend as a file: per week, a row with what was not fixed, opened and fixed and the markers of that week, then a row per tier, method and series with what of it was not fixed. The columns are the same whatever the data holds. Takes what the trend takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["export-code-finding-trend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8617,6 +8639,33 @@ export interface components {
             /** @description Whether it is the same flaw: a weakness of the same family, its last place within two lines. Otherwise within ten, and offered as possibly the same */
             same: boolean;
         };
+        CodeFindingMarkerBody: {
+            /**
+             * Format: date
+             * @description The day the runs were applied
+             */
+            at: string;
+            /**
+             * @description What changed from the run applied before on the same build: the tool, its version or its rules; or not-comparable, a run whose absences are no evidence for another reason
+             * @enum {string}
+             */
+            change: "not-comparable" | "rules" | "tool" | "tool-version";
+            /** @description The tool, the version or the number of rules before, where the run before stated one */
+            from?: string;
+            /**
+             * @description Why the runs were not comparable. Only on not-comparable
+             * @enum {string}
+             */
+            reason?: "exit-status" | "incomplete" | "failure-signal" | "no-coverage" | "units-short" | "tool-changed" | "rules-changed";
+            /**
+             * Format: int64
+             * @description How many runs, one per build, made the change that day
+             */
+            runs: number;
+            series: string;
+            /** @description The tool, the version or the number of rules after, where the run states one */
+            to?: string;
+        };
         CodeFindingOccurrence: {
             /** @description Whether the link opens on a branch the product names rather than on the analyzed commit */
             approximate?: boolean;
@@ -8658,6 +8707,40 @@ export interface components {
             unlinked?: string;
             /** @description The place's path inside that repository */
             within?: string;
+        };
+        CodeFindingPointBody: {
+            /**
+             * Format: date
+             * @description The day the week ends
+             */
+            at: string;
+            /** @description not_fixed by testing method, each named */
+            by_method: {
+                [key: string]: number;
+            };
+            /** @description not_fixed by analyzer series, naming every series with a code finding counted in any week */
+            by_series: {
+                [key: string]: number;
+            };
+            /** @description not_fixed by the tier of the rule's weaknesses as rated now: memory-safety, input, resource and other, each named */
+            by_tier: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Code findings closed as fixed in the week. Zero on the first week
+             */
+            fixed: number;
+            /**
+             * Format: int64
+             * @description Code findings opened and not closed as fixed by the end of the week, whatever was decided about them
+             */
+            not_fixed: number;
+            /**
+             * Format: int64
+             * @description Code findings not fixed at the end of the week that were not at the end of the one before. Zero on the first week
+             */
+            opened: number;
         };
         CodeFindingRowBody: {
             /** @description Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it */
@@ -8744,6 +8827,23 @@ export interface components {
              * @description Open code findings a decision waiting for a second person leaves out of the queue, counted among the open in states
              */
             waiting: number;
+        };
+        CodeFindingTrendBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CodeFindingTrendBody.json
+             */
+            readonly $schema?: string;
+            /** @description Runs applied in the weeks that changed what the trend compares, oldest first, one per day, series and change */
+            markers: components["schemas"]["CodeFindingMarkerBody"][] | null;
+            /**
+             * Format: int64
+             * @description Code findings a comparable run did not see, now: the code finding list's no-longer-detected count for the same narrowing. Absence closes nothing, so these are counted in not_fixed too
+             */
+            no_longer_detected: number;
+            /** @description One per week, oldest first */
+            points: components["schemas"]["CodeFindingPointBody"][] | null;
         };
         CodeFindingsOutputBody: {
             /**
@@ -11533,17 +11633,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["TokenBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodyTrendPointBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyTrendPointBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["TrendPointBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -14933,28 +15022,6 @@ export interface components {
             revision_history: components["schemas"]["Revision"][] | null;
             status: string;
             version: string;
-        };
-        TrendPointBody: {
-            /**
-             * Format: date
-             * @description The day the step ends
-             */
-            at: string;
-            /**
-             * Format: int64
-             * @description Code findings closed as fixed in the step
-             */
-            fixed: number;
-            /**
-             * Format: int64
-             * @description Code findings opened and not closed as fixed by the end of the step, whatever was decided about them
-             */
-            not_fixed: number;
-            /**
-             * Format: int64
-             * @description Code findings not fixed at the end of the step that were not at the end of the one before
-             */
-            opened: number;
         };
         "Trust-upstreamRequest": {
             /**
@@ -20437,49 +20504,6 @@ export interface operations {
             };
         };
     };
-    "trend-component-code-findings": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components */
-                namespace?: string;
-                /** @description The number of weeks, ending now */
-                weeks?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                branch_or_tag: string;
-                variant: string;
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyTrendPointBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "list-issues-at-component": {
         parameters: {
             query?: {
@@ -21641,6 +21665,113 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["List-code-finding-seriesResponse"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "trend-code-findings": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship, as the code finding list reads the name */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. This needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description The number of weeks, ending now */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingTrendBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-finding-trend": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship, as the code finding list reads the name */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. This needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description The number of weeks, ending now */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

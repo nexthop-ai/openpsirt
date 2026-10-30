@@ -169,32 +169,48 @@ export function useComponentCodeCounts(
   });
 }
 
-// Code findings at a component and under it on one build, week by week.
-export function useComponentCodeTrend(
-  build: Build,
-  component: string,
-  which: { version?: string; ecosystem?: string; namespace?: string },
-  weeks: number,
-): UseQueryResult<Body<"TrendPointBody">[]> {
+export type CodeFindingTrend = Body<"CodeFindingTrendBody">;
+export type CodeFindingMarker = Body<"CodeFindingMarkerBody">;
+
+// What narrows a trend of code findings: the queue's narrowing but the state
+// and the holder, which a line of what is not fixed does not read.
+type CodeFindingTrendAsked = Omit<CodeFindingsAsked, "state" | "assigned"> & {
+  weeks: number;
+};
+
+// Code findings of a product week by week: not fixed, split by tier, series
+// and method, what opened and was fixed, and the runs that changed what is
+// compared. Asked only where the reader reads security testing material in
+// the product, because a count not drawn is not asked for.
+export function useCodeFindingTrend(
+  product: string,
+  asked: CodeFindingTrendAsked,
+  enabled: boolean,
+): UseQueryResult<CodeFindingTrend> {
   return useQuery({
-    queryKey: ["code-findings", build.product, "trend", build, component, which, weeks],
+    enabled,
+    queryKey: ["code-findings", product, "trend", asked],
     queryFn: async () =>
       unwrap(
-        await api.GET(
-          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/code-finding-trend",
-          {
-            params: {
-              path: { ...build, component },
-              query: {
-                weeks,
-                ...(which.version ? { version: which.version } : {}),
-                ...(which.ecosystem ? { ecosystem: which.ecosystem } : {}),
-                ...(which.namespace ? { namespace: which.namespace } : {}),
-              },
+        await api.GET("/v1/products/{product}/code-finding-trend", {
+          params: {
+            path: { product },
+            query: {
+              weeks: asked.weeks,
+              ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
+              ...(asked.variant ? { variant: asked.variant } : {}),
+              ...(asked.series ? { series: asked.series } : {}),
+              ...(asked.method ? { method: asked.method } : {}),
+              ...(asked.component ? { component: asked.component } : {}),
+              ...(asked.component_version ? { component_version: asked.component_version } : {}),
+              ...(asked.beneath ? { beneath: asked.beneath } : {}),
+              ...(asked.beneath_version ? { beneath_version: asked.beneath_version } : {}),
+              ...(asked.beneath_ecosystem ? { beneath_ecosystem: asked.beneath_ecosystem } : {}),
+              ...(asked.beneath_namespace ? { beneath_namespace: asked.beneath_namespace } : {}),
             },
           },
-        ),
-      ).items ?? [],
+        }),
+      ),
     retry: false,
   });
 }

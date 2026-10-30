@@ -477,7 +477,6 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."build_id" = "f"."build_id"
 			  AND "fo"."closed_at" IS NULL))`).
 		Where(kinds, kindArgs...)
-	q = scope.inScope(q)
 	if scope.across() {
 		where, args := access.VisibleWhere(`"s"."product_id"`, `"f"."visibility"`, access.Split(scope.Across, subject.Reads))
 		q = q.Where(where, args...)
@@ -485,6 +484,16 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		reach := finding.CodeFindingReach(subject, scope.ProductID)
 		q = q.Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...)
 	}
+	return scope.narrow(db, scope.inScope(q), kind.CodeFindings)
+}
+
+// narrow keeps a statement over the findings under "f", their sightings under
+// "si" and their builds under "t" to the scope's branch or tag, variant,
+// holder, method, component, build, subtree and series, after inScope has kept
+// it to the scope's products. reader is the consumer the statement reads for,
+// whose kinds the series it names are of.
+func (scope Scope) narrow(db bun.IDB, q *bun.SelectQuery, reader kind.Consumer) *bun.SelectQuery {
+	bound := scope.bound()
 	if scope.BranchOrTagID != nil {
 		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
 	}
@@ -520,7 +529,7 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		}
 	}
 	if scope.Series != "" {
-		named, namedArgs := kind.CodeFindings.Where(`"sn"."kind"`)
+		named, namedArgs := reader.Where(`"sn"."kind"`)
 		q = q.Where(`"si"."series_id" IN (SELECT "sn"."id" FROM "series" AS "sn"
 			WHERE "sn"."product_id" = `+bound.sql+` AND "sn"."name_folded" = ? AND `+named+`)`,
 			append(append(bound.times(1), typedname.Matching(scope.Series)), namedArgs...)...)

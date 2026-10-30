@@ -6,14 +6,11 @@ package analysis
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // BuildCount is how many open code findings one build places on a source
@@ -189,110 +186,6 @@ func OpenOn(ctx context.Context, db bun.IDB, subject access.Subject, productID, 
 		}
 	}
 	return out, nil
-}
-
-// TrendPoint is the code findings at a moment: those not fixed, and those
-// opened and fixed in the step it ends.
-type TrendPoint struct {
-	At       time.Time
-	NotFixed int
-	Opened   int
-	Fixed    int
-}
-
-// TrendBeneath is the code findings one build places at a component or
-// anywhere under it, step by step: how many were not fixed at the end of each
-// step, and how many were opened and fixed in it. Plotted on when a run was
-// applied, as the dependency trend is.
-//
-// A code finding is not fixed from when it opened until a person closes it as
-// fixed: absence closes nothing, and a decision answers a code finding
-// without closing it. Under the build's root it is every code finding of the
-// build, as the queue beneath the root lists them.
-// Refused to anybody who does not read security testing material in the
-// product.
-func TrendBeneath(ctx context.Context, db bun.IDB, subject access.Subject, productID, buildID, beneath int64,
-	since time.Time, step time.Duration, steps int) ([]TrendPoint, error) {
-
-	if err := MayCount(subject, productID, "trend the code findings of a component"); err != nil {
-		return nil, err
-	}
-	visible, err := finding.CodeFindingVisible(subject, productID)
-	if err != nil {
-		return nil, err
-	}
-	whole, err := graph.IsRoot(ctx, db, buildID, beneath)
-	if err != nil {
-		return nil, err
-	}
-	until := since.Add(time.Duration(steps) * step)
-	reach := finding.CodeFindingReach(subject, productID)
-	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
-	var rows []struct {
-		Occurrence string     `bun:"occurrence_identity"`
-		OpenedAt   time.Time  `bun:"opened_at"`
-		ClosedAt   *time.Time `bun:"closed_at"`
-	}
-	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`"f"."occurrence_identity", "f"."opened_at", "f"."closed_at"`).
-		Where(`"f"."build_id" = ?`, buildID)
-	if !whole {
-		replaced, err := replacedIn(ctx, db, buildID)
-		if err != nil {
-			return nil, err
-		}
-		adopted, err := replacedWithin(ctx, db, buildID, beneath, replaced)
-		if err != nil {
-			return nil, err
-		}
-		cond, args := beneathOrAdopted(db, buildID, beneath, adopted)
-		q = q.Where(cond, args...)
-	}
-	err = q.Where(kinds, kindArgs...).
-		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
-		Where(`"f"."opened_at" <= ?`, until).
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr(`"f"."closed_at" IS NULL`).WhereOr(`"f"."closed_at" > ?`, since)
-		}).
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("read the code findings beneath a component of build %d over time: %w", buildID, err)
-	}
-
-	// Each step is the set of occurrences not fixed at its end, and the flows
-	// are the difference between one set and the last, so the three numbers
-	// agree. A code finding closes only as fixed.
-	open := make([]map[string]bool, steps)
-	for i := range open {
-		open[i] = map[string]bool{}
-	}
-	for _, row := range rows {
-		for i := 0; i < steps; i++ {
-			to := since.Add(time.Duration(i+1) * step)
-			if row.OpenedAt.After(to) || (row.ClosedAt != nil && !row.ClosedAt.After(to)) {
-				continue
-			}
-			open[i][row.Occurrence] = true
-		}
-	}
-	points := make([]TrendPoint, 0, steps)
-	for i := 0; i < steps; i++ {
-		point := TrendPoint{At: since.Add(time.Duration(i+1) * step), NotFixed: len(open[i])}
-		if i > 0 {
-			for occurrence := range open[i] {
-				if !open[i-1][occurrence] {
-					point.Opened++
-				}
-			}
-			for occurrence := range open[i-1] {
-				if !open[i][occurrence] {
-					point.Fixed++
-				}
-			}
-		}
-		points = append(points, point)
-	}
-	return points, nil
 }
 
 // OpenOfMatches is the open code findings on each matched source package in

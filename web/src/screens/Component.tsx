@@ -105,8 +105,9 @@ export function Component() {
   // Code findings sit beside them, counted and asked for only where the reader
   // reads security testing material here, which the session has to say first.
   // A product the session does not list is asked, and a refusal says the
-  // family is read elsewhere. Every code count and the trend are drawn from
-  // the answer alone: a column drawn while it loads reads as zeros.
+  // family is read elsewhere. Every code count is drawn from the answer
+  // alone: a column drawn while it loads reads as zeros. The trend is a read
+  // of its own under the same grant, and draws from its own answer.
   const asking = holding(who.data, "code", product);
   const codeHeld = useComponentCodeCounts(product, component, !!who.data && counted(asking));
   const code = refusedAt(asking, codeHeld.error, product);
@@ -413,12 +414,15 @@ export function Component() {
 
       {counts && <History product={product} pkg={pkg} here={here} />}
 
-      {codeAnswered && (
+      {/* Its own read, asked once the counts have settled: a refusal there
+          says the reader holds the family elsewhere, and asks nothing more. */}
+      {codeCounts && !codeHeld.isPending && (
         <CodeHistory
           product={product}
           build={here}
           component={pkg.name}
           which={{ version: pkg.version, ecosystem: here.ecosystem, namespace: pkg.namespace }}
+          code={code}
         />
       )}
     </>

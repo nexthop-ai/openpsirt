@@ -19,6 +19,9 @@ import (
 const (
 	hubQueue = "/v1/products/mine/code-findings"
 	hubBuild = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
+	// hubTrendOf is the trend of the hub's one build, to narrow beneath a
+	// component.
+	hubTrendOf = "/v1/products/mine/code-finding-trend?branch_or_tag=master&variant=broadcom"
 )
 
 // hubListed is the code finding queue as the hub's tests read it: the rules
@@ -278,28 +281,28 @@ func TestACodeFindingIsCountedOverTimeUntilItIsClosedAsFixed(t *testing.T) {
 			t.Fatalf("closing as fixed answered %d: %s", w.Code, w.Body.String())
 		}
 		var trend struct {
-			Items []struct {
+			Points []struct {
 				NotFixed int `json:"not_fixed"`
 				Opened   int `json:"opened"`
 				Fixed    int `json:"fixed"`
-			} `json:"items"`
+			} `json:"points"`
 		}
-		httpapitest.Read(t, r, "security-testing-reader", hubBuild+"/components/libmine1/code-finding-trend?weeks=2", &trend)
-		if len(trend.Items) != 2 {
-			t.Fatalf("two weeks are %d points", len(trend.Items))
+		httpapitest.Read(t, r, "security-testing-reader", hubTrendOf+"&beneath=libmine1&weeks=2", &trend)
+		if len(trend.Points) != 2 {
+			t.Fatalf("two weeks are %d points", len(trend.Points))
 		}
-		if got := trend.Items[0].NotFixed; got != 2 {
+		if got := trend.Points[0].NotFixed; got != 2 {
 			t.Errorf("a week ago %d were not fixed beneath the library; want 2", got)
 		}
-		if got := trend.Items[1]; got.NotFixed != 1 || got.Fixed != 1 || got.Opened != 0 {
+		if got := trend.Points[1]; got.NotFixed != 1 || got.Fixed != 1 || got.Opened != 0 {
 			t.Errorf("this week is %+v; want the confirmed one still counted and the other fixed", got)
 		}
-		httpapitest.Read(t, r, "security-testing-reader", hubBuild+"/components/zlib1g/code-finding-trend?weeks=2", &trend)
-		if got := trend.Items[1]; got.NotFixed != 1 || got.Fixed != 0 {
+		httpapitest.Read(t, r, "security-testing-reader", hubTrendOf+"&beneath=zlib1g&weeks=2", &trend)
+		if got := trend.Points[1]; got.NotFixed != 1 || got.Fixed != 0 {
 			t.Errorf("beneath the compression library this week is %+v; want its one, untouched by its own fix elsewhere", got)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet,
-			hubBuild+"/components/nosuch/code-finding-trend", ""), http.StatusNotFound)
+			hubTrendOf+"&beneath=nosuch", ""), http.StatusNotFound)
 	})
 }
 
@@ -380,15 +383,15 @@ func hubTree(t *testing.T, r *httpapitest.Reach) (hubNode, map[string][2]int) {
 func hubNotFixed(t *testing.T, r *httpapitest.Reach, component string) int {
 	t.Helper()
 	var trend struct {
-		Items []struct {
+		Points []struct {
 			NotFixed int `json:"not_fixed"`
-		} `json:"items"`
+		} `json:"points"`
 	}
-	httpapitest.Read(t, r, "security-testing-reader", hubBuild+"/components/"+component+"/code-finding-trend?weeks=1", &trend)
-	if len(trend.Items) != 1 {
-		t.Fatalf("one week is %d points", len(trend.Items))
+	httpapitest.Read(t, r, "security-testing-reader", hubTrendOf+"&beneath="+component+"&weeks=1", &trend)
+	if len(trend.Points) != 1 {
+		t.Fatalf("one week is %d points", len(trend.Points))
 	}
-	return trend.Items[0].NotFixed
+	return trend.Points[0].NotFixed
 }
 
 func TestUnderTheRootIsTheWholeBuildWhereNoEdgeLeavesTheRoot(t *testing.T) {

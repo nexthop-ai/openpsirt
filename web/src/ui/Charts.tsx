@@ -107,7 +107,20 @@ const ISSUE_WORDS: PaceWords = {
   done: "resolved",
 };
 
-export function Pace({ points, words = ISSUE_WORDS }: { points: Point[]; words?: PaceWords }) {
+// A mark on a step of a pace chart: what changed in it, said on hover. A
+// step carrying one is drawn with a dashed rule through the upper band, so a
+// jump an analyzer upgrade made does not read as new work or a clean-up.
+export type PaceMark = { step: number; said: string };
+
+export function Pace({
+  points,
+  words = ISSUE_WORDS,
+  marks = [],
+}: {
+  points: Point[];
+  words?: PaceWords;
+  marks?: PaceMark[];
+}) {
   if (points.length === 0) return null;
   const W = 560,
     L = 40,
@@ -156,6 +169,13 @@ export function Pace({ points, words = ISSUE_WORDS }: { points: Point[]; words?:
         </g>
       ))}
       <polygon className="open-area" points={`${L},${T + topH} ${pts} ${W - R},${T + topH}`} />
+      {marks.map((mark) => (
+        <g key={mark.step} className="mark">
+          <line x1={x(mark.step)} x2={x(mark.step)} y1={T} y2={T + topH} />
+          <path d={`M${x(mark.step) - 4},${T} h8 l-4,6 z`} />
+          <title>{mark.said}</title>
+        </g>
+      ))}
       <polyline className="open-line" points={pts} />
       <circle className="tip" cx={x(last)} cy={y(opens[last] ?? 0)} r={3.5} />
       <text
@@ -241,6 +261,45 @@ export function Mix({ points }: { points: Point[] }) {
             stackId="1"
             stroke={band.color}
             fill={band.color}
+            fillOpacity={0.5}
+          />
+        ))}
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+// One part of a stacked chart: the key each row counts it under, the words
+// its tooltip names it by, and the token it is drawn in.
+export type StackPart = { key: string; label: string; color: string };
+
+// A total split into parts over time, stacked so the top edge is the total
+// and each band a part's share of it.
+export function Stack({
+  rows,
+  parts,
+}: {
+  rows: ({ at?: string } & Record<string, number | string | undefined>)[];
+  parts: StackPart[];
+}) {
+  if (rows.length === 0 || parts.length === 0) return null;
+  const data = rows.map((row) => ({ ...row, at: day(row.at as string | undefined) }));
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid strokeOpacity={0.14} vertical={false} />
+        <XAxis dataKey="at" tick={axis} tickLine={false} axisLine={false} />
+        <YAxis tick={axis} tickLine={false} axisLine={false} width={46} tickFormatter={brief} />
+        <Tooltip contentStyle={tip} />
+        {parts.map((part) => (
+          <Area
+            key={part.key}
+            type="monotone"
+            dataKey={part.key}
+            name={part.label}
+            stackId="1"
+            stroke={part.color}
+            fill={part.color}
             fillOpacity={0.5}
           />
         ))}

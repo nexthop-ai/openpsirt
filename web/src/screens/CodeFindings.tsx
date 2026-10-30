@@ -6,6 +6,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useWho } from "../app/session";
 import { counted, heldLine, holding } from "../app/families";
 import { fileAt } from "../api/links";
+import { codeTrendAt } from "./codeTrend";
 import {
   PAGE,
   codeFindingsQuery,
@@ -209,9 +210,15 @@ export function CodeFindings() {
           )}
         </p>
         <span style={{ marginLeft: "auto" }}>
-          {/* A suppression rule belongs to one product. */}
+          {/* A suppression rule and a trend belong to one product. */}
           {!across && (
             <>
+              <Link
+                className="btn quiet"
+                to={codeTrendAt({ branch_or_tag: branchOrTag, variant, series, method, ...placed })}
+              >
+                Over time
+              </Link>{" "}
               <Link className="btn quiet" to={suppressionRulesAt(product)}>
                 Suppression rules
               </Link>{" "}

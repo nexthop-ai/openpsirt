@@ -148,6 +148,7 @@ func statedVocabularies() map[string][]string {
 		"code finding states":                 words(analysis.States()),
 		"code finding assignees":              analysis.CodeFindingAssignees(),
 		"code finding methods":                analysis.Methods(),
+		"code finding trend changes":          words(analysis.Changes()),
 		"suppression rule states":             words(analysis.RuleStates()),
 		"flaw record suggestion sources":      words(analysis.Sources()),
 		"statement scopes":                    words(triage.Scopes()),

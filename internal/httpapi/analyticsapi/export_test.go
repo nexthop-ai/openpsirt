@@ -798,6 +798,12 @@ func TestEveryExportSaysWhatItIsAndWhenItWasTaken(t *testing.T) {
 				case "records":
 					who = "auditor"
 				}
+				// A figure about security testing material is refused to
+				// everybody who reads none, so it is asked as somebody who
+				// reads that alone.
+				if strings.Contains(fmt.Sprint(asks), "security-testing-read") {
+					who = "security-testing-reader"
+				}
 			}
 			got := httpapitest.AsPerson(t, r, who, http.MethodGet, at+query, "")
 			if got.Code != http.StatusOK {

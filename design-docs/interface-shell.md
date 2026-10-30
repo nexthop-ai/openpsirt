@@ -48,6 +48,7 @@ right its screen asks for.
 | The Dependency findings and Unassigned badges | A reader of one half alone has the unit say which half the count is of (REQ-60) |
 | The Unassigned badges | One per family counted, side by side, each with its unit on hover and never summed; a family not counted is not asked (`design-docs/kinds.md` § Consumers) |
 | Security testing | A reader of security testing work in some product; declines in a product where it is not read, with the code family's line on hover |
+| Code findings over time | The same readers, below Security testing; declines until a product is picked, and in a product where the work is not read, saying why on hover |
 | Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
 | Record a flaw | A reader who may triage undisclosed or disclosed work in some product |
 | Incidents | Everybody: the shelf holds what each reader may be told of, a collaborator's own case included, and an administrator declares the response windows there |
@@ -56,7 +57,7 @@ right its screen asks for.
 
 ### The folded rail
 
-Twenty-four entries ask about 935 pixels, taller than most laptop windows. A
+The whole rail unfolded is taller than most laptop windows. A
 scroll region of its own puts a second scrollbar mid-screen; scrolling with the
 page leaves the menu far above the foot of a list.
 

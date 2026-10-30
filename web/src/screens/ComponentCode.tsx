@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Link } from "react-router-dom";
-import type { Holding } from "../app/families";
+import { refusedAt, type Holding } from "../app/families";
 import { codeFindingsAt, repositoriesAt } from "../app/routes";
 import {
   useComponentCodeCounts,
-  useComponentCodeTrend,
+  useCodeFindingTrend,
   type CodeFindingState,
   type ComponentCodeCounts,
 } from "../api/codeFindings";
@@ -16,6 +16,7 @@ import { Loading } from "../ui/Loading";
 import { Pace, TREND_WEEKS, trendSaid } from "../ui/Charts";
 import { Wide } from "../ui/Wide";
 import { CODE_FINDING_STATES } from "./codeFindings";
+import { codeTrendAt, marksOf } from "./codeTrend";
 
 // The security testing half of the component screen: what the analyzers hold
 // on the source package, per series and state, and over twelve weeks on one
@@ -205,25 +206,40 @@ export function SecurityTesting({
 }
 
 // Twelve weeks of code findings at the package and under it on one build: a
-// panel of its own beside the dependency one, never a summed line.
+// panel of its own beside the dependency one, never a summed line. It is the
+// Security testing statistics read, asked where the reader reads security
+// testing material in the product, and drawn from its own answer; a refusal
+// is the family's one line. Runs that changed what is compared are marked.
 export function CodeHistory({
   product,
   build,
   component,
   which,
+  code,
 }: {
   product: string;
   build: { branch_or_tag?: string; variant?: string };
   component: string;
   which: Which;
+  code: Holding;
 }) {
   const at = {
-    product,
     branch_or_tag: build.branch_or_tag ?? "",
     variant: build.variant ?? "",
   };
-  const trend = useComponentCodeTrend(at, component, which, TREND_WEEKS);
-  const points = (trend.data ?? []).map((each) => ({
+  const beneath = {
+    beneath: component,
+    beneath_version: which.version,
+    beneath_ecosystem: which.ecosystem,
+    beneath_namespace: which.namespace,
+  };
+  const trend = useCodeFindingTrend(
+    product,
+    { ...at, ...beneath, weeks: TREND_WEEKS },
+    !!at.branch_or_tag && !!at.variant,
+  );
+  const held = refusedAt(code, trend.error, product);
+  const points = (trend.data?.points ?? []).map((each) => ({
     at: each.at,
     open: each.not_fixed,
     opened: each.opened,
@@ -238,14 +254,21 @@ export function CodeHistory({
           {at.branch_or_tag} · {at.variant}
         </span>
       </div>
-      {trend.isError ? (
+      {held !== code ? (
+        <HeldLine at={held} />
+      ) : trend.isError ? (
         <p className="hint">Could not be read.</p>
       ) : trend.isPending ? (
         <Loading />
       ) : !moved ? (
         <p className="hint">No code finding here in {trendSaid}.</p>
       ) : (
-        <Pace points={points} words={CODE_WORDS} />
+        <>
+          <Pace points={points} words={CODE_WORDS} marks={marksOf(trend.data)} />
+          <p className="hint">
+            <Link to={codeTrendAt({ ...at, ...beneath })}>Code findings over time →</Link>
+          </p>
+        </>
       )}
     </div>
   );
