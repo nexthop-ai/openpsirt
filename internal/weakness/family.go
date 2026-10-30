@@ -55,6 +55,23 @@ const (
 	TierMemory
 )
 
+// Tiers is every tier, highest first, which is the order a figure draws them.
+func Tiers() []Tier { return []Tier{TierMemory, TierInjection, TierResource, TierOther} }
+
+// Name is the word a figure states the tier under. A number outside the tiers
+// is everything else.
+func (t Tier) Name() string {
+	switch t {
+	case TierMemory:
+		return "memory-safety"
+	case TierInjection:
+		return "input"
+	case TierResource:
+		return "resource"
+	}
+	return "other"
+}
+
 // tiers is the weaknesses each tier names. A weakness takes the tier of the
 // nearest of itself and its ancestors named here, so naming a class names
 // everything under it, and a weakness named here outranks its own class.

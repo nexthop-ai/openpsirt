@@ -6,7 +6,7 @@ which visibilities it holds; each consumer names the kinds it includes.
 Assignment, notes, approval, the trail, queues and notifications are one
 implementation over every kind.
 
-Satisfies REQ-06, REQ-14, REQ-17, REQ-18, REQ-19, REQ-21, REQ-25, REQ-43, REQ-50.
+Satisfies REQ-06, REQ-14, REQ-17, REQ-18, REQ-19, REQ-21, REQ-25, REQ-43, REQ-50, REQ-87.
 
 ## Contents
 
@@ -79,7 +79,8 @@ A consumer reads findings and names its kinds; others never reach it.
 | Advisories | Documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What people are told about findings | Vulnerability, entered |
 | Evidence | One code finding's place, path, links and kept source (`design-docs/analysis-source.md` § Source) | Analysis |
-| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, a component's counts, the tree's and the chooser's counts and a component's trend, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-queue.md` § Code findings of a component, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, `design-docs/notifications-work.md` § Code finding notices) | Analysis |
+| Security testing statistics | Every security testing figure over time: the trend of code findings, a component's included, its markers and file (`design-docs/analysis-statistics.md`) | Analysis |
+| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, a component's counts, the tree's and the chooser's counts, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-queue.md` § Code findings of a component, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, `design-docs/notifications-work.md` § Code finding notices) | Analysis |
 
 The audit log's file follows Decisions and includes code finding decisions under
 the log's visibility (REQ-50). `design-docs/interface-security-testing.md` § Security testing
@@ -89,7 +90,8 @@ holds the screens.
 |---|---|
 | Exports names the findings lists' files alone; the disposition register is Register | Analysis on a shared consumer puts code findings into a statement of what a build ships |
 | A findings file reads its code findings through Code findings' read, its other rows through the list's (`design-docs/analytics-exports.md` § Exports) | A list and its file are one read |
-| Counts by series, a component's counts and its trend belong to Code findings, never Statistics or Inventory | Statistics feeds vulnerability figures, and Inventory's tree and component reads count issues |
+| Counts by series and a component's counts belong to Code findings, and every trend of code findings to Security testing statistics, never Statistics or Inventory | Statistics feeds vulnerability figures, and Inventory's tree and component reads count issues |
+| Security testing results are counted per testing method and never added to dependency vulnerability counts (REQ-87): Statistics names dependency kinds alone, Security testing statistics code kinds alone | A rule at a place and an advisory at a component are different units, and one total would misstate both |
 | Each is the queue's own read and visibility | Figure, list and file count one population |
 | Assignment is its own consumer, apart from Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a code finding nobody has judged into both. Holding work is one act, so handovers move code findings too |
 | The held-work lists are Assignment's; the digest of held work is Notifications' and names no code finding | |

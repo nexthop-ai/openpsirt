@@ -6,6 +6,8 @@ import { useOutcomes } from "../../ui/outcomes";
 import { askForScope, useScope } from "../../app/scope";
 import { GROUPS, ON_SCREENS, leadsTo, scopeWords, type Needs, type Report } from "./catalog";
 import { fileAt, linkTo } from "../../api/links";
+import { holding } from "../../app/families";
+import { useWho } from "../../app/session";
 
 // The catalog of named reports.
 //
@@ -23,6 +25,10 @@ import { fileAt, linkTo } from "../../api/links";
 // copy is always the poorer one.
 export function Catalog() {
   const at = useScope();
+  const who = useWho().data;
+  const groups = GROUPS.filter(
+    (group) => !group.family || holding(who, group.family).held !== "nowhere",
+  );
 
   return (
     <>
@@ -34,7 +40,7 @@ export function Catalog() {
       <section className="panel">
         <h3>Named reports</h3>
         <div className="catalog-groups">
-          {GROUPS.map((group) => (
+          {groups.map((group) => (
             <div key={group.name} className="catalog-group">
               <h4>{group.name}</h4>
               <ul className="files catalog">

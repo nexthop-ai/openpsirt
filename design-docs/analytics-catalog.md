@@ -49,7 +49,8 @@ own. The catalog screen also holds the files reachable nowhere else.
 |---|---|
 | Program | Program overview, backlog over time, deadline compliance, effort by component |
 | Controls | Approval quality, the exception report, standing corrections, administrative changes |
-| Coverage | Last upload per build, code findings by analyzer, unmatched components, carried patches |
+| Coverage | Last upload per build, unmatched components, carried patches |
+| Security testing | Code findings by analyzer, code findings over time; listed only to a reader of security testing material in some product |
 | Releases | Release comparison, release readiness, releases out of support |
 | Records | Disposition register, advisories issued |
 | Also on screens | Assignments (holder workload), Disclosure deadlines (what is running out of embargo), planned upgrades (what a build waits on) |
@@ -66,6 +67,7 @@ own. The catalog screen also holds the files reachable nowhere else.
 | Effort by component | `design-docs/analytics-program.md` § Effort by subject |
 | Deadline compliance | `design-docs/analytics-program.md` § Deadline compliance |
 | Disposition register | `design-docs/analytics-controls.md` § The disposition register, asked for a whole build |
+| Code findings over time | `design-docs/analysis-statistics.md` § The page |
 | Code findings by analyzer | Code findings of each analyzer series of one product per state, across its builds, each opening the code finding list. Only for `security-testing-read` on the product; anybody else gets no count. `design-docs/analysis-queue.md` § Code findings by series |
 | Advisories issued | What went out about our own flaws over a period, and what went out twice. A row carries the digest it hashed to, for comparison with what would be generated now, its issue and product counts as stated, and its title; an issue taken off since is still named. An issuance without its bytes counts from the advisory's coverage today |
 

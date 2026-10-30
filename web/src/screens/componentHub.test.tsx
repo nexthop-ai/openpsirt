@@ -75,8 +75,7 @@ function serving(as: Who, answers: Record<string, unknown>) {
 }
 
 const COUNTS = "/v1/products/{product}/components/{component}/code-finding-counts";
-const TREND =
-  "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/code-finding-trend";
+const TREND = "/v1/products/{product}/code-finding-trend";
 const STATES = {
   open: 0,
   "no-longer-detected": 0,
@@ -86,6 +85,8 @@ const STATES = {
   confirmed: 0,
   "recorded-as-flaw": 0,
 };
+
+const SPLIT = { by_tier: {}, by_series: {}, by_method: {} };
 
 const SHIPPED = {
   items: [
@@ -139,10 +140,21 @@ async function component(
         builds: [{ branch_or_tag: "master", variant: "arm", version: "3.7", open: 3 }],
       },
       [TREND]: {
-        items: [
-          { at: "2026-10-15", not_fixed: 4, opened: 0, fixed: 0 },
-          { at: "2026-10-22", not_fixed: 3, opened: 0, fixed: 1 },
+        points: [
+          { at: "2026-10-15", not_fixed: 4, opened: 0, fixed: 0, ...SPLIT },
+          { at: "2026-10-22", not_fixed: 3, opened: 0, fixed: 1, ...SPLIT },
         ],
+        markers: [
+          {
+            at: "2026-10-21",
+            series: "clang-tidy/default",
+            change: "tool-version",
+            from: "18.1",
+            to: "19.1",
+            builds: 1,
+          },
+        ],
+        no_longer_detected: 0,
       },
       ...more,
     },
@@ -185,6 +197,12 @@ describe("the component screen's security testing", () => {
       mount.host().querySelector('svg[aria-label^="Code findings not fixed from 4 to 3"]'),
     ).not.toBeNull();
     expect(mount.host().querySelector('svg[aria-label^="Open findings"]')).toBeNull();
+    expect(mount.host().querySelector(".chart .mark title")?.textContent).toBe(
+      "clang-tidy/default: new version from 18.1 to 19.1",
+    );
+    expect(hrefOf("Code findings over time →")).toBe(
+      "/analytics/code-findings-over-time?branch_or_tag=master&variant=arm&beneath=libnl3&beneath_version=3.7&beneath_ecosystem=deb",
+    );
   });
 
   it("names the code findings on the build itself as unplaced, with the way to the repositories", async () => {
@@ -233,11 +251,18 @@ describe("the component screen's security testing", () => {
     );
   });
 
-  it("draws no build column while the counts have not answered", async () => {
+  it("draws no build column while the counts have not answered, and the trend from its own read", async () => {
     await component(BOTH, {}, undefined, { [COUNTS]: 500 });
     expect(mount.host().querySelector("th[title^='Open code findings']")).toBeNull();
     expect(text()).toContain("The code findings could not be counted.");
-    expect(text()).not.toContain("Code findings · 12 weeks");
+    expect(text()).toContain("Code findings · 12 weeks");
+  });
+
+  it("says in one line that the trend is refused where the session lists the product as read", async () => {
+    await component(BOTH, {}, undefined, { [TREND]: 403 });
+    expect(text()).toContain("3 code findings open");
+    expect(text()).toContain("You don't read code findings in sonic.");
+    expect(mount.host().querySelector('svg[aria-label^="Code findings not fixed"]')).toBeNull();
   });
 
   it("reads a refused count in a product the session does not list as held elsewhere", async () => {

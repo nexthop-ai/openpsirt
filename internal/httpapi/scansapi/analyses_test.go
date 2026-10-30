@@ -170,6 +170,10 @@ func TestAnAnalyzerUploadIsRefusedInWordsTheSenderCanAct(t *testing.T) {
 				map[string]string{"series": "s"}, "per-unit documents"},
 			"a scanner alone": {[]string{`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Trivy"}},"results":[]}]}`},
 				map[string]string{"series": "s"}, "scanner's (Trivy)"},
+			"a web scanner alone": {[]string{`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"ZAP"}},"results":[` +
+				`{"ruleId":"10038","message":{"text":"header not set"},"locations":[{"physicalLocation":` +
+				`{"artifactLocation":{"uri":"https://shop.example/login"}}}]}]}]}`},
+				map[string]string{"series": "s"}, "web scanner results are not supported"},
 			"a run that did not run": {[]string{`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"clang-tidy"}}}]}`},
 				map[string]string{"series": "s"}, "did not run"},
 			"a long series": {[]string{clangRun}, map[string]string{"series": strings.Repeat("s", database.NameWidth+1)},

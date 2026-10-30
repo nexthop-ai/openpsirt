@@ -28,6 +28,7 @@ import { folded, fold } from "./rail";
 import { signedOutBy, signOut } from "./session";
 import { counted, heldLine, holding, readsUndisclosed } from "./families";
 import { Scope } from "./Scope";
+import { codeTrendAt } from "../screens/codeTrend";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Notices } from "../ui/Notices";
@@ -326,6 +327,24 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 label="Security testing"
                 needs={!codeFindingsHere || counted(codeFindingsHere)}
                 why={codeFindingsHere ? heldLine(codeFindingsHere) : undefined}
+              />
+            )}
+            {/* Whether that work is shrinking, for the same readers. A trend is
+              one product's, since a series belongs to one, so it declines
+              until a product is picked. */}
+            {codeFindingsAnywhere && (
+              <Rail
+                to={product ? codeTrendAt() : ""}
+                icon="pulse"
+                label="Code findings over time"
+                needs={!!product && (!codeFindingsHere || counted(codeFindingsHere))}
+                why={
+                  !product
+                    ? "Pick a product"
+                    : codeFindingsHere
+                      ? heldLine(codeFindingsHere)
+                      : undefined
+                }
               />
             )}
             {/* Its own screen rather than an action on the findings list: what is

@@ -185,7 +185,22 @@
     "query": ["alone", "from", "in_force", "outcome", "product", "to"]
   },
   "analytics": { "path": "/analytics" },
-  "analyticsReport": { "path": "/analytics/:report", "query": ["days"] },
+  "analyticsReport": {
+    "path": "/analytics/:report",
+    "query": [
+      "beneath",
+      "beneath_ecosystem",
+      "beneath_namespace",
+      "beneath_version",
+      "branch_or_tag",
+      "component",
+      "component_version",
+      "days",
+      "method",
+      "series",
+      "variant"
+    ]
+  },
   "recordFlaw": { "path": "/record-a-flaw", "query": ["from", "product", "source"] },
   "disclosureDeadlines": { "path": "/disclosure-deadlines" },
   "incidents": { "path": "/incidents", "query": ["product"] },

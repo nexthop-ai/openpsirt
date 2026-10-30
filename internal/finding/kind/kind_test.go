@@ -5,6 +5,7 @@ package kind
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -33,7 +34,10 @@ func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 }
 
 // builtForAnalysis is the consumers that read analysis results.
-var builtForAnalysis = map[Consumer]bool{Assignment: true, Decisions: true, Exports: true, Evidence: true, CodeFindings: true}
+var builtForAnalysis = map[Consumer]bool{
+	Assignment: true, Decisions: true, Exports: true, Evidence: true, CodeFindings: true,
+	SecurityTestingStatistics: true,
+}
 
 func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 	for _, c := range consumers() {
@@ -45,8 +49,31 @@ func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 
 func TestOnlyTheSweepAndTheCodeFindingReadersLeaveRecordedFlawsOut(t *testing.T) {
 	for _, c := range consumers() {
-		if got, want := c.Includes(Entered), c != Closure && c != Evidence && c != CodeFindings; got != want {
+		if got, want := c.Includes(Entered), c != Closure && c != Evidence && c != CodeFindings &&
+			c != SecurityTestingStatistics; got != want {
 			t.Errorf("%s includes recorded flaws: %v; want %v", c, got, want)
+		}
+	}
+}
+
+// A figure counts one family: the vulnerability figures hold no security
+// testing result, and the security testing figures no dependency finding
+// (REQ-87).
+func TestNoFigureCountsTwoFamiliesAsOne(t *testing.T) {
+	for _, c := range []struct {
+		figures Consumer
+		holds   Family
+	}{
+		{Statistics, Dependency},
+		{SecurityTestingStatistics, Code},
+	} {
+		if len(c.figures.Kinds()) == 0 {
+			t.Fatalf("%s includes no kind, so this checked nothing", c.figures)
+		}
+		for _, k := range c.figures.Kinds() {
+			if !slices.Contains(c.holds.Kinds(), k) {
+				t.Errorf("%s counts %s, which is not in the %s family", c.figures, k, c.holds)
+			}
 		}
 	}
 }

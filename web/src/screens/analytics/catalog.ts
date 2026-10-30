@@ -50,7 +50,9 @@ export type Report = {
   needs?: Needs;
 };
 
-type Group = { name: string; reports: Report[] };
+// A group about one family of finding names it, and is listed only to a reader
+// who holds that family somewhere.
+type Group = { name: string; family?: "code"; reports: Report[] };
 
 // withProduct carries the selection into an address that reads its narrowing
 // from the address rather than from the picker.
@@ -162,14 +164,6 @@ export const GROUPS: Group[] = [
         answers: "What is being scanned, when each build was last seen, and what has gone quiet.",
       },
       {
-        slug: "code-findings-by-analyzer",
-        name: "Code findings by analyzer",
-        answers:
-          "How many static analysis code findings each analyzer holds, and where they stand.",
-        // A series is one product's, and so are its code findings.
-        needs: "product",
-      },
-      {
         name: "Unmatched components",
         answers: "Components in a build the scanner can't match, and why. They report no findings.",
         to: (at) => unmatchedComponentsAt(buildOf(at)),
@@ -180,6 +174,30 @@ export const GROUPS: Group[] = [
         answers: "Fixes a distribution carries without changing the version. On Uploads.",
         to: (at) => uploadsAt(buildOf(at)),
         needs: "build",
+      },
+    ],
+  },
+  {
+    // Code findings, counted per testing method and never beside the
+    // dependency figures. Absent for a reader who reads security testing
+    // material in no product.
+    name: "Security testing",
+    family: "code",
+    reports: [
+      {
+        slug: "code-findings-by-analyzer",
+        name: "Code findings by analyzer",
+        answers:
+          "How many static analysis code findings each analyzer holds, and where they stand.",
+        // A series is one product's, and so are its code findings.
+        needs: "product",
+      },
+      {
+        slug: "code-findings-over-time",
+        name: "Code findings over time",
+        answers:
+          "Whether the code findings backlog is shrinking, and where an analyzer change moved it.",
+        needs: "product",
       },
     ],
   },

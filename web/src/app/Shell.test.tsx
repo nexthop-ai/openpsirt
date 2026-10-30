@@ -105,6 +105,35 @@ describe("the code findings entry", () => {
   });
 });
 
+describe("the code findings over time entry", () => {
+  const TREND = "Code findings over time";
+
+  it("is absent for somebody who reads security testing material nowhere", async () => {
+    await railAt("/products/sonic", [{ product: "sonic", reads_private: true }]);
+    expect(entry(TREND)).toBeUndefined();
+  });
+
+  it("declines until a product is picked, saying so", async () => {
+    await railAt("/start", [{ product: "sonic", reads_security_testing: true }]);
+    expect(entry(TREND)?.tagName).toBe("BUTTON");
+    expect(entry(TREND)?.title).toBe("Pick a product");
+  });
+
+  it("declines where the reader reads security testing material in another product", async () => {
+    await railAt("/products/other", [
+      { product: "sonic", reads_security_testing: true },
+      { product: "other", reads_public: true },
+    ]);
+    expect(entry(TREND)?.tagName).toBe("BUTTON");
+    expect(entry(TREND)?.title).toBe("You don't read code findings in other.");
+  });
+
+  it("opens the page for the product picked", async () => {
+    await railAt("/products/sonic", [{ product: "sonic", reads_security_testing: true }]);
+    expect(entry(TREND)?.getAttribute("href")).toBe("/analytics/code-findings-over-time");
+  });
+});
+
 describe("the dependency findings entry", () => {
   it("names what it lists, and says SCA on hover", async () => {
     await railAt("/products/sonic", [{ product: "sonic", reads_private: true }]);

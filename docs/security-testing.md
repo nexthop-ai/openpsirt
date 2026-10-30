@@ -81,18 +81,22 @@ example `--series clang=clang-sa --series cppcheck=cppcheck-all`. The tool is
 the name its output gives it, in any case. `write` stores each analyzer's run
 in a file of its own, the analyzer's name before the extension.
 
-#### Dependency and secret scanners
+#### Scanners this upload refuses
 
-This upload takes static analysis of the product's own code. Two kinds of
+This upload takes static analysis of the product's own code. These kinds of
 tool that write SARIF are sent elsewhere or not at all:
 
 | Tool | Where its results go |
 |---|---|
 | A dependency scanner: govulncheck, cargo-audit, Trivy, Grype, OSV-Scanner, Snyk Open Source, OWASP Dependency-Check, npm audit, pip-audit, bundler-audit, Retire.js | Nowhere. A vulnerable dependency is found by matching the build's inventory, sent as [Build pipelines](pipeline.md) describes, and the same issue arriving here would be triaged twice |
 | A secret scanner: gitleaks, TruffleHog, detect-secrets, ggshield, Secretlint, Nosey Parker, Kingfisher | Nowhere. Its results carry the secret itself, and this deployment does not store one |
+| A web scanner, such as ZAP | Nowhere. Web scanner results are not supported: its results are at web addresses, which no file in the checkout holds |
 
-A run from one of these is left out whole and named on the receipt, and an
-upload holding nothing else is refused. A result whose rule is an advisory's
+A run from a dependency or secret scanner is left out whole and named on the
+receipt, and an upload holding nothing else is refused. An upload whose results
+are all at web addresses is refused, saying web scanner results are not
+supported; a result at a web address beside results in files is dropped and
+counted on the receipt as `web-address`. A result whose rule is an advisory's
 identifier, such as `CVE-2026-12345` or `GHSA-…`, is dropped and counted on the
 receipt, whatever tool wrote it.
 

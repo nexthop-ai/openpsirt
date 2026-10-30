@@ -91,7 +91,9 @@ func registerAnalyses(api huma.API, in core.Deps) {
 			"Poll `GET .../analyses` for what the run did. The same documents for the same series " +
 			"and build answer 200 with the run they match.\n\n" +
 			"A dependency or secret scanner's run is left out and named on the receipt; this " +
-			"upload takes static analysis alone, and refuses one holding nothing else.",
+			"upload takes static analysis alone, and refuses one holding nothing else. A result at an " +
+			"http or https address is dropped and counted as `web-address`; an upload whose every result " +
+			"is at one, a web scanner's, is refused.",
 		Tags:         []string{"Ingest"},
 		MaxBodyBytes: analysisLimits(in).MaxCompressed + core.Envelope,
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{

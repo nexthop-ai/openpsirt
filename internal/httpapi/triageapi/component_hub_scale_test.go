@@ -140,7 +140,8 @@ func TestMeasureTheComponentHub(t *testing.T) {
 					"/v1/products/mine/components/sonic-image/code-finding-counts",
 					build + "/components?code_findings=true",
 					build + "/components/pkg-17/around?code_findings=true",
-					build + "/components/sonic-image/code-finding-trend",
+					"/v1/products/mine/code-finding-trend?branch_or_tag=master&variant=broadcom&beneath=sonic-image",
+					"/v1/products/mine/code-finding-trend?weeks=104",
 					"/v1/components?q=linux",
 					"/v1/components?q=pkg-1",
 				}
@@ -211,7 +212,7 @@ func TestMeasureTheComponentHubOverAHistory(t *testing.T) {
 			build + "/components/pkg-17/around?code_findings=true",
 			build + "/components?q=pkg-1&code_findings=true",
 			"/v1/products/mine/code-findings?beneath=pkg-17&branch_or_tag=master&variant=broadcom",
-			build + "/components/pkg-17/code-finding-trend",
+			"/v1/products/mine/code-finding-trend?branch_or_tag=master&variant=broadcom&beneath=pkg-17",
 			"/v1/components?q=sonic",
 			"/v1/components?q=pkg-1",
 		})

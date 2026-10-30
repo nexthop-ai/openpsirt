@@ -57,7 +57,7 @@ POST /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}
 |---|---|
 | 202 `queued` | Stored and waiting |
 | 200 `already_held` | The same documents for the same series, build and build time, answered as the run repeated |
-| 422 | A document or field unreadable, no analyzer run that ran, placed results past the byte bound, or a series name too long; the detail names which |
+| 422 | A document or field unreadable, no analyzer run that ran, every result at a web address, placed results past the byte bound, or a series name too long; the detail names which |
 | 409 | Product, release or variant retired |
 | 503 | Queue past its backlog |
 
@@ -95,6 +95,7 @@ and entries are bounded across the upload as memory: placed results take about
 | Rule | Reason |
 |---|---|
 | A dependency or secret scanner's run is left out and named on the receipt; an upload of only those is refused, naming them | Inventories go to the scan upload |
+| A result whose first location is an `http` or `https` address is dropped, counted as `web-address`; an upload whose every result is one is refused: "web scanner results are not supported" | A web scanner's result is at an endpoint, and no placement holds one |
 | A run whose `results` is absent or null refuses the upload | Absent is a tool that did not start |
 | A result's rule is found by identifier, whole then by leading `/` components, within the tool component it names; a rule index only where no identifier is stated, within its component or the driver | Extensions number rules from zero; `CA5350/md5` is `CA5350` |
 | A rule that is an advisory's identifier drops the result, counted | |
@@ -201,7 +202,7 @@ An applied run, in order:
 
 | Part | State |
 |---|---|
-| Code findings over time | Not built: Statistics include none (`design-docs/kinds.md` § Consumers), so nothing reports time to judge or fix or a series' trend. Current standing is by series (`design-docs/analysis-queue.md` § Code findings by series); approval quality and the exception report read code finding decisions (`design-docs/analytics-controls.md` § Approval quality) |
+| Security testing pages beyond the trend | Not built: time to judge, time to fix, analyzer precision, analysis coverage, and code findings by release, the tag axis REQ-54 asks for. The trend is `design-docs/analysis-statistics.md`; approval quality and the exception report read code finding decisions (`design-docs/analytics-controls.md` § Approval quality) |
 | A repository an SPDX inventory states | Not read; a download location places nothing |
 | Pulling from a hosted analyzer | Not built |
 | Fuzzing findings | Intended scope, not built (REQ-14) |

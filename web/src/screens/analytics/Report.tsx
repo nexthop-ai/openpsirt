@@ -9,6 +9,7 @@ import { Compliance } from "./Compliance";
 import { LastUploads } from "./LastUploads";
 import { Effort } from "./Effort";
 import { CodeFindingSeries } from "./CodeFindingSeries";
+import { CodeFindingTrend } from "./CodeFindingTrend";
 import { Overview } from "./Overview";
 import { Published } from "./Published";
 import { Register } from "./Register";
@@ -28,6 +29,7 @@ export const PAGES: Record<string, ReactElement> = {
   "program-overview": <Overview />,
   "last-upload-per-build": <LastUploads />,
   "code-findings-by-analyzer": <CodeFindingSeries />,
+  "code-findings-over-time": <CodeFindingTrend />,
   "releases-out-of-support": <Support />,
   "approval-quality": <Scrutiny />,
   "deadline-compliance": <Compliance />,

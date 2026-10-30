@@ -39,7 +39,8 @@ the reader reads security testing material in.
 | A component in the address narrows to the code findings on that source package, at a version where one is named; beneath a component narrows to everything at or under it on the named build. Both are named in the heading and kept across tabs, counts and the file (`design-docs/analysis-queue.md` § Code finding queue) | The component screen's and the tree's counts open the list they count |
 | Unassigned only narrows to code findings nobody holds, in the address and heading, across tabs, counts and the file (`design-docs/analysis-queue.md` § Code finding queue) | The findings list holds no code finding |
 | The list is offered as CSV and JSON with the narrowing on screen, every row (`design-docs/analysis-queue.md` § Queue file) | |
-| The screen and Code findings by analyzer are about the code family, under `design-docs/interface.md` § Families a reader holds: for a reader not reading it in the product, neither is asked, and each shows "Nothing to list." and the family's line | A queue or table of zeros reads as an analyzer finding nothing |
+| A product's queue offers Over time, opening Code findings over time with its branch, variant, series, method and component narrowing; a queue over every build sends its branch and variant empty, so the picker's build does not narrow it (`design-docs/analysis-statistics.md` § The page) | The trend answers whether the list is shrinking |
+| The screen, Code findings by analyzer and Code findings over time are about the code family, under `design-docs/interface.md` § Families a reader holds: for a reader not reading it in the product, neither is asked, and each shows "Nothing to list." and the family's line | A queue or table of zeros reads as an analyzer finding nothing |
 
 ## A code finding
 

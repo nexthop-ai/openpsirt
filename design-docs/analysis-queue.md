@@ -120,12 +120,12 @@ before any component name is resolved (REQ-42, REQ-43).
 |---|---|
 | `GET /v1/products/{product}/components/{component}/code-finding-counts` | Every series of the product by state, zero included, over every build; the open ones placed on a build's own root, as unplaced; and the open ones per build and source version |
 | The tree's components and one step around a component, with `code_findings` | Open code findings on each row's component and at it or under it, one build |
-| `GET .../components/{component}/code-finding-trend` | Per week on one build: the code findings at the component or under it not fixed at its end, and those opened and fixed in it |
 | `GET /v1/components?q=` | Open code findings on each source package a term matches, beside its open issues, in every product the reader reads where none is picked (REQ-64; `design-docs/interface-shell.md` § The search box) |
 
-The trend reads the findings themselves, never the queue's state, because its
-line keeps what a decision answered. The chooser's issue count is the
-findings lists' read of open issues.
+A component's trend over weeks is Security testing statistics' read, beneath
+the component on one build (`design-docs/analysis-statistics.md` § Code
+findings over time). The chooser's issue count is the findings lists' read of
+open issues.
 
 | Rule | Reason |
 |---|---|
@@ -134,14 +134,10 @@ findings lists' read of open issues.
 | Unplaced is counted over the roots named as values | Asked of every code finding on the component, whether it was ever a root took 339 ms on MySQL 8.4 for the root's card at 16,000 components a build, against 23 ms as values |
 | Under a tree row is the union of the occurrences on everything the walk reaches from it, each once | A code finding placed on a library pulled in twice is one |
 | On the tree's root row are the code findings on every root the build has had, and under it every code finding of the build | The list the badge opens is the whole build |
-| A code finding on a component the build no longer holds counts at the build's live components of the same name: on them, beneath every row that reaches them, in the list beneath them and in their trend. A replaced root is left to the root, which counts every root the build has had | A code finding keeps the component it opened on, so a rescan at a new version replaces the component and not the finding (`design-docs/analysis-source.md` § Placement); at 4,000 components a build, the tree's first screen took 251 ms against 268 ms on MySQL 8.4 and 627 ms against 630 ms on PostgreSQL |
+| A code finding on a component the build no longer holds counts at the build's live components of the same name: on them, beneath every row that reaches them, in the list beneath them and in the trend beneath them. A replaced root is left to the root, which counts every root the build has had | A code finding keeps the component it opened on, so a rescan at a new version replaces the component and not the finding (`design-docs/analysis-source.md` § Placement); at 4,000 components a build, the tree's first screen took 251 ms against 268 ms on MySQL 8.4 and 627 ms against 630 ms on PostgreSQL |
 | A tree read reaching no component reads no code finding | The read takes no components as the whole build |
 | A chooser match counts what its name reaches in the match's builds, each code finding or issue once per name however many folds and binaries hold it | Joined once per binary, a kernel of ten binaries sorted ten rows for each it counted: 718 ms on PostgreSQL and 913 ms on MySQL 8.4 at 16,000 components a build, against 228 ms and 225 ms once per name |
 | A tree count is asked for only with `code_findings`; asked by a reader not reading security testing material, the read is refused | A count not drawn is not asked for |
-| The trend's line is not fixed: from opening until a person closes it as fixed; a decision answers a code finding and closes nothing, and absence closes nothing | Ruling a code finding not a problem keeps its record; the line counts what remains in the code |
-| Opened and fixed are the difference between one week's set and the last, so the three numbers agree | |
-| Plotted on when a run was applied, as the dependency trend is | |
-| The weeks are 1 to 104, twelve unless named | |
 | A chooser match in a product where the reader does not read security testing material carries no code finding count; one where they read no dependency finding carries no issue count | Absent is never zero (`design-docs/interface.md` § Families a reader holds) |
 
 ## Weakness families
