@@ -303,10 +303,10 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 			return refusal.Errorf("you are keeping %d saved filters, which is the "+
 				"limit: forget one before keeping another", held)
 		}
-		// Two saves of one new name both find nothing to update and both
-		// add a row. The unique index refuses the later one, and that is a
-		// lost race: taken again, the update above finds the row the other
-		// kept and replaces it.
+		// A filter of this name that landed after the update above looked is
+		// a lost race: the unique index refuses this add, and taken again, the
+		// update finds that filter and replaces it. A second save by the same
+		// person waits for its turn above, so it never lands here.
 		if _, err := db.NewInsert().Model(kept).Exec(ctx); err != nil {
 			if database.IsDuplicate(err) {
 				return database.ErrGoAgain
