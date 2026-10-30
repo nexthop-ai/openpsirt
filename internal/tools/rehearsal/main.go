@@ -248,6 +248,13 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	var acknowledged int64
+	if record.Last < renamesV0110 {
+		if acknowledged, err = r.acknowledged(ctx); err != nil {
+			return nil, err
+		}
+	}
+	filled := FilledV0110(record.Last, acknowledged)
 	// Every count below is under the name this tree gives its table.
 	held = AsRenamed(record.Last, held, migrations.TablesRenamedV0110())
 	r.note("%d tables, %d findings, %d decisions, %d decision occurrences", len(held), held["finding"],
@@ -279,7 +286,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded))...)
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded, filled))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -477,6 +484,23 @@ func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
 		counts[table] = n
 	}
 	return counts, nil
+}
+
+// acknowledged reads how many reports a release before v0.11.0 recorded as
+// acknowledged, each of which the upgrade writes as a message sent. A stamp
+// missing who made it is stepped over by the upgrade, and here.
+func (r *run) acknowledged(ctx context.Context) (int64, error) {
+	db, err := connect(ctx, r.hostURL)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = db.Close() }()
+	var n int64
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "flaw_report"
+		WHERE "acknowledged_at" IS NOT NULL AND "acknowledged_by" IS NOT NULL`).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count the acknowledged reports: %w", err)
+	}
+	return n, nil
 }
 
 // container is what every run of this tree's image shares: the release's

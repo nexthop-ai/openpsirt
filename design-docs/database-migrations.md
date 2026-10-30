@@ -195,7 +195,7 @@ the demo's inventories, so it runs locally, outside the gate.
 | The release's database | The release's image, built from its tag, runs its own demo targets unedited against the rehearsal's empty database: products, inventories, scans, a VEX document, decisions and an approval, an assignment, and a recorded flaw |
 | What it held | Open findings per build from its status report, and every table's row count with it stopped. A build with no count is not settled, and the wait refuses naming it |
 | The upgrade | This tree's image applies the migrations alone, reaching this tree's last migration |
-| The rows | A table both sides hold keeps its count; a table only the upgrade holds starts empty; a renamed table is counted under its new name on both sides |
+| The rows | A table holds what it held plus what the upgrade fills it with from the release's other rows; a table only the upgrade holds holds only what it is filled with; a renamed table is counted under its new name on both sides. The one fill is the v0.11.0 upgrade's: each report a release before it recorded as acknowledged, with who acknowledged it, becomes one message sent |
 | Served | This tree's server, started with the release's demo configuration, reports the same open findings per build, and no GET in the API document answers 5xx. The sweep names the build that sorts first. A GET whose path parameter the seed has no name for is skipped |
 
 | Rule | Reason |

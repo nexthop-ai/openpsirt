@@ -33,10 +33,23 @@ func AsRenamed(fromLast int64, held Counts, renamed map[string]string) Counts {
 	return out
 }
 
+// FilledV0110 is the rows the upgrade from a release whose last migration is
+// given writes from what the release held: each acknowledgement it recorded
+// becomes a report's first message sent. A release already past that upgrade
+// has its messages and is filled with nothing.
+func FilledV0110(fromLast, acknowledged int64) Counts {
+	if fromLast >= renamesV0110 {
+		return Counts{}
+	}
+	return Counts{"report_message": acknowledged}
+}
+
 // Compare reports every table whose count moved across an upgrade. before is
-// what the release held, after is what the upgrade left. A table both sides
-// hold keeps its count, and a table only the upgrade holds starts empty.
-func Compare(before, after Counts) []string {
+// what the release held, after is what the upgrade left, and filled is the
+// rows the upgrade writes into a table from what the release held elsewhere. A
+// table holds what it held and what it is filled with, and a table only the
+// upgrade holds starts with what it is filled with and nothing more.
+func Compare(before, after, filled Counts) []string {
 	var faults []string
 	names := map[string]bool{}
 	for name := range before {
@@ -57,10 +70,12 @@ func Compare(before, after Counts) []string {
 		switch {
 		case held && !holds:
 			faults = append(faults, fmt.Sprintf("%s held %d rows and is gone, and nothing says where they went", name, was))
-		case held && is != was:
-			faults = append(faults, fmt.Sprintf("%s held %d rows and holds %d", name, was, is))
-		case !held && is != 0:
+		case held && is != was+filled[name]:
+			faults = append(faults, fmt.Sprintf("%s held %d rows, is filled with %d, and holds %d", name, was, filled[name], is))
+		case !held && is != filled[name] && filled[name] == 0:
 			faults = append(faults, fmt.Sprintf("%s is new and holds %d rows, and nothing the release held fills it", name, is))
+		case !held && is != filled[name]:
+			faults = append(faults, fmt.Sprintf("%s is new and holds %d rows, and what the release held fills it with %d", name, is, filled[name]))
 		}
 	}
 	return faults
