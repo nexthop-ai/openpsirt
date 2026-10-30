@@ -93,6 +93,7 @@ holds the screens.
 | Each is the queue's own read and visibility | Figure, list and file count one population |
 | Assignment is its own consumer, apart from Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a code finding nobody has judged into both. Holding work is one act, so handovers move code findings too |
 | The held-work lists are Assignment's; the digest of held work is Notifications' and names no code finding | |
+| A held-work list asked for one family keeps that family's kinds, and its total counts that family alone: dependency findings are vulnerability and entered, code findings analysis; every kind is in one family | A rule at a place and an advisory at a component are different units, so a screen draws one count per family and never their sum |
 | A code finding is one piece of held work at its occurrence | Its builds may hold different versions of its component |
 
 ## Inclusion

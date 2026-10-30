@@ -64,3 +64,54 @@ func TestAConditionNamesTheKindsItIncludes(t *testing.T) {
 		}
 	}
 }
+
+// Every declared kind is in exactly one family, so a list of held work split
+// by family loses no row and counts none twice.
+func TestEveryKindIsInOneFamily(t *testing.T) {
+	declared := Declarations()
+	if len(declared) == 0 {
+		t.Fatal("no kinds were found, so this checked nothing")
+	}
+	for _, d := range declared {
+		in := 0
+		for _, f := range Families() {
+			for _, k := range f.Kinds() {
+				if k == d.Kind {
+					in++
+				}
+			}
+		}
+		if in != 1 {
+			t.Errorf("%s is in %d families; want 1", d.Kind, in)
+		}
+	}
+	for _, f := range Families() {
+		for _, k := range f.Kinds() {
+			if !Known(k) {
+				t.Errorf("the %s family holds %q, which nothing declares", f, k)
+			}
+		}
+	}
+}
+
+func TestAFamilyNarrowsAConsumerToItsKinds(t *testing.T) {
+	for _, c := range []struct {
+		consumer Consumer
+		family   Family
+		where    string
+		args     []any
+	}{
+		{Assignment, "", `"f"."kind" IN (?)`, nil},
+		{Assignment, Code, `"f"."kind" = ?`, []any{Analysis}},
+		{Assignment, Dependency, `"f"."kind" IN (?)`, nil},
+		{Notifications, Code, "1 = 0", nil},
+	} {
+		where, args := c.consumer.WhereIn(`"f"."kind"`, c.family)
+		if where != c.where {
+			t.Errorf("%s in the %q family: %q; want %q", c.consumer, c.family, where, c.where)
+		}
+		if c.args != nil && (len(args) != 1 || args[0] != c.args[0]) {
+			t.Errorf("%s in the %q family binds %v; want %v", c.consumer, c.family, args, c.args)
+		}
+	}
+}

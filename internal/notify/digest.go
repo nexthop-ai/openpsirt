@@ -218,7 +218,7 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	const mostPages = 20
 	taken := 0
 	for page := range mostPages {
-		held, total, err := findings.AssignedTo(ctx, kind.Notifications, subject, subject.Mine(),
+		held, total, err := findings.AssignedTo(ctx, kind.Notifications, "", subject, subject.Mine(),
 			finding.Scope{}, most, page*most)
 		if err != nil {
 			return digest, fmt.Errorf("read what %q holds: %w", person.Identity, err)

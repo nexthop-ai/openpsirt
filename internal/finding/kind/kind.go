@@ -83,6 +83,36 @@ func Of(k Kind) Declaration {
 // Known reports whether k is a kind this deployment declares.
 func Known(k Kind) bool { return len(Of(k).Issues) > 0 }
 
+// Family is one of the two families of finding a reader holds apart, and a
+// screen counts apart: dependency findings, what a scan of an inventory
+// matched and the flaws recorded beside them, and code findings, what
+// security testing reported in our own code. A count over both adds a rule at
+// a place to an advisory at a component, so a list of held work says how
+// much of each it holds.
+type Family string
+
+const (
+	// Dependency is what a scan of an inventory matched, and the flaws
+	// recorded beside them.
+	Dependency Family = "dependency"
+	// Code is what security testing reported in our own code.
+	Code Family = "code"
+)
+
+// Families is every family, in the order a screen draws them.
+func Families() []Family { return []Family{Dependency, Code} }
+
+// Kinds is the kinds of finding in this family, named as inclusions.
+func (f Family) Kinds() []Kind {
+	switch f {
+	case Dependency:
+		return []Kind{Vulnerability, Entered}
+	case Code:
+		return []Kind{Analysis}
+	}
+	return nil
+}
+
 // Consumer is something that reads findings. Each states the kinds it
 // includes, and a kind it does not name never reaches it.
 type Consumer string
@@ -191,6 +221,24 @@ func (c Consumer) Includes(k Kind) bool {
 // names it. A consumer including nothing is a condition nothing satisfies.
 func (c Consumer) Where(column string) (string, []any) {
 	return In(column, c.Kinds())
+}
+
+// WhereIn is Where narrowed to one family: the kinds this consumer includes
+// that the family holds. The empty family is every kind the consumer
+// includes.
+func (c Consumer) WhereIn(column string, f Family) (string, []any) {
+	if f == "" {
+		return c.Where(column)
+	}
+	var kinds []Kind
+	for _, k := range c.Kinds() {
+		for _, held := range f.Kinds() {
+			if k == held {
+				kinds = append(kinds, k)
+			}
+		}
+	}
+	return In(column, kinds)
 }
 
 // In is the condition keeping a query to the kinds given, over a column
