@@ -226,8 +226,9 @@ func newestCodeFinding(ctx context.Context, db bun.IDB, subject access.Subject, 
 // confirmedAt reports whether a decision confirming the code finding at an occurrence stands.
 func confirmedAt(ctx context.Context, db bun.IDB, productID, findingID int64) (bool, error) {
 	var outcome *string
+	product := inProduct(productID)
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		ColumnExpr(standingOutcome+` AS "outcome"`, productID).
+		ColumnExpr(standingOutcomeIn(product)+` AS "outcome"`, product.times(1)...).
 		Where(`"f"."id" = ?`, findingID).
 		Scan(ctx, &outcome); err != nil {
 		return false, fmt.Errorf("read the decision standing at the code finding: %w", err)

@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -222,6 +223,7 @@ func statedVocabularies() map[string][]string {
 		"inventory changes":                   words(graph.ChangeKinds()),
 		"spread over variants":                words(finding.VariantSpreads()),
 		"repository styles":                   words(sourcelink.Styles()),
+		"families":                            words(kind.Families()),
 	}
 }
 

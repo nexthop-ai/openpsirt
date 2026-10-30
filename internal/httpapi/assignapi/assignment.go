@@ -362,12 +362,15 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 			"built as several variants is one piece of work — a decision is keyed on the product " +
 			"and the code rather than on the build, so answering it once answers every build " +
 			"holding the same versions. `builds` says how many that is. Where two builds ship " +
-			"different versions of the component they are different work and appear separately.",
+			"different versions of the component they are different work and appear separately.\n\n" +
+			"`family` keeps dependency findings or code findings alone, and `total` then counts that " +
+			"family: a rule at a place and an advisory at a component are different units.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.ScopeQuery
-		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int `query:"offset" minimum:"0"`
+		Family core.Family `query:"family" doc:"Limit to one family: dependency is what a scan of an inventory matched and the flaws recorded beside them, code is what security testing reported. Left out, both, and total counts the two together"`
+		Limit  int         `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int         `query:"offset" minimum:"0"`
 	}) (*UnassignedPage, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -378,7 +381,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		rows, total, err := finding.NewStore(in.DB.DB).Unassigned(ctx, subject, scope,
-			input.Limit, input.Offset)
+			kind.Family(input.Family), input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what nobody is dealing with could not be read", err)
 		}
@@ -394,7 +397,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 			"product, not one per build. The same code built several ways is one piece of " +
 			"work, and it was taken on as one. A static analysis code finding is one item, with `occurrence` " +
 			"set, where you read it.\n\n" +
-			"Send `me` as the identity for your own.\n\n" +
+			"Send `me` as the identity for your own. `family` keeps dependency findings or code findings " +
+			"alone, and `total` then counts that family.\n\n" +
 			"An identity nobody holds answers with an empty list rather than a 404, which is " +
 			"also what an identity somebody holds answers when none of their work is yours to " +
 			"see. The two are deliberately the same.",
@@ -403,8 +407,9 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		"work you cannot see."), func(ctx context.Context, input *struct {
 		Identity string `path:"identity" doc:"Their sign-in identity, or 'me' for your own"`
 		core.ScopeQuery
-		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int `query:"offset" minimum:"0"`
+		Family core.Family `query:"family" doc:"Limit to one family: dependency is what a scan of an inventory matched and the flaws recorded beside them, code is what security testing reported. Left out, both, and total counts the two together"`
+		Limit  int         `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int         `query:"offset" minimum:"0"`
 	}) (*UnassignedPage, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -458,7 +463,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 				}
 			}
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, subject, holders,
+		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, kind.Family(input.Family), subject, holders,
 			scope, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what they are dealing with could not be read", err)
@@ -478,7 +483,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Summary: "List what one team is dealing with",
 		Description: "The open findings assigned to a team, most urgent first, in the same units " +
 			"as everywhere else: one item per issue in a component in a product, and one per static " +
-			"analysis code finding you read, with `occurrence` set.\n\n" +
+			"analysis code finding you read, with `occurrence` set. `family` keeps dependency findings " +
+			"or code findings alone, and `total` then counts that family.\n\n" +
 			"Work goes to a team by an assignment rule and by an assignment naming one, so a team " +
 			"holds work the way a person does — and the totals list says so. This is the list " +
 			"behind that number.\n\n" +
@@ -491,8 +497,9 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		"work you cannot see."), func(ctx context.Context, input *struct {
 		Team string `path:"team" doc:"The team's name"`
 		core.ScopeQuery
-		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int `query:"offset" minimum:"0"`
+		Family core.Family `query:"family" doc:"Limit to one family: dependency is what a scan of an inventory matched and the flaws recorded beside them, code is what security testing reported. Left out, both, and total counts the two together"`
+		Limit  int         `query:"limit" default:"50" minimum:"1" maximum:"200"`
+		Offset int         `query:"offset" minimum:"0"`
 	}) (*UnassignedPage, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -523,7 +530,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		case !errors.Is(err, access.ErrNoSuchTeam):
 			return nil, core.WentWrong(in.Logger, "that team could not be looked up", err)
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, subject, holders,
+		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, kind.Family(input.Family), subject, holders,
 			scope, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what the team is dealing with could not be read", err)

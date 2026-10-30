@@ -4,7 +4,7 @@
 import { Suspense, useEffect, useSyncExternalStore } from "react";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { useWho } from "./session";
 import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
@@ -31,7 +31,6 @@ import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
 import { Findings } from "../screens/Findings";
-import { UNOWNED_LIST } from "../screens/list";
 import { NotFound } from "../screens/NotFound";
 import { Products } from "../screens/Products";
 import { Product } from "../screens/Product";
@@ -69,6 +68,7 @@ const InventoryChanges = retrying(() =>
 );
 const Access = retrying(() => import("../screens/Access").then((m) => m.Access));
 const Assignments = retrying(() => import("../screens/Assignments").then((m) => m.Assignments));
+const Unassigned = retrying(() => import("../screens/Unassigned").then((m) => m.Unassigned));
 const Queue = retrying(() => import("../screens/Queue").then((m) => m.Queue));
 const Decision = retrying(() => import("../screens/Decision").then((m) => m.Decision));
 const DecisionOccurrence = retrying(() =>
@@ -172,12 +172,10 @@ export function App() {
             <Routes>
               <Route path={ROUTES.home} element={<Home who={who.data} />} />
               <Route path={ROUTES.reviewQueue} element={<Queue />} />
-              {/* Work nobody holds is the findings list under two filters, so
-                the address stays and the screen does not. It is a route rather
-                than nothing so that a bookmark, a link in an old digest and
-                the sidebar entry as it was all land on the list instead of
-                being swallowed by the catch-all below. */}
-              <Route path={ROUTES.unassigned} element={<Navigate to={UNOWNED_LIST} replace />} />
+              {/* Work nobody holds: a card per family for a reader counting
+                both, and the one list for a reader counting one, so a
+                bookmark or a link in an old digest lands on work. */}
+              <Route path={ROUTES.unassigned} element={<Unassigned who={who.data} />} />
               <Route path={ROUTES.findings} element={<Findings />} />
               {/* One decision, whole, and every act at that grain. A decision
                 occurrence's address resolves to it: what a decision says
@@ -215,6 +213,9 @@ export function App() {
               <Route path={ROUTES.vulnerabilityReports} element={<VulnerabilityReports />} />
               <Route path={ROUTES.vulnerabilityReport} element={<VulnerabilityReport />} />
               <Route path={ROUTES.codeFindings} element={<CodeFindings />} />
+              {/* The same queue over every product the reader reads security
+                testing material in. */}
+              <Route path={ROUTES.codeFindingsAcross} element={<CodeFindings />} />
               <Route path={ROUTES.codeFinding} element={<CodeFinding />} />
               <Route path={ROUTES.suppressionRules} element={<SuppressionRules />} />
               <Route path={ROUTES.repositories} element={<Repositories />} />

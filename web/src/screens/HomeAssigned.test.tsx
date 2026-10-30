@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Home } from "./Home";
 import type { Who } from "../app/session";
 import { mounted, screen, serve, settle } from "../test/mount";
-import { readingDependencies } from "../test/reach";
+import { reaching, readingDependencies } from "../test/reach";
 
 const mount = mounted();
 
@@ -28,7 +28,7 @@ async function drawn(reports: number) {
   mount.render(screen(<Home who={ANA} />));
   await settle();
   const tile = Array.from(mount.host().querySelectorAll("button.kpi")).find((each) =>
-    each.textContent?.includes("Assigned to you"),
+    each.textContent?.includes("Dependency findings assigned to you"),
   );
   return tile?.textContent ?? "";
 }
@@ -40,6 +40,60 @@ describe("what the front page says somebody holds", () => {
 
   it("says nothing of reports where they hold none", async () => {
     expect(await drawn(0)).not.toContain("report");
+  });
+});
+
+describe("what the front page says somebody holds, one family at a time", () => {
+  // The tiles' figures, answered per family: two dependency findings and
+  // three code findings.
+  async function tiles(who: Who, held: { dependency: number; code: number }) {
+    serve((path, init) => {
+      if (path === "/v1/people/{identity}/assignments") {
+        const family = (init as { params: { query: { family: "dependency" | "code" } } }).params
+          .query.family;
+        return { data: { items: [], total: held[family] } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Home who={who} />));
+    await settle();
+    return Array.from(mount.host().querySelectorAll("button.kpi"))
+      .filter((each) => each.textContent?.includes("assigned to you"))
+      .map((each) => [
+        each.querySelector(".l")?.textContent?.split(" · ")[0],
+        each.querySelector(".n")?.textContent,
+      ]);
+  }
+
+  it("draws one figure per family, never their sum", async () => {
+    const both = {
+      ...ANA,
+      reach: [
+        reaching("sonic", {
+          may_see: true,
+          reads_public: true,
+          reads_private: true,
+          reads_security_testing: true,
+        }),
+      ],
+    } as Who;
+    expect(await tiles(both, { dependency: 2, code: 3 })).toEqual([
+      ["Dependency findings assigned to you", "2"],
+      ["Code findings assigned to you", "3"],
+    ]);
+  });
+
+  it("draws no code finding figure for a reader of none who holds none", async () => {
+    expect(await tiles(ANA, { dependency: 2, code: 0 })).toEqual([
+      ["Dependency findings assigned to you", "2"],
+    ]);
+  });
+
+  it("counts the code findings a reader of none holds", async () => {
+    expect(await tiles(ANA, { dependency: 2, code: 1 })).toEqual([
+      ["Dependency findings assigned to you", "2"],
+      ["Code findings assigned to you", "1"],
+    ]);
   });
 });
 

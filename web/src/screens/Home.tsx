@@ -19,7 +19,8 @@ import { SOON_DAYS } from "./FindingsFilters";
 import { paceReading, mixReading } from "../ui/trend";
 import { decisionOf, useQueueCount } from "../api/decisions";
 import type { Who } from "../app/session";
-import { counted, holding, readsNothing, type Holding } from "../app/families";
+import { counted, heldLine, holding, readsNothing, type Holding } from "../app/families";
+import { useOwnWork } from "../app/ownWork";
 import { HeldLine } from "../ui/HeldLine";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
@@ -29,6 +30,7 @@ import {
   uploadsAt,
   incidentsAt,
   productFindingsAt,
+  codeFindingAt,
   reviewQueueAt,
 } from "../app/routes";
 
@@ -113,11 +115,18 @@ export function Home({ who }: { who: Who }) {
         </p>
       </div>
 
-      <Figures counting={counting} points={points} trend={trend} dependencies={dependencies} />
+      <Figures
+        who={who}
+        counting={counting}
+        points={points}
+        trend={trend}
+        dependencies={dependencies}
+      />
       <HeldLine at={dependencies} />
 
       <div className="panels">
-        {readsNothing(who) && <Records who={who} />}
+        {readsNothing(who) && (keepsRecords(who) || !who.collaborates) && <Records who={who} />}
+        {who.collaborates && <YourCases />}
         <Pending />
         <InProgress me={who.identity} />
         {/* Lapsed decisions are on either family; the lapsed findings line
@@ -406,11 +415,13 @@ function reading(now: number, shipped: number, release: string): string {
 // selection makes is on screen rather than inferred. Unscoped the twin is not
 // drawn: it would be the same number said twice.
 function Figures({
+  who,
   counting,
   points,
   trend,
   dependencies,
 }: {
+  who: Who;
   counting: string;
   points: { open?: number; by_severity?: Record<string, number> }[];
   trend: Readable;
@@ -460,15 +471,12 @@ function Figures({
   });
   // This person's holdings, and what has come back to them: Home answers
   // "what do I do next" as well as "how much is there".
-  const assigned = useQuery({
-    queryKey: ["home", "assigned", "me", scope],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/people/{identity}/assignments", {
-          params: { path: { identity: "me" }, query: { limit: 1, ...scope } },
-        }),
-      ),
-  });
+  // One figure per family, never their sum: a rule at a place and an
+  // advisory at a component are different units.
+  const own = [
+    useOwnWork(who, "dependency", scope, { limit: 1, offset: 0 }),
+    useOwnWork(who, "code", scope, { limit: 1, offset: 0 }),
+  ];
   // The open vulnerability reports this person and their teams hold. A report
   // belongs to a product and no build, so it is counted beside the findings
   // rather than among them.
@@ -577,17 +585,42 @@ function Figures({
     <div className="kpis">
       {/* Hers first. What somebody opening this most days has to decide is
           what to pick up, and a count of the estate does not answer it. */}
-      <button type="button" className="kpi" onClick={() => navigate("/assignments")}>
-        <span className="l">Assigned to you · {counting}</span>
-        <span className="n">
-          <Count of={assigned}>{() => (assigned.data?.total ?? 0).toLocaleString()}</Count>
-        </span>
-        <span className="d">
-          yours and your teams&rsquo;
-          {(reports.data?.total ?? 0) > 0 &&
-            `, and ${reports.data?.total?.toLocaleString()} ${reports.data?.total === 1 ? "report" : "reports"}`}
-        </span>
-      </button>
+      {own.map(
+        (work) =>
+          (work.drawn || work.at.held !== "nowhere") && (
+            <button
+              key={work.family}
+              type="button"
+              className="kpi"
+              onClick={() => navigate("/assignments")}
+            >
+              <span className="l">
+                {work.family === "code" ? "Code findings" : "Dependency findings"} assigned to you ·{" "}
+                {counting}
+              </span>
+              <span className="n">
+                {work.drawn ? (
+                  <Count of={work.query}>
+                    {() => (work.query.data?.total ?? 0).toLocaleString()}
+                  </Count>
+                ) : (
+                  "—"
+                )}
+              </span>
+              <span className="d">
+                {!work.drawn
+                  ? heldLine(work.at)
+                  : work.family === "code"
+                    ? "yours and your teams’"
+                    : `yours and your teams’${
+                        (reports.data?.total ?? 0) > 0
+                          ? `, and ${reports.data?.total?.toLocaleString()} ${reports.data?.total === 1 ? "report" : "reports"}`
+                          : ""
+                      }`}
+              </span>
+            </button>
+          ),
+      )}
       <button
         type="button"
         className={`kpi${sentBack > 0 ? " urgent" : ""}`}
@@ -748,12 +781,19 @@ function greeting(): string {
   return "Good evening";
 }
 
+// Whether the reader keeps the deployment's records: an administrator or an
+// auditor, whose work the Records panel opens.
+function keepsRecords(who: Who): boolean {
+  return who.admin || !!who.audits;
+}
+
 // The panel standing for the estate's figures for a reader holding no finding
 // in any product: an auditor, an administrator with no role on a product, or
-// somebody holding a capability alone. The deployment's records are what they
-// may open, never figures that are zero because none of them is theirs.
+// somebody holding a capability alone and collaborating on nothing, whose
+// home Your cases fills instead. The deployment's records are what they may
+// open, never figures that are zero because none of them is theirs.
 function Records({ who }: { who: Who }) {
-  const keeps = who.admin || !!who.audits;
+  const keeps = keepsRecords(who);
   return (
     <div className="panel">
       <header>
@@ -773,6 +813,69 @@ function Records({ who }: { who: Who }) {
           </Link>
         </footer>
       )}
+    </div>
+  );
+}
+
+// The cases the reader was brought into and the code findings they were
+// granted, each opening the one thing the grant reaches. Drawn only for a
+// collaborator, and only where a grant still reaches something: a code
+// finding's grant ends with its flaw's disclosure.
+function YourCases() {
+  const own = useQuery({
+    queryKey: ["session", "cases"],
+    queryFn: async () => unwrap(await api.GET("/v1/session/me/cases", {})),
+  });
+  if (own.isPending) return null;
+  if (own.isError) {
+    return (
+      <div className="panel">
+        <header>
+          <h3>Your cases</h3>
+        </header>
+        <Failed error={own.error} what="Your cases could not be read." />
+      </div>
+    );
+  }
+  const cases = own.data.cases ?? [];
+  const codeFindings = own.data.code_findings ?? [];
+  if (cases.length + codeFindings.length === 0) return null;
+  return (
+    <div className="panel">
+      <header>
+        <h3>Your cases</h3>
+      </header>
+      <ul>
+        {cases.map((each) => (
+          <li key={`case ${each.product} ${each.issue}`}>
+            <Link className="id" to={productFindingsAt(each.product, { q: each.issue })}>
+              {each.issue}
+            </Link>{" "}
+            <span className="what">in {each.product_name || each.product}</span>
+          </li>
+        ))}
+        {codeFindings.map((each) => (
+          <li key={`code ${each.product} ${each.occurrence}`}>
+            <Link
+              className="id"
+              to={codeFindingAt(
+                {
+                  product: each.product,
+                  branch_or_tag: each.branch_or_tag,
+                  variant: each.variant,
+                },
+                each.occurrence,
+              )}
+            >
+              {each.rule}
+            </Link>{" "}
+            <span className="what">
+              code finding at {each.path}, recorded as {each.flaw} in{" "}
+              {each.product_name || each.product}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

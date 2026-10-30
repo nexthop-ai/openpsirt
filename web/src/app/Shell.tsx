@@ -14,6 +14,7 @@ import {
   vulnerabilityReportsAt,
   uploadsAt,
   codeFindingsAt,
+  codeFindingsAcrossAt,
   issueAt,
   componentSearchAt,
   branchesAndTagsAt,
@@ -21,7 +22,8 @@ import {
   plannedUpgradesAt,
   variantsAt,
 } from "./routes";
-import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
+import { asAsked, listQuery } from "../screens/list";
+import { unownedAt, useUnowned } from "../screens/unowned";
 import { folded, fold } from "./rail";
 import { signedOutBy, signOut } from "./session";
 import { counted, heldLine, holding, readsUndisclosed } from "./families";
@@ -44,16 +46,9 @@ import {
 import type { Who } from "./session";
 import { useClickAway } from "../ui/away";
 
-// The badge beside the Unassigned entry, asked as the list itself asks it.
-//
-// The list writes three narrowings of its own into whatever address it is
-// given — nothing lands in a tag, nothing in a release past end-of-life, and
-// the by-issue view sets aside what a promised upgrade already answers — so a
-// total counted without them is a number that disagrees with the list it
-// opens. Built from the entry's own address for that reason.
-const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"));
-// The Dependency findings entry's badge, for the same reason: the list it opens writes the
-// same narrowings, so the count is asked with them.
+// The Dependency findings entry's badge, asked as the list itself asks it: the
+// list writes narrowings of its own into a silent address, so a total counted
+// without them disagrees with the list it opens.
 const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 
 // The frame the restyled mockup settled on: a rail down the side carrying the
@@ -122,16 +117,11 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // Rulings on vulnerability reports waiting for this reader, which sit in the
   // same queue as the decisions.
   const approvable = useApprovable();
-  // Across every product a reader can see, like the entry it sits under and
-  // unlike the scoped count below: the badge is what the address opens, and
-  // that address names no product.
-  const unassigned = useQuery({
-    queryKey: ["findings", "unowned"],
-    enabled: dependenciesAnywhere,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/findings", { params: { query: { ...UNOWNED_QUERY, limit: 1 } } })),
-    refetchInterval: 60_000,
-  });
+  // Work nobody holds, one badge per family, across every product a reader
+  // can see, like the entry they sit beside and unlike the scoped count below:
+  // what the entry opens names no product.
+  const unowned = useUnowned(who);
+  const unownedOpens = unownedAt(unowned);
   // Counted for whatever is selected rather than only for a whole build : the
   // entry beside this number opens the list that produced it, and a rail that
   // goes quiet the moment somebody widens the scope is one that looks broken
@@ -224,18 +214,27 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               unread={queue.isError || approvable.isError}
               unit="waiting for your approval"
             />
-            {dependenciesAnywhere && (
+            {(dependenciesAnywhere || codeFindingsAnywhere) && (
               <Rail
-                to={UNOWNED_LIST}
-                mark={UNOWNED}
+                to={unownedOpens.to}
+                mark={unownedOpens.mark}
                 icon="nobody"
                 label="Unassigned"
-                count={unassigned.data?.total}
-                unread={unassigned.isError}
-                unit={withLine(
-                  "dependency findings nobody holds and nobody has decided",
-                  heldLine(dependencies),
-                )}
+                counts={[
+                  {
+                    count: unowned.dependency.count.data?.total,
+                    unread: unowned.dependency.count.isError,
+                    unit: withLine(
+                      "dependency findings nobody holds and nobody has decided",
+                      heldLine(dependencies),
+                    ),
+                  },
+                  {
+                    count: unowned.code.count.data?.total,
+                    unread: unowned.code.count.isError,
+                    unit: "code findings nobody holds",
+                  },
+                ]}
                 quiet
               />
             )}
@@ -309,10 +308,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 }
               />
             )}
-            {/* A product's code findings from security testing, under the same
-              rule as the vulnerability reports: shown to somebody who reads
-              security testing material anywhere, and opening on the branch and
-              variant picked where both are. */}
+            {/* Code findings from security testing, shown to somebody who
+              reads security testing material anywhere: a product's, opening
+              on the branch and variant picked where both are, and with no
+              product picked, every product's they read. */}
             {codeFindingsAnywhere && (
               <Rail
                 to={
@@ -321,12 +320,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                         product,
                         whole ? { branch_or_tag: branchOrTag, variant } : undefined,
                       )
-                    : ""
+                    : codeFindingsAcrossAt()
                 }
                 icon="triage"
                 label="Security testing"
-                needs={!!codeFindingsHere && counted(codeFindingsHere)}
-                why={codeFindingsHere ? heldLine(codeFindingsHere) : "Pick a product"}
+                needs={!codeFindingsHere || counted(codeFindingsHere)}
+                why={codeFindingsHere ? heldLine(codeFindingsHere) : undefined}
               />
             )}
             {/* Its own screen rather than an action on the findings list: what is
@@ -453,6 +452,33 @@ function withLine(unit: string, line: string): string {
   return line ? `${unit}. ${line}` : unit;
 }
 
+// One count beside a rail entry.
+type Badge = { count?: number; unread?: boolean; unit?: string };
+
+function BadgeOf({ badge: { count, unread, unit }, quiet }: { badge: Badge; quiet?: boolean }) {
+  if (unread) {
+    return (
+      <span
+        className="count quiet"
+        title="This count could not be read"
+        aria-label="This count could not be read"
+      >
+        —
+      </span>
+    );
+  }
+  if (typeof count !== "number" || count <= 0) return null;
+  return (
+    <span
+      className={quiet ? "count quiet" : "count"}
+      title={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+      aria-label={unit ? `${count.toLocaleString()} ${unit}` : undefined}
+    >
+      {count.toLocaleString()}
+    </span>
+  );
+}
+
 // The version running here.
 function Version() {
   const version = useQuery({
@@ -478,6 +504,7 @@ function Rail({
   count,
   unread,
   unit,
+  counts,
   quiet,
   end,
   needs = true,
@@ -503,6 +530,9 @@ function Rail({
   // — enough that "Unassigned 7,616" beside "5,803 open issues" stops being
   // two numbers that look like they should agree.
   unit?: string;
+  // Several badges, one per thing counted, where an entry opens more than one
+  // list: each family's count stands apart, never summed.
+  counts?: Badge[];
   quiet?: boolean;
   end?: boolean;
   needs?: boolean;
@@ -529,26 +559,9 @@ function Rail({
     <>
       <Icon name={icon} />
       {label}
-      {unread ? (
-        <span
-          className="count quiet"
-          title="This count could not be read"
-          aria-label="This count could not be read"
-        >
-          —
-        </span>
-      ) : (
-        typeof count === "number" &&
-        count > 0 && (
-          <span
-            className={quiet ? "count quiet" : "count"}
-            title={unit ? `${count.toLocaleString()} ${unit}` : undefined}
-            aria-label={unit ? `${count.toLocaleString()} ${unit}` : undefined}
-          >
-            {count.toLocaleString()}
-          </span>
-        )
-      )}
+      {(counts ?? [{ count, unread, unit }]).map((badge, i) => (
+        <BadgeOf key={i} badge={badge} quiet={quiet} />
+      ))}
     </>
   );
   if (mark !== undefined) {

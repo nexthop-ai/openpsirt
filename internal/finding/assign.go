@@ -856,9 +856,12 @@ const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` +
 // , so two products shipping the identical component at the identical version
 // are two decisions, and merging them would offer one answer for work that is
 // answered separately.
-func (s *Store) Unassigned(ctx context.Context, subject access.Subject, scope Scope,
+//
+// A family keeps one of the two, which a screen counts apart; the empty family
+// is both.
+func (s *Store) Unassigned(ctx context.Context, subject access.Subject, scope Scope, family kind.Family,
 	limit, offset int) ([]Owned, int, error) {
-	return s.work(ctx, kind.Assignment, subject, scope, nil, limit, offset)
+	return s.workSince(ctx, kind.Assignment, family, subject, scope, nil, nil, limit, offset)
 }
 
 // AssignedTo reports what one party is dealing with — a person, or a team the
@@ -870,10 +873,12 @@ func (s *Store) Unassigned(ctx context.Context, subject access.Subject, scope Sc
 // for nobody" are the same question asked of a different holder, and answering
 // them in two shapes is how a screen ends up saying somebody holds ninety
 // things because it counted occurrences where the other counted decisions.
-func (s *Store) AssignedTo(ctx context.Context, c kind.Consumer, subject access.Subject, parties []int64,
-	scope Scope, limit, offset int) ([]Owned, int, error) {
+//
+// A family keeps one of the two families, as Unassigned does.
+func (s *Store) AssignedTo(ctx context.Context, c kind.Consumer, family kind.Family, subject access.Subject,
+	parties []int64, scope Scope, limit, offset int) ([]Owned, int, error) {
 
-	return s.work(ctx, c, subject, scope, parties, limit, offset)
+	return s.workSince(ctx, c, family, subject, scope, parties, nil, limit, offset)
 }
 
 // UnassignedSince is what nobody owns that arrived after a moment.
@@ -884,27 +889,22 @@ func (s *Store) AssignedTo(ctx context.Context, c kind.Consumer, subject access.
 func (s *Store) UnassignedSince(ctx context.Context, subject access.Subject, scope Scope,
 	since time.Time, limit int) ([]Owned, int, error) {
 
-	return s.workSince(ctx, kind.Notifications, subject, scope, nil, &since, limit, 0)
+	return s.workSince(ctx, kind.Notifications, "", subject, scope, nil, &since, limit, 0)
 }
 
-// work is what some set of parties holds, or what nobody does.
+// workSince is what some set of parties holds, or what nobody does, of the
+// consumer's kinds in one family or both, bounded to what opened after a
+// moment where one is given.
 //
-// A set rather than one, because "assigned to me" means mine or my team's
-// everywhere the phrase appears, and a screen that asked twice and merged
-// would page and count two half-lists.
-func (s *Store) work(ctx context.Context, c kind.Consumer, subject access.Subject, scope Scope,
-	holders []int64, limit, offset int) ([]Owned, int, error) {
-
-	return s.workSince(ctx, c, subject, scope, holders, nil, limit, offset)
-}
-
-// workSince is the same, bounded to what opened after a moment.
+// A set of parties rather than one, because "assigned to me" means mine or my
+// team's everywhere the phrase appears, and a screen that asked twice and
+// merged would page and count two half-lists.
 //
-// Only the digest passes one, and it passes the moment the last digest went:
-// what it carries is what has arrived since, rather than everything that is
-// open, which after a month is a list nobody reads.
-func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.Subject, scope Scope,
-	holders []int64, since *time.Time, limit, offset int) ([]Owned, int, error) {
+// Only the digest passes a moment, and it passes the moment the last digest
+// went: what it carries is what has arrived since, rather than everything
+// that is open, which after a month is a list nobody reads.
+func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Family, subject access.Subject,
+	scope Scope, holders []int64, since *time.Time, limit, offset int) ([]Owned, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are different
 	// statements, and this is the second.
@@ -922,7 +922,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 	}
 	limit = database.AList.Of(limit)
 
-	kinds, kindArgs := c.Where(`"f"."kind"`)
+	kinds, kindArgs := c.WhereIn(`"f"."kind"`, family)
 	// Nobody holds a code finding seen only in releases past their end of life, and
 	// nobody may take one, so the work nobody holds leaves out each sighting
 	// of a code finding in such a release, as the code finding queue does.

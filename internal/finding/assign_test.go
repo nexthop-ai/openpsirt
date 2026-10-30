@@ -222,7 +222,7 @@ func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicTriage, access.Assigner)
 
-		nobodys, total, err := f.store.Unassigned(t.Context(), who, finding.Scope{}, 50, 0)
+		nobodys, total, err := f.store.Unassigned(t.Context(), who, finding.Scope{}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -271,7 +271,7 @@ func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicTriage, access.Assigner)
 
-		alone, one, err := f.store.Unassigned(ctx, who, finding.Scope{}, 50, 0)
+		alone, one, err := f.store.Unassigned(ctx, who, finding.Scope{}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -290,7 +290,7 @@ func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		both, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, 50, 0)
+		both, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -335,7 +335,7 @@ func TestVariantsAtDifferentVersionsAreDifferentWork(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicTriage, access.Assigner)
-		rows, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, 50, 0)
+		rows, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -382,7 +382,7 @@ func TestTheSameComponentInTwoProductsIsTwoPiecesOfWork(t *testing.T) {
 
 		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
 			access.PublicRead, access.PrivateRead)
-		rows, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, 50, 0)
+		rows, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -436,7 +436,7 @@ func TestAssigningCoversEveryBuildOfTheProductHoldingIt(t *testing.T) {
 		if moved == 0 {
 			t.Fatal("assigning moved nothing")
 		}
-		rows, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, 50, 0)
+		rows, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

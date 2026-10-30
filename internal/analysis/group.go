@@ -137,6 +137,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 	// that the decision and the rule are asked of the kin. Which code findings are one
 	// flaw does not depend on which of the two is asked about.
 	var out []Member
+	product := inProduct(productID)
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "finding" AS "g" ON "g"."id" = ?`, codeFindingID).
@@ -148,8 +149,8 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionOccurrenceFiledAt("dc", "f")+`)`,
 			productID).
-		Where(`NOT `+ruled, productID).
-		Where(`NOT `+recordedAsFlaw, productID).
+		Where(`NOT `+ruledIn(product), product.times(1)...).
+		Where(`NOT `+recordedAsFlawIn(product), product.times(1)...).
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if len(ended) == 0 {
 				return q

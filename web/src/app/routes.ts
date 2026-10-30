@@ -108,6 +108,16 @@ export const codeFindingsAt = (
     beneath_namespace?: string;
   },
 ) => at("codeFindings", { product }, query);
+// The code findings of every product the reader reads security testing
+// material in, as one queue.
+export const codeFindingsAcrossAt = (query?: {
+  state?: string;
+  series?: string;
+  method?: string;
+  assigned?: "nobody";
+  component?: string;
+  component_version?: string;
+}) => at("codeFindingsAcross", {}, query);
 // One code finding's evidence on one build.
 export const codeFindingAt = (build: Build, occurrence: string) =>
   at("codeFinding", { ...build, occurrence });

@@ -656,6 +656,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/code-findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List code findings across products
+         * @description The code finding queue across every product you read security testing work in: one row per code finding in a product, however many of its builds it is on, each naming its product. Ordered, narrowed and counted as one product's list is, with `states`, `waiting`, `ruled` and `past_end_of_life` summed over those products.
+         *
+         *     A product where you do not read security testing work contributes nothing, and a reader of it in no product is answered an empty list. A branch, a variant and a subtree belong to one product, so `beneath` is refused with 422 here and asked of that product's list. Supports limit and offset.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products where you read security testing work.
+         */
+        get: operations["list-code-findings-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-findings.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export code findings across products
+         * @description The code finding list across products as a file: every row the same filters would list, not one page of them, in the same order, each naming its product.
+         *
+         *     Read with your own visibility, as it is written. No row carries source text. Takes every filter the list across products takes.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only the products where you read security testing work.
+         */
+        get: operations["export-code-findings-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/comments/{id}": {
         parameters: {
             query?: never;
@@ -2093,7 +2141,7 @@ export interface paths {
          * List what one person is dealing with
          * @description The open findings assigned to somebody, most urgent first, in the same units as what nobody is dealing with: one item per issue in a component in a product, not one per build. The same code built several ways is one piece of work, and it was taken on as one. A static analysis code finding is one item, with `occurrence` set, where you read it.
          *
-         *     Send `me` as the identity for your own.
+         *     Send `me` as the identity for your own. `family` keeps dependency findings or code findings alone, and `total` then counts that family.
          *
          *     An identity nobody holds answers with an empty list rather than a 404, which is also what an identity somebody holds answers when none of their work is yours to see. The two are deliberately the same.
          *
@@ -6446,6 +6494,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/session/me/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List your cases
+         * @description Returns the cases the caller was brought into, one issue in one product each, and the code findings recorded as a flaw they were granted, one occurrence in one product each.
+         *
+         *     A code finding is listed while its flaw is undisclosed: disclosure ends the grant. A withdrawn grant is not listed. A pipeline key is refused with 403.
+         *
+         *     Requires: your own sign-in, as a person and not a pipeline key
+         */
+        get: operations["list-own-cases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/session/me/chat": {
         parameters: {
             query?: never;
@@ -6733,7 +6805,7 @@ export interface paths {
         };
         /**
          * List what one team is dealing with
-         * @description The open findings assigned to a team, most urgent first, in the same units as everywhere else: one item per issue in a component in a product, and one per static analysis code finding you read, with `occurrence` set.
+         * @description The open findings assigned to a team, most urgent first, in the same units as everywhere else: one item per issue in a component in a product, and one per static analysis code finding you read, with `occurrence` set. `family` keeps dependency findings or code findings alone, and `total` then counts that family.
          *
          *     Work goes to a team by an assignment rule and by an assignment naming one, so a team holds work the way a person does — and the totals list says so. This is the list behind that number.
          *
@@ -6982,6 +7054,8 @@ export interface paths {
          *     Deliberately not scoped to one product: work falling between people is exactly what hides when every screen shows one product and nobody looks at the others.
          *
          *     One item per issue in a component in a product, not one per build. The same code built as several variants is one piece of work — a decision is keyed on the product and the code rather than on the build, so answering it once answers every build holding the same versions. `builds` says how many that is. Where two builds ship different versions of the component they are different work and appear separately.
+         *
+         *     `family` keeps dependency findings or code findings alone, and `total` then counts that family: a rule at a place and an advisory at a component are different units.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -8610,7 +8684,7 @@ export interface components {
             line?: number;
             /** @description What the analyzer says */
             message: string;
-            /** @description The code finding's occurrence identity, which addresses it on every build it is on */
+            /** @description The code finding's occurrence identity, which addresses it on every build of its product it is on */
             occurrence: string;
             /** @description Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from */
             on_build?: boolean;
@@ -8621,6 +8695,10 @@ export interface components {
             opened: string;
             /** @description The file, from the top of the checkout */
             path: string;
+            /** @description The product the code finding is in, by the name that addresses it */
+            product: string;
+            /** @description The product's name as shown, where it differs */
+            product_name?: string;
             /** @description The analyzer's rule, as <tool>/<rule> */
             rule: string;
             /**
@@ -12220,6 +12298,52 @@ export interface components {
              */
             waiting: number;
         };
+        OwnCaseBody: {
+            /** @description When they were brought in */
+            added_at: string;
+            /** @description The issue the case is about */
+            issue: string;
+            /** @description The product the case is in */
+            product: string;
+            /** @description The label shown for the product, where it differs from its name */
+            product_name?: string;
+        };
+        OwnCasesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OwnCasesBody.json
+             */
+            readonly $schema?: string;
+            /** @description The cases they were brought into, newest first */
+            cases: components["schemas"]["OwnCaseBody"][] | null;
+            /** @description The code findings recorded as a flaw they were granted, newest first, while the flaw is undisclosed */
+            code_findings: components["schemas"]["OwnCodeFindingBody"][] | null;
+        };
+        OwnCodeFindingBody: {
+            /** @description When they were granted it */
+            added_at: string;
+            /** @description The branch or tag of the build the code finding was last seen in */
+            branch_or_tag: string;
+            /** @description The label shown for the branch or tag, where it differs from its name */
+            branch_or_tag_name?: string;
+            /** @description The flaw the code finding was recorded as */
+            flaw: string;
+            /** @description The code finding's occurrence identity */
+            occurrence: string;
+            /** @description The file the code finding is in */
+            path: string;
+            /** @description The product the code finding is in */
+            product: string;
+            /** @description The label shown for the product, where it differs from its name */
+            product_name?: string;
+            /** @description The rule that reported the code finding */
+            rule: string;
+            /** @description The variant of the build the code finding was last seen in */
+            variant: string;
+            /** @description The label shown for the variant, where it differs from its name */
+            variant_name?: string;
+        };
         PackageKindBody: {
             /** @description The package type as the package identifier spells it, such as deb, golang or pypi. What the findings list's ecosystem filter takes */
             kind: string;
@@ -15348,6 +15472,8 @@ export interface components {
             bulk_cap?: number;
             /** @description The chat platforms this deployment offers and what they chose, where it offers any */
             chat?: components["schemas"]["ChatBody"];
+            /** @description They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names */
+            collaborates?: boolean;
             /**
              * Format: int64
              * @description The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted
@@ -16478,6 +16604,98 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CountedListBodyAuditedDecisionBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-code-findings-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under lists nothing */
+                series?: string;
+                /** @description List the code findings in one state. Left out, the queue */
+                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
+                assigned?: "nobody";
+                /** @description Limit to the code findings placed on one source package the products' builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Refused with 422: a subtree is a walk over one build's edges, so it is asked of one product's list with a branch or tag and a variant */
+                beneath?: string;
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-findings-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under lists nothing */
+                series?: string;
+                /** @description List the code findings in one state. Left out, the queue */
+                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
+                assigned?: "nobody";
+                /** @description Limit to the code findings placed on one source package the products' builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Refused with 422: a subtree is a walk over one build's edges, so it is asked of one product's list with a branch or tag and a variant */
+                beneath?: string;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -18589,6 +18807,8 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description Limit to one family: dependency is what a scan of an inventory matched and the flaws recorded beside them, code is what security testing reported. Left out, both, and total counts the two together */
+                family?: "dependency" | "code";
                 limit?: number;
                 offset?: number;
             };
@@ -25806,6 +26026,35 @@ export interface operations {
             };
         };
     };
+    "list-own-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnCasesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "set-chat": {
         parameters: {
             query?: never;
@@ -26208,6 +26457,8 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description Limit to one family: dependency is what a scan of an inventory matched and the flaws recorded beside them, code is what security testing reported. Left out, both, and total counts the two together */
+                family?: "dependency" | "code";
                 limit?: number;
                 offset?: number;
             };
@@ -26603,6 +26854,8 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description Limit to one family: dependency is what a scan of an inventory matched and the flaws recorded beside them, code is what security testing reported. Left out, both, and total counts the two together */
+                family?: "dependency" | "code";
                 limit?: number;
                 offset?: number;
             };

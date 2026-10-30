@@ -84,7 +84,7 @@ func TestACarriedDisclosedFindingIsInTheHoldersWorkAndNotInTheProductsAnswers(t 
 		who := f.holding(t, access.PrivateRead)
 		f.handTo(t, f.build, "CVE-2026-1", libnl.Name, who.Party())
 
-		mine, total, err := f.store.AssignedTo(ctx, kind.Assignment, who, who.Mine(), finding.Scope{}, 50, 0)
+		mine, total, err := f.store.AssignedTo(ctx, kind.Assignment, "", who, who.Mine(), finding.Scope{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

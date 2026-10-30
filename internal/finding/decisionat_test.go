@@ -45,6 +45,10 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 	"finding/assign.go": {
 		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its branch or tag",
 	},
+	"finding/own_cases.go": {
+		{"lc", "lh"}: "a code finding grant and its flaw record, in the grant's product",
+		{"lc", "sf"}: "a code finding grant and its sightings, in the grant's product",
+	},
 	"finding/disclaim.go": {
 		{"f", "lt"}: "two rows of one build at one occurrence",
 	},

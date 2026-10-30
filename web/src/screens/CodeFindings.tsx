@@ -18,8 +18,10 @@ import {
   componentAt,
   suppressionRulesAt,
   codeFindingsAt,
+  codeFindingsAcrossAt,
   productAt,
 } from "../app/routes";
+import { askForScope } from "../app/scope";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -39,8 +41,12 @@ import {
 
 // A product's static analysis code findings. With no state it is the queue: open
 // code findings nothing waits on. A state lists that state's code findings instead.
+//
+// With no product in the address it is the same queue over every product the
+// reader reads security testing material in, each row naming its product.
 export function CodeFindings() {
   const { product = "" } = useParams();
+  const across = product === "";
   const [params, setParams] = useSearchParams();
   const asked = params.get("state") ?? "";
   const state = Object.hasOwn(CODE_FINDING_STATES, asked) ? (asked as CodeFindingState) : undefined;
@@ -66,8 +72,11 @@ export function CodeFindings() {
   const [offset, setOffset] = useState(0);
   // Code findings, asked and drawn only where the reader reads them in the
   // product: a queue of zeros reads as an analyzer finding nothing.
-  const code = holding(useWho().data, "code", product);
+  const code = holding(useWho().data, "code", product || undefined);
   const reads = counted(code);
+  // At or under a component names one build, so across products it is said
+  // to need one and nothing is asked.
+  const needsBuild = across && !!placed.beneath;
   const listed = useCodeFindings(
     product,
     {
@@ -80,7 +89,7 @@ export function CodeFindings() {
       ...placed,
       offset,
     },
-    reads,
+    reads && !needsBuild,
   );
   const opener = useRowOpener();
 
@@ -104,18 +113,37 @@ export function CodeFindings() {
 
   // The list on screen as a file: the same narrowing, every row of it.
   const file = (format: "csv" | "json") =>
-    fileAt("/v1/products/{product}/code-findings.{format}", format, {
-      path: { product },
-      query: codeFindingsQuery({
-        state,
-        branch_or_tag: branchOrTag,
-        variant,
-        series,
-        method,
-        assigned,
-        ...placed,
-      }),
-    });
+    across
+      ? fileAt("/v1/code-findings.{format}", format, {
+          query: codeFindingsQuery({
+            state,
+            series,
+            method,
+            assigned,
+            component: placed.component,
+            component_version: placed.component_version,
+          }),
+        })
+      : fileAt("/v1/products/{product}/code-findings.{format}", format, {
+          path: { product },
+          query: codeFindingsQuery({
+            state,
+            branch_or_tag: branchOrTag,
+            variant,
+            series,
+            method,
+            assigned,
+            ...placed,
+          }),
+        });
+  // Where the code findings are: one product, or every product read.
+  const where = across ? (
+    "Code findings in every product you read"
+  ) : (
+    <>
+      Code findings in <Link to={productAt(product)}>{product}</Link>
+    </>
+  );
   const counts = listed.data?.states ?? {};
   const rows = listed.data?.items ?? [];
 
@@ -124,11 +152,32 @@ export function CodeFindings() {
       <div>
         <div className="screen-head">
           <h2>Security testing</h2>
-          <p>
-            Code findings in <Link to={productAt(product)}>{product}</Link>
-          </p>
+          <p>{where}</p>
         </div>
         <Empty title="Nothing to list." detail={heldLine(code)} />
+      </div>
+    );
+  }
+
+  if (needsBuild) {
+    return (
+      <div>
+        <div className="screen-head">
+          <h2>Security testing</h2>
+          <p>
+            {where}
+            {" · at or under "}
+            <span className="id">{placed.beneath}</span>
+          </p>
+        </div>
+        <Empty
+          title="This needs one build."
+          detail="At or under a component is read on one build. Pick a product, a branch and a variant."
+        >
+          <button type="button" className="btn" onClick={askForScope}>
+            Pick a build
+          </button>
+        </Empty>
       </div>
     );
   }
@@ -138,7 +187,7 @@ export function CodeFindings() {
       <div className="screen-head">
         <h2>Security testing</h2>
         <p>
-          Code findings in <Link to={productAt(product)}>{product}</Link>
+          {where}
           {branchOrTag && ` · ${branchOrTag}`}
           {variant && ` · ${variant}`}
           {series && ` · ${series}`}
@@ -160,9 +209,14 @@ export function CodeFindings() {
           )}
         </p>
         <span style={{ marginLeft: "auto" }}>
-          <Link className="btn quiet" to={suppressionRulesAt(product)}>
-            Suppression rules
-          </Link>{" "}
+          {/* A suppression rule belongs to one product. */}
+          {!across && (
+            <>
+              <Link className="btn quiet" to={suppressionRulesAt(product)}>
+                Suppression rules
+              </Link>{" "}
+            </>
+          )}
           <a className="btn quiet" href={file("csv")}>
             CSV
           </a>{" "}
@@ -224,15 +278,26 @@ export function CodeFindings() {
               listed.data.ruled > 0 && (
                 <Link
                   key="ruled"
-                  to={codeFindingsAt(product, {
-                    state: "dismissed",
-                    branch_or_tag: branchOrTag,
-                    variant,
-                    series,
-                    method,
-                    assigned,
-                    ...placed,
-                  })}
+                  to={
+                    across
+                      ? codeFindingsAcrossAt({
+                          state: "dismissed",
+                          series,
+                          method,
+                          assigned,
+                          component: placed.component,
+                          component_version: placed.component_version,
+                        })
+                      : codeFindingsAt(product, {
+                          state: "dismissed",
+                          branch_or_tag: branchOrTag,
+                          variant,
+                          series,
+                          method,
+                          assigned,
+                          ...placed,
+                        })
+                  }
                 >
                   {listed.data.ruled.toLocaleString()} dismissed by a rule
                 </Link>
@@ -264,6 +329,7 @@ export function CodeFindings() {
               <thead>
                 <tr>
                   <th>Rule</th>
+                  {across && <th>Product</th>}
                   <th>Location</th>
                   <th>Component</th>
                   <th>Message</th>
@@ -275,13 +341,16 @@ export function CodeFindings() {
               </thead>
               <tbody>
                 {rows.map((row) => {
+                  // Across products each row's own product, which the queue
+                  // names; in one product, that product.
+                  const of = across ? row.product : product;
                   const to = codeFindingAt(
-                    { product, branch_or_tag: row.branch_or_tag, variant: row.variant },
+                    { product: of, branch_or_tag: row.branch_or_tag, variant: row.variant },
                     row.occurrence,
                   );
                   return (
                     <tr
-                      key={`${row.occurrence}/${row.branch_or_tag}/${row.variant}`}
+                      key={`${of}/${row.occurrence}/${row.branch_or_tag}/${row.variant}`}
                       className="row opens"
                       onClick={opener(to)}
                     >
@@ -290,13 +359,18 @@ export function CodeFindings() {
                           {row.rule}
                         </Link>
                       </td>
+                      {across && (
+                        <td className="hint" style={{ whiteSpace: "nowrap" }}>
+                          <Link to={productAt(of)}>{row.product_name || of}</Link>
+                        </td>
+                      )}
                       <td className="mono" title={row.function}>
                         {located(row.path, row.line)}
                       </td>
                       <td className="mono">
                         {placedOn(row).component ? (
                           <Link
-                            to={componentAt(product, row.component, undefined, {
+                            to={componentAt(of, row.component, undefined, {
                               branch_or_tag: row.branch_or_tag,
                               variant: row.variant,
                             })}

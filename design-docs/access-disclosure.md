@@ -1,7 +1,8 @@
 # Disclosure
 
 Embargo dates, the list of what approaches disclosure, disclosing an issue,
-moving a date, and collaborators granted one case.
+moving a date, collaborators granted one case, and the list of a person's
+own cases.
 
 Satisfies REQ-37, REQ-38, REQ-40, REQ-43.
 
@@ -10,6 +11,7 @@ Satisfies REQ-37, REQ-38, REQ-40, REQ-43.
 - [Disclosure](#disclosure)
 - [Disclosure-date movements](#disclosure-date-movements)
 - [Case collaborators](#case-collaborators)
+- [Own cases](#own-cases)
 - [Limits](#limits)
 
 ## Disclosure
@@ -119,8 +121,25 @@ it sits in the product, never the embargo list or a count of it.
 The product-wide question keeps answering no, and that is the whole of the
 safety: every list, count, report and export narrows by it. The grant is a
 second question beside it at every read about one named issue. A collaborator
-gets no findings list, and reaches the case through the notification the grant
-sends.
+gets no findings list of the product, and reaches the case from the
+notification the grant sends and from their own cases.
+
+## Own cases
+
+`GET /v1/session/me/cases` lists what the caller was granted one at a time:
+each case, one issue in one product, and each code finding recorded as a flaw,
+one occurrence in one product (`design-docs/analysis-flaws.md` § Code finding collaborators). The session
+says whether the list holds anything, so a screen asks only then.
+
+| Rule | Reason |
+|---|---|
+| Only the caller's own grants are listed, narrowed in the query to their person | A grant names the case to whoever reads it |
+| A withdrawn grant is not listed | It reaches nothing |
+| A code finding is listed while its flaw is undisclosed | Disclosure ends that grant |
+| A code finding names the build it was last seen in, its rule, its file and its flaw | Its page is reached through a build |
+| Newest grant first | |
+| The session's flag is the list's own read: true exactly where the list holds a row | A code finding grant outlives its flaw's disclosure, and a flag counting grants opens an empty panel |
+| A pipeline key is refused | It holds no grant |
 
 ## Limits
 

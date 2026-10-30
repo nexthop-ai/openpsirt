@@ -10,6 +10,7 @@ Satisfies REQ-25, REQ-27, REQ-28, REQ-29, REQ-34.
 - [The review queue](#the-review-queue)
 - [The decision page](#the-decision-page)
 - [Assignments and assignment rules](#assignments-and-assignment-rules)
+- [Work nobody holds](#work-nobody-holds)
 - [Limits](#limits)
 
 ## The review queue
@@ -106,15 +107,12 @@ Assignments is two tabs: what is due soon and undecided, and who holds what.
 | A picker nobody can use says so in the box, "Pick a product to assign", and is drawn disabled | |
 | Offering work to somebody needs a product picked, and says so; taking it does not | The list spans products |
 | A team's row opens the team's queue | A team holds work as a person does |
-| What the reader and their teams hold is counted for every reader; who else holds what counts findings of both families, so its tab is drawn, and its totals and any one holder's list asked, only where the reader reads one at the scope, with the line for a family read in another product (`design-docs/interface.md` § Families a reader holds) | "Nobody else is holding anything" reads as no open work |
+| What the reader and their teams hold is two lists, dependency findings and code findings, each with its own count and pages, never one summed figure (`design-docs/kinds.md` § Consumers) | A rule at a place and an advisory at a component are different units |
+| Each of the reader's own lists is asked for every reader and drawn where the family is counted at the scope or the reader holds some of it; held in another product and holding none, the family's line stands in its place; held nowhere and holding none, it is absent | Work handed to somebody stays theirs where it is disclosed, so a reader of nothing can still hold some |
+| Who else holds what counts findings of both families, so its tab is drawn, and its totals and any one holder's list asked, only where the reader reads one at the scope, with the line for a family read in another product (`design-docs/interface.md` § Families a reader holds) | "Nobody else is holding anything" reads as no open work |
 | Where nobody else holds anything in a picked product, it links that product's unassigned code findings where the code family is counted there | The findings list holds no code finding |
 | A holder's list carries the reports they hold below their findings, and the people tab the reports nobody holds, drawn only where there are any; the people table counts each holder's open reports in a column; the narrowing is the product picked | Most people read no reports |
 | A holder nothing matches holds nothing, never refused; the read is narrowed by what the caller may see | A refusal would answer whether a team exists |
-
-Work nobody holds is the findings list under two filters (nobody assigned,
-nothing decided), keeping the rail entry's label, icon and place. Its badge is
-counted from that address through the list's own query, the list's three
-silent-address narrowings included. `/unassigned` still resolves to it.
 
 The assignment rules screen (REQ-34) is per product, a numbered list because
 order is precedence: the first matching rule places the work.
@@ -126,6 +124,20 @@ order is precedence: the first matching rule places the work.
 | Saving says the sweep has started | One rule can place thousands, so it is queued |
 | The finding names the rule that placed it on the holder card, and says taking it picks up unheld work the rule will not take back | |
 | Both are read off the occurrences the reader may read, the ones the card shows | Read off an unreadable one, the holder names who works undisclosed work |
+
+## Work nobody holds
+
+Work nobody holds is one list per family, opened from the rail's Unassigned
+entry: the findings list under nobody assigned and nothing decided, and the
+code finding queue across products under nobody assigned.
+
+| Rule | Reason |
+|---|---|
+| The two lists stay apart, each with its own count, never summed | An unjudged code result must never reach a published statement, and a rule at a place and an advisory at a component are different units |
+| `/unassigned` offers one card per family to a reader counting both, each with its count and the line for a family read in half, opening its list | |
+| A reader counting one family is taken from `/unassigned` straight to that family's list | A bookmark or an old digest's link lands on work |
+| The dependency count is asked from the list's address through the list's own query, its three silent-address narrowings included; the code count is the queue's total under the same filter | A count is of what its list shows |
+| A family's count is asked only where the family is counted (`design-docs/interface.md` § Families a reader holds) | A count not drawn is not asked for |
 
 ## Limits
 

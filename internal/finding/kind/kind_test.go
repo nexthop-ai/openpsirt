@@ -3,7 +3,10 @@
 
 package kind
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 	all := consumers()
@@ -61,6 +64,56 @@ func TestAConditionNamesTheKindsItIncludes(t *testing.T) {
 		where, args := In(`"f"."kind"`, c.kinds)
 		if where != c.where || len(args) != c.args {
 			t.Errorf("%v: %q with %d arguments; want %q with %d", c.kinds, where, len(args), c.where, c.args)
+		}
+	}
+}
+
+// Every declared kind is in exactly one family, so a list of held work split
+// by family loses no row and counts none twice.
+func TestEveryKindIsInOneFamily(t *testing.T) {
+	declared := Declarations()
+	if len(declared) == 0 {
+		t.Fatal("no kinds were found, so this checked nothing")
+	}
+	for _, d := range declared {
+		in := 0
+		for _, f := range Families() {
+			for _, k := range f.Kinds() {
+				if k == d.Kind {
+					in++
+				}
+			}
+		}
+		if in != 1 {
+			t.Errorf("%s is in %d families; want 1", d.Kind, in)
+		}
+	}
+	for _, f := range Families() {
+		for _, k := range f.Kinds() {
+			if !Known(k) {
+				t.Errorf("the %s family holds %q, which nothing declares", f, k)
+			}
+		}
+	}
+}
+
+func TestAFamilyNarrowsAConsumerToItsKinds(t *testing.T) {
+	const column = `"f"."kind"`
+	for _, c := range []struct {
+		consumer Consumer
+		family   Family
+		kinds    []Kind
+	}{
+		{Assignment, "", Assignment.Kinds()},
+		{Assignment, Code, []Kind{Analysis}},
+		{Assignment, Dependency, []Kind{Vulnerability, Entered}},
+		{Notifications, Code, nil},
+	} {
+		where, args := c.consumer.WhereIn(column, c.family)
+		wantWhere, wantArgs := In(column, c.kinds)
+		if where != wantWhere || !reflect.DeepEqual(args, wantArgs) {
+			t.Errorf("%s in the %q family keeps %q %v; want %v, %q %v",
+				c.consumer, c.family, where, args, c.kinds, wantWhere, wantArgs)
 		}
 	}
 }
