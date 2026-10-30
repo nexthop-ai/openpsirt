@@ -86,7 +86,7 @@ type cast struct {
 }
 
 // castSeed is the world every test here starts from, seeded once per binary
-// on SQLite and per test on a server.
+// on every engine.
 var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, error) {
 	world, err := fixtures.Declare(ctx, db)
 	if err != nil {

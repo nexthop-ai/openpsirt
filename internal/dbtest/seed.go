@@ -18,16 +18,18 @@ import (
 // already in it, and T is what the seed made: identifiers, a secret shown
 // once, whatever a test needs to reach what was seeded.
 //
-// On SQLite the seed runs once per binary, against the migrated template, and
-// every test copies the result — so a fixture of many transactions costs a
-// file write per test rather than those transactions per test, which for the
-// API package is half of what a test costs under the race detector. On the
-// three servers a package has one database, so the seed runs per test, after
-// the database is emptied.
+// The seed runs once per binary on every engine. On SQLite it runs against the
+// migrated template, and every test copies the result — so a fixture of many
+// transactions costs a file write per test rather than those transactions per
+// test, which for the API package is half of what a test costs under the race
+// detector. On the three servers a package has one database, emptied before
+// every test, so the first test's seed is followed by reading back every row
+// it wrote, and each later test has those rows written again in one
+// transaction: the API package's seed is about a hundred transactions, 157 ms
+// a test on PostgreSQL and 71 ms on MySQL.
 //
-// What the seed made on SQLite is one value shared by every test copying the
-// template, and those tests run beside each other, so a test reads it and
-// does not write to it.
+// What the seed made is one value shared by every test, and on SQLite those
+// tests run beside each other, so a test reads it and does not write to it.
 type Seeded[T any] struct {
 	fn func(ctx context.Context, db *database.DB) (T, error)
 
@@ -35,6 +37,16 @@ type Seeded[T any] struct {
 	bytes []byte
 	made  T
 	err   error
+
+	keptMu sync.Mutex
+	kept   map[database.Engine]*keptSeed
+}
+
+// keptSeed is what a seed wrote on one server and what it made, read back
+// after its first run there.
+type keptSeed struct {
+	made any
+	rows []keptTable
 }
 
 // Seed declares a template seeded by fn.
@@ -137,6 +149,32 @@ func (s *Seeded[T]) sqlite() ([]byte, any, error) {
 }
 
 // server seeds a server database for one test. The caller has emptied it.
+//
+// The first test on an engine runs the seed and reads back what it wrote;
+// every later one has those rows written again. A measurement runs the seed
+// every time, because it empties a table by truncating it, which on MySQL and
+// MariaDB starts its identifiers again under the identifiers kept.
 func (s *Seeded[T]) server(ctx context.Context, db *database.DB) (any, error) {
-	return s.fn(ctx, db)
+	if measuring {
+		return s.fn(ctx, db)
+	}
+	engine := db.Server.Engine
+	s.keptMu.Lock()
+	defer s.keptMu.Unlock()
+	if kept := s.kept[engine]; kept != nil {
+		return kept.made, restore(ctx, db, kept.rows)
+	}
+	made, err := s.fn(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := keep(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("read back what the seed wrote: %w", err)
+	}
+	if s.kept == nil {
+		s.kept = map[database.Engine]*keptSeed{}
+	}
+	s.kept[engine] = &keptSeed{made: made, rows: rows}
+	return made, nil
 }

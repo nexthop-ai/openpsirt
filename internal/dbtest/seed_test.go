@@ -54,7 +54,9 @@ func TestASeededTemplateGivesEveryTestTheSeedAndNothingATestAdded(t *testing.T) 
 	// Two tests start from the seed. Each sees the seeded row under the
 	// identifier the seed returned, adds a row of its own, and never sees the
 	// other's: on SQLite each holds a copy of the seeded template, and on a
-	// server the database is emptied and seeded again between them.
+	// server the database is emptied and the seeded rows written back between
+	// them. The row a test adds takes an identifier of its own, so the
+	// written-back row did not move the server's counter back.
 	//
 	// Grouped under one subtest so that the count below runs after both,
 	// because on SQLite they run beside each other and the enclosing function
@@ -103,13 +105,9 @@ func TestASeededTemplateGivesEveryTestTheSeedAndNothingATestAdded(t *testing.T) 
 	seedRunsMu.Lock()
 	defer seedRunsMu.Unlock()
 	for engine := range engines {
-		want := 2
-		if engine == database.SQLite {
-			// Once per binary, however many tests copy it.
-			want = 1
-		}
-		if got := seedRuns[engine]; got != want {
-			t.Errorf("the seed ran %d times on %s, want %d", got, engine, want)
+		// Once per binary, however many tests start from it.
+		if got := seedRuns[engine]; got != 1 {
+			t.Errorf("the seed ran %d times on %s, want once", got, engine)
 		}
 	}
 }

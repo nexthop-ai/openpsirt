@@ -20,8 +20,9 @@
 //
 // A package whose tests start from the same rows declares them once as a
 // Seeded template. On SQLite the seed is applied to the template before the
-// first copy, so the rows cost nothing per test; on a server it is applied per
-// test, after the database is emptied.
+// first copy, so the rows cost nothing per test; on a server it is applied in
+// the first test, and every later test has the rows it wrote written back
+// after the database is emptied.
 //
 // Tests within a package run beside each other when SQLite is the only engine
 // in the run, because SQLite is the only engine where each test already holds
@@ -321,7 +322,7 @@ func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, see
 			// The package's one database on this server holds whatever the
 			// previous test, or the previous run, left: the per-test copy
 			// SQLite takes has no counterpart on a server. So it is emptied
-			// before every test, and seeded again where there is a seed. A
+			// before every test, and seeded where there is a seed. A
 			// measurement empties it to the layout a fresh load leaves,
 			// because the plan it times depends on that layout.
 			empty := clear
