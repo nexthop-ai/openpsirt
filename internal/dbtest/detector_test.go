@@ -57,7 +57,7 @@ func TestARaceBetweenOurCodeAndTheDatabaseLayerIsReported(t *testing.T) {
 }
 
 // raceRounds is how many times the child races, each over a variable of its
-// own. On two loaded processors one race went unreported in 4 runs of 60,
+// own. On two loaded processors one race went unreported in 4 runs of 40,
 // and in 3 of 100 with the two goroutines overlapping throughout; a report
 // needs only one round seen.
 const raceRounds = 8
