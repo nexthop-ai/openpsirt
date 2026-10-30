@@ -27,13 +27,11 @@ const (
 // a claim, a job that ran out of attempts beside one that finished, a kept
 // filter naming the renamed words, a trail row and a job of each renamed
 // kind, the renamed settings under their v0.10.0 names, and a change on the
-// trail of the renamed kind beside one of a kind kept.
-func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
+// trail of the renamed kind beside one of a kind kept. It answers the two
+// claims it wrote.
+func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) wordsV0100 {
 	t.Helper()
-	declared, err := declareBeforeV0110(ctx, db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
 	exec := func(query string, args ...any) {
 		t.Helper()
@@ -41,11 +39,22 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 			t.Fatalf("%v\n%s", err, query)
 		}
 	}
+	id := func(query string) int64 {
+		t.Helper()
+		var out int64
+		if err := db.DB.NewRaw(query).Scan(ctx, &out); err != nil {
+			t.Fatalf("%v\n%s", err, query)
+		}
+		return out
+	}
 	person := declared.Person.ID
+	var out wordsV0100
 	exec(`INSERT INTO "claim" ("kind", "proposed_by", "proposed_at", "outcome") VALUES (?, ?, ?, ?)`,
 		"together", person, at, "not-applicable")
+	out.bulk = id(`SELECT MAX("id") FROM "claim"`)
 	exec(`INSERT INTO "claim" ("kind", "proposed_by", "proposed_at", "outcome") VALUES (?, ?, ?, ?)`,
 		"finding", person, at, "not-applicable")
+	out.single = id(`SELECT MAX("id") FROM "claim"`)
 	for i, kind := range []string{"claim-waiting", "claim-lapsed", "obligation-open", "obligation-near",
 		"obligation-passed", "assigned"} {
 		exec(`INSERT INTO "notification" ("person_id", "kind", "lifetime", "about", "body", "link",
@@ -86,18 +95,39 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 			"created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			kind, "1", "done", 1, 5, at, at, at)
 	}
+	return out
 }
 
+// wordsV0100 is the bulk claim and the claim of one finding seedWordsV0100
+// writes.
+type wordsV0100 struct{ bulk, single int64 }
+
 // wordsRenamed asserts every stored word the seed wrote reads in v0.11.0's
-// spelling, and every word v0.11.0 keeps reads as it was written.
-func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
+// spelling, and every word v0.11.0 keeps reads as it was written. The two
+// decisions are read by the rows the seed wrote, so a decision another seed
+// writes beside them is not counted.
+func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB, seeded wordsV0100) {
 	t.Helper()
+	for _, c := range []struct {
+		what, kind string
+		id         int64
+	}{
+		{"a bulk decision", "bulk", seeded.bulk},
+		{"a decision of one finding", "finding", seeded.single},
+	} {
+		var n int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "decision" WHERE "kind" = ? AND "id" = ?`, c.kind, c.id).
+			Scan(ctx, &n); err != nil {
+			t.Fatalf("read %s: %v", c.what, err)
+		}
+		if n != 1 {
+			t.Errorf("%s: %d rows after the upgrade, want 1", c.what, n)
+		}
+	}
 	for _, c := range []struct {
 		what, query string
 		want        int
 	}{
-		{"a bulk decision", `SELECT COUNT(*) FROM "decision" WHERE "kind" = 'bulk'`, 1},
-		{"a decision of one finding", `SELECT COUNT(*) FROM "decision" WHERE "kind" = 'finding'`, 1},
 		{"a decision of the v0.10.0 kind", `SELECT COUNT(*) FROM "decision" WHERE "kind" = 'together'`, 0},
 		{"a notification of a decision waiting",
 			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'decision-waiting'`, 1},
@@ -181,20 +211,6 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 	}
 }
 
-// A v0.10.0 database holding every stored word v0.11.0 renames is upgraded,
-// and each reads in v0.11.0's spelling.
-func TestAV0100DatabaseTakesTheV0110StoredWords(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
-		seedWordsV0100(t, ctx, db)
-		dbtest.MigrateTo(t, db, v0110)
-		wordsRenamed(t, ctx, db)
-		leaveAtLatest(t, ctx, db)
-	})
-}
-
 // An upgrade stopped after each step rewriting stored words in turn, every
 // start resuming the one before it, is started again, and leaves what one that
 // did not stop leaves. One database per engine runs every stop, as
@@ -210,14 +226,14 @@ func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v0100)
-		seedWordsV0100(t, ctx, db)
+		seeded := seedWordsV0100(t, ctx, db)
 		for _, step := range steps {
 			stopAt(t, step, func() (bool, error) {
 				return migrations.StopV0110RewritingAfter(ctx, db, step)
 			})
 		}
 		dbtest.MigrateTo(t, db, v0110)
-		wordsRenamed(t, ctx, db)
+		wordsRenamed(t, ctx, db, seeded)
 		leaveAtLatest(t, ctx, db)
 	})
 }

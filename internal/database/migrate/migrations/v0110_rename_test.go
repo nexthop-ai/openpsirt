@@ -28,10 +28,7 @@ type triageV0100 struct{ claim, decision, revision int64 }
 
 func seedTriageV0100(t *testing.T, ctx context.Context, db *database.DB) triageV0100 {
 	t.Helper()
-	declared, err := declareBeforeV0110(ctx, db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
 	exec := func(query string, args ...any) {
 		t.Helper()
@@ -127,19 +124,10 @@ func (w triageV0100) renamedAs(t *testing.T, ctx context.Context, db *database.D
 // record ranks first.
 type incidentsV0100 struct{ incident, fix, told, window, finding int64 }
 
-// seedIncidentsV0100 writes the rows beside the fixture's product, declaring
-// it where nothing seeded before has.
+// seedIncidentsV0100 writes the rows beside the fixture's product.
 func seedIncidentsV0100(t *testing.T, ctx context.Context, db *database.DB) incidentsV0100 {
 	t.Helper()
-	var products int
-	if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "product"`).Scan(ctx, &products); err != nil {
-		t.Fatal(err)
-	}
-	if products == 0 {
-		if _, err := declareBeforeV0110(ctx, db); err != nil {
-			t.Fatal(err)
-		}
-	}
+	worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 3, 0, 0, 0, time.UTC)
 	exec := func(query string, args ...any) {
 		t.Helper()
@@ -229,54 +217,28 @@ func (w incidentsV0100) renamedAs(t *testing.T, ctx context.Context, db *databas
 	}
 }
 
-// A v0.10.0 database holding an incident, its windows and everything beside
-// them is upgraded, and every row reads back under v0.11.0's names in the
-// shape the release declares, with new rows numbered after the old.
-func TestAV0100DatabaseTakesTheV0110IncidentNames(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
-		seeded := seedIncidentsV0100(t, ctx, db)
-		dbtest.MigrateTo(t, db, v0110)
-		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
-		seeded.renamedAs(t, ctx, db)
-		var person int64
-		if err := db.DB.NewRaw(`SELECT "recorded_by" FROM "incident" WHERE "id" = ?`,
-			seeded.incident).Scan(ctx, &person); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := db.DB.NewRaw(`INSERT INTO "response_window" ("name", "length_hours", "declared_by",
-			"declared_at", "live_name", "from_fix") VALUES (?, ?, ?, ?, ?, ?)`,
-			"Final report", 720, person, time.Now().UTC(), "final report", false).Exec(ctx); err != nil {
-			t.Fatalf("declare a window after the upgrade: %v", err)
-		}
-		var next int64
-		if err := db.DB.NewRaw(`SELECT MAX("id") FROM "response_window"`).Scan(ctx, &next); err != nil {
-			t.Fatal(err)
-		}
-		if next <= seeded.window {
-			t.Errorf("a window declared after the upgrade is row %d, at or before row %d it held", next,
-				seeded.window)
-		}
-		leaveAtLatest(t, ctx, db)
-	})
-}
-
-// A v0.10.0 database holding a claim and everything beside it is upgraded,
-// and every row reads back under v0.11.0's names in the shape the release
-// declares.
-func TestAV0100DatabaseTakesTheV0110TriageNames(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
-		seeded := seedTriageV0100(t, ctx, db)
-		dbtest.MigrateTo(t, db, v0110)
-		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
-		seeded.renamedAs(t, ctx, db)
-		leaveAtLatest(t, ctx, db)
-	})
+// numberedAfter asserts a window declared after the upgrade is numbered after
+// every window the database held. It writes the window.
+func (w incidentsV0100) numberedAfter(t *testing.T, ctx context.Context, db *database.DB) {
+	t.Helper()
+	var person int64
+	if err := db.DB.NewRaw(`SELECT "recorded_by" FROM "incident" WHERE "id" = ?`,
+		w.incident).Scan(ctx, &person); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DB.NewRaw(`INSERT INTO "response_window" ("name", "length_hours", "declared_by",
+		"declared_at", "live_name", "from_fix") VALUES (?, ?, ?, ?, ?, ?)`,
+		"Final report", 720, person, time.Now().UTC(), "final report", false).Exec(ctx); err != nil {
+		t.Fatalf("declare a window after the upgrade: %v", err)
+	}
+	var next int64
+	if err := db.DB.NewRaw(`SELECT MAX("id") FROM "response_window"`).Scan(ctx, &next); err != nil {
+		t.Fatal(err)
+	}
+	if next <= w.window {
+		t.Errorf("a window declared after the upgrade is row %d, at or before row %d it held", next,
+			w.window)
+	}
 }
 
 // An upgrade stopped after each rename in turn, every start resuming the one

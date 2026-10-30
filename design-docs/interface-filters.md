@@ -107,7 +107,7 @@ Personal; nothing is shared.
 | What is kept is the list's own query string; a parameter the list no longer offers stops narrowing | A column per filter needs a migration per filter and is a second definition |
 | A renamed parameter is rewritten in kept queries by that release's migration; the list reads current words only | Two spellings are two meanings to keep in step |
 | Saving over a name replaces it | |
-| Two saves of one new name at once keep one: the later addition, refused by the unique index, is taken as a lost race and replaces | |
+| Two saves of one new name at once keep one: one person's saves take turns, and an addition the unique index refuses, because a filter of that name landed after the save looked, is taken as a lost race and replaces it | On MySQL and MariaDB the look holds a gap lock, so nothing lands there |
 | Personal is enforced at the query; another person's name answers as no name | |
 | Opening one replaces the filters on screen, keeps the scope and grouping, and drops the page | |
 | The list is bounded by the per-person limit and says how many are kept in all; under a lowered limit, saving is refused until under it | |

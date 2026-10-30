@@ -20,10 +20,7 @@ type rulesV0100 struct{ rule, feed, label, received, published int64 }
 
 func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV0100 {
 	t.Helper()
-	declared, err := declareBeforeV0110(ctx, db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
 	exec := func(query string, args ...any) {
 		t.Helper()
@@ -58,14 +55,14 @@ func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV01
 	issue := id(`SELECT "id" FROM "vulnerability" WHERE "identifier" = ?`, "CVE-2026-1102")
 	exec(`UPDATE "vulnerability" SET "issue_id" = "id" WHERE "id" = ?`, issue)
 	exec(`INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key", "first_seen_at")
-		VALUES (?, ?, ?, ?, ?, ?)`, "libbar", "libbar", "1.0", "libbar", "libbar", at)
-	component := id(`SELECT "id" FROM "component" WHERE "identity" = ?`, "libbar")
+		VALUES (?, ?, ?, ?, ?, ?)`, "libbaz", "libbaz", "1.0", "libbaz", "libbaz", at)
+	component := id(`SELECT "id" FROM "component" WHERE "identity" = ?`, "libbaz")
 	exec(`INSERT INTO "finding_tag" ("product_id", "vulnerability_id", "component_id", "tag", "typed",
 		"added_by", "added_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, product, issue, component, "waiting", "Waiting", person, at)
 	out.label = id(`SELECT MAX("id") FROM "finding_tag"`)
 	exec(`INSERT INTO "vex_statement" ("product_id", "publisher", "source", "document_id", "vulnerability",
 		"component", "about", "status", "document", "digest", "uploaded_by", "uploaded_at")
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, product, "acme", "vex", "", "cve-2026-1102", "libbar", "",
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, product, "acme", "vex", "", "cve-2026-1102", "libbaz", "",
 		"not_affected", "acme.json", "digest", person, at)
 	out.received = id(`SELECT MAX("id") FROM "vex_statement"`)
 	exec(`INSERT INTO "vex_issuance" ("target_id", "kind", "ordinal", "digest", "document", "issued_by",
@@ -101,22 +98,6 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 			t.Errorf("%s reads %d rows after the upgrade, want 1", c.what, n)
 		}
 	}
-}
-
-// A v0.10.0 database holding a standing rule, a supplier, a label and VEX each
-// way is upgraded, and every row reads
-// back under v0.11.0's names in the shape the release declares.
-func TestAV0100DatabaseTakesTheV0110RuleNames(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
-		seeded := seedRulesV0100(t, ctx, db)
-		dbtest.MigrateTo(t, db, v0110)
-		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
-		seeded.renamedAs(t, ctx, db)
-		leaveAtLatest(t, ctx, db)
-	})
 }
 
 // An upgrade stopped after each of these renames in turn, every start resuming

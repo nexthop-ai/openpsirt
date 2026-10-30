@@ -182,6 +182,7 @@ times on each engine.
 | A bulk decision, a notification and a destination of each renamed kind, a link to a decision's row and one to a claim, a failed job, a kept filter naming renamed words, the bulk action limit, a trail change of the renamed kind | Each value in its v0.11.0 spelling, every value beside it unchanged |
 | The same, stopped after each value-rewriting step in turn | Started again, it leaves what an unstopped upgrade leaves |
 | A v0.10.0 database holding a role grant | The grant keeps its role, and every table holding a role takes the longest role name |
+| Every check above that does not stop, at once | One v0.10.0 database per engine holds all their seeds and is upgraded once; each check reads its own seed's rows or counts every seed's, so no seed changes what another's check expects, and the checks that write run last |
 
 ## Limits
 
