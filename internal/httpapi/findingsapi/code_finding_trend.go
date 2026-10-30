@@ -45,15 +45,7 @@ type CodeFindingTrendAsked struct {
 // reader is refused before any component name is resolved, so a name held and
 // a name not held are refused alike.
 func (a CodeFindingTrendAsked) scoped(ctx context.Context, in core.Deps) (access.Subject, analysis.Scope, error) {
-	subject, scope, err := a.selected(ctx, in, a.Product)
-	if err != nil {
-		return subject, analysis.Scope{}, err
-	}
-	if err := analysis.MayCount(subject, *scope.ProductID, "trend the code findings"); err != nil {
-		return subject, analysis.Scope{}, core.Refused(in.Logger, err, "cannot trend the code findings")
-	}
-	out, err := a.narrowed(ctx, in, scope)
-	return subject, out, err
+	return figuresScoped(ctx, in, a.Product, a.CodeFindingNarrowing, "trend the code findings")
 }
 
 // trended works the trend out over the weeks asked. The weeks end at

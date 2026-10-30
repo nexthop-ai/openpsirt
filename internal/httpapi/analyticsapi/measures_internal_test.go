@@ -23,7 +23,7 @@ func TestAWaitIsRoundedToATenthOfADay(t *testing.T) {
 		{time.Duration(1.94 * float64(day)), 1.9},
 		{0, 0},
 	} {
-		if got := inDays(c.wait); got != c.want {
+		if got := core.InDays(c.wait); got != c.want {
 			t.Errorf("%v is %v days, want %v", c.wait, got, c.want)
 		}
 	}

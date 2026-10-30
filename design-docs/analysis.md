@@ -202,7 +202,6 @@ An applied run, in order:
 
 | Part | State |
 |---|---|
-| Security testing pages beyond the trend | Not built: time to judge, time to fix, analyzer precision, analysis coverage, and code findings by release, the tag axis REQ-54 asks for. The trend is `design-docs/analysis-statistics.md`; approval quality and the exception report read code finding decisions (`design-docs/analytics-controls.md` § Approval quality) |
 | A repository an SPDX inventory states | Not read; a download location places nothing |
 | Pulling from a hosted analyzer | Not built |
 | Fuzzing findings | Intended scope, not built (REQ-14) |

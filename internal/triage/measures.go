@@ -403,12 +403,7 @@ func spreads(by map[string][]time.Duration) []Spread {
 		if len(all) == 0 {
 			continue
 		}
-		sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
-		out = append(out, Spread{
-			Band: band, Count: len(all),
-			Median: nearestRank(all, 0.5), P90: nearestRank(all, 0.9),
-			Worst: all[len(all)-1],
-		})
+		out = append(out, SpreadOf(band, all))
 	}
 	sort.Slice(out, func(i, j int) bool {
 		left, right := bandRank(out[i].Band), bandRank(out[j].Band)
@@ -418,6 +413,21 @@ func spreads(by map[string][]time.Duration) []Spread {
 		return out[i].Band < out[j].Band
 	})
 	return out
+}
+
+// SpreadOf is a set of durations as a Spread under the band named: how many,
+// the median, the ninetieth percentile and the longest, each nearest-rank.
+// It sorts the set it is given. An empty set is a Spread counting none.
+func SpreadOf(band string, all []time.Duration) Spread {
+	if len(all) == 0 {
+		return Spread{Band: band}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i] < all[j] })
+	return Spread{
+		Band: band, Count: len(all),
+		Median: nearestRank(all, 0.5), P90: nearestRank(all, 0.9),
+		Worst: all[len(all)-1],
+	}
 }
 
 // nearestRank is the value at a position in a sorted set.

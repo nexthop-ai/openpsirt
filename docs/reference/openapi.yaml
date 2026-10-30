@@ -561,6 +561,41 @@ components:
           maxLength: 191
           type: string
       type: object
+    AnalysisCoverageBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AnalysisCoverageBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          description: One per series and build in use, quiet first, then the longest silent
+          items:
+            $ref: "#/components/schemas/AnalyzedBody"
+          type:
+            - array
+            - "null"
+        quiet:
+          description: Series gone quiet on a build
+          format: int64
+          type: integer
+        since:
+          description: The first day the run counts cover
+          format: date
+          type: string
+        until:
+          description: The last day the run counts cover
+          format: date
+          type: string
+      required:
+        - since
+        - until
+        - quiet
+        - items
+      type: object
     AnalysisReceiptBody:
       additionalProperties: false
       properties:
@@ -705,6 +740,97 @@ components:
         - outcome
         - series
         - built_at
+      type: object
+    AnalyzedBody:
+      additionalProperties: false
+      properties:
+        allowed_days:
+          description: "The silence the expected interval allows before the series is quiet: three intervals, never under a day"
+          format: double
+          type: number
+        applied_runs:
+          description: Runs that arrived in the weeks asked and were applied
+          format: int64
+          type: integer
+        branch_or_tag:
+          description: The branch or tag, by the name that addresses it
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as shown
+          type: string
+        expected_days:
+          description: "The series' own expected interval on the build: the median of its newest gaps between runs, in days. Left out until three runs were applied"
+          format: double
+          type: number
+        failed_runs:
+          description: Runs that arrived in the weeks asked and could not be read
+          format: int64
+          type: integer
+        last_applied:
+          description: When the newest applied run was applied
+          type: string
+        last_arrived:
+          description: When the newest applied run arrived. Left out where none was applied
+          type: string
+        last_comparable:
+          description: When the newest comparable run arrived. Left out where none did
+          type: string
+        method:
+          description: The testing method the series reports. sast is static analysis
+          type: string
+        not_comparable:
+          description: Why the newest applied run's absences are no evidence. Left out where they are
+          enum:
+            - exit-status
+            - incomplete
+            - failure-signal
+            - no-coverage
+            - units-short
+            - tool-changed
+            - rules-changed
+          type: string
+        not_comparable_runs:
+          description: Of those applied, the runs whose absences are no evidence
+          format: int64
+          type: integer
+        past_end_of_life:
+          description: Whether the release is past its end of life, analyzed by nobody on purpose
+          type: boolean
+        quiet:
+          description: "Whether the series has gone quiet on the build: no run applied for three of its own usual gaps, never under a day. Never on a release past its end of life"
+          type: boolean
+        series:
+          description: The analyzer series, by name
+          type: string
+        silent_days:
+          description: Days since the newest comparable run arrived, or since the oldest run read where none was comparable. Left out where none was applied
+          format: double
+          type: number
+        units_analyzed:
+          description: What the newest applied run said it analyzed. Left out where it said nothing
+          format: int64
+          type: integer
+        units_expected:
+          description: What the newest applied run said it was meant to analyze. Left out where it said nothing
+          format: int64
+          type: integer
+        variant:
+          description: The variant, by the name that addresses it
+          type: string
+        variant_name:
+          description: The variant as shown
+          type: string
+      required:
+        - branch_or_tag
+        - branch_or_tag_name
+        - variant
+        - variant_name
+        - series
+        - method
+        - quiet
+        - applied_runs
+        - not_comparable_runs
+        - failed_runs
       type: object
     AnalyzerSaidBody:
       additionalProperties: false
@@ -2182,6 +2308,87 @@ components:
       required:
         - because
       type: object
+    CodeFindingAgedBody:
+      additionalProperties: false
+      properties:
+        by_tier:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: waiting by the tier of the rule's weaknesses as rated now, each named
+          type: object
+        from_days:
+          description: The age in days the stretch starts at
+          format: int64
+          type: integer
+        label:
+          description: The stretch in words
+          type: string
+        until_days:
+          description: The age in days the stretch ends before. Left out on the last, which has no end
+          format: int64
+          type: integer
+        waiting:
+          description: Code findings in the stretch
+          format: int64
+          type: integer
+      required:
+        - label
+        - from_days
+        - waiting
+        - by_tier
+      type: object
+    CodeFindingAnsweredBody:
+      additionalProperties: false
+      properties:
+        confirmed:
+          description: Code findings whose standing decision confirms them, or recorded as a flaw
+          format: int64
+          type: integer
+        dismissed:
+          description: Code findings whose standing decision dismisses them
+          format: int64
+          type: integer
+        fixed:
+          description: Code findings a person closed as fixed with no decision standing
+          format: int64
+          type: integer
+        judged:
+          description: "Code findings a person or a suppression rule answered: the sum of dismissed, not_security, ruled, confirmed and fixed"
+          format: int64
+          type: integer
+        noise_share:
+          description: The share of judged answered as noise, dismissed, not_security and ruled together, from 0 to 1. Left out where none is judged
+          format: double
+          type: number
+        not_security:
+          description: Code findings whose standing decision says they are not a security issue
+          format: int64
+          type: integer
+        rule:
+          description: The analyzer rule, as <tool>/<rule>. Left out on a series' own row
+          type: string
+        ruled:
+          description: Code findings a suppression rule dismisses with no decision standing
+          format: int64
+          type: integer
+        series:
+          description: The analyzer series, by name
+          type: string
+        unjudged:
+          description: Code findings nothing answers yet, a decision waiting for a second person included
+          format: int64
+          type: integer
+      required:
+        - series
+        - judged
+        - dismissed
+        - not_security
+        - ruled
+        - confirmed
+        - fixed
+        - unjudged
+      type: object
     CodeFindingBuild:
       additionalProperties: false
       properties:
@@ -2366,6 +2573,41 @@ components:
       required:
         - at
       type: object
+    CodeFindingFixingBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CodeFindingFixingBody.json
+          format: uri
+          readOnly: true
+          type: string
+        dismissed:
+          description: Code findings closed as fixed in the window that a dismissal, a not-security decision or a suppression rule answers, left out of fixed
+          format: int64
+          type: integer
+        fixed:
+          $ref: "#/components/schemas/CodeFindingWaitsBody"
+          description: From a code finding first opening to a person closing it as fixed on the last build in the scope holding it, for the closings in the window. Dismissals are left out
+        no_longer_detected:
+          $ref: "#/components/schemas/CodeFindingWaitsBody"
+          description: Code findings no comparable run saw, now, from opening to the first run not seeing them. Absence is no fix, so these are apart from fixed and have no history
+        since:
+          description: The first day of the window
+          format: date
+          type: string
+        until:
+          description: The last day of the window
+          format: date
+          type: string
+      required:
+        - since
+        - until
+        - fixed
+        - dismissed
+        - no_longer_detected
+      type: object
     CodeFindingFlawBody:
       additionalProperties: false
       properties:
@@ -2393,6 +2635,49 @@ components:
         - disclosed
         - recorded_by
         - recorded_at
+      type: object
+    CodeFindingJudgingBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CodeFindingJudgingBody.json
+          format: uri
+          readOnly: true
+          type: string
+        judged:
+          $ref: "#/components/schemas/CodeFindingWaitsBody"
+          description: From a code finding opening to the first decision proposed about it, whatever its outcome, for the first decisions proposed in the window
+        no_longer_detected:
+          description: "Code findings no comparable run saw, now, which wait in no queue: the code finding list's no-longer-detected count for the same narrowing"
+          format: int64
+          type: integer
+        oldest:
+          description: When the longest-waiting code finding in the queue opened. Left out where the queue is empty
+          format: date
+          type: string
+        since:
+          description: The first day of the window
+          format: date
+          type: string
+        until:
+          description: The last day of the window
+          format: date
+          type: string
+        waiting:
+          description: The code finding queue now, open code findings no decision waits on, by the age of their first opening
+          items:
+            $ref: "#/components/schemas/CodeFindingAgedBody"
+          type:
+            - array
+            - "null"
+      required:
+        - since
+        - until
+        - judged
+        - waiting
+        - no_longer_detected
       type: object
     CodeFindingKin:
       additionalProperties: false
@@ -2567,6 +2852,87 @@ components:
         - by_series
         - by_method
       type: object
+    CodeFindingPrecisionBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CodeFindingPrecisionBody.json
+          format: uri
+          readOnly: true
+          type: string
+        by_rule:
+          description: One per analyzer rule with a code finding judged, the highest noise share first, then the most judged
+          items:
+            $ref: "#/components/schemas/CodeFindingAnsweredBody"
+          type:
+            - array
+            - "null"
+        by_series:
+          description: One per series with a code finding in the scope, by name
+          items:
+            $ref: "#/components/schemas/CodeFindingAnsweredBody"
+          type:
+            - array
+            - "null"
+        suppression_rules:
+          description: The product's suppression rules, retired ones included, oldest first. Every branch and variant, whatever the narrowing
+          items:
+            $ref: "#/components/schemas/CodeFindingSuppressionBody"
+          type:
+            - array
+            - "null"
+      required:
+        - by_series
+        - by_rule
+        - suppression_rules
+      type: object
+    CodeFindingReleaseBody:
+      additionalProperties: false
+      properties:
+        branch_or_tag:
+          description: The tag, by the name that addresses it
+          type: string
+        branch_or_tag_name:
+          description: The tag as shown
+          type: string
+        by_tier:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: not_fixed by the tier of the rule's weaknesses as rated now, each named
+          type: object
+        cut:
+          description: When the release went out, where somebody said, and when it was declared otherwise. It orders the releases
+          format: date
+          type: string
+        dismissed:
+          description: Of not_fixed, those dismissed or not a security issue on a build of the release, by a decision or a suppression rule
+          format: int64
+          type: integer
+        no_longer_detected:
+          description: Of not_fixed, those no comparable run saw on a build of the release
+          format: int64
+          type: integer
+        not_fixed:
+          description: Code findings on the release's builds nobody closed as fixed, whatever was decided about them
+          format: int64
+          type: integer
+        open:
+          description: "Of not_fixed, those open on a build of the release: nothing answers them"
+          format: int64
+          type: integer
+      required:
+        - branch_or_tag
+        - branch_or_tag_name
+        - cut
+        - not_fixed
+        - by_tier
+        - open
+        - dismissed
+        - no_longer_detected
+      type: object
     CodeFindingRowBody:
       additionalProperties: false
       properties:
@@ -2698,6 +3064,54 @@ components:
         - waiting
         - ruled
       type: object
+    CodeFindingSuppressionBody:
+      additionalProperties: false
+      properties:
+        approved_at:
+          description: When it was last approved, where it was
+          type: string
+        approved_covering:
+          description: The code findings it covered when it was approved
+          format: int64
+          type: integer
+        covering:
+          description: The open code findings it names now that the reader may read, whether or not it is in force
+          format: int64
+          type: integer
+        id:
+          description: The rule's identifier in the product
+          format: int64
+          type: integer
+        path:
+          description: The path it names, from the top of the checkout, where it names one
+          type: string
+        proposed_at:
+          description: When it was proposed
+          type: string
+        reason:
+          description: Why what it covers is dismissed
+          enum:
+            - false_positive
+            - wont_fix
+            - used_in_tests
+            - mitigated
+          type: string
+        retired_at:
+          description: When it was taken out of use, where it was
+          type: string
+        rule:
+          description: The analyzer rule it names, where it names one
+          type: string
+        state:
+          description: "Where the rule stands: proposed, in-force, outgrown, needs-path or retired"
+          type: string
+      required:
+        - id
+        - reason
+        - state
+        - proposed_at
+        - covering
+      type: object
     CodeFindingTrendBody:
       additionalProperties: false
       properties:
@@ -2730,6 +3144,51 @@ components:
         - points
         - markers
         - no_longer_detected
+      type: object
+    CodeFindingWaitBody:
+      additionalProperties: false
+      properties:
+        count:
+          description: The number of code findings behind it
+          format: int64
+          type: integer
+        median_days:
+          description: The middle wait, in days, nearest-rank
+          format: double
+          type: number
+        p90_days:
+          description: The wait nine in ten came in under, in days, nearest-rank
+          format: double
+          type: number
+        tier:
+          description: "The tier of the rule's weaknesses as rated now: memory-safety, input, resource or other. Left out on the whole set"
+          type: string
+        worst_days:
+          description: The longest wait, in days
+          format: double
+          type: number
+      required:
+        - count
+        - median_days
+        - p90_days
+        - worst_days
+      type: object
+    CodeFindingWaitsBody:
+      additionalProperties: false
+      properties:
+        all:
+          $ref: "#/components/schemas/CodeFindingWaitBody"
+          description: Every code finding counted
+        by_tier:
+          description: One per tier, memory-safety first, every tier named
+          items:
+            $ref: "#/components/schemas/CodeFindingWaitBody"
+          type:
+            - array
+            - "null"
+      required:
+        - all
+        - by_tier
       type: object
     CodeFindingsOutputBody:
       additionalProperties: false
@@ -3060,6 +3519,26 @@ components:
         - states
         - waiting
         - ruled
+      type: object
+    Count-code-findings-by-releaseResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Count-code-findings-by-releaseResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        releases:
+          description: One per release, oldest first
+          items:
+            $ref: "#/components/schemas/CodeFindingReleaseBody"
+          type:
+            - array
+            - "null"
+      required:
+        - releases
       type: object
     CountedListBodyAuditedBody:
       additionalProperties: false
@@ -20880,6 +21359,162 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
+  /v1/products/{product}/analysis-coverage:
+    get:
+      description: |-
+        Returns every analyzer series on every build in use of the product: its newest applied run, what that run analyzed against what it was meant to, its newest comparable run, the runs in the weeks asked that were applied, not comparable or failed, and its own expected interval between runs on that build.
+
+        A series is quiet when no comparable run arrived for three of its own usual gaps between applied runs, never under a day, once three runs were applied. Each series is judged on its own interval, so a quarterly series is not quiet after a week. A retired build is left out; a release past its end of life is listed and never quiet. Quiet first, then the longest silent.
+
+        Refused to anybody who does not read security testing material in the product.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: read-analysis-coverage
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals
+            maxLength: 200
+            type: string
+        - description: Limit to the series of one testing method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the series of one testing method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks the run counts cover, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks the run counts cover, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisCoverageBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Read analysis coverage
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
+  /v1/products/{product}/analysis-coverage.{format}:
+    get:
+      description: |-
+        Analysis coverage as a file, a row per series and build in the order the coverage lists them. Takes what the coverage takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: export-analysis-coverage
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals
+            maxLength: 200
+            type: string
+        - description: Limit to the series of one testing method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the series of one testing method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks the run counts cover, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks the run counts cover, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export analysis coverage
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
   /v1/products/{product}/assignment-rules:
     get:
       description: |-
@@ -24888,6 +25523,234 @@ paths:
           - public-read
           - public-triage
         note: "Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue."
+  /v1/products/{product}/code-finding-precision:
+    get:
+      description: |-
+        Returns what was said of the code findings of each analyzer series and of each analyzer rule, now: dismissed, not a security issue, dismissed by a suppression rule, confirmed, fixed, or nothing yet, each code finding counted once at the first that holds, and the share of those judged that was answered as noise. Also returns the product's suppression rules with what each covers now.
+
+        Takes the code finding list's narrowings but the state and the holder. Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: measure-analyzer-precision
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product, and independent of the branch
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            maxLength: 200
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            maxLength: 200
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            maxLength: 200
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            maxLength: 200
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeFindingPrecisionBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Measure analyzer precision
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
+  /v1/products/{product}/code-finding-precision.{format}:
+    get:
+      description: |-
+        Analyzer precision as a file: a row per series, then a row per analyzer rule with a code finding judged, then a row per suppression rule with what it covers. Takes what the figure takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: export-analyzer-precision
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product, and independent of the branch
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            maxLength: 200
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            maxLength: 200
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            maxLength: 200
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            maxLength: 200
+            type: string
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export analyzer precision
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
   /v1/products/{product}/code-finding-series:
     get:
       description: |-
@@ -24919,6 +25782,508 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Count code findings by analyzer series
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
+  /v1/products/{product}/code-finding-time-to-fix:
+    get:
+      description: |-
+        Returns how long code findings took from first opening to a person closing them as fixed on every build in the scope holding them, for the closings in the weeks asked: the median, the ninetieth percentile and the longest, for every code finding and per tier of the rule's weaknesses as rated now. A code finding a dismissal, a not-security decision or a suppression rule answers is left out and counted in `dismissed`.
+
+        A run missing a code finding closes nothing, so `no_longer_detected` times the code findings no comparable run saw, now, from opening to the first run not seeing them, apart from the fixes and with no history.
+
+        Takes the code finding list's narrowings but the state and the holder. Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: time-code-finding-fixing
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product, and independent of the branch
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            maxLength: 200
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            maxLength: 200
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            maxLength: 200
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            maxLength: 200
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeFindingFixingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Measure time to fix code findings
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
+  /v1/products/{product}/code-finding-time-to-fix.{format}:
+    get:
+      description: |-
+        The time to fix as a file: a row per tier for the fixes, then a row per tier for the code findings no longer detected, then the count of fixes left out as dismissed. Takes what the figure takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: export-code-finding-time-to-fix
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product, and independent of the branch
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            maxLength: 200
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            maxLength: 200
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            maxLength: 200
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            maxLength: 200
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the time to fix code findings
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
+  /v1/products/{product}/code-finding-time-to-judge:
+    get:
+      description: |-
+        Returns how long code findings waited from opening to the first decision anybody proposed about them, for the first decisions proposed in the weeks asked: the median, the ninetieth percentile and the longest, for every code finding and per tier of the rule's weaknesses as rated now. A dismissal is a judgment and counts; a code finding a suppression rule covers has no wait. Also returns the queue now, by age, and how many code findings are no longer detected, which wait in no queue.
+
+        Takes the code finding list's narrowings but the state and the holder. Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: time-code-finding-judging
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product, and independent of the branch
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            maxLength: 200
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            maxLength: 200
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            maxLength: 200
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            maxLength: 200
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeFindingJudgingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Measure time to judge code findings
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
+  /v1/products/{product}/code-finding-time-to-judge.{format}:
+    get:
+      description: |-
+        The time to judge as a file: a row per wait and tier, then a row per stretch of the queue's ages and tier, then the count no longer detected. Takes what the figure takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: export-code-finding-time-to-judge
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product, and independent of the branch
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: "Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included"
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            maxLength: 200
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            maxLength: 200
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            maxLength: 200
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            maxLength: 200
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the time to judge code findings
       tags:
         - Analytics
       x-openpsirt-requires:
@@ -25337,6 +26702,178 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/code-findings-by-release:
+    get:
+      description: |-
+        Returns, for each tagged release of the product an analyzer run was applied to, oldest first, the code findings on its builds nobody closed as fixed, split by the tier of the rule's weaknesses as rated now, with how many of them are open, dismissed and no longer detected. A release is one frozen point, answered today; a release analyzed and holding nothing is a point at zero, and a release never analyzed is absent.
+
+        Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: count-code-findings-by-release
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one variant. Left out, every one
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals
+            maxLength: 200
+            type: string
+        - description: Limit to one testing method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to one testing method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: Limit to the code findings placed on one source package, as the code finding list reads it
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Limit to the code findings placed on one source package, as the code finding list reads it
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: The number of releases, the newest
+          explode: false
+          in: query
+          name: releases
+          schema:
+            default: 12
+            description: The number of releases, the newest
+            format: int64
+            maximum: 50
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Count-code-findings-by-releaseResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Count code findings by release
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
+  /v1/products/{product}/code-findings-by-release.{format}:
+    get:
+      description: |-
+        Code findings by release as a file: a row per release with what is not fixed, open, dismissed and no longer detected, then a row per tier. Takes what the figure takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+      operationId: export-code-findings-by-release
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one variant. Left out, every one
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one
+            type: string
+        - description: Limit to one analyzer series, by name, without regard to capitals
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to one analyzer series, by name, without regard to capitals
+            maxLength: 200
+            type: string
+        - description: Limit to one testing method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to one testing method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: Limit to the code findings placed on one source package, as the code finding list reads it
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Limit to the code findings placed on one source package, as the code finding list reads it
+            maxLength: 200
+            type: string
+        - description: Limit component to the source package at this version. Ignored without component
+          explode: false
+          in: query
+          name: component_version
+          schema:
+            description: Limit component to the source package at this version. Ignored without component
+            maxLength: 200
+            type: string
+        - description: The number of releases, the newest
+          explode: false
+          in: query
+          name: releases
+          schema:
+            default: 12
+            description: The number of releases, the newest
+            format: int64
+            maximum: 50
+            minimum: 1
+            type: integer
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export code findings by release
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Requires security-testing-read on the product.
   /v1/products/{product}/code-findings.{format}:
     get:
       description: |-

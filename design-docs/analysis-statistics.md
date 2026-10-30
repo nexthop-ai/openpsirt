@@ -55,7 +55,7 @@ GET /v1/products/{product}/code-finding-trend?weeks=12
 | Plotted on when a run was applied, the time a code finding opened, as the dependency trend is | A built-time axis would differ from every other chart |
 | Weeks end at midnight UTC, the last at the coming one; a week holds its start and not its end | A marker is dated by its UTC day, so it falls in the week its runs moved the line |
 | A code finding open only in releases past their end of life counts, as the backlog trend counts a vulnerability | End of life is a state of today; applied to past weeks it rewrites them |
-| On calendar weeks, the axis REQ-54 gives a branch; release over release for tags is Code findings by release (`design-docs/analysis.md` § Not built) | |
+| On calendar weeks, the axis REQ-54 gives a branch; release over release for tags is Code findings by release (`design-docs/analysis-figures.md` § Code findings by release) | |
 | The tier is the rule's as rated now | No rating history is stored, as for the vulnerability trend |
 | No table of presence spans; every week is worked out from opening and closing times (REQ-74) | A return after absence is mostly analyzer nondeterminism, and absence closes nothing |
 | Each occurrence's weeks are one bit each, read in one statement and counted in the application | A statement per week is a hundred round trips; one statement takes 46 ms on PostgreSQL and 257 ms on MySQL 8.4 for 104 weeks of 4,000 code findings on a 16,000-component build (`design-docs/analysis-measurements.md` § Trend of code findings) |

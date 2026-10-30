@@ -2438,6 +2438,54 @@ export interface paths {
         patch: operations["amend-product"];
         trace?: never;
     };
+    "/v1/products/{product}/analysis-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read analysis coverage
+         * @description Returns every analyzer series on every build in use of the product: its newest applied run, what that run analyzed against what it was meant to, its newest comparable run, the runs in the weeks asked that were applied, not comparable or failed, and its own expected interval between runs on that build.
+         *
+         *     A series is quiet when no comparable run arrived for three of its own usual gaps between applied runs, never under a day, once three runs were applied. Each series is judged on its own interval, so a quarterly series is not quiet after a week. A retired build is left out; a release past its end of life is listed and never quiet. Quiet first, then the longest silent.
+         *
+         *     Refused to anybody who does not read security testing material in the product.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["read-analysis-coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/analysis-coverage.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export analysis coverage
+         * @description Analysis coverage as a file, a row per series and build in the order the coverage lists them. Takes what the coverage takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["export-analysis-coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/assignment-rules": {
         parameters: {
             query?: never;
@@ -3882,6 +3930,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/code-finding-precision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Measure analyzer precision
+         * @description Returns what was said of the code findings of each analyzer series and of each analyzer rule, now: dismissed, not a security issue, dismissed by a suppression rule, confirmed, fixed, or nothing yet, each code finding counted once at the first that holds, and the share of those judged that was answered as noise. Also returns the product's suppression rules with what each covers now.
+         *
+         *     Takes the code finding list's narrowings but the state and the holder. Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["measure-analyzer-precision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-precision.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export analyzer precision
+         * @description Analyzer precision as a file: a row per series, then a row per analyzer rule with a code finding judged, then a row per suppression rule with what it covers. Takes what the figure takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["export-analyzer-precision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/code-finding-series": {
         parameters: {
             query?: never;
@@ -3900,6 +3994,100 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
          */
         get: operations["list-code-finding-series"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-time-to-fix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Measure time to fix code findings
+         * @description Returns how long code findings took from first opening to a person closing them as fixed on every build in the scope holding them, for the closings in the weeks asked: the median, the ninetieth percentile and the longest, for every code finding and per tier of the rule's weaknesses as rated now. A code finding a dismissal, a not-security decision or a suppression rule answers is left out and counted in `dismissed`.
+         *
+         *     A run missing a code finding closes nothing, so `no_longer_detected` times the code findings no comparable run saw, now, from opening to the first run not seeing them, apart from the fixes and with no history.
+         *
+         *     Takes the code finding list's narrowings but the state and the holder. Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["time-code-finding-fixing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-time-to-fix.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the time to fix code findings
+         * @description The time to fix as a file: a row per tier for the fixes, then a row per tier for the code findings no longer detected, then the count of fixes left out as dismissed. Takes what the figure takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["export-code-finding-time-to-fix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-time-to-judge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Measure time to judge code findings
+         * @description Returns how long code findings waited from opening to the first decision anybody proposed about them, for the first decisions proposed in the weeks asked: the median, the ninetieth percentile and the longest, for every code finding and per tier of the rule's weaknesses as rated now. A dismissal is a judgment and counts; a code finding a suppression rule covers has no wait. Also returns the queue now, by age, and how many code findings are no longer detected, which wait in no queue.
+         *
+         *     Takes the code finding list's narrowings but the state and the holder. Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["time-code-finding-judging"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-time-to-judge.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the time to judge code findings
+         * @description The time to judge as a file: a row per wait and tier, then a row per stretch of the queue's ages and tier, then the count no longer detected. Takes what the figure takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["export-code-finding-time-to-judge"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3976,6 +4164,52 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-code-findings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-findings-by-release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count code findings by release
+         * @description Returns, for each tagged release of the product an analyzer run was applied to, oldest first, the code findings on its builds nobody closed as fixed, split by the tier of the rule's weaknesses as rated now, with how many of them are open, dismissed and no longer detected. A release is one frozen point, answered today; a release analyzed and holding nothing is a point at zero, and a release never analyzed is absent.
+         *
+         *     Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["count-code-findings-by-release"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-findings-by-release.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export code findings by release
+         * @description Code findings by release as a file: a row per release with what is not fixed, open, dismissed and no longer detected, then a row per tier. Takes what the figure takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["export-code-findings-by-release"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7577,6 +7811,31 @@ export interface components {
             /** @description What to call it instead. Omitted leaves the name alone */
             name?: string;
         };
+        AnalysisCoverageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AnalysisCoverageBody.json
+             */
+            readonly $schema?: string;
+            /** @description One per series and build in use, quiet first, then the longest silent */
+            items: components["schemas"]["AnalyzedBody"][] | null;
+            /**
+             * Format: int64
+             * @description Series gone quiet on a build
+             */
+            quiet: number;
+            /**
+             * Format: date
+             * @description The first day the run counts cover
+             */
+            since: string;
+            /**
+             * Format: date
+             * @description The last day the run counts cover
+             */
+            until: string;
+        };
         AnalysisReceiptBody: {
             /** @description The build time the run states, or the time it arrived where it states none */
             built_at: string;
@@ -7659,6 +7918,75 @@ export interface components {
             run_id: number;
             /** @description The series the run belongs to */
             series: string;
+        };
+        AnalyzedBody: {
+            /**
+             * Format: double
+             * @description The silence the expected interval allows before the series is quiet: three intervals, never under a day
+             */
+            allowed_days?: number;
+            /**
+             * Format: int64
+             * @description Runs that arrived in the weeks asked and were applied
+             */
+            applied_runs: number;
+            /** @description The branch or tag, by the name that addresses it */
+            branch_or_tag: string;
+            /** @description The branch or tag as shown */
+            branch_or_tag_name: string;
+            /**
+             * Format: double
+             * @description The series' own expected interval on the build: the median of its newest gaps between runs, in days. Left out until three runs were applied
+             */
+            expected_days?: number;
+            /**
+             * Format: int64
+             * @description Runs that arrived in the weeks asked and could not be read
+             */
+            failed_runs: number;
+            /** @description When the newest applied run was applied */
+            last_applied?: string;
+            /** @description When the newest applied run arrived. Left out where none was applied */
+            last_arrived?: string;
+            /** @description When the newest comparable run arrived. Left out where none did */
+            last_comparable?: string;
+            /** @description The testing method the series reports. sast is static analysis */
+            method: string;
+            /**
+             * @description Why the newest applied run's absences are no evidence. Left out where they are
+             * @enum {string}
+             */
+            not_comparable?: "exit-status" | "incomplete" | "failure-signal" | "no-coverage" | "units-short" | "tool-changed" | "rules-changed";
+            /**
+             * Format: int64
+             * @description Of those applied, the runs whose absences are no evidence
+             */
+            not_comparable_runs: number;
+            /** @description Whether the release is past its end of life, analyzed by nobody on purpose */
+            past_end_of_life?: boolean;
+            /** @description Whether the series has gone quiet on the build: no run applied for three of its own usual gaps, never under a day. Never on a release past its end of life */
+            quiet: boolean;
+            /** @description The analyzer series, by name */
+            series: string;
+            /**
+             * Format: double
+             * @description Days since the newest comparable run arrived, or since the oldest run read where none was comparable. Left out where none was applied
+             */
+            silent_days?: number;
+            /**
+             * Format: int64
+             * @description What the newest applied run said it analyzed. Left out where it said nothing
+             */
+            units_analyzed?: number;
+            /**
+             * Format: int64
+             * @description What the newest applied run said it was meant to analyze. Left out where it said nothing
+             */
+            units_expected?: number;
+            /** @description The variant, by the name that addresses it */
+            variant: string;
+            /** @description The variant as shown */
+            variant_name: string;
         };
         AnalyzerSaidBody: {
             message: string;
@@ -8501,6 +8829,75 @@ export interface components {
             /** @description Why the record is being cleared */
             because: string;
         };
+        CodeFindingAgedBody: {
+            /** @description waiting by the tier of the rule's weaknesses as rated now, each named */
+            by_tier: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description The age in days the stretch starts at
+             */
+            from_days: number;
+            /** @description The stretch in words */
+            label: string;
+            /**
+             * Format: int64
+             * @description The age in days the stretch ends before. Left out on the last, which has no end
+             */
+            until_days?: number;
+            /**
+             * Format: int64
+             * @description Code findings in the stretch
+             */
+            waiting: number;
+        };
+        CodeFindingAnsweredBody: {
+            /**
+             * Format: int64
+             * @description Code findings whose standing decision confirms them, or recorded as a flaw
+             */
+            confirmed: number;
+            /**
+             * Format: int64
+             * @description Code findings whose standing decision dismisses them
+             */
+            dismissed: number;
+            /**
+             * Format: int64
+             * @description Code findings a person closed as fixed with no decision standing
+             */
+            fixed: number;
+            /**
+             * Format: int64
+             * @description Code findings a person or a suppression rule answered: the sum of dismissed, not_security, ruled, confirmed and fixed
+             */
+            judged: number;
+            /**
+             * Format: double
+             * @description The share of judged answered as noise, dismissed, not_security and ruled together, from 0 to 1. Left out where none is judged
+             */
+            noise_share?: number;
+            /**
+             * Format: int64
+             * @description Code findings whose standing decision says they are not a security issue
+             */
+            not_security: number;
+            /** @description The analyzer rule, as <tool>/<rule>. Left out on a series' own row */
+            rule?: string;
+            /**
+             * Format: int64
+             * @description Code findings a suppression rule dismisses with no decision standing
+             */
+            ruled: number;
+            /** @description The analyzer series, by name */
+            series: string;
+            /**
+             * Format: int64
+             * @description Code findings nothing answers yet, a decision waiting for a second person included
+             */
+            unjudged: number;
+        };
         CodeFindingBuild: {
             /** @description A branch or a tag */
             branch_or_tag: string;
@@ -8610,6 +9007,33 @@ export interface components {
              */
             at: string;
         };
+        CodeFindingFixingBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CodeFindingFixingBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Code findings closed as fixed in the window that a dismissal, a not-security decision or a suppression rule answers, left out of fixed
+             */
+            dismissed: number;
+            /** @description From a code finding first opening to a person closing it as fixed on the last build in the scope holding it, for the closings in the window. Dismissals are left out */
+            fixed: components["schemas"]["CodeFindingWaitsBody"];
+            /** @description Code findings no comparable run saw, now, from opening to the first run not seeing them. Absence is no fix, so these are apart from fixed and have no history */
+            no_longer_detected: components["schemas"]["CodeFindingWaitsBody"];
+            /**
+             * Format: date
+             * @description The first day of the window
+             */
+            since: string;
+            /**
+             * Format: date
+             * @description The last day of the window
+             */
+            until: string;
+        };
         CodeFindingFlawBody: {
             /** @description Whether the flaw is disclosed, which ends moving the code finding in or out */
             disclosed: boolean;
@@ -8623,6 +9047,38 @@ export interface components {
             recorded_by: string;
             /** @description Their display name, where it differs from their identity */
             recorded_by_name?: string;
+        };
+        CodeFindingJudgingBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CodeFindingJudgingBody.json
+             */
+            readonly $schema?: string;
+            /** @description From a code finding opening to the first decision proposed about it, whatever its outcome, for the first decisions proposed in the window */
+            judged: components["schemas"]["CodeFindingWaitsBody"];
+            /**
+             * Format: int64
+             * @description Code findings no comparable run saw, now, which wait in no queue: the code finding list's no-longer-detected count for the same narrowing
+             */
+            no_longer_detected: number;
+            /**
+             * Format: date
+             * @description When the longest-waiting code finding in the queue opened. Left out where the queue is empty
+             */
+            oldest?: string;
+            /**
+             * Format: date
+             * @description The first day of the window
+             */
+            since: string;
+            /**
+             * Format: date
+             * @description The last day of the window
+             */
+            until: string;
+            /** @description The code finding queue now, open code findings no decision waits on, by the age of their first opening */
+            waiting: components["schemas"]["CodeFindingAgedBody"][] | null;
         };
         CodeFindingKin: {
             /**
@@ -8743,6 +9199,55 @@ export interface components {
              */
             opened: number;
         };
+        CodeFindingPrecisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CodeFindingPrecisionBody.json
+             */
+            readonly $schema?: string;
+            /** @description One per analyzer rule with a code finding judged, the highest noise share first, then the most judged */
+            by_rule: components["schemas"]["CodeFindingAnsweredBody"][] | null;
+            /** @description One per series with a code finding in the scope, by name */
+            by_series: components["schemas"]["CodeFindingAnsweredBody"][] | null;
+            /** @description The product's suppression rules, retired ones included, oldest first. Every branch and variant, whatever the narrowing */
+            suppression_rules: components["schemas"]["CodeFindingSuppressionBody"][] | null;
+        };
+        CodeFindingReleaseBody: {
+            /** @description The tag, by the name that addresses it */
+            branch_or_tag: string;
+            /** @description The tag as shown */
+            branch_or_tag_name: string;
+            /** @description not_fixed by the tier of the rule's weaknesses as rated now, each named */
+            by_tier: {
+                [key: string]: number;
+            };
+            /**
+             * Format: date
+             * @description When the release went out, where somebody said, and when it was declared otherwise. It orders the releases
+             */
+            cut: string;
+            /**
+             * Format: int64
+             * @description Of not_fixed, those dismissed or not a security issue on a build of the release, by a decision or a suppression rule
+             */
+            dismissed: number;
+            /**
+             * Format: int64
+             * @description Of not_fixed, those no comparable run saw on a build of the release
+             */
+            no_longer_detected: number;
+            /**
+             * Format: int64
+             * @description Code findings on the release's builds nobody closed as fixed, whatever was decided about them
+             */
+            not_fixed: number;
+            /**
+             * Format: int64
+             * @description Of not_fixed, those open on a build of the release: nothing answers them
+             */
+            open: number;
+        };
         CodeFindingRowBody: {
             /** @description Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it */
             assigned_team?: boolean;
@@ -8829,6 +9334,40 @@ export interface components {
              */
             waiting: number;
         };
+        CodeFindingSuppressionBody: {
+            /** @description When it was last approved, where it was */
+            approved_at?: string;
+            /**
+             * Format: int64
+             * @description The code findings it covered when it was approved
+             */
+            approved_covering?: number;
+            /**
+             * Format: int64
+             * @description The open code findings it names now that the reader may read, whether or not it is in force
+             */
+            covering: number;
+            /**
+             * Format: int64
+             * @description The rule's identifier in the product
+             */
+            id: number;
+            /** @description The path it names, from the top of the checkout, where it names one */
+            path?: string;
+            /** @description When it was proposed */
+            proposed_at: string;
+            /**
+             * @description Why what it covers is dismissed
+             * @enum {string}
+             */
+            reason: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
+            /** @description When it was taken out of use, where it was */
+            retired_at?: string;
+            /** @description The analyzer rule it names, where it names one */
+            rule?: string;
+            /** @description Where the rule stands: proposed, in-force, outgrown, needs-path or retired */
+            state: string;
+        };
         CodeFindingTrendBody: {
             /**
              * Format: uri
@@ -8845,6 +9384,36 @@ export interface components {
             no_longer_detected: number;
             /** @description One per week, oldest first */
             points: components["schemas"]["CodeFindingPointBody"][] | null;
+        };
+        CodeFindingWaitBody: {
+            /**
+             * Format: int64
+             * @description The number of code findings behind it
+             */
+            count: number;
+            /**
+             * Format: double
+             * @description The middle wait, in days, nearest-rank
+             */
+            median_days: number;
+            /**
+             * Format: double
+             * @description The wait nine in ten came in under, in days, nearest-rank
+             */
+            p90_days: number;
+            /** @description The tier of the rule's weaknesses as rated now: memory-safety, input, resource or other. Left out on the whole set */
+            tier?: string;
+            /**
+             * Format: double
+             * @description The longest wait, in days
+             */
+            worst_days: number;
+        };
+        CodeFindingWaitsBody: {
+            /** @description Every code finding counted */
+            all: components["schemas"]["CodeFindingWaitBody"];
+            /** @description One per tier, memory-safety first, every tier named */
+            by_tier: components["schemas"]["CodeFindingWaitBody"][] | null;
         };
         CodeFindingsOutputBody: {
             /**
@@ -9031,6 +9600,16 @@ export interface components {
              * @description Open code findings a decision waiting for a second person leaves out of the queue, counted among the open in states
              */
             waiting: number;
+        };
+        "Count-code-findings-by-releaseResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Count-code-findings-by-releaseResponse.json
+             */
+            readonly $schema?: string;
+            /** @description One per release, oldest first */
+            releases: components["schemas"]["CodeFindingReleaseBody"][] | null;
         };
         CountedListBodyAuditedBody: {
             /**
@@ -19321,6 +19900,89 @@ export interface operations {
             };
         };
     };
+    "read-analysis-coverage": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals */
+                series?: string;
+                /** @description Limit to the series of one testing method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks the run counts cover, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisCoverageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-analysis-coverage": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals */
+                series?: string;
+                /** @description Limit to the series of one testing method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks the run counts cover, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-assignment-rules": {
         parameters: {
             query?: never;
@@ -21647,6 +22309,109 @@ export interface operations {
             };
         };
     };
+    "measure-analyzer-precision": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingPrecisionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-analyzer-precision": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-code-finding-series": {
         parameters: {
             query?: never;
@@ -21666,6 +22431,220 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["List-code-finding-seriesResponse"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "time-code-finding-fixing": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingFixingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-finding-time-to-fix": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "time-code-finding-judging": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingJudgingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-finding-time-to-judge": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under matches nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -21833,6 +22812,93 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CodeFindingsOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "count-code-findings-by-release": {
+        parameters: {
+            query?: {
+                /** @description Limit to one variant. Left out, every one */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals */
+                series?: string;
+                /** @description Limit to one testing method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package, as the code finding list reads it */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description The number of releases, the newest */
+                releases?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Count-code-findings-by-releaseResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-findings-by-release": {
+        parameters: {
+            query?: {
+                /** @description Limit to one variant. Left out, every one */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals */
+                series?: string;
+                /** @description Limit to one testing method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings placed on one source package, as the code finding list reads it */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description The number of releases, the newest */
+                releases?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
