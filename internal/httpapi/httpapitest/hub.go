@@ -103,6 +103,25 @@ func HubRootRescanned(t *testing.T, r *Reach) {
 	}})
 }
 
+// HubZlibRescanned scans the hub's build again with the compression library
+// at a new version, so cppcheck's code finding stays on the version it opened
+// on, which the build no longer holds.
+func HubZlibRescanned(t *testing.T, r *Reach) {
+	t.Helper()
+	zlib := HubZlib
+	zlib.Purl, zlib.Version = "pkg:deb/debian/zlib1g@1.4", "1.4"
+	r.ScanAt(t, SeededBuild, "hub-zlib-rescanned", graph.Snapshot{
+		Root:       HubRoot,
+		Components: []graph.Described{HubLib, HubTools, zlib},
+		Dependencies: []graph.Dependency{
+			{Parent: HubRoot, Child: HubLib}, {Parent: HubRoot, Child: HubTools},
+			{Parent: HubLib, Child: zlib},
+		},
+	}, []finding.Reported{{
+		Issue: finding.Named{Identifier: "CVE-2026-4242", Severity: "high"}, Component: HubLib, FixState: finding.NoFix,
+	}})
+}
+
 // HubTheirsShipsTheSource ships, in the other product, a binary of a name
 // the hub's product never ships, built from the hub library's source at its
 // version: one fold, reached by a name only the other product holds.

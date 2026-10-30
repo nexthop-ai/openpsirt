@@ -459,6 +459,44 @@ func TestACodeFindingOnAFormerRootIsOnTheBuild(t *testing.T) {
 	})
 }
 
+func TestACodeFindingOnAReplacedVersionStaysOnItsName(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.HubCodeFindings(t, r)
+		// The compression library is scanned again at a new version and no
+		// run has placed anything since: cppcheck's code finding stays on
+		// zlib1g 1.3.
+		httpapitest.HubZlibRescanned(t, r)
+		if got := hubQueueOf(t, r, "security-testing-reader", "?component=zlib1g"); !sameRules(got.rules(), []string{"cppcheck/bad"}) || got.States["open"] != 1 {
+			t.Errorf("the rescanned library lists %v, %d open; want cppcheck's, on the version it opened on", got.rules(), got.States["open"])
+		}
+		if got := hubQueueOf(t, r, "security-testing-reader", "?component=zlib1g&component_version=1.3"); !sameRules(got.rules(), []string{"cppcheck/bad"}) {
+			t.Errorf("the rescanned library at 1.3 lists %v; want cppcheck's", got.rules())
+		}
+		if got := hubQueueOf(t, r, "security-testing-reader", "?component=zlib1g&component_version=1.4"); len(got.Items) != 0 {
+			t.Errorf("the rescanned library at 1.4 lists %v; want nothing", got.rules())
+		}
+		var counted hubCounted
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/components/zlib1g/code-finding-counts", &counted)
+		for _, each := range counted.Series {
+			want := 0
+			if each.Series == "cppcheck/default" {
+				want = 1
+			}
+			if each.States["open"] != want || each.Unplaced != 0 {
+				t.Errorf("the rescanned library in %s counts %d open and %d unplaced; want %d open and none unplaced",
+					each.Series, each.States["open"], each.Unplaced, want)
+			}
+		}
+		var found struct {
+			Items []hubMatch `json:"items"`
+		}
+		httpapitest.Read(t, r, "code-finding-handler", "/v1/components?q=zlib1g", &found)
+		if len(found.Items) != 1 || found.Items[0].CodeFindings == nil || *found.Items[0].CodeFindings != 1 {
+			t.Errorf("the chooser finds %+v for the rescanned library; want its one code finding", found.Items)
+		}
+	})
+}
+
 func TestANameReachesOnlyWhatTheProductsBuildsShip(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.HubCodeFindings(t, r)

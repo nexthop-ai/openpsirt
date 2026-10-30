@@ -137,11 +137,18 @@ type Reached struct {
 }
 
 // ReachedByName is what each of these names reaches in these builds, keyed by
-// the name folded, as the component screen reaches a name: a live component of
-// the name in one of the builds, or one built from a source of the name, and
-// the fold each is in. A version narrows to what was built at it. A name that
-// names a build's root reaches every component that was ever its root as
-// well, at that version where one is named. A blank name reaches nothing.
+// the name folded. A name reaches what it reaches on the component screen, a
+// live component of the name in one of the builds or one built from a source
+// of the name, and besides that every component of the name holding a
+// finding in one of the builds, at whatever version a rescan has since
+// replaced. A version narrows to what was built at it. A name that names a
+// build's root now reaches every component that was ever its root as well, at
+// that version where one is named. A blank name reaches nothing.
+//
+// A finding keeps the component it opened on, so one on a version a rescan
+// replaced is still on the name. The finding's component index answers which
+// components of the name hold one; the build's node history has no index by
+// component.
 //
 // Read on its own and answered as values, for the reason FoldsNamed is: as a
 // subquery its size is the planner's estimate, and on MySQL the estimate
@@ -209,6 +216,45 @@ func ReachedByName(ctx context.Context, db bun.IDB, buildIDs []int64, names []st
 			}
 		}
 	}
+	var named []struct {
+		ID       int64  `bun:"id"`
+		Name     string `bun:"name_folded"`
+		Upstream string `bun:"upstream_folded"`
+		Fold     string `bun:"fold_key"`
+	}
+	if err := narrowed(db.NewSelect().TableExpr(`"component" AS "cn"`).
+		ColumnExpr(`"cn"."id", "cn"."name_folded", COALESCE("cn"."upstream_folded", '') AS "upstream_folded", "cn"."fold_key"`).
+		Where(`("cn"."name_folded" IN (?) OR "cn"."upstream_folded" IN (?))`, bun.List(list), bun.List(list))).
+		Scan(ctx, &named); err != nil {
+		return nil, fmt.Errorf("read the components of %d names: %w", len(list), err)
+	}
+	// Only a component in a fold no name it carries reaches yet is asked
+	// after: a replaced version is a fold of its own.
+	var unreached []int64
+	foldOfNamed := map[int64]string{}
+	for _, row := range named {
+		for _, name := range []string{row.Name, row.Upstream} {
+			if asked[name] && !folds[name][row.Fold] && foldOfNamed[row.ID] == "" {
+				foldOfNamed[row.ID] = row.Fold
+				unreached = append(unreached, row.ID)
+			}
+		}
+	}
+	holding, err := holdingAFinding(ctx, db, buildIDs, unreached)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range named {
+		if !holding[row.ID] {
+			continue
+		}
+		for _, name := range []string{row.Name, row.Upstream} {
+			if asked[name] {
+				add(name, row.Fold)
+			}
+		}
+	}
+
 	// Every root each build whose root a name names has had, at the version
 	// asked for.
 	roots, err := graph.RootsOf(ctx, db, rootBuilds)
@@ -257,6 +303,37 @@ func ReachedByName(ctx context.Context, db bun.IDB, buildIDs []int64, names []st
 		}
 		sort.Strings(reached.Folds)
 		out[name] = reached
+	}
+	return out, nil
+}
+
+// holdingAFinding is which of these components hold a finding in one of these
+// builds.
+//
+// One probe per component, each naming it as a value, so every probe is a seek
+// on the finding's component index that stops at the first row. Correlated to
+// a list of components instead, PostgreSQL on statistics that lag the table
+// read every finding of the build: 24,079 index rows for the ten binaries of
+// one kernel at 4,000 components a build.
+func holdingAFinding(ctx context.Context, db bun.IDB, buildIDs, componentIDs []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	const per = 100
+	for start := 0; start < len(componentIDs); start += per {
+		chunk := componentIDs[start:min(start+per, len(componentIDs))]
+		probes := make([]string, 0, len(chunk))
+		var args []any
+		for _, id := range chunk {
+			probes = append(probes, `SELECT "cn"."id" FROM "component" AS "cn" WHERE "cn"."id" = ?
+				AND EXISTS (SELECT 1 FROM "finding" AS "hf" WHERE "hf"."component_id" = ? AND "hf"."build_id" IN (?))`)
+			args = append(args, id, id, bun.List(buildIDs))
+		}
+		var ids []int64
+		if err := db.NewRaw(strings.Join(probes, " UNION ALL "), args...).Scan(ctx, &ids); err != nil {
+			return nil, fmt.Errorf("ask which of %d components hold a finding in these builds: %w", len(chunk), err)
+		}
+		for _, id := range ids {
+			out[id] = true
+		}
 	}
 	return out, nil
 }
