@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
@@ -257,41 +258,45 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 	})
 }
 
-func TestTwoSavesOfOneNewNameAtOnceBothKeepIt(t *testing.T) {
-	// A second press of save, or a second tab. Both find no filter by that
-	// name and both add one; the unique index refuses the later addition,
-	// and taken again it finds the filter the other kept and replaces it.
-	// The harness holds SQLite to one connection, so nothing lands between
-	// the two there.
-	//
-	// A moment rather than until the rival finishes: on the two engines whose
-	// empty update holds a gap lock, the rival waits on this transaction and
-	// lands only once it commits, so which of the two adds the row differs by
-	// engine and the test asks only that both are kept as one.
+// A filter of a new name kept by somebody else between a save's look for it
+// and its add is replaced by the save: the unique index refuses the add, and
+// taken again the save finds the filter and replaces it.
+//
+// The rival writes the row itself, because a second save waits on the first
+// for its turn and never lands between the look and the add. On PostgreSQL
+// the rival lands there and the save's add is refused, so the retry is what
+// keeps the save. On MySQL and MariaDB the empty update holds a gap lock, the
+// rival waits for the save to commit and its own add is refused, so the retry
+// is unreachable there. SQLite holds the harness to one connection, so nothing
+// lands between the two.
+func TestASaveLosingTheRaceForANewNameReplacesTheWinner(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		hooked, rival := dbtest.RivalAfterRead(t, f.DB, "saved_filter", "saved_filter", 2*time.Second, func() error {
-			_, err := f.store.SaveFilterPreparing(context.Background(), person.ID,
-				"Kernel", "component=linux", saved.Filter{}, 10)
+			_, err := f.DB.DB.NewInsert().Model(&saved.Filter{PersonID: person.ID, Name: "kernel",
+				DisplayName: "Kernel", Query: "component=linux", CreatedAt: time.Now().UTC()}).
+				Exec(context.Background())
 			return err
 		})
 
 		if _, err := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID,
 			"kernel", "component=linux-image", saved.Filter{}, 10); err != nil {
-			t.Errorf("one of two saves of one name answered %v", err)
+			t.Errorf("the save that lost the race answered %v", err)
 		}
-		if err := rival(); err != nil {
-			t.Errorf("the other of two saves of one name answered %v", err)
+		// Landed, the rival made the save's add a duplicate; held behind the
+		// gap lock, it is the duplicate itself.
+		if landed := rival(); landed != nil && !database.IsDuplicate(landed) {
+			t.Errorf("the rival answered %v, want it kept or refused as a duplicate", landed)
 		}
 		kept, _, err := f.store.SavedFilters(t.Context(), person.ID, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(kept) != 1 {
-			t.Errorf("the person keeps %+v, want one filter", kept)
+		if len(kept) != 1 || kept[0].Query != "component=linux-image" {
+			t.Errorf("the person keeps %+v, want the one filter the save wrote", kept)
 		}
 	})
 }
