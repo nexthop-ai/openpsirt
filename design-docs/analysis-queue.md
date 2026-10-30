@@ -9,6 +9,7 @@ Satisfies REQ-17, REQ-30, REQ-42, REQ-43, REQ-50, REQ-56, REQ-64.
 ## Contents
 
 - [Code finding queue](#code-finding-queue)
+- [Queue across products](#queue-across-products)
 - [Queue file](#queue-file)
 - [Code findings by series](#code-findings-by-series)
 - [Code findings of a component](#code-findings-of-a-component)
@@ -58,6 +59,23 @@ its code findings out.
 | A rule's tier is the highest of every weakness recorded for it, re-ranked each run naming it | |
 | A severity outside 0 to 10 or not a number, and an unknown precision, are none | |
 
+## Queue across products
+
+`GET /v1/code-findings` lists the code findings of every product the reader
+reads security testing material in (REQ-43), as one queue: the same rows,
+order, states, filters and counts as a product's queue, each row naming its
+product.
+
+| Rule | Reason |
+|---|---|
+| The products are those the reader holds `security-testing-read` in; a product read no other way contributes nothing, and a reader holding it nowhere is answered an empty queue | A flaw's reader reads one code finding, never a product's queue |
+| Every state and count is the sum of each product's own, row for row | One population, split by product |
+| Each product's state is worked out against that product: the rules that cover it, the outcome standing for it and its flaw records are its own | A rule or a decision belongs to one product |
+| The component and version filters, the method, the series, the state and unheld work narrow as they do in one product | |
+| Beneath is refused, since it names one build | The list across products refuses it the same way (`design-docs/api-lists.md` § Issue-keyed and cross-product reads) |
+| A pipeline key is refused | It sends scans and reads nothing |
+| `GET /v1/code-findings.{format}` writes it, under the rules of the queue file | |
+
 ## Queue file
 
 `GET /v1/products/{product}/code-findings.{format}` writes the list as CSV or
@@ -68,6 +86,7 @@ JSON (`design-docs/analytics-exports.md` § Exports).
 | The file is the list, every row, same filters and order, same visibility (REQ-42, REQ-43) | One read |
 | A row names the holder (who, display name, whether a team's queue) and whether third-party, from the newest run seeing it | A team and a person may share a name |
 | A row names the component it is placed on, its version while the build still ships it and whether it is the build itself, on the row's build (`design-docs/analysis-source.md` § Placement) | |
+| A row names its product, in the last column of the CSV | The queue across products writes the same file |
 | No row carries source text | |
 | With no state named, the file says it lists the queue; narrowed to unheld work, it says so | An empty query reads as everything |
 | A refusal is answered before the first byte | |

@@ -90,7 +90,9 @@ sits at, with how far it is decided in each.
 | Each row applies its own product's minimum severity; `severity` raises it for the page and never lowers it, an exploited row passes both, and `below_minimum_severity` turns every one off | |
 | `beneath`, `differs` and `across_variants` are not offered across products; every other filter is shared | They are about one build or a selection of builds |
 | `across_variants` compares a row with the other builds of its branch: `only` keeps what no other variant holds and needs a variant selected; `every` keeps what every build of the branch holds | |
-| The dependency tree, the inventories and the list of unowned work stay per product | |
+| `/v1/code-findings` spans products as one code finding queue, with the per-product queue's filters except `beneath` (`design-docs/analysis-queue.md` § Queue across products) | |
+| The dependency tree and the inventories stay per product | |
+| `/v1/unassigned` and a person's or team's assignments span products, and `family` keeps one family, dependency or code, and counts it alone (`design-docs/kinds.md` § Consumers) | A screen draws one count per family |
 
 ## Limits
 

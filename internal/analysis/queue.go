@@ -23,13 +23,15 @@ import (
 )
 
 // waitingDecision is whether a decision at the occurrence of the finding under "f", in
-// the product bound, waits for a second person. A code finding somebody has already
+// the product the expression given names, waits for a second person. A code finding somebody has already
 // judged is not work for the next person to take.
-var waitingDecision = `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
-	WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL
+func waitingDecision(product string) string {
+	return `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
+	WHERE "dc"."product_id" = ` + product + ` AND "dc"."live_key" IS NOT NULL
 	  AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `
 	  AND "dc"."state" = '` + string(triage.Proposed) + `'
 	  AND "dc"."needs_approval" = TRUE AND "dc"."sent_back_at" IS NULL)`
+}
 
 // precisionRank is the tool's precision of the rule of the finding under "f",
 // whose rating is under "rr", as a number that sorts the most precise first,
@@ -45,7 +47,12 @@ var precisionRank = func() string {
 // Scope narrows a product's code findings to one branch or tag, one variant or one build,
 // and to one analyzer series. Unset is every one under the product.
 type Scope struct {
-	ProductID     int64
+	ProductID int64
+	// Across is the products a list across products reads, each one the
+	// reader reads security testing work in, in place of ProductID. A
+	// branch, a variant, a build and a subtree belong to one product, so a
+	// scope across products names none of them.
+	Across        []int64
 	BranchOrTagID *int64
 	VariantID     *int64
 	// Series is a series' name, matched without regard to capitals. A name
@@ -120,16 +127,38 @@ func (scope Scope) resolved(ctx context.Context, db bun.IDB) (Scope, error) {
 	return scope, nil
 }
 
+// across reports whether the scope reads a list across products.
+func (scope Scope) across() bool { return scope.Across != nil }
+
+// bound is what the scope's product-bound conditions compare with.
+func (scope Scope) bound() productBound {
+	if scope.across() {
+		return eachProduct
+	}
+	return inProduct(scope.ProductID)
+}
+
+// inScope keeps a statement over the branch or tag under "s" to the
+// scope's product, or its products across.
+func (scope Scope) inScope(q *bun.SelectQuery) *bun.SelectQuery {
+	if scope.across() {
+		if len(scope.Across) == 0 {
+			return q.Where("1 = 0")
+		}
+		return q.Where(`"s"."product_id" IN (?)`, bun.List(scope.Across))
+	}
+	return q.Where(`"s"."product_id" = ?`, scope.ProductID)
+}
+
 // builds is every build the scope covers, retired ones included, as the queue
 // reads them.
 func (scope Scope) builds(ctx context.Context, db bun.IDB) ([]int64, error) {
 	if scope.BuildID != nil {
 		return []int64{*scope.BuildID}, nil
 	}
-	q := db.NewSelect().TableExpr(`"build" AS "t"`).
+	q := scope.inScope(db.NewSelect().TableExpr(`"build" AS "t"`).
 		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
-		ColumnExpr(`"t"."id"`).
-		Where(`"s"."product_id" = ?`, scope.ProductID)
+		ColumnExpr(`"t"."id"`))
 	if scope.BranchOrTagID != nil {
 		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
 	}
@@ -172,7 +201,11 @@ func CodeFindingAssignees() []string { return []string{finding.HeldByNobody} }
 // QueueRow is one code finding in a product: its occurrence, and what the newest of its
 // findings in the scope says about it.
 type QueueRow struct {
-	Occurrence  string `bun:"occurrence_identity"`
+	Occurrence string `bun:"occurrence_identity"`
+	// Product is the product the code finding is in, by the name that
+	// addresses it, and ProductName the name shown.
+	Product     string `bun:"product"`
+	ProductName string `bun:"product_name"`
 	Rule        string `bun:"rule"`
 	Path        string `bun:"path"`
 	Line        *int   `bun:"start_line"`
@@ -248,11 +281,18 @@ func OpenCodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject,
 func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	waiting bool, limit, offset int) (*Queue, error) {
 
-	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
-	if err != nil {
-		return nil, err
+	// Across products the scope names only products the reader reads
+	// security testing work in, and each row is narrowed to what they read
+	// in its own.
+	var visible []access.Visibility
+	if !scope.across() {
+		var err error
+		if visible, err = finding.CodeFindingVisible(subject, scope.ProductID); err != nil {
+			return nil, err
+		}
 	}
-	if scope, err = scope.resolved(ctx, db); err != nil {
+	scope, err := scope.resolved(ctx, db)
+	if err != nil {
 		return nil, err
 	}
 	perFinding := func() *bun.SelectQuery { return codeFindingFindings(db, subject, scope, visible) }
@@ -343,7 +383,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	for i, p := range page {
 		newest[i] = p.Newest
 	}
-	state, stateArgs := stateOf(scope.ProductID)
+	state, stateArgs := stateAt(scope.bound())
 	var rows []QueueRow
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
@@ -352,6 +392,8 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
+		ColumnExpr(`"p"."name" AS "product", `+catalog.ShownExpr("p")+` AS "product_name"`).
 		ColumnExpr(`"f"."occurrence_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
 		ColumnExpr(`"s"."name" AS "branch_or_tag", "va"."name" AS "variant", "f"."assigned_to"`).
@@ -388,9 +430,12 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 // The product's own visibilities, and a code finding included in its flaw's case. A code finding granted
 // one at a time is reached through its evidence, never a list. A finding
 // closed on a build is read until the code finding opens anew at its occurrence there.
+//
+// Across products, the rows are each product's the reader reads security
+// testing work in, at the visibilities they read in it.
 func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
-	reach := finding.CodeFindingReach(subject, scope.ProductID)
-	state, stateArgs := stateOf(scope.ProductID)
+	bound := scope.bound()
+	state, stateArgs := stateAt(bound)
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
@@ -404,14 +449,20 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
 		ColumnExpr(precisionRank+` AS "precise"`).
 		ColumnExpr(state+` AS "stands"`, stateArgs...).
-		ColumnExpr(`CASE WHEN `+waitingDecision+` THEN 1 ELSE 0 END AS "awaits"`, scope.ProductID).
-		ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
-		Where(`"s"."product_id" = ?`, scope.ProductID).
+		ColumnExpr(`CASE WHEN `+waitingDecision(bound.sql)+` THEN 1 ELSE 0 END AS "awaits"`, bound.args...).
+		ColumnExpr(`CASE WHEN `+ruledIn(bound.sql)+` THEN 1 ELSE 0 END AS "covered"`, bound.args...).
 		Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
 			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."build_id" = "f"."build_id"
 			  AND "fo"."closed_at" IS NULL))`).
-		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		Where(kinds, kindArgs...)
+	q = scope.inScope(q)
+	if scope.across() {
+		where, args := access.VisibleWhere(`"s"."product_id"`, `"f"."visibility"`, access.Split(scope.Across, subject.Reads))
+		q = q.Where(where, args...)
+	} else {
+		reach := finding.CodeFindingReach(subject, scope.ProductID)
+		q = q.Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...)
+	}
 	if scope.BranchOrTagID != nil {
 		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
 	}
@@ -449,8 +500,8 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 	if scope.Series != "" {
 		named, namedArgs := kind.CodeFindings.Where(`"sn"."kind"`)
 		q = q.Where(`"si"."series_id" IN (SELECT "sn"."id" FROM "series" AS "sn"
-			WHERE "sn"."product_id" = ? AND "sn"."name_folded" = ? AND `+named+`)`,
-			append([]any{scope.ProductID, typedname.Matching(scope.Series)}, namedArgs...)...)
+			WHERE "sn"."product_id" = `+bound.sql+` AND "sn"."name_folded" = ? AND `+named+`)`,
+			append(append(bound.times(1), typedname.Matching(scope.Series)), namedArgs...)...)
 	}
 	return q
 }

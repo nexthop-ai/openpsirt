@@ -107,12 +107,17 @@ const covers = `("lr"."rule_folded" IS NULL OR EXISTS (SELECT 1 FROM "vulnerabil
 // A rule naming an analyzer rule and no path covers nothing once the rule is
 // found to find memory safety or injection flaws, which are judged one code finding
 // at a time.
-var ruled = `EXISTS (SELECT 1 FROM "suppression_rule" AS "lr"
-	WHERE "lr"."product_id" = ? AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL
+var ruled = ruledIn("?")
+
+// ruledIn is ruled in the product the expression given names.
+func ruledIn(product string) string {
+	return `EXISTS (SELECT 1 FROM "suppression_rule" AS "lr"
+	WHERE "lr"."product_id" = ` + product + ` AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL
 	  AND ` + covers + `
 	  AND ("lr"."prefix" IS NOT NULL OR "lr"."rule_folded" IS NULL OR NOT EXISTS (
 		SELECT 1 FROM "rule_rating" AS "rb" WHERE "rb"."vulnerability_id" = "f"."vulnerability_id"
 		  AND "rb"."weakness_tier" >= ` + strconv.Itoa(int(weakness.TierInjection)) + `)))`
+}
 
 // SuppressionRule is a suppression rule as it is read: what it names, who proposed
 // and approved it, and how many code findings it covers now.

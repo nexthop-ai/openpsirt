@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
@@ -93,17 +94,28 @@ func ApplyRunIn(t *testing.T, r *Reach, seriesName string, built time.Time, doc 
 // reach's database that a test watches.
 func ApplyRunOn(t *testing.T, r *Reach, db *database.DB, seriesName string, built time.Time, doc string) {
 	t.Helper()
+	applyRun(t, r, db, SeededBuild, seriesName, built, doc)
+}
+
+// ApplyRunAt is ApplyRunIn against the build given.
+func ApplyRunAt(t *testing.T, r *Reach, b Build, seriesName string, built time.Time, doc string) {
+	t.Helper()
+	applyRun(t, r, r.DB, b, seriesName, built, doc)
+}
+
+func applyRun(t *testing.T, r *Reach, db *database.DB, b Build, seriesName string, built time.Time, doc string) {
+	t.Helper()
 	ctx := t.Context()
 	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
 	if err != nil {
 		t.Fatal(err)
 	}
-	located, err := catalog.NewStore(r.DB.DB).Locate(ctx, "mine", "master", "broadcom")
+	located, err := catalog.NewStore(r.DB.DB).Locate(ctx, b.Product, b.BranchOrTag, b.Variant)
 	if err != nil {
 		t.Fatal(err)
 	}
 	given := analysis.Describe([]sarif.Log{log}, analysis.Stated{Series: seriesName, BuiltAt: built})
-	build := r.BuildOf(t, SeededBuild)
+	build := r.BuildOf(t, b)
 	var runID int64
 	if err := database.InTransaction(ctx, r.DB.DB, func(ctx context.Context, tx bun.Tx) error {
 		repositories, err := sourcelink.NewStore(tx).Config(ctx, located.ProductID)
@@ -224,4 +236,22 @@ func FixedBody(t *testing.T, r *Reach, codeFinding, because string) string {
 		t.Fatal(err)
 	}
 	return string(written)
+}
+
+// TheirBuild is the other product's build a code finding is seeded on.
+var TheirBuild = Build{Product: "theirs", BranchOrTag: "master", Variant: "mellanox"}
+
+// CodeFindingsInBothProducts is the hub's code findings in the seeded product,
+// and in the other product the seeded code finding's run applied to its
+// build: one rule reporting the same place in two products, which are two
+// code findings.
+func CodeFindingsInBothProducts(t *testing.T, r *Reach) {
+	t.Helper()
+	HubCodeFindings(t, r)
+	root := graph.Described{Purl: "pkg:generic/theirs-image@1.0", Name: "theirs-image", Version: "1.0"}
+	_, scan := r.Shipped(t, TheirBuild, "theirs-code-finding", graph.Snapshot{Root: root})
+	if err := ingest.NewStore(r.DB.DB).Made(t.Context(), scan, 1, 1, root.Name); err != nil {
+		t.Fatal(err)
+	}
+	ApplyRunAt(t, r, TheirBuild, "clang-tidy/default", time.Now().UTC().Add(-2*time.Hour), CodeFindingRun(true))
 }

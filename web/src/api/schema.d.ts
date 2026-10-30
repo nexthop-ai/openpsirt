@@ -656,6 +656,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/code-findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List code findings across products
+         * @description The code finding queue across every product you read security testing work in: one row per code finding in a product, however many of its builds it is on, each naming its product. Ordered, narrowed and counted as one product's list is, with `states`, `waiting`, `ruled` and `past_end_of_life` summed over those products.
+         *
+         *     A product where you do not read security testing work contributes nothing, and a reader of it in no product is answered an empty list. A branch, a variant and a subtree belong to one product, so `beneath` is refused with 422 here and asked of that product's list. Supports limit and offset.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products where you read security testing work.
+         */
+        get: operations["list-code-findings-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-findings.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export code findings across products
+         * @description The code finding list across products as a file: every row the same filters would list, not one page of them, in the same order, each naming its product.
+         *
+         *     Read with your own visibility, as it is written. No row carries source text. Takes every filter the list across products takes.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only the products where you read security testing work.
+         */
+        get: operations["export-code-findings-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/comments/{id}": {
         parameters: {
             query?: never;
@@ -8612,7 +8660,7 @@ export interface components {
             line?: number;
             /** @description What the analyzer says */
             message: string;
-            /** @description The code finding's occurrence identity, which addresses it on every build it is on */
+            /** @description The code finding's occurrence identity, which addresses it on every build of its product it is on */
             occurrence: string;
             /** @description Whether the code finding is placed on the build itself, because its path is in no repository a component of the build was built from */
             on_build?: boolean;
@@ -8623,6 +8671,10 @@ export interface components {
             opened: string;
             /** @description The file, from the top of the checkout */
             path: string;
+            /** @description The product the code finding is in, by the name that addresses it */
+            product: string;
+            /** @description The product's name as shown, where it differs */
+            product_name?: string;
             /** @description The analyzer's rule, as <tool>/<rule> */
             rule: string;
             /**
@@ -16480,6 +16532,98 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CountedListBodyAuditedDecisionBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-code-findings-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under lists nothing */
+                series?: string;
+                /** @description List the code findings in one state. Left out, the queue */
+                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
+                assigned?: "nobody";
+                /** @description Limit to the code findings placed on one source package the products' builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Refused with 422: a subtree is a walk over one build's edges, so it is asked of one product's list with a branch or tag and a variant */
+                beneath?: string;
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-findings-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under lists nothing */
+                series?: string;
+                /** @description List the code findings in one state. Left out, the queue */
+                state?: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
+                assigned?: "nobody";
+                /** @description Limit to the code findings placed on one source package the products' builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Refused with 422: a subtree is a walk over one build's edges, so it is asked of one product's list with a branch or tag and a variant */
+                beneath?: string;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
