@@ -257,7 +257,7 @@ type seededCatalog struct {
 }
 
 // catalogSeed is the catalog every test here starts from, seeded once per
-// binary on SQLite and per test on a server.
+// binary on every engine.
 var catalogSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (seededCatalog, error) {
 	w, err := world.Declare(ctx, db)
 	if err != nil {

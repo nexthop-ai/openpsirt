@@ -70,6 +70,7 @@ every engine. Engine-specific code lives in these places and no others.
 | The job queue's locking | The one application file outside the database package, because the queue owns the statement |
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped and PostgreSQL refuses it in a timestamp column. PostgreSQL casts to a zoned timestamp, MySQL and MariaDB to a six-digit datetime, SQLite to nothing |
 | The test harness | It names each engine to choose a connection and report which ran, never to write a query |
+| Seeing a seam's rival wait on a lock | No portable statement reports another session's lock wait. PostgreSQL's activity view names the wait; InnoDB lists a transaction waiting, joined to its session for the database, since other binaries hold databases on the same server |
 | Leasing the harness's slots | A named lock on MySQL and MariaDB, a numbered advisory lock on PostgreSQL, each held for the connection |
 | Numbering the rows of one insert on MySQL | MySQL reports only the first identifier; the rest are counted in the server's step, read from the inserting session. The branch asks which statements the dialect can write |
 | Writing a batch whose identifiers nobody reads | PostgreSQL takes one array a column; the others take a list of rows (`design-docs/database-queries.md` § Bulk inserts) |
@@ -214,8 +215,8 @@ The harness owns the seams that put a writer or a failure at one point.
 
 | Seam | What it does |
 |---|---|
-| A rival after a read | Arms once a statement reads one table and starts another writer before the next statement writing a second, waiting a bounded time. A rival blocked on a held lock lands at commit. A rival that never ran fails the test. Skipped on SQLite |
-| A rival after a select | Arms once a select reads one table and starts another writer before the next statement, reaching the gap between two reads a write depends on. A rival that never ran fails the test. Skipped on SQLite |
+| A rival after a read | Arms once a statement reads one table and starts another writer before the next statement writing a second, waiting a bounded time. A rival blocked on a held lock lands at commit, and the wait ends once the server reports a session of the test's database waiting on a lock. A rival that never ran fails the test. Skipped on SQLite |
+| A rival after a select | Arms once a select reads one table and starts another writer before the next statement, reaching the gap between two reads a write depends on. The wait ends as a rival after a read's does. A rival that never ran fails the test. Skipped on SQLite |
 | A failing statement | The armed statement runs on an ended context, so its failure carries a cancellation a test can tell apart |
 | A hidden table | Renamed away and put back when the test ends, however it ends |
 | A closed database | Opened and closed, so every call fails. A missing database is refused by a different arm |

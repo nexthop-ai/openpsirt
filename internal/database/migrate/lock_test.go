@@ -56,8 +56,8 @@ func open(t *testing.T, url string) *database.DB {
 // through Up passes with the entire advisory lock deleted. It proves the mutex
 // and nothing else. This drives acquire directly, from two separate pools.
 func TestLockExcludesAnotherConnection(t *testing.T) {
-	// Attempts of one second, so the second instance tries several times
-	// within the few seconds it is given.
+	// Attempts of one second, so the second instance's first attempt times
+	// out, and says so, within the second and a half it is given.
 	shortAttempts(t)
 
 	for name, env := range map[database.Engine]string{
@@ -90,7 +90,7 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 			// account that can connect may take the lock and an operator
 			// told "another instance" looks for a replica.
 			said := &lines{}
-			waiting, cancel := context.WithTimeout(WithEngine(ctx, name, said.logger()), 3*time.Second)
+			waiting, cancel := context.WithTimeout(WithEngine(ctx, name, said.logger()), 1500*time.Millisecond)
 			defer cancel()
 			if release2, err := acquire(waiting, second); err == nil {
 				_ = release2(ctx)
@@ -184,14 +184,15 @@ func TestAWaiterTakesTheLockWhenItsHolderDies(t *testing.T) {
 			})
 		}()
 
-		// Several attempts, each of which times out. A wait bounded by one
-		// attempt's length would have failed here.
+		// Two attempts, each of which times out after a second, and a second
+		// to spare. A wait bounded by one attempt's length would have failed
+		// here.
 		select {
 		case err := <-done:
 			t.Fatalf("the waiter stopped waiting while the lock was held: %v", err)
 		case <-migrated:
 			t.Fatal("the waiter migrated while the lock was held")
-		case <-time.After(4 * time.Second):
+		case <-time.After(3 * time.Second):
 		}
 		if got := strings.Count(said.String(), "waiting for the migration lock"); got < 2 {
 			t.Errorf("a wait of several attempts said so %d times: %q", got, said.String())
@@ -601,7 +602,9 @@ func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
 			t.Fatalf("the first instance could not take the lock: %v", err)
 		}
 		time.Sleep(2 * time.Second)
-		asking, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+		// A free lock is taken at once, so a short ask finds one the
+		// server released with the holder's session.
+		asking, cancel := context.WithTimeout(ctx, time.Second)
 		defer cancel()
 		if again, err := acquire(asking, waiting); err == nil {
 			_ = again(ctx)

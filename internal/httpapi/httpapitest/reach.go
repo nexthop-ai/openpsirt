@@ -260,7 +260,7 @@ type cast struct {
 
 // CastSeed is the world every test here reaches into — two products, one of
 // them built, and one person per way of holding rights — seeded once per
-// binary on SQLite and per test on a server.
+// binary on every engine.
 var CastSeed = dbtest.Seed(seedCast)
 
 func seedCast(ctx context.Context, db *database.DB) (cast, error) {

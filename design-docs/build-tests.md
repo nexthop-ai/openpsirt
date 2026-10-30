@@ -61,19 +61,26 @@ A package whose tests share starting rows declares them once as a seeded
 template: a function filling a migrated, empty database and returning what tests
 need, such as an identifier or a secret shown once.
 
-| Engine | The seed runs |
-|---|---|
-| SQLite | Once per binary, into the template |
-| The three servers | Per test, after emptying |
+| Engine | The seed runs | A later test gets |
+|---|---|---|
+| SQLite | Once per binary, into the template | A copy of the template |
+| The three servers | Once per binary, in its first test, after emptying | The rows the seed wrote, read back after it ran and written again after emptying, in one transaction |
 
 | Rule | Reason |
 |---|---|
-| A test reads what the seed returns and never writes to it | On SQLite it is one value shared by parallel tests |
+| A test reads what the seed returns and never writes to it | It is one value shared by every test, and on SQLite by parallel tests |
+| Rows are written back with the identifiers they were read with | What the seed returned names them. Emptying leaves every engine's identifier counter past them, so a row a test adds takes a new one |
+| A table's rows are written back in identifier order, parents' tables first | A row referencing its own table follows the row it references |
+| A measurement runs the seed per test | Truncating starts a table's identifiers again on MySQL and MariaDB, under the identifiers kept |
+| A test holds every column of a written-back row to what the seed wrote: a moment to the microsecond, a date, both booleans, an absent value, text outside ASCII | A value the driver reads in one form and writes in another changes a seeded row on one engine only |
+| The API package's seed is written back, never run, after its first test | About a hundred transactions: 157 ms a test on PostgreSQL and 71 ms on MySQL |
 | The API package's fixture is a seeded template | Two products, eighteen people, their decisions and grants: per test it was 27% of the package's processor time under the detector |
 
 A test needing a product, its branches and tags, its variants and a build takes
-them from one shared default world, seeded per test or into a template. A test
-needing a second product declares it on that world.
+them from one shared default world, a seeded template of its own or part of a
+package's. A test needing a second product declares it on that world. Each test
+gets its own copy of the world's rows as values, so changing one reaches no
+other test.
 
 | The default world holds | So that |
 |---|---|

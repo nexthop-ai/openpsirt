@@ -466,10 +466,7 @@ func TestTwoUploadsTogetherCannotBothTakeTheLastRoom(t *testing.T) {
 				close(both)
 			}
 			mu.Unlock()
-			select {
-			case <-both:
-			case <-time.After(2 * time.Second):
-			}
+			dbtest.UntilLockWait(t.Context(), db, both, 2*time.Second)
 		})
 
 		errs := make(chan error, 2)
