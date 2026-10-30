@@ -101,18 +101,16 @@ const covers = `("lr"."rule_folded" IS NULL OR EXISTS (SELECT 1 FROM "vulnerabil
 	AND ("lr"."prefix" IS NULL OR "lr"."prefix" = "ar"."path"
 		OR SUBSTR("ar"."path", 1, "lr"."under_length") = "lr"."under")`
 
-// ruled is whether an approved suppression rule in use in the product bound
-// covers the finding under "f", whose result is under "ar".
+// ruledIn is whether an approved suppression rule in use in the product bound
+// covers the finding under "f", whose result is under "ar". It binds the
+// product's arguments once.
 //
 // A rule naming an analyzer rule and no path covers nothing once the rule is
 // found to find memory safety or injection flaws, which are judged one code finding
 // at a time.
-var ruled = ruledIn("?")
-
-// ruledIn is ruled in the product the expression given names.
-func ruledIn(product string) string {
+func ruledIn(product productBound) string {
 	return `EXISTS (SELECT 1 FROM "suppression_rule" AS "lr"
-	WHERE "lr"."product_id" = ` + product + ` AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL
+	WHERE "lr"."product_id" = ` + product.sql + ` AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL
 	  AND ` + covers + `
 	  AND ("lr"."prefix" IS NOT NULL OR "lr"."rule_folded" IS NULL OR NOT EXISTS (
 		SELECT 1 FROM "rule_rating" AS "rb" WHERE "rb"."vulnerability_id" = "f"."vulnerability_id"

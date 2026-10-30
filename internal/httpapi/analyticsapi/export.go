@@ -293,15 +293,15 @@ func withCodeFindings(by core.Narrowing, at core.AtOneBuild) core.Stated {
 // no row.
 func codeFindingRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
 	return func(ctx context.Context, limit, offset int) ([][]string, error) {
-		queue, err := analysis.OpenCodeFindingsOf(ctx, in.DB.DB, subject, scope, limit, offset)
+		open, err := analysis.OpenCodeFindingsOf(ctx, in.DB.DB, subject, scope, limit, offset)
 		if errors.Is(err, access.ErrDenied) {
 			return nil, nil
 		}
 		if err != nil {
 			return nil, err
 		}
-		rows := make([][]string, 0, len(queue.Rows))
-		for _, r := range queue.Rows {
+		rows := make([][]string, 0, len(open))
+		for _, r := range open {
 			cells := codeFindingCells(r)
 			if product != "" {
 				cells = append([]string{product}, cells...)

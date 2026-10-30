@@ -5,6 +5,8 @@ package httpapi_test
 
 import (
 	"encoding/csv"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"sort"
@@ -43,9 +45,40 @@ func (l acrossListed) rows() []string {
 	return out
 }
 
+// summed reads the queue across products as the security testing reader,
+// with the query given, and holds it to the rows wanted, and its waiting and
+// ruled counts to those wanted and to the sum of each product's own.
+func summed(t *testing.T, r *httpapitest.Reach, want []string, query string, waiting, ruled int) {
+	t.Helper()
+	var across, mine, theirs acrossListed
+	httpapitest.Read(t, r, "security-testing-reader", acrossQueue+query, &across)
+	httpapitest.Read(t, r, "security-testing-reader", "/v1/products/mine/code-findings"+query, &mine)
+	httpapitest.Read(t, r, "security-testing-reader", "/v1/products/theirs/code-findings"+query, &theirs)
+	if !slices.Equal(across.rows(), want) {
+		t.Errorf("across products %s lists %v; want %v", query, across.rows(), want)
+	}
+	if across.Waiting != waiting || across.Ruled != ruled ||
+		across.Waiting != mine.Waiting+theirs.Waiting || across.Ruled != mine.Ruled+theirs.Ruled {
+		t.Errorf("across products %s waits %d and ruled %d; want %d and %d, and the products sum to %d and %d",
+			query, across.Waiting, across.Ruled, waiting, ruled, mine.Waiting+theirs.Waiting, mine.Ruled+theirs.Ruled)
+	}
+	for state, n := range across.States {
+		if n != mine.States[state]+theirs.States[state] {
+			t.Errorf("%d %s across products %s; the two products count %d and %d", n, state, query,
+				mine.States[state], theirs.States[state])
+		}
+	}
+}
+
 // readsSecurityTestingIn grants one of the cast security testing reading in a
 // product.
 func readsSecurityTestingIn(t *testing.T, r *httpapitest.Reach, who, product string) {
+	t.Helper()
+	grantIn(t, r, who, product, access.SecurityTestingRead)
+}
+
+// grantIn grants one of the cast a role in a product.
+func grantIn(t *testing.T, r *httpapitest.Reach, who, product string, role access.Role) {
 	t.Helper()
 	ctx := t.Context()
 	person, err := r.Rights.ByIdentity(ctx, who)
@@ -56,7 +89,7 @@ func readsSecurityTestingIn(t *testing.T, r *httpapitest.Reach, who, product str
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Rights.GrantRole(ctx, person.ID, named.ID, access.SecurityTestingRead); err != nil {
+	if err := r.Rights.GrantRole(ctx, person.ID, named.ID, role); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -143,6 +176,65 @@ func TestTheQueueAcrossProductsListsEveryProductReadAsItsOwnQueueDoes(t *testing
 		if !slices.Equal(filed, both) {
 			t.Errorf("the file across products holds %v; want %v", filed, both)
 		}
+
+		// Each row's state, wait and rule are its own product's. The same
+		// rule at the same place is a code finding in each product, so a
+		// decision or a rule read in the wrong product moves the other's row,
+		// or leaves its own where it was. Each step has a decision or rule in
+		// one product the other lacks, in both directions.
+		leaks := map[string]string{}
+		for _, each := range across.Items {
+			if each.Rule == "clang-tidy/leak" {
+				leaks[each.Product] = each.Occurrence
+			}
+		}
+		if len(leaks) != 2 {
+			t.Fatalf("the queue across products lists the leak in %v; want mine and theirs", leaks)
+		}
+		grantIn(t, r, "security-testing-triager", "theirs", access.SecurityTestingTriage)
+		grantIn(t, r, "security-testing-reviewer", "theirs", access.SecurityTestingRead)
+		grantIn(t, r, "security-testing-reviewer", "theirs", access.Approver)
+		dismiss := func(product, at string) int64 {
+			t.Helper()
+			got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost,
+				"/v1/products/"+product+"/branches-and-tags/master/variants/"+at+"/code-findings/"+leaks[product]+"/decision",
+				`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
+			var decided struct {
+				DecisionID int64 `json:"decision_id"`
+			}
+			if got.Code != http.StatusCreated || json.Unmarshal(got.Body.Bytes(), &decided) != nil {
+				t.Fatalf("the dismissal in %s answered %d: %s", product, got.Code, got.Body)
+			}
+			return decided.DecisionID
+		}
+		rest := []string{"mine cppcheck/bad", "mine semgrep/bad"}
+
+		dismiss("mine", "broadcom")
+		summed(t, r, append(rest, "theirs clang-tidy/leak"), "", 1, 0)
+		waiting := dismiss("theirs", "mellanox")
+		summed(t, r, rest, "", 2, 0)
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/decisions/%d/approval", waiting), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving the dismissal in theirs answered %d: %s", got.Code, got.Body)
+		}
+		summed(t, r, rest, "", 1, 0)
+		summed(t, r, []string{"theirs clang-tidy/leak"}, "?state=dismissed", 1, 0)
+
+		rule := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost,
+			"/v1/products/mine/suppression-rules",
+			`{"rule":"clang-tidy/leak","prefix":"src/a.c","reason":"false_positive","reasoning":"every allocation here is pooled"}`)
+		var proposed struct {
+			ID int64 `json:"id"`
+		}
+		if rule.Code != http.StatusCreated || json.Unmarshal(rule.Body.Bytes(), &proposed) != nil {
+			t.Fatalf("proposing the rule answered %d: %s", rule.Code, rule.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/products/mine/suppression-rules/%d/approval", proposed.ID), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving the rule answered %d: %s", got.Code, got.Body)
+		}
+		summed(t, r, rest, "", 0, 1)
+		summed(t, r, []string{"mine clang-tidy/leak", "theirs clang-tidy/leak"}, "?state=dismissed", 0, 1)
 	})
 }
 

@@ -284,12 +284,12 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			About:  []core.Stated{{Label: "lists", Value: listedAs(input.State, input.Assigned == finding.HeldByNobody, scope, input.Beneath)}},
 			Header: codeFindingColumns(),
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				queue, err := analysis.CodeFindingsOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
+				page, err := analysis.CodeFindingPageOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
 					limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				listed, err := codeFindingRows(ctx, in, queue.Rows)
+				listed, err := codeFindingRows(ctx, in, page)
 				if err != nil {
 					return nil, err
 				}
@@ -402,12 +402,12 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 			},
 			Header: codeFindingColumns(),
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				queue, err := analysis.CodeFindingsOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
+				page, err := analysis.CodeFindingPageOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
 					limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				listed, err := codeFindingRows(ctx, in, queue.Rows)
+				listed, err := codeFindingRows(ctx, in, page)
 				if err != nil {
 					return nil, err
 				}

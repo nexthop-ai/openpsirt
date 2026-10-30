@@ -22,12 +22,13 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
-// waitingDecision is whether a decision at the occurrence of the finding under "f", in
-// the product the expression given names, waits for a second person. A code finding somebody has already
-// judged is not work for the next person to take.
-func waitingDecision(product string) string {
+// waitingDecision is whether a decision at the occurrence of the finding under
+// "f", in the product bound, waits for a second person. It binds the product's
+// arguments once. A code finding somebody has already judged is not work for
+// the next person to take.
+func waitingDecision(product productBound) string {
 	return `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
-	WHERE "dc"."product_id" = ` + product + ` AND "dc"."live_key" IS NOT NULL
+	WHERE "dc"."product_id" = ` + product.sql + ` AND "dc"."live_key" IS NOT NULL
 	  AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `
 	  AND "dc"."state" = '` + string(triage.Proposed) + `'
 	  AND "dc"."needs_approval" = TRUE AND "dc"."sent_back_at" IS NULL)`
@@ -263,23 +264,42 @@ type Queue struct {
 // security severity for the rule, its precision, then newest first.
 func CodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {
-	return codeFindingsOf(ctx, db, subject, scope, want, false, limit, offset)
+	return codeFindingsOf(ctx, db, subject, scope, want, false, true, limit, offset)
 }
 
-// OpenCodeFindingsOf is one page of the code findings a findings file holds: every open code finding
-// of the selection, the ones a decision waits on included, as the file's findings
-// rows include a finding a decision waits on. A code finding open only in releases past
-// their end of life is left out, as the queue leaves it out. Ordered as the
-// queue is.
+// CodeFindingPageOf is the rows of one page of CodeFindingsOf, with none of
+// its counts. A file is read a page at a time, and each count covers the
+// whole population, so counting on every page costs the file pages times the
+// population.
+func CodeFindingPageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
+	limit, offset int) ([]QueueRow, error) {
+	queue, err := codeFindingsOf(ctx, db, subject, scope, want, false, false, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return queue.Rows, nil
+}
+
+// OpenCodeFindingsOf is the rows of one page of the code findings a findings
+// file holds, with none of the queue's counts: every open code finding of the
+// selection, the ones a decision waits on included, as the file's findings
+// rows include a finding a decision waits on. A code finding open only in
+// releases past their end of life is left out, as the queue leaves it out.
+// Ordered as the queue is.
 func OpenCodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
-	limit, offset int) (*Queue, error) {
-	return codeFindingsOf(ctx, db, subject, scope, "", true, limit, offset)
+	limit, offset int) ([]QueueRow, error) {
+	queue, err := codeFindingsOf(ctx, db, subject, scope, "", true, false, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return queue.Rows, nil
 }
 
 // codeFindingsOf is CodeFindingsOf, with the open code findings a decision waits on kept in where
-// waiting is set and no state is named.
+// waiting is set and no state is named, and the counts read only where
+// counted is set.
 func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
-	waiting bool, limit, offset int) (*Queue, error) {
+	waiting, counted bool, limit, offset int) (*Queue, error) {
 
 	// Across products the scope names only products the reader reads
 	// security testing work in, and each row is narrowed to what they read
@@ -323,38 +343,40 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	}
 
 	out := &Queue{ByState: map[State]int{}}
-	var counted []struct {
-		State        State `bun:"stands"`
-		Awaits       int   `bun:"awaits"`
-		Covered      int   `bun:"covered"`
-		CodeFindings int   `bun:"code_findings"`
-	}
-	if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding()).
-		ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
-		GroupExpr(`"l"."stands", "l"."awaits", "l"."covered"`).
-		Scan(ctx, &counted); err != nil {
-		return nil, fmt.Errorf("count the code findings of product %d: %w", scope.ProductID, err)
-	}
-	for _, c := range counted {
-		out.ByState[c.State] += c.CodeFindings
-		if c.State == Open && c.Awaits == 1 {
-			out.Waiting += c.CodeFindings
+	if counted {
+		var byState []struct {
+			State        State `bun:"stands"`
+			Awaits       int   `bun:"awaits"`
+			Covered      int   `bun:"covered"`
+			CodeFindings int   `bun:"code_findings"`
 		}
-		if c.State == Dismissed && c.Covered == 1 {
-			out.Ruled += c.CodeFindings
+		if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding()).
+			ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
+			GroupExpr(`"l"."stands", "l"."awaits", "l"."covered"`).
+			Scan(ctx, &byState); err != nil {
+			return nil, fmt.Errorf("count the code findings of product %d: %w", scope.ProductID, err)
 		}
-	}
-	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
-		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &out.Total); err != nil {
-		return nil, fmt.Errorf("count the code findings listed in product %d: %w", scope.ProductID, err)
-	}
-	if want == "" && len(ended) > 0 {
-		var all int
-		if err := queued(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
-			ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &all); err != nil {
-			return nil, fmt.Errorf("count the code findings of product %d past their end of life: %w", scope.ProductID, err)
+		for _, c := range byState {
+			out.ByState[c.State] += c.CodeFindings
+			if c.State == Open && c.Awaits == 1 {
+				out.Waiting += c.CodeFindings
+			}
+			if c.State == Dismissed && c.Covered == 1 {
+				out.Ruled += c.CodeFindings
+			}
 		}
-		out.Ended = all - out.Total
+		if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
+			ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &out.Total); err != nil {
+			return nil, fmt.Errorf("count the code findings listed in product %d: %w", scope.ProductID, err)
+		}
+		if want == "" && len(ended) > 0 {
+			var all int
+			if err := queued(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
+				ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &all); err != nil {
+				return nil, fmt.Errorf("count the code findings of product %d past their end of life: %w", scope.ProductID, err)
+			}
+			out.Ended = all - out.Total
+		}
 	}
 
 	var page []struct {
@@ -449,8 +471,8 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
 		ColumnExpr(precisionRank+` AS "precise"`).
 		ColumnExpr(state+` AS "stands"`, stateArgs...).
-		ColumnExpr(`CASE WHEN `+waitingDecision(bound.sql)+` THEN 1 ELSE 0 END AS "awaits"`, bound.args...).
-		ColumnExpr(`CASE WHEN `+ruledIn(bound.sql)+` THEN 1 ELSE 0 END AS "covered"`, bound.args...).
+		ColumnExpr(`CASE WHEN `+waitingDecision(bound)+` THEN 1 ELSE 0 END AS "awaits"`, bound.times(1)...).
+		ColumnExpr(`CASE WHEN `+ruledIn(bound)+` THEN 1 ELSE 0 END AS "covered"`, bound.times(1)...).
 		Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
 			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."build_id" = "f"."build_id"
 			  AND "fo"."closed_at" IS NULL))`).
