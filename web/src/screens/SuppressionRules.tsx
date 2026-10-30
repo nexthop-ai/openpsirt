@@ -12,7 +12,7 @@ import {
   type CodeFindingReason,
   type SuppressionRule,
 } from "../api/codeFindings";
-import { codeFindingsAt } from "../app/routes";
+import { analyticsReportAt, codeFindingsAt } from "../app/routes";
 import { Editor } from "../ui/Editor";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -35,7 +35,8 @@ export function SuppressionRules() {
       <div className="screen-head">
         <h2>Suppression rules</h2>
         <p>
-          Code findings in <Link to={codeFindingsAt(product)}>{product}</Link>
+          Code findings in <Link to={codeFindingsAt(product)}>{product}</Link> ·{" "}
+          <Link to={analyticsReportAt("analyzer-precision")}>Analyzer precision</Link>
         </p>
       </div>
       <Rules product={product} triages={triages} agrees={agrees} />

@@ -50,7 +50,7 @@ own. The catalog screen also holds the files reachable nowhere else.
 | Program | Program overview, backlog over time, deadline compliance, effort by component |
 | Controls | Approval quality, the exception report, standing corrections, administrative changes |
 | Coverage | Last upload per build, unmatched components, carried patches |
-| Security testing | Code findings by analyzer, code findings over time; listed only to a reader of security testing material in some product |
+| Security testing | Code findings by analyzer, code findings over time, time to judge, time to fix, analyzer precision, analysis coverage, code findings by release (`design-docs/analysis-figures.md`); listed only to a reader of security testing material in some product |
 | Releases | Release comparison, release readiness, releases out of support |
 | Records | Disposition register, advisories issued |
 | Also on screens | Assignments (holder workload), Disclosure deadlines (what is running out of embargo), planned upgrades (what a build waits on) |

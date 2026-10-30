@@ -3,7 +3,7 @@
 
 import { Link } from "react-router-dom";
 import { useCodeFindingSeries, type CodeFindingState } from "../../api/codeFindings";
-import { codeFindingsAt } from "../../app/routes";
+import { analyticsReportAt, codeFindingsAt } from "../../app/routes";
 import { useWho } from "../../app/session";
 import { counted as reading, heldLine, holding } from "../../app/families";
 import { useScope } from "../../app/scope";
@@ -67,6 +67,12 @@ export function CodeFindingSeries() {
         <section className="panel">
           <p className="hint" style={{ marginTop: 0 }}>
             Every build of the product. A code finding on two builds in two states counts in both.
+          </p>
+          <p className="hint">
+            How noisy each is:{" "}
+            <Link to={analyticsReportAt("analyzer-precision")}>Analyzer precision</Link>. Whether
+            each still runs:{" "}
+            <Link to={analyticsReportAt("analysis-coverage")}>Analysis coverage</Link>.
           </p>
           <Wide>
             <table>

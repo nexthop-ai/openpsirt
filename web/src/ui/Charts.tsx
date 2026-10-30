@@ -397,8 +397,13 @@ export function Across({ releases }: { releases: Release[] }) {
 // reason this axis exists.
 export function Releases({
   points,
+  counts = "open issues",
+  each = "open",
 }: {
   points: { branch_or_tag?: string; branch_or_tag_name?: string; open?: number; cut?: string }[];
+  // What the bars count, for the chart's label and each bar's tooltip.
+  counts?: string;
+  each?: string;
 }) {
   if (points.length === 0) return null;
   const W = 560,
@@ -415,7 +420,7 @@ export function Releases({
       viewBox={`0 0 ${W} ${H + 34}`}
       className="chart"
       role="img"
-      aria-label="Open issues in each release"
+      aria-label={`${counts.charAt(0).toUpperCase()}${counts.slice(1)} in each release`}
     >
       {[0, 0.5, 1].map((f) => (
         <line
@@ -447,7 +452,7 @@ export function Releases({
             >
               <title>
                 {point.branch_or_tag_name || point.branch_or_tag}:{" "}
-                {(point.open ?? 0).toLocaleString()} open
+                {(point.open ?? 0).toLocaleString()} {each}
               </title>
             </rect>
             {/* Every release is named. A tick every other bar would leave

@@ -64,9 +64,11 @@ type CodeFindingsAsked = {
 };
 
 // The narrowing as the query a request carries, with nothing for what is unset.
-export function codeFindingsQuery(asked: CodeFindingsAsked): Record<string, string> {
+export function codeFindingsQuery<T extends string | number>(
+  asked: Record<string, T | undefined>,
+): Record<string, T> {
   return Object.fromEntries(
-    Object.entries(asked).filter((entry): entry is [string, string] => !!entry[1]),
+    Object.entries(asked).filter((entry): entry is [string, T] => !!entry[1]),
   );
 }
 
@@ -416,5 +418,117 @@ export function useIncludeCodeFinding(build: Build, occurrence: string) {
           : await api.DELETE(path, { params: { path: { ...build, occurrence } } }),
       ),
     onSuccess: after,
+  });
+}
+
+type CodeFindingJudging = Body<"CodeFindingJudgingBody">;
+type CodeFindingFixing = Body<"CodeFindingFixingBody">;
+export type CodeFindingWaits = Body<"CodeFindingWaitsBody">;
+type CodeFindingPrecision = Body<"CodeFindingPrecisionBody">;
+export type CodeFindingAnswered = Body<"CodeFindingAnsweredBody">;
+export type AnalysisCoverage = Body<"AnalysisCoverageBody">;
+export type Analyzed = Body<"AnalyzedBody">;
+type CodeFindingRelease = Body<"CodeFindingReleaseBody">;
+
+// The narrowing a security testing figure takes, as its request carries it:
+// the queue's narrowing but the state and the holder, and the weeks where
+// the figure covers a window.
+export type CodeFindingFigureAsked = Omit<CodeFindingsAsked, "state" | "assigned"> & {
+  weeks?: number;
+};
+
+// A security testing figure, asked only where the reader reads security
+// testing material in the product, because a count not drawn is not asked
+// for.
+export function useCodeFindingJudging(
+  product: string,
+  asked: CodeFindingFigureAsked,
+  enabled: boolean,
+): UseQueryResult<CodeFindingJudging> {
+  return useQuery({
+    enabled,
+    queryKey: ["code-findings", product, "time-to-judge", asked],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/code-finding-time-to-judge", {
+          params: { path: { product }, query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+export function useCodeFindingFixing(
+  product: string,
+  asked: CodeFindingFigureAsked,
+  enabled: boolean,
+): UseQueryResult<CodeFindingFixing> {
+  return useQuery({
+    enabled,
+    queryKey: ["code-findings", product, "time-to-fix", asked],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/code-finding-time-to-fix", {
+          params: { path: { product }, query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+export function useCodeFindingPrecision(
+  product: string,
+  asked: CodeFindingFigureAsked,
+  enabled: boolean,
+): UseQueryResult<CodeFindingPrecision> {
+  return useQuery({
+    enabled,
+    queryKey: ["code-findings", product, "precision", asked],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/code-finding-precision", {
+          params: { path: { product }, query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+export function useAnalysisCoverage(
+  product: string,
+  asked: Pick<CodeFindingFigureAsked, "branch_or_tag" | "variant" | "series" | "method" | "weeks">,
+  enabled: boolean,
+): UseQueryResult<AnalysisCoverage> {
+  return useQuery({
+    enabled,
+    queryKey: ["code-findings", product, "coverage", asked],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/analysis-coverage", {
+          params: { path: { product }, query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+export function useCodeFindingsByRelease(
+  product: string,
+  asked: Pick<
+    CodeFindingFigureAsked,
+    "variant" | "series" | "method" | "component" | "component_version"
+  > & { releases?: number },
+  enabled: boolean,
+): UseQueryResult<{ releases: CodeFindingRelease[] }> {
+  return useQuery({
+    enabled,
+    queryKey: ["code-findings", product, "by-release", asked],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/code-findings-by-release", {
+          params: { path: { product }, query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
   });
 }

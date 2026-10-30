@@ -15,7 +15,9 @@ import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
 import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
-import { uploadsAt } from "../../app/routes";
+import { analyticsReportAt, uploadsAt } from "../../app/routes";
+import { holding } from "../../app/families";
+import { useWho } from "../../app/session";
 
 // The builds being scanned, and the ones that have gone silent.
 //
@@ -36,6 +38,9 @@ const SHOWN = 200;
 export function LastUploads() {
   const at = useScope();
   const opener = useRowOpener();
+  // Inventories are judged here; analyzer runs on Analysis coverage, which
+  // only a reader of security testing material somewhere reaches.
+  const analyzes = holding(useWho().data, "code").held !== "nowhere";
   const scope = scopeQuery(at);
   const uploads = useQuery({
     queryKey: ["last-uploads", "report", scope],
@@ -110,6 +115,12 @@ export function LastUploads() {
               Download <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
               <a href={fileAt("json", asked)}>JSON</a>
             </p>
+            {analyzes && (
+              <p className="hint">
+                Analyzer runs, each against its own interval:{" "}
+                <Link to={analyticsReportAt("analysis-coverage")}>Analysis coverage</Link>
+              </p>
+            )}
           </section>
 
           <section className="panel" style={{ marginTop: 14 }}>

@@ -10,6 +10,10 @@ import { LastUploads } from "./LastUploads";
 import { Effort } from "./Effort";
 import { CodeFindingSeries } from "./CodeFindingSeries";
 import { CodeFindingTrend } from "./CodeFindingTrend";
+import { TimeToFix, TimeToJudge } from "./CodeFindingTiming";
+import { CodeFindingsByRelease } from "./CodeFindingsByRelease";
+import { AnalysisCoverage } from "./AnalysisCoverage";
+import { AnalyzerPrecision } from "./AnalyzerPrecision";
 import { Overview } from "./Overview";
 import { Published } from "./Published";
 import { Register } from "./Register";
@@ -30,6 +34,11 @@ export const PAGES: Record<string, ReactElement> = {
   "last-upload-per-build": <LastUploads />,
   "code-findings-by-analyzer": <CodeFindingSeries />,
   "code-findings-over-time": <CodeFindingTrend />,
+  "time-to-judge": <TimeToJudge />,
+  "time-to-fix": <TimeToFix />,
+  "analyzer-precision": <AnalyzerPrecision />,
+  "analysis-coverage": <AnalysisCoverage />,
+  "code-findings-by-release": <CodeFindingsByRelease />,
   "releases-out-of-support": <Support />,
   "approval-quality": <Scrutiny />,
   "deadline-compliance": <Compliance />,
