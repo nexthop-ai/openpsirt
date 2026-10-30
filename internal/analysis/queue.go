@@ -71,6 +71,10 @@ type Scope struct {
 	// build. Nil, no narrowing.
 	Beneath *int64
 	BuildID *int64
+	// adopted is the components a rescan replaced whose live namesake is
+	// beneath Beneath, read once by resolved: a code finding on one is
+	// beneath it as well.
+	adopted []int64
 	// on keeps the code findings on BuildID placed on these components, for
 	// counting what sits on each.
 	on []int64
@@ -103,6 +107,14 @@ func (scope Scope) resolved(ctx context.Context, db bun.IDB) (Scope, error) {
 		}
 		if root {
 			scope.Beneath = nil
+		} else {
+			replaced, err := replacedIn(ctx, db, *scope.BuildID)
+			if err != nil {
+				return scope, err
+			}
+			if scope.adopted, err = replacedWithin(ctx, db, *scope.BuildID, *scope.Beneath, replaced); err != nil {
+				return scope, err
+			}
 		}
 	}
 	return scope, nil
@@ -427,7 +439,8 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		if scope.Beneath != nil {
 			// The subtree as the engine walks it. Under the build's root it
 			// is the whole build, which resolved has made no narrowing.
-			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAny(db, *scope.BuildID, []int64{*scope.Beneath}))
+			cond, args := beneathOrAdopted(db, *scope.BuildID, *scope.Beneath, scope.adopted)
+			q = q.Where(cond, args...)
 		}
 		if scope.on != nil {
 			q = q.Where(`"f"."component_id" IN (?)`, bun.List(scope.on))

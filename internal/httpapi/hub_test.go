@@ -497,6 +497,53 @@ func TestACodeFindingOnAReplacedVersionStaysOnItsName(t *testing.T) {
 	})
 }
 
+func TestTheTreeCountsACodeFindingOnAReplacedVersionAtItsComponent(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.HubCodeFindings(t, r)
+		// cppcheck's code finding stays on zlib1g 1.3 after the build ships
+		// 1.4, and the tree counts it at zlib1g as the card does.
+		httpapitest.HubZlibRescanned(t, r)
+		root, items := hubTree(t, r)
+		if got := root.counts(); got != [2]int{1, 3} {
+			t.Errorf("the root carries %v; want 1 on it and the build's 3 beneath", got)
+		}
+		if got := items["libmine1"]; got != [2]int{1, 2} {
+			t.Errorf("the library carries %v; want 1 on it and 2 beneath, the compression library's included", got)
+		}
+		var around struct {
+			Below []hubNode `json:"below"`
+		}
+		httpapitest.Read(t, r, "security-testing-reader", hubBuild+"/components/libmine1/around?code_findings=true", &around)
+		if len(around.Below) != 1 || around.Below[0].counts() != [2]int{1, 1} {
+			t.Errorf("below the library is %+v; want the compression library carrying its one", around.Below)
+		}
+		var found struct {
+			Items []hubNode `json:"items"`
+		}
+		httpapitest.Read(t, r, "security-testing-reader", hubBuild+"/components?q=zlib&code_findings=true", &found)
+		if len(found.Items) != 1 || found.Items[0].counts() != [2]int{1, 1} {
+			t.Errorf("a search for zlib finds %+v; want the compression library carrying its one", found.Items)
+		}
+		build := "&branch_or_tag=master&variant=broadcom"
+		for beneath, want := range map[string][]string{
+			"zlib1g":      {"cppcheck/bad"},
+			"libmine1":    {"clang-tidy/leak", "cppcheck/bad"},
+			"sonic-image": {"clang-tidy/leak", "cppcheck/bad", "semgrep/bad"},
+			"mine-tools":  nil,
+		} {
+			if got := hubQueueOf(t, r, "security-testing-reader", "?beneath="+beneath+build); !sameRules(got.rules(), want) || got.Total != len(want) {
+				t.Errorf("beneath %s lists %v, %d in all; want %v", beneath, got.rules(), got.Total, want)
+			}
+		}
+		if got := hubNotFixed(t, r, "zlib1g"); got != 1 {
+			t.Errorf("the compression library's trend counts %d not fixed; want its one", got)
+		}
+		if got := hubNotFixed(t, r, "libmine1"); got != 2 {
+			t.Errorf("the library's trend counts %d not fixed; want 2", got)
+		}
+	})
+}
+
 func TestANameReachesOnlyWhatTheProductsBuildsShip(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.HubCodeFindings(t, r)

@@ -114,9 +114,10 @@ func CountsOfComponent(ctx context.Context, db bun.IDB, subject access.Subject, 
 
 // OpenOn is the open code findings one build places on each of these
 // components, by occurrence, where the subject may read them; nil components
-// is every component of the build. Refused to anybody who does not read
-// security testing material in the product, as every count of code findings
-// is.
+// is every component of the build. A component counts as well the code
+// findings on every version of it a rescan replaced, which no node of the
+// build holds. Refused to anybody who does not read security testing material
+// in the product, as every count of code findings is.
 func OpenOn(ctx context.Context, db bun.IDB, subject access.Subject, productID, buildID int64,
 	components []int64) (map[int64][]string, error) {
 
@@ -131,21 +132,61 @@ func OpenOn(ctx context.Context, db bun.IDB, subject access.Subject, productID, 
 	if err != nil {
 		return nil, err
 	}
-	var rows []struct {
-		ComponentID int64  `bun:"component_id"`
-		Occurrence  string `bun:"occurrence_identity"`
+	read := func(on []int64) (map[int64][]string, error) {
+		var rows []struct {
+			ComponentID int64  `bun:"component_id"`
+			Occurrence  string `bun:"occurrence_identity"`
+		}
+		scope := Scope{ProductID: productID, BuildID: &buildID, on: on}
+		if err := db.NewSelect().
+			TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+			ColumnExpr(`"l"."component_id", "l"."occurrence_identity"`).
+			Where(`"l"."stands" = ?`, string(Open)).
+			GroupExpr(`"l"."component_id", "l"."occurrence_identity"`).
+			Scan(ctx, &rows); err != nil {
+			return nil, fmt.Errorf("read the open code findings on components of build %d: %w", buildID, err)
+		}
+		got := map[int64][]string{}
+		for _, row := range rows {
+			got[row.ComponentID] = append(got[row.ComponentID], row.Occurrence)
+		}
+		return got, nil
 	}
-	scope := Scope{ProductID: productID, BuildID: &buildID, on: components}
-	if err := db.NewSelect().
-		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
-		ColumnExpr(`"l"."component_id", "l"."occurrence_identity"`).
-		Where(`"l"."stands" = ?`, string(Open)).
-		GroupExpr(`"l"."component_id", "l"."occurrence_identity"`).
-		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read the open code findings on components of build %d: %w", buildID, err)
+	if out, err = read(components); err != nil {
+		return nil, err
 	}
-	for _, row := range rows {
-		out[row.ComponentID] = append(out[row.ComponentID], row.Occurrence)
+	replaced, err := replacedIn(ctx, db, buildID)
+	if err != nil || len(replaced) == 0 {
+		return out, err
+	}
+	asked := map[int64]bool{}
+	for _, id := range components {
+		asked[id] = true
+	}
+	var wanted []int64
+	for id, live := range replaced {
+		for _, l := range live {
+			if components == nil || asked[l] {
+				wanted = append(wanted, id)
+				break
+			}
+		}
+	}
+	on := out
+	if components != nil {
+		if len(wanted) == 0 {
+			return out, nil
+		}
+		if on, err = read(wanted); err != nil {
+			return nil, err
+		}
+	}
+	for _, id := range wanted {
+		for _, l := range replaced[id] {
+			if components == nil || asked[l] {
+				out[l] = append(out[l], on[id]...)
+			}
+		}
 	}
 	return out, nil
 }
@@ -196,7 +237,16 @@ func TrendBeneath(ctx context.Context, db bun.IDB, subject access.Subject, produ
 		ColumnExpr(`"f"."occurrence_identity", "f"."opened_at", "f"."closed_at"`).
 		Where(`"f"."build_id" = ?`, buildID)
 	if !whole {
-		q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAny(db, buildID, []int64{beneath}))
+		replaced, err := replacedIn(ctx, db, buildID)
+		if err != nil {
+			return nil, err
+		}
+		adopted, err := replacedWithin(ctx, db, buildID, beneath, replaced)
+		if err != nil {
+			return nil, err
+		}
+		cond, args := beneathOrAdopted(db, buildID, beneath, adopted)
+		q = q.Where(cond, args...)
 	}
 	err = q.Where(kinds, kindArgs...).
 		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).

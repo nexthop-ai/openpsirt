@@ -143,6 +143,7 @@ as on it, worked out when read, never stored, because findings move.
 | For a reader not reading dependency findings in the product, rows carry no count or band and search hits are not said to be ordered by findings; one line says where they are read elsewhere (`design-docs/interface.md` § Families a reader holds) | A tree of zeros reads as a clean build |
 | For a reader of security testing material in the product, each row and search hit carries a code findings badge of its own: open code findings at it and under it, the whole build's on the root, opening the queue beneath it on the build. Asked for only then; held elsewhere, one line says so | The families are different units, so the badge sits beside the issue count, never added to it |
 | Under the root row, a line states how many open code findings are unplaced, on the build itself, every root it has had included, with a link to Repositories, zero included | Code findings in files no repository holds sit on the root; a repository's settings are what place them |
+| A code finding on a version of a component a rescan replaced is counted on the row of the component's present version, and under every row above it | The card and the chooser count it by name, and the badge matches them (`design-docs/analysis-queue.md` § Queue file) |
 
 ## Tree search
 
