@@ -129,6 +129,7 @@ code finding, as case collaborators into a flaw (REQ-43,
 | Refused with 409 once disclosed; granted in one transaction with the flaw record read | |
 | In the trail, and the person told in a line their grant reaches | |
 | A case reader reads an included one in full | |
+| The person granted it finds it among their own cases while the flaw is undisclosed (`design-docs/access-disclosure.md` § Own cases) | |
 
 ## Limits
 

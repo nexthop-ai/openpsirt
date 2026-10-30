@@ -77,6 +77,9 @@ type WhoBody struct {
 	Audits   bool      `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
 	Kind     string    `json:"kind" enum:"person" doc:"Always a person. A pipeline key is refused this route"`
 	Reach    []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
+	// Collaborates says a screen has their own cases to ask for: a grant on
+	// one issue or one code finding reaches nothing in Reach.
+	Collaborates bool `json:"collaborates,omitempty" doc:"They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names"`
 	// Digest is the daily summary they asked for. Answered here because a
 	// screen offering the switches has to know their state, and because a
 	// person is the only one who decides them.
@@ -133,6 +136,7 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		body := WhoBody{
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{}, Outcomes: outcomeBodies(),
+			Collaborates: len(subject.CaseProducts()) > 0 || len(subject.CodeFindingProducts()) > 0,
 		}
 		// Each of these fails the answer rather than being left out. Omitted, a
 		// limit reads to the interface as no limit at all.

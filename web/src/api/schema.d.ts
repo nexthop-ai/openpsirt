@@ -6494,6 +6494,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/session/me/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List your cases
+         * @description Returns the cases the caller was brought into, one issue in one product each, and the code findings recorded as a flaw they were granted, one occurrence in one product each.
+         *
+         *     A code finding is listed while its flaw is undisclosed: disclosure ends the grant. A withdrawn grant is not listed. A pipeline key is refused with 403.
+         *
+         *     Requires: your own sign-in, as a person and not a pipeline key
+         */
+        get: operations["list-own-cases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/session/me/chat": {
         parameters: {
             query?: never;
@@ -12274,6 +12298,52 @@ export interface components {
              */
             waiting: number;
         };
+        OwnCaseBody: {
+            /** @description When they were brought in */
+            added_at: string;
+            /** @description The issue the case is about */
+            issue: string;
+            /** @description The product the case is in */
+            product: string;
+            /** @description The label shown for the product, where it differs from its name */
+            product_name?: string;
+        };
+        OwnCasesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/OwnCasesBody.json
+             */
+            readonly $schema?: string;
+            /** @description The cases they were brought into, newest first */
+            cases: components["schemas"]["OwnCaseBody"][] | null;
+            /** @description The code findings recorded as a flaw they were granted, newest first, while the flaw is undisclosed */
+            code_findings: components["schemas"]["OwnCodeFindingBody"][] | null;
+        };
+        OwnCodeFindingBody: {
+            /** @description When they were granted it */
+            added_at: string;
+            /** @description The branch or tag of the build the code finding was last seen in */
+            branch_or_tag: string;
+            /** @description The label shown for the branch or tag, where it differs from its name */
+            branch_or_tag_name?: string;
+            /** @description The flaw the code finding was recorded as */
+            flaw: string;
+            /** @description The code finding's occurrence identity */
+            occurrence: string;
+            /** @description The file the code finding is in */
+            path: string;
+            /** @description The product the code finding is in */
+            product: string;
+            /** @description The label shown for the product, where it differs from its name */
+            product_name?: string;
+            /** @description The rule that reported the code finding */
+            rule: string;
+            /** @description The variant of the build the code finding was last seen in */
+            variant: string;
+            /** @description The label shown for the variant, where it differs from its name */
+            variant_name?: string;
+        };
         PackageKindBody: {
             /** @description The package type as the package identifier spells it, such as deb, golang or pypi. What the findings list's ecosystem filter takes */
             kind: string;
@@ -15402,6 +15472,8 @@ export interface components {
             bulk_cap?: number;
             /** @description The chat platforms this deployment offers and what they chose, where it offers any */
             chat?: components["schemas"]["ChatBody"];
+            /** @description They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names */
+            collaborates?: boolean;
             /**
              * Format: int64
              * @description The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted
@@ -25941,6 +26013,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WhoBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-own-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnCasesBody"];
                 };
             };
             /** @description Error */

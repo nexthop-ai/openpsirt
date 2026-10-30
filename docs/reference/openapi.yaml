@@ -9077,6 +9077,100 @@ components:
         - undecided
         - waiting
       type: object
+    OwnCaseBody:
+      additionalProperties: false
+      properties:
+        added_at:
+          description: When they were brought in
+          type: string
+        issue:
+          description: The issue the case is about
+          type: string
+        product:
+          description: The product the case is in
+          type: string
+        product_name:
+          description: The label shown for the product, where it differs from its name
+          type: string
+      required:
+        - product
+        - issue
+        - added_at
+      type: object
+    OwnCasesBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/OwnCasesBody.json
+          format: uri
+          readOnly: true
+          type: string
+        cases:
+          description: The cases they were brought into, newest first
+          items:
+            $ref: "#/components/schemas/OwnCaseBody"
+          type:
+            - array
+            - "null"
+        code_findings:
+          description: The code findings recorded as a flaw they were granted, newest first, while the flaw is undisclosed
+          items:
+            $ref: "#/components/schemas/OwnCodeFindingBody"
+          type:
+            - array
+            - "null"
+      required:
+        - cases
+        - code_findings
+      type: object
+    OwnCodeFindingBody:
+      additionalProperties: false
+      properties:
+        added_at:
+          description: When they were granted it
+          type: string
+        branch_or_tag:
+          description: The branch or tag of the build the code finding was last seen in
+          type: string
+        branch_or_tag_name:
+          description: The label shown for the branch or tag, where it differs from its name
+          type: string
+        flaw:
+          description: The flaw the code finding was recorded as
+          type: string
+        occurrence:
+          description: The code finding's occurrence identity
+          type: string
+        path:
+          description: The file the code finding is in
+          type: string
+        product:
+          description: The product the code finding is in
+          type: string
+        product_name:
+          description: The label shown for the product, where it differs from its name
+          type: string
+        rule:
+          description: The rule that reported the code finding
+          type: string
+        variant:
+          description: The variant of the build the code finding was last seen in
+          type: string
+        variant_name:
+          description: The label shown for the variant, where it differs from its name
+          type: string
+      required:
+        - product
+        - branch_or_tag
+        - variant
+        - occurrence
+        - rule
+        - path
+        - flaw
+        - added_at
+      type: object
     PackageKindBody:
       additionalProperties: false
       properties:
@@ -14404,6 +14498,9 @@ components:
         chat:
           $ref: "#/components/schemas/ChatBody"
           description: The chat platforms this deployment offers and what they chose, where it offers any
+        collaborates:
+          description: They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names
+          type: boolean
         deferral_days:
           description: The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted
           format: int64
@@ -33313,6 +33410,33 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Describe the current subject
+      tags:
+        - Access
+      x-openpsirt-requires:
+        scope: self
+  /v1/session/me/cases:
+    get:
+      description: |-
+        Returns the cases the caller was brought into, one issue in one product each, and the code findings recorded as a flaw they were granted, one occurrence in one product each.
+
+        A code finding is listed while its flaw is undisclosed: disclosure ends the grant. A withdrawn grant is not listed. A pipeline key is refused with 403.
+
+        Requires: your own sign-in, as a person and not a pipeline key
+      operationId: list-own-cases
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnCasesBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List your cases
       tags:
         - Access
       x-openpsirt-requires:

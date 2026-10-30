@@ -25,6 +25,7 @@ func Register(api huma.API, in core.Deps) {
 	registerFindingDetail(api, in)
 	registerCodeFindings(api, in)
 	registerCodeFindingQueue(api, in)
+	registerOwnCases(api, in)
 	registerEntry(api, in)
 	registerDisclosure(api, in)
 	registerResolution(api, in)
