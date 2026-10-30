@@ -114,6 +114,7 @@ findings lists' read of open issues.
 | Unplaced is counted over the roots named as values | Asked of every code finding on the component, whether it was ever a root took 339 ms on MySQL 8.4 for the root's card at 16,000 components a build, against 23 ms as values |
 | Under a tree row is the union of the occurrences on everything the walk reaches from it, each once | A code finding placed on a library pulled in twice is one |
 | On the tree's root row are the code findings on every root the build has had, and under it every code finding of the build | The list the badge opens is the whole build |
+| A tree read reaching no component reads no code finding | The read takes no components as the whole build |
 | A chooser match counts what its name reaches in the match's builds, each code finding or issue once per name however many folds and binaries hold it | Joined once per binary, a kernel of ten binaries sorted ten rows for each it counted: 718 ms on PostgreSQL and 913 ms on MySQL 8.4 at 16,000 components a build, against 228 ms and 225 ms once per name |
 | A tree count is asked for only with `code_findings`; asked by a reader not reading security testing material, the read is refused | A count not drawn is not asked for |
 | The trend's line is not fixed: from opening until a person closes it as fixed; a decision answers a code finding and closes nothing, and absence closes nothing | Ruling a code finding not a problem keeps its record; the line counts what remains in the code |

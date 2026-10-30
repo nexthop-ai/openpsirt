@@ -590,6 +590,11 @@ func (s *Store) codeBeneath(ctx context.Context, buildID int64, reached []reachi
 		return nil, nil
 	}
 	out := &codeCounts{on: map[int64]int{}, beneath: map[int64]int{}}
+	// Nothing reached is nothing to count; the read below takes no
+	// components as the whole build.
+	if len(reached) == 0 {
+		return out, nil
+	}
 	root, roots, err := s.rootsOf(ctx, buildID)
 	if err != nil {
 		return nil, err
