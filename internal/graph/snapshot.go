@@ -109,6 +109,23 @@ type Applied struct {
 type Store struct {
 	db         bun.IDB
 	components *Components
+	// code counts the open code findings on components, where the reader
+	// asked for them beside the issues. Nil, none are counted.
+	code CodeCounter
+}
+
+// CodeCounter reads the open code findings one build places on each of these
+// components, by occurrence, narrowed to the reader; nil components is every
+// component of the build. The graph cannot read them itself: their state is
+// the analysis package's, which reads the graph.
+type CodeCounter func(ctx context.Context, buildID int64, components []int64) (map[int64][]string, error)
+
+// CountingCode is the store with every neighbor it answers carrying the open
+// code findings on it and beneath it as well, by the same walk as its issues.
+func (s *Store) CountingCode(counter CodeCounter) *Store {
+	counting := *s
+	counting.code = counter
+	return &counting
 }
 
 // NewStore returns a graph store over db.
@@ -674,6 +691,12 @@ type Neighbor struct {
 	// the count is the issues there, not the rows across every occurrence.
 	Findings int `bun:"findings"`
 	Beneath  int `bun:"beneath,scanonly"`
+	// CodeFindings and CodeBeneath are the open code findings on it, and on
+	// it and everything under it with each once, where the store counts code
+	// findings. A code finding is at one occurrence, so the union is of
+	// occurrences, as the issues' is of issues.
+	CodeFindings int `bun:"-"`
+	CodeBeneath  int `bun:"-"`
 	// BeneathBy is that same number by how the issues were rated. A node
 	// saying five thousand beneath it says nothing about whether any of it
 	// matters, which is exactly what somebody deciding where to descend is
@@ -769,7 +792,15 @@ func (s *Store) filledWith(ctx context.Context, productID, buildID int64,
 			ids = append(ids, row.ComponentID)
 		}
 	}
-	totals, err := s.beneath(ctx, productID, buildID, readable, ids, adopt)
+	reached, err := s.reach(ctx, buildID, ids, adopt)
+	if err != nil {
+		return err
+	}
+	totals, err := s.beneath(ctx, productID, buildID, readable, reached)
+	if err != nil {
+		return err
+	}
+	codes, err := s.codeBeneath(ctx, buildID, reached)
 	if err != nil {
 		return err
 	}
@@ -783,6 +814,10 @@ func (s *Store) filledWith(ctx context.Context, productID, buildID int64,
 			rows[i].Beneath = 0
 			for _, n := range bands {
 				rows[i].Beneath += n
+			}
+			if codes != nil {
+				rows[i].CodeFindings = codes.on[rows[i].ComponentID]
+				rows[i].CodeBeneath = codes.beneath[rows[i].ComponentID]
 			}
 		}
 	}
@@ -867,8 +902,81 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, buildID int64
 	}
 	root.Beneath = top[0].Beneath
 	root.BeneathBy = top[0].BeneathBy
+	root.CodeFindings, root.CodeBeneath = top[0].CodeFindings, top[0].CodeBeneath
 	ordered(kids)
 	return root, kids, nil
+}
+
+// IsRoot is whether a component is a build's root now.
+func IsRoot(ctx context.Context, db bun.IDB, buildID, componentID int64) (bool, error) {
+	root, err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."component_id" = ?`, componentID).
+		Where(`"n"."is_root" = ?`, true).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("ask whether component %d is the root of build %d: %w", componentID, buildID, err)
+	}
+	return root, nil
+}
+
+// Root is a component that was ever a build's root.
+type Root struct {
+	BuildID     int64 `bun:"build_id"`
+	ComponentID int64 `bun:"component_id"`
+	// Live is whether it is the build's root now.
+	Live bool `bun:"live"`
+}
+
+// RootsOf is every component that was ever the root of one of these builds,
+// the present ones included, each once per build.
+//
+// Read from the root index, which holds a build's roots apart from its other
+// nodes: a node is never deleted, so the build's whole history is otherwise
+// what the read walks.
+func RootsOf(ctx context.Context, db bun.IDB, buildIDs []int64) ([]Root, error) {
+	if len(buildIDs) == 0 {
+		return nil, nil
+	}
+	var rows []struct {
+		BuildID     int64 `bun:"build_id"`
+		ComponentID int64 `bun:"component_id"`
+		Live        int   `bun:"live"`
+	}
+	if err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."build_id", "n"."component_id"`).
+		ColumnExpr(`MAX(CASE WHEN "n"."closed_scan_id" IS NULL THEN 1 ELSE 0 END) AS "live"`).
+		Where(`"n"."build_id" IN (?)`, bun.List(buildIDs)).
+		Where(`"n"."is_root" = ?`, true).
+		GroupExpr(`"n"."build_id", "n"."component_id"`).
+		OrderExpr(`"n"."build_id", "n"."component_id"`).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read every root of %d builds: %w", len(buildIDs), err)
+	}
+	out := make([]Root, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, Root{BuildID: row.BuildID, ComponentID: row.ComponentID, Live: row.Live == 1})
+	}
+	return out, nil
+}
+
+// rootsOf is a build's root now, zero where nothing has been applied, and
+// every component that was ever its root, the present one included.
+func (s *Store) rootsOf(ctx context.Context, buildID int64) (int64, []int64, error) {
+	roots, err := RootsOf(ctx, s.db, []int64{buildID})
+	if err != nil {
+		return 0, nil, err
+	}
+	var live int64
+	ever := make([]int64, 0, len(roots))
+	for _, root := range roots {
+		ever = append(ever, root.ComponentID)
+		if root.Live {
+			live = root.ComponentID
+		}
+	}
+	return live, ever, nil
 }
 
 // describe reads one component as a neighbor of nothing, for the root.

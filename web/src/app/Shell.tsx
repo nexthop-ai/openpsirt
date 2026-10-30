@@ -9,12 +9,13 @@ import { initials } from "../ui/initials";
 import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { TO_THE_TOP, useTopOnArrival } from "./arrival";
-import { findingsPath, useScope, type Scoped } from "./scope";
+import { findingsPath, useScope } from "./scope";
 import {
   vulnerabilityReportsAt,
   uploadsAt,
   codeFindingsAt,
   issueAt,
+  componentSearchAt,
   branchesAndTagsAt,
   dependenciesAt,
   plannedUpgradesAt,
@@ -170,7 +171,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         </button>
         <Scope />
         <span className="spacer" />
-        <Search at={{ product, branch_or_tag: branchOrTag, variant }} />
+        <Search />
         <button
           type="button"
           className="topact"
@@ -595,7 +596,7 @@ function Rail({
 // Guessing from the shape of the text would be a second, worse copy of the
 // server's own name resolution — one that is wrong about every identifier a
 // deployment mints for itself.
-function Search({ at }: { at: Scoped }) {
+function Search() {
   const navigate = useNavigate();
   const [typed, setTyped] = useState("");
   const [looking, setLooking] = useState(false);
@@ -646,10 +647,11 @@ function Search({ at }: { at: Scoped }) {
               return;
             }
             // Not an issue anybody here carries, so it is a component
-            // search. The list answers that across every product a reader
-            // can see as readily as within one, so with no product picked the
-            // term still reaches a list rather than being dropped.
-            navigate(findingsPath(at, false, { q: term }));
+            // search: the components it names in the picker's selection,
+            // each with both families' counts, which lead to the component
+            // screen. With no product picked it is every product the reader
+            // reads.
+            navigate(componentSearchAt(term));
           })
           .catch(() => {
             setLooking(false);

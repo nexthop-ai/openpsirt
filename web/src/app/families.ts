@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { statusOf } from "../api/queries";
 import type { Who } from "./session";
 
 // The two families of finding a reader may hold apart. Dependency findings are
@@ -90,6 +91,24 @@ export function holding(who: Who | null | undefined, family: Family, product?: s
 // it means what it says: everything here, or one half said to be that.
 export function counted(at: Holding): boolean {
   return at.held === "here" || at.held === "partial";
+}
+
+// The holding a refused read of the family's counts says. A product the session
+// does not list is held "here" until asked, and the server answers a reader who
+// does not read the family there with 403: from then on it is held elsewhere,
+// so one line stands where a zero would.
+export function refusedAt(at: Holding, error: unknown, product: string): Holding {
+  if (statusOf(error) !== 403 || !counted(at)) return at;
+  return { held: "elsewhere", family: at.family, product };
+}
+
+// The holding one row's count of the family says, in a list spanning
+// products. The server leaves a count out where the reader does not read the
+// family in the row's product, which the session cannot say for a product it
+// does not list.
+export function answeredAt(at: Holding, present: boolean, product: string): Holding {
+  if (present || !counted(at)) return at;
+  return { held: "elsewhere", family: at.family, product };
 }
 
 // Whether the reader reads no finding of either family in any product: an

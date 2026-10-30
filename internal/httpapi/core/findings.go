@@ -324,20 +324,28 @@ type AtOneBuild struct {
 // statement it is narrowing.
 func BeneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 	which graph.Choice) (*int64, error) {
+	_, componentID, err := BeneathAt(ctx, in, scope, name, which)
+	return componentID, err
+}
+
+// BeneathAt is BeneathIn answering the one build the walk is over as well.
+// Both nil where nothing was asked.
+func BeneathAt(ctx context.Context, in Deps, scope finding.Scope, name string,
+	which graph.Choice) (*int64, *int64, error) {
 	if name == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if scope.ProductID == nil {
-		return nil, huma.Error422UnprocessableEntity(
+		return nil, nil, huma.Error422UnprocessableEntity(
 			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
 				" needs a product, a branch and a variant that name exactly one build")
 	}
 	buildIDs, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
 	if err != nil {
-		return nil, WentWrong(in.Logger, "cannot tell which builds are in scope", err)
+		return nil, nil, WentWrong(in.Logger, "cannot tell which builds are in scope", err)
 	}
 	if len(buildIDs) != 1 {
-		return nil, huma.Error422UnprocessableEntity(
+		return nil, nil, huma.Error422UnprocessableEntity(
 			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
 				" needs a branch and a variant that name exactly one build")
 	}
@@ -345,15 +353,15 @@ func BeneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 	if err != nil {
 		var several *graph.Ambiguous
 		if errors.As(err, &several) {
-			return nil, SeveralComponents(several,
+			return nil, nil, SeveralComponents(several,
 				"&beneath_version= and, where two share a version, &beneath_ecosystem= and &beneath_namespace=")
 		}
-		return nil, Absent(in.Logger, err, "the component to narrow beneath could not be looked up",
+		return nil, nil, Absent(in.Logger, err, "the component to narrow beneath could not be looked up",
 			func() error {
 				return huma.Error404NotFound("this build does not hold a component called " + name)
 			})
 	}
-	return &componentID, nil
+	return &buildIDs[0], &componentID, nil
 }
 
 // RefusedFinding turns a store's refusal about a finding into an answer.

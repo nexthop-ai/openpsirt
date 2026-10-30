@@ -31,7 +31,7 @@ is waiting on the reader, and who they are.
 | The comparison of two releases is not on the rail: it is a named report under Analytics, arriving with the selection made, linked from the front page | One screen, one door |
 | With a product, branch or variant unpicked, the tree and Uploads entries are disabled and say why | A build-only entry declines rather than opening on a meaningless scope |
 | Dependency findings takes whatever is selected; its count is asked with the narrowings the list writes into a silent address, as the Unassigned entry's is | The count is of what the list will show |
-| The bar's search is the findings list's search; "/" focuses it unless somebody is typing | |
+| The bar's search finds an issue or a component (§ The search box); "/" focuses it unless somebody is typing | |
 | Upload is in the bar on every screen (REQ-05), and on Uploads | The form picks its own build; Uploads is where the result appears |
 | On a narrow screen the rail gives way to a tab bar: home, findings, queue, and a fourth tab and a bar control opening the whole rail as a panel | What somebody reviews and responds from on a phone |
 
@@ -145,6 +145,10 @@ chosen (REQ-64).
 | It asks at the picker's selection, including none, which is every product the reader sees | Returning without navigating swallows what was typed |
 | A term resolving to an issue goes to the issue, decided by asking | A second copy of name resolution is wrong about minted identifiers |
 | A term resolves to an issue when the issue's read holds a row; an empty answer is a component search; only an unanswered read stops at the box | The read answers an issue nobody here carries with an empty list |
+| A component search lands on a chooser: each source package matching the term in the picker's selection, one row per product, with its open issues and open code findings, each opening the component screen (`design-docs/interface-component.md` § Security testing on the component) | The component is the hub both families link into |
+| A family the reader does not read in a row's product is a dash with the family's line on hover, never a zero; a count the server left out is such a family, in a product the session does not list too | A retired product has no row in the session |
+| The chooser offers the findings list's search for the same term | A finding's name is not always a component's |
+| The term is in the chooser's path and the scope is the picker's, so a change of selection answers the same term again | |
 | The findings list's box holds the term the list applies, and whatever removes it from the address (its chip, clearing filters, a saved filter, Back) empties the box | Enter would restore a search the reader thought gone |
 
 ## Limits

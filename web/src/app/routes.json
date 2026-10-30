@@ -149,13 +149,27 @@
   },
   "codeFindings": {
     "path": "/products/:product/code-findings",
-    "query": ["state", "branch_or_tag", "variant", "series", "method"]
+    "query": [
+      "state",
+      "branch_or_tag",
+      "variant",
+      "series",
+      "method",
+      "assigned",
+      "component",
+      "component_version",
+      "beneath",
+      "beneath_version",
+      "beneath_ecosystem",
+      "beneath_namespace"
+    ]
   },
   "codeFinding": {
     "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/code-findings/:occurrence"
   },
   "suppressionRules": { "path": "/products/:product/suppression-rules" },
   "repositories": { "path": "/products/:product/repositories" },
+  "componentSearch": { "path": "/search/:term" },
   "vulnerabilityReport": { "path": "/products/:product/vulnerability-reports/:reference" },
   "me": { "path": "/me" },
   "access": { "path": "/access" },

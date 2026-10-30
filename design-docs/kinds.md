@@ -79,7 +79,7 @@ A consumer reads findings and names its kinds; others never reach it.
 | Advisories | Documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What people are told about findings | Vulnerability, entered |
 | Evidence | One code finding's place, path, links and kept source (`design-docs/analysis-source.md` § Source) | Analysis |
-| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, `design-docs/notifications-work.md` § Code finding notices) | Analysis |
+| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, a component's counts, the tree's and the chooser's counts and a component's trend, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-queue.md` § Code findings of a component, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, `design-docs/notifications-work.md` § Code finding notices) | Analysis |
 
 The audit log's file follows Decisions and includes code finding decisions under
 the log's visibility (REQ-50). `design-docs/interface-security-testing.md` § Security testing
@@ -89,7 +89,7 @@ holds the screens.
 |---|---|
 | Exports names the findings lists' files alone; the disposition register is Register | Analysis on a shared consumer puts code findings into a statement of what a build ships |
 | A findings file reads its code findings through Code findings' read, its other rows through the list's (`design-docs/analytics-exports.md` § Exports) | A list and its file are one read |
-| Counts by series belong to Code findings, never Statistics | Statistics feeds vulnerability figures |
+| Counts by series, a component's counts and its trend belong to Code findings, never Statistics or Inventory | Statistics feeds vulnerability figures, and Inventory's tree and component reads count issues |
 | Each is the queue's own read and visibility | Figure, list and file count one population |
 | Assignment is its own consumer, apart from Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a code finding nobody has judged into both. Holding work is one act, so handovers move code findings too |
 | The held-work lists are Assignment's; the digest of held work is Notifications' and names no code finding | |

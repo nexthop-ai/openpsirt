@@ -27,6 +27,9 @@ type SeriesCount struct {
 	ByState map[State]int
 	Waiting int
 	Ruled   int
+	// Unplaced is the open code findings placed on the build itself, counted
+	// where a component is asked about: what no repository of the build holds.
+	Unplaced int
 }
 
 // CountsBySeries is how many code findings each analyzer series of a product holds,
@@ -40,14 +43,33 @@ type SeriesCount struct {
 // A series holding no code finding is listed with every count zero. An analyzer that
 // runs and finds nothing is a fact about the product.
 func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, productID int64) ([]SeriesCount, error) {
-	if !subject.Sees(productID) || !subject.Reads(access.SecurityTesting, productID) {
-		return nil, access.Denied(fmt.Sprintf("read the code finding counts of product %d", productID))
+	if err := MayCount(subject, productID, "read the code finding counts"); err != nil {
+		return nil, err
 	}
 	visible, err := finding.CodeFindingVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}
+	counted, err := countBySeries(ctx, db, subject, Scope{ProductID: productID}, visible)
+	if err != nil {
+		return nil, err
+	}
+	return counted.out, nil
+}
 
+// bySeries is every series of a product with its counts, and each series'
+// entry by its identifier.
+type bySeries struct {
+	out []SeriesCount
+	at  map[int64]*SeriesCount
+}
+
+// countBySeries counts what the queue lists in the scope for the subject, per
+// series of the product and state, every series listed.
+func countBySeries(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
+	visible []access.Visibility) (*bySeries, error) {
+
+	productID := scope.ProductID
 	kinds, kindArgs := kind.CodeFindings.Where(`"se"."kind"`)
 	var named []struct {
 		ID   int64  `bun:"id"`
@@ -70,7 +92,7 @@ func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, pro
 		CodeFindings int   `bun:"code_findings"`
 	}
 	if err := db.NewSelect().
-		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, Scope{ProductID: productID}, visible)).
+		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
 		ColumnExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).
 		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
 		GroupExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).
@@ -78,17 +100,16 @@ func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, pro
 		return nil, fmt.Errorf("count the code findings of product %d by series: %w", productID, err)
 	}
 
-	out := make([]SeriesCount, len(named))
-	at := make(map[int64]*SeriesCount, len(named))
+	out := &bySeries{out: make([]SeriesCount, len(named)), at: make(map[int64]*SeriesCount, len(named))}
 	for i, each := range named {
-		out[i] = SeriesCount{Series: each.Name, ByState: map[State]int{}}
+		out.out[i] = SeriesCount{Series: each.Name, ByState: map[State]int{}}
 		for _, state := range States() {
-			out[i].ByState[state] = 0
+			out.out[i].ByState[state] = 0
 		}
-		at[each.ID] = &out[i]
+		out.at[each.ID] = &out.out[i]
 	}
 	for _, c := range counted {
-		one, ok := at[c.SeriesID]
+		one, ok := out.at[c.SeriesID]
 		if !ok {
 			continue
 		}

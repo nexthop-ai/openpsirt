@@ -740,6 +740,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/components": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find components by name
+         * @description Returns the source packages whose name, or a binary's built from them, contains `q`, without regard to capitals, one entry per product and source package, in the builds the selection covers. An exact name comes first, then by name.
+         *
+         *     Each entry counts what is open on it in both families where you read them: `issues` where you read dependency findings in the product, `code_findings` where you read security testing material there. A product you read nothing in is not searched.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["find-components"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/decision-occurrences": {
         parameters: {
             query?: never;
@@ -3090,6 +3114,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/code-finding-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trend a component's code findings
+         * @description Returns, per week, the code findings one build places at a component or anywhere under it that are not fixed at the end of the week, and how many were opened and fixed in it. The walk under the component is the one the dependency tree counts with, and under the build's root it is every code finding of the build. Weeks end now and every seven days before; a code finding is dated by when the run that opened it was applied.
+         *
+         *     A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing.
+         *
+         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices.
+         *
+         *     Refused, with no count, to anybody who does not read security testing material in the product.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["trend-component-code-findings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues": {
         parameters: {
             query?: never;
@@ -3849,7 +3901,7 @@ export interface paths {
          *
          *     With no `state` it is the queue: open code findings with no decision waiting for a second person. `state` lists the code findings in one state instead. `fixed` lists the code findings closed on a build and not opened anew there.
          *
-         *     `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and recording it as a flaw are refused with 409. `branch_or_tag`, `variant`, `series` and `method` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
+         *     `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and recording it as a flaw are refused with 409. `branch_or_tag`, `variant`, `series` and `method` are optional and independent. `component` keeps the code findings placed on one source package, by its name or a binary's. `beneath` keeps those placed at a component or under it on one build, which needs a branch or tag and a variant. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -4056,6 +4108,34 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-component"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/components/{component}/code-finding-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count a component's code findings
+         * @description Returns the code findings the product places on one source package: per analyzer series and state across every build, and the open ones per build and source version.
+         *
+         *     `component` is a binary name or a source package name a build of the product ships, matched without regard to capitals, as the component page reads it. Each count is the total the code finding list answers for the same `component`, `series` and `state`.
+         *
+         *     `unplaced` counts the open code findings placed on the build itself: on a name that is a build's root, those on every root the build has had, and zero on any other name.
+         *
+         *     Refused, with no count, to anybody who does not read security testing material in the product.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
+         */
+        get: operations["count-component-code-findings"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8664,6 +8744,29 @@ export interface components {
             newly_present: components["schemas"]["ChangedBody"][] | null;
             still_present: components["schemas"]["ChangedBody"][] | null;
         };
+        ComponentBuildBody: {
+            branch_or_tag: string;
+            /**
+             * Format: int64
+             * @description Open code findings, the ones a decision waits on included: the code finding list's open count for this component, version, branch or tag and variant
+             */
+            open: number;
+            variant: string;
+            /** @description The version the source package was built at, as the component's entries name it */
+            version: string;
+        };
+        ComponentCodeFindingsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ComponentCodeFindingsBody.json
+             */
+            readonly $schema?: string;
+            /** @description The open code findings on the source package per build and source version, where any are open */
+            builds: components["schemas"]["ComponentBuildBody"][] | null;
+            /** @description Every analyzer series of the product, ordered by name, with the code findings it holds on the source package in each state across every build */
+            series: components["schemas"]["ComponentSeriesBody"][] | null;
+        };
         ComponentFindingBody: {
             /** @description Those issues by how they were rated. 'unrated' is what nobody scored */
             by_severity?: {
@@ -8711,6 +8814,44 @@ export interface components {
             items: components["schemas"]["ComponentFindingBody"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ComponentMatchBody: {
+            /**
+             * Format: int64
+             * @description Open code findings placed on it in the builds searched, the ones a decision waits on included. Absent where you do not read security testing material in the product
+             */
+            code_findings?: number;
+            /** @description The source package, as a producer spelled it. The component page answers for it by this name */
+            component: string;
+            /**
+             * Format: int64
+             * @description Distinct vulnerabilities open on it in the builds searched, of what you read. Absent where you read no dependency finding in the product
+             */
+            issues?: number;
+            product: string;
+        };
+        ComponentSeriesBody: {
+            /**
+             * Format: int64
+             * @description Dismissed code findings an approved suppression rule covers, counted among the dismissed in states
+             */
+            ruled: number;
+            /** @description The series' name, as its producer first sent it */
+            series: string;
+            /** @description The series' code findings by where they stand, every state named. A code finding on two builds in two states counts in both */
+            states: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Open code findings counted here that are placed on the build itself, because their files are in no repository a component of the build was built from. Only a build's own root holds them
+             */
+            unplaced: number;
+            /**
+             * Format: int64
+             * @description Open code findings a decision waiting for a second person leaves out of the queue, counted among the open in states
+             */
+            waiting: number;
         };
         CountedListBodyAuditedBody: {
             /**
@@ -10910,6 +11051,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyComponentMatchBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyComponentMatchBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ComponentMatchBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyEmbargoedBody: {
             /**
              * Format: uri
@@ -11306,6 +11458,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyTrendPointBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyTrendPointBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["TrendPointBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyUpstreamSaidBody: {
             /**
              * Format: uri
@@ -11622,6 +11785,16 @@ export interface components {
              * @description The number of components it pulls in. Zero means nothing to open
              */
             children: number;
+            /**
+             * Format: int64
+             * @description Open code findings placed on this component itself, where code_findings was asked for. On the build's own root these are the code findings in files no repository of the build holds, on every root the build has had
+             */
+            code_findings?: number;
+            /**
+             * Format: int64
+             * @description Open code findings placed on it and everything under it, each once, where code_findings was asked for. On the build's own root, every open code finding of the build
+             */
+            code_findings_beneath?: number;
             component: string;
             /** @description The kind of package this is, as its identifier spells it. Send it back where a build holds one name at one version as two components */
             ecosystem?: string;
@@ -14637,6 +14810,28 @@ export interface components {
             status: string;
             version: string;
         };
+        TrendPointBody: {
+            /**
+             * Format: date
+             * @description The day the step ends
+             */
+            at: string;
+            /**
+             * Format: int64
+             * @description Code findings closed as fixed in the step
+             */
+            fixed: number;
+            /**
+             * Format: int64
+             * @description Code findings opened and not closed as fixed by the end of the step, whatever was decided about them
+             */
+            not_fixed: number;
+            /**
+             * Format: int64
+             * @description Code findings not fixed at the end of the step that were not at the end of the one before
+             */
+            opened: number;
+        };
         "Trust-upstreamRequest": {
             /**
              * Format: uri
@@ -16390,6 +16585,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverPeriodRateBodyBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "find-components": {
+        parameters: {
+            query: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                /** @description Part of a name */
+                q: string;
+                /** @description The number of entries returned */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyComponentMatchBody"];
                 };
             };
             /** @description Error */
@@ -19827,6 +20062,8 @@ export interface operations {
                 q?: string;
                 /** @description The number of matches returned. Only read when searching */
                 limit?: number;
+                /** @description Count the open code findings on each component and beneath it as well. Requires security-testing-read on the product */
+                code_findings?: boolean;
             };
             header?: never;
             path: {
@@ -19900,6 +20137,8 @@ export interface operations {
                 ecosystem?: string;
                 /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components */
                 namespace?: string;
+                /** @description Count the open code findings on each component and beneath it as well. Requires security-testing-read on the product */
+                code_findings?: boolean;
             };
             header?: never;
             path: {
@@ -19965,6 +20204,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Decide-in-bulkResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "trend-component-code-findings": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components */
+                namespace?: string;
+                /** @description The number of weeks, ending now */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                branch_or_tag: string;
+                variant: string;
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyTrendPointBody"];
                 };
             };
             /** @description Error */
@@ -21166,6 +21448,18 @@ export interface operations {
                 method?: "sast";
                 /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
                 assigned?: "nobody";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
                 /** @description The number returned */
                 limit?: number;
                 /** @description The number skipped */
@@ -21214,6 +21508,18 @@ export interface operations {
                 method?: "sast";
                 /** @description Limit to the code findings with no holder on the build each row names. Every count is then of those code findings */
                 assigned?: "nobody";
+                /** @description Limit to the code findings placed on one source package the selected builds ship: a source of this name, or the source a binary of this name was built from, without regard to capitals, as the component page reads a name. A build's root names the build itself, every root it has had included */
+                component?: string;
+                /** @description Limit component to the source package at this version. Ignored without component */
+                component_version?: string;
+                /** @description Limit to the code findings placed at this component or anywhere under it, by the walk the dependency tree counts with; beneath the build's root, every code finding of the build. A subtree is a walk over one build's edges, so this needs a branch or tag and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
             };
             header?: never;
             path: {
@@ -21478,6 +21784,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListBodyPerBuildBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "count-component-code-findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComponentCodeFindingsBody"];
                 };
             };
             /** @description Error */

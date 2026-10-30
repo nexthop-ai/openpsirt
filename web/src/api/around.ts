@@ -15,13 +15,15 @@ export const aroundKey = (
   version = "",
   ecosystem = "",
   namespace = "",
-) => ["around", at, component, version, ecosystem, namespace] as const;
+  code = false,
+) => ["around", at, component, version, ecosystem, namespace, code] as const;
 
 // A name is not always enough: a build ships some libraries at several
 // versions, and a few it ships at one version as two components, which only
-// the kind of package or its namespace tells apart.
+// the kind of package or its namespace tells apart. Code findings are counted
+// only where asked, for a reader of security testing material.
 export const fetchAround =
-  (at: Build, component: string, version = "", ecosystem = "", namespace = "") =>
+  (at: Build, component: string, version = "", ecosystem = "", namespace = "", code = false) =>
   async () =>
     unwrap(
       await api.GET(
@@ -33,6 +35,7 @@ export const fetchAround =
               ...(version ? { version } : {}),
               ...(ecosystem ? { ecosystem } : {}),
               ...(namespace ? { namespace } : {}),
+              ...(code ? { code_findings: true } : {}),
             },
           },
         },

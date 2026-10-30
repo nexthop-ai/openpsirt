@@ -42,9 +42,9 @@ describe("the top search", () => {
     expect(at).toContain("CVE-2026-1");
   });
 
-  it("searches components for a term no issue here answers to", async () => {
+  it("lands on the component chooser for a term no issue here answers to", async () => {
     const at = await searched("openssl", { data: { items: [], total: 0 } });
-    expect(at).toContain("q=openssl");
+    expect(at).toBe("/search/openssl");
     expect(mount.host().textContent).not.toContain("could not be looked up");
   });
 

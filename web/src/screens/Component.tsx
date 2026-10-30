@@ -26,9 +26,17 @@ import { Wide } from "../ui/Wide";
 import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
 import { useUpstreamSaid } from "../api/upstream";
 import { mayOf, useWho } from "../app/session";
-import { counted, holding } from "../app/families";
+import { counted, holding, refusedAt } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
+import { useComponentCodeCounts } from "../api/codeFindings";
+import {
+  BuildCodeCell,
+  CodeHistory,
+  SecurityTesting,
+  codeByBuild,
+  holdsAny,
+} from "./ComponentCode";
 
 // One source package, and the one piece of work it is.
 //
@@ -94,6 +102,17 @@ export function Component() {
   const who = useWho();
   const dependencies = holding(who.data, "dependency", product);
   const counts = counted(dependencies);
+  // Code findings sit beside them, counted and asked for only where the reader
+  // reads security testing material here, which the session has to say first.
+  // A product the session does not list is asked, and a refusal says the
+  // family is read elsewhere. Every code count and the trend are drawn from
+  // the answer alone: a column drawn while it loads reads as zeros.
+  const asking = holding(who.data, "code", product);
+  const codeHeld = useComponentCodeCounts(product, component, !!who.data && counted(asking));
+  const code = refusedAt(asking, codeHeld.error, product);
+  const codeCounts = !!who.data && counted(code);
+  const codeOn = useMemo(() => codeByBuild(codeHeld.data), [codeHeld.data]);
+  const codeAnswered = codeCounts && !!codeHeld.data;
 
   const builds = useQuery({
     queryKey: ["component", product, component],
@@ -146,15 +165,24 @@ export function Component() {
   }
   const pkg = here ? pickPackage(here, params.get("package") || component) : undefined;
   if (!here || !pkg) {
+    // A build's root is no package any build row ships, and it is where the
+    // code findings no repository holds are placed: its card stands alone.
+    const rooted = codeAnswered && holdsAny(codeHeld.data);
     return (
       <>
         <div className="screen-head">
           <h2 className="id">{component}</h2>
         </div>
-        <Empty
-          title="No build of this product ships it."
-          detail="The name is not one any scanned build carries."
-        />
+        {rooted ? (
+          <SecurityTesting product={product} source={component} code={code} counts={codeHeld} />
+        ) : codeCounts && codeHeld.isPending ? (
+          <Loading />
+        ) : (
+          <Empty
+            title="No build of this product ships it."
+            detail="The name is not one any scanned build carries."
+          />
+        )}
       </>
     );
   }
@@ -199,6 +227,8 @@ export function Component() {
         </p>
         <HeldLine at={dependencies} />
       </div>
+
+      <SecurityTesting product={product} source={component} code={code} counts={codeHeld} />
 
       {versions.length > 1 && (
         <div className="card" style={{ marginBottom: 12 }}>
@@ -370,11 +400,27 @@ export function Component() {
         </div>
       </div>
 
-      <Ships product={product} rows={rows} here={here} counts={counts} />
+      <Ships
+        product={product}
+        rows={rows}
+        here={here}
+        counts={counts}
+        source={component}
+        code={codeAnswered ? codeOn : undefined}
+      />
 
       <UpstreamStatements product={product} component={component} />
 
       {counts && <History product={product} pkg={pkg} here={here} />}
+
+      {codeAnswered && (
+        <CodeHistory
+          product={product}
+          build={here}
+          component={pkg.name}
+          which={{ version: pkg.version, ecosystem: here.ecosystem, namespace: pkg.namespace }}
+        />
+      )}
     </>
   );
 }
@@ -1089,11 +1135,18 @@ function Ships({
   rows,
   here,
   counts,
+  source,
+  code,
 }: {
   product: string;
   rows: Build[];
   here: Build;
   counts: boolean;
+  // The name the code findings were counted by, which their links ask by.
+  source: string;
+  // The open code findings per build and source version, where the reader
+  // reads them and the counts answered; absent, the column is not drawn.
+  code?: Map<string, number>;
 }) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
@@ -1110,6 +1163,11 @@ function Ships({
               <th>Release</th>
               <th>Ships</th>
               {counts && <th className="num">Open on it</th>}
+              {code && (
+                <th className="num" title="Open code findings on it in that build">
+                  Code findings
+                </th>
+              )}
               <th className="num">Consumers</th>
               <th className="num">Occurrences</th>
               <th>Due</th>
@@ -1136,6 +1194,7 @@ function Ships({
                     </Link>
                   </td>
                 )}
+                {code && <BuildCodeCell product={product} source={source} row={row} code={code} />}
                 <td className="num">{(row.consumers ?? 0).toLocaleString()}</td>
                 <td className="num" style={{ color: "var(--faint)" }}>
                   {(row.occurrences ?? 0).toLocaleString()}

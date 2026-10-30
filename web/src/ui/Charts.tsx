@@ -97,7 +97,17 @@ function day(at?: string): string {
 // the number anybody reads; new against resolved sit beneath as paired bars on
 // their own scale, so a week where new outran resolved shows as a taller bar,
 // not as a second axis (the one thing a chart must never grow).
-export function Pace({ points }: { points: Point[] }) {
+// The words a pace chart is drawn with: its line's name at the endpoint, what
+// the whole chart shows for a screen reader, and what the lower bars count.
+type PaceWords = { line: string; what: string; fresh: string; done: string };
+const ISSUE_WORDS: PaceWords = {
+  line: "open issues",
+  what: "Open findings",
+  fresh: "new findings",
+  done: "resolved",
+};
+
+export function Pace({ points, words = ISSUE_WORDS }: { points: Point[]; words?: PaceWords }) {
   if (points.length === 0) return null;
   const W = 560,
     L = 40,
@@ -135,7 +145,7 @@ export function Pace({ points }: { points: Point[] }) {
       className="chart"
       viewBox={`0 0 ${W} ${T + topH + gap + botH + 18}`}
       role="img"
-      aria-label={paceLabel(points)}
+      aria-label={paceLabel(points, words)}
     >
       {ticks.map((v) => (
         <g key={v}>
@@ -155,7 +165,7 @@ export function Pace({ points }: { points: Point[] }) {
         textAnchor="end"
         style={{ fill: "var(--accent)", fontWeight: 600, fontSize: 11 }}
       >
-        {(opens[last] ?? 0).toLocaleString()} open issues
+        {(opens[last] ?? 0).toLocaleString()} {words.line}
       </text>
 
       <line className="zero" x1={L} x2={W - R} y1={zero} y2={zero} />
@@ -169,7 +179,7 @@ export function Pace({ points }: { points: Point[] }) {
               <title>{`${day(p.at)}: ${news[i]} new`}</title>
             </rect>
             <rect className="bar-res" x={cx + 1} y={zero} width={bw} height={down} rx={1}>
-              <title>{`${day(p.at)}: ${dones[i]} resolved`}</title>
+              <title>{`${day(p.at)}: ${dones[i]} ${words.done}`}</title>
             </rect>
           </g>
         );
@@ -202,11 +212,11 @@ function niceTicks(lo: number, hi: number, want: number): number[] {
   return out;
 }
 
-function paceLabel(points: Point[]): string {
+function paceLabel(points: Point[], words: PaceWords): string {
   const first = points[0]?.open ?? 0;
   const last = points[points.length - 1]?.open ?? 0;
   const outran = points.filter((p) => (p.opened ?? 0) > (p.resolved ?? 0)).length;
-  return `Open findings from ${first.toLocaleString()} to ${last.toLocaleString()} over ${points.length} steps, with new findings outrunning resolved in ${outran} of them`;
+  return `${words.what} from ${first.toLocaleString()} to ${last.toLocaleString()} over ${points.length} steps, with ${words.fresh} outrunning ${words.done} in ${outran} of them`;
 }
 
 // The same total, split. A flat line with a rising critical share is getting
