@@ -1,10 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQueries, type UseQueryResult } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import {
+  analysisCoverageRead,
+  codeFindingJudgingRead,
+  codeFindingTrendRead,
   codeFindingsQuery,
   type AnalysisCoverage,
   type CodeFindingMarker,
@@ -12,13 +15,13 @@ import {
   type CodeFindingTrend,
   type CodeFindings,
 } from "../api/codeFindings";
-import { unwrap } from "../api/queries";
-import { counted, holding, type Holding } from "../app/families";
+import { statusOf, unwrap } from "../api/queries";
+import { counted, holding, refusedAt, type Holding } from "../app/families";
 import { analyticsReportAt, codeFindingsAcrossAt, codeFindingsAt } from "../app/routes";
 import { useScope, type Scoped } from "../app/scope";
 import type { Who } from "../app/session";
 import { Pace, Stack, type StackPart } from "../ui/Charts";
-import { Count } from "../ui/Count";
+import { Count, type Readable } from "../ui/Count";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { HeldLine } from "../ui/HeldLine";
@@ -31,11 +34,11 @@ import { TIERS, codeTrendAt, marksOf } from "./codeTrend";
 // analyzers gone quiet, and twelve weeks of what is not fixed. Counted per
 // testing method and never beside a dependency figure.
 //
-// A series belongs to one product, so the trend, the waits and the coverage are
-// asked per product and added together across products, which is sound
-// because a code finding belongs to one product. The counts of the queue are
-// one read across products. Every product counted is one where the reader
-// reads security testing material, and the head says how many.
+// Every figure is asked per product and added together across products, which
+// is sound because a code finding belongs to one product. Every product
+// counted is one where the reader reads security testing material, and the
+// head says how many; one read across products would also count products the
+// session does not list, a retired one among them.
 
 // The weeks home's charts cover, as the dependency trend does.
 const WEEKS = 12;
@@ -77,40 +80,40 @@ function narrowing(at: Scoped) {
 export function useCoverages(products: string[], at: Scoped): UseQueryResult<AnalysisCoverage>[] {
   const asked = { ...narrowing(at), weeks: COVERAGE_WEEKS };
   return useQueries({
-    queries: products.map((product) => ({
-      queryKey: ["code-findings", product, "coverage", asked],
-      queryFn: async () =>
-        unwrap(
-          await api.GET("/v1/products/{product}/analysis-coverage", {
-            params: { path: { product }, query: codeFindingsQuery(asked) },
-          }),
-        ),
-      retry: false,
-    })),
+    queries: products.map((product) => analysisCoverageRead(product, asked)),
   });
 }
 
-// The queue's counts at the scope: one product's, or every product's the
-// reader reads security testing material in, in one read. Narrowed to one
-// method where one is named.
-function useQueueCounts(at: Scoped, enabled: boolean, method?: CodeFindingMethod) {
-  const query = { limit: 1, ...(method ? { method } : {}) };
-  return useQuery({
-    enabled,
-    queryKey: ["code-findings", at.product ?? "", { ...narrowing(at), method, limit: 1 }],
+// The holding a product's refused read says: a product the session does not
+// list is held here until the server refuses a read of it.
+export function heldAfter(code: Holding, reads: Readable[], product: string | undefined): Holding {
+  if (!product) return code;
+  const refusal = reads.find((each) => statusOf(each.error) === 403);
+  return refusal ? refusedAt(code, refusal.error, product) : code;
+}
+
+// One product's queue counts, narrowed to the picker and to one method where
+// one is named.
+function queueRead(product: string, at: Scoped, method?: CodeFindingMethod) {
+  const asked = { ...narrowing(at), method, limit: 1 };
+  return {
+    queryKey: ["code-findings", product, asked],
     queryFn: async (): Promise<CodeFindings> =>
-      at.product
-        ? unwrap(
-            await api.GET("/v1/products/{product}/code-findings", {
-              params: {
-                path: { product: at.product },
-                query: { ...query, ...codeFindingsQuery(narrowing(at)) },
-              },
-            }),
-          )
-        : unwrap(await api.GET("/v1/code-findings", { params: { query } })),
+      unwrap(
+        await api.GET("/v1/products/{product}/code-findings", {
+          params: { path: { product }, query: codeFindingsQuery(asked) },
+        }),
+      ),
     retry: false,
-  });
+  };
+}
+
+// A count added across every product's answer.
+function summed(
+  reads: UseQueryResult<CodeFindings>[],
+  pick: (each: CodeFindings) => number | undefined,
+): number {
+  return reads.reduce((sum, each) => sum + (each.data ? (pick(each.data) ?? 0) : 0), 0);
 }
 
 // The figures, at the picked scope.
@@ -122,56 +125,31 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
   const one = at.product && reads ? at.product : undefined;
   const asked = narrowing(at);
 
-  const queue = useQueueCounts(at, reads);
+  const queue = useQueries({ queries: products.map((product) => queueRead(product, at)) });
   const methods = Object.keys(CODE_FINDING_METHODS) as CodeFindingMethod[];
   // Split by method once there is more than one: each method's open count
-  // from its own read, never one total over methods.
-  const byMethod = useQueries({
-    queries: (methods.length > 1 && reads ? methods : []).map((method) => ({
-      queryKey: ["code-findings", at.product ?? "", { ...asked, method, limit: 1 }],
-      queryFn: async (): Promise<CodeFindings> =>
-        at.product
-          ? unwrap(
-              await api.GET("/v1/products/{product}/code-findings", {
-                params: {
-                  path: { product: at.product },
-                  query: { limit: 1, method, ...codeFindingsQuery(asked) },
-                },
-              }),
-            )
-          : unwrap(await api.GET("/v1/code-findings", { params: { query: { limit: 1, method } } })),
-      retry: false,
-    })),
+  // from its own reads, never one total over methods.
+  const split = methods.length > 1 && reads;
+  const byMethodReads = useQueries({
+    queries: (split ? methods : []).flatMap((method) =>
+      products.map((product) => queueRead(product, at, method)),
+    ),
   });
+  const byMethod = methods.map((_, i) =>
+    byMethodReads.slice(i * products.length, (i + 1) * products.length),
+  );
   const trends = useQueries({
-    queries: products.map((product) => ({
-      queryKey: ["code-findings", product, "trend", { ...asked, weeks: WEEKS }],
-      queryFn: async () =>
-        unwrap(
-          await api.GET("/v1/products/{product}/code-finding-trend", {
-            params: { path: { product }, query: { weeks: WEEKS, ...codeFindingsQuery(asked) } },
-          }),
-        ),
-      retry: false,
-    })),
+    queries: products.map((product) => codeFindingTrendRead(product, { ...asked, weeks: WEEKS })),
   });
   // The queue's oldest code finding, which the time to judge answers beside
   // its ages. Its window is the shortest, since only the queue is read here.
   const judging = useQueries({
-    queries: products.map((product) => ({
-      queryKey: ["code-findings", product, "time-to-judge", { ...asked, weeks: 1 }],
-      queryFn: async () =>
-        unwrap(
-          await api.GET("/v1/products/{product}/code-finding-time-to-judge", {
-            params: { path: { product }, query: { weeks: 1, ...codeFindingsQuery(asked) } },
-          }),
-        ),
-      retry: false,
-    })),
+    queries: products.map((product) => codeFindingJudgingRead(product, { ...asked, weeks: 1 })),
   });
   const coverages = useCoverages(products, at);
 
-  if (!reads) return <HeldLine at={code} />;
+  const held = heldAfter(code, [...queue, ...trends, ...judging, ...coverages], one);
+  if (!reads || !counted(held)) return <HeldLine at={held} />;
 
   const counting = one
     ? [one, at.branch_or_tag, at.variant].filter(Boolean).join(" · ")
@@ -190,15 +168,24 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
     .filter((when): when is string => !!when)
     .sort()[0];
   const last = trend?.points[trend.points.length - 1];
-  const open = queue.data?.states?.open;
-  const absent = queue.data?.states?.["no-longer-detected"];
+  const open = summed(queue, (each) => each.states?.open);
+  const absent = summed(queue, (each) => each.states?.["no-longer-detected"]);
+  const waiting = summed(queue, (each) => each.total);
   const queueAt = (state?: string) =>
     one
       ? codeFindingsAt(one, { state, ...asked })
       : codeFindingsAcrossAt(state ? { state } : undefined);
 
+  // No series and nothing in the queue: a code finding outlives its series in
+  // the coverage, which leaves out a retired branch or variant.
   const coverageRead = coverages.every((each) => each.isSuccess);
-  if (coverageRead && series.length === 0) {
+  const queueAnswered = queue.every((each) => each.isSuccess);
+  const queued = queue.some(
+    (each) =>
+      (each.data?.total ?? 0) > 0 ||
+      Object.values(each.data?.states ?? {}).some((n) => (n ?? 0) > 0),
+  );
+  if (coverageRead && queueAnswered && series.length === 0 && !queued) {
     return (
       <>
         <p className="eyebrow">Counting {counting}</p>
@@ -216,16 +203,21 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
         <button type="button" className="kpi" onClick={() => navigate(queueAt("open"))}>
           <span className="l">Open · {counting}</span>
           <span className="n">
-            <Count of={queue}>{() => (open ?? 0).toLocaleString()}</Count>
+            <Count of={queue}>{() => open.toLocaleString()}</Count>
           </span>
           <span className="d">
-            {methods.length > 1
-              ? methods
-                  .map(
-                    (method, i) =>
-                      `${(byMethod[i]?.data?.states?.open ?? 0).toLocaleString()} ${CODE_FINDING_METHODS[method].label}`,
-                  )
-                  .join(" · ")
+            {split
+              ? methods.map((method, i) => (
+                  <span key={method}>
+                    {i > 0 && " · "}
+                    <Count of={byMethod[i] ?? []}>
+                      {() =>
+                        summed(byMethod[i] ?? [], (each) => each.states?.open).toLocaleString()
+                      }
+                    </Count>{" "}
+                    {CODE_FINDING_METHODS[method].label}
+                  </span>
+                ))
               : `to be judged, ${CODE_FINDING_METHODS[methods[0] ?? "sast"].hint.toLowerCase()}`}
           </span>
         </button>
@@ -234,14 +226,11 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
             <i style={{ background: "var(--wait)" }} /> Waiting for a judgment
           </span>
           <span className="n">
-            <Count of={queue}>{() => (queue.data?.total ?? 0).toLocaleString()}</Count>
+            <Count of={queue}>{() => waiting.toLocaleString()}</Count>
           </span>
           <span className="d">
-            {judging.some((each) => each.isError)
-              ? "nobody has proposed a decision"
-              : oldest
-                ? `nobody has proposed a decision · oldest ${ageOf(oldest)}`
-                : "nobody has proposed a decision"}
+            nobody has proposed a decision
+            <Count of={judging}>{() => (oldest ? ` · oldest ${ageOf(oldest)}` : "")}</Count>
           </span>
         </button>
         {/* Worked out from the trend, with nothing to open: the queue holds
@@ -270,7 +259,7 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
         >
           <span className="l">No longer detected</span>
           <span className="n">
-            <Count of={queue}>{() => (absent ?? 0).toLocaleString()}</Count>
+            <Count of={queue}>{() => absent.toLocaleString()}</Count>
           </span>
           <span className="d">today, still counted until fixed</span>
         </button>

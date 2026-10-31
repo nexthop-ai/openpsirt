@@ -1,15 +1,20 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, it } from "vitest";
+import { act } from "react";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Home, figuresShown } from "./Home";
 import { merged } from "./HomeSecurityTesting";
 import type { CodeFindingTrend } from "../api/codeFindings";
 import type { Who } from "../app/session";
-import { mounted, screen, serve, settle } from "../test/mount";
+import { location, mounted, screen, serve, settle } from "../test/mount";
+import { on } from "../ui/when";
 import { reaching, readingDependencies } from "../test/reach";
 
 const mount = mounted();
+
+// A product picked in one test is the tab's remembered scope in the next.
+beforeEach(() => window.sessionStorage.clear());
 
 const person = (reach: Who["reach"]) =>
   ({
@@ -52,16 +57,27 @@ function trendOf(notFixed: number, marker?: string): CodeFindingTrend {
 
 // The home page drawn for a reader at an address, the server answering the
 // security testing reads with figures and everything else with nothing.
-async function home(who: Who, at = "/", quiet = true) {
+async function home(
+  who: Who,
+  at = "/",
+  quiet = true,
+  aside?: (path: string, product: string) => { status?: number; data?: unknown } | undefined,
+) {
   const asked: string[] = [];
-  serve((path) => {
+  serve((path, init) => {
     asked.push(path);
+    const product = (init as { params?: { path?: { product?: string } } } | undefined)?.params?.path
+      ?.product;
+    const said = product ? aside?.(path, product) : undefined;
+    if (said) return said;
     if (path === "/v1/code-findings" || path === "/v1/products/{product}/code-findings") {
       return {
         data: { items: [], total: 4, states: { open: 6, "no-longer-detected": 2 }, waiting: 2 },
       };
     }
-    if (path === "/v1/products/{product}/code-finding-trend") return { data: trendOf(5) };
+    if (path === "/v1/products/{product}/code-finding-trend") {
+      return { data: trendOf(5, product === "sonic" ? "clang" : undefined) };
+    }
     if (path === "/v1/products/{product}/code-finding-time-to-judge") {
       return { data: { waiting: [], no_longer_detected: 2, oldest: "2026-10-01" } };
     }
@@ -191,23 +207,54 @@ describe("the home tab strip", () => {
   });
 });
 
+const shown = (label: string) => tile(label)?.querySelector(".n")?.textContent;
+
+async function press(label: string) {
+  await act(async () => (tile(label) as HTMLButtonElement | undefined)?.click());
+}
+
 describe("the Security testing figures", () => {
-  it("count the queue, this week and the quiet series at every product read", async () => {
+  it("count the queue, this week and the quiet series over the products the head names", async () => {
     const asked = await home(person([codeOnly("sonic"), codeOnly("edge")]));
     expect(mount.host().textContent).toContain("Open · 2 products");
-    expect(tile("Open")?.querySelector(".n")?.textContent).toBe("6");
-    expect(tile("Waiting for a judgment")?.querySelector(".n")?.textContent).toBe("4");
-    expect(tile("This week")?.querySelector(".n")?.textContent).toBe("+6 −2");
-    expect(tile("No longer detected")?.querySelector(".n")?.textContent).toBe("2");
+    expect(shown("Open")).toBe("12");
+    expect(shown("Waiting for a judgment")).toBe("8");
+    expect(shown("This week")).toBe("+6 −2");
+    expect(shown("No longer detected")).toBe("4");
     expect(tile("Analyzers gone quiet")?.textContent).toContain("sonic clang-tidy on main · arm");
+    expect(asked).not.toContain("/v1/code-findings");
     expect(
       asked.filter((path) => path === "/v1/products/{product}/code-finding-trend"),
     ).toHaveLength(2);
   });
 
-  it("open the queue they count, narrowed to the product picked", async () => {
+  it("name each analyzer change's product on the line over several products", async () => {
+    await home(person([codeOnly("sonic"), codeOnly("edge")]), "/?figures=security-testing");
+    const titles = [...mount.host().querySelectorAll("title")].map((each) => each.textContent);
+    expect(titles.some((each) => each?.startsWith("sonic clang: new version"))).toBe(true);
+  });
+
+  it("name no product on an analyzer change where one is picked", async () => {
     await home(person([codeOnly("sonic")]), "/products/sonic");
-    expect(tile("Open")?.textContent).toContain("Open · sonic");
+    const titles = [...mount.host().querySelectorAll("title")].map((each) => each.textContent);
+    expect(titles.some((each) => each?.startsWith("clang: new version"))).toBe(true);
+  });
+
+  it("open the queue each counts, narrowed to the product picked", async () => {
+    for (const [label, wanted] of [
+      ["Open", "/products/sonic/code-findings?state=open"],
+      ["Waiting for a judgment", "/products/sonic/code-findings"],
+      ["No longer detected", "/products/sonic/code-findings?state=no-longer-detected"],
+    ] as const) {
+      await home(person([codeOnly("sonic")]), "/products/sonic");
+      expect(tile("Open")?.textContent).toContain("Open · sonic");
+      await press(label);
+      expect(location()).toBe(wanted);
+    }
+  });
+
+  it("name no product on a quiet series where one is picked", async () => {
+    await home(person([codeOnly("sonic")]), "/products/sonic");
     expect(tile("Analyzers gone quiet")?.textContent).toContain("clang-tidy on main · arm");
     expect(tile("Analyzers gone quiet")?.textContent).not.toContain("sonic clang-tidy");
   });
@@ -222,7 +269,18 @@ describe("the Security testing figures", () => {
     expect(asked).not.toContain("/v1/products/{product}/code-finding-trend");
   });
 
-  it("say no analyzer has run where no series has, rather than drawing zeros", async () => {
+  it("say so in one line where the server refuses a product the session does not list", async () => {
+    await home(person([codeOnly("sonic")]), "/products/retired", true, (path) =>
+      path.startsWith("/v1/products/{product}/") ? { status: 403 } : undefined,
+    );
+    const text = mount.host().textContent ?? "";
+    expect(text).toContain("You don't read code findings in retired.");
+    expect(tile("Waiting for a judgment")).toBeUndefined();
+    expect(text).not.toContain("The analyzer runs could not be read.");
+    expect(text).not.toContain("Last analyzer run received");
+  });
+
+  it("say no analyzer has run where no series has and nothing is queued, rather than drawing zeros", async () => {
     serve((path) =>
       path === "/v1/products/{product}/analysis-coverage"
         ? { data: { quiet: 0, items: [] } }
@@ -234,19 +292,42 @@ describe("the Security testing figures", () => {
     expect(tile("Open")).toBeUndefined();
   });
 
+  it("count the queue where no series is listed and code findings are still open", async () => {
+    await home(person([codeOnly("sonic")]), "/", true, (path) =>
+      path === "/v1/products/{product}/analysis-coverage"
+        ? { data: { quiet: 0, items: [] } }
+        : undefined,
+    );
+    expect(mount.host().textContent).not.toContain("No analyzer has run here.");
+    expect(shown("Open")).toBe("6");
+  });
+
+  it("draw no oldest wait where one product's time to judge fails", async () => {
+    await home(person([codeOnly("sonic"), codeOnly("edge")]), "/", true, (path, product) =>
+      path === "/v1/products/{product}/code-finding-time-to-judge" && product === "edge"
+        ? { status: 500 }
+        : undefined,
+    );
+    const said = tile("Waiting for a judgment")?.querySelector(".d");
+    expect(said?.textContent).not.toContain("oldest");
+    expect(said?.querySelector(".count-failed")).not.toBeNull();
+  });
+
   it("name the last analyzer run in the status panel", async () => {
     await home(person([codeOnly("sonic")]), "/", false);
-    expect(mount.host().textContent).toContain("Last analyzer run received");
-    expect(tile("Analyzers gone quiet")?.querySelector(".n")?.textContent).toBe("0");
+    const line = [...mount.host().querySelectorAll("li")].find((each) =>
+      each.textContent?.includes("Last analyzer run received"),
+    );
+    expect(line?.querySelector(".when")?.textContent).toBe(on("2026-10-20T00:00:00Z"));
+    expect(shown("Analyzers gone quiet")).toBe("0");
   });
 });
 
 describe("a trend over several products", () => {
-  it("adds each week's counts and names each marker's product", () => {
-    const one = merged(["sonic", "edge"], [trendOf(5, "clang"), trendOf(2)], true);
+  it("adds each week's counts", () => {
+    const one = merged(["sonic", "edge"], [trendOf(5), trendOf(2)], true);
     expect(one?.points[11]).toMatchObject({ not_fixed: 7, opened: 6, fixed: 2 });
     expect(one?.points[11]?.by_tier["memory-safety"]).toBe(7);
-    expect(one?.markers.map((m) => m.series)).toEqual(["sonic clang"]);
   });
 
   it("is unread until every product's trend is", () => {

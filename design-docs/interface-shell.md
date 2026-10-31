@@ -74,7 +74,7 @@ page leaves the menu far above the foot of a list.
 
 | Rule | Reason |
 |---|---|
-| A group heading folds what is under it, and Manage starts folded | It is occasional work; folded, the rail asks 982 pixels at 1440 wide for a reader drawn every other entry |
+| A group heading folds what is under it, and Manage starts folded | It is occasional work, and folding it shortens the rail by its entries |
 | A first visit needs nothing folded open | A product is picked in the bar |
 | The heading stays drawn as a heading, a caret its only control mark | Five headings drawn as buttons read as five more places |
 | What is folded is kept in the browser, per person, by group name; a name no group has folds nothing | |
@@ -191,9 +191,10 @@ figure (REQ-87), from the Security testing statistics consumer and the queue
 |---|---|
 | With no product picked, the figures count every product where the reader reads security testing material, and say how many | REQ-42: a product read nowhere is never counted |
 | A product, branch or variant picked narrows every figure as the queue narrows | |
-| The trend, the oldest wait and the coverage are asked per product and added across products; a failed read of one product fails the figure | A series is one product's, and a total missing one product is wrong |
+| Every figure, the queue's counts included, is asked per product and added across the products the head counts; a failed read of one product fails the figure | A series is one product's, a total missing one product is wrong, and a read across products also counts products the session does not list |
 | A marker names its product where more than one is counted | A series name is one product's |
-| Where no series has run in the scope, one line says no analyzer has run there, in place of the figures | A series never run reads as clean at zero |
+| Where no series has run in the scope and the queue holds nothing, one line says no analyzer has run there, in place of the figures | A series never run reads as clean at zero; coverage leaves out a retired branch or variant, whose code findings stay in the queue |
+| A product the session does not list is asked, and a refusal draws the family's line in place of the figures and the analyzer lines of the status panel | It is held here until the server says otherwise (`design-docs/interface.md` § Families a reader holds) |
 | This week and Analyzers gone quiet open nothing across products | Both pages are one product's |
 | The charts plot on when a run was applied, as the dependency trend does | |
 

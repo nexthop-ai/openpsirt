@@ -23,9 +23,15 @@ import { scopeQuery, useScope } from "../app/scope";
 import type { Who } from "../app/session";
 import { Count, known } from "../ui/Count";
 import { Failed } from "../ui/Failed";
+import { HeldLine } from "../ui/HeldLine";
 import { on } from "../ui/when";
 import { DependencyFigures } from "./HomeDependencies";
-import { SecurityTestingFigures, codeProducts, useCoverages } from "./HomeSecurityTesting";
+import {
+  SecurityTestingFigures,
+  codeProducts,
+  heldAfter,
+  useCoverages,
+} from "./HomeSecurityTesting";
 
 // The most of a person's own decisions the "sent back" tile reads. What became of
 // a decision is derived from its rows rather than stored on them, so there is no
@@ -745,6 +751,10 @@ function Status({ who, code }: { who: Who; code?: Holding }) {
   const at = useScope();
   const scope = scopeQuery(at);
   const coverages = useCoverages(code ? codeProducts(who, at.product) : [], at);
+  // A product the session does not list is asked, and a refusal stands one
+  // line where the analyzer lines would.
+  const runs = code && heldAfter(code, coverages, at.product);
+  const runsCounted = !!runs && counted(runs);
   const series = coverages.flatMap((each) => each.data?.items ?? []);
   const lastRun = series.reduce<string>(
     (newest, item) =>
@@ -789,9 +799,10 @@ function Status({ who, code }: { who: Who; code?: Holding }) {
       {scanning.isError && (
         <Failed error={scanning.error} what="The last upload per build could not be read." />
       )}
-      {unreadRuns && (
+      {runsCounted && unreadRuns && (
         <Failed error={unreadRuns.error} what="The analyzer runs could not be read." />
       )}
+      {runs && !runsCounted && <HeldLine at={runs} />}
       {quiet.slice(0, 3).map((build) => (
         <div
           className="alert"
@@ -830,7 +841,7 @@ function Status({ who, code }: { who: Who; code?: Holding }) {
             <Count of={scanning}>{() => `${scanning.data?.quiet_after_days ?? "—"} days`}</Count>
           </span>
         </li>
-        {code && (
+        {runsCounted && (
           <>
             <li>
               <span className="what">Last analyzer run received</span>
