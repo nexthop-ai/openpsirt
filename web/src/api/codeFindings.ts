@@ -558,3 +558,81 @@ export function useCodeFindingsByRelease(
     retry: false,
   });
 }
+
+// The narrowing a security testing figure across products takes: none that
+// names a part of one product.
+type CodeFindingAcrossAsked = Pick<CodeFindingFigureAsked, "series" | "method" | "weeks">;
+
+// The queue's counts, as a product's list and the counts across products both
+// state them.
+type CodeFindingCounts = Pick<Body<"CodeFindingCountsBody">, "total" | "states">;
+
+// The figures across every product in use where the reader reads security
+// testing material, one read each, under the key of a product's read with no
+// product named, so a decision refreshing the code findings refreshes them.
+
+// The queue's counts: a product's, from one row of its list narrowed as
+// asked, or with no product named the counts across products, with no rows.
+export function codeFindingCountsRead(
+  product: string | undefined,
+  asked: Pick<CodeFindingsAsked, "branch_or_tag" | "variant" | "series" | "method">,
+) {
+  return queryOptions({
+    queryKey: ["code-findings", product ?? "", "counts", asked],
+    queryFn: async (): Promise<CodeFindingCounts> =>
+      product
+        ? unwrap(
+            await api.GET("/v1/products/{product}/code-findings", {
+              params: { path: { product }, query: { ...codeFindingsQuery(asked), limit: 1 } },
+            }),
+          )
+        : unwrap(
+            await api.GET("/v1/code-finding-counts", {
+              params: { query: codeFindingsQuery({ series: asked.series, method: asked.method }) },
+            }),
+          ),
+    retry: false,
+  });
+}
+
+// The trend of code findings across products, each marker naming its product.
+export function codeFindingTrendAcrossRead(asked: CodeFindingAcrossAsked & { weeks: number }) {
+  return queryOptions({
+    queryKey: ["code-findings", "", "trend", asked],
+    queryFn: async (): Promise<CodeFindingTrend> =>
+      unwrap(
+        await api.GET("/v1/code-finding-trend", {
+          params: { query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+// The time to judge across products.
+export function codeFindingJudgingAcrossRead(asked: CodeFindingAcrossAsked) {
+  return queryOptions({
+    queryKey: ["code-findings", "", "time-to-judge", asked],
+    queryFn: async (): Promise<CodeFindingJudging> =>
+      unwrap(
+        await api.GET("/v1/code-finding-time-to-judge", {
+          params: { query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+// Analysis coverage across products, each row naming its product.
+export function analysisCoverageAcrossRead(asked: CodeFindingAcrossAsked) {
+  return queryOptions({
+    queryKey: ["code-findings", "", "coverage", asked],
+    queryFn: async (): Promise<AnalysisCoverage> =>
+      unwrap(
+        await api.GET("/v1/analysis-coverage", {
+          params: { query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}

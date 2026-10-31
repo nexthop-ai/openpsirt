@@ -1,21 +1,22 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useQueries, type UseQueryResult } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api/client";
 import {
+  analysisCoverageAcrossRead,
   analysisCoverageRead,
+  codeFindingCountsRead,
+  codeFindingJudgingAcrossRead,
   codeFindingJudgingRead,
+  codeFindingTrendAcrossRead,
   codeFindingTrendRead,
-  codeFindingsQuery,
   type AnalysisCoverage,
   type CodeFindingMarker,
   type CodeFindingMethod,
   type CodeFindingTrend,
-  type CodeFindings,
 } from "../api/codeFindings";
-import { statusOf, unwrap } from "../api/queries";
+import { statusOf } from "../api/queries";
 import { counted, holding, refusedAt, type Holding } from "../app/families";
 import { analyticsReportAt, codeFindingsAcrossAt, codeFindingsAt } from "../app/routes";
 import { useScope, type Scoped } from "../app/scope";
@@ -34,11 +35,10 @@ import { TIERS, codeTrendAt, marksOf } from "./codeTrend";
 // analyzers gone quiet, and twelve weeks of what is not fixed. Counted per
 // testing method and never beside a dependency figure.
 //
-// Every figure is asked per product and added together across products, which
-// is sound because a code finding belongs to one product. Every product
-// counted is one where the reader reads security testing material, and the
-// head says how many; one read across products would also count products the
-// session does not list, a retired one among them.
+// Every figure is one read: of the product picked, or with none picked one
+// read across every product in use where the reader reads security testing
+// material, the products the session lists them as reading it in, and the
+// head says how many. The server adds the products together.
 
 // The weeks home's charts cover, as the dependency trend does.
 const WEEKS = 12;
@@ -75,13 +75,22 @@ function narrowing(at: Scoped) {
   };
 }
 
-// Every product's analysis coverage, for the quiet series and the newest run.
-// Shared with the status panel, which asks the same reads.
+// The product a figure is asked of, the one picked; none is the read across
+// products.
+function pickedOf(products: string[], at: Scoped): string | undefined {
+  return at.product && products.length > 0 ? at.product : undefined;
+}
+
+// The analysis coverage, for the quiet series and the newest run: one read of
+// the product picked, or one across products. Shared with the status panel,
+// which asks the same read. Nothing is asked where no product is counted.
 export function useCoverages(products: string[], at: Scoped): UseQueryResult<AnalysisCoverage>[] {
-  const asked = { ...narrowing(at), weeks: COVERAGE_WEEKS };
-  return useQueries({
-    queries: products.map((product) => analysisCoverageRead(product, asked)),
-  });
+  const one = pickedOf(products, at);
+  const read = one
+    ? analysisCoverageRead(one, { ...narrowing(at), weeks: COVERAGE_WEEKS })
+    : analysisCoverageAcrossRead({ weeks: COVERAGE_WEEKS });
+  const queries: (typeof read)[] = products.length === 0 ? [] : [read];
+  return useQueries({ queries });
 }
 
 // The holding a product's refused read says: a product the session does not
@@ -92,28 +101,10 @@ export function heldAfter(code: Holding, reads: Readable[], product: string | un
   return refusal ? refusedAt(code, refusal.error, product) : code;
 }
 
-// One product's queue counts, narrowed to the picker and to one method where
-// one is named.
-function queueRead(product: string, at: Scoped, method?: CodeFindingMethod) {
-  const asked = { ...narrowing(at), method, limit: 1 };
-  return {
-    queryKey: ["code-findings", product, asked],
-    queryFn: async (): Promise<CodeFindings> =>
-      unwrap(
-        await api.GET("/v1/products/{product}/code-findings", {
-          params: { path: { product }, query: codeFindingsQuery(asked) },
-        }),
-      ),
-    retry: false,
-  };
-}
-
-// A count added across every product's answer.
-function summed(
-  reads: UseQueryResult<CodeFindings>[],
-  pick: (each: CodeFindings) => number | undefined,
-): number {
-  return reads.reduce((sum, each) => sum + (each.data ? (pick(each.data) ?? 0) : 0), 0);
+// The queue's counts, narrowed to the picker and to one method where one is
+// named.
+function queueRead(one: string | undefined, at: Scoped, method?: CodeFindingMethod) {
+  return codeFindingCountsRead(one, { ...narrowing(at), method });
 }
 
 // The figures, at the picked scope.
@@ -122,55 +113,47 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
   const navigate = useNavigate();
   const products = codeProducts(who, at.product);
   const reads = products.length > 0;
-  const one = at.product && reads ? at.product : undefined;
+  const one = pickedOf(products, at);
   const asked = narrowing(at);
 
-  const queue = useQueries({ queries: products.map((product) => queueRead(product, at)) });
+  const queue = useQuery({ ...queueRead(one, at), enabled: reads });
   const methods = Object.keys(CODE_FINDING_METHODS) as CodeFindingMethod[];
   // Split by method once there is more than one: each method's open count
-  // from its own reads, never one total over methods.
+  // from its own read, never one total over methods.
   const split = methods.length > 1 && reads;
-  const byMethodReads = useQueries({
-    queries: (split ? methods : []).flatMap((method) =>
-      products.map((product) => queueRead(product, at, method)),
-    ),
+  const byMethod = useQueries({
+    queries: (split ? methods : []).map((method) => queueRead(one, at, method)),
   });
-  const byMethod = methods.map((_, i) =>
-    byMethodReads.slice(i * products.length, (i + 1) * products.length),
-  );
-  const trends = useQueries({
-    queries: products.map((product) => codeFindingTrendRead(product, { ...asked, weeks: WEEKS })),
+  const trends = useQuery({
+    ...(one
+      ? codeFindingTrendRead(one, { ...asked, weeks: WEEKS })
+      : codeFindingTrendAcrossRead({ weeks: WEEKS })),
+    enabled: reads,
   });
   // The queue's oldest code finding, which the time to judge answers beside
   // its ages. Its window is the shortest, since only the queue is read here.
-  const judging = useQueries({
-    queries: products.map((product) => codeFindingJudgingRead(product, { ...asked, weeks: 1 })),
+  const judging = useQuery({
+    ...(one
+      ? codeFindingJudgingRead(one, { ...asked, weeks: 1 })
+      : codeFindingJudgingAcrossRead({ weeks: 1 })),
+    enabled: reads,
   });
   const coverages = useCoverages(products, at);
 
-  const held = heldAfter(code, [...queue, ...trends, ...judging, ...coverages], one);
+  const held = heldAfter(code, [queue, trends, judging, ...coverages], one);
   if (!reads || !counted(held)) return <HeldLine at={held} />;
 
   const counting = one
     ? [one, at.branch_or_tag, at.variant].filter(Boolean).join(" · ")
     : `${products.length.toLocaleString()} ${products.length === 1 ? "product" : "products"}`;
-  const trend = merged(
-    products,
-    trends.map((each) => each.data),
-    !one,
-  );
-  const series = coverages.flatMap((each, i) =>
-    (each.data?.items ?? []).map((item) => ({ ...item, product: products[i] ?? "" })),
-  );
+  const trend = trends.data && named(trends.data, !one);
+  const series = coverages.flatMap((each) => each.data?.items ?? []);
   const quiet = series.filter((item) => item.quiet);
-  const oldest = judging
-    .map((each) => each.data?.oldest)
-    .filter((when): when is string => !!when)
-    .sort()[0];
+  const oldest = judging.data?.oldest;
   const last = trend?.points[trend.points.length - 1];
-  const open = summed(queue, (each) => each.states?.open);
-  const absent = summed(queue, (each) => each.states?.["no-longer-detected"]);
-  const waiting = summed(queue, (each) => each.total);
+  const open = queue.data?.states?.open ?? 0;
+  const absent = queue.data?.states?.["no-longer-detected"] ?? 0;
+  const waiting = queue.data?.total ?? 0;
   const queueAt = (state?: string) =>
     one
       ? codeFindingsAt(one, { state, ...asked })
@@ -179,12 +162,10 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
   // No series and nothing in the queue: a code finding outlives its series in
   // the coverage, which leaves out a retired branch or variant.
   const coverageRead = coverages.every((each) => each.isSuccess);
-  const queueAnswered = queue.every((each) => each.isSuccess);
-  const queued = queue.some(
-    (each) =>
-      (each.data?.total ?? 0) > 0 ||
-      Object.values(each.data?.states ?? {}).some((n) => (n ?? 0) > 0),
-  );
+  const queueAnswered = queue.isSuccess;
+  const queued =
+    (queue.data?.total ?? 0) > 0 ||
+    Object.values(queue.data?.states ?? {}).some((n) => (n ?? 0) > 0);
   if (coverageRead && queueAnswered && series.length === 0 && !queued) {
     return (
       <>
@@ -211,9 +192,7 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
                   <span key={method}>
                     {i > 0 && " · "}
                     <Count of={byMethod[i] ?? []}>
-                      {() =>
-                        summed(byMethod[i] ?? [], (each) => each.states?.open).toLocaleString()
-                      }
+                      {() => (byMethod[i]?.data?.states?.open ?? 0).toLocaleString()}
                     </Count>{" "}
                     {CODE_FINDING_METHODS[method].label}
                   </span>
@@ -369,69 +348,31 @@ const TIER_PARTS: StackPart[] = Object.entries(TIERS).map(([key, label], i) => (
   color: TIER_COLORS[i] ?? "var(--muted)",
 }));
 
-// A chart's body once every product's trend is read: one failure stands for
-// the whole, because a total missing a product is a wrong total.
+// A chart's body once the trend is read.
 function Drawn({
   trends,
   children,
 }: {
-  trends: UseQueryResult<CodeFindingTrend>[];
+  trends: UseQueryResult<CodeFindingTrend>;
   children: () => React.ReactNode;
 }) {
-  const failed = trends.find((each) => each.isError);
-  if (failed)
-    return <Failed error={failed.error} what="The code findings over time could not be read." />;
-  if (trends.some((each) => each.isPending)) return <Loading />;
+  if (trends.isError)
+    return <Failed error={trends.error} what="The code findings over time could not be read." />;
+  if (trends.isPending) return <Loading />;
   return <>{children()}</>;
 }
 
-// Every product's trend as one: the weeks end on the same days, so each
-// week's counts add. A marker names its product where more than one is
-// counted, because a series is one product's.
+// A trend as the charts draw it, each marker naming its product where the
+// trend is across products, because a series is one product's.
 type Point = NonNullable<CodeFindingTrend["points"]>[number];
-type Merged = { points: Point[]; markers: CodeFindingMarker[]; no_longer_detected: number };
+type Drawable = { points: Point[]; markers: CodeFindingMarker[]; no_longer_detected: number };
 
-export function merged(
-  products: string[],
-  trends: (CodeFindingTrend | undefined)[],
-  named: boolean,
-): Merged | undefined {
-  if (trends.length === 0 || trends.some((each) => !each)) return undefined;
-  const read = trends as CodeFindingTrend[];
-  const first = read[0];
-  if (!first) return undefined;
-  const add = (a: Record<string, number>, b: Record<string, number>) => {
-    const out = { ...a };
-    for (const [key, n] of Object.entries(b)) out[key] = (out[key] ?? 0) + n;
-    return out;
-  };
-  const points = (first.points ?? []).map((point, i) =>
-    read.slice(1).reduce(
-      (sum, other) => {
-        const at = other.points?.[i];
-        if (!at) return sum;
-        return {
-          at: sum.at,
-          not_fixed: sum.not_fixed + at.not_fixed,
-          opened: sum.opened + at.opened,
-          fixed: sum.fixed + at.fixed,
-          by_tier: add(sum.by_tier, at.by_tier),
-          by_series: add(sum.by_series, at.by_series),
-          by_method: add(sum.by_method, at.by_method),
-        };
-      },
-      { ...point },
-    ),
-  );
-  const markers: CodeFindingMarker[] = read.flatMap((trend, i) =>
-    (trend.markers ?? []).map((m) =>
-      named ? { ...m, series: `${products[i] ?? ""} ${m.series}` } : m,
-    ),
-  );
+function named(trend: CodeFindingTrend, across: boolean): Drawable {
+  const markers = trend.markers ?? [];
   return {
-    points,
-    markers: markers.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)),
-    no_longer_detected: read.reduce((sum, each) => sum + each.no_longer_detected, 0),
+    points: trend.points ?? [],
+    no_longer_detected: trend.no_longer_detected,
+    markers: across ? markers.map((m) => ({ ...m, series: `${m.product} ${m.series}` })) : markers,
   };
 }
 

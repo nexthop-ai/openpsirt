@@ -4,7 +4,6 @@
 import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Home, figuresShown } from "./Home";
-import { merged } from "./HomeSecurityTesting";
 import type { CodeFindingTrend } from "../api/codeFindings";
 import type { Who } from "../app/session";
 import { location, mounted, screen, serve, settle } from "../test/mount";
@@ -36,27 +35,33 @@ const both = (product: string) =>
 const codeOnly = (product: string) =>
   reaching(product, { may_see: true, reads_security_testing: true });
 
-// A twelve-week trend whose last week opened three and fixed one.
-function trendOf(notFixed: number, marker?: string): CodeFindingTrend {
+// A twelve-week trend whose last week opened and fixed the counts given, with
+// a marker on a product's series where one is named.
+function trendOf(
+  notFixed: number,
+  marker?: { product: string; series: string },
+  opened = 3,
+  fixed = 1,
+): CodeFindingTrend {
   return {
     points: Array.from({ length: 12 }, (_, i) => ({
       at: `2026-08-${String(i + 10).padStart(2, "0")}`,
       not_fixed: notFixed,
-      opened: i === 11 ? 3 : 0,
-      fixed: i === 11 ? 1 : 0,
+      opened: i === 11 ? opened : 0,
+      fixed: i === 11 ? fixed : 0,
       by_tier: { "memory-safety": notFixed, input: 0, resource: 0, other: 0 },
       by_series: {},
       by_method: { sast: notFixed },
     })),
-    markers: marker
-      ? [{ at: "2026-08-20", series: marker, change: "tool-version", builds: 1 }]
-      : [],
+    markers: marker ? [{ at: "2026-08-20", ...marker, change: "tool-version", builds: 1 }] : [],
     no_longer_detected: 0,
   };
 }
 
 // The home page drawn for a reader at an address, the server answering the
-// security testing reads with figures and everything else with nothing.
+// security testing reads with figures and everything else with nothing. A
+// product's read answers one product's figures; a read across products
+// answers two products' together, each marker and series naming its product.
 async function home(
   who: Who,
   at = "/",
@@ -68,34 +73,43 @@ async function home(
     asked.push(path);
     const product = (init as { params?: { path?: { product?: string } } } | undefined)?.params?.path
       ?.product;
-    const said = product ? aside?.(path, product) : undefined;
+    const said = aside?.(path, product ?? "");
     if (said) return said;
-    if (path === "/v1/code-findings" || path === "/v1/products/{product}/code-findings") {
-      return {
-        data: { items: [], total: 4, states: { open: 6, "no-longer-detected": 2 }, waiting: 2 },
-      };
-    }
-    if (path === "/v1/products/{product}/code-finding-trend") {
-      return { data: trendOf(5, product === "sonic" ? "clang" : undefined) };
-    }
-    if (path === "/v1/products/{product}/code-finding-time-to-judge") {
-      return { data: { waiting: [], no_longer_detected: 2, oldest: "2026-10-01" } };
-    }
-    if (path === "/v1/products/{product}/analysis-coverage") {
-      return {
-        data: {
-          quiet: quiet ? 1 : 0,
-          items: [
-            {
-              series: "clang-tidy",
-              branch_or_tag: "main",
-              variant: "arm",
-              quiet,
-              last_arrived: "2026-10-20T00:00:00Z",
-            },
-          ],
-        },
-      };
+    const coverage = (named: string) => ({
+      data: {
+        quiet: quiet ? 1 : 0,
+        items: [
+          {
+            product: named,
+            series: "clang-tidy",
+            branch_or_tag: "main",
+            variant: "arm",
+            quiet,
+            last_arrived: "2026-10-20T00:00:00Z",
+          },
+        ],
+      },
+    });
+    switch (path) {
+      case "/v1/products/{product}/code-findings":
+        return {
+          data: { items: [], total: 4, states: { open: 6, "no-longer-detected": 2 }, waiting: 2 },
+        };
+      case "/v1/code-finding-counts":
+        return { data: { total: 8, states: { open: 12, "no-longer-detected": 4 }, waiting: 4 } };
+      case "/v1/products/{product}/code-finding-trend":
+        return {
+          data: trendOf(5, product === "sonic" ? { product: "sonic", series: "clang" } : undefined),
+        };
+      case "/v1/code-finding-trend":
+        return { data: trendOf(10, { product: "sonic", series: "clang" }, 6, 2) };
+      case "/v1/products/{product}/code-finding-time-to-judge":
+      case "/v1/code-finding-time-to-judge":
+        return { data: { waiting: [], no_longer_detected: 2, oldest: "2026-10-01" } };
+      case "/v1/products/{product}/analysis-coverage":
+        return coverage(product ?? "");
+      case "/v1/analysis-coverage":
+        return coverage("sonic");
     }
     return { data: { items: [], total: 0 } };
   });
@@ -214,18 +228,25 @@ async function press(label: string) {
 }
 
 describe("the Security testing figures", () => {
-  it("count the queue, this week and the quiet series over the products the head names", async () => {
+  it("count every figure from one read across the products the head names", async () => {
     const asked = await home(person([codeOnly("sonic"), codeOnly("edge")]));
     expect(mount.host().textContent).toContain("Open · 2 products");
     expect(shown("Open")).toBe("12");
     expect(shown("Waiting for a judgment")).toBe("8");
+    expect(tile("Waiting for a judgment")?.textContent).toContain("oldest");
     expect(shown("This week")).toBe("+6 −2");
     expect(shown("No longer detected")).toBe("4");
     expect(tile("Analyzers gone quiet")?.textContent).toContain("sonic clang-tidy on main · arm");
+    for (const across of [
+      "/v1/code-finding-counts",
+      "/v1/code-finding-trend",
+      "/v1/code-finding-time-to-judge",
+      "/v1/analysis-coverage",
+    ]) {
+      expect(asked.filter((path) => path === across)).toHaveLength(1);
+    }
+    expect(asked.filter((path) => path.startsWith("/v1/products/{product}/"))).toEqual([]);
     expect(asked).not.toContain("/v1/code-findings");
-    expect(
-      asked.filter((path) => path === "/v1/products/{product}/code-finding-trend"),
-    ).toHaveLength(2);
   });
 
   it("name each analyzer change's product on the line over several products", async () => {
@@ -282,7 +303,7 @@ describe("the Security testing figures", () => {
 
   it("say no analyzer has run where no series has and nothing is queued, rather than drawing zeros", async () => {
     serve((path) =>
-      path === "/v1/products/{product}/analysis-coverage"
+      path === "/v1/analysis-coverage"
         ? { data: { quiet: 0, items: [] } }
         : { data: { items: [], total: 0, states: {}, points: [], markers: [] } },
     );
@@ -294,19 +315,15 @@ describe("the Security testing figures", () => {
 
   it("count the queue where no series is listed and code findings are still open", async () => {
     await home(person([codeOnly("sonic")]), "/", true, (path) =>
-      path === "/v1/products/{product}/analysis-coverage"
-        ? { data: { quiet: 0, items: [] } }
-        : undefined,
+      path === "/v1/analysis-coverage" ? { data: { quiet: 0, items: [] } } : undefined,
     );
     expect(mount.host().textContent).not.toContain("No analyzer has run here.");
-    expect(shown("Open")).toBe("6");
+    expect(shown("Open")).toBe("12");
   });
 
-  it("draw no oldest wait where one product's time to judge fails", async () => {
-    await home(person([codeOnly("sonic"), codeOnly("edge")]), "/", true, (path, product) =>
-      path === "/v1/products/{product}/code-finding-time-to-judge" && product === "edge"
-        ? { status: 500 }
-        : undefined,
+  it("draw no oldest wait where the time to judge across products fails", async () => {
+    await home(person([codeOnly("sonic"), codeOnly("edge")]), "/", true, (path) =>
+      path === "/v1/code-finding-time-to-judge" ? { status: 500 } : undefined,
     );
     const said = tile("Waiting for a judgment")?.querySelector(".d");
     expect(said?.textContent).not.toContain("oldest");
@@ -320,17 +337,5 @@ describe("the Security testing figures", () => {
     );
     expect(line?.querySelector(".when")?.textContent).toBe(on("2026-10-20T00:00:00Z"));
     expect(shown("Analyzers gone quiet")).toBe("0");
-  });
-});
-
-describe("a trend over several products", () => {
-  it("adds each week's counts", () => {
-    const one = merged(["sonic", "edge"], [trendOf(5), trendOf(2)], true);
-    expect(one?.points[11]).toMatchObject({ not_fixed: 7, opened: 6, fixed: 2 });
-    expect(one?.points[11]?.by_tier["memory-safety"]).toBe(7);
-  });
-
-  it("is unread until every product's trend is", () => {
-    expect(merged(["sonic", "edge"], [trendOf(5), undefined], true)).toBeUndefined();
   });
 });

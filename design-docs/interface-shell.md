@@ -152,7 +152,7 @@ are asked occasionally and are the slowest read.
 | Review queue count | One count per product: the rail's badge, the pending figure and the across-products figure are one request under one key, polled once a minute by the rail |
 | Dependency findings and code findings assigned to you | What the reader and their teams hold of each family, in the list's unit; the dependency figure carries the reports they hold beside it, never among them: a report is against a product and no build |
 | In progress | How much each person and team holds, open findings and reports together, three rows, the reader's own first |
-| Analyzer runs in the status panel | The newest run received and the series gone quiet, over the products the Security testing figures count, from the same reads |
+| Analyzer runs in the status panel | The newest run received and the series gone quiet, over the products the Security testing figures count, from the same read |
 
 ### Dependencies figures
 
@@ -191,8 +191,9 @@ figure (REQ-87), from the Security testing statistics consumer and the queue
 |---|---|
 | With no product picked, the figures count every product where the reader reads security testing material, and say how many | REQ-42: a product read nowhere is never counted |
 | A product, branch or variant picked narrows every figure as the queue narrows | |
-| Every figure, the queue's counts included, is asked per product and added across the products the head counts; a failed read of one product fails the figure | A series is one product's, a total missing one product is wrong, and a read across products also counts products the session does not list |
-| A marker names its product where more than one is counted | A series name is one product's |
+| Every figure is one read: of the product picked, or with none picked one read across the products in use where the reader reads security testing material, the products the head counts (`design-docs/analysis-figures.md` § Figures across products) | A read per product grows with the products, and the queue across products also counts a retired product the session does not list |
+| A failed read fails its whole figure | A total missing a product is wrong |
+| A marker and a quiet series name their product where no product is picked | A series name is one product's |
 | Where no series has run in the scope and the queue holds nothing, one line says no analyzer has run there, in place of the figures | A series never run reads as clean at zero; coverage leaves out a retired branch or variant, whose code findings stay in the queue |
 | A product the session does not list is asked, and a refusal draws the family's line in place of the figures and the analyzer lines of the status panel | It is held here until the server says otherwise (`design-docs/interface.md` § Families a reader holds) |
 | This week and Analyzers gone quiet open nothing across products | Both pages are one product's |
