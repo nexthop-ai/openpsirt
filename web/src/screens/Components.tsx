@@ -2,26 +2,34 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { answeredAt, holding } from "../app/families";
-import { componentAt } from "../app/routes";
+import { componentAt, componentSearchAt } from "../app/routes";
 import { findingsPath, scopeQuery, useScope } from "../app/scope";
 import { useWho } from "../app/session";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { HeldCell } from "../ui/HeldLine";
 import { Loading } from "../ui/Loading";
+import { notACredential } from "../ui/noautofill";
+import { useReseed } from "../ui/reseed";
 import { Wide } from "../ui/Wide";
 
-// The components a term names, for a search no issue answers. Each is a source
-// package in one product with what is open on it in both families, and opens
-// the component screen, where both families meet.
+// The components a term names, for a search no issue answers and for the
+// rail's Components entry. Each is a source package in one product with what
+// is open on it in both families, and opens the component screen, where both
+// families meet. Reached with no term, it asks for one.
 //
 // The scope is the picker's, so changing it answers the same term again.
 export function Components() {
   const { term = "" } = useParams();
+  const navigate = useNavigate();
+  const [typed, setTyped] = useState(term);
+  // Another term in the address, from the bar's search or Back, is the box's.
+  useReseed(term, () => setTyped(term));
   const at = useScope();
   const who = useWho();
   const found = useQuery({
@@ -35,18 +43,52 @@ export function Components() {
       ).items ?? [],
   });
   const rows = found.data ?? [];
+  const asked = term.trim() !== "";
 
   return (
     <div>
       <div className="screen-head">
-        <h2>Components named “{term}”</h2>
+        <h2>{asked ? `Components named “${term}”` : "Components"}</h2>
         <p>
           {at.product ? `In ${at.product}` : "In every product you read"}
-          {" · "}
-          <Link to={findingsPath(at, false, { q: term })}>Search the findings list instead</Link>
+          {asked && (
+            <>
+              {" · "}
+              <Link to={findingsPath(at, false, { q: term })}>
+                Search the findings list instead
+              </Link>
+            </>
+          )}
         </p>
       </div>
-      {found.isPending ? (
+      <form
+        className="filters"
+        style={{ marginBottom: 10 }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          const name = typed.trim();
+          if (name !== "") navigate(componentSearchAt(name));
+        }}
+      >
+        <input
+          {...notACredential}
+          type="search"
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          placeholder="Part of a component’s name"
+          aria-label="Part of a component’s name"
+          style={{ width: 260 }}
+        />
+        <button type="submit" className="btn">
+          Find
+        </button>
+      </form>
+      {!asked ? (
+        <Empty
+          title="Type part of a component’s name."
+          detail="Each match opens its component, with both families’ findings on it."
+        />
+      ) : found.isPending ? (
         <Loading />
       ) : found.isError ? (
         <Failed error={found.error} what="The components could not be searched." />

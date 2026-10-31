@@ -20,6 +20,10 @@ func TestEverySecurityTestingFigureRefusesAReaderOfDependencyWorkAlone(t *testin
 	scope := Scope{ProductID: 7}
 	now := time.Now()
 	for name, figure := range map[string]func() error{
+		"counts": func() error {
+			_, err := CodeFindingCountsOf(t.Context(), nil, reader, scope)
+			return err
+		},
 		"trend": func() error {
 			_, err := Trend(t.Context(), nil, reader, scope, now, time.Hour, 1)
 			return err
@@ -60,4 +64,39 @@ func refusedOrReached(figure func() error) (err error) {
 		}
 	}()
 	return figure()
+}
+
+// Every security testing figure across products refuses a scope naming a
+// product where the reader does not read security testing material, in the
+// data layer and before the database is asked anything, though they read it
+// in another product of the scope: each product is checked, never the first.
+func TestEverySecurityTestingFigureAcrossProductsRefusesAProductNotReadAtSecurityTesting(t *testing.T) {
+	reader := access.NewPerson(1, "reader", false, map[int64][]access.Role{
+		7: {access.SecurityTestingRead},
+		8: {access.PublicRead, access.PrivateRead},
+	}, 0)
+	scope := Scope{Across: []int64{7, 8}}
+	now := time.Now()
+	for name, figure := range map[string]func() error{
+		"counts": func() error {
+			_, err := CodeFindingCountsOf(t.Context(), nil, reader, scope)
+			return err
+		},
+		"trend": func() error {
+			_, err := Trend(t.Context(), nil, reader, scope, now, time.Hour, 1)
+			return err
+		},
+		"time to judge": func() error {
+			_, err := TimeToJudge(t.Context(), nil, reader, scope, now, now, now)
+			return err
+		},
+		"coverage": func() error {
+			_, err := CoverageOf(t.Context(), nil, reader, scope, now, now, now)
+			return err
+		},
+	} {
+		if err := refusedOrReached(figure); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("%s across products answered %v with a product read for dependency work alone; want a refusal", name, err)
+		}
+	}
 }

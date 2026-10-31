@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Link } from "react-router-dom";
-import { branchOrTagAt, branchesAndTagsAt } from "../app/routes";
+import { branchOrTagAt, productAt } from "../app/routes";
 
 // The place you are in, and the way back up. A screen bound to one build says
-// which build that is on the screen rather than only in the address bar.
+// which build that is on the screen rather than only in the address bar. The
+// product opens its page, where every build is named with what is open in it.
 export function Crumbs({
   product,
   branch_or_tag: branchOrTag,
@@ -24,13 +25,9 @@ export function Crumbs({
         Products
       </Link>
       <span aria-hidden>/</span>
-      {branchOrTag ? (
-        <Link to={branchesAndTagsAt(product)} className="hover:text-[var(--ink)]">
-          {product}
-        </Link>
-      ) : (
-        <span className="text-[var(--ink)]">{product}</span>
-      )}
+      <Link to={productAt(product)} className="hover:text-[var(--ink)]">
+        {product}
+      </Link>
       {branchOrTag && (
         <>
           <span aria-hidden>/</span>

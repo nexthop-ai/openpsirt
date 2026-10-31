@@ -1,7 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import type { paths } from "./schema";
 import { unwrap } from "./queries";
@@ -189,10 +195,16 @@ export function useCodeFindingTrend(
   asked: CodeFindingTrendAsked,
   enabled: boolean,
 ): UseQueryResult<CodeFindingTrend> {
-  return useQuery({
-    enabled,
+  return useQuery({ ...codeFindingTrendRead(product, asked), enabled });
+}
+
+// The trend's read, for a screen asking it of several products at once. One
+// builder for every caller, because a key shared by two copies of a request
+// serves either's answer to both.
+export function codeFindingTrendRead(product: string, asked: CodeFindingTrendAsked) {
+  return queryOptions({
     queryKey: ["code-findings", product, "trend", asked],
-    queryFn: async () =>
+    queryFn: async (): Promise<CodeFindingTrend> =>
       unwrap(
         await api.GET("/v1/products/{product}/code-finding-trend", {
           params: {
@@ -445,10 +457,14 @@ export function useCodeFindingJudging(
   asked: CodeFindingFigureAsked,
   enabled: boolean,
 ): UseQueryResult<CodeFindingJudging> {
-  return useQuery({
-    enabled,
+  return useQuery({ ...codeFindingJudgingRead(product, asked), enabled });
+}
+
+// The read behind useCodeFindingJudging, for a screen asking it of several products.
+export function codeFindingJudgingRead(product: string, asked: CodeFindingFigureAsked) {
+  return queryOptions({
     queryKey: ["code-findings", product, "time-to-judge", asked],
-    queryFn: async () =>
+    queryFn: async (): Promise<CodeFindingJudging> =>
       unwrap(
         await api.GET("/v1/products/{product}/code-finding-time-to-judge", {
           params: { path: { product }, query: codeFindingsQuery(asked) },
@@ -494,15 +510,25 @@ export function useCodeFindingPrecision(
   });
 }
 
+// The narrowing analysis coverage takes.
+type CoverageAsked = Pick<
+  CodeFindingFigureAsked,
+  "branch_or_tag" | "variant" | "series" | "method" | "weeks"
+>;
+
 export function useAnalysisCoverage(
   product: string,
-  asked: Pick<CodeFindingFigureAsked, "branch_or_tag" | "variant" | "series" | "method" | "weeks">,
+  asked: CoverageAsked,
   enabled: boolean,
 ): UseQueryResult<AnalysisCoverage> {
-  return useQuery({
-    enabled,
+  return useQuery({ ...analysisCoverageRead(product, asked), enabled });
+}
+
+// The read behind useAnalysisCoverage, for a screen asking it of several products.
+export function analysisCoverageRead(product: string, asked: CoverageAsked) {
+  return queryOptions({
     queryKey: ["code-findings", product, "coverage", asked],
-    queryFn: async () =>
+    queryFn: async (): Promise<AnalysisCoverage> =>
       unwrap(
         await api.GET("/v1/products/{product}/analysis-coverage", {
           params: { path: { product }, query: codeFindingsQuery(asked) },
@@ -527,6 +553,84 @@ export function useCodeFindingsByRelease(
       unwrap(
         await api.GET("/v1/products/{product}/code-findings-by-release", {
           params: { path: { product }, query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+// The narrowing a security testing figure across products takes: none that
+// names a part of one product.
+type CodeFindingAcrossAsked = Pick<CodeFindingFigureAsked, "series" | "method" | "weeks">;
+
+// The queue's counts, as a product's list and the counts across products both
+// state them.
+type CodeFindingCounts = Pick<Body<"CodeFindingCountsBody">, "total" | "states">;
+
+// The figures across every product in use where the reader reads security
+// testing material, one read each, under the key of a product's read with no
+// product named, so a decision refreshing the code findings refreshes them.
+
+// The queue's counts: a product's, from one row of its list narrowed as
+// asked, or with no product named the counts across products, with no rows.
+export function codeFindingCountsRead(
+  product: string | undefined,
+  asked: Pick<CodeFindingsAsked, "branch_or_tag" | "variant" | "series" | "method">,
+) {
+  return queryOptions({
+    queryKey: ["code-findings", product ?? "", "counts", asked],
+    queryFn: async (): Promise<CodeFindingCounts> =>
+      product
+        ? unwrap(
+            await api.GET("/v1/products/{product}/code-findings", {
+              params: { path: { product }, query: { ...codeFindingsQuery(asked), limit: 1 } },
+            }),
+          )
+        : unwrap(
+            await api.GET("/v1/code-finding-counts", {
+              params: { query: codeFindingsQuery({ series: asked.series, method: asked.method }) },
+            }),
+          ),
+    retry: false,
+  });
+}
+
+// The trend of code findings across products, each marker naming its product.
+export function codeFindingTrendAcrossRead(asked: CodeFindingAcrossAsked & { weeks: number }) {
+  return queryOptions({
+    queryKey: ["code-findings", "", "trend", asked],
+    queryFn: async (): Promise<CodeFindingTrend> =>
+      unwrap(
+        await api.GET("/v1/code-finding-trend", {
+          params: { query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+// The time to judge across products.
+export function codeFindingJudgingAcrossRead(asked: CodeFindingAcrossAsked) {
+  return queryOptions({
+    queryKey: ["code-findings", "", "time-to-judge", asked],
+    queryFn: async (): Promise<CodeFindingJudging> =>
+      unwrap(
+        await api.GET("/v1/code-finding-time-to-judge", {
+          params: { query: codeFindingsQuery(asked) },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+// Analysis coverage across products, each row naming its product.
+export function analysisCoverageAcrossRead(asked: CodeFindingAcrossAsked) {
+  return queryOptions({
+    queryKey: ["code-findings", "", "coverage", asked],
+    queryFn: async (): Promise<AnalysisCoverage> =>
+      unwrap(
+        await api.GET("/v1/analysis-coverage", {
+          params: { query: codeFindingsQuery(asked) },
         }),
       ),
     retry: false,

@@ -79,6 +79,7 @@ nothing. A move in the line beside one comes from the analyzer.
 | The run before is the series' newest applied run on the build built before it | It is the run it was compared with |
 | A tool change and a rule change on one run are two markers; a failed run on a new version is two | A run records its first reason alone |
 | One marker per day, series, change and the values it names, with how many builds it was made on; a series run twice on one build counts it once | A nightly series over forty builds is one change |
+| A marker names its product | A series is one product's; the trend across products marks every product's (`design-docs/analysis-figures.md` § Figures across products) |
 | A first run has no run before it and marks nothing unless it is not comparable for its own reason | |
 | A tool, version or rule count a run did not state is left out of the answer, and the page and the file say "not stated" | A blank reads as a value lost |
 
@@ -133,9 +134,10 @@ GET /v1/products/{product}/code-finding-trend.json
 
 Code findings over time is a page of the analytics catalog, in its Security
 testing group (`design-docs/analytics-catalog.md` § Catalog groups), reached
-from the rail, the Security testing screen and a component's trend panel
-(`design-docs/interface-security-testing.md` § Security testing,
-`design-docs/interface-component.md` § Security testing on the component).
+from the rail, the Security testing screen, a component's trend panel and home's
+This week figure (`design-docs/interface-security-testing.md` § Security
+testing, `design-docs/interface-component.md` § Security testing on the
+component, `design-docs/interface-shell.md` § Security testing figures).
 
 | Part | Holds |
 |---|---|

@@ -8,6 +8,7 @@ justifies.
 - [Producer output](#producer-output)
 - [Trend of code findings](#trend-of-code-findings)
 - [Security testing figures](#security-testing-figures)
+- [Figures across products](#figures-across-products)
 
 ## Producer output
 
@@ -92,3 +93,36 @@ last three is shown, the slower of the two states.
 |---|---|
 | Beneath a component is not in the table | It adds the tree walk the trend's table measures, which on MySQL and MariaDB at this size outlasts the run |
 | One build of the product | The figures read every build of the product; this model holds one, and the other product's build holds only closings |
+
+## Figures across products
+
+Justifies reading home's Security testing figures once across products
+(`design-docs/analysis-figures.md` § Figures across products).
+`TestMeasureTheSecurityTestingFiguresAcrossProducts` under `make measure`: the
+model of § Security testing figures, with the reader holding security testing
+material in both products. Each across-products read is set beside the same
+figure for the hub's product alone, asked as home asks it: the queue's counts,
+twelve weeks of trend, and one week of time to judge and coverage. Each is
+asked four times, as loaded and again refreshed; the second fastest of the last
+three is shown, the slower of the two states.
+
+| Read | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|---|---|---|
+| Counts across products | 919 ms | 3.44 s | 2.87 s |
+| The product's queue, one row | 6.95 s | 4.45 s | 17.3 s |
+| Trend across products | 56 ms | 565 ms | 473 ms |
+| The product's trend | 49 ms | 353 ms | 243 ms |
+| Time to judge across products | 138 ms | 831 ms | 750 ms |
+| The product's time to judge | 137 ms | 609 ms | 483 ms |
+| Coverage across products | 8 ms | 3 ms | 5 ms |
+| The product's coverage | 8 ms | 3 ms | 4 ms |
+
+| Reading | |
+|---|---|
+| Counts | Counting without rows skips building the page, so the counts across both products are faster than one product's queue of one row |
+| The other figures | Across products costs about one more product's read, and saves a request per product |
+
+| Caveat | Detail |
+|---|---|
+| MariaDB ran beside another measurement on PostgreSQL and MySQL | Its times carry that noise |
+| The other product holds dependency closings alone | It adds rows to read and nothing to count |

@@ -3,15 +3,12 @@
 
 // The groups of the rail that are folded away.
 //
-// The rail asks for about 935 pixels of entries, which is taller than the
-// window on most laptops. Giving it a scroll region of its own put a second
-// scrollbar down the middle of the screen — a worse thing than the problem it
-// solved — and letting it scroll with the page left the menu a thousand pixels
-// above somebody reading the foot of a findings list.
-//
-// So it folds instead. "Manage" is shut to begin with: it is where somebody
-// goes occasionally to grant a role or change a setting, rather than while
-// working, and with it away the rail fits a laptop with room to spare.
+// The rail unfolded is taller than the window on most laptops. A scroll
+// region of its own puts a second scrollbar down the middle of the screen,
+// and scrolling with the page leaves the menu far above somebody reading the
+// foot of a findings list, so it folds. "Manage" is shut to begin with: it is
+// where somebody goes occasionally to grant a role or change a setting, and
+// folding it shortens the rail by its entries.
 //
 // Kept in the browser, per person, the same rule as the look and saved
 // filters: it changes what one person sees and nothing anybody else is shown.

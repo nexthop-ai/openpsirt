@@ -168,19 +168,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &struct{ Body CodeFindingJudgingBody }{}
-		out.Body = CodeFindingJudgingBody{
-			Since: since.UTC().Format(time.DateOnly), Until: lastDay(until), Judged: waitsBody(got.Judged),
-			NoLongerDetected: got.NoLongerDetected, Waiting: make([]CodeFindingAgedBody, 0, len(got.Waiting)),
-		}
-		if got.Oldest != nil {
-			out.Body.Oldest = got.Oldest.UTC().Format(time.DateOnly)
-		}
-		for _, aged := range got.Waiting {
-			out.Body.Waiting = append(out.Body.Waiting, CodeFindingAgedBody{Label: aged.Stretch.Label,
-				From: aged.Stretch.From, Until: aged.Stretch.To, Waiting: aged.Waiting, ByTier: aged.ByTier})
-		}
-		return out, nil
+		return &struct{ Body CodeFindingJudgingBody }{Body: judgingBody(got, since, until)}, nil
 	})
 	judgedFile := figureFile{
 		id: "export-code-finding-time-to-judge", path: "/v1/products/{product}/code-finding-time-to-judge",
@@ -199,16 +187,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		rows := waitRows("judged", got.Judged)
-		for _, aged := range got.Waiting {
-			rows = append(rows, []string{"waiting " + aged.Stretch.Label, "all", strconv.Itoa(aged.Waiting), "", "", ""})
-			for _, tier := range weakness.Tiers() {
-				rows = append(rows, []string{"waiting " + aged.Stretch.Label, tier.Name(),
-					strconv.Itoa(aged.ByTier[tier.Name()]), "", "", ""})
-			}
-		}
-		rows = append(rows, []string{"no longer detected", "all", strconv.Itoa(got.NoLongerDetected), "", "", ""})
-		return judgedFile.stream(input.Format, input.Product, weeksStated(input.Weeks), rows), nil
+		return judgedFile.stream(input.Format, input.Product, weeksStated(input.Weeks), judgingRows(got)), nil
 	})
 
 	fixed := func(ctx context.Context, input *CodeFindingWindowAsked) (*analysis.Fixing, time.Time, time.Time, error) {
@@ -275,6 +254,35 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 	})
 }
 
+// judgingBody is the time to judge as its figure reads it.
+func judgingBody(got *analysis.Judging, since, until time.Time) CodeFindingJudgingBody {
+	out := CodeFindingJudgingBody{
+		Since: since.UTC().Format(time.DateOnly), Until: lastDay(until), Judged: waitsBody(got.Judged),
+		NoLongerDetected: got.NoLongerDetected, Waiting: make([]CodeFindingAgedBody, 0, len(got.Waiting)),
+	}
+	if got.Oldest != nil {
+		out.Oldest = got.Oldest.UTC().Format(time.DateOnly)
+	}
+	for _, aged := range got.Waiting {
+		out.Waiting = append(out.Waiting, CodeFindingAgedBody{Label: aged.Stretch.Label,
+			From: aged.Stretch.From, Until: aged.Stretch.To, Waiting: aged.Waiting, ByTier: aged.ByTier})
+	}
+	return out
+}
+
+// judgingRows is the time to judge as the rows of its file.
+func judgingRows(got *analysis.Judging) [][]string {
+	rows := waitRows("judged", got.Judged)
+	for _, aged := range got.Waiting {
+		rows = append(rows, []string{"waiting " + aged.Stretch.Label, "all", strconv.Itoa(aged.Waiting), "", "", ""})
+		for _, tier := range weakness.Tiers() {
+			rows = append(rows, []string{"waiting " + aged.Stretch.Label, tier.Name(),
+				strconv.Itoa(aged.ByTier[tier.Name()]), "", "", ""})
+		}
+	}
+	return append(rows, []string{"no longer detected", "all", strconv.Itoa(got.NoLongerDetected), "", "", ""})
+}
+
 // figureFile is the file of one figure: what the operation is called and
 // says, and what its rows are headed.
 type figureFile struct {
@@ -309,7 +317,11 @@ func (f figureFile) stream(format, product string, about []core.Stated, rows [][
 			return rows, nil
 		},
 	}
-	name := f.what + "-" + strings.ToLower(product)
+	// A figure across products is named for no product.
+	name := f.what
+	if product != "" {
+		name += "-" + strings.ToLower(product)
+	}
 	return &huma.StreamResponse{Body: func(writer huma.Context) {
 		core.WriteExport(writer, format, name, out)
 	}}

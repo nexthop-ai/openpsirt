@@ -72,14 +72,14 @@ A consumer reads findings and names its kinds; others never reach it.
 | Assignment | Giving work, handovers, a lost role's hand-back, team assignment rules and preview, and the lists of held work: unassigned, one person's, a team's queue, totals per holder (`design-docs/access-assignment.md` § Teams, `design-docs/analysis-triage.md` § Code finding assignment) | Vulnerability, entered, analysis |
 | Decisions | Decisions and occurrences, reasoning and revisions, approvals, comments, the review queue, every read of one decision, the audit log and file, and decision notices: waiting, sent back, lapsed, agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and its occurrences | Vulnerability, entered |
-| Statistics | Trends, build comparisons, coverage, reports, the home page's figures | Vulnerability, entered |
+| Statistics | Trends, build comparisons, coverage, reports, the home page's Dependencies figures | Vulnerability, entered |
 | Exports | The findings lists as files (REQ-50): the rows, then the selection's code findings as Code findings reads them | Vulnerability, entered, analysis |
 | Register | The disposition register, screen and file | Vulnerability, entered |
 | VEX | Documents stating what affects a build | Vulnerability, entered |
 | Advisories | Documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What people are told about findings | Vulnerability, entered |
 | Evidence | One code finding's place, path, links and kept source (`design-docs/analysis-source.md` § Source) | Analysis |
-| Security testing statistics | Every security testing figure over time: the trend of code findings, a component's included, its markers and file (`design-docs/analysis-statistics.md`) | Analysis |
+| Security testing statistics | Every security testing figure over time: the trend of code findings, a component's included, its markers and file (`design-docs/analysis-statistics.md`), and the home page's Security testing figures (`design-docs/interface-shell.md` § Security testing figures) | Analysis |
 | Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, a component's counts, the tree's and the chooser's counts, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-queue.md` § Code findings of a component, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, `design-docs/notifications-work.md` § Code finding notices) | Analysis |
 
 The audit log's file follows Decisions and includes code finding decisions under

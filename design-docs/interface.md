@@ -344,6 +344,6 @@ a text file that reads as binary, which every text tool skips silently.
 
 | Limit | Detail |
 |---|---|
-| Code findings are counted on no shared screen | The code family's rule reaches the rail and the product page's link alone; home, the component screen, the tree and the product figures count dependency findings |
+| The product page counts dependency findings alone | Its builds table names no code finding count; its link to code findings opens the queue |
 | No component library | Built from the mockup's tokens and components written here; a packaged data grid owning its markup cannot become cards on a phone (REQ-55) |
 | Dependencies are pinned exactly | A range resolves at build time; `npm ci` installs the lockfile |

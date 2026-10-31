@@ -18,7 +18,7 @@ Satisfies REQ-01, REQ-15, REQ-28, REQ-60.
 
 ## Analytics
 
-Analytics is the catalog of named reports under Across products, beside the audit
+Analytics is the catalog of named reports under Reports, beside the audit
 log: the audit log is what was judged and who agreed; a report is the shape of
 the judging. Reports may span products; a person only sees products they hold a
 role on.

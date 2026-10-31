@@ -58,7 +58,7 @@ is and § Dispositions what a ruling does.
 | Rule | Reason |
 |---|---|
 | The link appears only for a reader of undisclosed work in the product, and the product page's link says how many rulings wait | |
-| The rail carries it under the scope for a reader of reports anywhere, declining where no product is picked or the reader may not read reports there | |
+| The rail carries it under Respond for a reader of reports anywhere, declining where no product is picked or the reader may not read reports there | |
 | A reader who does not work reports sees no writing control (recording, editing, recording a message, writing a note, assigning, accepting, attaching, proposing, withdrawing); notes and correspondence are drawn without a composer. Approve is offered where the capability answer's ruling field says so | |
 | A problem somebody sent is called a vulnerability report wherever a person reads it | Analytics' named reports sit on the rail |
 | The reported problem, a message and a ruling's reason offer no mentions | Nothing reads a mention there |

@@ -91,6 +91,7 @@ sits at, with how far it is decided in each.
 | `beneath`, `differs` and `across_variants` are not offered across products; every other filter is shared | They are about one build or a selection of builds |
 | `across_variants` compares a row with the other builds of its branch: `only` keeps what no other variant holds and needs a variant selected; `every` keeps what every build of the branch holds | |
 | `/v1/code-findings` spans products as one code finding queue, with the per-product queue's filters except `beneath` (`design-docs/analysis-queue.md` § Queue across products) | |
+| The queue's counts, the code finding trend, the time to judge and analysis coverage each have one read across the products in use, narrowed by series and method (`design-docs/analysis-figures.md` § Figures across products) | Home asks one read per figure, whatever the number of products |
 | The dependency tree and the inventories stay per product | |
 | `/v1/unassigned` and a person's or team's assignments span products, and `family` keeps one family, dependency or code, and counts it alone (`design-docs/kinds.md` § Consumers) | The reader's own lists and the lists of unheld work draw one count per family (`design-docs/interface-review.md` § Work nobody holds) |
 

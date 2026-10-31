@@ -84,13 +84,14 @@ type CodeFindingPointBody struct {
 // CodeFindingMarkerBody is runs of one series on one day that changed what
 // the trend compares.
 type CodeFindingMarkerBody struct {
-	At     string            `json:"at" format:"date" doc:"The day the runs were applied"`
-	Series string            `json:"series" doc:"The analyzer series whose runs made the change, by name"`
-	Change CodeFindingChange `json:"change" doc:"What changed from the run applied before on the same build: the tool, its version or its rules; or not-comparable, a run whose absences are no evidence for another reason"`
-	Reason core.RunReason    `json:"reason,omitempty" doc:"Why the runs were not comparable. Only on not-comparable"`
-	From   string            `json:"from,omitempty" doc:"The tool, the version or the number of rules before. Left out on a tool, version or rules change where the run before stated none"`
-	To     string            `json:"to,omitempty" doc:"The tool, the version or the number of rules after. Left out on a tool, version or rules change where the run stated none"`
-	Builds int               `json:"builds" doc:"How many builds the change was made on that day"`
+	At      string            `json:"at" format:"date" doc:"The day the runs were applied"`
+	Product string            `json:"product" doc:"The product the series is in, by the name that addresses it"`
+	Series  string            `json:"series" doc:"The analyzer series whose runs made the change, by name"`
+	Change  CodeFindingChange `json:"change" doc:"What changed from the run applied before on the same build: the tool, its version or its rules; or not-comparable, a run whose absences are no evidence for another reason"`
+	Reason  core.RunReason    `json:"reason,omitempty" doc:"Why the runs were not comparable. Only on not-comparable"`
+	From    string            `json:"from,omitempty" doc:"The tool, the version or the number of rules before. Left out on a tool, version or rules change where the run before stated none"`
+	To      string            `json:"to,omitempty" doc:"The tool, the version or the number of rules after. Left out on a tool, version or rules change where the run stated none"`
+	Builds  int               `json:"builds" doc:"How many builds the change was made on that day"`
 }
 
 func registerCodeFindingTrend(api huma.API, in core.Deps) {
@@ -121,23 +122,7 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.Refused(in.Logger, err, "the code findings over time could not be worked out")
 		}
-		out := &struct{ Body CodeFindingTrendBody }{}
-		out.Body.NoLongerDetected = trended.NoLongerDetected
-		out.Body.Points = make([]CodeFindingPointBody, 0, len(trended.Points))
-		for _, p := range trended.Points {
-			out.Body.Points = append(out.Body.Points, CodeFindingPointBody{
-				At: lastDay(p.At), NotFixed: p.NotFixed, Opened: p.Opened, Fixed: p.Fixed,
-				ByTier: p.ByTier, BySeries: p.BySeries, ByMethod: p.ByMethod,
-			})
-		}
-		out.Body.Markers = make([]CodeFindingMarkerBody, 0, len(trended.Markers))
-		for _, m := range trended.Markers {
-			out.Body.Markers = append(out.Body.Markers, CodeFindingMarkerBody{
-				At: m.At.UTC().Format(time.DateOnly), Series: m.Series, Change: CodeFindingChange(m.Change),
-				Reason: core.RunReason(m.Reason), From: m.From, To: m.To, Builds: m.Builds,
-			})
-		}
-		return out, nil
+		return &struct{ Body CodeFindingTrendBody }{Body: trendBody(trended)}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -173,7 +158,7 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 				if err != nil {
 					return nil, err
 				}
-				return trendRows(trended), nil
+				return trendRows(trended, false), nil
 			},
 		}
 		name := "code findings over time-" + strings.ToLower(input.Product)
@@ -183,8 +168,30 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 	})
 }
 
-// trendRows is a trend as the rows of its file.
-func trendRows(trended *analysis.Trended) [][]string {
+// trendBody is a trend as the chart reads it.
+func trendBody(trended *analysis.Trended) CodeFindingTrendBody {
+	out := CodeFindingTrendBody{NoLongerDetected: trended.NoLongerDetected}
+	out.Points = make([]CodeFindingPointBody, 0, len(trended.Points))
+	for _, p := range trended.Points {
+		out.Points = append(out.Points, CodeFindingPointBody{
+			At: lastDay(p.At), NotFixed: p.NotFixed, Opened: p.Opened, Fixed: p.Fixed,
+			ByTier: p.ByTier, BySeries: p.BySeries, ByMethod: p.ByMethod,
+		})
+	}
+	out.Markers = make([]CodeFindingMarkerBody, 0, len(trended.Markers))
+	for _, m := range trended.Markers {
+		out.Markers = append(out.Markers, CodeFindingMarkerBody{
+			At: m.At.UTC().Format(time.DateOnly), Product: m.Product, Series: m.Series,
+			Change: CodeFindingChange(m.Change), Reason: core.RunReason(m.Reason), From: m.From, To: m.To,
+			Builds: m.Builds,
+		})
+	}
+	return out
+}
+
+// trendRows is a trend as the rows of its file. Across products, a marker
+// names its product, since a series is one product's.
+func trendRows(trended *analysis.Trended, across bool) [][]string {
 	var rows [][]string
 	for i, p := range trended.Points {
 		end := lastDay(p.At)
@@ -196,7 +203,7 @@ func trendRows(trended *analysis.Trended) [][]string {
 			if day > end || (i > 0 && day <= lastDay(trended.Points[i-1].At)) {
 				continue
 			}
-			changes = append(changes, markerWords(m))
+			changes = append(changes, markerWords(m, across))
 		}
 		rows = append(rows, []string{end, "total", "", strconv.Itoa(p.NotFixed),
 			strconv.Itoa(p.Opened), strconv.Itoa(p.Fixed), strings.Join(changes, "; ")})
@@ -218,9 +225,13 @@ func trendRows(trended *analysis.Trended) [][]string {
 	return rows
 }
 
-// markerWords is a marker as the file states it.
-func markerWords(m analysis.Marker) string {
+// markerWords is a marker as the file states it, naming its product where
+// named is set.
+func markerWords(m analysis.Marker, named bool) string {
 	said := m.Series + " " + string(m.Change)
+	if named {
+		said = m.Product + " " + said
+	}
 	if m.Change == analysis.NotComparable {
 		said += " (" + string(m.Reason) + ")"
 	}

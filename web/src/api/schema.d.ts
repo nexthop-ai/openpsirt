@@ -378,6 +378,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/analysis-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read analysis coverage across products
+         * @description Returns every analyzer series on every build in use of every product counted, each row naming its product, as one product's coverage lists them: quiet first, then the longest silent.
+         *
+         *     Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["read-analysis-coverage-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/analysis-coverage.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export analysis coverage across products
+         * @description Analysis coverage across products as a file, a row per series and build in the order the coverage lists them, in the columns of one product's with its product last. Takes what the coverage takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["export-analysis-coverage-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/approval-batches/{batch}": {
         parameters: {
             query?: never;
@@ -648,6 +694,144 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-audit-decisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-finding-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count code findings across products
+         * @description Returns the code finding queue's counts summed over products, with no rows: how many code findings the queue holds, how many stand in each state, how many wait for a second person, how many a suppression rule dismisses, and how many are open only in releases past their end of life. Each product's counts are its own queue's.
+         *
+         *     Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["count-code-findings-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-finding-counts.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export code finding counts across products
+         * @description The code finding counts across products as a file: a row for the queue, a row per state, then the rows waiting, ruled and past end of life. Takes what the counts take, and is refused as they are.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["export-code-finding-counts-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-finding-time-to-judge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Measure time to judge code findings across products
+         * @description Returns how long code findings waited from opening to the first decision proposed about them in their product, for the first decisions proposed in the weeks asked, over every product's code findings together; the queue now by age, summed over products; when the oldest code finding in any product's queue opened; and how many are no longer detected. Each product's code findings are judged against its own decisions.
+         *
+         *     Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["time-code-finding-judging-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-finding-time-to-judge.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the time to judge code findings across products
+         * @description The time to judge across products as a file, in the rows of one product's. Takes what the figure takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["export-code-finding-time-to-judge-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-finding-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trend code findings across products
+         * @description Returns, per week, the code findings not fixed at the end of the week summed over products, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it, as one product's trend counts them. A series of the same name in two products is one split. Each marker names its product.
+         *
+         *     Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["trend-code-findings-across-products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/code-finding-trend.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the code finding trend across products
+         * @description The code finding trend across products as a file, in the columns of one product's, each marker naming its product. Takes what the trend takes, and is refused as it is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+         */
+        get: operations["export-code-finding-trend-across-products"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7964,6 +8148,8 @@ export interface components {
             not_comparable_runs: number;
             /** @description Whether the release is past its end of life, analyzed by nobody on purpose */
             past_end_of_life?: boolean;
+            /** @description The product the series is in, by the name that addresses it */
+            product: string;
             /** @description Whether the series has gone quiet on the build: no comparable run arrived for three of its own usual gaps, never under a day. Never on a release past its end of life */
             quiet: boolean;
             /** @description The analyzer series, by name */
@@ -8904,6 +9090,38 @@ export interface components {
             /** @description The way that line is built */
             variant: string;
         };
+        CodeFindingCountsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CodeFindingCountsBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Open code findings left out of the queue because every release they are open in is past its end of life
+             */
+            past_end_of_life: number;
+            /**
+             * Format: int64
+             * @description Dismissed code findings an approved suppression rule covers, counted among the dismissed in states
+             */
+            ruled: number;
+            /** @description The code findings by where they stand. A code finding on two builds in two states counts in both, and a fixed code finding counts until it opens anew on its build */
+            states: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description The code findings the queue holds: open, with no decision waiting for a second person, and seen in a release still in support
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description Open code findings left out of the queue because a decision about them waits for a second person
+             */
+            waiting: number;
+        };
         CodeFindingDecisionBody: {
             /**
              * Format: uri
@@ -9113,6 +9331,8 @@ export interface components {
             change: "not-comparable" | "rules" | "tool" | "tool-version";
             /** @description The tool, the version or the number of rules before. Left out on a tool, version or rules change where the run before stated none */
             from?: string;
+            /** @description The product the series is in, by the name that addresses it */
+            product: string;
             /**
              * @description Why the runs were not comparable. Only on not-comparable
              * @enum {string}
@@ -16832,6 +17052,78 @@ export interface operations {
             };
         };
     };
+    "read-analysis-coverage-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisCoverageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-analysis-coverage-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "undo-batch": {
         parameters: {
             query?: never;
@@ -17256,6 +17548,218 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CountedListBodyAuditedDecisionBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "count-code-findings-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingCountsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-finding-counts-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "time-code-finding-judging-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingJudgingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-finding-time-to-judge-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "trend-code-findings-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeFindingTrendBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-code-finding-trend-across-products": {
+        parameters: {
+            query?: {
+                /** @description Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing */
+                series?: string;
+                /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
+                method?: "sast";
+                /** @description The number of weeks, ending at the coming midnight UTC */
+                weeks?: number;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

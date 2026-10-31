@@ -84,6 +84,7 @@ type AnalysisCoverageAsked struct {
 
 // AnalyzedBody is one series on one build in use.
 type AnalyzedBody struct {
+	Product           string         `json:"product" doc:"The product the series is in, by the name that addresses it"`
 	BranchOrTag       string         `json:"branch_or_tag" doc:"The branch or tag, by the name that addresses it"`
 	BranchOrTagName   string         `json:"branch_or_tag_name" doc:"The branch or tag as shown"`
 	Variant           string         `json:"variant" doc:"The variant, by the name that addresses it"`
@@ -272,27 +273,15 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &struct{ Body AnalysisCoverageBody }{}
-		out.Body = AnalysisCoverageBody{Since: since.UTC().Format(time.DateOnly), Until: lastDay(until),
-			Items: make([]AnalyzedBody, 0, len(got))}
-		for _, a := range got {
-			if a.Quiet() {
-				out.Body.Quiet++
-			}
-			out.Body.Items = append(out.Body.Items, analyzedBody(a))
-		}
-		return out, nil
+		return &struct{ Body AnalysisCoverageBody }{Body: coverageBody(got, since, until)}, nil
 	})
 	coveredFile := figureFile{
 		id: "export-analysis-coverage", path: "/v1/products/{product}/analysis-coverage",
 		summary: "Export analysis coverage",
 		description: "Analysis coverage as a file, a row per series and build in the order the coverage " +
 			"lists them. Takes what the coverage takes, and is refused as it is.",
-		what: "analysis coverage",
-		header: []string{"branch or tag", "variant", "series", "method", "quiet", "past end of life",
-			"last arrived", "last applied", "not comparable", "units expected", "units analyzed",
-			"last comparable", "applied runs", "not comparable runs", "failed runs", "expected days",
-			"allowed days", "silent days"},
+		what:   "analysis coverage",
+		header: coverageColumns(),
 	}
 	huma.Register(api, coveredFile.operation(), func(ctx context.Context, input *struct {
 		AnalysisCoverageAsked
@@ -302,16 +291,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		rows := make([][]string, 0, len(got))
-		for _, a := range got {
-			b := analyzedBody(a)
-			rows = append(rows, []string{b.BranchOrTagName, b.VariantName, b.Series, b.Method,
-				strconv.FormatBool(b.Quiet), strconv.FormatBool(b.PastEndOfLife), b.Arrived, b.Applied,
-				string(b.NotComparable), optionalInt(b.UnitsExpected), optionalInt(b.UnitsAnalyzed), b.Comparable,
-				strconv.Itoa(b.AppliedRuns), strconv.Itoa(b.NotComparableRuns), strconv.Itoa(b.FailedRuns),
-				optionalDays(b.Expected), optionalDays(b.Allowed), optionalDays(b.Silent)})
-		}
-		return coveredFile.stream(input.Format, input.Product, weeksStated(input.Weeks), rows), nil
+		return coveredFile.stream(input.Format, input.Product, weeksStated(input.Weeks), coverageRows(got, false)), nil
 	})
 
 	released := func(ctx context.Context, input *CodeFindingsByReleaseAsked) ([]analysis.Release, error) {
@@ -395,8 +375,51 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 	})
 }
 
+// coverageBody is analysis coverage as its figure reads it.
+func coverageBody(got []analysis.Analyzed, since, until time.Time) AnalysisCoverageBody {
+	out := AnalysisCoverageBody{Since: since.UTC().Format(time.DateOnly), Until: lastDay(until),
+		Items: make([]AnalyzedBody, 0, len(got))}
+	for _, a := range got {
+		if a.Quiet() {
+			out.Quiet++
+		}
+		out.Items = append(out.Items, analyzedBody(a))
+	}
+	return out
+}
+
+// coverageColumns names the columns of analysis coverage's file, in the
+// order coverageRows fills them. Across products, a last column names the
+// product.
+func coverageColumns() []string {
+	return []string{"branch or tag", "variant", "series", "method", "quiet", "past end of life",
+		"last arrived", "last applied", "not comparable", "units expected", "units analyzed",
+		"last comparable", "applied runs", "not comparable runs", "failed runs", "expected days",
+		"allowed days", "silent days"}
+}
+
+// coverageRows is analysis coverage as the rows of its file, each naming its
+// product last where across is set.
+func coverageRows(got []analysis.Analyzed, across bool) [][]string {
+	rows := make([][]string, 0, len(got))
+	for _, a := range got {
+		b := analyzedBody(a)
+		row := []string{b.BranchOrTagName, b.VariantName, b.Series, b.Method,
+			strconv.FormatBool(b.Quiet), strconv.FormatBool(b.PastEndOfLife), b.Arrived, b.Applied,
+			string(b.NotComparable), optionalInt(b.UnitsExpected), optionalInt(b.UnitsAnalyzed), b.Comparable,
+			strconv.Itoa(b.AppliedRuns), strconv.Itoa(b.NotComparableRuns), strconv.Itoa(b.FailedRuns),
+			optionalDays(b.Expected), optionalDays(b.Allowed), optionalDays(b.Silent)}
+		if across {
+			row = append(row, b.Product)
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
 func analyzedBody(a analysis.Analyzed) AnalyzedBody {
 	out := AnalyzedBody{
+		Product:     a.Product,
 		BranchOrTag: a.BranchOrTag, BranchOrTagName: a.BranchOrTagShown, Variant: a.Variant,
 		VariantName: a.VariantShown, Series: a.Series, Method: string(a.Method), Quiet: a.Quiet(),
 		PastEndOfLife: a.PastEndOfLife, Arrived: core.StampAt(a.Arrived), Applied: core.StampAt(a.Applied),
