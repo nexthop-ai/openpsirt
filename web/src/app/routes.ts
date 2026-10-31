@@ -125,8 +125,16 @@ export const codeFindingAt = (build: Build, occurrence: string) =>
 export const suppressionRulesAt = (product: string) => at("suppressionRules", { product });
 // The hosts a product's source links open on, and what it says per path.
 export const repositoriesAt = (product: string) => at("repositories", { product });
-// The components a term names, in the picker's selection.
+// The components a term names, in the picker's selection, and the same
+// screen before a term is typed.
 export const componentSearchAt = (term: string) => at("componentSearch", { term });
+export const componentsAt = () => at("components");
+
+// Home, opened on one family's figures where a reader holds both. Dependencies
+// is the figures shown where the address names none.
+export type HomeFigures = "dependencies" | "security-testing";
+export const homeAt = (figures?: HomeFigures) =>
+  at("home", {}, { figures: figures === "security-testing" ? figures : undefined });
 
 // A component of a product, wherever it sits. The version travels with it
 // where it is known, and so does the build it was reached from, so the screen

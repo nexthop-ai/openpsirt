@@ -24,7 +24,7 @@ the reader reads security testing material in.
 | Rule | Reason |
 |---|---|
 | The link appears only for a reader of security testing material in the product | A code finding is at security testing visibility |
-| The rail carries it under the scope beside Dependency findings and Vulnerability reports, for a reader of security testing material anywhere, declining in a product where the reader may not read security testing material. With a product picked it opens on the picked branch and variant where both are, else every build; with none, the queue across products | |
+| The rail carries it under Investigate beside Dependency findings, for a reader of security testing material anywhere, declining in a product where the reader may not read security testing material. With a product picked it opens on the picked branch and variant where both are, else every build; with none, the queue across products | |
 | Across products, the queue lists every product the reader reads security testing material in, with the per-product screen's tabs, counts, filters and file, each row naming its product and opening the code finding, its component and its product in that product (`design-docs/analysis-queue.md` § Queue across products) | |
 | Across products, suppression rules are not offered, and a rule's dismissals open the dismissed tab across products | A suppression rule is one product's |
 | Across products, an address naming a subtree says it needs one build and offers the scope picker, asking nothing | At or under a component is read on one build |

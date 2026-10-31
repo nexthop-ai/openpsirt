@@ -133,9 +133,10 @@ GET /v1/products/{product}/code-finding-trend.json
 
 Code findings over time is a page of the analytics catalog, in its Security
 testing group (`design-docs/analytics-catalog.md` § Catalog groups), reached
-from the rail, the Security testing screen and a component's trend panel
-(`design-docs/interface-security-testing.md` § Security testing,
-`design-docs/interface-component.md` § Security testing on the component).
+from the rail, the Security testing screen, a component's trend panel and home's
+This week figure (`design-docs/interface-security-testing.md` § Security
+testing, `design-docs/interface-component.md` § Security testing on the
+component, `design-docs/interface-shell.md` § Security testing figures).
 
 | Part | Holds |
 |---|---|

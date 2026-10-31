@@ -13,6 +13,9 @@ import { findingsPath, useScope } from "./scope";
 import {
   vulnerabilityReportsAt,
   uploadsAt,
+  branchOrTagAt,
+  componentsAt,
+  productAt,
   codeFindingsAt,
   codeFindingsAcrossAt,
   issueAt,
@@ -53,14 +56,12 @@ import { useClickAway } from "../ui/away";
 const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 
 // The frame the restyled mockup settled on: a rail down the side carrying the
-// brand and the entries grouped by what they span, a bar across the top
-// carrying what you are looking at, a way to find things, a way to upload,
-// what is waiting on you, and who you are; the screen in the rest.
+// brand and the entries grouped by workflow, a bar across the top carrying
+// what you are looking at, a way to find things, a way to upload, what is
+// waiting on you, and who you are; the screen in the rest.
 //
-// The grouping is the point. "Across products" and a named build are different
-// kinds of place, and a flat list of links hides that the findings list is
-// bound to one build while the queue is not: the findings list is scoped to a
-// product, and home summarizes across them.
+// The scope is the bar's, and every entry answers for it: an entry bound to
+// one build declines until one is picked, and says why.
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const { product, branch_or_tag: branchOrTag, variant } = useScope();
   const whole = !!(product && branchOrTag && variant);
@@ -80,7 +81,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const dependenciesHere = product ? holding(who, "dependency", product) : dependencies;
   // Recording a flaw is triage at the visibility it is recorded at.
   const recordsAnywhere = (who.reach ?? []).some((each) => each.may_hide || each.triages_public);
-  const scope = [product ?? "all products", branchOrTag, variant].filter(Boolean).join(" · ");
   const build = whole ? { product, branch_or_tag: branchOrTag, variant } : undefined;
   const [uploading, setUploading] = useState(false);
   // On a narrow screen the rail is a panel that opens from a menu control. The
@@ -199,8 +199,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
           />
         </Link>
 
-        <Group name="across" label="Across products" shut={shut} onToggle={toggleGroup} />
-        {!shut.has("across") && (
+        {/* The rail by workflow: the work waiting, then where somebody looks
+            into it, then answering people outside, then the reports, then
+            setting up. The component is the hub every screen links into, and
+            no group is built around it. */}
+        <Group name="work" label="Work" shut={shut} onToggle={toggleGroup} />
+        {!shut.has("work") && (
           <>
             <Rail to="/" end icon="home" label="Home" />
             <Rail
@@ -240,22 +244,18 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               />
             )}
             <Rail to="/assignments" icon="people" label="Assignments" />
-            {/* The audit log of what was decided. Across products because that
-              is how it is asked for — an auditor asks about a period, not a
-              build. */}
-            <Rail to="/audit-log" icon="ledger" label="Audit log" />
-            {/* The catalog of named reports, and the one place a report is
-              built by hand. Here rather than under a build because a report
-              spans whatever the picker has selected, up to every product a
-              reader can see. Offered to everybody: the coverage reports
-              answer what is scanned to anybody who sees a build, and a report
-              counting a family the reader does not hold says so itself. */}
-            <Rail to="/analytics" icon="chart" label="Analytics" />
           </>
         )}
-        <Group name="scope" label={scope} shut={shut} onToggle={toggleGroup} />
-        {!shut.has("scope") && (
+        <Group name="investigate" label="Investigate" shut={shut} onToggle={toggleGroup} />
+        {!shut.has("investigate") && (
           <>
+            {/* The components a name matches, each opening the component
+                screen where both families meet. For a reader of either
+                family somewhere, since the search covers only products where
+                they read one. */}
+            {(dependenciesAnywhere || codeFindingsAnywhere) && (
+              <Rail to={componentsAt()} icon="component" label="Components" />
+            )}
             {/* An entry that opens on one build declines while none is picked,
               rather than opening on a scope that means nothing, and says why.
               Findings needs nothing: it answers for whatever the picker has
@@ -278,37 +278,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 why={heldLine(dependenciesHere)}
               />
             )}
-            <Rail
-              to={build ? dependenciesAt(build) : ""}
-              icon="tree"
-              label="Dependencies"
-              needs={whole}
-            />
-            <Rail to={build ? uploadsAt(build) : ""} icon="scan" label="Uploads" needs={whole} />
-            {/* What this build is waiting on, which is the product's planned
-              upgrades read from the other end. */}
-            <Rail
-              to={build ? plannedUpgradesAt(build) : ""}
-              icon="flag"
-              label="Planned upgrades"
-              needs={whole}
-            />
-            {/* What people outside have sent a product. Only for somebody who may
-              read vulnerability reports somewhere, and it needs a product
-              picked because a product's reports belong to it. */}
-            {undisclosedAnywhere && (
-              <Rail
-                to={product ? vulnerabilityReportsAt(product) : ""}
-                icon="letter"
-                label="Vulnerability reports"
-                needs={!!product && reportsHere}
-                why={
-                  product
-                    ? "You can't read vulnerability reports in this product"
-                    : "Pick a product"
-                }
-              />
-            )}
             {/* Code findings from security testing, shown to somebody who
               reads security testing material anywhere: a product's, opening
               on the branch and variant picked where both are, and with no
@@ -329,29 +298,60 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 why={codeFindingsHere ? heldLine(codeFindingsHere) : undefined}
               />
             )}
-            {/* Whether that work is shrinking, for the same readers. A trend is
-              one product's, since a series belongs to one, so it declines
-              until a product is picked. */}
-            {codeFindingsAnywhere && (
+            <Rail
+              to={build ? dependenciesAt(build) : ""}
+              icon="tree"
+              label="Dependencies"
+              needs={whole}
+            />
+            {/* Reading how a product goes: its page, naming every build with
+              what is open in each, or with a branch or tag picked, that
+              line's own page, which for a tag is its release. The catalog's
+              lists stay under Manage. */}
+            <Rail
+              to={
+                product
+                  ? branchOrTag
+                    ? branchOrTagAt(product, branchOrTag)
+                    : productAt(product)
+                  : ""
+              }
+              end
+              icon="release"
+              label="Builds and releases"
+              needs={!!product}
+              why="Pick a product"
+            />
+            <Rail to={build ? uploadsAt(build) : ""} icon="scan" label="Uploads" needs={whole} />
+            {/* What this build is waiting on, which is the product's planned
+              upgrades read from the other end. */}
+            <Rail
+              to={build ? plannedUpgradesAt(build) : ""}
+              icon="flag"
+              label="Planned upgrades"
+              needs={whole}
+            />
+          </>
+        )}
+        <Group name="respond" label="Respond" shut={shut} onToggle={toggleGroup} />
+        {!shut.has("respond") && (
+          <>
+            {/* What people outside have sent a product. Only for somebody who may
+              read vulnerability reports somewhere, and it needs a product
+              picked because a product's reports belong to it. */}
+            {undisclosedAnywhere && (
               <Rail
-                to={product ? codeTrendAt() : ""}
-                icon="pulse"
-                label="Code findings over time"
-                needs={!!product && (!codeFindingsHere || counted(codeFindingsHere))}
+                to={product ? vulnerabilityReportsAt(product) : ""}
+                icon="letter"
+                label="Vulnerability reports"
+                needs={!!product && reportsHere}
                 why={
-                  !product
-                    ? "Pick a product"
-                    : codeFindingsHere
-                      ? heldLine(codeFindingsHere)
-                      : undefined
+                  product
+                    ? "You can't read vulnerability reports in this product"
+                    : "Pick a product"
                 }
               />
             )}
-            {/* Its own screen rather than an action on the findings list: what is
-              being recorded is precisely what is *not* in that list, and it asks
-              more than a control beside a table has room for. It needs no
-              product picked, because the screen asks for one. */}
-            {recordsAnywhere && <Rail to="/record-a-flaw" icon="record" label="Record a flaw" />}
             {/* What is running out of embargo. The list is itself a disclosure,
               so a product somebody may not read undisclosed work in contributes
               nothing to it — the server narrows it. */}
@@ -369,6 +369,44 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               Disclosure deadlines because an embargo reaching its date is one
               of the three things an advisory gets written for. */}
             <Rail to="/advisories" icon="advisory" label="Published advisories" />
+            {/* Its own screen rather than an action on the findings list: what is
+              being recorded is precisely what is *not* in that list, and it asks
+              more than a control beside a table has room for. It needs no
+              product picked, because the screen asks for one. */}
+            {recordsAnywhere && <Rail to="/record-a-flaw" icon="record" label="Record a flaw" />}
+          </>
+        )}
+        <Group name="reports" label="Reports" shut={shut} onToggle={toggleGroup} />
+        {!shut.has("reports") && (
+          <>
+            {/* The catalog of named reports, and the one place a report is
+              built by hand. A report spans whatever the picker has selected,
+              up to every product a reader can see. Offered to everybody: the
+              coverage reports answer what is scanned to anybody who sees a
+              build, and a report counting a family the reader does not hold
+              says so itself. */}
+            <Rail to="/analytics" icon="chart" label="Analytics" />
+            {/* Whether security testing work is shrinking, for the readers of
+              it. A trend is one product's, since a series belongs to one, so
+              it declines until a product is picked. */}
+            {codeFindingsAnywhere && (
+              <Rail
+                to={product ? codeTrendAt() : ""}
+                icon="pulse"
+                label="Code findings over time"
+                needs={!!product && (!codeFindingsHere || counted(codeFindingsHere))}
+                why={
+                  !product
+                    ? "Pick a product"
+                    : codeFindingsHere
+                      ? heldLine(codeFindingsHere)
+                      : undefined
+                }
+              />
+            )}
+            {/* The audit log of what was decided, asked about a period rather
+              than a build. */}
+            <Rail to="/audit-log" icon="ledger" label="Audit log" />
           </>
         )}
         <Group name="manage" label="Manage" shut={shut} onToggle={toggleGroup} />
@@ -376,10 +414,8 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
           <>
             {/* The catalog, whole and in order: a product, then the branches and
               tags under it, then what those are built as. The two below need a
-              product picked, and the screen that picks one sat in another group
-              — so managing a product meant two groups, one of them folded.
-              Somebody arriving with nothing chosen picks a product in the bar
-              above, which is what that control is for. */}
+              product picked, which somebody arriving with nothing chosen picks
+              in the bar above. */}
             <Rail to="/products" end icon="box" label="Products" />
             <Rail
               to={branchesAndTagsAt(product ?? "")}
@@ -444,15 +480,34 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
       </main>
 
       {/* A narrow screen has no rail. The three places somebody reviews and
-          responds from are a tab bar instead. */}
+          responds from are a tab bar instead, from the rail's Work and
+          Investigate groups: home, the reader's findings, and the queue. The
+          findings tab is the family they read, dependency findings first;
+          for a reader of code findings alone it opens the Security testing
+          queue, and for a reader of neither it is absent. */}
       <nav className="tabbar">
         <NavLink to="/" end>
           Home
         </NavLink>
-        {dependenciesAnywhere && (
+        {dependenciesAnywhere ? (
           <NavLink to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}>
             Findings
           </NavLink>
+        ) : (
+          codeFindingsAnywhere && (
+            <NavLink
+              to={
+                product && (!codeFindingsHere || counted(codeFindingsHere))
+                  ? codeFindingsAt(
+                      product,
+                      whole ? { branch_or_tag: branchOrTag, variant } : undefined,
+                    )
+                  : codeFindingsAcrossAt()
+              }
+            >
+              Code findings
+            </NavLink>
+          )
         )}
         <NavLink to="/review-queue">Queue</NavLink>
         <button type="button" aria-expanded={menu} onClick={() => setMenu(!menu)}>

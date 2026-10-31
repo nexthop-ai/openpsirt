@@ -161,7 +161,7 @@ describe("the rail for a reader without dependency findings", () => {
     expect(entry("Unassigned")?.getAttribute("href")).toBe("/code-findings?assigned=nobody");
   });
 
-  it("draws no phone findings tab for a reader holding dependency findings nowhere", async () => {
+  it("draws no dependency findings tab on the phone for a reader holding them nowhere", async () => {
     await railAt("/products/sonic", securityTestingOnly);
     const tabs = [...mount.host().querySelectorAll(".tabbar a")].map((each) => each.textContent);
     expect(tabs).toContain("Home");
@@ -312,5 +312,156 @@ describe("the Unassigned entry, one count per family", () => {
     expect(got.asked).not.toContain("/v1/findings");
     expect(got.badges.map(([n]) => n)).toEqual(["3"]);
     expect(got.href).toBe("/code-findings?assigned=nobody");
+  });
+});
+
+describe("the rail by workflow", () => {
+  // Somebody reading and triaging both families in sonic, administering the
+  // deployment: every entry is drawn for them.
+  const everything = [
+    {
+      product: "sonic",
+      may_see: true,
+      reads_public: true,
+      reads_private: true,
+      reads_security_testing: true,
+      may_hide: true,
+    },
+  ];
+
+  // The rail's entries under each group heading, in order, with every group
+  // unfolded.
+  async function grouped(at: string, reach: Record<string, unknown>[], admin = true) {
+    window.localStorage.setItem("openpsirt.rail", "[]");
+    window.sessionStorage.clear();
+    serve(() => ({ data: { items: [], total: 0 } }));
+    mount.render(
+      screen(
+        <Shell who={{ ...who, admin, reach: reach as unknown as Who["reach"] }}>{null}</Shell>,
+        at,
+      ),
+    );
+    await settle();
+    window.localStorage.removeItem("openpsirt.rail");
+    const groups: [string, string[]][] = [];
+    for (const each of mount.host().querySelectorAll<HTMLElement>(".rail .group, .rail .nav")) {
+      if (each.classList.contains("group")) {
+        groups.push([each.querySelector(".what")?.textContent ?? "", []]);
+      } else {
+        groups[groups.length - 1]?.[1].push(each.textContent?.trim() ?? "");
+      }
+    }
+    return groups;
+  }
+
+  it("groups every entry by the work it serves", async () => {
+    expect(
+      await grouped("/products/sonic/branches-and-tags/main/variants/x86", everything),
+    ).toEqual([
+      ["Work", ["Home", "Review queue", "Unassigned", "Assignments"]],
+      [
+        "Investigate",
+        [
+          "Components",
+          "Dependency findings",
+          "Security testing",
+          "Dependencies",
+          "Builds and releases",
+          "Uploads",
+          "Planned upgrades",
+        ],
+      ],
+      [
+        "Respond",
+        [
+          "Vulnerability reports",
+          "Disclosure deadlines",
+          "Incidents",
+          "Published advisories",
+          "Record a flaw",
+        ],
+      ],
+      ["Reports", ["Analytics", "Code findings over time", "Audit log"]],
+      [
+        "Manage",
+        [
+          "Products",
+          "Branches and tags",
+          "Variants",
+          "Teams",
+          "Access",
+          "Auto-assignment",
+          "Settings",
+          "System",
+        ],
+      ],
+    ]);
+  });
+
+  it("starts with Manage folded and every other group open", async () => {
+    window.localStorage.removeItem("openpsirt.rail");
+    await railAt("/start", everything);
+    const headings = [...mount.host().querySelectorAll(".rail .group")].map((each) => [
+      each.querySelector(".what")?.textContent,
+      each.getAttribute("aria-expanded"),
+    ]);
+    expect(headings).toEqual([
+      ["Work", "true"],
+      ["Investigate", "true"],
+      ["Respond", "true"],
+      ["Reports", "true"],
+      ["Manage", "false"],
+    ]);
+  });
+
+  it("draws no Components entry for a reader of neither family", async () => {
+    await railAt("/start", [{ product: "sonic" }]);
+    expect(entry("Components")).toBeUndefined();
+  });
+
+  it("opens the components screen for a reader of code findings alone", async () => {
+    await railAt("/start", [{ product: "sonic", reads_security_testing: true }]);
+    expect(entry("Components")?.getAttribute("href")).toBe("/components");
+  });
+
+  it("declines Builds and releases until a product is picked, saying so", async () => {
+    await railAt("/start", everything);
+    expect(entry("Builds and releases")?.tagName).toBe("BUTTON");
+    expect(entry("Builds and releases")?.title).toBe("Pick a product");
+  });
+
+  it("opens the product page from Builds and releases where only a product is picked", async () => {
+    await railAt("/products/sonic/findings", everything);
+    expect(entry("Builds and releases")?.getAttribute("href")).toBe("/products/sonic");
+  });
+
+  it("opens the branch or tag's own page from Builds and releases where one is picked", async () => {
+    await railAt("/products/sonic/branches-and-tags/v1.2/variants/x86/findings", everything);
+    expect(entry("Builds and releases")?.getAttribute("href")).toBe(
+      "/products/sonic/branches-and-tags/v1.2",
+    );
+  });
+});
+
+describe("the phone tab bar", () => {
+  const tabs = () =>
+    [...mount.host().querySelectorAll(".tabbar a")].map((each) => [
+      each.textContent,
+      each.getAttribute("href"),
+    ]);
+
+  it("opens the Security testing queue from its findings tab for a reader of code findings alone", async () => {
+    await railAt("/start", [{ product: "sonic", reads_security_testing: true }]);
+    expect(tabs()).toContainEqual(["Code findings", "/code-findings"]);
+  });
+
+  it("opens the picked product's queue for a reader of code findings alone", async () => {
+    await railAt("/products/sonic", [{ product: "sonic", reads_security_testing: true }]);
+    expect(tabs()).toContainEqual(["Code findings", "/products/sonic/code-findings"]);
+  });
+
+  it("draws no findings tab for a reader of neither family", async () => {
+    await railAt("/start", [{ product: "sonic" }]);
+    expect(tabs().map(([label]) => label)).toEqual(["Home", "Queue"]);
   });
 });

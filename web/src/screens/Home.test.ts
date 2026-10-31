@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { blockingPath } from "./Home";
+import { blockingPath } from "./HomeDependencies";
 
 describe("the link under the readiness blockers", () => {
   it("opens the list without the defaults the count was not taken with", () => {

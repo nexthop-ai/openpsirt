@@ -124,7 +124,9 @@ One product's repository settings, reached from its row in the products table
 
 The product page names every declared build with what is open, overdue,
 exploited, undecided and agreed in each, and when each was last scanned. The
-products table is administration; this page is reading how something goes.
+products table is administration; this page is reading how something goes, and
+the rail's Builds and releases and every breadcrumb's product open it
+(`design-docs/interface-shell.md` § The shell).
 
 | Rule | Reason |
 |---|---|
@@ -164,7 +166,8 @@ chip, since the disclosed findings asked otherwise are ones they do not read.
 
 `/products/:product/branches-and-tags/:branch_or_tag` names a tag's release page
 when the catalog says the name is a tag: a tag is what was handed over when cut,
-a branch what it is built as nightly.
+a branch what it is built as nightly. The rail's Builds and releases opens it
+with the line picked, and a breadcrumb from the line's name.
 
 | Section | Answers |
 |---|---|

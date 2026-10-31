@@ -48,6 +48,8 @@ const SAMPLES: Record<string, () => string[]> = {
   suppressionRulesAt: () => [routes.suppressionRulesAt(odd)],
   repositoriesAt: () => [routes.repositoriesAt(odd)],
   componentSearchAt: () => [routes.componentSearchAt(odd)],
+  componentsAt: () => [routes.componentsAt()],
+  homeAt: () => [routes.homeAt(), routes.homeAt("security-testing")],
   componentAt: () => [routes.componentAt(odd, odd), routes.componentAt(odd, odd, odd, build)],
   allFindingsAt: () => [routes.allFindingsAt(), routes.allFindingsAt({ q: odd })],
   productFindingsAt: () => [routes.productFindingsAt(odd, { q: odd })],
