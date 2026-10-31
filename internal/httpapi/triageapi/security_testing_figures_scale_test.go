@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
@@ -29,111 +31,15 @@ import (
 // applies, a nightly series over a hundred and four days.
 const figureHistory = 104
 
+// figuresN and figuresCodeFindings are the size of the hub's build the
+// figures are measured on.
+const figuresN, figuresCodeFindings = 16000, 4000
+
 func TestMeasureTheSecurityTestingFigures(t *testing.T) {
-	const n, codeFindings = 16000, 4000
+	const n = figuresN
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
-		began := time.Now()
-		hubSeeded(t, r, n, codeFindings)
-		now := time.Now().UTC()
-		day := 24 * time.Hour
-		// Openings a week apart over two years, by a hundred residues of
-		// the identifier, and every tenth closed half way to now.
-		for d := range 100 {
-			if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
-				Set(`"opened_at" = ?`, now.Add(-time.Duration(d*7)*day)).
-				Where(`"kind" = ?`, kind.Analysis).Where(`"id" % 100 = ?`, d).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
-				Set(`"closed_at" = ?`, now.Add(-time.Duration(d*7/2)*day)).
-				Where(`"kind" = ?`, kind.Analysis).Where(`"id" % 100 = ?`, d).Where(`"id" % 10 = 0`).
-				Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
-		// Every dependency finding closed in the last thirteen weeks, a
-		// week apart by thirteen residues, so time to fix reads past the
-		// closings of another family.
-		for w := range 13 {
-			if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
-				Set(`"closed_at" = ?`, now.Add(-time.Duration(w*7)*day)).
-				Where(`"kind" <> ?`, kind.Analysis).Where(`"id" % 13 = ?`, w).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
-		// The other product's build holding those closings twice over, so
-		// the deployment closes three dependency findings for each of the
-		// hub's.
-		described, err := r.DB.QueryContext(ctx, `SELECT * FROM "finding" WHERE 1 = 0`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		every, err := described.Columns()
-		if closeErr := described.Close(); err == nil {
-			err = closeErr
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		var columns []string
-		for _, column := range every {
-			if column != "id" && column != "build_id" {
-				columns = append(columns, column)
-			}
-		}
-		theirs := r.BuildOf(t, httpapitest.TheirBuild)
-		listed := `"` + strings.Join(columns, `", "`) + `"`
-		// Each copy a distinct occurrence, its identity's first character
-		// replaced, as another product's findings are.
-		for _, first := range []string{"x", "y"} {
-			copied := strings.Replace(listed, `"occurrence_identity"`,
-				`CONCAT('`+first+`', SUBSTR("occurrence_identity", 2))`, 1)
-			if _, err := r.DB.DB.NewRaw(`INSERT INTO "finding" ("build_id", `+listed+`) SELECT ?, `+copied+
-				` FROM "finding" WHERE "kind" <> ? AND "build_id" <> ?`, theirs, kind.Analysis, theirs).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
-		var closings int
-		if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).
-			Where(`"kind" <> ?`, kind.Analysis).Where(`"closed_at" IS NOT NULL`).Scan(ctx, &closings); err != nil {
-			t.Fatal(err)
-		}
-		var open []string
-		if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"occurrence_identity"`).
-			Where(`"kind" = ?`, kind.Analysis).Where(`"closed_at" IS NULL`).
-			OrderExpr(`"id"`).Limit(codeFindings/20).Scan(ctx, &open); err != nil {
-			t.Fatal(err)
-		}
-		for _, occurrence := range open {
-			at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence + "/decision"
-			if w := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, at,
-				`{"outcome":"confirmed","reasoning":"measured"}`); w.Code != http.StatusCreated {
-				t.Fatalf("confirming answered %d: %s", w.Code, w.Body.String())
-			}
-		}
-		var run struct {
-			ID      int64     `bun:"id"`
-			BuiltAt time.Time `bun:"built_at"`
-		}
-		if err := r.DB.DB.NewSelect().TableExpr(`"series_run"`).ColumnExpr(`"id", "built_at"`).
-			Limit(1).Scan(ctx, &run); err != nil {
-			t.Fatal(err)
-		}
-		for i := 1; i <= figureHistory; i++ {
-			at := now.Add(-time.Duration(i) * day)
-			if _, err := r.DB.DB.NewRaw(`INSERT INTO "series_run" ("series_id", "build_id", "content_hash",
-					"built_at", "received_at", "status", "comparable", "not_comparable", "applied_at",
-					"units_expected", "units_analyzed")
-				SELECT "series_id", "build_id", ?, ?, ?, "status", "comparable", "not_comparable", ?,
-					"units_expected", "units_analyzed"
-				FROM "series_run" WHERE "id" = ?`,
-				fmt.Sprintf("%064d", i), run.BuiltAt.Add(-time.Duration(i)*day), at, at, run.ID).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
-		t.Logf("%d components, %d code findings, %d dependency findings closed: seeded in %s",
-			n, codeFindings, closings, time.Since(began).Round(time.Second))
+		figuresSeeded(t, r)
 		paths := []string{
 			"/v1/products/mine/code-finding-time-to-judge?weeks=104",
 			"/v1/products/mine/code-finding-time-to-fix?weeks=104",
@@ -152,4 +58,146 @@ func TestMeasureTheSecurityTestingFigures(t *testing.T) {
 			"/v1/products/mine/code-findings-by-release",
 		})
 	})
+}
+
+// What home's Security testing figures cost with no product picked, one read
+// each across products, beside the reads of one product they replace. The
+// reader reads security testing material in both products, and the other
+// product's build holds only dependency closings.
+func TestMeasureTheSecurityTestingFiguresAcrossProducts(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		figuresSeeded(t, r)
+		person, err := r.Rights.ByIdentity(t.Context(), "code-finding-handler")
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := catalog.NewStore(r.DB.DB).ProductByName(t.Context(), "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Rights.GrantRole(t.Context(), person.ID, theirs.ID, access.SecurityTestingRead); err != nil {
+			t.Fatal(err)
+		}
+		timed(t, r, fmt.Sprintf("%d components", figuresN), []string{
+			"/v1/code-finding-counts",
+			"/v1/code-finding-trend?weeks=12",
+			"/v1/code-finding-time-to-judge?weeks=1",
+			"/v1/analysis-coverage?weeks=1",
+			"/v1/products/mine/code-findings?limit=1",
+			"/v1/products/mine/code-finding-trend?weeks=12",
+			"/v1/products/mine/code-finding-time-to-judge?weeks=1",
+			"/v1/products/mine/analysis-coverage?weeks=1",
+		})
+	})
+}
+
+// figuresSeeded is the hub's build with the figures' history: openings a week
+// apart over two years, a tenth closed, a twentieth confirmed, every
+// dependency finding closed in thirteen weeks and copied twice to the other
+// product's build, and a hundred and four earlier runs of the series.
+func figuresSeeded(t *testing.T, r *httpapitest.Reach) {
+	t.Helper()
+	const n, codeFindings = figuresN, figuresCodeFindings
+	ctx := t.Context()
+	began := time.Now()
+	hubSeeded(t, r, n, codeFindings)
+	now := time.Now().UTC()
+	day := 24 * time.Hour
+	// Openings a week apart over two years, by a hundred residues of
+	// the identifier, and every tenth closed half way to now.
+	for d := range 100 {
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"opened_at" = ?`, now.Add(-time.Duration(d*7)*day)).
+			Where(`"kind" = ?`, kind.Analysis).Where(`"id" % 100 = ?`, d).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"closed_at" = ?`, now.Add(-time.Duration(d*7/2)*day)).
+			Where(`"kind" = ?`, kind.Analysis).Where(`"id" % 100 = ?`, d).Where(`"id" % 10 = 0`).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Every dependency finding closed in the last thirteen weeks, a
+	// week apart by thirteen residues, so time to fix reads past the
+	// closings of another family.
+	for w := range 13 {
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"closed_at" = ?`, now.Add(-time.Duration(w*7)*day)).
+			Where(`"kind" <> ?`, kind.Analysis).Where(`"id" % 13 = ?`, w).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The other product's build holding those closings twice over, so
+	// the deployment closes three dependency findings for each of the
+	// hub's.
+	described, err := r.DB.QueryContext(ctx, `SELECT * FROM "finding" WHERE 1 = 0`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	every, err := described.Columns()
+	if closeErr := described.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var columns []string
+	for _, column := range every {
+		if column != "id" && column != "build_id" {
+			columns = append(columns, column)
+		}
+	}
+	theirs := r.BuildOf(t, httpapitest.TheirBuild)
+	listed := `"` + strings.Join(columns, `", "`) + `"`
+	// Each copy a distinct occurrence, its identity's first character
+	// replaced, as another product's findings are.
+	for _, first := range []string{"x", "y"} {
+		copied := strings.Replace(listed, `"occurrence_identity"`,
+			`CONCAT('`+first+`', SUBSTR("occurrence_identity", 2))`, 1)
+		if _, err := r.DB.DB.NewRaw(`INSERT INTO "finding" ("build_id", `+listed+`) SELECT ?, `+copied+
+			` FROM "finding" WHERE "kind" <> ? AND "build_id" <> ?`, theirs, kind.Analysis, theirs).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var closings int
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).
+		Where(`"kind" <> ?`, kind.Analysis).Where(`"closed_at" IS NOT NULL`).Scan(ctx, &closings); err != nil {
+		t.Fatal(err)
+	}
+	var open []string
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"occurrence_identity"`).
+		Where(`"kind" = ?`, kind.Analysis).Where(`"closed_at" IS NULL`).
+		OrderExpr(`"id"`).Limit(codeFindings/20).Scan(ctx, &open); err != nil {
+		t.Fatal(err)
+	}
+	for _, occurrence := range open {
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence + "/decision"
+		if w := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, at,
+			`{"outcome":"confirmed","reasoning":"measured"}`); w.Code != http.StatusCreated {
+			t.Fatalf("confirming answered %d: %s", w.Code, w.Body.String())
+		}
+	}
+	var run struct {
+		ID      int64     `bun:"id"`
+		BuiltAt time.Time `bun:"built_at"`
+	}
+	if err := r.DB.DB.NewSelect().TableExpr(`"series_run"`).ColumnExpr(`"id", "built_at"`).
+		Limit(1).Scan(ctx, &run); err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= figureHistory; i++ {
+		at := now.Add(-time.Duration(i) * day)
+		if _, err := r.DB.DB.NewRaw(`INSERT INTO "series_run" ("series_id", "build_id", "content_hash",
+				"built_at", "received_at", "status", "comparable", "not_comparable", "applied_at",
+				"units_expected", "units_analyzed")
+			SELECT "series_id", "build_id", ?, ?, ?, "status", "comparable", "not_comparable", ?,
+				"units_expected", "units_analyzed"
+			FROM "series_run" WHERE "id" = ?`,
+			fmt.Sprintf("%064d", i), run.BuiltAt.Add(-time.Duration(i)*day), at, at, run.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Logf("%d components, %d code findings, %d dependency findings closed: seeded in %s",
+		n, codeFindings, closings, time.Since(began).Round(time.Second))
 }

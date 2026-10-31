@@ -2,7 +2,8 @@
 
 The figures beside the trend that say how security testing work is going: time
 to judge, time to fix, analyzer precision, analysis coverage, and code findings
-by release, with who reads them, their files and their pages.
+by release, with who reads them, their files and their pages; and the figures
+home reads across products.
 
 Satisfies REQ-17, REQ-42, REQ-43, REQ-50, REQ-52, REQ-54, REQ-74, REQ-87.
 
@@ -15,6 +16,7 @@ Satisfies REQ-17, REQ-42, REQ-43, REQ-50, REQ-52, REQ-54, REQ-74, REQ-87.
 - [Analysis coverage](#analysis-coverage)
 - [Code findings by release](#code-findings-by-release)
 - [Access](#access)
+- [Figures across products](#figures-across-products)
 - [Figure files](#figure-files)
 - [The pages](#the-pages)
 - [Limits](#limits)
@@ -177,6 +179,38 @@ Whether a release shipped fewer code findings than the one before (REQ-54).
 | The check is repeated in the data layer, and every count carries the subject: a code finding counts where its visibility is read or its flaw's reach includes the reader (REQ-43) | A handler missing its check still leaks nothing |
 | Series and runs carry the family's visibility alone | A series names no code finding |
 | A role, visibility and endpoint matrix holds every figure and its files | |
+
+## Figures across products
+
+Home's Security testing figures with no product picked
+(`design-docs/interface-shell.md` § Security testing figures) are one read
+each, across products.
+
+```
+GET /v1/code-finding-counts
+GET /v1/code-finding-trend?weeks=12
+GET /v1/code-finding-time-to-judge?weeks=13
+GET /v1/analysis-coverage?weeks=13
+```
+
+| Figure | Holds |
+|---|---|
+| Counts | The queue's counts with no rows: its length, each state, waiting for a second person, ruled, past end of life (`design-docs/analysis-queue.md` § Queue across products) |
+| Trend | One product's trend, each week's counts summed; a series of one name in two products is one split; each marker names its product (`design-docs/analysis-statistics.md` § Code findings over time) |
+| Time to judge | Every product's waits as one population, the queue's ages summed, the oldest of any product's queue |
+| Analysis coverage | Every product's rows, each naming its product, in one order |
+
+| Rule | Reason |
+|---|---|
+| The products are those in use where the reader holds `security-testing-read`: a retired product, a product read at another visibility and a product not seen contribute nothing | They are the products the session lists as read, so the head's count, the tiles and the trend cover one set (REQ-42) |
+| A reader of security testing material in no product is answered with nothing counted | An empty set is an answer |
+| A pipeline key is refused 403 | It sends scans and reads nothing |
+| Each finding counts at its own product's visibilities, bound per product in the data layer, and each figure checks the reader on every product before reading (REQ-43) | A disclosed code finding counts where the reader reads disclosed work beside security testing material, and nowhere else |
+| A decision, a suppression rule and an end of life are each worked out in the finding's own product | They belong to one product |
+| Each count and list is the sum or merge of each product's own figure, row for row | One population split by product; series identity is a product's, so no occurrence is in two products |
+| A spread across products is worked out over every product's waits together | A median of medians is no median |
+| Narrowed by series and method alone | A branch, a variant, a component and a subtree name part of one product |
+| Each has a file at `.csv` and `.json`, in the columns of one product's; a coverage row and a marker name the product | REQ-50 |
 
 ## Figure files
 

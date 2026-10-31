@@ -31,13 +31,14 @@ type codeTrend struct {
 		ByMethod map[string]int `json:"by_method"`
 	} `json:"points"`
 	Markers []struct {
-		At     string `json:"at"`
-		Series string `json:"series"`
-		Change string `json:"change"`
-		Reason string `json:"reason"`
-		From   string `json:"from"`
-		To     string `json:"to"`
-		Builds int    `json:"builds"`
+		At      string `json:"at"`
+		Product string `json:"product"`
+		Series  string `json:"series"`
+		Change  string `json:"change"`
+		Reason  string `json:"reason"`
+		From    string `json:"from"`
+		To      string `json:"to"`
+		Builds  int    `json:"builds"`
 	} `json:"markers"`
 	NoLongerDetected int `json:"no_longer_detected"`
 }

@@ -419,6 +419,7 @@ func TestPrecisionCountsEachCodeFindingAtItsFirstAnswer(t *testing.T) {
 type coverageRead struct {
 	Quiet int `json:"quiet"`
 	Items []struct {
+		Product           string   `json:"product"`
 		BranchOrTag       string   `json:"branch_or_tag"`
 		Series            string   `json:"series"`
 		Quiet             bool     `json:"quiet"`

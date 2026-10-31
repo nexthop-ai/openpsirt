@@ -13,7 +13,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
@@ -65,9 +64,12 @@ func Changes() []Change { return []Change{NotComparable, RulesChanged, ToolChang
 // run whose absences are no evidence.
 type Marker struct {
 	// At is the day the runs were applied, at midnight UTC.
-	At     time.Time
-	Series string
-	Change Change
+	At time.Time
+	// Product is the product the series is in, by the name that addresses
+	// it, and Series the series' name.
+	Product string
+	Series  string
+	Change  Change
 	// Reason is why the runs were not comparable, on NotComparable alone.
 	Reason series.Reason
 	// From and To are the tool, the version or the count of rules before
@@ -103,17 +105,19 @@ type Trended struct {
 //
 // The tier is the rule's as it is rated now. Refused to anybody who does not
 // read security testing material in the product, before any name in the scope
-// is resolved.
+// is resolved. Across products, every product of the scope is one the reader
+// reads security testing material in, each counted at its own visibilities: a
+// code finding is one product's, so each step is the sum of each product's.
 func Trend(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	since time.Time, step time.Duration, steps int) (*Trended, error) {
 
-	if err := MayCount(subject, scope.ProductID, "trend the code findings"); err != nil {
+	if err := scope.mayCount(subject, "trend the code findings"); err != nil {
 		return nil, err
 	}
 	if steps < 1 || steps > MostTrendSteps || step <= 0 {
 		return nil, fmt.Errorf("trend code findings over %d steps of %s: out of range", steps, step)
 	}
-	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
+	visible, err := scope.visible(subject)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +168,7 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the code findings of product %d over time: %w", scope.ProductID, err)
 	}
-	names, err := seriesNames(ctx, db, scope.ProductID)
+	names, err := seriesNames(ctx, db, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -246,18 +250,18 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 // are two rows.
 //
 // The product's own visibilities, and a code finding included in its flaw's
-// case (REQ-43). Narrowed as the queue narrows, so a figure narrowed alike
-// counts the list it opens.
+// case (REQ-43); across products, each product's own visibilities. Narrowed
+// as the queue narrows, so a figure narrowed alike counts the list it opens.
 func statisticsFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
 	kinds, kindArgs := kind.SecurityTestingStatistics.Where(`"f"."kind"`)
-	reach := finding.CodeFindingReach(subject, scope.ProductID)
+	readable, readableArgs := scope.readable(subject, visible)
 	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
 		Where(kinds, kindArgs...).
-		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...)
+		Where(readable, readableArgs...)
 	return scope.narrow(db, scope.inScope(q), kind.SecurityTestingStatistics)
 }
 
@@ -271,20 +275,21 @@ func methodOf(k kind.Kind) Method {
 	return ""
 }
 
-// seriesNames is the name of every series of a product a security testing
-// figure counts, by identifier.
-func seriesNames(ctx context.Context, db bun.IDB, productID int64) (map[int64]string, error) {
+// seriesNames is the name of every series of the scope's product, or of its
+// products across, a security testing figure counts, by identifier.
+func seriesNames(ctx context.Context, db bun.IDB, scope Scope) (map[int64]string, error) {
 	kinds, kindArgs := kind.SecurityTestingStatistics.Where(`"se"."kind"`)
+	inProducts, inProductsArgs := scope.productIn(`"se"."product_id"`)
 	var named []struct {
 		ID   int64  `bun:"id"`
 		Name string `bun:"name"`
 	}
 	if err := db.NewSelect().TableExpr(`"series" AS "se"`).
 		ColumnExpr(`"se"."id", "se"."name"`).
-		Where(`"se"."product_id" = ?`, productID).
+		Where(inProducts, inProductsArgs...).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &named); err != nil {
-		return nil, fmt.Errorf("read the analyzer series of product %d: %w", productID, err)
+		return nil, fmt.Errorf("read the analyzer series of product %d: %w", scope.ProductID, err)
 	}
 	out := make(map[int64]string, len(named))
 	for _, each := range named {
@@ -304,7 +309,9 @@ func seriesNames(ctx context.Context, db bun.IDB, productID int64) (map[int64]st
 // version is marked for both.
 func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until time.Time) ([]Marker, error) {
 	named, namedArgs := kind.SecurityTestingStatistics.Where(`"se"."kind"`)
+	inProducts, inProductsArgs := scope.productIn(`"se"."product_id"`)
 	var runs []struct {
+		Product     string        `bun:"product"`
 		Series      string        `bun:"series"`
 		BuildID     int64         `bun:"build_id"`
 		AppliedAt   time.Time     `bun:"applied_at"`
@@ -323,6 +330,7 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 	q := db.NewSelect().TableExpr(`"series_run" AS "sr"`).
 		Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "sr"."build_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "se"."product_id"`).
 		// The run applied before it on its build: the newest built before
 		// it, which is the run it was compared with when it was applied.
 		Join(`LEFT JOIN "series_run" AS "pr" ON "pr"."series_id" = "sr"."series_id"
@@ -330,12 +338,12 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 			AND "pr"."built_at" = (SELECT MAX("pb"."built_at") FROM "series_run" AS "pb"
 				WHERE "pb"."series_id" = "sr"."series_id" AND "pb"."build_id" = "sr"."build_id"
 				  AND "pb"."status" = ? AND "pb"."built_at" < "sr"."built_at")`, applied, applied).
-		ColumnExpr(`"se"."name" AS "series", "sr"."build_id", "sr"."applied_at", "sr"."not_comparable"`).
+		ColumnExpr(`"p"."name" AS "product", "se"."name" AS "series", "sr"."build_id", "sr"."applied_at", "sr"."not_comparable"`).
 		ColumnExpr(`"sr"."tool_name", "sr"."tool_version", "sr"."rules_digest", "sr"."rules_count"`).
 		ColumnExpr(`"pr"."id" AS "before_id", "pr"."tool_name" AS "was_tool_name"`).
 		ColumnExpr(`"pr"."tool_version" AS "was_tool_version", "pr"."rules_digest" AS "was_rules_digest"`).
 		ColumnExpr(`"pr"."rules_count" AS "was_rules_count"`).
-		Where(`"se"."product_id" = ?`, scope.ProductID).
+		Where(inProducts, inProductsArgs...).
 		Where(named, namedArgs...).
 		Where(`"sr"."status" = ?`, applied).
 		Where(`"sr"."comparable" = FALSE`).
@@ -361,6 +369,7 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 
 	type key struct {
 		at       time.Time
+		product  string
 		series   string
 		change   Change
 		reason   series.Reason
@@ -371,7 +380,7 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 	for _, run := range runs {
 		day := run.AppliedAt.UTC().Truncate(24 * time.Hour)
 		mark := func(change Change, reason series.Reason, from, to string) {
-			k := key{at: day, series: run.Series, change: change, reason: reason, from: from, to: to}
+			k := key{at: day, product: run.Product, series: run.Series, change: change, reason: reason, from: from, to: to}
 			if counted[k] == nil {
 				counted[k] = map[int64]bool{}
 			}
@@ -395,7 +404,7 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 	out := make([]Marker, 0, len(counted))
 	for k, builds := range counted {
 		out = append(out, Marker{
-			At: k.at, Series: k.series, Change: k.change, Reason: k.reason, From: k.from, To: k.to,
+			At: k.at, Product: k.product, Series: k.series, Change: k.change, Reason: k.reason, From: k.from, To: k.to,
 			Builds: len(builds),
 		})
 	}
@@ -403,6 +412,9 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 		a, b := out[i], out[j]
 		if !a.At.Equal(b.At) {
 			return a.At.Before(b.At)
+		}
+		if a.Product != b.Product {
+			return a.Product < b.Product
 		}
 		if a.Series != b.Series {
 			return a.Series < b.Series

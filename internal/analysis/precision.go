@@ -102,7 +102,7 @@ func PrecisionOf(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what was said of the code findings of product %d: %w", scope.ProductID, err)
 	}
-	names, err := seriesNames(ctx, db, scope.ProductID)
+	names, err := seriesNames(ctx, db, scope)
 	if err != nil {
 		return nil, err
 	}

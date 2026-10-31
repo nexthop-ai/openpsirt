@@ -142,13 +142,56 @@ func (scope Scope) bound() productBound {
 // inScope keeps a statement over the branch or tag under "s" to the
 // scope's product, or its products across.
 func (scope Scope) inScope(q *bun.SelectQuery) *bun.SelectQuery {
-	if scope.across() {
-		if len(scope.Across) == 0 {
-			return q.Where("1 = 0")
-		}
-		return q.Where(`"s"."product_id" IN (?)`, bun.List(scope.Across))
+	where, args := scope.productIn(`"s"."product_id"`)
+	return q.Where(where, args...)
+}
+
+// productIn is a condition keeping a product column to the scope's product,
+// or to its products across. Across no product, it keeps nothing.
+func (scope Scope) productIn(column string) (string, []any) {
+	if !scope.across() {
+		return column + ` = ?`, []any{scope.ProductID}
 	}
-	return q.Where(`"s"."product_id" = ?`, scope.ProductID)
+	if len(scope.Across) == 0 {
+		return `1 = 0`, nil
+	}
+	return column + ` IN (?)`, []any{bun.List(scope.Across)}
+}
+
+// mayCount refuses a subject who does not read security testing material in
+// the scope's product, or in any one of its products across, before any name
+// in the scope is resolved.
+func (scope Scope) mayCount(subject access.Subject, what string) error {
+	if !scope.across() {
+		return MayCount(subject, scope.ProductID, what)
+	}
+	for _, product := range scope.Across {
+		if err := MayCount(subject, product, what); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// visible is the visibilities the subject reads in the scope's product, which
+// readable binds. Across products, readable binds each product's own, so none.
+func (scope Scope) visible(subject access.Subject) ([]access.Visibility, error) {
+	if scope.across() {
+		return nil, nil
+	}
+	return finding.CodeFindingVisible(subject, scope.ProductID)
+}
+
+// readable is the condition keeping the findings under "f" to what the
+// subject reads: in one product, the visibilities given and a code finding
+// its flaw's case includes; across products, each product's own
+// visibilities, bound per product.
+func (scope Scope) readable(subject access.Subject, visible []access.Visibility) (string, []any) {
+	if scope.across() {
+		return access.VisibleWhere(`"s"."product_id"`, `"f"."visibility"`, access.Split(scope.Across, subject.Reads))
+	}
+	reach := finding.CodeFindingReach(subject, scope.ProductID)
+	return `("f"."visibility" IN (?) OR ` + reach.Included + `)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)
 }
 
 // builds is every build the scope covers, retired ones included, as the queue
@@ -280,6 +323,19 @@ func CodeFindingPageOf(ctx context.Context, db bun.IDB, subject access.Subject, 
 	return queue.Rows, nil
 }
 
+// CodeFindingCountsOf is the counts of CodeFindingsOf with no state named,
+// and no rows: the queue's length, every state, what waits for a second
+// person, what a suppression rule dismisses and what is open only past end of
+// life. A security testing figure, so refused to anybody who does not read
+// security testing material in the scope's product, or in each product
+// across, as the trend is.
+func CodeFindingCountsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope) (*Queue, error) {
+	if err := scope.mayCount(subject, "count the code findings"); err != nil {
+		return nil, err
+	}
+	return codeFindingsOf(ctx, db, subject, scope, "", false, true, 0, 0)
+}
+
 // OpenCodeFindingsOf is the rows of one page of the code findings a findings
 // file holds, with none of the queue's counts: every open code finding of the
 // selection, the ones a decision waits on included, as the file's findings
@@ -304,14 +360,11 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	// Across products the scope names only products the reader reads
 	// security testing work in, and each row is narrowed to what they read
 	// in its own.
-	var visible []access.Visibility
-	if !scope.across() {
-		var err error
-		if visible, err = finding.CodeFindingVisible(subject, scope.ProductID); err != nil {
-			return nil, err
-		}
+	visible, err := scope.visible(subject)
+	if err != nil {
+		return nil, err
 	}
-	scope, err := scope.resolved(ctx, db)
+	scope, err = scope.resolved(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -379,6 +432,10 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 		}
 	}
 
+	// Counts alone: no page is read.
+	if limit <= 0 {
+		return out, nil
+	}
 	var page []struct {
 		Occurrence string    `bun:"occurrence_identity"`
 		Newest     int64     `bun:"newest"`
@@ -477,14 +534,8 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."build_id" = "f"."build_id"
 			  AND "fo"."closed_at" IS NULL))`).
 		Where(kinds, kindArgs...)
-	if scope.across() {
-		where, args := access.VisibleWhere(`"s"."product_id"`, `"f"."visibility"`, access.Split(scope.Across, subject.Reads))
-		q = q.Where(where, args...)
-	} else {
-		reach := finding.CodeFindingReach(subject, scope.ProductID)
-		q = q.Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...)
-	}
-	return scope.narrow(db, scope.inScope(q), kind.CodeFindings)
+	where, args := scope.readable(subject, visible)
+	return scope.narrow(db, scope.inScope(q.Where(where, args...)), kind.CodeFindings)
 }
 
 // narrow keeps a statement over the findings under "f", their sightings under

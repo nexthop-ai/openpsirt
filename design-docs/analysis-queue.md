@@ -75,6 +75,7 @@ product.
 | Beneath is refused, since it names one build | The list across products refuses it the same way (`design-docs/api-lists.md` § Issue-keyed and cross-product reads) |
 | A pipeline key is refused | It sends scans and reads nothing |
 | `GET /v1/code-findings.{format}` writes it, under the rules of the queue file | |
+| `GET /v1/code-finding-counts` is its counts with no rows, over the products in use alone (`design-docs/analysis-figures.md` § Figures across products) | Home counts the products the session lists, and a retired product is in none |
 
 ## Queue file
 

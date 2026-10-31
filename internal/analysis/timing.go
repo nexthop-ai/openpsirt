@@ -75,14 +75,16 @@ type Judging struct {
 // backlog ages in. A code finding open only in releases past their end of
 // life is left out, as the queue leaves it out. Refused to anybody who does
 // not read security testing material in the product, before any name in the
-// scope is resolved.
+// scope is resolved. Across products, every product of the scope is one the
+// reader reads security testing material in, each counted at its own
+// visibilities and against its own decisions.
 func TimeToJudge(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	since, until, now time.Time) (*Judging, error) {
 
-	if err := MayCount(subject, scope.ProductID, "time the judging of code findings"); err != nil {
+	if err := scope.mayCount(subject, "time the judging of code findings"); err != nil {
 		return nil, err
 	}
-	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
+	visible, err := scope.visible(subject)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +105,11 @@ func TimeToJudge(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		First      time.Time `bun:"first_proposed"`
 	}
 	// Subtraction is spelled four ways across the engines, so the waits are
-	// worked out here.
+	// worked out here. A decision is one product's, so across products each
+	// finding reads its own product's.
+	bound := scope.bound()
 	if err := statisticsFindings(db, subject, scope, visible).
-		Join(`JOIN "decision_occurrence" AS "de" ON "de"."product_id" = ?`, scope.ProductID).
+		Join(`JOIN "decision_occurrence" AS "de" ON "de"."product_id" = `+bound.sql, bound.times(1)...).
 		Join(`JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`).
 		Where(finding.DecisionOccurrenceOf("f")).
 		ColumnExpr(`"f"."occurrence_identity", COALESCE("rr"."weakness_tier", 0) AS "tier", "f"."opened_at"`).
