@@ -161,7 +161,7 @@ administrator sets, and the caller is told to retry.
 | The depth counts work held by a worker that stopped reporting | Mid-reclaim every row is claimed by dead workers, and a waiting count reads empty |
 | A stored setting, read as work is queued | The refusal lands on a build server, and its remedy cannot be a new binary or a restart |
 | Back-pressure, not an exact bound | Producers adding at once each count what committed, so the backlog can pass the limit by as many as are adding. An exact bound takes a lock per kind, spelled per engine |
-| An upload refused for a full queue raises an alert naming the build, the limit, and how to raise it | The producer may not retry. A deep queue still taking work alerts nobody. Not built: the refusal is answered 503, neither logged nor recorded as a refused upload, and the System screen marks the kind at its limit |
+| An upload refused for a full queue raises an alert naming the build, the limit, and how to raise it | The producer may not retry. A deep queue still taking work alerts nobody. Not built: the refusal is answered 503 and recorded as a refused upload, is not logged, and the System screen marks the kind at its limit |
 
 ## Configurable bounds
 

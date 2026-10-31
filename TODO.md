@@ -54,19 +54,10 @@ The owner has chosen to wait on each of these.
 
 | | |
 |---|---|
-| Today | An advisory is written, approved by a second person and generated as a CSAF 2.0 document. Every issued advisory marked shareable is written into a CSAF provider directory, which the operator's own web server serves. Anything else is sent by hand, and somebody records that it went out |
+| Today | An advisory is written, approved by a second person and generated as a CSAF 2.0 document. The deployment serves its own CSAF provider directory at the well-known path, and also writes every issued advisory marked shareable into a static provider directory the operator's web server serves (`design-docs/publishing.md`). Anything else is sent by hand, and somebody records that it went out |
 | Problem | Nothing pushes an advisory anywhere. A project that publishes through GitHub Security Advisories, or a vendor that posts to a customer portal, copies each one by hand |
 | Work | Add optional adapters, configured per deployment, that deliver an issued advisory to a destination. The one the design names is a code forge's advisory system: draft privately, request an identifier, then publish (REQ-39) |
 | Waits on | The owner choosing which platforms, and the credentials for each |
-
-### TODO-04 Advisory signatures and key
-
-| | |
-|---|---|
-| Today | The provider directory is written unsigned. Each document has a SHA-256 checksum file beside it, which proves the file arrived intact and not who wrote it |
-| Problem | A customer cannot verify that a document came from this publisher. The CSAF "trusted provider" role needs an OpenPGP signature beside each document and the public key named in the directory's metadata, so a CSAF checker rates this directory below trusted provider |
-| Work | Take a signing key from the operator. Write a detached signature beside each issued document, publish the public key, and name both in the directory metadata and the feed |
-| Waits on | How a private key enters a deployment: a file or a secret, how it is rotated, and whether a key held in a KMS or HSM is supported. The deployment already takes other secrets, such as the Slack token and the object store keys; it takes no private key |
 
 ### TODO-05 CVE Numbering Authority
 
@@ -207,7 +198,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | | |
 |---|---|
 | Today | The "Twelve weeks" chart on the Component screen shows findings opened, resolved and open per week, for this component and everything under it, in one build |
-| Problem | It does not show which version the build shipped each week, so it cannot show that the move to 3.2 in week 5 was followed by closures. The chart also follows only the component at its current version, so findings on an earlier version may drop out of it altogether; that part is suspected and unconfirmed |
+| Problem | It does not show which version the build shipped each week, so it cannot show that the move to 3.2 in week 5 was followed by closures. The chart also counts only the component at its current version: the trend beneath a component walks only the build's live graph, so findings on a version a rescan replaced, including those the version change closed, are not counted. The code findings panel on the same screen counts a replaced version at the present version's row (`design-docs/interface-component.md`, `design-docs/analysis-statistics.md`) |
 | Work | Draw the chart for the component by name across versions, and mark each week the shipped version changed, labeled with the version. Work the version per scan out from the graph's history |
 | Waits on | Nothing |
 
@@ -287,10 +278,10 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 
 | | |
 |---|---|
-| Today | An upload that arrives while 1,000 inventories wait to be read is answered 503 "try again shortly". Nothing is logged, and no record of the refused upload is kept, unlike every other refusal. The System screen marks the queue at its limit |
-| Problem | A pipeline that does not retry loses the inventory with no trace. A week later the deployment tells administrators the build "has not been scanned for a week. Nothing has failed — nothing has arrived", which blames a pipeline that did send it. |
-| Work | Log and record the refusal like any other, name it in the week-quiet message, and alert administrators naming the build, the limit and how to raise it, at most once per build per day |
-| Waits on | The owner: an event people acknowledge, or a condition that clears when the build next uploads; administrators only, or the product's triagers too. Logging and recording need nothing |
+| Today | An upload that arrives while 1,000 inventories wait to be read is answered 503 "try again shortly" and recorded as a refused upload against its build, as every other refusal is; the "a full backlog" case of TestEveryDoorThatTurnsAnUploadAwayRecordsIt pins it. The week-quiet message names the build's last refusal and its reason. The System screen marks the queue at its limit. The refusal is not logged: only a rejected inventory writes the "an upload was refused" line. Nothing alerts anybody |
+| Problem | A pipeline that does not retry loses the inventory, and nobody hears of it until the build has been quiet for a week. An operator reading the log finds no line for it |
+| Work | Log the refusal like a rejected inventory. Alert administrators naming the build, the limit and how to raise it, at most once per build per day |
+| Waits on | The owner: an event people acknowledge, or a condition that clears when the build next uploads; administrators only, or the product's triagers too. Logging needs nothing |
 
 ## Weak tests
 
@@ -308,17 +299,17 @@ Each test passes today, and would keep passing if the code it covers broke.
 
 | | |
 |---|---|
-| Today | A test asks the planned upgrades list for each sort order it offers, both directions, and checks only that an answer comes back |
-| Problem | An offered order with no matching column silently sorts by the default and still answers, and an order mapped to the wrong column passes too. The findings list has a test tying every offered order to a column. The upgrade list has none |
-| Work | Add the same two-way test between offered orders and columns, and data in which each order puts a different upgrade first |
+| Today | A test asks the planned upgrades list for each sort order it offers, both directions, and checks only that an answer comes back. TestBumpsOrderByWhatEachWouldClose ties the default order and the issues order, both directions, to data in which each puts a different upgrade first |
+| Problem | An offered order with no matching column silently sorts by the default and still answers, and severity, occurrences, builds or deadline mapped to the wrong column passes too. The findings list has a test tying every offered order to a column, TestEveryOfferedOrderHasAnExpression. The upgrade list has none |
+| Work | Add the same two-way test between the offered orders and the expressions they sort by, and data in which each of the remaining orders puts a different upgrade first |
 
 ### TODO-41 Connection pool limits
 
 | | |
 |---|---|
-| Today | One test checks that an unreachable database fails quickly, and another that the pool is bounded |
-| Problem | The first dials a port that refuses at once, so it fails in milliseconds whatever the timeout is, and it calls the open function where its name says validate. The second compares the pool's limit with the function that set it, so setting that limit to zero, which means unlimited, still passes |
-| Work | Point the timeout test at a listener that accepts and never answers, and check the attempt gives up in time. Make the pool test check a fixed number, or that one query past the limit waits |
+| Today | TestValidateGivesUpOnAServerThatNeverAnswers points the check at a listener that accepts and never answers, and checks it gives up in time. TestOpenFailsQuicklyAgainstSomethingUnreachable dials a port that refuses at once. TestPoolIsBounded and TestSQLitePoolIsAsWideAsConfigured check the pool's limit |
+| Problem | Both pool tests compare the limit with the default pool that set it, so setting that limit to zero, which means unlimited, still passes |
+| Work | Make the pool tests check a fixed number, or that one query past the limit waits |
 
 ### TODO-42 Upstream currency retry
 
@@ -340,9 +331,9 @@ Each test passes today, and would keep passing if the code it covers broke.
 
 | | |
 |---|---|
-| Today | The shared API test fixture has helpers that make a scanned build, and they always make the same one: one fixed product, release and variant, scanned now, with the scan run left unfinished |
-| Problem | Tests that need another variant, another time, a graph with no findings or a finished run build it step by step themselves, repeating the same sequence. Tests of the component tree, of inventory comparison and of upload receipts do this, and two tests write scan run rows directly |
-| Work | Give the fixture helper parameters for the variant, the time, whether to read findings and whether to finish the run, and use it in those tests |
+| Today | The shared API test fixture makes a scanned build of any variant, and a build whose graph has no findings. Every upload it records is dated now, and every scan run it applies is left unfinished |
+| Problem | Tests that need another time or a finished run build it step by step themselves, repeating the same sequence. Tests of the component tree, of inventory comparison and of upload receipts do this, and the tests of upload receipts and of the overview write scan run rows directly |
+| Work | Give the fixture helpers a parameter for the time and an option to finish the run, and use them in those tests |
 
 ## Measured and left alone
 

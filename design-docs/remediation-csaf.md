@@ -104,6 +104,7 @@ component, where it declared one.
 | Not built | What exists |
 |---|---|
 | A note stating a version 4 score with no version 3 rating: version, base score, severity and vector | A flaw rated under version 4 alone is published with no score; CSAF 2.1 gains a field |
+| A version 2 score | CSAF 2.0 has a field for it; only version 3.0 and 3.1 scores are carried, so a flaw rated under version 2 alone is published with no score |
 
 ## Limits
 

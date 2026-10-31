@@ -230,6 +230,8 @@ what moved.
 | A ROLIE service document and a category document | Both optional; the description lists the one feed, and a checker warns on each absence |
 | Directory listings | A folder path answers 404; the index and the changes list name every document |
 | A score in a VEX document | None is carried, and the validator's optional test for one on an affected product warns |
+| A key held in a KMS or HSM | The key is an armored private key in a configured secret |
+| Key rotation | One key is configured and served. Replaced, every document is signed with the new key from the next request, and the old key's path answers as nothing published |
 
 ## Limits
 
