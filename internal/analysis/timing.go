@@ -150,7 +150,7 @@ func TimeToJudge(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		return nil, err
 	}
 	queued := db.NewSelect().TableExpr(`(?) AS "l"`,
-		codeFindingFindings(db, subject, scope, visible, Open).Apply(notWaiting(scope.bound()))).
+		codeFindingFindings(db, subject, scope, visible, Open).Apply(scope.notWaiting(db))).
 		ColumnExpr(`MIN("l"."opened_at") AS "opened", MAX("l"."tier") AS "tier"`).
 		GroupExpr(`"l"."occurrence_identity"`)
 	if len(ended) > 0 {

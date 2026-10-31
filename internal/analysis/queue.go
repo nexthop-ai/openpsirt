@@ -389,7 +389,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	queued := func(ordered bool) *bun.SelectQuery {
 		q := perFinding(Open, ordered)
 		if !waiting {
-			q = q.Apply(notWaiting(scope.bound()))
+			q = q.Apply(scope.notWaiting(db))
 		}
 		return db.NewSelect().TableExpr(`(?) AS "l"`, q)
 	}
@@ -550,7 +550,7 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 			OR "f"."id" NOT IN (?))`, scope.reopenedIn(db))
 	}
 	if keep != "" {
-		q = q.Apply(inState(bound, keep))
+		q = q.Apply(scope.inState(db, keep))
 	}
 	where, args := scope.readable(subject, visible)
 	return scope.narrow(db, scope.inScope(q.Where(where, args...)), kind.CodeFindings)

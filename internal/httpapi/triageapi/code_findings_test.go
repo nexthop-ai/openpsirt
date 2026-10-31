@@ -232,6 +232,11 @@ func TestACodeFindingOpenAnewOnItsBuildIsNotFixedWhateverNarrowsTheList(t *testi
 		if got := codeFindingsOf(t, r, "security-testing-reader", narrowed); len(got.Items) != 1 || got.States["fixed"] != 1 {
 			t.Fatalf("the fixed code findings on %s are %+v; want the one closed", placed, got)
 		}
+		var counted codeFindingsListed
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/code-finding-counts", &counted)
+		if counted.States["fixed"] != 1 {
+			t.Fatalf("the counts across products are %+v; want the one closed counted fixed", counted)
+		}
 
 		// Seen again, and placed on another component of the build, so a list
 		// narrowed to the first component holds the closed finding and not
@@ -255,6 +260,11 @@ func TestACodeFindingOpenAnewOnItsBuildIsNotFixedWhateverNarrowsTheList(t *testi
 		httpapitest.Read(t, r, "security-testing-reader", "/v1/code-findings?state=fixed", &across)
 		if len(across.Items) != 0 || across.States["fixed"] != 0 {
 			t.Errorf("the fixed code findings across products are %+v; want none once the code finding opened anew", across)
+		}
+		var recounted codeFindingsListed
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/code-finding-counts", &recounted)
+		if recounted.States["fixed"] != 0 || recounted.States["open"] != 1 {
+			t.Errorf("the counts across products are %+v; want none fixed and one open once the code finding opened anew", recounted)
 		}
 	})
 }
@@ -418,6 +428,19 @@ func TestADecisionWaitingOnASecondPersonTakesItsCodeFindingOutOfTheQueue(t *test
 		}
 		if listed := codeFindingsOf(t, r, "security-testing-reader", "?state=open"); len(listed.Items) != 1 {
 			t.Errorf("the open code findings are %+v; want the one waiting", listed.Items)
+		}
+
+		// Sent back, it waits on nobody and is in the queue again.
+		var made core.DecisionOccurrenceBody
+		if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		if back := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/decisions/%d/send-back", made.DecisionID), `{"because":"Name the check."}`); back.Code != http.StatusNoContent {
+			t.Fatalf("sending the dismissal back answered %d: %s", back.Code, back.Body)
+		}
+		if queue := codeFindingsOf(t, r, "security-testing-reader", ""); len(queue.Items) != 1 || queue.Waiting != 0 {
+			t.Errorf("the queue is %+v; want the code finding back in it once its dismissal is sent back", queue)
 		}
 	})
 }
