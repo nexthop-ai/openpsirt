@@ -4181,7 +4181,7 @@ export interface paths {
         };
         /**
          * Count code findings by release
-         * @description Returns, for each tagged release of the product an analyzer run was applied to, oldest first, the code findings on its builds nobody closed as fixed, split by the tier of the rule's weaknesses as rated now, with how many of them are open, dismissed and no longer detected. A release is one frozen point, answered today; a release analyzed and holding nothing is a point at zero, and a release never analyzed is absent.
+         * @description Returns, for each tagged release of the product an analyzer run was applied to, oldest first, the code findings on its builds nobody closed as fixed, split by the tier of the rule's weaknesses as rated now, with how many of them are open, dismissed, not a security issue and no longer detected. A release is one frozen point, answered today; a release analyzed and holding nothing is a point at zero, and a release never analyzed is absent.
          *
          *     Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
          *
@@ -4205,7 +4205,7 @@ export interface paths {
         };
         /**
          * Export code findings by release
-         * @description Code findings by release as a file: a row per release with what is not fixed, open, dismissed and no longer detected, then a row per tier. Takes what the figure takes, and is refused as it is.
+         * @description Code findings by release as a file: a row per release with what is not fixed, open, dismissed, not a security issue and no longer detected, then a row per tier. Takes what the figure takes, and is refused as it is.
          *
          *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
          */
@@ -7964,7 +7964,7 @@ export interface components {
             not_comparable_runs: number;
             /** @description Whether the release is past its end of life, analyzed by nobody on purpose */
             past_end_of_life?: boolean;
-            /** @description Whether the series has gone quiet on the build: no run applied for three of its own usual gaps, never under a day. Never on a release past its end of life */
+            /** @description Whether the series has gone quiet on the build: no comparable run arrived for three of its own usual gaps, never under a day. Never on a release past its end of life */
             quiet: boolean;
             /** @description The analyzer series, by name */
             series: string;
@@ -9229,7 +9229,7 @@ export interface components {
             cut: string;
             /**
              * Format: int64
-             * @description Of not_fixed, those dismissed or not a security issue on a build of the release, by a decision or a suppression rule
+             * @description Of not_fixed, those dismissed on a build of the release, by a decision or a suppression rule
              */
             dismissed: number;
             /**
@@ -9242,6 +9242,11 @@ export interface components {
              * @description Code findings on the release's builds nobody closed as fixed, whatever was decided about them
              */
             not_fixed: number;
+            /**
+             * Format: int64
+             * @description Of not_fixed, those decided not a security issue on a build of the release
+             */
+            not_security: number;
             /**
              * Format: int64
              * @description Of not_fixed, those open on a build of the release: nothing answers them

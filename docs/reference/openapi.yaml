@@ -797,7 +797,7 @@ components:
           description: Whether the release is past its end of life, analyzed by nobody on purpose
           type: boolean
         quiet:
-          description: "Whether the series has gone quiet on the build: no run applied for three of its own usual gaps, never under a day. Never on a release past its end of life"
+          description: "Whether the series has gone quiet on the build: no comparable run arrived for three of its own usual gaps, never under a day. Never on a release past its end of life"
           type: boolean
         series:
           description: The analyzer series, by name
@@ -2908,7 +2908,7 @@ components:
           format: date
           type: string
         dismissed:
-          description: Of not_fixed, those dismissed or not a security issue on a build of the release, by a decision or a suppression rule
+          description: Of not_fixed, those dismissed on a build of the release, by a decision or a suppression rule
           format: int64
           type: integer
         no_longer_detected:
@@ -2917,6 +2917,10 @@ components:
           type: integer
         not_fixed:
           description: Code findings on the release's builds nobody closed as fixed, whatever was decided about them
+          format: int64
+          type: integer
+        not_security:
+          description: Of not_fixed, those decided not a security issue on a build of the release
           format: int64
           type: integer
         open:
@@ -2931,6 +2935,7 @@ components:
         - by_tier
         - open
         - dismissed
+        - not_security
         - no_longer_detected
       type: object
     CodeFindingRowBody:
@@ -26705,7 +26710,7 @@ paths:
   /v1/products/{product}/code-findings-by-release:
     get:
       description: |-
-        Returns, for each tagged release of the product an analyzer run was applied to, oldest first, the code findings on its builds nobody closed as fixed, split by the tier of the rule's weaknesses as rated now, with how many of them are open, dismissed and no longer detected. A release is one frozen point, answered today; a release analyzed and holding nothing is a point at zero, and a release never analyzed is absent.
+        Returns, for each tagged release of the product an analyzer run was applied to, oldest first, the code findings on its builds nobody closed as fixed, split by the tier of the rule's weaknesses as rated now, with how many of them are open, dismissed, not a security issue and no longer detected. A release is one frozen point, answered today; a release analyzed and holding nothing is a point at zero, and a release never analyzed is absent.
 
         Refused, with no count, to anybody who does not read security testing material in the product, before a component name is looked up.
 
@@ -26790,7 +26795,7 @@ paths:
   /v1/products/{product}/code-findings-by-release.{format}:
     get:
       description: |-
-        Code findings by release as a file: a row per release with what is not fixed, open, dismissed and no longer detected, then a row per tier. Takes what the figure takes, and is refused as it is.
+        Code findings by release as a file: a row per release with what is not fixed, open, dismissed, not a security issue and no longer detected, then a row per tier. Takes what the figure takes, and is refused as it is.
 
         Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
       operationId: export-code-findings-by-release

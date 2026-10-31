@@ -136,6 +136,7 @@ const ANSWERS: Record<string, object> = {
         by_tier: { "memory-safety": 4 },
         open: 6,
         dismissed: 2,
+        not_security: 7,
         no_longer_detected: 1,
       },
       {
@@ -146,6 +147,7 @@ const ANSWERS: Record<string, object> = {
         by_tier: {},
         open: 3,
         dismissed: 0,
+        not_security: 0,
         no_longer_detected: 0,
       },
     ],
@@ -160,8 +162,13 @@ const PAGES: [string, string, () => ReactElement][] = [
   ["code-findings-by-release", RELEASES, () => <CodeFindingsByRelease />],
 ];
 
-async function drawn(page: () => ReactElement, at: string, reads: boolean) {
-  window.sessionStorage.setItem("openpsirt.scope", JSON.stringify({ product: "sonic" }));
+async function drawn(
+  page: () => ReactElement,
+  at: string,
+  reads: boolean,
+  scope: Record<string, string> = { product: "sonic" },
+) {
+  window.sessionStorage.setItem("openpsirt.scope", JSON.stringify(scope));
   const session = {
     identity: "ana",
     name: "Ana",
@@ -203,6 +210,11 @@ describe.each(PAGES)("the %s page", (slug, path, page) => {
     const csv = link("CSV");
     expect(csv.pathname).toBe(`${path.replace("{product}", "sonic")}.csv`);
     expect(csv.searchParams.get("series")).toBe("cppcheck/default");
+  });
+
+  it("names every branch and variant where the address names them empty", async () => {
+    await drawn(page, `/analytics/${slug}?branch_or_tag=&variant=`, true);
+    expect(text()).toContain("sonic · every branch · every variant");
   });
 
   it("says nothing of reviewing code by any other means", async () => {
@@ -274,5 +286,17 @@ describe("code findings by release", () => {
     expect(dismissed.pathname).toBe("/products/sonic/code-findings");
     expect(dismissed.searchParams.get("branch_or_tag")).toBe("v1.1");
     expect(dismissed.searchParams.get("state")).toBe("dismissed");
+    expect(link("7").searchParams.get("state")).toBe("not-security");
+    // Open opens the open list, which keeps releases past their end of life.
+    expect(link("6").searchParams.get("state")).toBe("open");
+  });
+
+  it("names no branch, since every tag is read", async () => {
+    await drawn(() => <CodeFindingsByRelease />, "/analytics/code-findings-by-release", true, {
+      product: "sonic",
+      branch_or_tag: "main",
+    });
+    expect(text()).toContain("sonic · every branch · every variant");
+    expect(text()).not.toContain("main");
   });
 });

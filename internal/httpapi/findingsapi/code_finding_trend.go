@@ -54,10 +54,8 @@ func (a CodeFindingTrendAsked) scoped(ctx context.Context, in core.Deps) (access
 func (a CodeFindingTrendAsked) trended(ctx context.Context, in core.Deps, subject access.Subject,
 	scope analysis.Scope) (*analysis.Trended, error) {
 
-	const week = 7 * 24 * time.Hour
-	until := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
-	since := until.Add(-time.Duration(a.Weeks) * week)
-	return analysis.Trend(ctx, in.DB.DB, subject, scope, since, week, a.Weeks)
+	since, _ := weeksEnding(a.Weeks)
+	return analysis.Trend(ctx, in.DB.DB, subject, scope, since, 7*24*time.Hour, a.Weeks)
 }
 
 // lastDay is the day a week ending at a midnight ends on.

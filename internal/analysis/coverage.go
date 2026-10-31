@@ -82,11 +82,13 @@ func CoverageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope S
 			Join(`JOIN "build" AS "t" ON "t"."id" = "sr"."build_id"`).
 			Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 			Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "se"."product_id"`).
 			Where(`"se"."product_id" = ?`, scope.ProductID).
 			Where(`"s"."product_id" = ?`, scope.ProductID).
 			Where(named, namedArgs...).
 			Where(`"s"."retired_at" IS NULL`).
-			Where(`"va"."retired_at" IS NULL`)
+			Where(`"va"."retired_at" IS NULL`).
+			Where(`"p"."retired_at" IS NULL`)
 		if scope.BranchOrTagID != nil {
 			q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
 		}

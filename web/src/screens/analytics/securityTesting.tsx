@@ -3,10 +3,11 @@
 
 import { type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import type {
-  CodeFindingFigureAsked,
-  CodeFindingMethod,
-  CodeFindingWaits,
+import {
+  codeFindingsQuery,
+  type CodeFindingFigureAsked,
+  type CodeFindingMethod,
+  type CodeFindingWaits,
 } from "../../api/codeFindings";
 import { fileAt } from "../../api/links";
 import { counted, heldLine, holding, type Holding } from "../../app/families";
@@ -35,8 +36,9 @@ export function weeksWords(n: number): string {
 
 // The narrowing in the address, over the picker's scope. A branch and a
 // variant the address names stand over the picker's, so a link from a queue
-// opens on the builds it lists; one named empty is every one.
-export function useFigureAsked() {
+// opens on the builds it lists; one named empty is every one. A branchless
+// figure reads every branch and tag, and its heading names none.
+export function useFigureAsked({ branchless = false }: { branchless?: boolean } = {}) {
   const at = useScope();
   const [params] = useSearchParams();
   const product = at.product ?? "";
@@ -57,7 +59,11 @@ export function useFigureAsked() {
   // At or under a component is read on one build.
   const needsBuild = !!asked.beneath && !(asked.branch_or_tag && asked.variant);
   const of = [
-    scopeWords({ product: at.product, branch_or_tag: asked.branch_or_tag, variant: asked.variant }),
+    scopeWords({
+      product: at.product,
+      branch_or_tag: branchless ? undefined : asked.branch_or_tag || undefined,
+      variant: asked.variant || undefined,
+    }),
     asked.series,
     method && CODE_FINDING_METHODS[method]?.label,
     asked.component && `on ${asked.component}`,
@@ -68,14 +74,11 @@ export function useFigureAsked() {
   return { product, asked, code, reads: counted(code), needsBuild, of, params };
 }
 
-// The query a figure's file is asked with: what is narrowed, and nothing unset.
+// The query a figure's file is asked with: the query its page asks, so the
+// file and the screen read the same narrowing.
 export function queryOf(asked: Record<string, string | number | undefined>): string {
   return new URLSearchParams(
-    Object.entries(asked)
-      .filter(
-        (entry): entry is [string, string | number] => entry[1] !== undefined && entry[1] !== "",
-      )
-      .map(([key, value]) => [key, String(value)]),
+    Object.entries(codeFindingsQuery(asked)).map(([key, value]) => [key, String(value)]),
   ).toString();
 }
 

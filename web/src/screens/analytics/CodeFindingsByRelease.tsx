@@ -17,7 +17,8 @@ import { Files, Gate, queryOf, useFigureAsked } from "./securityTesting";
 // not fixed on each tagged release now, release over release. A release is a
 // frozen point, so these are bars in the order they went out, never a line.
 export function CodeFindingsByRelease() {
-  const { product, asked, code, reads, of } = useFigureAsked();
+  // Every tag is read, so the heading names no branch.
+  const { product, asked, code, reads, of } = useFigureAsked({ branchless: true });
   const narrowed = {
     variant: asked.variant,
     series: asked.series,
@@ -89,8 +90,11 @@ export function CodeFindingsByRelease() {
                       <th className="num" title="Nothing answers them">
                         Open
                       </th>
-                      <th className="num" title="Dismissed or not a security issue">
+                      <th className="num" title="Dismissed by a decision or a suppression rule">
                         Dismissed
+                      </th>
+                      <th className="num" title="Decided not a security issue">
+                        Not security
                       </th>
                       <th className="num" title="A comparable run didn't see them">
                         No longer detected
@@ -111,13 +115,18 @@ export function CodeFindingsByRelease() {
                             </td>
                           ))}
                           <td className="num">
-                            <Link to={codeFindingsAt(product, on)}>
+                            <Link to={codeFindingsAt(product, { ...on, state: "open" })}>
                               {each.open.toLocaleString()}
                             </Link>
                           </td>
                           <td className="num">
                             <Link to={codeFindingsAt(product, { ...on, state: "dismissed" })}>
                               {each.dismissed.toLocaleString()}
+                            </Link>
+                          </td>
+                          <td className="num">
+                            <Link to={codeFindingsAt(product, { ...on, state: "not-security" })}>
+                              {each.not_security.toLocaleString()}
                             </Link>
                           </td>
                           <td className="num">

@@ -90,7 +90,7 @@ type AnalyzedBody struct {
 	VariantName       string         `json:"variant_name" doc:"The variant as shown"`
 	Series            string         `json:"series" doc:"The analyzer series, by name"`
 	Method            string         `json:"method" doc:"The testing method the series reports. sast is static analysis"`
-	Quiet             bool           `json:"quiet" doc:"Whether the series has gone quiet on the build: no run applied for three of its own usual gaps, never under a day. Never on a release past its end of life"`
+	Quiet             bool           `json:"quiet" doc:"Whether the series has gone quiet on the build: no comparable run arrived for three of its own usual gaps, never under a day. Never on a release past its end of life"`
 	PastEndOfLife     bool           `json:"past_end_of_life,omitempty" doc:"Whether the release is past its end of life, analyzed by nobody on purpose"`
 	Arrived           string         `json:"last_arrived,omitempty" doc:"When the newest applied run arrived. Left out where none was applied"`
 	Applied           string         `json:"last_applied,omitempty" doc:"When the newest applied run was applied"`
@@ -133,7 +133,8 @@ type CodeFindingReleaseBody struct {
 	NotFixed         int            `json:"not_fixed" doc:"Code findings on the release's builds nobody closed as fixed, whatever was decided about them"`
 	ByTier           map[string]int `json:"by_tier" doc:"not_fixed by the tier of the rule's weaknesses as rated now, each named"`
 	Open             int            `json:"open" doc:"Of not_fixed, those open on a build of the release: nothing answers them"`
-	Dismissed        int            `json:"dismissed" doc:"Of not_fixed, those dismissed or not a security issue on a build of the release, by a decision or a suppression rule"`
+	Dismissed        int            `json:"dismissed" doc:"Of not_fixed, those dismissed on a build of the release, by a decision or a suppression rule"`
+	NotSecurity      int            `json:"not_security" doc:"Of not_fixed, those decided not a security issue on a build of the release"`
 	NoLongerDetected int            `json:"no_longer_detected" doc:"Of not_fixed, those no comparable run saw on a build of the release"`
 }
 
@@ -229,7 +230,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 			rows = append(rows, []string{"suppression rule", "", named, "", "", "", "", "", "", "", "",
 				string(r.State), strconv.Itoa(r.Covering)})
 		}
-		return preciseFile.stream(input.Format, input.Product, rows), nil
+		return preciseFile.stream(input.Format, input.Product, nil, rows), nil
 	})
 
 	covered := func(ctx context.Context, input *AnalysisCoverageAsked) ([]analysis.Analyzed, time.Time, time.Time, error) {
@@ -310,7 +311,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 				strconv.Itoa(b.AppliedRuns), strconv.Itoa(b.NotComparableRuns), strconv.Itoa(b.FailedRuns),
 				optionalDays(b.Expected), optionalDays(b.Allowed), optionalDays(b.Silent)})
 		}
-		return coveredFile.stream(input.Format, input.Product, rows), nil
+		return coveredFile.stream(input.Format, input.Product, weeksStated(input.Weeks), rows), nil
 	})
 
 	released := func(ctx context.Context, input *CodeFindingsByReleaseAsked) ([]analysis.Release, error) {
@@ -333,9 +334,10 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 		Summary: "Count code findings by release",
 		Description: "Returns, for each tagged release of the product an analyzer run was applied to, " +
 			"oldest first, the code findings on its builds nobody closed as fixed, split by the tier of " +
-			"the rule's weaknesses as rated now, with how many of them are open, dismissed and no longer " +
-			"detected. A release is one frozen point, answered today; a release analyzed and holding " +
-			"nothing is a point at zero, and a release never analyzed is absent.\n\n" +
+			"the rule's weaknesses as rated now, with how many of them are open, dismissed, not a " +
+			"security issue and no longer detected. A release is one frozen point, answered today; a " +
+			"release analyzed and holding nothing is a point at zero, and a release never analyzed is " +
+			"absent.\n\n" +
 			"Refused, with no count, to anybody who does not read security testing material in the " +
 			"product, before a component name is looked up.",
 		Tags: []string{"Analytics"},
@@ -363,10 +365,11 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 		id: "export-code-findings-by-release", path: "/v1/products/{product}/code-findings-by-release",
 		summary: "Export code findings by release",
 		description: "Code findings by release as a file: a row per release with what is not fixed, open, " +
-			"dismissed and no longer detected, then a row per tier. Takes what the figure takes, and is " +
-			"refused as it is.",
-		what:   "code findings by release",
-		header: []string{"release", "cut", "split", "not fixed", "open", "dismissed", "no longer detected"},
+			"dismissed, not a security issue and no longer detected, then a row per tier. Takes what the " +
+			"figure takes, and is refused as it is.",
+		what: "code findings by release",
+		header: []string{"release", "cut", "split", "not fixed", "open", "dismissed", "not security",
+			"no longer detected"},
 	}
 	huma.Register(api, releasedFile.operation(), func(ctx context.Context, input *struct {
 		CodeFindingsByReleaseAsked
@@ -380,13 +383,15 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 		for _, r := range got {
 			b := releaseBody(r)
 			rows = append(rows, []string{b.BranchOrTagName, b.Cut, "all", strconv.Itoa(b.NotFixed),
-				strconv.Itoa(b.Open), strconv.Itoa(b.Dismissed), strconv.Itoa(b.NoLongerDetected)})
+				strconv.Itoa(b.Open), strconv.Itoa(b.Dismissed), strconv.Itoa(b.NotSecurity),
+				strconv.Itoa(b.NoLongerDetected)})
 			for _, tier := range weakness.Tiers() {
 				rows = append(rows, []string{b.BranchOrTagName, b.Cut, tier.Name(),
-					strconv.Itoa(b.ByTier[tier.Name()]), "", "", ""})
+					strconv.Itoa(b.ByTier[tier.Name()]), "", "", "", ""})
 			}
 		}
-		return releasedFile.stream(input.Format, input.Product, rows), nil
+		return releasedFile.stream(input.Format, input.Product,
+			[]core.Stated{{Label: "releases", Value: strconv.Itoa(input.Releases)}}, rows), nil
 	})
 }
 
@@ -416,7 +421,7 @@ func releaseBody(r analysis.Release) CodeFindingReleaseBody {
 	return CodeFindingReleaseBody{
 		BranchOrTag: r.BranchOrTag, BranchOrTagName: r.Shown, Cut: r.Cut.UTC().Format(time.DateOnly),
 		NotFixed: r.NotFixed, ByTier: r.ByTier, Open: r.Open, Dismissed: r.Dismissed,
-		NoLongerDetected: r.NoLongerDetected,
+		NotSecurity: r.NotSecurity, NoLongerDetected: r.NoLongerDetected,
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
@@ -241,8 +242,18 @@ func TimeToFix(ctx context.Context, db bun.IDB, subject access.Subject, scope Sc
 	}
 	// Every finding still open, for what is no longer detected and for what
 	// keeps an occurrence from being fixed, and every finding of an
-	// occurrence closed in the window, for its earliest opening.
-	closedIn := db.NewSelect().TableExpr(`"finding" AS "fx"`).ColumnExpr(`"fx"."occurrence_identity"`).
+	// occurrence closed in the window, for its earliest opening. The closings
+	// are the product's code findings alone: with every closing in the
+	// deployment under the OR, PostgreSQL took 5.9 s at 240,957 dependency
+	// closings (design-docs/analysis-measurements.md § Security testing
+	// figures).
+	closedKinds, closedKindArgs := kind.SecurityTestingStatistics.Where(`"fx"."kind"`)
+	closedIn := db.NewSelect().TableExpr(`"finding" AS "fx"`).
+		Join(`JOIN "build" AS "xt" ON "xt"."id" = "fx"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "xs" ON "xs"."id" = "xt"."branch_or_tag_id"`).
+		ColumnExpr(`"fx"."occurrence_identity"`).
+		Where(`"xs"."product_id" = ?`, scope.ProductID).
+		Where(closedKinds, closedKindArgs...).
 		Where(`"fx"."closed_at" >= ?`, since).Where(`"fx"."closed_at" < ?`, until)
 	if err := statisticsFindings(db, subject, scope, visible).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).

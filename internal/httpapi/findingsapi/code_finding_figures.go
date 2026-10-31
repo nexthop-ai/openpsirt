@@ -50,6 +50,12 @@ func weeksEnding(weeks int) (since, until time.Time) {
 	return until.Add(-time.Duration(weeks) * 7 * 24 * time.Hour), until
 }
 
+// weeksStated is the window a figure's file covers, as the trend's file
+// states it.
+func weeksStated(weeks int) []core.Stated {
+	return []core.Stated{{Label: "weeks", Value: strconv.Itoa(weeks)}}
+}
+
 // CodeFindingWindowAsked is a figure over a window of weeks, narrowed as the
 // queue narrows.
 type CodeFindingWindowAsked struct {
@@ -202,7 +208,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 			}
 		}
 		rows = append(rows, []string{"no longer detected", "all", strconv.Itoa(got.NoLongerDetected), "", "", ""})
-		return judgedFile.stream(input.Format, input.Product, rows), nil
+		return judgedFile.stream(input.Format, input.Product, weeksStated(input.Weeks), rows), nil
 	})
 
 	fixed := func(ctx context.Context, input *CodeFindingWindowAsked) (*analysis.Fixing, time.Time, time.Time, error) {
@@ -265,7 +271,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 		}
 		rows := append(waitRows("fixed", got.Fixed), waitRows("no longer detected", got.NoLongerDetected)...)
 		rows = append(rows, []string{"dismissed, left out", "all", strconv.Itoa(got.Dismissed), "", "", ""})
-		return fixedFile.stream(input.Format, input.Product, rows), nil
+		return fixedFile.stream(input.Format, input.Product, weeksStated(input.Weeks), rows), nil
 	})
 }
 
@@ -285,12 +291,14 @@ func (f figureFile) operation() huma.Operation {
 	}, core.AnyPerson, securityTestingRead)
 }
 
-// stream writes a figure's rows as its file. The figure is worked out before
-// this is called, so a refusal is a status rather than a line in a file that
-// answered 200.
-func (f figureFile) stream(format, product string, rows [][]string) *huma.StreamResponse {
+// stream writes a figure's rows as its file, saying what it covers where a
+// default the query leaves out decides it, such as the weeks of a window. The
+// figure is worked out before this is called, so a refusal is a status rather
+// than a line in a file that answered 200.
+func (f figureFile) stream(format, product string, about []core.Stated, rows [][]string) *huma.StreamResponse {
 	out := core.Exporting{
 		What:   f.what,
+		About:  about,
 		Header: f.header,
 		// Every row in one answer: a figure is worked out whole, so the
 		// second page is empty and the walk stops.

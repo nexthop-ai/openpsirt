@@ -63,8 +63,8 @@ type Precision struct {
 // and by analyzer rule, and the product's suppression rules.
 //
 // A code finding is counted once, by its occurrence, at the first of these
-// that holds: the decision standing at it; a flaw record; a closure as fixed
-// on a build with no finding of it open there since; a suppression rule
+// that holds: the decision standing at it; a flaw record; a closure as fixed,
+// with no finding of it open on any build in the scope; a suppression rule
 // covering it; and otherwise unjudged. A decision is the occurrence's in the
 // product, so every build holding it reads the same one.
 //

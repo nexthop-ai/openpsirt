@@ -83,6 +83,7 @@ How long until a code finding is fixed.
 | A code finding answered as noise, by a standing decision or a covering suppression rule, is left out of fixed | A dismissal is not a fix, and an analyzer change closing it says nothing of the work |
 | Fixed is a person's closure; absence closes nothing | 5 of 28 hand-checked absences returned within two builds |
 | No longer detected is timed apart, never counted as fixed | Absence is no proof |
+| The closings in the window are read from the product's code findings alone | Read across the deployment, PostgreSQL took 5.94 s at 240,957 dependency closings (`design-docs/analysis-measurements.md` § Security testing figures) |
 
 ## Analyzer precision
 
@@ -98,7 +99,7 @@ occurrence, at the first of these that holds:
 | 1 | Dismissed | The standing decision dismisses it |
 | 2 | Not security | The standing decision says it is not a security issue |
 | 3 | Confirmed | Any other standing decision, or a flaw record |
-| 4 | Fixed | Closed as fixed with nothing open at it on that build since |
+| 4 | Fixed | Closed as fixed, with nothing open at it on any build in the scope |
 | 5 | By rule | A suppression rule in force covers it |
 | 6 | Unjudged | None of these |
 
@@ -134,7 +135,7 @@ What is analyzed, and what has gone quiet: one row per series and build in use.
 
 | Rule | Reason |
 |---|---|
-| Each series is judged on its own build against its own interval, never one deployment-wide window | A quarterly series is not quiet after a week |
+| Each series is judged on its own build against its own interval, never one deployment-wide window; a quiet series is the stale analysis REQ-52 reports | A quarterly series is not quiet after a week |
 | The interval and the silence allowed are the stopped-reporting alert's: three usual gaps, never under a day, once three runs were applied (`design-docs/notifications-alerts.md` § Analyzer alerts) | One rule for the interval, in one place |
 | The silence is counted from the newest comparable run; never comparable, from the oldest of the runs read | Runs whose absences prove nothing leave the code as unwatched as runs that stopped |
 | A build retired at any level is left out; a release past its end of life is listed, marked, and never quiet | Nobody analyzes a release out of support on purpose |
@@ -154,7 +155,7 @@ Whether a release shipped fewer code findings than the one before (REQ-54).
 |---|---|
 | A point per tag | Its name and when it went out: the released date where one is set, and when it was declared otherwise |
 | Not fixed | The code findings on its builds nobody closed as fixed, whatever was decided, split by tier, every tier named |
-| States | Open, dismissed (by a decision or a suppression rule), and no longer detected, as the queue states them on its builds |
+| States | Open, dismissed (by a decision or a suppression rule), not security, and no longer detected, as the queue states them on its builds |
 
 | Rule | Reason |
 |---|---|
@@ -162,6 +163,7 @@ Whether a release shipped fewer code findings than the one before (REQ-54).
 | A tag is a point once a run of a series in the scope was applied to one of its builds; a tag never analyzed is absent, and one analyzed with nothing is a point at zero | An absent point and a zero say different things |
 | Counted now, as the queue answers it today | A tag is frozen; its code findings are answered as decisions stand |
 | A code finding on two builds of a release in two states counts in both state counts and once in not fixed | The state counts open the queue's lists |
+| Each state count opens the queue's list of that state on the tag, open included | The default queue leaves out releases past their end of life and what waits for approval |
 | Drawn as bars in release order, never a line | A line between two releases draws a path nothing travelled |
 | Narrowed by variant, series, method and component; no branch and no subtree | The release line is the branch axis; a subtree is one build's |
 
@@ -171,7 +173,7 @@ Whether a release shipped fewer code findings than the one before (REQ-54).
 |---|---|
 | Only `security-testing-read` on the product reads a figure or its file; anybody else reading the product is refused 403, naming no count, series or rule | Every figure is at security testing visibility |
 | A product the reader cannot see is 404 | |
-| The check runs before any name is resolved, so an unknown component, series or branch is refused as a known one is (REQ-42) | A refusal differing by name is a directory |
+| The check runs before any component or series name is resolved, so an unknown one is refused as a known one is (REQ-42); a branch or variant, which every reader of the product sees, resolves first | A refusal differing by name is a directory |
 | The check is repeated in the data layer, and every count carries the subject: a code finding counts where its visibility is read or its flaw's reach includes the reader (REQ-43) | A handler missing its check still leaks nothing |
 | Series and runs carry the family's visibility alone | A series names no code finding |
 | A role, visibility and endpoint matrix holds every figure and its files | |

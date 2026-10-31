@@ -5,7 +5,9 @@
 
 // What the security testing figures cost on the component hub's build of
 // 16,000 components and 4,000 code findings: their openings spread over two
-// years, a tenth closed as fixed, a twentieth judged, a hundred and four runs
+// years, a tenth closed as fixed, a twentieth judged, every dependency finding
+// closed in the last thirteen weeks and copied closed twice to the other
+// product's build, a hundred and four runs
 // of the series before the one applied, and the build read as a release.
 //
 // Behind a build tag because it is a measurement and not a gate. `make
@@ -15,6 +17,7 @@ package triageapi_test
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,6 +52,53 @@ func TestMeasureTheSecurityTestingFigures(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		// Every dependency finding closed in the last thirteen weeks, a
+		// week apart by thirteen residues, so time to fix reads past the
+		// closings of another family.
+		for w := range 13 {
+			if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
+				Set(`"closed_at" = ?`, now.Add(-time.Duration(w*7)*day)).
+				Where(`"kind" <> ?`, kind.Analysis).Where(`"id" % 13 = ?`, w).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// The other product's build holding those closings twice over, so
+		// the deployment closes three dependency findings for each of the
+		// hub's.
+		described, err := r.DB.QueryContext(ctx, `SELECT * FROM "finding" WHERE 1 = 0`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		every, err := described.Columns()
+		if closeErr := described.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		var columns []string
+		for _, column := range every {
+			if column != "id" && column != "build_id" {
+				columns = append(columns, column)
+			}
+		}
+		theirs := r.BuildOf(t, httpapitest.TheirBuild)
+		listed := `"` + strings.Join(columns, `", "`) + `"`
+		// Each copy a distinct occurrence, its identity's first character
+		// replaced, as another product's findings are.
+		for _, first := range []string{"x", "y"} {
+			copied := strings.Replace(listed, `"occurrence_identity"`,
+				`CONCAT('`+first+`', SUBSTR("occurrence_identity", 2))`, 1)
+			if _, err := r.DB.DB.NewRaw(`INSERT INTO "finding" ("build_id", `+listed+`) SELECT ?, `+copied+
+				` FROM "finding" WHERE "kind" <> ? AND "build_id" <> ?`, theirs, kind.Analysis, theirs).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var closings int
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).
+			Where(`"kind" <> ?`, kind.Analysis).Where(`"closed_at" IS NOT NULL`).Scan(ctx, &closings); err != nil {
+			t.Fatal(err)
+		}
 		var open []string
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"occurrence_identity"`).
 			Where(`"kind" = ?`, kind.Analysis).Where(`"closed_at" IS NULL`).
@@ -82,10 +132,12 @@ func TestMeasureTheSecurityTestingFigures(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		t.Logf("%d components, %d code findings: seeded in %s", n, codeFindings, time.Since(began).Round(time.Second))
+		t.Logf("%d components, %d code findings, %d dependency findings closed: seeded in %s",
+			n, codeFindings, closings, time.Since(began).Round(time.Second))
 		paths := []string{
 			"/v1/products/mine/code-finding-time-to-judge?weeks=104",
 			"/v1/products/mine/code-finding-time-to-fix?weeks=104",
+			"/v1/products/mine/code-finding-time-to-fix?weeks=13",
 			"/v1/products/mine/code-finding-precision",
 			"/v1/products/mine/analysis-coverage?weeks=104",
 		}

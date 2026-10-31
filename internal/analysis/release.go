@@ -34,11 +34,12 @@ type Release struct {
 	// named.
 	NotFixed int
 	ByTier   map[string]int
-	// Open, Dismissed and NoLongerDetected are those of them in that state
-	// on a build of the release: open, answered as noise by a decision or a
-	// suppression rule, and unseen by a comparable run. A code finding on two
-	// builds in two states counts in both, as the queue counts it.
-	Open, Dismissed, NoLongerDetected int
+	// Open, Dismissed, NotSecurity and NoLongerDetected are those of them in
+	// that state on a build of the release: open, dismissed by a decision or
+	// a suppression rule, decided not a security issue, and unseen by a
+	// comparable run. A code finding on two builds in two states counts in
+	// both, as the queue counts it.
+	Open, Dismissed, NotSecurity, NoLongerDetected int
 }
 
 // ByRelease is the code findings each tagged release of the product holds
@@ -164,8 +165,11 @@ func ByRelease(ctx context.Context, db bun.IDB, subject access.Subject, scope Sc
 			if one.states[Open] {
 				out[i].Open++
 			}
-			if one.states[Dismissed] || one.states[NotSecurity] {
+			if one.states[Dismissed] {
 				out[i].Dismissed++
+			}
+			if one.states[NotSecurity] {
+				out[i].NotSecurity++
 			}
 			if one.states[NoLongerDetected] {
 				out[i].NoLongerDetected++

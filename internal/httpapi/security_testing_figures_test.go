@@ -244,6 +244,116 @@ func TestTimeToFixLeavesOutDismissalsAndTimesAbsenceApart(t *testing.T) {
 	})
 }
 
+// stable is a second branch of the seeded product holding the hub's
+// inventory.
+var stable = httpapitest.Build{Product: "mine", BranchOrTag: "stable", Variant: "broadcom"}
+
+// backported ships the hub's inventory on stable and applies clang-tidy's run
+// finding the leak there, so the leak trendSeeded fixed on master is open on
+// stable. It returns the leak's address on stable.
+func backported(t *testing.T, r *httpapitest.Reach) string {
+	t.Helper()
+	names := catalog.NewStore(r.DB.DB)
+	mine, err := names.ProductByName(t.Context(), "mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := names.DeclareBranchOrTag(t.Context(), mine.ID, stable.BranchOrTag, catalog.Branch, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, scan := r.Shipped(t, stable, "hub-stable", graph.Snapshot{
+		Root:       httpapitest.HubRoot,
+		Components: []graph.Described{httpapitest.HubLib, httpapitest.HubTools, httpapitest.HubZlib},
+		Dependencies: []graph.Dependency{
+			{Parent: httpapitest.HubRoot, Child: httpapitest.HubLib},
+			{Parent: httpapitest.HubRoot, Child: httpapitest.HubTools},
+			{Parent: httpapitest.HubLib, Child: httpapitest.HubZlib},
+		},
+	})
+	if err := ingest.NewStore(r.DB.DB).Made(t.Context(), scan, 4, 4, httpapitest.HubRoot.Name); err != nil {
+		t.Fatal(err)
+	}
+	httpapitest.ApplyRunAt(t, r, stable, "clang-tidy/default", time.Now().UTC().Add(-time.Hour),
+		httpapitest.CodeFindingRun(true))
+	var items struct {
+		Items []struct {
+			Occurrence string `json:"occurrence"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, "code-finding-handler",
+		"/v1/products/mine/code-findings?branch_or_tag=stable&variant=broadcom&series=clang-tidy/default", &items)
+	if len(items.Items) != 1 {
+		t.Fatalf("stable's queue is %+v; want the leak", items)
+	}
+	return "/v1/products/mine/branches-and-tags/stable/variants/broadcom/code-findings/" + items.Items[0].Occurrence
+}
+
+// A code finding is fixed once no build in the scope holds it open: the leak
+// fixed on master and open on stable is neither timed as fixed nor counted
+// fixed in precision until stable's closes too.
+func TestAFixCountsOnceNoBuildHoldsItOpen(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		trendSeeded(t, r)
+		leak := backported(t, r)
+
+		var fixing fixingRead
+		httpapitest.Read(t, r, "security-testing-reader", fixOf+"?weeks=2", &fixing)
+		if fixing.Fixed.All.Count != 0 {
+			t.Errorf("the fixed are %+v; want none while stable holds the leak open", fixing.Fixed)
+		}
+		var precise precisionRead
+		httpapitest.Read(t, r, "security-testing-reader", precisionOf, &precise)
+		if got := precise.series("clang-tidy/default"); got.Fixed != 0 || got.Unjudged != 1 {
+			t.Errorf("clang-tidy is %+v; want the leak unjudged while stable holds it open", got)
+		}
+
+		httpapitest.ApplyRunAt(t, r, stable, "clang-tidy/default", time.Now().UTC().Add(-30*time.Minute),
+			httpapitest.CodeFindingRun(false))
+		body := httpapitest.FixedBody(t, r, leak, "backported the fix")
+		if w := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, leak+"/fixed", body); w.Code != http.StatusOK {
+			t.Fatalf("closing stable's leak as fixed answered %d: %s", w.Code, w.Body.String())
+		}
+		httpapitest.Read(t, r, "security-testing-reader", fixOf+"?weeks=2", &fixing)
+		if all := fixing.Fixed.All; all.Count != 1 || all.Median != 10 {
+			t.Errorf("the fixed are %+v; want the leak once, ten days from master's opening", fixing.Fixed)
+		}
+		httpapitest.Read(t, r, "security-testing-reader", precisionOf, &precise)
+		if got := precise.series("clang-tidy/default"); got.Fixed != 1 || got.Unjudged != 0 {
+			t.Errorf("clang-tidy is %+v; want the leak fixed once", got)
+		}
+	})
+}
+
+// A code finding a suppression rule dismisses, with no decision standing, is
+// left out of fixed and counted dismissed.
+func TestTimeToFixLeavesOutWhatASuppressionRuleDismisses(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		trendSeeded(t, r)
+		cppcheck := atOf(t, r, "cppcheck/default", "no-longer-detected")
+		rule := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, "/v1/products/mine/suppression-rules",
+			`{"prefix":"inflate.cpp","reason":"false_positive","reasoning":"vendored and audited upstream"}`)
+		var proposed struct {
+			ID int64 `json:"id"`
+		}
+		if rule.Code != http.StatusCreated || json.Unmarshal(rule.Body.Bytes(), &proposed) != nil {
+			t.Fatalf("proposing the rule answered %d: %s", rule.Code, rule.Body)
+		}
+		if w := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/products/mine/suppression-rules/%d/approval", proposed.ID), `{}`); w.Code != http.StatusOK {
+			t.Fatalf("approving the rule answered %d: %s", w.Code, w.Body)
+		}
+		body := httpapitest.FixedBody(t, r, cppcheck, "the parser was rewritten")
+		if w := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, cppcheck+"/fixed", body); w.Code != http.StatusOK {
+			t.Fatalf("closing cppcheck's as fixed answered %d: %s", w.Code, w.Body.String())
+		}
+		var got fixingRead
+		httpapitest.Read(t, r, "security-testing-reader", fixOf+"?weeks=2", &got)
+		if got.Fixed.All.Count != 1 || got.Dismissed != 1 {
+			t.Errorf("after the ruled one is fixed: %+v; want the leak alone fixed and one dismissed left out", got)
+		}
+	})
+}
+
 // Each code finding is counted once, at the first answer that holds, and the
 // noise share is of those judged.
 func TestPrecisionCountsEachCodeFindingAtItsFirstAnswer(t *testing.T) {
@@ -436,6 +546,25 @@ func TestAnalysisCoverageJudgesEachSeriesAgainstItsOwnInterval(t *testing.T) {
 		if got.Quiet != 0 {
 			t.Errorf("%d quiet past end of life", got.Quiet)
 		}
+
+		// A build retired at any level is left out: its variant, its
+		// branch, or its product.
+		for _, retired := range []struct{ table, name string }{
+			{`"variant"`, "broadcom"}, {`"branch_or_tag"`, "master"}, {`"product"`, "mine"},
+		} {
+			retire := func(when *time.Time) {
+				if _, err := r.DB.DB.NewUpdate().TableExpr(retired.table).
+					Set(`"retired_at" = ?`, when).Where(`"name" = ?`, retired.name).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			retire(&now)
+			httpapitest.Read(t, r, "security-testing-reader", coverageOf+"?weeks=1", &got)
+			if len(got.Items) != 0 {
+				t.Errorf("with %s %s retired coverage lists %+v; want nothing", retired.table, retired.name, got.Items)
+			}
+			retire(nil)
+		}
 	})
 }
 
@@ -475,6 +604,7 @@ type releasesRead struct {
 		ByTier           map[string]int `json:"by_tier"`
 		Open             int            `json:"open"`
 		Dismissed        int            `json:"dismissed"`
+		NotSecurity      int            `json:"not_security"`
 		NoLongerDetected int            `json:"no_longer_detected"`
 	} `json:"releases"`
 }
@@ -540,6 +670,19 @@ func TestCodeFindingsByReleaseFollowTheTagsInOrder(t *testing.T) {
 		// its absence.
 		if first := got.Releases[0]; first.Dismissed != 1 || first.NoLongerDetected != 1 {
 			t.Errorf("v1.0 is %+v; want one dismissed and one no longer detected", first)
+		}
+		// Not a security issue is its own count, apart from dismissed, as
+		// the queue lists it apart.
+		httpapitest.Read(t, r, "code-finding-handler",
+			"/v1/products/mine/code-findings?branch_or_tag=v1.0&variant=broadcom&state=no-longer-detected", &items)
+		if len(items.Items) != 1 {
+			t.Fatalf("v1.0's no longer detected are %+v", items)
+		}
+		decided(t, r, "/v1/products/mine/branches-and-tags/v1.0/variants/broadcom/code-findings/"+items.Items[0].Occurrence,
+			`{"outcome":"not-security","reasoning":"only the test harness reaches it"}`, true)
+		httpapitest.Read(t, r, "security-testing-reader", releasesOf, &got)
+		if first := got.Releases[0]; first.NotFixed != 2 || first.Dismissed != 1 || first.NotSecurity != 1 || first.NoLongerDetected != 0 {
+			t.Errorf("v1.0 is %+v; want one dismissed and one not a security issue", first)
 		}
 		httpapitest.Read(t, r, "security-testing-reader", releasesOf+"?releases=2", &got)
 		if len(got.Releases) != 2 || got.Releases[0].BranchOrTag != "v1.1" {
@@ -646,6 +789,31 @@ func TestWhoMayReadTheSecurityTestingFigures(t *testing.T) {
 			w := httpapitest.AsPerson(t, r, c.who, http.MethodGet, precisionOf+".csv", "")
 			if strings.Contains(w.Body.String(), "series,semgrep/default") != c.semgrep {
 				t.Errorf("%s's precision file reads %s; want semgrep counted %v", c.who, w.Body.String(), c.semgrep)
+			}
+		}
+	})
+}
+
+// A figure's file states what it covers where the query leaves the default to
+// decide it: the weeks of a window, and the releases of a release line.
+func TestAFigureFileStatesWhatItCovers(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		trendSeeded(t, r)
+		for _, c := range []struct{ path, csv, json string }{
+			{judgeOf, "# weeks,13", `"weeks":"4"`},
+			{fixOf, "# weeks,13", `"weeks":"4"`},
+			{coverageOf, "# weeks,13", `"weeks":"4"`},
+			{releasesOf, "# releases,12", `"releases":"4"`},
+		} {
+			asked := "?weeks=4"
+			if c.path == releasesOf {
+				asked = "?releases=4"
+			}
+			if w := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, c.path+".csv", ""); !strings.Contains(w.Body.String(), c.csv) {
+				t.Errorf("%s.csv reads %s; want %q", c.path, w.Body.String(), c.csv)
+			}
+			if w := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, c.path+".json"+asked, ""); !strings.Contains(w.Body.String(), c.json) {
+				t.Errorf("%s.json%s reads %s; want %q", c.path, asked, w.Body.String(), c.json)
 			}
 		}
 	})
