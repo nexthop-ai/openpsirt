@@ -133,7 +133,7 @@ func ByRelease(ctx context.Context, db bun.IDB, subject access.Subject, scope Sc
 		Stands        State  `bun:"stands"`
 		Tier          int    `bun:"tier"`
 	}
-	if err := db.NewSelect().TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, notFixed)).
+	if err := db.NewSelect().TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, notFixed).Apply(scope.stood(db))).
 		ColumnExpr(`"l"."branch_or_tag_id", "l"."occurrence_identity", "l"."stands", MAX("l"."tier") AS "tier"`).
 		Where(`"l"."branch_or_tag_id" IN (?)`, bun.List(ids)).
 		GroupExpr(`"l"."branch_or_tag_id", "l"."occurrence_identity", "l"."stands"`).

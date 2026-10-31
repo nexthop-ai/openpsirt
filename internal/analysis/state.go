@@ -74,13 +74,22 @@ func stateOf(productID int64) (string, []any) { return stateAt(inProduct(product
 // stateAt is stateOf in the product bound given: one product, or the product
 // of each row's branch or tag.
 func stateAt(b productBound) (string, []any) {
+	return stateDecidedBy(b, standingOutcomeIn(b)+` IS NOT NULL`, b.times(1))
+}
+
+// stateDecidedBy is stateAt with whether a decision stands at the open
+// finding under "f" asked as the condition given, with what it binds; the
+// outcome is read only where one does.
+func stateDecidedBy(b productBound, decided string, decidedArgs []any) (string, []any) {
+	args := append(b.times(1), decidedArgs...)
+	args = append(args, b.times(2)...)
 	return `CASE
 		WHEN "f"."closed_at" IS NOT NULL THEN '` + string(Fixed) + `'
 		WHEN ` + recordedAsFlawIn(b) + ` THEN '` + string(RecordedAsFlaw) + `'
-		WHEN ` + standingOutcomeIn(b) + ` IS NOT NULL THEN ` + standingOutcomeIn(b) + `
+		WHEN ` + decided + ` THEN ` + standingOutcomeIn(b) + `
 		WHEN ` + ruledIn(b) + ` THEN '` + string(Dismissed) + `'
 		WHEN "si"."absent_run_id" IS NOT NULL THEN '` + string(NoLongerDetected) + `'
-		ELSE '` + string(Open) + `' END`, b.times(4)
+		ELSE '` + string(Open) + `' END`, args
 }
 
 // inState keeps a statement over the finding under "f", whose sighting is
@@ -139,8 +148,9 @@ const (
 	// and not sent back. standingOutcomeIn reads the same, and every
 	// decision has an outcome.
 	standing decided = false
-	// waiting is a decision proposed and waiting on a second person, as
-	// waitingDecision reads it.
+	// waiting is a decision proposed and waiting on a second person. A code
+	// finding somebody has already judged is not work for the next person
+	// to take.
 	waiting decided = true
 )
 

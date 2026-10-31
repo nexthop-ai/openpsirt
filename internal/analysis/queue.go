@@ -18,21 +18,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
-
-// waitingDecision is whether a decision at the occurrence of the finding under
-// "f", in the product bound, waits for a second person. It binds the product's
-// arguments once. A code finding somebody has already judged is not work for
-// the next person to take.
-func waitingDecision(product productBound) string {
-	return `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
-	WHERE "dc"."product_id" = ` + product.sql + ` AND "dc"."live_key" IS NOT NULL
-	  AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `
-	  AND "dc"."state" = '` + string(triage.Proposed) + `'
-	  AND "dc"."needs_approval" = TRUE AND "dc"."sent_back_at" IS NULL)`
-}
 
 // precisionRank is the tool's precision of the rule of the finding under "f",
 // whose rating is under "rr", as a number that sorts the most precise first,
@@ -373,7 +360,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	perFinding := func(keep State, ordered bool) *bun.SelectQuery {
 		q := codeFindingFindings(db, subject, scope, visible, keep)
 		if ordered {
-			q = q.ColumnExpr(`CASE WHEN "f"."id" IN (?) THEN 1 ELSE 0 END AS "corroborated"`, scope.corroboratedIn(db))
+			q = q.ColumnExpr(`CASE WHEN "f"."id" IN (?) THEN 1 ELSE 0 END AS "corroborated"`, scope.corroboratedIn(db, keep == Fixed))
 		}
 		return q
 	}
@@ -412,7 +399,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 			Covered      int   `bun:"covered"`
 			CodeFindings int   `bun:"code_findings"`
 		}
-		if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding("", false)).
+		if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding("", false).Apply(scope.stood(db))).
 			ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
 			GroupExpr(`"l"."stands", "l"."awaits", "l"."covered"`).
 			Scan(ctx, &byState); err != nil {
@@ -511,11 +498,11 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 }
 
 // codeFindingFindings is every finding of a code finding in the scope that the subject may
-// read, one row per finding: the code finding's occurrence, its build, its series, where it
-// stands, whether a decision waits on it, whether a suppression rule covers it, and
+// read, one row per finding: the code finding's occurrence, its build, its series, and
 // what the queue orders it by, except whether another analyzer agrees, which the page
-// adds. Where keep names a state, only the findings standing in it, kept by the
-// conditions that make it (inState).
+// adds. Where it stands is added by stood, for the reads that count by it. Where keep
+// names a state, only the findings standing in it, kept by the conditions that make
+// it (inState).
 //
 // The product's own visibilities, and a code finding included in its flaw's case. A code finding granted
 // one at a time is reached through its evidence, never a list. A finding
@@ -526,8 +513,6 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 // testing work in, at the visibilities they read in it.
 func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility,
 	keep State) *bun.SelectQuery {
-	bound := scope.bound()
-	state, stateArgs := stateAt(bound)
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
@@ -539,9 +524,6 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
 		ColumnExpr(precisionRank+` AS "precise"`).
-		ColumnExpr(state+` AS "stands"`, stateArgs...).
-		ColumnExpr(`CASE WHEN `+waitingDecision(bound)+` THEN 1 ELSE 0 END AS "awaits"`, bound.times(1)...).
-		ColumnExpr(`CASE WHEN `+ruledIn(bound)+` THEN 1 ELSE 0 END AS "covered"`, bound.times(1)...).
 		Where(kinds, kindArgs...)
 	if keep == "" || keep == Fixed {
 		// A closed finding is read until its code finding opens anew on its
@@ -554,6 +536,28 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 	}
 	where, args := scope.readable(subject, visible)
 	return scope.narrow(db, scope.inScope(q.Where(where, args...)), kind.CodeFindings)
+}
+
+// stood adds to a statement over the finding under "f", whose sighting is
+// under "si" and whose result is under "ar", where it stands in the scope,
+// whether a decision waits on it while it is open and whether a suppression
+// rule covers it. Added only where a read counts by them, because MySQL 8.4
+// works out every column of a derived table it materializes, read or not:
+// 0.16 s of the queue's 0.36 s count over 36,000 open code findings.
+//
+// Whether a decision stands or waits is asked of each row by identifier from
+// decidedIn's sets, and the standing outcome read only where one stands.
+// Asked of each row, MySQL 8.4 read every decision of the product for each
+// code finding, through the index the product leads: 0.22 s against 0.13 s
+// for home's counts across two products, analyzed.
+func (scope Scope) stood(db bun.IDB) func(*bun.SelectQuery) *bun.SelectQuery {
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		bound := scope.bound()
+		state, stateArgs := stateDecidedBy(bound, `"f"."id" IN (?)`, []any{scope.decidedIn(db, standing)})
+		return q.ColumnExpr(state+` AS "stands"`, stateArgs...).
+			ColumnExpr(`CASE WHEN "f"."id" IN (?) THEN 1 ELSE 0 END AS "awaits"`, scope.decidedIn(db, waiting)).
+			ColumnExpr(`CASE WHEN `+ruledIn(bound)+` THEN 1 ELSE 0 END AS "covered"`, bound.times(1)...)
+	}
 }
 
 // reopenedIn is the closed code findings of the scope's builds at whose
