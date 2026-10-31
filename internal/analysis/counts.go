@@ -92,7 +92,7 @@ func countBySeries(ctx context.Context, db bun.IDB, subject access.Subject, scop
 		CodeFindings int   `bun:"code_findings"`
 	}
 	if err := db.NewSelect().
-		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, "")).
 		ColumnExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).
 		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
 		GroupExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).

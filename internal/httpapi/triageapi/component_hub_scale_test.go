@@ -43,8 +43,9 @@ const hubKernelBinaries = 10
 // ten binaries carrying n/2 issues each, and generic packages, the first of
 // which are built from a repository of their own. Then one analyzer run
 // reports codeFindings results, spread over those repositories, the kernel's
-// and one the build does not hold.
-func hubSeeded(t *testing.T, r *httpapitest.Reach, n, codeFindings int) {
+// and one the build does not hold, under rules of the weaknesses tags names,
+// where any are given.
+func hubSeeded(t *testing.T, r *httpapitest.Reach, n, codeFindings int, tags ...string) {
 	t.Helper()
 	root := graph.Described{Purl: "pkg:generic/sonic-image@1.0", Name: "sonic-image", Version: "1.0"}
 	var components []graph.Described
@@ -88,8 +89,15 @@ func hubSeeded(t *testing.T, r *httpapitest.Reach, n, codeFindings int) {
 		t.Fatal(err)
 	}
 
-	// The repositories the run states: the kernel's, each package's own up
-	// to the bound, and one nothing in the build is built from.
+	httpapitest.ApplyRunIn(t, r, "clang/measured", time.Now().UTC().Add(-time.Hour), hubRun("clang", n, codeFindings, 0, tags))
+}
+
+// hubRun is one analyzer's run over the hub's build: codeFindings results
+// spread over the repositories the run states, the kernel's, each package's
+// own up to the bound, and one nothing in the build is built from, under
+// eight rules. offset moves every line, so a second tool's results sit beside
+// the first's, and tags, where given, are each rule's weakness.
+func hubRun(tool string, n, codeFindings, offset int, tags []string) string {
 	repositories := []string{"https://github.com/acme/linux", "https://github.com/acme/elsewhere"}
 	for i := hubKernelBinaries; i < min(n, hubRepositories); i++ {
 		repositories = append(repositories, fmt.Sprintf("https://github.com/acme/repo-%d", i))
@@ -105,18 +113,21 @@ func hubSeeded(t *testing.T, r *httpapitest.Reach, n, codeFindings int) {
 	for i := range codeFindings {
 		results = append(results, fmt.Sprintf(`{"ruleId":"r%d","message":{"text":"code finding %d"},`+
 			`"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/f%05d.c","uriBaseId":"M%d"},`+
-			`"region":{"startLine":%d}}}]}`, i%8, i, i/20, i%len(repositories), 10+5*(i%20)))
+			`"region":{"startLine":%d}}}]}`, i%8, i, i/20, i%len(repositories), 10+5*(i%20)+offset))
 	}
 	rules := make([]string, 0, 8)
 	for i := range 8 {
-		rules = append(rules, fmt.Sprintf(`{"id":"r%d"}`, i))
+		if len(tags) > 0 {
+			rules = append(rules, fmt.Sprintf(`{"id":"r%d","properties":{"tags":["external/cwe/cwe-%s"]}}`, i, tags[i%len(tags)]))
+		} else {
+			rules = append(rules, fmt.Sprintf(`{"id":"r%d"}`, i))
+		}
 	}
-	doc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"clang","rules":[` + strings.Join(rules, ",") + `]}},` +
+	return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"` + tool + `","rules":[` + strings.Join(rules, ",") + `]}},` +
 		`"originalUriBaseIds":{` + strings.Join(bases, ",") + `},` +
 		`"versionControlProvenance":[` + strings.Join(modules, ",") + `],` +
 		`"properties":{"openpsirt/unitsExpected":1,"openpsirt/unitsAnalyzed":1},` +
 		`"results":[` + strings.Join(results, ",") + `]}]}`
-	httpapitest.ApplyRunIn(t, r, "clang/measured", time.Now().UTC().Add(-time.Hour), doc)
 }
 
 func TestMeasureTheComponentHub(t *testing.T) {

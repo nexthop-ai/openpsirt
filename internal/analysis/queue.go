@@ -368,7 +368,15 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	if err != nil {
 		return nil, err
 	}
-	perFinding := func() *bun.SelectQuery { return codeFindingFindings(db, subject, scope, visible) }
+	// Whether another analyzer agrees is read for the page alone, the one
+	// statement ordering by it.
+	perFinding := func(keep State, ordered bool) *bun.SelectQuery {
+		q := codeFindingFindings(db, subject, scope, visible, keep)
+		if ordered {
+			q = q.ColumnExpr(`CASE WHEN "f"."id" IN (?) THEN 1 ELSE 0 END AS "corroborated"`, scope.corroboratedIn(db))
+		}
+		return q
+	}
 
 	// A sighting in a release past its end of life is no work for anybody,
 	// so the queue counts none of them, and a code finding open only there leaves
@@ -378,21 +386,22 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	if err != nil {
 		return nil, err
 	}
-	queued := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.Where(`"l"."stands" = ?`, string(Open))
-		if waiting {
-			return q
+	queued := func(ordered bool) *bun.SelectQuery {
+		q := perFinding(Open, ordered)
+		if !waiting {
+			q = q.Apply(notWaiting(scope.bound()))
 		}
-		return q.Where(`"l"."awaits" = 0`)
+		return db.NewSelect().TableExpr(`(?) AS "l"`, q)
 	}
-	listed := func(q *bun.SelectQuery) *bun.SelectQuery {
+	listed := func(ordered bool) *bun.SelectQuery {
 		if want != "" {
-			return q.Where(`"l"."stands" = ?`, string(want))
+			return db.NewSelect().TableExpr(`(?) AS "l"`, perFinding(want, ordered))
 		}
+		q := queued(ordered)
 		if len(ended) > 0 {
 			q = q.Where(`"l"."branch_or_tag_id" NOT IN (?)`, bun.List(ended))
 		}
-		return queued(q)
+		return q
 	}
 
 	out := &Queue{ByState: map[State]int{}}
@@ -403,7 +412,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 			Covered      int   `bun:"covered"`
 			CodeFindings int   `bun:"code_findings"`
 		}
-		if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding()).
+		if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding("", false)).
 			ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
 			GroupExpr(`"l"."stands", "l"."awaits", "l"."covered"`).
 			Scan(ctx, &byState); err != nil {
@@ -418,13 +427,13 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 				out.Ruled += c.CodeFindings
 			}
 		}
-		if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
+		if err := listed(false).
 			ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &out.Total); err != nil {
 			return nil, fmt.Errorf("count the code findings listed in product %d: %w", scope.ProductID, err)
 		}
 		if want == "" && len(ended) > 0 {
 			var all int
-			if err := queued(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
+			if err := queued(false).
 				ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &all); err != nil {
 				return nil, fmt.Errorf("count the code findings of product %d past their end of life: %w", scope.ProductID, err)
 			}
@@ -442,7 +451,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 		Builds     int       `bun:"builds"`
 		Opened     time.Time `bun:"opened"`
 	}
-	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
+	if err := listed(true).
 		ColumnExpr(`"l"."occurrence_identity", MAX("l"."id") AS "newest"`).
 		// Builds rather than rows: a code finding fixed, seen again and fixed again
 		// on one build is two closed rows there.
@@ -504,15 +513,19 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 // codeFindingFindings is every finding of a code finding in the scope that the subject may
 // read, one row per finding: the code finding's occurrence, its build, its series, where it
 // stands, whether a decision waits on it, whether a suppression rule covers it, and
-// what the queue orders it by.
+// what the queue orders it by, except whether another analyzer agrees, which the page
+// adds. Where keep names a state, only the findings standing in it, kept by the
+// conditions that make it (inState).
 //
 // The product's own visibilities, and a code finding included in its flaw's case. A code finding granted
 // one at a time is reached through its evidence, never a list. A finding
-// closed on a build is read until the code finding opens anew at its occurrence there.
+// closed on a build is read until the code finding opens anew at its occurrence there,
+// which a state other than fixed has no need to ask.
 //
 // Across products, the rows are each product's the reader reads security
 // testing work in, at the visibilities they read in it.
-func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
+func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility,
+	keep State) *bun.SelectQuery {
 	bound := scope.bound()
 	state, stateArgs := stateAt(bound)
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
@@ -524,18 +537,83 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
 		ColumnExpr(`"f"."id", "f"."occurrence_identity", "f"."build_id", "f"."component_id", "f"."opened_at", "si"."series_id", "t"."branch_or_tag_id"`).
 		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
-		ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
 		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
 		ColumnExpr(precisionRank+` AS "precise"`).
 		ColumnExpr(state+` AS "stands"`, stateArgs...).
 		ColumnExpr(`CASE WHEN `+waitingDecision(bound)+` THEN 1 ELSE 0 END AS "awaits"`, bound.times(1)...).
 		ColumnExpr(`CASE WHEN `+ruledIn(bound)+` THEN 1 ELSE 0 END AS "covered"`, bound.times(1)...).
-		Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
-			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."build_id" = "f"."build_id"
-			  AND "fo"."closed_at" IS NULL))`).
 		Where(kinds, kindArgs...)
+	if keep == "" || keep == Fixed {
+		// A closed finding is read until its code finding opens anew on its
+		// build.
+		q = q.Where(`("f"."closed_at" IS NULL
+			OR "f"."id" NOT IN (?))`, scope.reopenedIn(db))
+	}
+	if keep != "" {
+		q = q.Apply(inState(bound, keep))
+	}
 	where, args := scope.readable(subject, visible)
 	return scope.narrow(db, scope.inScope(q.Where(where, args...)), kind.CodeFindings)
+}
+
+// reopenedIn is the closed code findings of the scope's builds at whose
+// occurrence a code finding is open again on the same build.
+//
+// The code findings of those builds are read once, and each is told whether
+// one of its occurrence on its build is open as a window over the two; the
+// closed ones so told are asked of each row by identifier. A window, because
+// every pairing of a closed finding with the open ones was planned by some
+// engine through every open finding of the build, with statistics as loaded:
+//
+// | Pairing | What an engine did |
+// |---|---|
+// | Asked of each closed finding | MySQL 8.4: past 30 s for one count |
+// | The open ones joined to the rows | PostgreSQL 16: planned for a handful of closed findings and read the open ones once per row, 9.4 s |
+// | Occurrence and build asked of the open ones together | SQLite: 0.42 s against 0.18 s, a miss tested again for a missing pair |
+// | The closed and the open each a set, joined | MariaDB 11.4: read the open set again for each closed finding, past 30 s |
+//
+// Code findings alone: an occurrence a code finding is at is named from its
+// series and key, which no other kind of finding is at.
+func (scope Scope) reopenedIn(db bun.IDB) *bun.SelectQuery {
+	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
+	told := scope.builtIn(db.NewSelect().TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`"f"."id", "f"."closed_at"`).
+		ColumnExpr(`MAX(CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END)
+			OVER (PARTITION BY "f"."occurrence_identity", "f"."build_id") AS "open_there"`).
+		Where(kinds, kindArgs...))
+	return identifiers(db, db.NewSelect().TableExpr(`(?) AS "ro"`, told).
+		ColumnExpr(`"ro"."id"`).
+		Where(`"ro"."closed_at" IS NOT NULL AND "ro"."open_there" = 1`).
+		GroupExpr(`"ro"."id"`))
+}
+
+// identifiers is a set of identifiers, read under "id" and grouped by it, as
+// a set an engine looks each row up in. Asked of each row as a statement of
+// its own, MariaDB 11.4 compared every row with all of the set and took past
+// 30 s for 8,000 code findings; a grouped set it reads once and keys by what
+// it is grouped by, and an engine drops a grouping written in the statement
+// asked.
+func identifiers(db bun.IDB, set *bun.SelectQuery) *bun.SelectQuery {
+	return db.NewSelect().TableExpr(`(?) AS "ks"`, set).ColumnExpr(`"ks"."id"`)
+}
+
+// builtIn keeps a statement over the findings under "f" to the builds the
+// scope covers: its products, branch or tag, variant and build. The rest of
+// the scope narrows which code findings are listed, never which of their
+// builds' code findings they are compared with.
+func (scope Scope) builtIn(q *bun.SelectQuery) *bun.SelectQuery {
+	q = q.Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`)
+	if scope.BranchOrTagID != nil {
+		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
+	}
+	if scope.VariantID != nil {
+		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
+	}
+	if scope.BuildID != nil {
+		q = q.Where(`"f"."build_id" = ?`, *scope.BuildID)
+	}
+	return scope.inScope(q)
 }
 
 // narrow keeps a statement over the findings under "f", their sightings under

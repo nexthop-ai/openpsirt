@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 const codeFindingDecisionAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/%s/decision"
@@ -206,6 +208,78 @@ func TestACodeFindingIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 		}
 		if got := codeFindingsOf(t, r, "security-testing-reader", "?state=fixed"); len(got.Items) != 1 || got.Items[0].Builds != 1 {
 			t.Errorf("the fixed code findings are %+v; want the one code finding on its one build", got)
+		}
+	})
+}
+
+func TestACodeFindingOpenAnewOnItsBuildIsNotFixedWhateverNarrowsTheList(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		codeFinding := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.CodeFindingRun(false))
+		body := httpapitest.FixedBody(t, r, codeFinding, "the bounds check landed")
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFinding+"/fixed", body); got.Code != http.StatusOK {
+			t.Fatalf("closing the code finding answered %d: %s", got.Code, got.Body)
+		}
+		var placed string
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).ColumnExpr(`"c"."name"`).
+			Where(`"f"."occurrence_identity" = ?`, occurrence).Scan(ctx, &placed); err != nil {
+			t.Fatal(err)
+		}
+		narrowed := "?state=fixed&component=" + placed
+		if got := codeFindingsOf(t, r, "security-testing-reader", narrowed); len(got.Items) != 1 || got.States["fixed"] != 1 {
+			t.Fatalf("the fixed code findings on %s are %+v; want the one closed", placed, got)
+		}
+
+		// Seen again, and placed on another component of the build, so a list
+		// narrowed to the first component holds the closed finding and not
+		// the open one.
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-30*time.Minute), httpapitest.CodeFindingRun(true))
+		var other int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`MIN("c"."id")`).
+			Where(`"c"."name" <> ?`, placed).Scan(ctx, &other); err != nil || other == 0 {
+			t.Fatalf("no other component to place the code finding on: %v", err)
+		}
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).Set(`"component_id" = ?`, other).
+			Where(`"occurrence_identity" = ?`, occurrence).Where(`"closed_at" IS NULL`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for _, query := range []string{narrowed, "?state=fixed&series=clang-tidy/default", "?state=fixed"} {
+			if got := codeFindingsOf(t, r, "security-testing-reader", query); len(got.Items) != 0 || got.States["fixed"] != 0 {
+				t.Errorf("the code findings listed by %s are %+v; want none fixed once the code finding opened anew", query, got)
+			}
+		}
+		var across codeFindingsListed
+		httpapitest.Read(t, r, "security-testing-reader", "/v1/code-findings?state=fixed", &across)
+		if len(across.Items) != 0 || across.States["fixed"] != 0 {
+			t.Errorf("the fixed code findings across products are %+v; want none once the code finding opened anew", across)
+		}
+	})
+}
+
+func TestACodeFindingOpenOnAnotherBuildLeavesItFixedOnItsOwn(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		codeFinding := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.CodeFindingRun(false))
+		body := httpapitest.FixedBody(t, r, codeFinding, "the bounds check landed")
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFinding+"/fixed", body); got.Code != http.StatusOK {
+			t.Fatalf("closing the code finding answered %d: %s", got.Code, got.Body)
+		}
+		// Another variant's build reports it, open there.
+		r.AlsoIn(t, "mellanox")
+		mellanox := httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: "mellanox"}
+		_, scan := r.Shipped(t, mellanox, "made-mellanox", graph.Snapshot{Root: httpapitest.SeededRoot})
+		if err := ingest.NewStore(r.DB.DB).Made(t.Context(), scan, 1, 1, httpapitest.SeededRoot.Name); err != nil {
+			t.Fatal(err)
+		}
+		httpapitest.ApplyRunAt(t, r, mellanox, "clang-tidy/default", time.Now().UTC().Add(-30*time.Minute),
+			httpapitest.CodeFindingRun(true))
+		got := codeFindingsOf(t, r, "security-testing-reader", "?state=fixed")
+		if len(got.Items) != 1 || got.Items[0].Occurrence != occurrence || got.States["fixed"] != 1 || got.States["open"] != 1 {
+			t.Errorf("the fixed code findings are %+v; want the one closed on its own build, open on the other", got)
 		}
 	})
 }

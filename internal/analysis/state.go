@@ -4,6 +4,8 @@
 package analysis
 
 import (
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -27,6 +29,10 @@ const (
 	Confirmed   State = finding.OutcomeConfirmed
 )
 
+// notFixed keeps a read to the findings in every state but fixed, the ones
+// still open on their build. It is no state of its own and is never listed.
+const notFixed State = "not-fixed"
+
 // States are every state a code finding is in, in the order a code finding meets them.
 func States() []State {
 	return []State{Open, NoLongerDetected, Fixed, Dismissed, NotSecurity, Confirmed, RecordedAsFlaw}
@@ -37,11 +43,24 @@ func States() []State {
 // one that waits on nobody and was not sent back. A decision waiting for a
 // second person answers nothing yet. It binds the product's arguments once.
 func standingOutcomeIn(product productBound) string {
-	return `(SELECT MAX("sc"."outcome") FROM "decision_occurrence" AS "dc"
+	return `(SELECT MAX("sc"."outcome") ` + standingDecisions(product) + `)`
+}
+
+// standingIn is whether a decision stands at the occurrence of the finding
+// under "f", in the product bound: whether standingOutcomeIn is not null. It
+// binds the product's arguments once.
+func standingIn(product productBound) string {
+	return `EXISTS (SELECT 1 ` + standingDecisions(product) + ` AND "sc"."outcome" IS NOT NULL)`
+}
+
+// standingDecisions is the decisions standing at the occurrence of the
+// finding under "f", in the product bound, from their decision under "sc".
+func standingDecisions(product productBound) string {
+	return `FROM "decision_occurrence" AS "dc"
 	JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"
 	WHERE "dc"."product_id" = ` + product.sql + ` AND "dc"."live_key" IS NOT NULL
 	  AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `
-	  AND ("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL)))`
+	  AND ("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL))`
 }
 
 // recordedAsFlawIn is whether the code finding under "f" in the product bound
@@ -73,6 +92,53 @@ func stateAt(b productBound) (string, []any) {
 		WHEN ` + ruledIn(b) + ` THEN '` + string(Dismissed) + `'
 		WHEN "si"."absent_run_id" IS NOT NULL THEN '` + string(NoLongerDetected) + `'
 		ELSE '` + string(Open) + `' END`, b.times(4)
+}
+
+// inState keeps a statement over the finding under "f", whose sighting is
+// under "si" and whose result is under "ar", to the findings standing in a
+// state in the product bound: stateAt equal to want, as conditions.
+//
+// Conditions, never a test of the state worked out, because a planner has no
+// statistics on an expression: PostgreSQL guessed that one row in two hundred
+// matched, planned the joins after it for a handful of rows, and took 8.7 s
+// for the queue's page of 8,000 code findings, against 0.1 s.
+func inState(b productBound, want State) func(*bun.SelectQuery) *bun.SelectQuery {
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		if want == Fixed {
+			return q.Where(`"f"."closed_at" IS NOT NULL`)
+		}
+		q = q.Where(`"f"."closed_at" IS NULL`)
+		if want == notFixed {
+			return q
+		}
+		if want == RecordedAsFlaw {
+			return q.Where(recordedAsFlawIn(b), b.times(1)...)
+		}
+		q = q.Where(`NOT `+recordedAsFlawIn(b), b.times(1)...)
+		switch want {
+		case Dismissed:
+			return q.Where(`(`+standingOutcomeIn(b)+` = ? OR (NOT `+standingIn(b)+` AND `+ruledIn(b)+`))`,
+				append(append(append(b.times(1), string(Dismissed)), b.times(1)...), b.times(1)...)...)
+		case NotSecurity, Confirmed:
+			return q.Where(standingOutcomeIn(b)+` = ?`, append(b.times(1), string(want))...)
+		case NoLongerDetected, Open:
+			q = q.Where(`NOT `+standingIn(b), b.times(1)...).Where(`NOT `+ruledIn(b), b.times(1)...)
+			if want == Open {
+				return q.Where(`"si"."absent_run_id" IS NULL`)
+			}
+			return q.Where(`"si"."absent_run_id" IS NOT NULL`)
+		}
+		return q.Where("1 = 0")
+	}
+}
+
+// notWaiting keeps a statement over the finding under "f" to those no
+// decision in the product bound waits on a second person about, as a
+// condition for the reason inState gives.
+func notWaiting(b productBound) func(*bun.SelectQuery) *bun.SelectQuery {
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where(`NOT `+waitingDecision(b), b.times(1)...)
+	}
 }
 
 // productBound is the product the product-bound conditions of a statement

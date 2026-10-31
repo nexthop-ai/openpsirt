@@ -149,10 +149,9 @@ func TimeToJudge(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 	if err != nil {
 		return nil, err
 	}
-	queued := db.NewSelect().TableExpr(`(?) AS "l"`, openCodeFindingFindings(db, subject, scope, visible)).
+	queued := db.NewSelect().TableExpr(`(?) AS "l"`,
+		codeFindingFindings(db, subject, scope, visible, Open).Apply(notWaiting(scope.bound()))).
 		ColumnExpr(`MIN("l"."opened_at") AS "opened", MAX("l"."tier") AS "tier"`).
-		Where(`"l"."stands" = ?`, string(Open)).
-		Where(`"l"."awaits" = 0`).
 		GroupExpr(`"l"."occurrence_identity"`)
 	if len(ended) > 0 {
 		queued = queued.Where(`"l"."branch_or_tag_id" NOT IN (?)`, bun.List(ended))
@@ -331,25 +330,14 @@ func TimeToFix(ctx context.Context, db bun.IDB, subject access.Subject, scope Sc
 	return out, nil
 }
 
-// openCodeFindingFindings is the queue's rows of open findings alone: every
-// state but fixed. Narrowed before the queue's test of a closed finding,
-// which on MySQL 8.4 reads every open finding of the build per closed code
-// finding: 26.6 s for 400 closed code findings on a build of 84,000 findings,
-// where time to judge takes 726 ms reading open findings alone
-// (design-docs/analysis-measurements.md § Security testing figures).
-func openCodeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
-	return codeFindingFindings(db, subject, scope, visible).Where(`"f"."closed_at" IS NULL`)
-}
-
 // noLongerDetected is the queue's count of code findings no longer detected in
 // the scope, now, so a figure is the length of the list it opens.
 func noLongerDetected(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	visible []access.Visibility) (int, error) {
 	var out int
 	if err := db.NewSelect().
-		TableExpr(`(?) AS "l"`, openCodeFindingFindings(db, subject, scope, visible)).
+		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, NoLongerDetected)).
 		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).
-		Where(`"l"."stands" = ?`, string(NoLongerDetected)).
 		Scan(ctx, &out); err != nil {
 		return 0, fmt.Errorf("count the code findings of product %d no longer detected: %w", scope.ProductID, err)
 	}
