@@ -96,17 +96,10 @@ var queueTags = []string{"787", "416", "476", "401", "120", "190", "563", "252"}
 func TestMeasureTheCodeFindingQueueOfTheHubBuild(t *testing.T) {
 	const n, codeFindings = 16000, 4000
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		ctx := t.Context()
 		began := time.Now()
 		queueSeeded(t, r, n, codeFindings)
 		t.Logf("%d components, %d code findings a tool: seeded in %s", n, codeFindings, time.Since(began).Round(time.Second))
-		// The handler again, over a handle timing each statement it makes.
-		slowest := &slowestStatement{}
-		deps := r.Deps
-		deps.DB = dbtest.Hooked(r.DB, slowest)
-		measured := *r
-		measured.Handler, _ = httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, deps)
-		paths := []string{
+		queueTimed(t, r, []string{
 			"/v1/products/mine/code-findings",
 			"/v1/products/mine/code-findings?state=fixed",
 			"/v1/products/mine/code-findings?state=open",
@@ -114,36 +107,164 @@ func TestMeasureTheCodeFindingQueueOfTheHubBuild(t *testing.T) {
 			"/v1/products/mine/components/linux/code-finding-counts",
 			"/v1/products/mine/code-finding-series",
 			"/v1/products/mine/code-finding-trend?weeks=104",
-		}
-		for _, stats := range []string{"as loaded", "analyzed"} {
-			if stats == "analyzed" {
-				if _, err := database.AnalyzeEveryTable(ctx, r.DB); err != nil {
-					t.Fatal(err)
-				}
-			}
-			for _, path := range paths {
-				var took []time.Duration
-				var statement time.Duration
-				var body string
-				for i := range 4 {
-					slowest.reset()
-					began := time.Now()
-					got := httpapitest.AsPerson(t, &measured, "code-finding-handler", http.MethodGet, path, "")
-					if i > 0 {
-						took = append(took, time.Since(began))
-						statement = max(statement, slowest.took())
-					}
-					if got.Code != http.StatusOK {
-						t.Fatalf("GET %s answered %d: %s", path, got.Code, got.Body.String())
-					}
-					body = got.Body.String()
-				}
-				slices.Sort(took)
-				t.Logf("%s, GET %s: %s, slowest statement %s, %s", stats, path,
-					took[1].Round(time.Millisecond), statement.Round(time.Millisecond), said(body))
-			}
-		}
+		})
 	})
+}
+
+// TestMeasureTheCodeFindingQueueOverRescanHistory times the queue of the
+// hub's build once its code findings carry the history of many scans: each
+// closed and seen again eight times on the build, and the code findings in
+// four more builds of the product, every tenth closed there too.
+func TestMeasureTheCodeFindingQueueOverRescanHistory(t *testing.T) {
+	const n, codeFindings = 16000, 4000
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		began := time.Now()
+		queueSeeded(t, r, n, codeFindings)
+		rescanned(t, r)
+		var all, closed int
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).
+			ColumnExpr(`COUNT(*), SUM(CASE WHEN "closed_at" IS NULL THEN 0 ELSE 1 END)`).
+			Where(`"kind" = ?`, kind.Analysis).Scan(t.Context(), &all, &closed); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%d components, %d code findings, %d closed: seeded in %s", n, all, closed, time.Since(began).Round(time.Second))
+		queueTimed(t, r, []string{
+			"/v1/products/mine/code-findings",
+			"/v1/products/mine/code-findings?state=fixed",
+			"/v1/products/mine/code-findings?state=open",
+			"/v1/products/mine/code-findings?series=clang/measured",
+		})
+	})
+}
+
+// queueTimed logs the second fastest of the last three reads of each path,
+// and the slowest statement any of them made, once on the statistics the
+// load leaves and once after every table is analyzed.
+func queueTimed(t *testing.T, r *httpapitest.Reach, paths []string) {
+	t.Helper()
+	ctx := t.Context()
+	// The handler again, over a handle timing each statement it makes.
+	slowest := &slowestStatement{}
+	deps := r.Deps
+	deps.DB = dbtest.Hooked(r.DB, slowest)
+	measured := *r
+	measured.Handler, _ = httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, deps)
+	for _, stats := range []string{"as loaded", "analyzed"} {
+		if stats == "analyzed" {
+			if _, err := database.AnalyzeEveryTable(ctx, r.DB); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, path := range paths {
+			var took []time.Duration
+			var statement time.Duration
+			var body string
+			for i := range 4 {
+				slowest.reset()
+				began := time.Now()
+				got := httpapitest.AsPerson(t, &measured, "code-finding-handler", http.MethodGet, path, "")
+				if i > 0 {
+					took = append(took, time.Since(began))
+					statement = max(statement, slowest.took())
+				}
+				if got.Code != http.StatusOK {
+					t.Fatalf("GET %s answered %d: %s", path, got.Code, got.Body.String())
+				}
+				body = got.Body.String()
+			}
+			slices.Sort(took)
+			t.Logf("%s, GET %s: %s, slowest statement %s, %s", stats, path,
+				took[1].Round(time.Millisecond), statement.Round(time.Millisecond), said(body))
+		}
+	}
+}
+
+// rescanned gives the hub build's code findings the history of many scans:
+// each copied eight times on the build, closed at a day apart before the
+// row open now, and the code findings copied to four more builds of the
+// product, on branches of their own, as they stand on the hub's. Copies take
+// identifiers past every seeded one, and their sightings and results come
+// with them.
+func rescanned(t *testing.T, r *httpapitest.Reach) {
+	t.Helper()
+	ctx := t.Context()
+	const past = 10_000_000
+	hub := r.BuildOf(t, httpapitest.SeededBuild)
+	var branch int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"build"`).ColumnExpr(`"branch_or_tag_id"`).
+		Where(`"id" = ?`, hub).Scan(ctx, &branch); err != nil {
+		t.Fatal(err)
+	}
+	columnsOf := func(table string, leave ...string) string {
+		described, err := r.DB.QueryContext(ctx, `SELECT * FROM "`+table+`" WHERE 1 = 0`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		every, err := described.Columns()
+		if closeErr := described.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, column := range every {
+			if !slices.Contains(leave, column) {
+				out = append(out, column)
+			}
+		}
+		return `"` + strings.Join(out, `", "`) + `"`
+	}
+	findings := columnsOf("finding", "id", "build_id", "closed_at")
+	sightings := columnsOf("sighting", "id", "finding_id")
+	results := columnsOf("analysis_result", "id", "finding_id")
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := r.DB.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// copied copies the hub build's code findings to a build, each under its
+	// identifier plus an offset, closed as given or as it stands.
+	copied := func(offset, build int64, closed string, closedArgs ...any) {
+		t.Helper()
+		args := append([]any{offset, build}, closedArgs...)
+		args = append(args, kind.Analysis, hub, past)
+		exec(`INSERT INTO "finding" ("id", "build_id", "closed_at", `+findings+`)
+			SELECT "id" + ?, ?, `+closed+`, `+findings+` FROM "finding"
+			WHERE "kind" = ? AND "build_id" = ? AND "id" < ?`, args...)
+		exec(`INSERT INTO "sighting" ("finding_id", `+sightings+`)
+			SELECT "finding_id" + ?, `+sightings+` FROM "sighting"
+			WHERE "finding_id" IN (SELECT "id" FROM "finding" WHERE "kind" = ? AND "build_id" = ? AND "id" < ?)`,
+			offset, kind.Analysis, hub, past)
+		exec(`INSERT INTO "analysis_result" ("finding_id", `+results+`)
+			SELECT "finding_id" + ?, `+results+` FROM "analysis_result"
+			WHERE "finding_id" IN (SELECT "id" FROM "finding" WHERE "kind" = ? AND "build_id" = ? AND "id" < ?)`,
+			offset, kind.Analysis, hub, past)
+	}
+	now := time.Now().UTC()
+	for i := int64(1); i <= 8; i++ {
+		copied(i*past, hub, `?`, now.Add(-time.Duration(i)*24*time.Hour))
+	}
+	branches := columnsOf("branch_or_tag", "id", "name")
+	builds := columnsOf("build", "id", "branch_or_tag_id")
+	for i := int64(1); i <= 4; i++ {
+		name := fmt.Sprintf("rescanned-%d", i)
+		exec(`INSERT INTO "branch_or_tag" ("name", `+branches+`) SELECT ?, `+branches+` FROM "branch_or_tag" WHERE "id" = ?`,
+			name, branch)
+		var made, build int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"branch_or_tag"`).ColumnExpr(`"id"`).
+			Where(`"name" = ?`, name).Scan(ctx, &made); err != nil {
+			t.Fatal(err)
+		}
+		exec(`INSERT INTO "build" ("branch_or_tag_id", `+builds+`) SELECT ?, `+builds+` FROM "build" WHERE "id" = ?`,
+			made, hub)
+		if err := r.DB.DB.NewSelect().TableExpr(`"build"`).ColumnExpr(`"id"`).
+			Where(`"branch_or_tag_id" = ?`, made).Scan(ctx, &build); err != nil {
+			t.Fatal(err)
+		}
+		copied((8+i)*past, build, `"closed_at"`)
+	}
 }
 
 // queueSeeded is the hub's build of n components with two analyzers'

@@ -562,15 +562,10 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 // The code findings of those builds are read once, and each is told whether
 // one of its occurrence on its build is open as a window over the two; the
 // closed ones so told are asked of each row by identifier. A window, because
-// every pairing of a closed finding with the open ones was planned by some
-// engine through every open finding of the build, with statistics as loaded:
-//
-// | Pairing | What an engine did |
-// |---|---|
-// | Asked of each closed finding | MySQL 8.4: past 30 s for one count |
-// | The open ones joined to the rows | PostgreSQL 16: planned for a handful of closed findings and read the open ones once per row, 9.4 s |
-// | Occurrence and build asked of the open ones together | SQLite: 0.42 s against 0.18 s, a miss tested again for a missing pair |
-// | The closed and the open each a set, joined | MariaDB 11.4: read the open set again for each closed finding, past 30 s |
+// asked of each closed finding MySQL 8.4 took past 30 s for one count with
+// statistics as loaded, and every other pairing was planned by some engine
+// through every open finding of the build
+// (design-docs/analysis-measurements.md § Code finding queue).
 //
 // Code findings alone: an occurrence a code finding is at is named from its
 // series and key, which no other kind of finding is at.

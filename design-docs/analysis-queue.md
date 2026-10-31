@@ -202,7 +202,7 @@ a line or two apart; wider, or by first place, at least one merged falsely.
 | A group is a code finding and those within two lines of it, per code finding | Two at four lines apart sharing a third are two groups |
 | Whether another analyzer agrees is worked out over the whole build, whatever narrows the list | Order does not depend on the reader |
 | The code findings another analyzer agrees with are told once over the scope's builds, as a window over each build, file and weakness family within the lines of a group; each row of the page is asked whether it is among them | Every pairing of a code finding with the open ones near it was planned by some engine through every open finding of a build or of a rule, with statistics as loaded (`design-docs/analysis-measurements.md` § Code finding queue) |
-| In that window, another analyzer is one whose name differs from the row's own among the open code findings in it, fewest and most | A rule belongs to a family once, under its own analyzer |
+| In that window, another analyzer is one whose name differs from the row's own: the first or last, in name order, of the analyzers of the open code findings in it | A rule belongs to a family once, under its own analyzer |
 | Counts never read whether another analyzer agrees | Only the page orders by it |
 | Nearby code findings are found through an index on a digest of the last path, and the last line | No MySQL index takes a path whole. 16,000 code findings: 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, against 90 s and 37 minutes without |
 | A rule with no weakness groups with nothing | |

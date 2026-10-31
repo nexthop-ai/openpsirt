@@ -208,7 +208,7 @@ GET /v1/analysis-coverage?weeks=13
 | Each finding counts at its own product's visibilities, bound per product in the data layer, and each figure checks the reader on every product before reading (REQ-43) | A disclosed code finding counts where the reader reads disclosed work beside security testing material, and nowhere else |
 | A decision, a suppression rule and an end of life are each worked out in the finding's own product | They belong to one product |
 | Each count and list is the sum or merge of each product's own figure, row for row | One population split by product; series identity is a product's, so no occurrence is in two products |
-| Counts are the queue's counts with no row built | Counts across two products took 919 ms on PostgreSQL, where one product's queue of one row took 6.95 s (`design-docs/analysis-measurements.md` § Figures across products) |
+| Counts are the queue's counts with no row built | A count needs no page; counts across two products took 112 ms on PostgreSQL, 1.23 s on MySQL and 862 ms on MariaDB (`design-docs/analysis-measurements.md` § Figures across products) |
 | A spread across products is worked out over every product's waits together | A median of medians is no median |
 | Narrowed by series and method alone | A branch, a variant, a component and a subtree name part of one product |
 | Each has a file at `.csv` and `.json`, in the columns of one product's; a coverage row and a marker name the product | REQ-50 |
