@@ -796,6 +796,9 @@ components:
         past_end_of_life:
           description: Whether the release is past its end of life, analyzed by nobody on purpose
           type: boolean
+        product:
+          description: The product the series is in, by the name that addresses it
+          type: string
         quiet:
           description: "Whether the series has gone quiet on the build: no comparable run arrived for three of its own usual gaps, never under a day. Never on a release past its end of life"
           type: boolean
@@ -821,6 +824,7 @@ components:
           description: The variant as shown
           type: string
       required:
+        - product
         - branch_or_tag
         - branch_or_tag_name
         - variant
@@ -2404,6 +2408,45 @@ components:
         - branch_or_tag
         - variant
       type: object
+    CodeFindingCountsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CodeFindingCountsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        past_end_of_life:
+          description: Open code findings left out of the queue because every release they are open in is past its end of life
+          format: int64
+          type: integer
+        ruled:
+          description: Dismissed code findings an approved suppression rule covers, counted among the dismissed in states
+          format: int64
+          type: integer
+        states:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: The code findings by where they stand. A code finding on two builds in two states counts in both, and a fixed code finding counts until it opens anew on its build
+          type: object
+        total:
+          description: "The code findings the queue holds: open, with no decision waiting for a second person, and seen in a release still in support"
+          format: int64
+          type: integer
+        waiting:
+          description: Open code findings left out of the queue because a decision about them waits for a second person
+          format: int64
+          type: integer
+      required:
+        - total
+        - states
+        - waiting
+        - ruled
+        - past_end_of_life
+      type: object
     CodeFindingDecisionBody:
       additionalProperties: false
       properties:
@@ -2726,6 +2769,9 @@ components:
         from:
           description: The tool, the version or the number of rules before. Left out on a tool, version or rules change where the run before stated none
           type: string
+        product:
+          description: The product the series is in, by the name that addresses it
+          type: string
         reason:
           description: Why the runs were not comparable. Only on not-comparable
           enum:
@@ -2745,6 +2791,7 @@ components:
           type: string
       required:
         - at
+        - product
         - series
         - change
         - builds
@@ -16123,6 +16170,122 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/analysis-coverage:
+    get:
+      description: |-
+        Returns every analyzer series on every build in use of every product counted, each row naming its product, as one product's coverage lists them: quiet first, then the longest silent.
+
+        Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: read-analysis-coverage-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisCoverageBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Read analysis coverage across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
+  /v1/analysis-coverage.{format}:
+    get:
+      description: |-
+        Analysis coverage across products as a file, a row per series and build in the order the coverage lists them, in the columns of one product's with its product last. Takes what the coverage takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: export-analysis-coverage-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export analysis coverage across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
   /v1/approval-batches/{batch}:
     delete:
       description: |-
@@ -17003,6 +17166,332 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/code-finding-counts:
+    get:
+      description: |-
+        Returns the code finding queue's counts summed over products, with no rows: how many code findings the queue holds, how many stand in each state, how many wait for a second person, how many a suppression rule dismisses, and how many are open only in releases past their end of life. Each product's counts are its own queue's.
+
+        Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: count-code-findings-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeFindingCountsBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Count code findings across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
+  /v1/code-finding-counts.{format}:
+    get:
+      description: |-
+        The code finding counts across products as a file: a row for the queue, a row per state, then the rows waiting, ruled and past end of life. Takes what the counts take, and is refused as they are.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: export-code-finding-counts-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export code finding counts across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
+  /v1/code-finding-time-to-judge:
+    get:
+      description: |-
+        Returns how long code findings waited from opening to the first decision proposed about them in their product, for the first decisions proposed in the weeks asked, over every product's code findings together; the queue now by age, summed over products; when the oldest code finding in any product's queue opened; and how many are no longer detected. Each product's code findings are judged against its own decisions.
+
+        Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: time-code-finding-judging-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeFindingJudgingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Measure time to judge code findings across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
+  /v1/code-finding-time-to-judge.{format}:
+    get:
+      description: |-
+        The time to judge across products as a file, in the rows of one product's. Takes what the figure takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: export-code-finding-time-to-judge-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 13
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the time to judge code findings across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
+  /v1/code-finding-trend:
+    get:
+      description: |-
+        Returns, per week, the code findings not fixed at the end of the week summed over products, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it, as one product's trend counts them. A series of the same name in two products is one split. Each marker names its product.
+
+        Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: trend-code-findings-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 12
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeFindingTrendBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Trend code findings across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
+  /v1/code-finding-trend.{format}:
+    get:
+      description: |-
+        The code finding trend across products as a file, in the columns of one product's, each marker naming its product. Takes what the trend takes, and is refused as it is.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products in use where you read security testing material.
+      operationId: export-code-finding-trend-across-products
+      parameters:
+        - description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+          explode: false
+          in: query
+          name: series
+          schema:
+            description: Limit to the analyzer series of this name in each product, without regard to capitals. A name no product holds a series under counts nothing
+            maxLength: 200
+            type: string
+        - description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+          explode: false
+          in: query
+          name: method
+          schema:
+            description: Limit to the code findings one testing method reported. Left out, every method. sast is static analysis
+            enum:
+              - sast
+            type: string
+        - description: The number of weeks, ending at the coming midnight UTC
+          explode: false
+          in: query
+          name: weeks
+          schema:
+            default: 12
+            description: The number of weeks, ending at the coming midnight UTC
+            format: int64
+            maximum: 104
+            minimum: 1
+            type: integer
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the code finding trend across products
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products in use where you read security testing material.
   /v1/code-findings:
     get:
       description: |-
