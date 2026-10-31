@@ -49,13 +49,50 @@ func nearby(lines int) string {
 		WHERE "fa"."vulnerability_id" = "f"."vulnerability_id" AND "fb"."vulnerability_id" = "g"."vulnerability_id")`
 }
 
-// corroborated is whether another analyzer's code finding on the build of the finding
-// under "f", whose result is under "ar", is the same flaw. It is worked out
-// over every code finding, whoever reads it, because where a code finding sorts does not
-// depend on who is looking.
-var corroborated = `EXISTS (SELECT 1 FROM "analysis_result" AS "ag"
-	JOIN "finding" AS "g" ON "g"."id" = "ag"."finding_id"
-	WHERE ` + nearby(groupLines) + `)`
+// corroboratedIn is the code findings of the scope's builds that another
+// analyzer's code finding is the same flaw as: nearby within the lines of a
+// group, worked out over every code finding of those builds, whoever reads
+// it, because where a code finding sorts does not depend on who is looking.
+//
+// Each code finding is read once for each weakness family of its rule, and
+// the rows of one build, file and family are compared within those lines as
+// a window: the analyzers of the open code findings in it, fewest and most,
+// differ from the row's own where another analyzer reports the flaw. A rule
+// belongs to a family once, under its own analyzer, so another analyzer is
+// another rule.
+//
+// A window, because every pairing of a code finding with the open ones near
+// it was planned by some engine through every open finding of a build or of
+// a rule, with statistics as loaded:
+//
+// | Pairing | What an engine did |
+// |---|---|
+// | Asked of each row | MySQL 8.4: 12 s for 8,000 code findings |
+// | Joined to the rows | PostgreSQL 16: planned for a handful, 1.8 s |
+// | A set with the family among the joins | MySQL 8.4: paired every code finding of one rule with every one of another, 11 s |
+// | A set reaching the open ones by build | MySQL 8.4: past 30 s; with them read as a set of their own, 7 s |
+// | Two sets of their own, paired by build and file | PostgreSQL 16: planned for one row each and read one set once per row of the other, 5.5 s |
+//
+// The set is asked of each row of the page.
+func (scope Scope) corroboratedIn(db bun.IDB) *bun.SelectQuery {
+	n := strconv.Itoa(groupLines)
+	open := `CASE WHEN "f"."closed_at" IS NULL AND "f"."kind" = '` + string(kind.Analysis) + `' THEN "fa"."tool" END`
+	near := ` OVER (PARTITION BY "f"."build_id", "ar"."last_path_identity", "ar"."last_path", "fa"."family"
+		ORDER BY "ar"."last_line" RANGE BETWEEN ` + n + ` PRECEDING AND ` + n + ` FOLLOWING)`
+	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
+	placed := scope.builtIn(db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
+		Join(`JOIN "rule_family" AS "fa" ON "fa"."vulnerability_id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"f"."id", "fa"."tool"`).
+		ColumnExpr(`MIN(`+open+`)`+near+` AS "fewest"`).
+		ColumnExpr(`MAX(`+open+`)`+near+` AS "most"`).
+		Where(`"ar"."last_line" IS NOT NULL`).
+		Where(kinds, kindArgs...))
+	return identifiers(db, db.NewSelect().TableExpr(`(?) AS "nw"`, placed).
+		ColumnExpr(`"nw"."id"`).
+		Where(`("nw"."fewest" <> "nw"."tool" OR "nw"."most" <> "nw"."tool")`).
+		GroupExpr(`"nw"."id"`))
+}
 
 // Kin is another code finding on a code finding's build that is the same flaw, or possibly
 // is.

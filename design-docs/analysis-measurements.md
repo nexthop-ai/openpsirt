@@ -9,6 +9,7 @@ justifies.
 - [Trend of code findings](#trend-of-code-findings)
 - [Security testing figures](#security-testing-figures)
 - [Figures across products](#figures-across-products)
+- [Code finding queue](#code-finding-queue)
 
 ## Producer output
 
@@ -126,3 +127,53 @@ three is shown, the slower of the two states.
 |---|---|
 | MariaDB ran beside another measurement on PostgreSQL and MySQL | Its times carry that noise |
 | The other product holds dependency closings alone | It adds rows to read and nothing to count |
+
+## Code finding queue
+
+Justifies reading whether a code finding opened anew and whether another
+analyzer agrees as windows over the scope's code findings, each asked of a row
+by identifier, and keeping a list by state by its conditions
+(`design-docs/analysis-queue.md` § Code finding queue and
+`design-docs/analysis-queue.md` § Grouped code findings).
+`TestMeasureTheCodeFindingQueueOfTheHubBuild` under `make measure`: one build
+of 16,000 components and 84,000 findings, two analyzers' 4,000 code findings
+each a line apart under rules of three weakness families, every tenth code
+finding closed and every third dependency finding, each at one of 100
+moments over a year. Each read is timed on the statistics the load
+leaves and again after every table is analyzed; a page is every statement of
+one request.
+
+| Engine | Statistics | Queue page before | Queue page after | Fixed list before | Fixed list after | Slowest statement before | Slowest statement after |
+|---|---|---|---|---|---|---|---|
+| PostgreSQL 16 | As loaded | 2.5 s | 0.19 s | 1.0 s | 0.19 s | 0.89 s | 0.09 s |
+| PostgreSQL 16 | Analyzed | 0.23 s | 0.19 s | 0.20 s | 0.17 s | 0.11 s | 0.08 s |
+| MySQL 8.4 | As loaded | past 30 s | 0.84 s | past 30 s | 0.88 s | past 30 s | 0.31 s |
+| MySQL 8.4 | Analyzed | 0.32 s | 0.39 s | 0.31 s | 0.27 s | 0.11 s | 0.21 s |
+| MariaDB 11.4 | As loaded | past 30 s | 0.42 s | past 30 s | 0.45 s | past 30 s | 0.18 s |
+| MariaDB 11.4 | Analyzed | 0.17 s | 0.28 s | 0.11 s | 0.18 s | 0.08 s | 0.14 s |
+| SQLite | As loaded | 0.47 s | 0.42 s | 0.40 s | 0.64 s | 0.19 s | 0.32 s |
+| SQLite | Analyzed | 0.42 s | 0.31 s | 0.34 s | 0.82 s | 0.23 s | 0.34 s |
+
+Each pairing of a code finding with others of its build was planned by some
+engine through every open finding of a build or of a rule:
+
+| Form | Engine, as loaded | Cost |
+|---|---|---|
+| Opened anew, asked of each closed finding | MySQL 8.4, MariaDB 11.4 | Past 30 s a statement |
+| Opened anew, the open ones joined to the rows | PostgreSQL 16 | 9.4 s, the set read once per row |
+| Opened anew, occurrence and build asked together | SQLite | 0.42 s against 0.18 s |
+| Opened anew, the closed and the open each a set, joined | MariaDB 11.4 | Past 30 s, the open set read again for each closed finding |
+| Agreement, asked of each row | MySQL 8.4 | 12 s |
+| Agreement, a set joined to the rows | PostgreSQL 16 | 1.8 s |
+| Agreement, a set with the family among the joins | MySQL 8.4 | 11 s for the set |
+| Agreement, two sets paired by build and file | PostgreSQL 16 | 5.5 s; MySQL 8.4 keyed one by build alone, 7 s |
+| Agreement, a set asked of each row ungrouped | MariaDB 11.4 | Past 30 s, every row compared with the whole set |
+| A state tested on its worked-out value | PostgreSQL 16, analyzed | 8.7 s for the page, against 0.1 s |
+
+| Caveat | Detail |
+|---|---|
+| Statements are capped at 30 s on MySQL and MariaDB | A capped read answers an error, so its page is past 30 s |
+| Statistics as loaded differ from run to run | A server refreshes them in the background; each form above failed in at least one of several runs, and the forms kept passed in every run |
+| The windows cost on analyzed statistics | MySQL, MariaDB and SQLite read every code finding of the scope's builds once per set, where a correlated test reached a handful |
+| The statement bar is the backlog trend's 0.25 s | MySQL as loaded and SQLite read about 0.3 s for one statement |
+

@@ -38,7 +38,7 @@ figure says otherwise.
 | Waits are worked out in the application from stored times | Subtraction of times is spelled four ways across the engines |
 | The tier is the rule's as rated now | No rating history is stored |
 | No presence spans and no stored figure; each is worked out from opening, closing, decision and run times when asked (REQ-74) | Absence closes nothing, and a stored answer drifts |
-| A figure counting no fixed code finding reads the queue's rows of open findings alone | On MySQL 8.4 the queue's test of a closed finding reads every open finding of its build: 26.6 s for 400 closed code findings (`design-docs/analysis-measurements.md` § Security testing figures) |
+| A figure counting no fixed code finding reads the queue's rows of open findings alone, kept by the conditions of its states | A state other than fixed has no closed finding to test for opening anew (`design-docs/analysis-queue.md` § Code finding queue) |
 | Nothing names a testing method that is not built | AI review is not supported |
 
 ## Time to judge

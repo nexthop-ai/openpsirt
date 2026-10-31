@@ -75,9 +75,8 @@ func CountsOfComponent(ctx context.Context, db bun.IDB, subject access.Subject, 
 			CodeFindings int   `bun:"code_findings"`
 		}
 		if err := db.NewSelect().
-			TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+			TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, Open)).
 			ColumnExpr(`"l"."series_id", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
-			Where(`"l"."stands" = ?`, string(Open)).
 			Where(`"l"."component_id" IN (?)`, bun.List(scope.reached.Roots)).
 			GroupExpr(`"l"."series_id"`).
 			Scan(ctx, &unplaced); err != nil {
@@ -92,7 +91,7 @@ func CountsOfComponent(ctx context.Context, db bun.IDB, subject access.Subject, 
 
 	out := &ComponentCounts{Series: series.out}
 	if err := db.NewSelect().
-		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, Open)).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "l"."component_id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "l"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
@@ -100,7 +99,6 @@ func CountsOfComponent(ctx context.Context, db bun.IDB, subject access.Subject, 
 		ColumnExpr(`"s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(finding.SourceVersion+` AS "source_version"`).
 		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity") AS "open"`).
-		Where(`"l"."stands" = ?`, string(Open)).
 		GroupExpr(`"s"."name", "va"."name", `+finding.SourceVersion).
 		OrderExpr(`"s"."name", "va"."name", `+finding.SourceVersion).
 		Scan(ctx, &out.Builds); err != nil {
@@ -136,9 +134,8 @@ func OpenOn(ctx context.Context, db bun.IDB, subject access.Subject, productID, 
 		}
 		scope := Scope{ProductID: productID, BuildID: &buildID, on: on}
 		if err := db.NewSelect().
-			TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+			TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, Open)).
 			ColumnExpr(`"l"."component_id", "l"."occurrence_identity"`).
-			Where(`"l"."stands" = ?`, string(Open)).
 			GroupExpr(`"l"."component_id", "l"."occurrence_identity"`).
 			Scan(ctx, &rows); err != nil {
 			return nil, fmt.Errorf("read the open code findings on components of build %d: %w", buildID, err)
@@ -225,10 +222,9 @@ func OpenOfMatches(ctx context.Context, db bun.IDB, subject access.Subject,
 		if folds := finding.FoldsOf(reached); len(folds) > 0 {
 			scope := Scope{ProductID: productID, reached: &finding.Reached{Folds: folds}}
 			keyed := db.NewSelect().
-				TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
+				TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, Open)).
 				Join(`JOIN "component" AS "lc" ON "lc"."id" = "l"."component_id"`).
 				ColumnExpr(`"lc"."fold_key", "l"."occurrence_identity" AS "key"`).
-				Where(`"l"."stands" = ?`, string(Open)).
 				Where(`"l"."build_id" IN (?)`, bun.List(builds)).
 				Distinct()
 			if open, err = finding.OpenByName(ctx, keyed, reached); err != nil {
