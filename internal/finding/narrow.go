@@ -158,6 +158,9 @@ type Filter struct {
 	// by a caller, for the same reason ProductID is: the walk beneath a
 	// component is a walk over one build's edges.
 	BuildID int64
+	// replaced is the components the build no longer holds whose name sits
+	// beneath, read by the store with the build.
+	replaced []int64
 	// State keeps groups by how far they have been decided. A group is an issue
 	// in a component across every occurrence it sits at, and its occurrences
 	// can be in different states, so what a group's state *is* had to be
@@ -768,7 +771,14 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.Beneath != nil {
 		// The subtree as the engine walks it, not as a list of identifiers
 		// bound back in: under a build's root that list is the whole build.
-		q = q.Where(`"f"."component_id" IN (?)`, graph.Within(q.DB(), f.BuildID, *f.Beneath))
+		// A finding on a version a rescan replaced is beneath wherever the
+		// present version of its name is.
+		walked := graph.Within(q.DB(), f.BuildID, *f.Beneath)
+		if len(f.replaced) == 0 {
+			q = q.Where(`"f"."component_id" IN (?)`, walked)
+		} else {
+			q = q.Where(`("f"."component_id" IN (?) OR "f"."component_id" IN (?))`, walked, bun.List(f.replaced))
+		}
 	}
 	q = f.byState(q)
 	if !f.BelowMinimumSeverity {

@@ -84,7 +84,7 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
 		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
-		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
+		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
 		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
 		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`

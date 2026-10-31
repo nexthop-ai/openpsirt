@@ -72,6 +72,41 @@ func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 		buildID, bun.List(componentIDs), buildID)
 }
 
+// Replaced is the components a build held and holds no longer, each with the
+// live components of the build carrying its name. A finding keeps the
+// component it opened on, so a rescan at a new version replaces the component
+// and not the finding, and what was found on the old version is counted
+// wherever the present one sits. A component no live one names is left out.
+//
+// Read from the build's node history, on the index the build leads, and
+// answered as values.
+func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64, error) {
+	var rows []struct {
+		Replaced int64 `bun:"replaced"`
+		Live     int64 `bun:"live"`
+	}
+	if err := db.NewSelect().TableExpr(`"graph_node" AS "nr"`).
+		Join(`JOIN "component" AS "cr" ON "cr"."id" = "nr"."component_id"`).
+		Join(`JOIN "component" AS "cl" ON "cl"."name_folded" = "cr"."name_folded"`).
+		Join(`JOIN "graph_node" AS "nl" ON "nl"."component_id" = "cl"."id"`).
+		ColumnExpr(`"nr"."component_id" AS "replaced", "nl"."component_id" AS "live"`).
+		Where(`"nr"."build_id" = ?`, buildID).
+		Where(`"nr"."closed_scan_id" IS NOT NULL`).
+		Where(`"nl"."build_id" = ?`, buildID).
+		Where(`"nl"."closed_scan_id" IS NULL`).
+		Where(`NOT EXISTS (SELECT 1 FROM "graph_node" AS "ln" WHERE "ln"."build_id" = ?
+			AND "ln"."closed_scan_id" IS NULL AND "ln"."component_id" = "nr"."component_id")`, buildID).
+		Distinct().
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read the components build %d no longer holds: %w", buildID, err)
+	}
+	out := map[int64][]int64{}
+	for _, row := range rows {
+		out[row.Replaced] = append(out[row.Replaced], row.Live)
+	}
+	return out, nil
+}
+
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
 // `JOIN ... ON`, and the difference is not cosmetic. It is standard SQL and
 // an inner join on every engine; on SQLite it is also an instruction about
@@ -654,5 +689,75 @@ func (s *Store) codeBeneath(ctx context.Context, buildID int64, reached []reachi
 	for start, occurrences := range under {
 		out.beneath[start] = len(occurrences)
 	}
+	return out, nil
+}
+
+// withReplaced is reached with each replaced component reached from every
+// start reaching a live component of its name.
+func withReplaced(reached []reaching, replaced map[int64][]int64) []reaching {
+	if len(replaced) == 0 {
+		return reached
+	}
+	named := map[int64][]int64{}
+	for old, live := range replaced {
+		for _, l := range live {
+			named[l] = append(named[l], old)
+		}
+	}
+	out := slices.Clone(reached)
+	added := map[reaching]bool{}
+	for _, row := range reached {
+		for _, old := range named[row.Reached] {
+			if pair := (reaching{Start: row.Start, Reached: old}); !added[pair] {
+				added[pair] = true
+				out = append(out, pair)
+			}
+		}
+	}
+	return out
+}
+
+// ReplacedWithin is the components of replaced whose name a component at the
+// component named or anywhere under it carries, sorted. A finding on one is
+// beneath the component as one on its live namesake is.
+//
+// Answered as values and named beside the walk rather than matched to it by
+// name in the walk's own statement: on MySQL 8.4 the trend beneath the bench
+// kernel took 1.72 s that way and 227 ms this way.
+func ReplacedWithin(ctx context.Context, db bun.IDB, buildID, componentID int64,
+	replaced map[int64][]int64) ([]int64, error) {
+
+	if len(replaced) == 0 {
+		return nil, nil
+	}
+	named := map[int64][]int64{}
+	var namesakes []int64
+	for old, live := range replaced {
+		for _, l := range live {
+			if named[l] == nil {
+				namesakes = append(namesakes, l)
+			}
+			named[l] = append(named[l], old)
+		}
+	}
+	var reached []int64
+	if err := db.NewSelect().TableExpr(`(?) AS "w"`, WithinAny(db, buildID, []int64{componentID})).
+		ColumnExpr(`"w"."component_id"`).
+		Where(`"w"."component_id" IN (?)`, bun.List(namesakes)).
+		Scan(ctx, &reached); err != nil {
+		return nil, fmt.Errorf("read which replaced components are beneath component %d of build %d: %w",
+			componentID, buildID, err)
+	}
+	seen := map[int64]bool{}
+	var out []int64
+	for _, l := range reached {
+		for _, old := range named[l] {
+			if !seen[old] {
+				seen[old] = true
+				out = append(out, old)
+			}
+		}
+	}
+	slices.Sort(out)
 	return out, nil
 }

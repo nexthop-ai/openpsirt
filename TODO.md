@@ -197,9 +197,9 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 
 | | |
 |---|---|
-| Today | The "Twelve weeks" chart on the Component screen shows findings opened, resolved and open per week, for this component and everything under it, in one build |
-| Problem | It does not show which version the build shipped each week, so it cannot show that the move to 3.2 in week 5 was followed by closures. The chart also counts only the component at its current version: the trend beneath a component walks only the build's live graph, so findings on a version a rescan replaced, including those the version change closed, are not counted. The code findings panel on the same screen counts a replaced version at the present version's row (`design-docs/interface-component.md`, `design-docs/analysis-statistics.md`) |
-| Work | Draw the chart for the component by name across versions, and mark each week the shipped version changed, labeled with the version. Work the version per scan out from the graph's history |
+| Today | The "Twelve weeks" chart on the Component screen shows findings opened, resolved and open per week, for this component by name across versions and everything under it, in one build |
+| Problem | It does not show which version the build shipped each week, so it cannot show that the move to 3.2 in week 5 was followed by closures |
+| Work | Mark each week the shipped version changed, labeled with the version. Work the version per scan out from the graph's history |
 | Waits on | Nothing |
 
 ### TODO-22 CVSS 4.0 and CSAF 2.1

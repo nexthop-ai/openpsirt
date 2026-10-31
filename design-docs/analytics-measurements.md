@@ -6,6 +6,7 @@ Benchmark runs behind the analytics rules.
 
 - [Grouping before the join](#grouping-before-the-join)
 - [Planned upgrades page cost](#planned-upgrades-page-cost)
+- [Trend beneath a replaced version](#trend-beneath-a-replaced-version)
 
 ## Grouping before the join
 
@@ -39,3 +40,33 @@ partial groups; `design-docs/findings-queries.md` § Two-level grouping holds th
 form and `design-docs/findings-measurements.md` § Two-level grouping its
 measurement. `make measure` takes it over the form in force on every
 engine.
+
+## Trend beneath a replaced version
+
+Justifies `design-docs/data-model-graph.md` § Path traversal. The full-size
+switch image, every package carrying one issue and the kernel 4,943, rescanned
+ten days later with the kernel and every hundredth package at a new version:
+30 components replaced, half of what sat on them fixed. Twelve weekly steps,
+one read after a warm one, each engine run alone.
+
+| Read | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|--:|--:|--:|--:|
+| Trend beneath the kernel, live version only | 111 ms | 116 ms | 233 ms | 114 ms |
+| Trend beneath the kernel, replaced versions named | 490 ms | 146 ms | 238 ms | 202 ms |
+| The same rows asked for by the kernel's name, no walk | 404 ms | 236 ms | 641 ms | 408 ms |
+| Trend beneath a parent of 4,867 children, live only | 178 ms | 157 ms | 390 ms | 209 ms |
+| The same, replaced versions named | 558 ms | 204 ms | 261 ms | 236 ms |
+| The list beneath that parent, first page, before and after | 163 ms, 184 ms | 108 ms, 119 ms | 330 ms, 319 ms | 250 ms, 128 ms |
+| The tree's step around the kernel, before and after | 166 ms, 172 ms | 93 ms, 98 ms | 295 ms, 242 ms | 98 ms, 101 ms |
+| Reading the replaced components and their live namesakes | 0.2 ms | 1.4 ms | 0.5 ms | 0.6 ms |
+
+| Reading | Detail |
+|---|---|
+| The live-only trend is the wrong answer | 0 open the week before the bump against 4,943, and none of the 2,472 it fixed resolved |
+| The added cost is the rows | Named, the trend reads the replaced kernel's 4,943 issues beside the live one's 2,471; asking for the same rows by name costs as much or more |
+| Matched by name inside the walk's statement | 1.72 s beneath the kernel and 1.36 s beneath the parent on MySQL 8.4, against 238 ms and 261 ms as values beside the walk |
+
+| Caveat | Detail |
+|---|---|
+| Beneath the build's root is not in the table | Its walk is the one the tree's root read measures, which on MySQL outlasts the run at this size |
+| One sample per figure | Five were taken; they agree within about ten percent |

@@ -293,7 +293,7 @@ type CountedPaging struct {
 // "differs between builds" and the spread across variants are statements
 // about a selection.
 type AtOneBuild struct {
-	Beneath          string        `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices"`
+	Beneath          string        `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices"`
 	BeneathVersion   string        `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 	BeneathEcosystem string        `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
 	BeneathNamespace string        `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`

@@ -796,7 +796,14 @@ func (s *Store) filledWith(ctx context.Context, productID, buildID int64,
 	if err != nil {
 		return err
 	}
-	totals, err := s.beneath(ctx, productID, buildID, readable, reached)
+	// A finding on a version a rescan replaced is beneath every start reaching
+	// the present version of its name, as the list beneath it holds it. The
+	// code findings reach replaced versions through their own counter.
+	replaced, err := Replaced(ctx, s.db, buildID)
+	if err != nil {
+		return err
+	}
+	totals, err := s.beneath(ctx, productID, buildID, readable, withReplaced(reached, replaced))
 	if err != nil {
 		return err
 	}

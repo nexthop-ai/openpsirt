@@ -184,8 +184,24 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 			return nil, refusal.Errorf("trend beneath a component: a subtree is a walk over one"+
 				" build's edges, and %d builds are in scope", len(buildIDs))
 		}
-		moments = moments.Where(`"f"."component_id" IN (?)`,
-			graph.Within(moments.DB(), buildIDs[0], *within.Beneath))
+		// A finding keeps the component it opened on, so what a version
+		// bump closed sits on the version it replaced, and is beneath
+		// wherever the present version of its name is.
+		replaced, err := graph.Replaced(ctx, s.db, buildIDs[0])
+		if err != nil {
+			return nil, err
+		}
+		walked := graph.Within(moments.DB(), buildIDs[0], *within.Beneath)
+		under, err := graph.ReplacedWithin(ctx, s.db, buildIDs[0], *within.Beneath, replaced)
+		if err != nil {
+			return nil, err
+		}
+		if len(under) == 0 {
+			moments = moments.Where(`"f"."component_id" IN (?)`, walked)
+		} else {
+			moments = moments.Where(`("f"."component_id" IN (?) OR "f"."component_id" IN (?))`,
+				walked, bun.List(under))
+		}
 	}
 
 	query := s.db.NewSelect().

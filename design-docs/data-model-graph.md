@@ -144,6 +144,8 @@ answers) takes 3 ms on PostgreSQL and 11 ms on MySQL, everything above it (78)
 | No walk carries a depth | The union ends a cycle; a depth keeps a node per route length, 55,060 rows for thirty mutually dependent components on SQLite |
 | The upward walk returns the nodes above and their edges, and the shortest route from a root is drawn in memory, to sixty-four steps | Deeper, a component is counted beneath, found in a list narrowed beneath, and shown on a finding as placed nowhere |
 | Downward walks are spelled `CROSS JOIN ... WHERE` | On SQLite it keeps the queue outside the join: 0.018 s against 6.6 s under a build's root |
+| A walk beneath a component also reaches every component the build held and holds no longer whose name a component it reaches carries: the tree's counts, the list beneath and the trend beneath | A finding keeps the component it opened on, so a rescan at a new version replaces the component and not the finding |
+| The replaced components are read from the build's node history first, with the live components of their names; the list and the trend walk once more for which of those names sit beneath, and name the replaced components as values beside the walk | Matched by name in the walk's own statement, the trend beneath the bench kernel took 1.72 s on MySQL 8.4, against 227 ms as values (`design-docs/analytics-measurements.md` § Trend beneath a replaced version) |
 
 ## Limits
 
