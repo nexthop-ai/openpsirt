@@ -9,8 +9,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/uptrace/bun"
-
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -106,27 +104,15 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	}
 	visible := []access.Visibility{access.Public}
 
-	var rows []struct {
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Identifier      string `bun:"identifier"`
-		Component       string `bun:"component"`
-		Purl            string `bun:"purl"`
-		finding.Covering
+	rows, err := finding.CoveredInBuild(ctx, s.idb(), named.ProductID, buildID, visible,
+		finding.ForStatements, s.carrying())
+	if err != nil {
+		return nil, err
 	}
-	if err := finding.WhollyCovered(s.grouped(buildID, visible), named.ProductID, visible,
-		finding.ForStatements).Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what stands about this build: %w", err)
-	}
-	var affected []struct {
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Identifier      string `bun:"identifier"`
-		Component       string `bun:"component"`
-		Purl            string `bun:"purl"`
-		finding.Affected
-	}
-	if err := finding.WhollyAffected(s.grouped(buildID, visible), named.ProductID,
-		visible).Scan(ctx, &affected); err != nil {
-		return nil, fmt.Errorf("read what applies in this build: %w", err)
+	affected, err := finding.AffectedInBuild(ctx, s.idb(), named.ProductID, buildID, visible,
+		s.carrying())
+	if err != nil {
+		return nil, err
 	}
 	fixed, err := s.patched(ctx, buildID, visible)
 	if err != nil {
@@ -245,28 +231,6 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	}
 	sort.Slice(built.Facts, func(i, j int) bool { return built.Facts[i].before(built.Facts[j]) })
 	return built, nil
-}
-
-// grouped is the findings of one build at the visibilities given, one row per
-// issue and component by its name and package identifier, carrying the columns
-// every statement about a component reads.
-func (s *Store) grouped(buildID int64, visible []access.Visibility) *bun.SelectQuery {
-	return s.idb().NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Join(nodeJoin).
-		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
-		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
-		ColumnExpr(`"v"."identifier" AS "identifier"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Apply(vexKinds("f")).
-		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
-		Limit(int64(s.carrying() + 1))
 }
 
 // factOf is the fact an agreed decision states about one component, beneath one

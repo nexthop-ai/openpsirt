@@ -21,7 +21,7 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 	// list of CVEs in our dependencies and asks what we say about them,
 	// which is more often than they ask for an advisory. It is mostly
 	// formatting over decisions already made and approved.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
@@ -102,7 +102,7 @@ func TestAVEXDocumentCarriesNothingNobodyHasAnnounced(t *testing.T) {
 	// Every statement names an issue and a component in something we ship, so
 	// a document built from undisclosed work would announce the undisclosed
 	// work.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		hidden := r.Embargoed(t)
 		decision, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
@@ -150,7 +150,7 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 	// under. The document declared aliases from the start and never put
 	// anything in them, so the one search it exists to satisfy — find what
 	// they say about the name I have — found nothing.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
@@ -611,7 +611,7 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 	// state, so nothing about the match being ours to correct has to be
 	// explained to a reader — and the statement has to survive the bump,
 	// because surviving the bump is the whole of what a correction is.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 

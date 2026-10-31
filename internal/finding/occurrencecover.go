@@ -181,37 +181,22 @@ func CoveredAtOccurrences(ctx context.Context, db bun.IDB, productID, buildID in
 
 // statedOccurrenceColumns are what an occurrence is read with: the issue, the
 // component and the consumer, each by the package identifier the build stated
-// for it.
-//
-// The build's open node for a component holds the identifier this build
-// stated; the component row is shared by every product shipping the package.
-// A container image is stored with no version, and the identifier this build
-// stamped it with is its open image version: a product named with no version
-// is one a reader cannot match. A build holds one open node per component and
-// a node one open image version, so the joins add no row.
+// for it (StatedPurl), or the component's own where the build stated none.
 func statedOccurrenceColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Join(`LEFT JOIN "graph_node" AS "gn" ON "gn"."build_id" = "f"."build_id"
-			AND "gn"."component_id" = "f"."component_id" AND "gn"."closed_scan_id" IS NULL`).
-		Join(`LEFT JOIN "image_version" AS "giv" ON "giv"."node_id" = "gn"."id"
-			AND "giv"."closed_scan_id" IS NULL`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`LEFT JOIN "graph_node" AS "cn" ON "cn"."build_id" = "f"."build_id"
-			AND "cn"."component_id" = "f"."consumer_id" AND "cn"."closed_scan_id" IS NULL`).
-		Join(`LEFT JOIN "image_version" AS "civ" ON "civ"."node_id" = "cn"."id"
-			AND "civ"."closed_scan_id" IS NULL`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		ColumnExpr(`"f"."id" AS "finding_id"`).
 		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
 		ColumnExpr(`"v"."identifier" AS "identifier"`).
 		ColumnExpr(`"c"."id" AS "component_id"`).
 		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
+		ColumnExpr(`COALESCE(` + StatedPurl(`"f"."component_id"`) + `, "c"."purl", '') AS "purl"`).
 		ColumnExpr(`COALESCE("f"."consumer_id", 0) AS "consumer_id"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
-		ColumnExpr(`COALESCE("civ"."purl", "cn"."purl", "uc"."purl", '') AS "consumer_purl"`)
+		ColumnExpr(`COALESCE(` + StatedPurl(`"f"."consumer_id"`) + `, "uc"."purl", '') AS "consumer_purl"`)
 }
 
 // statedOccurrence is one occurrence as statedOccurrenceColumns reads it.
@@ -240,9 +225,17 @@ func (r statedOccurrence) occurrence() coveredOccurrence {
 //
 // Only occurrences somebody decided are read here. A build holds hundreds of
 // thousands of open occurrences, and a statement occurrence by occurrence is
-// only ever about a component somebody decided at least one occurrence of.
+// only ever about a component somebody decided at least one occurrence of, so
+// only the issues a covering decision exists for in the product are read, as
+// CoveredInBuild reads them.
 func decidedOccurrences(ctx context.Context, db bun.IDB, productID, buildID int64,
 	visible []access.Visibility) (map[int64]coveredOccurrence, error) {
+
+	issues, err := issuesDecided(ctx, db, productID, visible, `"de"."state" = 'approved'`, nil,
+		coveringOutcomes(ForStatements))
+	if err != nil || len(issues) == 0 {
+		return nil, err
+	}
 
 	var rows []struct {
 		statedOccurrence
@@ -252,6 +245,7 @@ func decidedOccurrences(ctx context.Context, db bun.IDB, productID, buildID int6
 		Covering
 	}
 	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
+	byIssue, issueArgs := database.InAnyOf(`"f"."vulnerability_id"`, issues)
 	q := covered(statedOccurrenceColumns(db.NewSelect()), productID, visible, ForStatements).
 		ColumnExpr(`COUNT(*) AS "joined"`).
 		ColumnExpr(`COUNT("cl"."id") AS "decided"`).
@@ -259,8 +253,9 @@ func decidedOccurrences(ctx context.Context, db bun.IDB, productID, buildID int6
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"f"."id", "v"."id", "v"."identifier", "c"."id", "c"."name", "giv"."purl", "gn"."purl", "c"."purl", "f"."consumer_id",
-			"uc"."name", "civ"."purl", "cn"."purl", "uc"."purl"`).
+		Where(byIssue, issueArgs...).
+		GroupExpr(`"f"."id", "f"."build_id", "f"."component_id", "f"."consumer_id", "v"."id", "v"."identifier",
+			"c"."id", "c"."name", "c"."purl", "uc"."name", "uc"."purl"`).
 		Having(`COUNT("cl"."id") > 0`)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the occurrences decisions cover: %w", err)
