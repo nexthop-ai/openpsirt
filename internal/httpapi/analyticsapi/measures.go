@@ -5,7 +5,6 @@ package analyticsapi
 
 import (
 	"context"
-	"math"
 	"net/http"
 	"time"
 
@@ -130,12 +129,8 @@ func spreadBodies(all []triage.Spread) []SpreadBody {
 	for _, one := range all {
 		out = append(out, SpreadBody{
 			Band: one.Band, Count: one.Count,
-			Median: inDays(one.Median), P90: inDays(one.P90), Worst: inDays(one.Worst),
+			Median: core.InDays(one.Median), P90: core.InDays(one.P90), Worst: core.InDays(one.Worst),
 		})
 	}
 	return out
-}
-
-func inDays(d time.Duration) float64 {
-	return math.Round(d.Hours()/24*10) / 10
 }

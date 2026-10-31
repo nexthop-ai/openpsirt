@@ -133,6 +133,7 @@ describe("code findings over time", () => {
     const query = paths(spy).at(-1)?.[1].params?.query ?? {};
     expect(query.branch_or_tag).toBeUndefined();
     expect(query.variant).toBeUndefined();
+    expect(mount.host().textContent).toContain("every branch · every variant");
   });
 
   it("splits by tier until another split is picked, and the file asks what the screen asked", async () => {

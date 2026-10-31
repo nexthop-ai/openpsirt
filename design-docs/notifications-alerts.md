@@ -69,7 +69,7 @@ a build and nothing found, and is withheld as security testing work
 |---|---|
 | A sharp drop is applied, never held | A held run leaves every later run superseded behind it, and a fix sweep looks like a partial run |
 | Its thresholds are the analyzer drop share and floor, both passed | `design-docs/analysis.md` § Run application |
-| The usual gap is the median of the newest ten | A long weekend or rerun burst does not move it |
+| The usual gap is the median of the newest ten | A long weekend or rerun burst does not move it; Analysis coverage reads the same interval (`design-docs/analysis-figures.md` § Analysis coverage) |
 | Fewer than three applied runs on a build is never quiet | Two runs are one gap |
 | Builds retired at any level, and releases past end of life, are left out | |
 

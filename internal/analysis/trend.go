@@ -128,14 +128,8 @@ func Trend(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	if out.Markers, err = trendMarkers(ctx, db, scope, since, until); err != nil {
 		return nil, err
 	}
-	// The queue's own count, so the figure is the length of the list it
-	// opens.
-	if err := db.NewSelect().
-		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible)).
-		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).
-		Where(`"l"."stands" = ?`, string(NoLongerDetected)).
-		Scan(ctx, &out.NoLongerDetected); err != nil {
-		return nil, fmt.Errorf("count the code findings of product %d no longer detected: %w", scope.ProductID, err)
+	if out.NoLongerDetected, err = noLongerDetected(ctx, db, subject, scope, visible); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -151,8 +145,6 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 	visible []access.Visibility, since time.Time, step time.Duration, steps int) ([]TrendPoint, error) {
 
 	until := since.Add(time.Duration(steps) * step)
-	kinds, kindArgs := kind.SecurityTestingStatistics.Where(`"f"."kind"`)
-	reach := finding.CodeFindingReach(subject, scope.ProductID)
 	var rows []struct {
 		Occurrence string     `bun:"occurrence_identity"`
 		Kind       kind.Kind  `bun:"kind"`
@@ -161,21 +153,15 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		OpenedAt   time.Time  `bun:"opened_at"`
 		ClosedAt   *time.Time `bun:"closed_at"`
 	}
-	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
-		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
+	q := statisticsFindings(db, subject, scope, visible).
 		ColumnExpr(`"f"."occurrence_identity", "f"."kind", "si"."series_id"`).
 		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 		ColumnExpr(`"f"."opened_at", "f"."closed_at"`).
-		Where(kinds, kindArgs...).
-		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		Where(`"f"."opened_at" < ?`, until).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr(`"f"."closed_at" IS NULL`).WhereOr(`"f"."closed_at" >= ?`, since)
 		})
-	if err := scope.narrow(db, scope.inScope(q), kind.SecurityTestingStatistics).Scan(ctx, &rows); err != nil {
+	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the code findings of product %d over time: %w", scope.ProductID, err)
 	}
 	names, err := seriesNames(ctx, db, scope.ProductID)
@@ -250,6 +236,29 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		points[i] = p
 	}
 	return points, nil
+}
+
+// statisticsFindings is every finding of the Security testing statistics
+// consumer's kinds in the scope that the subject may read, one row per
+// finding, with its sighting under "si", its build under "t", its branch or
+// tag under "s" and its rule's rating under "rr", and no columns: each figure
+// names its own. A finding closed and a finding opened anew at its occurrence
+// are two rows.
+//
+// The product's own visibilities, and a code finding included in its flaw's
+// case (REQ-43). Narrowed as the queue narrows, so a figure narrowed alike
+// counts the list it opens.
+func statisticsFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
+	kinds, kindArgs := kind.SecurityTestingStatistics.Where(`"f"."kind"`)
+	reach := finding.CodeFindingReach(subject, scope.ProductID)
+	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
+		Where(kinds, kindArgs...).
+		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...)
+	return scope.narrow(db, scope.inScope(q), kind.SecurityTestingStatistics)
 }
 
 // methodOf is the testing method that records findings of a kind.

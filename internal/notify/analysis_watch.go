@@ -6,7 +6,6 @@ package notify
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strconv"
 	"time"
 
@@ -19,23 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
-)
-
-// The bounds on when a series has gone quiet on a build.
-const (
-	// quietRuns is how many applied runs a series needs on a build before its
-	// rhythm is a thing to measure. Two runs are one gap, which is a guess.
-	quietRuns = 3
-	// quietGaps is how many of the newest gaps the rhythm is read from, so a
-	// pipeline that moved from weekly to nightly is judged by what it does
-	// now.
-	quietGaps = 10
-	// quietTimes is how many usual gaps make one silence.
-	quietTimes = 3
-	// quietFloor is the shortest silence worth saying. A pipeline running
-	// hourly that misses three runs is a bad afternoon rather than a
-	// pipeline nobody is watching.
-	quietFloor = 24 * time.Hour
 )
 
 // analysisBuild is one series on one build in use, with the names a message
@@ -185,9 +167,9 @@ func uncomparable(r series.Reason) string {
 // analysesQuiet is every series that has stopped arriving on a build it ran
 // on regularly, against the product's security testing readers.
 //
-// Measured against the series' own rhythm on that build: three times its
-// usual gap, and never less than a day. A series with fewer than three runs
-// there has no rhythm yet and is never quiet. It clears on the next run.
+// Measured against the series' own rhythm on that build (series.RhythmOf):
+// three times its usual gap, and never less than a day. A series with fewer
+// than three runs there has no rhythm yet. It clears on the next run.
 func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 	var rows []struct {
 		analysisBuild
@@ -203,7 +185,7 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 			ColumnExpr(`ROW_NUMBER() OVER (PARTITION BY "sr"."series_id", "sr"."build_id" `+
 				`ORDER BY "sr"."received_at" DESC, "sr"."id" DESC) AS "newest"`)).
 		ColumnExpr(`"ranked".*`).
-		Where(`"ranked"."newest" <= ?`, quietGaps+1).
+		Where(`"ranked"."newest" <= ?`, series.RhythmGaps+1).
 		OrderExpr(`"ranked"."series_id", "ranked"."build_id", "ranked"."received_at" DESC`).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -237,10 +219,11 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 		if past[build.BranchOrTagID] {
 			continue
 		}
-		silent, quiet := quietFor(runs[at], now)
-		if !quiet {
+		rhythm := series.RhythmOf(runs[at], now)
+		if !rhythm.Quiet {
 			continue
 		}
+		silent := rhythm.Silent
 		body := fmt.Sprintf("%s %s %s: no run of %s has been applied for %s.",
 			build.Product, build.BranchOrTag, build.Variant, build.Series, plainly(int(silent.Hours()/24)))
 		turned, err := w.lastRefused(ctx, build, runs[at][0])
@@ -260,28 +243,6 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 		})
 	}
 	return out, nil
-}
-
-// quietFor is how long a series has been silent and whether that is longer
-// than its rhythm allows. arrived is newest first.
-func quietFor(arrived []time.Time, now time.Time) (time.Duration, bool) {
-	if len(arrived) < quietRuns {
-		return 0, false
-	}
-	gaps := make([]time.Duration, 0, len(arrived)-1)
-	for i := 1; i < len(arrived); i++ {
-		gaps = append(gaps, arrived[i-1].Sub(arrived[i]))
-	}
-	slices.Sort(gaps)
-	// The median, which a single long weekend or a burst of reruns does not
-	// move.
-	usual := gaps[len(gaps)/2]
-	if len(gaps)%2 == 0 {
-		usual = (gaps[len(gaps)/2-1] + gaps[len(gaps)/2]) / 2
-	}
-	allowed := max(quietTimes*usual, quietFloor)
-	silent := now.Sub(arrived[0])
-	return silent, silent > allowed
 }
 
 // lastRefused is the last upload of the series to the build turned away after

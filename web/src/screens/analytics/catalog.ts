@@ -199,6 +199,36 @@ export const GROUPS: Group[] = [
           "Whether the code findings backlog is shrinking, and where an analyzer change moved it.",
         needs: "product",
       },
+      {
+        slug: "time-to-judge",
+        name: "Time to judge",
+        answers: "How long a new code finding waits for a person, and what is waiting now.",
+        needs: "product",
+      },
+      {
+        slug: "time-to-fix",
+        name: "Time to fix",
+        answers: "How long until a code finding is fixed, with what is no longer detected apart.",
+        needs: "product",
+      },
+      {
+        slug: "analyzer-precision",
+        name: "Analyzer precision",
+        answers: "Which analyzers and rules are noise, and what each suppression rule covers.",
+        needs: "product",
+      },
+      {
+        slug: "analysis-coverage",
+        name: "Analysis coverage",
+        answers: "What each analyzer covers on each build, and which series have gone quiet.",
+        needs: "product",
+      },
+      {
+        slug: "code-findings-by-release",
+        name: "Code findings by release",
+        answers: "Whether a release shipped fewer code findings than the one before.",
+        needs: "product",
+      },
     ],
   },
   {

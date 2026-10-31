@@ -40,6 +40,7 @@ the reader reads security testing material in.
 | Unassigned only narrows to code findings nobody holds, in the address and heading, across tabs, counts and the file (`design-docs/analysis-queue.md` § Code finding queue) | The findings list holds no code finding |
 | The list is offered as CSV and JSON with the narrowing on screen, every row (`design-docs/analysis-queue.md` § Queue file) | |
 | A product's queue offers Over time, opening Code findings over time with its branch, variant, series, method and component narrowing; a queue over every build sends its branch and variant empty, so the picker's build does not narrow it (`design-docs/analysis-statistics.md` § The page) | The trend answers whether the list is shrinking |
+| A product's queue offers Time to judge beside Over time, with the same narrowing (`design-docs/analysis-figures.md` § The pages) | How long the list waits is the question beside whether it shrinks |
 | The screen, Code findings by analyzer and Code findings over time are about the code family, under `design-docs/interface.md` § Families a reader holds: for a reader not reading it in the product, neither is asked, and each shows "Nothing to list." and the family's line | A queue or table of zeros reads as an analyzer finding nothing |
 
 ## A code finding
@@ -80,6 +81,7 @@ the reader reads security testing material in.
 | Rule | Reason |
 |---|---|
 | The screen lists every rule with what it names, what it covers beside the coverage at approval, and its state, explained on hover where needed | An outgrown rule shows why |
+| The screen links Analyzer precision (`design-docs/analysis-figures.md` § Analyzer precision) | Which rules are noise is the case for a new rule |
 | Approve is offered on a waiting or outgrown rule to a holder of `approver` and `security-testing-read`, never on their own; the rule names its proposer | The server refuses the proposer |
 | A new rule names an analyzer rule, a path, or both; one for a memory or injection rule needs a path | The server refuses otherwise |
 

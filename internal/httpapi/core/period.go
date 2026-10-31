@@ -4,6 +4,7 @@
 package core
 
 import (
+	"math"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -110,6 +111,12 @@ func Stamp(t time.Time) string {
 		return ""
 	}
 	return t.UTC().Format(time.RFC3339)
+}
+
+// InDays is a span in days, rounded to a tenth rather than cut: cut, 0.99
+// days reads as 0.9.
+func InDays(d time.Duration) float64 {
+	return math.Round(d.Hours()/24*10) / 10
 }
 
 // StampAt is Stamp for a time that may be absent.

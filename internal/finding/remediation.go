@@ -79,6 +79,23 @@ var agingBuckets = []agingBucket{
 	{"over three months", 90, 0},
 }
 
+// Stretch is one stretch of days before now that open work is aged into: From
+// is where it starts and To where it ends, zero for no end.
+type Stretch struct {
+	Label    string
+	From, To int
+}
+
+// AgingStretches are the stretches open work is aged into, so the code
+// finding backlog ages in the same stretches as the vulnerability backlog.
+func AgingStretches() []Stretch {
+	out := make([]Stretch, len(agingBuckets))
+	for i, b := range agingBuckets {
+		out[i] = Stretch{Label: b.label, From: b.from, To: b.to}
+	}
+	return out
+}
+
 // resolved keeps only what counts as an issue actually going away.
 //
 // A closure is not a fix unless the issue went with it. A bump that

@@ -15,6 +15,7 @@ import {
   type CodeFindingState,
 } from "../api/codeFindings";
 import {
+  analyticsReportAt,
   codeFindingAt,
   componentAt,
   suppressionRulesAt,
@@ -226,6 +227,18 @@ export function CodeFindings() {
                 })}
               >
                 Over time
+              </Link>{" "}
+              <Link
+                className="btn quiet"
+                to={analyticsReportAt("time-to-judge", {
+                  branch_or_tag: branchOrTag ?? "",
+                  variant: variant ?? "",
+                  series,
+                  method,
+                  ...placed,
+                })}
+              >
+                Time to judge
               </Link>{" "}
               <Link className="btn quiet" to={suppressionRulesAt(product)}>
                 Suppression rules

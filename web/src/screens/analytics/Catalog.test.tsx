@@ -100,6 +100,15 @@ describe("the security testing reports", () => {
       "/analytics/code-findings-over-time",
     );
     expect(row("Code findings by analyzer").tagName).toBe("A");
+    for (const [name, slug] of [
+      ["Time to judge", "time-to-judge"],
+      ["Time to fix", "time-to-fix"],
+      ["Analyzer precision", "analyzer-precision"],
+      ["Analysis coverage", "analysis-coverage"],
+      ["Code findings by release", "code-findings-by-release"],
+    ]) {
+      expect(row(name ?? "").getAttribute("href")).toBe(`/analytics/${slug}`);
+    }
   });
 
   it("are absent for a reader holding it nowhere", async () => {
@@ -107,6 +116,7 @@ describe("the security testing reports", () => {
     mount.render(screen(<Catalog />, "/products/sonic"));
     await settle();
     expect(mount.host().textContent).not.toContain("Code findings over time");
+    expect(mount.host().textContent).not.toContain("Analyzer precision");
     expect(mount.host().textContent).not.toContain("Security testing");
     expect(mount.host().textContent).toContain("Release comparison");
   });

@@ -7,6 +7,7 @@ justifies.
 
 - [Producer output](#producer-output)
 - [Trend of code findings](#trend-of-code-findings)
+- [Security testing figures](#security-testing-figures)
 
 ## Producer output
 
@@ -56,3 +57,38 @@ slower is shown.
 |---|---|
 | MariaDB at 16,000 components is not in the table | The run ends at its hour limit in the MySQL tree read before it, a read the trend does not take |
 | The bar is the backlog trend's 0.25 s over 367,577 occurrences | That model holds far more rows than this one's 4,000 code findings |
+
+## Security testing figures
+
+Justifies how time to judge reads first proposals and how the figures read
+the queue's rows (`design-docs/analysis-figures.md`).
+`TestMeasureTheSecurityTestingFigures` under `make measure`: the hub's build of
+16,000 components and 84,000 findings, 4,000 of them code findings opened a
+week apart over two years, every tenth closed as fixed, 200 confirmed, 104
+earlier runs of the series, and the build then read as a release. Every
+dependency finding is closed in the last thirteen weeks and copied twice, as
+distinct occurrences, onto the other product's build: 240,957 dependency
+closings in the deployment. Each figure
+is asked four times, as loaded and again refreshed; the second fastest of the
+last three is shown, the slower of the two states.
+
+| Figure | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|---|---|---|
+| Time to judge, the product, 104 weeks | 104 ms | 728 ms | 303 ms |
+| Time to fix, the product, 104 weeks | 76 ms | 494 ms | 197 ms |
+| Time to fix, the product, 13 weeks | 67 ms | 500 ms | 190 ms |
+| Analyzer precision | 41 ms | 336 ms | 138 ms |
+| Analysis coverage, 104 weeks | 8 ms | 3 ms | 4 ms |
+| Code findings by release | 45 ms | 258 ms | 91 ms |
+
+| Shape | Measured |
+|---|---|
+| First proposals asked per finding as a correlated test | 7.96 s as loaded on PostgreSQL, against 195 ms with the decisions joined to the findings and grouped |
+| The queue's test of a closed finding, on MySQL 8.4 | 26.6 s per statement for 400 closed code findings: the open one is looked up through the build's open findings, 84,000 rows per closed code finding. Time to judge took 53 s through it, and 726 ms reading open findings alone |
+| The same test on MariaDB and PostgreSQL | 86 ms and 1.25 s for the statement alone |
+| Time to fix reading every closing in the deployment for the occurrences closed in the window | 5.94 s at 13 weeks and 4.83 s at 104 weeks as loaded on PostgreSQL, against 67 ms and 76 ms reading the product's code findings alone. MySQL 8.4 and MariaDB took the same time either way: 502 ms and 186 ms at 13 weeks |
+
+| Caveat | Detail |
+|---|---|
+| Beneath a component is not in the table | It adds the tree walk the trend's table measures, which on MySQL and MariaDB at this size outlasts the run |
+| One build of the product | The figures read every build of the product; this model holds one, and the other product's build holds only closings |

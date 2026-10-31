@@ -135,7 +135,11 @@ export function CodeFindingTrend() {
   };
 
   const of = [
-    scopeWords({ product: at.product, branch_or_tag: branchOrTag, variant }),
+    scopeWords({
+      product: at.product,
+      branch_or_tag: branchOrTag || undefined,
+      variant: variant || undefined,
+    }),
     narrowed.series,
     method && CODE_FINDING_METHODS[method]?.label,
     narrowed.component && `on ${narrowed.component}`,

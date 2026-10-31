@@ -29,12 +29,14 @@ export const TIERS: Record<string, string> = {
 
 // Why a run's absences prove nothing, in a few words.
 // eslint-disable-next-line no-restricted-syntax -- Keyed on the server's reasons.
-const REASONS: Record<string, string> = {
+export const REASONS: Record<string, string> = {
   "exit-status": "exited with an error",
   incomplete: "didn't finish",
   "failure-signal": "reported a failure of its own",
   "no-coverage": "stated no coverage",
   "units-short": "analyzed fewer units than expected",
+  "tool-changed": "a new tool or version",
+  "rules-changed": "a new rule set",
 };
 
 // What a marker names where a run stated no tool, version or rule count.
