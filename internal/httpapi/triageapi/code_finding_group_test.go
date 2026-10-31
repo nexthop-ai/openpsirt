@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 // taggedLeak is the seeded run, the leak's last place being src/b.c line 3,
@@ -105,6 +107,38 @@ func TestASecondAnalyzerReportingTheSameFlawGroupsItAndSortsItFirst(t *testing.T
 	})
 }
 
+func TestASecondAnalyzerSortsAFlawFirstWhateverNarrowsTheList(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		// cppcheck reports the leak's flaw a line past its last place. Then
+		// the seeded series' next run reports an overflow of the leak's
+		// weakness alone in another file, newer than the leak.
+		overflowsBesideTheLeak(t, r, "416", "416", 4)
+		alone := strings.Replace(taggedLeak("416"), `{"id":"overflow"}`,
+			`{"id":"overflow","properties":{"tags":["external/cwe/cwe-416"]}}`, 1)
+		alone = strings.Replace(alone, `"results":[`, `"results":[{"ruleId":"overflow","message":{"text":"n overflows"},`+
+			`"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/z.c","uriBaseId":"SRCROOT"},`+
+			`"region":{"startLine":50}}}]},`, 1)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-30*time.Minute), alone)
+		// Narrowed to the seeded series, the list holds neither cppcheck's
+		// code finding nor anything else to sort the leak first by.
+		queue := codeFindingsOf(t, r, "security-testing-reader", "?series=clang-tidy/default")
+		if len(queue.Items) != 2 || queue.Items[0].Occurrence != occurrence || queue.Items[1].Path != "src/z.c" {
+			t.Errorf("the seeded series' queue is %+v; want the leak cppcheck also reports first, then the newer overflow", queue.Items)
+		}
+		// cppcheck's code finding closed, the leak is one analyzer's again.
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).Set(`"closed_at" = ?`, time.Now().UTC()).
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = 'cppcheck/overflow')`).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		queue = codeFindingsOf(t, r, "security-testing-reader", "?series=clang-tidy/default")
+		if len(queue.Items) != 2 || queue.Items[0].Path != "src/z.c" || queue.Items[1].Occurrence != occurrence {
+			t.Errorf("the seeded series' queue is %+v; want the newer overflow first once cppcheck's code finding closed", queue.Items)
+		}
+	})
+}
+
 func TestClangsCheckersRunByClangTidyAreNotASecondAnalyzer(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededCodeFinding(t, r)
@@ -152,7 +186,83 @@ func TestCodeFindingsOfUnrelatedWeaknessesAreNotOneFlaw(t *testing.T) {
 		if kin := kinOf(t, r, occurrence); len(kin) != 0 {
 			t.Errorf("the leak's kin are %+v; want none", kin)
 		}
+		// Nor does the queue sort the leak above a newer code finding of its
+		// weakness that no second analyzer reports.
+		sortsBelowANewerOne(t, r, occurrence, "563")
 	})
+}
+
+func TestASecondAnalyzerOnAnotherBuildIsNotTheSameFlaw(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		// cppcheck reports the leak's flaw a line past its last place, on
+		// another variant's build.
+		r.AlsoIn(t, "mellanox")
+		mellanox := httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: "mellanox"}
+		_, scan := r.Shipped(t, mellanox, "made-mellanox", graph.Snapshot{Root: httpapitest.SeededRoot})
+		if err := ingest.NewStore(r.DB.DB).Made(t.Context(), scan, 1, 1, httpapitest.SeededRoot.Name); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC()
+		httpapitest.ApplyRun(t, r, now.Add(-90*time.Minute), taggedLeak("416"))
+		httpapitest.ApplyRunAt(t, r, mellanox, "cppcheck/default", now.Add(-70*time.Minute),
+			httpapitest.OtherToolRun("cppcheck", "overflow", "787", "src/b.c", 4))
+		if kin := kinOf(t, r, occurrence); len(kin) != 0 {
+			t.Errorf("the leak's kin are %+v; want none on another build", kin)
+		}
+		sortsBelowANewerOne(t, r, occurrence, "416")
+	})
+}
+
+func TestCodeFindingsWithoutALineAreNotOneFlaw(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededCodeFinding(t, r)
+		// Two analyzers report an overflow of one weakness in src/y.c,
+		// neither saying on which line.
+		lineless := func(tool string) string {
+			return strings.Replace(httpapitest.OtherToolRun(tool, "overflow", "416", "src/y.c", 1),
+				`,"region":{"startLine":1}`, "", 1)
+		}
+		now := time.Now().UTC()
+		httpapitest.ApplyRunIn(t, r, "cppcheck/default", now.Add(-70*time.Minute), lineless("cppcheck"))
+		httpapitest.ApplyRunIn(t, r, "semgrep/default", now.Add(-60*time.Minute), lineless("semgrep"))
+		occurrence := ""
+		for _, item := range codeFindingsOf(t, r, "security-testing-reader", "").Items {
+			if item.Path == "src/y.c" {
+				occurrence = item.Occurrence
+			}
+		}
+		if occurrence == "" {
+			t.Fatal("neither overflow in src/y.c is listed")
+		}
+		sortsBelowANewerOne(t, r, occurrence, "416")
+	})
+}
+
+// sortsBelowANewerOne has the seeded analyzer report, after everything
+// else, an overflow tagged with the weakness CWE-tag in src/z.c, and checks
+// that the queue sorts the code finding at occurrence below it, as one no
+// second analyzer reports.
+func sortsBelowANewerOne(t *testing.T, r *httpapitest.Reach, occurrence, tag string) {
+	t.Helper()
+	alone := strings.Replace(taggedLeak(tag), `{"id":"overflow"}`,
+		`{"id":"overflow","properties":{"tags":["external/cwe/cwe-`+tag+`"]}}`, 1)
+	alone = strings.Replace(alone, `"results":[`, `"results":[{"ruleId":"overflow","message":{"text":"n overflows"},`+
+		`"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/z.c","uriBaseId":"SRCROOT"},`+
+		`"region":{"startLine":50}}}]},`, 1)
+	httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-30*time.Minute), alone)
+	newer, older := -1, -1
+	for i, item := range codeFindingsOf(t, r, "security-testing-reader", "").Items {
+		switch {
+		case item.Path == "src/z.c":
+			newer = i
+		case item.Occurrence == occurrence:
+			older = i
+		}
+	}
+	if newer < 0 || older < 0 || newer > older {
+		t.Errorf("the newer code finding is at %d and the older one at %d; want the newer one first", newer, older)
+	}
 }
 
 func TestCodeFindingsInTwoFilesAreNotOneFlaw(t *testing.T) {
@@ -162,6 +272,7 @@ func TestCodeFindingsInTwoFilesAreNotOneFlaw(t *testing.T) {
 		if kin := kinOf(t, r, occurrence); len(kin) != 0 {
 			t.Errorf("the leak's kin are %+v; want none in another file", kin)
 		}
+		sortsBelowANewerOne(t, r, occurrence, "416")
 	})
 }
 

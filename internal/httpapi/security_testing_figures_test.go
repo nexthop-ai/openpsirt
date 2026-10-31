@@ -201,6 +201,13 @@ func TestTimeToJudgeIsFromOpeningToTheFirstProposal(t *testing.T) {
 		if earlier.Judged.All.Count != 0 {
 			t.Errorf("a second decision this week is %+v; want no first judgment in the week", earlier.Judged)
 		}
+		// The dismissal waits for a second person, so the code finding waits
+		// for nobody here.
+		for _, aged := range earlier.Waiting {
+			if aged.Waiting != 0 {
+				t.Errorf("%s waits %d with its dismissal waiting on a second person; want none", aged.Label, aged.Waiting)
+			}
+		}
 	})
 }
 
@@ -684,6 +691,16 @@ func TestCodeFindingsByReleaseFollowTheTagsInOrder(t *testing.T) {
 		httpapitest.Read(t, r, "security-testing-reader", releasesOf, &got)
 		if first := got.Releases[0]; first.NotFixed != 2 || first.Dismissed != 1 || first.NotSecurity != 1 || first.NoLongerDetected != 0 {
 			t.Errorf("v1.0 is %+v; want one dismissed and one not a security issue", first)
+		}
+		// A code finding stated fixed is no longer counted at all.
+		fixed := "/v1/products/mine/branches-and-tags/v1.0/variants/broadcom/code-findings/" + items.Items[0].Occurrence
+		body := httpapitest.FixedBody(t, r, fixed, "the harness was removed")
+		if w := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, fixed+"/fixed", body); w.Code != http.StatusOK {
+			t.Fatalf("closing v1.0's as fixed answered %d: %s", w.Code, w.Body.String())
+		}
+		httpapitest.Read(t, r, "security-testing-reader", releasesOf, &got)
+		if first := got.Releases[0]; first.NotFixed != 1 || first.Dismissed != 1 || first.NotSecurity != 0 {
+			t.Errorf("v1.0 with one fixed is %+v; want the dismissed one alone not fixed", first)
 		}
 		httpapitest.Read(t, r, "security-testing-reader", releasesOf+"?releases=2", &got)
 		if len(got.Releases) != 2 || got.Releases[0].BranchOrTag != "v1.1" {

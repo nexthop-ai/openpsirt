@@ -38,7 +38,7 @@ figure says otherwise.
 | Waits are worked out in the application from stored times | Subtraction of times is spelled four ways across the engines |
 | The tier is the rule's as rated now | No rating history is stored |
 | No presence spans and no stored figure; each is worked out from opening, closing, decision and run times when asked (REQ-74) | Absence closes nothing, and a stored answer drifts |
-| A figure counting no fixed code finding reads the queue's rows of open findings alone | On MySQL 8.4 the queue's test of a closed finding reads every open finding of its build: 26.6 s for 400 closed code findings (`design-docs/analysis-measurements.md` § Security testing figures) |
+| A figure counting no fixed code finding reads the queue's rows of open findings alone, kept by the conditions of its states | A state other than fixed has no closed finding to test for opening anew (`design-docs/analysis-queue.md` § Code finding queue) |
 | Nothing names a testing method that is not built | AI review is not supported |
 
 ## Time to judge
@@ -208,7 +208,7 @@ GET /v1/analysis-coverage?weeks=13
 | Each finding counts at its own product's visibilities, bound per product in the data layer, and each figure checks the reader on every product before reading (REQ-43) | A disclosed code finding counts where the reader reads disclosed work beside security testing material, and nowhere else |
 | A decision, a suppression rule and an end of life are each worked out in the finding's own product | They belong to one product |
 | Each count and list is the sum or merge of each product's own figure, row for row | One population split by product; series identity is a product's, so no occurrence is in two products |
-| Counts are the queue's counts with no row built | Counts across two products took 919 ms on PostgreSQL, where one product's queue of one row took 6.95 s (`design-docs/analysis-measurements.md` § Figures across products) |
+| Counts are the queue's counts with no row built | A count needs no page; counts across two products took 112 ms on PostgreSQL, 1.23 s on MySQL and 862 ms on MariaDB (`design-docs/analysis-measurements.md` § Figures across products) |
 | A spread across products is worked out over every product's waits together | A median of medians is no median |
 | Narrowed by series and method alone | A branch, a variant, a component and a subtree name part of one product |
 | Each has a file at `.csv` and `.json`, in the columns of one product's; a coverage row and a marker name the product | REQ-50 |

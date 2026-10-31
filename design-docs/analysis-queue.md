@@ -42,6 +42,10 @@ its code findings out.
 | Rule | Reason |
 |---|---|
 | Every list counts its scope by state, the open ones a waiting decision leaves out, and the dismissed ones a rule covers | A list leaving things out says how many (REQ-30) |
+| A list by state keeps its state by the conditions that make it, never by testing the state worked out | A planner has no statistics on an expression; PostgreSQL planned the joins after one for a handful of rows (`design-docs/analysis-measurements.md` § Code finding queue) |
+| A closed finding is listed until a code finding of its build opens anew at its occurrence, whatever narrows the list and whoever reads | Narrowing picks the rows; the build says whether one is fixed |
+| Whether one opened anew is told once over the code findings of the scope's builds, as a window over each occurrence on each build; each row is asked whether it is among the closed ones so told | Every pairing of a closed finding with the open ones was planned by some engine through every open finding of the build, with statistics as loaded (`design-docs/analysis-measurements.md` § Code finding queue) |
+| Whether a decision stands or waits at an open code finding, as a list keeps its state or the queue leaves one out, is told once from the decisions of the scope's products to the open code findings they reach at their occurrence, under the same issue and in the decision's own product; each row is asked whether it is among them | Asked of each row, PostgreSQL and MySQL read every decision of the product once per code finding; joined from the scope's builds, MariaDB read every open finding of each build first (`design-docs/analysis-measurements.md` § Code finding queue) |
 | One open on two builds in two states counts in both | |
 | Only what the subject may read is listed or counted (REQ-42, REQ-43) | |
 | A branch or tag and a variant narrow independently | |
@@ -196,7 +200,10 @@ a line or two apart; wider, or by first place, at least one merged falsely.
 | Within ten lines and otherwise alike is Possibly also found by, never grouped | A false merge hides a real flaw |
 | The evidence lists both, where the reader may read them (REQ-42) | |
 | A group is a code finding and those within two lines of it, per code finding | Two at four lines apart sharing a third are two groups |
-| Whether another analyzer agrees is worked out over the whole build | Order does not depend on the reader |
+| Whether another analyzer agrees is worked out over the whole build, whatever narrows the list | Order does not depend on the reader |
+| The code findings another analyzer agrees with are told once over the scope's builds, as a window over each build, file and weakness family within the lines of a group; each row of the page is asked whether it is among them | Every pairing of a code finding with the open ones near it was planned by some engine through every open finding of a build or of a rule, with statistics as loaded (`design-docs/analysis-measurements.md` § Code finding queue) |
+| In that window, another analyzer is one whose name differs from the row's own: the first or last, in name order, of the analyzers of the open code findings in it | A rule belongs to a family once, under its own analyzer |
+| Counts never read whether another analyzer agrees | Only the page orders by it |
 | Nearby code findings are found through an index on a digest of the last path, and the last line | No MySQL index takes a path whole. 16,000 code findings: 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, against 90 s and 37 minutes without |
 | A rule with no weakness groups with nothing | |
 | A decision covers its code finding and every unanswered one of its group, agreed once | |

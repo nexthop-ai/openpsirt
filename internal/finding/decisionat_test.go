@@ -33,9 +33,6 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 	"analysis/flaw.go": {
 		{"lh", "od"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",
 	},
-	"analysis/queue.go": {
-		{"f", "fo"}: "two rows of one build at one occurrence",
-	},
 	"analysis/state.go": {
 		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
 	},
