@@ -39,11 +39,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	findingkind "github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
-	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
@@ -510,88 +508,6 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	return doc, nil
 }
 
-// closedPairs is the findings of a build closed for the reason given that a
-// statement is still made about, at the visibilities given, one row per issue
-// and component with its name, stated package identifier and lowest finding.
-// The caller adds what the closure itself still has to hold, and closedGroups
-// makes them statements.
-//
-// The component's shipping and the open occurrences of its name are asked of
-// each issue and component in HAVING, where every engine asks them per row with
-// the keys bound. In WHERE an engine estimating the finding table at a few rows
-// joins them unkeyed, reading the build's graph or its open findings once per
-// closed finding: past 30 s for the patched findings on PostgreSQL never
-// analyzed, against 4.2 s in HAVING.
-func (s *Store) closedPairs(buildID int64, visible []access.Visibility,
-	because finding.Closure) *bun.SelectQuery {
-
-	return s.idb().NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`COALESCE(`+finding.StatedPurl(`"f"."component_id"`)+`, "c"."purl", '') AS "purl"`).
-		ColumnExpr(`MIN("f"."id") AS "first"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."closed_because" = ?`, because).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Apply(vexKinds("f")).
-		GroupExpr(`"f"."vulnerability_id", "f"."build_id", "f"."component_id", "c"."name", "c"."purl"`).
-		Having(stillShips).
-		Apply(noneOpenByNameAndPurl)
-}
-
-// closedGroups is the closed findings closedPairs reads, one row per issue,
-// name and package identifier, up to one past the ceiling, so that reaching it
-// is distinguishable from landing on it.
-//
-// The row read beside each is the lowest, which names the same row on every
-// engine, and is read rather than aggregated: a time read through an
-// aggregate comes back as text on one engine and a time on another.
-func (s *Store) closedGroups(pairs *bun.SelectQuery) *bun.SelectQuery {
-	return s.idb().NewSelect().
-		TableExpr(`(?) AS "p"`, pairs).
-		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "p"."vulnerability_id"`).
-		ColumnExpr(`"p"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"v"."identifier" AS "identifier"`).
-		ColumnExpr(`"p"."component" AS "component"`).
-		ColumnExpr(`"p"."purl" AS "purl"`).
-		ColumnExpr(`MIN("p"."first") AS "first"`).
-		GroupExpr(`"p"."vulnerability_id", "v"."identifier", "p"."component", "p"."purl"`).
-		Limit(int64(s.carrying() + 1))
-}
-
-// stillShips says the component of a finding `f` is still in its build, asked
-// of a query grouped by the finding's build and component.
-const stillShips = `EXISTS (SELECT 1 FROM "graph_node" AS "n"
-	WHERE "n"."build_id" = "f"."build_id" AND "n"."component_id" = "f"."component_id"
-		AND "n"."closed_scan_id" IS NULL)`
-
-// noneOpenByNameAndPurl keeps a query grouped by a finding `f`'s build and
-// issue and a component `c`'s name and package identifier to the groups with no
-// occurrence of the issue in the build open at a component of that name and
-// package identifier.
-//
-// Asked of the name and package identifier the statement is made about, which
-// may be several components: one at a version a patch does not reach is
-// affected, and a statement naming both would say otherwise.
-func noneOpenByNameAndPurl(q *bun.SelectQuery) *bun.SelectQuery {
-	kinds, args := findingkind.VEX.Where(`"o"."kind"`)
-	return q.Having(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
-	JOIN "component" AS "oc" ON "oc"."id" = "o"."component_id"
-	WHERE "o"."build_id" = "f"."build_id" AND "o"."vulnerability_id" = "f"."vulnerability_id"
-		AND "o"."closed_at" IS NULL AND "oc"."name" = "c"."name"
-		AND COALESCE("oc"."purl", '') = COALESCE("c"."purl", '')
-		AND `+kinds+`)`, args...)
-}
-
-// vexKinds keeps a query to the kinds of finding a VEX document states, over
-// the finding table under the alias given.
-func vexKinds(alias string) func(*bun.SelectQuery) *bun.SelectQuery {
-	where, args := findingkind.VEX.Where(`"` + alias + `"."kind"`)
-	return func(q *bun.SelectQuery) *bun.SelectQuery { return q.Where(where, args...) }
-}
-
 // fixedByPatch is an issue a patch the build declares has fixed in one
 // component.
 type fixedByPatch struct {
@@ -618,17 +534,7 @@ type fixedByPatch struct {
 func (s *Store) patched(ctx context.Context, buildID int64,
 	visible []access.Visibility) ([]fixedByPatch, error) {
 
-	var rows []struct {
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Identifier      string `bun:"identifier"`
-		Component       string `bun:"component"`
-		Purl            string `bun:"purl"`
-		First           int64  `bun:"first"`
-	}
-	err := s.closedGroups(s.closedPairs(buildID, visible, finding.Patched).
-		Join(`JOIN "suppression" AS "sup" ON "sup"."id" = "f"."suppressed_by"`).
-		Where(`"sup"."closed_scan_id" IS NULL`)).
-		Scan(ctx, &rows)
+	rows, err := s.closed(ctx, buildID, visible, finding.Patched)
 	if err != nil {
 		return nil, fmt.Errorf("read what the build's patches fix: %w", err)
 	}
@@ -730,36 +636,7 @@ func (s statedBySupplier) attributed() string {
 func (s *Store) disclaimed(ctx context.Context, buildID int64,
 	visible []access.Visibility) ([]statedBySupplier, error) {
 
-	var rows []struct {
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Identifier      string `bun:"identifier"`
-		Component       string `bun:"component"`
-		Purl            string `bun:"purl"`
-		First           int64  `bun:"first"`
-	}
-	pairs := s.closedPairs(buildID, visible, finding.Disclaimed).
-		Join(`JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
-		Where(`"ss"."superseded_at" IS NULL`).
-		// What the occurrence holds now: a later row at it, patched by the build
-		// or open again, is what the document goes by.
-		Where(finding.LatestAtItsOccurrence).
-		ColumnExpr(`MIN("f"."stated_by") AS "stated_least"`).
-		ColumnExpr(`MAX("f"."stated_by") AS "stated_greatest"`).
-		ColumnExpr(`SUM(CASE WHEN "ss"."status" <> ? THEN 1 ELSE 0 END) AS "otherwise"`,
-			string(sbom.NotAffected))
-	err := s.closedGroups(pairs).
-		// One supplier's statement and no other. Two suppliers answering
-		// occurrences of one component each spoke for their own product, and the
-		// format names the component once: credited to either, the document
-		// says one of them spoke for the other's.
-		//
-		// And only a statement that said not affected, counted over every
-		// statement closing an occurrence of the component: an upstream's
-		// statement that a component is fixed closes occurrences too, and is not a
-		// statement that it is unaffected, and counted out before grouping it
-		// would leave one supplier answering for an occurrence it did not close.
-		Having(`MIN("p"."stated_least") = MAX("p"."stated_greatest") AND SUM("p"."otherwise") = 0`).
-		Scan(ctx, &rows)
+	rows, err := s.closed(ctx, buildID, visible, finding.Disclaimed)
 	if err != nil {
 		return nil, fmt.Errorf("read what suppliers' statements close: %w", err)
 	}

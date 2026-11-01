@@ -26,7 +26,7 @@ import (
 // the notifications.
 const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)`
 
-// LatestAtItsOccurrence says no row of the same kind and issue has been
+// latestAtItsOccurrence says no row of the same kind and issue has been
 // recorded at the same occurrence in the same build after the finding `f`.
 //
 // A run records a new row rather than reopening a closed one, so an occurrence
@@ -35,7 +35,7 @@ const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)
 // by identifier rather than by moment: a version moving closes the row before
 // and records the row after at one moment. Held to the kind of `f`, so the
 // later rows are of a kind the outer query already reads.
-const LatestAtItsOccurrence = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
+const latestAtItsOccurrence = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 	WHERE "lt"."build_id" = "f"."build_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
 	  AND "lt"."occurrence_identity" = "f"."occurrence_identity" AND "lt"."kind" = "f"."kind"
 	  AND "lt"."id" > "f"."id")`
@@ -46,7 +46,7 @@ const LatestAtItsOccurrence = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 // next run opens it again, so the occurrence has to be reachable while the
 // statement has it closed.
 const Decidable = `("f"."closed_at" IS NULL OR ("f"."closed_because" = '` + string(Disclaimed) + "' AND " +
-	LatestAtItsOccurrence + "))"
+	latestAtItsOccurrence + "))"
 
 // disclaiming is what a run needs to apply suppliers' statements: the
 // statements that can close a finding in this build, the graph they are placed
