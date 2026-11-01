@@ -37,6 +37,9 @@ import (
 // times the image was rebuilt. Picked out in an aggregate over every version of
 // the node, each row read the image's whole history: 4.9 s against 0.21 s for
 // the document on MariaDB, analyzed, with 1,000 rebuilds behind each image.
+//
+// StatedPurls reads the same identifier as sets, for the closed reads of a VEX
+// document; a change to which identifier wins is made in both.
 func StatedPurl(component string) string {
 	switch component {
 	case `"f"."component_id"`, `"f"."consumer_id"`:
@@ -53,7 +56,7 @@ func StatedPurl(component string) string {
 // StatedPurls is, for each component given with an open node in the build, the
 // package identifier StatedPurl reads for it, null where the build states none.
 // A component with no open node is absent, so the map also says what still
-// ships.
+// ships. A change to which identifier wins is made in both.
 //
 // Read as three sets keyed by constant lists: the open nodes, the nodes' own
 // identifiers, and their open image versions. A statement reading one table by

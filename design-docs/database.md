@@ -80,6 +80,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Commit durability on the harness servers | A global setting on MySQL and MariaDB. PostgreSQL takes it per session in the connection string |
 | Refreshing planner statistics before a measurement | A measurement queries seconds after a bulk load, before a server's own refresh. It asks as a start does |
 | Emptying a database for a measurement | PostgreSQL truncates every table in one statement; MySQL and MariaDB one table a statement, with foreign key checks suspended. SQLite copies a migrated file. `design-docs/build-tests.md` § Measurement databases has the measurement |
+| Stopping a measured statement past its cap | A driver giving up leaves MySQL and MariaDB running it on the server; each engine names its sessions' running statements in its own view |
 | Reading a table's layout beside a measurement | PostgreSQL keeps pages and column correlation in its catalogs; MySQL and MariaDB report size through the information schema, in bytes of a page size each server sets |
 | Refreshing planner statistics in a deployment | `ANALYZE` with `SKIP_LOCKED` on PostgreSQL, `ANALYZE TABLE` under a bound on lock waits on MySQL and MariaDB, each table named from the catalog. SQLite is asked at start and after every scan (`design-docs/database-schema.md` § Planner statistics) |
 | Reading the planner's estimate of a table in a test | PostgreSQL's catalog, InnoDB's statistics tables, SQLite's own table |

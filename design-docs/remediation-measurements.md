@@ -20,8 +20,7 @@ decision that 100 issues do not apply, and a fourth one that 100 apply. Of the
 closed findings, every tenth is patched by a claim the build declares and every
 tenth beside it closed by a supplier's statement. A read is timed four times and
 the first is not kept; the median of the rest is shown, and the slowest
-statement among them. A statement past 30 s is stopped, and its read shown as
-stopped there. Each engine runs alone.
+statement among them. Each engine runs alone.
 
 The joined form joins the build's open node and image version beside every
 finding and works out the decisions of every open finding of the build. The
@@ -205,8 +204,10 @@ suppliers, and the statements published.
 | Reading | |
 |---|---|
 | Plans as loaded | Grouped, each engine probes the build's findings or graph per closed finding through whichever index its statistics favor: PostgreSQL the build's whole finding index for the latest row, SQLite and MySQL the build's open findings for the open check, MySQL every open node through the closing scan's index for the shipping check. Which statistics turn it catastrophic differs by run, so never analyzed is no worst case on PostgreSQL |
-| Sets as loaded | Every closed read stays under 0.35 s on every engine, never analyzed or as the background left it |
-| Sets analyzed | Faster than grouped on every engine but MySQL, where the suppliers' statements read the findings of their issues once more: 200 to 213 ms against 129 to 139 ms, 50 ms more for the document with suppliers |
+| Sets as loaded | On this fixture every closed read stays under 0.35 s on every engine, never analyzed or as the background left it |
+| Sets as loaded, many builds | MySQL reads the findings of the closed issues through the issue index across every build holding them: 2.6 s with 11 builds holding the issues, against 0.22 s analyzed |
+| Sets analyzed | As fast as grouped or faster on every engine but MySQL, where the suppliers' statements read the findings of their issues once more: 200 to 213 ms against 129 to 139 ms, 50 ms more for the document with suppliers |
+| Sets, a long history | With 50 rows at each occurrence, 310,000 findings closed and 620,000 rows of their issues, SQLite reads the suppliers' statements in 1.4 to 1.6 s against 0.55 to 0.61 s grouped, analyzed, since every row of the issues reaches the application. The other three engines stay faster than grouped |
 | As loaded, what remains | The open reads: the occurrences stated one by one on MariaDB and MySQL, the decided groups and occurrences on SQLite, the decided issues on MySQL for a long-lived product |
 
 ## Failed alternatives

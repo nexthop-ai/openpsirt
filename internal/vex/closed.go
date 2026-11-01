@@ -276,6 +276,10 @@ func (s *Store) closedRows(ctx context.Context, buildID int64, visible []access.
 // findingsOf is the findings of a build of the issues given at the kinds a VEX
 // document states. For the build's patches, the open ones, one per issue and
 // component; for suppliers' statements every one, which latest needs as well.
+//
+// Read at every visibility, whatever the document is read at: an undisclosed
+// occurrence still open holds back a disclosed statement, which would otherwise
+// say fixed or not affected about a component the build has open.
 func (s *Store) findingsOf(ctx context.Context, buildID int64, issues []int64,
 	because finding.Closure) ([]heldRow, error) {
 

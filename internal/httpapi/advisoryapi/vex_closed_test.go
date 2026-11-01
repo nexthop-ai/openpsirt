@@ -245,3 +245,57 @@ func TestAnOpenCodeFindingLeavesAPatchStated(t *testing.T) {
 		}
 	})
 }
+
+// openUndisclosedBeside opens an undisclosed finding of each issue closed for
+// the reason given, at a second component of the same name and package
+// identifier.
+func openUndisclosedBeside(t *testing.T, r *httpapitest.Reach, because finding.Closure, name string) {
+	t.Helper()
+	const hash = "5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e5ca1ab1e"
+	r.PatchedRows(t, `INSERT INTO "component" ("identity", "purl", "name", "version",
+			"fold_key", "first_seen_at")
+		SELECT '`+hash+`', "purl", "name", "version", '`+hash+`', "first_seen_at"
+		FROM "component" WHERE "name" = '`+name+`'`)
+	r.PatchedRows(t, `INSERT INTO "finding" ("build_id", "kind", "vulnerability_id",
+			"visibility", "component_id", "occurrence_identity", "urgency",
+			"urgency_exploited", "urgency_incident", "urgency_shipped",
+			"opened_at")
+		SELECT "build_id", "kind", "vulnerability_id", 'private',
+			(SELECT "id" FROM "component" WHERE "identity" = '`+hash+`'),
+			"occurrence_identity", "urgency", "urgency_exploited", "urgency_incident",
+			"urgency_shipped", "opened_at"
+		FROM "finding" WHERE "closed_because" = '`+string(because)+`'`)
+}
+
+// An undisclosed occurrence still open holds back a patch of disclosed work:
+// the open check reads every visibility, whatever the document is read at.
+func TestAnUndisclosedOpenOccurrenceHoldsBackAPatch(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.PatchedKernel(t)
+		if fixed := r.FixedIn(t); len(fixed["CVE-2026-9999"]) != 1 {
+			t.Fatalf("the patch is said as %v fixed before anything else is open", fixed)
+		}
+		openUndisclosedBeside(t, r, finding.Patched, "linux-image")
+		if fixed := r.FixedIn(t); len(fixed) != 0 {
+			t.Errorf("with an undisclosed occurrence open, the patch is said as %v fixed", fixed)
+		}
+	})
+}
+
+// An undisclosed occurrence still open holds back a supplier's statement of
+// disclosed work, the same as it holds back a patch.
+func TestAnUndisclosedOpenOccurrenceHoldsBackASuppliersStatement(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 1 {
+			t.Fatalf("the document with suppliers says %+v, want the statement of not affected", said)
+		}
+		openUndisclosedBeside(t, r, finding.Disclaimed, "zlib")
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 0 {
+			t.Errorf("with an undisclosed occurrence open, the document with suppliers says %+v", said)
+		}
+	})
+}
