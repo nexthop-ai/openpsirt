@@ -68,6 +68,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | [remediation-advisories](design-docs/remediation-advisories.md) | Advisories as records, their agreement and their issuances | publication adapters, advisory identifier, editorial state, editions, agreement, issuance, settled digest, delivered checksum, publisher identity |
 | [remediation-csaf](design-docs/remediation-csaf.md) | The CSAF document generated for one advisory | CSAF 2.0, profile, distribution label, release status, marked affected, remediations, scores, weakness names, product identification |
 | [remediation-vex](design-docs/remediation-vex.md) | The OpenVEX document of one build | document kinds, with suppliers, statements, patches, supplier statements, earliest decision, statements about one occurrence, VEX revisions |
+| [remediation-measurements](design-docs/remediation-measurements.md) | Benchmark runs behind the remediation rules | VEX document reads, statements as loaded, failed alternatives |
 | [remediation-directory](design-docs/remediation-directory.md) | Issued advisories written as a static CSAF provider directory | provider directory, travel, year folder, provider-metadata.json, index.txt, changes.csv, ROLIE feed, hash files |
 | [incidents](design-docs/incidents.md) | A regulator's questions after an incident, and what one does to decisions | three conflated facts, stored facts, decisions against an incident, response windows, window clock, notices, fix releases, the shelf |
 

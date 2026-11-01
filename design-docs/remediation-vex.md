@@ -18,6 +18,7 @@ records; the documents this deployment serves per issue and per branch, in
 - [Supplier statements](#supplier-statements)
 - [Agreement across occurrences](#agreement-across-occurrences)
 - [Statements about one occurrence](#statements-about-one-occurrence)
+- [Reads](#reads)
 - [Identity and revisions](#identity-and-revisions)
 - [Limits](#limits)
 
@@ -95,6 +96,22 @@ libswsscommon 1.0.0: not affected".
 | An occurrence the build holds directly is never stated alone | Its product would be the whole build |
 | One statement per consumer; a deeper occurrence is also stated about its own consumer where the rule holds | |
 | Only from an agreed decision, never from a declared patch | A patch is stated about a whole component, and is not published while another occurrence is open |
+
+## Reads
+
+The document of a build and the statements published about it
+(`design-docs/publishing.md`) read through the same statements. The runs behind
+these rules are in `design-docs/remediation-measurements.md` § VEX document
+reads and § A long-lived product.
+
+| Rule | Reason |
+|---|---|
+| The issues a covering decision exists for in the product, at an occurrence the build holds open, are read first, and only their findings after | Most of a build's open findings are undecided, and a product decides issues across every build it had |
+| A statement about the build is grouped in two levels: each issue at each component, then each name and stated package identifier | The stated identifier is asked once per component |
+| A component's stated package identifier is asked of each row with its keys bound, never joined | Joined, an engine with no statistics reads the build's graph once per finding |
+| The open image version is asked of each open node with its keys bound | An image keeps every version it was rebuilt at; read through all of them, each row costs the image's history |
+| A statement occurrence by occurrence reads the same issues first | |
+| Whether a closed finding's component still ships and has nothing open of its name is asked per issue and component in HAVING | Each engine asks it with the keys bound; in WHERE an engine with no statistics joins it unkeyed, and analyzed, a set read once is slower on MariaDB and SQLite |
 
 ## Identity and revisions
 

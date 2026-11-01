@@ -145,20 +145,15 @@ type Affected struct {
 	DecidedBy int64  `bun:"decided_by"`
 }
 
-// WhollyAffected narrows a grouped read of findings to the groups whose every
-// open occurrence stands under a decision in force that says the issue applies,
-// and adds the columns Affected reads.
+// affecting joins each open finding of a grouped read to the decisions in
+// force saying the issue applies, and adds the least and greatest outcome and
+// the earliest decision occurrence as the columns Affected reads.
 //
 // In force rather than approved. Saying an issue applies hides nothing, so a
 // decision saying so needs nobody, and the review that guards a dismissal has
-// nothing to guard here. The read is over findings `f` grouped by what one
-// statement is about, as WhollyCovered's is.
-func WhollyAffected(q *bun.SelectQuery, productID int64, visible []access.Visibility) *bun.SelectQuery {
+// nothing to guard here.
+func affecting(q *bun.SelectQuery, productID int64, visible []access.Visibility) *bun.SelectQuery {
 	standing, args := InForce()
-	quoted := make([]string, 0, len(AffectedOutcomes()))
-	for _, outcome := range AffectedOutcomes() {
-		quoted = append(quoted, "'"+outcome+"'")
-	}
 	bound := append([]any{productID}, args...)
 	bound = append(bound, bun.List(visible))
 	return q.
@@ -168,13 +163,21 @@ func WhollyAffected(q *bun.SelectQuery, productID int64, visible []access.Visibi
 			AND "de"."visibility" IN (?)
 			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "decision" AS "mc"
 				WHERE "mc"."id" = "de"."decision_id")`), bound...).
-		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id" AND "cl"."outcome" IN (` +
-			strings.Join(quoted, ", ") + `)`).
+		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id" AND ` + affectingOutcomes()).
 		ColumnExpr(`MIN("cl"."outcome") AS "least"`).
 		ColumnExpr(`MAX("cl"."outcome") AS "greatest"`).
 		ColumnExpr(`MIN("de"."id") AS "decided_by"`).
-		Where(`"f"."closed_at" IS NULL`).
-		Having(`COUNT("cl"."id") = COUNT(*)`)
+		Where(`"f"."closed_at" IS NULL`)
+}
+
+// affectingOutcomes is the condition that a decision `cl` says the issue
+// applies.
+func affectingOutcomes() string {
+	quoted := make([]string, 0, len(AffectedOutcomes()))
+	for _, outcome := range AffectedOutcomes() {
+		quoted = append(quoted, "'"+outcome+"'")
+	}
+	return `"cl"."outcome" IN (` + strings.Join(quoted, ", ") + `)`
 }
 
 // Stated is what one decision occurrence states, as a published statement

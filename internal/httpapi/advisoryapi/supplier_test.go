@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
@@ -243,6 +245,63 @@ func TestAnOccurrenceTheBuildLaterPatchedIsSaidOnlyAsFixed(t *testing.T) {
 		_, said := statementsAbout(t, r, "with-suppliers")
 		if len(said) != 1 || said[0].Status != "fixed" {
 			t.Errorf("the document with suppliers says %+v, want fixed alone", said)
+		}
+	})
+}
+
+// Two suppliers each closing an occurrence of one component spoke for their own
+// products, and the document names the component once: it says nothing.
+func TestOccurrencesTwoSuppliersClosedAreNoStatementAboutTheComponent(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", true)
+
+		// A second supplier's statement, closing the zlib under curl.
+		var acme finding.Statement
+		if err := r.DB.DB.NewSelect().Model(&acme).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		other := acme
+		other.ID, other.Publisher = 0, "other"
+		if _, err := r.DB.DB.NewInsert().Model(&other).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		closed, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Set(`"closed_because" = ?`, string(finding.Disclaimed)).
+			Set(`"stated_by" = ?`, other.ID).
+			Where(`"closed_at" IS NULL`).
+			Exec(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n, _ := closed.RowsAffected(); n != 1 {
+			t.Fatalf("closed %d findings, want the zlib under curl", n)
+		}
+
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 0 {
+			t.Errorf("with zlib closed by two suppliers, the document says %+v", said)
+		}
+	})
+}
+
+// A supplier's statement that a component is fixed closes the occurrence and is
+// no statement that it is unaffected.
+func TestASuppliersStatementThatItIsFixedIsNoStatementOfNotAffected(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 1 {
+			t.Fatalf("the document with suppliers says %+v, want the statement of not affected", said)
+		}
+		r.PatchedRows(t, `UPDATE "received_vex_statement" SET "status" = 'fixed'`)
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 0 {
+			t.Errorf("with the supplier saying fixed, the document says %+v", said)
 		}
 	})
 }
