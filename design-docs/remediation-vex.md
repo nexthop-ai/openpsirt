@@ -111,7 +111,9 @@ reads and § A long-lived product.
 | A component's stated package identifier is asked of each row with its keys bound, never joined | Joined, an engine with no statistics reads the build's graph once per finding |
 | The open image version is asked of each open node with its keys bound | An image keeps every version it was rebuilt at; read through all of them, each row costs the image's history |
 | A statement occurrence by occurrence reads the same issues first | |
-| Whether a closed finding's component still ships and has nothing open of its name is asked per issue and component in HAVING | Each engine asks it with the keys bound; in WHERE an engine with no statistics joins it unkeyed, and analyzed, a set read once is slower on MariaDB and SQLite |
+| The patches and suppliers' statements are read as sets and grouped in the application: the build's closed findings, what closed them, the findings of their issues, the open nodes and image versions of their components, and the components' names | Asked per row or per group inside one statement, every engine picks a plan reading the build's findings or graph once per closed finding on the statistics a bulk load leaves |
+| Each of those statements reads one table by constants, and joins another only by its primary key | A primary key lookup is the one plan every engine picks whatever its statistics say |
+| The findings of the closed issues are read once, open and closed, for both the open check and the latest row at each occurrence | Read twice, the suppliers' statements take 202 ms against 119 ms on SQLite, analyzed |
 
 ## Identity and revisions
 
