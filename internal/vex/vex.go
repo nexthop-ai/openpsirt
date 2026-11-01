@@ -334,19 +334,15 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// no finer grain to say it at. Two occurrences decided in separate sittings
 	// differ in when and in what was written, and grouping on those emits the
 	// same decision twice, or, where the outcomes differ, two statements
-	// contradicting each other about one component.
-	rows, err := finding.CoveredInBuild(ctx, s.idb(), named.ProductID, build.ID, visible,
-		finding.ForStatements, s.carrying())
+	// contradicting each other about one component. Where a component's
+	// occurrences disagree, each occurrence a decision covers is stated on its
+	// own, naming what pulls the component in as the product.
+	rows, placed, err := finding.CoveredInBuild(ctx, s.idb(), named.ProductID, build.ID, visible,
+		s.carrying())
 	if err != nil {
 		return nil, err
 	}
 	fixed, err := s.patched(ctx, build.ID, visible)
-	if err != nil {
-		return nil, err
-	}
-	// Where a component's occurrences disagree, each occurrence a decision covers is
-	// stated on its own, naming what pulls the component in as the product.
-	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, build.ID, visible, s.carrying())
 	if err != nil {
 		return nil, err
 	}

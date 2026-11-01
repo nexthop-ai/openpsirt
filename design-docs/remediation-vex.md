@@ -74,7 +74,8 @@ a document is generated.
 ## Agreement across occurrences
 
 A statement about the build is made only where every open occurrence agrees the
-same way; an advisory asks the same of each release, through the same query.
+same way; an advisory asks the same of each release, under the same counting
+(§ Reads).
 
 | Rule | Reason |
 |---|---|
@@ -106,13 +107,17 @@ reads and § A long-lived product.
 
 | Rule | Reason |
 |---|---|
-| The issues a covering decision exists for in the product, at an occurrence the build holds open, are read first, and only their findings after | Most of a build's open findings are undecided, and a product decides issues across every build it had |
-| A statement about the build is grouped in two levels: each issue at each component, then each name and stated package identifier | The stated identifier is asked once per component |
-| In a statement read as one query, a component's stated package identifier is asked of each row with its keys bound, never joined | Joined, an engine with no statistics reads the build's graph once per finding |
-| In a statement read as one query, the open image version is asked of each open node with its keys bound | An image keeps every version it was rebuilt at; read through all of them, each row costs the image's history |
-| A statement occurrence by occurrence reads the same issues first | |
+| The issues a decision the read counts exists for in the product, that the build holds open, are read first, and only their findings after | Most of a build's open findings are undecided, and a product decides issues across every build it had |
+| The build bounds those issues by issue alone, through its open issues read once as a set | Asked of each decision occurrence at its occurrence, MySQL on the statistics a bulk load leaves reads every finding at the occurrence once per decision occurrence: past 30 s for a long-lived product, against 0.21 s |
+| The statements from decisions are read as sets and matched in the application: the open findings of those issues, the decision occurrences filed under them, the components and consumers the findings sit in, and the issues' identifiers | Matched or grouped inside one statement, an engine on the statistics a bulk load leaves reads the build's graph or the product's decisions once per finding: past 30 s on MySQL and MariaDB, 23.7 s on SQLite |
+| A decision occurrence matches a finding at the issue it is filed under, read as the issue it joined, at the same occurrence, and at the versions it was keyed on unless its outcome holds at any version | The versions are read through the same two expressions every statement compares, so the match is the one rule an advisory asks in a statement |
+| A group counts each finding once with no match and once per match, and is covered only where every match counts and all say one outcome; the earliest match speaks | The counting of an advisory's covered group, so a document and an advisory say the same of the same occurrences |
+| The document of a build reads those sets once, for the statements about the build and those occurrence by occurrence | Read twice, the issues and findings cost each read again |
+| A statement about the build is grouped by issue, component name and stated package identifier | |
+| A component's stated package identifier is read for every component and consumer at once: its open nodes, their own identifiers, and their open image versions by node | Asked of each row, or joined, an engine with no statistics reads the build's graph once per finding |
+| The open image version is read by the open nodes' identifiers | An image keeps every version it was rebuilt at; read through all of them, each row costs the image's history |
 | The patches and suppliers' statements are read as sets and grouped in the application: the build's closed findings, what closed them, the findings of their issues, the open nodes and image versions of their components, and the components' names | Asked per row or per group inside one statement, every engine picks a plan reading the build's findings or graph once per closed finding on the statistics a bulk load leaves |
-| Each of those statements reads one table by constants, and joins another only by its primary key | A primary key lookup is the one plan every engine picks whatever its statistics say |
+| Each statement read as a set, from decisions or from closures, reads one table by constants, and joins another only by its primary key; the issues decided add the build's open issues as one set that refers to nothing outside it | A primary key lookup is the one plan every engine picks whatever its statistics say, and a set referring to nothing outside it is probed by the issue alone or read once |
 | The findings of the closed issues are read once: open and closed for the suppliers' statements, serving both the open check and the latest row at each occurrence; the open ones for the patches | Read twice, the suppliers' statements take 202 ms against 119 ms on SQLite, analyzed |
 | The findings of the closed issues are read at every visibility, whatever the document is read at | An undisclosed occurrence still open holds back a disclosed statement |
 

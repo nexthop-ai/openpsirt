@@ -104,8 +104,8 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	}
 	visible := []access.Visibility{access.Public}
 
-	rows, err := finding.CoveredInBuild(ctx, s.idb(), named.ProductID, buildID, visible,
-		finding.ForStatements, s.carrying())
+	rows, placed, err := finding.CoveredInBuild(ctx, s.idb(), named.ProductID, buildID, visible,
+		s.carrying())
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +115,6 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 		return nil, err
 	}
 	fixed, err := s.patched(ctx, buildID, visible)
-	if err != nil {
-		return nil, err
-	}
-	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, buildID, visible, s.carrying())
 	if err != nil {
 		return nil, err
 	}
