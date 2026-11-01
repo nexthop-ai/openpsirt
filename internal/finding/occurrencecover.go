@@ -5,14 +5,10 @@ package finding
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -60,7 +56,7 @@ type statedGroup struct {
 	purl            string
 }
 
-// CoveredAtOccurrences reads what a VEX document of one build states occurrence
+// coveredAtOccurrences is what a VEX document of one build states occurrence
 // by occurrence: the occurrences a decision covers, in components some of whose
 // occurrences are open and undecided or decided another way.
 //
@@ -78,16 +74,12 @@ type statedGroup struct {
 //
 // Where several occurrences beneath one consumer were decided in separate
 // sittings, the earliest decision speaks, as it does for a whole component.
-func CoveredAtOccurrences(ctx context.Context, db bun.IDB, productID, buildID int64,
-	visible []access.Visibility, most int) ([]OccurrenceCovered, error) {
+func (s *decidedSets) coveredAtOccurrences(ctx context.Context, db bun.IDB, buildID int64,
+	most int) ([]OccurrenceCovered, error) {
 
-	decided, err := decidedOccurrences(ctx, db, productID, buildID, visible)
-	if err != nil || len(decided) == 0 {
-		return nil, err
-	}
-	every, err := everyOccurrenceOf(ctx, db, buildID, visible, decided)
-	if err != nil {
-		return nil, err
+	every := s.everyOccurrence()
+	if len(every) == 0 {
+		return nil, nil
 	}
 	occurrences, err := occurrenceEdges(ctx, db, buildID, 0)
 	if err != nil {
@@ -179,145 +171,29 @@ func CoveredAtOccurrences(ctx context.Context, db bun.IDB, productID, buildID in
 	return out, nil
 }
 
-// statedOccurrenceColumns are what an occurrence is read with: the issue, the
-// component and the consumer, each by the package identifier the build stated
-// for it (StatedPurl), or the component's own where the build stated none.
-func statedOccurrenceColumns(q *bun.SelectQuery) *bun.SelectQuery {
-	return q.
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
-		ColumnExpr(`"f"."id" AS "finding_id"`).
-		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
-		ColumnExpr(`"v"."identifier" AS "identifier"`).
-		ColumnExpr(`"c"."id" AS "component_id"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`COALESCE(` + StatedPurl(`"f"."component_id"`) + `, "c"."purl", '') AS "purl"`).
-		ColumnExpr(`COALESCE("f"."consumer_id", 0) AS "consumer_id"`).
-		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
-		ColumnExpr(`COALESCE(` + StatedPurl(`"f"."consumer_id"`) + `, "uc"."purl", '') AS "consumer_purl"`)
-}
-
-// statedOccurrence is one occurrence as statedOccurrenceColumns reads it.
-type statedOccurrence struct {
-	FindingID       int64  `bun:"finding_id"`
-	VulnerabilityID int64  `bun:"vulnerability_id"`
-	Identifier      string `bun:"identifier"`
-	ComponentID     int64  `bun:"component_id"`
-	Component       string `bun:"component"`
-	Purl            string `bun:"purl"`
-	ConsumerID      int64  `bun:"consumer_id"`
-	Consumer        string `bun:"consumer"`
-	ConsumerPurl    string `bun:"consumer_purl"`
-}
-
-func (r statedOccurrence) occurrence() coveredOccurrence {
-	return coveredOccurrence{
-		vulnerabilityID: r.VulnerabilityID, identifier: r.Identifier,
-		componentID: r.ComponentID, component: r.Component, purl: r.Purl,
-		consumerID: r.ConsumerID, consumer: r.Consumer, consumerPurl: r.ConsumerPurl,
-	}
-}
-
-// decidedOccurrences is every open occurrence of the build a decision covers
-// for a VEX document, one row per occurrence.
-//
-// Only occurrences somebody decided are read here. A build holds hundreds of
-// thousands of open occurrences, and a statement occurrence by occurrence is
-// only ever about a component somebody decided at least one occurrence of, so
-// only the issues a covering decision exists for in the product are read, as
-// CoveredInBuild reads them.
-func decidedOccurrences(ctx context.Context, db bun.IDB, productID, buildID int64,
-	visible []access.Visibility) (map[int64]coveredOccurrence, error) {
-
-	issues, err := issuesDecided(ctx, db, productID, buildID, visible, `"de"."state" = 'approved'`, nil,
-		coveringOutcomes(ForStatements))
-	if err != nil || len(issues) == 0 {
-		return nil, err
-	}
-
-	var rows []struct {
-		statedOccurrence
-		Joined   int `bun:"joined"`
-		Decided  int `bun:"decided"`
-		Outcomes int `bun:"outcomes"`
-		Covering
-	}
-	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
-	byIssue, issueArgs := database.InAnyOf(`"f"."vulnerability_id"`, issues)
-	q := covered(statedOccurrenceColumns(db.NewSelect()), productID, visible, ForStatements).
-		ColumnExpr(`COUNT(*) AS "joined"`).
-		ColumnExpr(`COUNT("cl"."id") AS "decided"`).
-		ColumnExpr(`COUNT(DISTINCT "cl"."outcome") AS "outcomes"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(kinds, kindArgs...).
-		Where(byIssue, issueArgs...).
-		GroupExpr(`"f"."id", "f"."build_id", "f"."component_id", "f"."consumer_id", "v"."id", "v"."identifier",
-			"c"."id", "c"."name", "c"."purl", "uc"."name", "uc"."purl"`).
-		Having(`COUNT("cl"."id") > 0`)
-	if err := q.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read the occurrences decisions cover: %w", err)
-	}
-	out := make(map[int64]coveredOccurrence, len(rows))
-	for _, row := range rows {
-		one := row.occurrence()
-		one.covered = row.Decided == row.Joined && row.Outcomes == 1
-		one.Covering = row.Covering
-		out[row.FindingID] = one
-	}
-	return out, nil
-}
-
-// everyOccurrenceOf is every open occurrence of the components the decided
-// occurrences are in, grouped by what one statement is about, with whether each
-// is covered.
-func everyOccurrenceOf(ctx context.Context, db bun.IDB, buildID int64,
-	visible []access.Visibility, decided map[int64]coveredOccurrence) (map[statedGroup][]coveredOccurrence, error) {
-
-	wanted := map[statedGroup]bool{}
-	issues, components := map[int64]bool{}, map[int64]bool{}
-	for _, one := range decided {
-		wanted[statedGroup{one.vulnerabilityID, one.component, one.purl}] = true
-		issues[one.vulnerabilityID] = true
-		components[one.componentID] = true
-	}
-	var rows []statedOccurrence
-	byIssue, issueArgs := database.InAnyOf(`"f"."vulnerability_id"`, keysOf(issues))
-	byComponent, componentArgs := database.InAnyOf(`"f"."component_id"`, keysOf(components))
-	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
-	if err := statedOccurrenceColumns(db.NewSelect()).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(`"f"."closed_at" IS NULL`).
-		Where(byIssue, issueArgs...).
-		Where(byComponent, componentArgs...).
-		Where(kinds, kindArgs...).
-		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read every occurrence of the components decided: %w", err)
-	}
+// everyOccurrence is every open occurrence of the issues decided, grouped by
+// what one statement is about, with whether each is covered: approved, live
+// decisions agreeing on one outcome. A group no decision covers an occurrence
+// of states nothing.
+func (s *decidedSets) everyOccurrence() map[statedGroup][]coveredOccurrence {
 	out := map[statedGroup][]coveredOccurrence{}
-	for _, row := range rows {
-		g := statedGroup{row.VulnerabilityID, row.Component, row.Purl}
-		if !wanted[g] {
-			continue
+	for _, f := range s.findings {
+		c := s.components[f.ComponentID]
+		g := statedGroup{f.VulnerabilityID, c.Name, c.Purl}
+		one := coveredOccurrence{
+			vulnerabilityID: f.VulnerabilityID, identifier: s.identifiers[f.VulnerabilityID],
+			componentID: f.ComponentID, component: c.Name, purl: c.Purl,
+			consumerID: f.ConsumerID,
 		}
-		one, ok := decided[row.FindingID]
-		if !ok {
-			one = row.occurrence()
+		if f.ConsumerID != 0 {
+			uc := s.components[f.ConsumerID]
+			one.consumer, one.consumerPurl = uc.Name, uc.Purl
+		}
+		if f.decided > 0 {
+			one.covered = f.agreed()
+			one.Covering = Covering{Outcome: f.least, DecidedBy: f.first}
 		}
 		out[g] = append(out[g], one)
 	}
-	return out, nil
-}
-
-// keysOf is a set's members, in order.
-func keysOf(set map[int64]bool) []int64 {
-	out := make([]int64, 0, len(set))
-	for id := range set {
-		out = append(out, id)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
