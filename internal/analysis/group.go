@@ -51,7 +51,7 @@ func nearby(lines int) string {
 
 // corroboratedIn is the code findings of the scope's builds that another
 // analyzer's code finding is the same flaw as: nearby within the lines of a
-// group, worked out over every code finding of those builds, whoever reads
+// group, worked out over the code findings of those builds, whoever reads
 // it, because where a code finding sorts does not depend on who is looking.
 // A closed code finding never agrees, so the set reads the open code findings
 // and, where closed is set and the list holds closed ones, the closed ones

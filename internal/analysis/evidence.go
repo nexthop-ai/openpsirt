@@ -68,8 +68,8 @@ type Evidence struct {
 //
 // A live node is asked as a closing scan of nought, which no index on the
 // closing scan answers: with statistics as loaded MySQL 8.4 read every live
-// node of the deployment through that index for each row, 0.53 s for a
-// page of 50 against 0.06 s.
+// node of the deployment through that index for each row, 0.48 s for the
+// page's rows against 3 ms.
 var placedOn = `"co"."name" AS "component", ` +
 	`CASE WHEN EXISTS (SELECT 1 FROM "graph_node" AS "gv" WHERE "gv"."build_id" = "f"."build_id" ` +
 	`AND "gv"."component_id" = "f"."component_id" AND COALESCE("gv"."closed_scan_id", 0) = 0) ` +

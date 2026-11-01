@@ -289,7 +289,7 @@ the slower of as loaded and refreshed:
 | Caveat | Detail |
 |---|---|
 | What is left over rescan history | Each statement reads the scope's 104,000 code findings. On MySQL 8.4 joining them alone takes 0.2 s, telling which opened anew 0.4 s, and the agreement set over 36,000 open ones 0.35 s |
-| The slowest statements over rescan history | On MySQL 8.4, the queue's counts, 0.70 s with opening anew, and the fixed list's page, 1.17 s, which tells opening anew for the list and again for its agreement |
+| The slowest statements over rescan history | On MySQL 8.4, 0.63 s to 0.67 s for the page's slowest statement and 1.13 s to 1.16 s for the fixed list's, which tells opening anew for the list and again for its agreement |
 | SQLite's fixed list as loaded | Telling opening anew for the agreement costs SQLite more than reading every closed code finding: 2.68 s against 2.39 s |
 | Another measurement shared the host | Runs of one engine and side differ by up to a fifth |
 | SQLite is one run of each side | Measured alone; run beside the other measures it read up to twice as long |
