@@ -44,29 +44,75 @@ engine.
 ## Trend beneath a replaced version
 
 Justifies `design-docs/data-model-graph.md` § Path traversal. The full-size
-switch image, every package carrying one issue and the kernel 4,943, rescanned
-ten days later with the kernel and every hundredth package at a new version:
-30 components replaced, half of what sat on them fixed. Twelve weekly steps,
-one read after a warm one, each engine run alone.
+switch image, every package carrying one issue and the kernel 4,943, in two
+histories. One rescan: ten days after the first scan, the kernel and every
+hundredth package at a new version, 32 components replaced. A year: 52 weekly
+rescans, each moving two hundredths of the packages and every fourth the
+kernel, 3,037 components replaced. A move fixes the issue on every second
+package it moves and half of what is left on the kernel. Twelve weekly steps,
+each figure the median of five reads after a warm one, each engine run alone.
+"Small package" is a package a rescan moved that pulls in nothing, its issue
+carried.
 
-| Read | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+### One rescan
+
+| Read, before and after | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| Trend beneath the kernel, live version only | 111 ms | 116 ms | 233 ms | 114 ms |
-| Trend beneath the kernel, replaced versions named | 490 ms | 146 ms | 238 ms | 202 ms |
-| The same rows asked for by the kernel's name, no walk | 404 ms | 236 ms | 641 ms | 408 ms |
-| Trend beneath a parent of 4,867 children, live only | 178 ms | 157 ms | 390 ms | 209 ms |
-| The same, replaced versions named | 558 ms | 204 ms | 261 ms | 236 ms |
-| The list beneath that parent, first page, before and after | 163 ms, 184 ms | 108 ms, 119 ms | 330 ms, 319 ms | 250 ms, 128 ms |
-| The tree's step around the kernel, before and after | 166 ms, 172 ms | 93 ms, 98 ms | 295 ms, 242 ms | 98 ms, 101 ms |
-| Reading the replaced components and their live namesakes | 0.2 ms | 1.4 ms | 0.5 ms | 0.6 ms |
+| Trend beneath the kernel | 109 ms, 513 ms | 115 ms, 165 ms | 215 ms, 939 ms | 116 ms, 501 ms |
+| The same rows asked for by the kernel's name, no walk | 400 ms | 229 ms | 625 ms | 403 ms |
+| Trend beneath a parent of 4,867 children | 173 ms, 637 ms | 156 ms, 263 ms | 408 ms, 1,219 ms | 213 ms, 605 ms |
+| Trend beneath the root | 190 ms, 660 ms | 152 ms, 263 ms | 407 ms, 1,122 ms | 236 ms, 567 ms |
+| Trend beneath a small package | 0.5 ms, 7.8 ms | 108 ms, 118 ms | 0.6 ms, 11 ms | 0.8 ms, 11 ms |
+| List beneath the kernel, first page | 105 ms, 111 ms | 109 ms, 124 ms | 383 ms, 455 ms | 254 ms, 288 ms |
+| List beneath the parent | 161 ms, 173 ms | 106 ms, 118 ms | 323 ms, 275 ms | 225 ms, 214 ms |
+| List beneath the root | 190 ms, 206 ms | 116 ms, 137 ms | 246 ms, 295 ms | 259 ms, 236 ms |
+| List beneath a small package | 3.3 ms, 10 ms | 49 ms, 58 ms | 2.7 ms, 12 ms | 3.6 ms, 12 ms |
+| The tree's step around the kernel | 162 ms, 168 ms | 93 ms, 103 ms | 191 ms, 221 ms | 83 ms, 89 ms |
+| Reading the replaced components and their live namesakes | 7.7 ms | 7.9 ms | 11 ms | 8.9 ms |
+
+### A year of weekly rescans
+
+| Read, before and after | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|--:|--:|--:|--:|
+| Trend beneath the kernel | 0.7 ms, 20 ms | 11 ms, 42 ms | 0.7 ms, 19 ms | 0.6 ms, 15 ms |
+| The same rows asked for by the kernel's name, no walk | 77 ms | 42 ms | 37 ms | 32 ms |
+| Trend beneath a parent of 4,867 children | 39 ms, 81 ms | 27 ms, 76 ms | 47 ms, 83 ms | 31 ms, 75 ms |
+| Trend beneath the root | 53 ms, 107 ms | 34 ms, 131 ms | 55 ms, 77 ms | 41 ms, 84 ms |
+| Trend beneath a small package | 0.6 ms, 19 ms | 12 ms, 34 ms | 0.6 ms, 18 ms | 0.6 ms, 15 ms |
+| List beneath the kernel, first page | 5.4 ms, 27 ms | 21 ms, 44 ms | 3.4 ms, 21 ms | 4.2 ms, 17 ms |
+| List beneath the parent | 52 ms, 81 ms | 53 ms, 88 ms | 70 ms, 95 ms | 48 ms, 75 ms |
+| List beneath the root | 73 ms, 109 ms | 62 ms, 96 ms | 82 ms, 119 ms | 63 ms, 103 ms |
+| List beneath a small package | 3.8 ms, 24 ms | 21 ms, 42 ms | 2.6 ms, 19 ms | 2.8 ms, 17 ms |
+| The tree's step around the kernel | 41 ms, 60 ms | 41 ms, 57 ms | 35 ms, 55 ms | 22 ms, 39 ms |
+| Reading the replaced components and their live namesakes, two reads | 14 ms | 11 ms | 14 ms | 12 ms |
+| The same joined by name in one statement | 14 ms | 12 ms | 18 ms | 14 ms |
+
+### Forms of the membership test
+
+Findings beneath, counted, with the replaced components beneath named in each
+form. The form in force unites them with the walk's answer in a derived table.
+
+| Form, a year of rescans | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|--:|--:|--:|--:|
+| United with the walk, beneath a small package | 0.5 ms | 18 ms | 0.3 ms | 0.2 ms |
+| Two membership tests joined by OR, the same | 0.5 ms | 26 ms | 43 ms | 66 ms |
+| Named in the walk's last step, the same | 0.1 ms | 17 ms | 1.7 ms | 1.8 ms |
+| United with the walk, beneath the root | 57 ms | 50 ms | 68 ms | 75 ms |
+| Named as a second start of the walk, the same | 62 ms | 174 ms | 63 ms | 75 ms |
+| Two membership tests joined by OR, the same | 89 ms | 46 ms | 64 ms | 87 ms |
 
 | Reading | Detail |
 |---|---|
-| The live-only trend is the wrong answer | 0 open the week before the bump against 4,943, and none of the 2,472 it fixed resolved |
-| The added cost is the rows | Named, the trend reads the replaced kernel's 4,943 issues beside the live one's 2,471; asking for the same rows by name costs as much or more |
-| Matched by name inside the walk's statement | 1.72 s beneath the kernel and 1.36 s beneath the parent on MySQL 8.4, against 238 ms and 261 ms as values beside the walk |
+| The before figures are the wrong answer | One rescan: 0 open the week before the bump against 4,943, and none of the 2,472 it fixed resolved. A year: beneath the kernel 0 open eleven weeks back against 5 |
+| The added cost beneath a large subtree is the rows | One rescan, the trend reads the replaced kernel's 4,943 issues beside the live one's 2,471; asking for the same rows by name costs 625 ms on MySQL 8.4 |
+| The added cost beneath a small package is once per read | Reading the replaced components, walking for which sit beneath, and asking which hold a row the read keeps: 11 ms to 19 ms on every engine, against a statement under 1 ms |
+| Two membership tests joined by OR | MySQL and MariaDB never make it a semi-join, and read every finding of the build: 43 ms and 66 ms beneath a small package |
+| Replaced components named in the walk's last step | The count beneath a small package took 1.7 ms, the trend beneath it 127 ms on MySQL 8.4 and 118 ms on MariaDB |
+| Replaced components named as a second start of the walk | The trend beneath the kernel took 1,161 ms on MySQL 8.4 after one rescan, and the list beneath the root 2,209 ms on PostgreSQL after a year |
+| Replaced components named whatever rows they hold | MariaDB read each replaced kernel's findings on the index of the component alone, every closed row with it: the list beneath the kernel took 374 ms after a year, against 17 ms naming only those holding an open row |
+| Replaced components joined to the live ones by name in one statement | 18 ms against 14 ms on MySQL 8.4 with one build; the join probes every component of a name in the deployment, so it grows with every build sharing it |
 
 | Caveat | Detail |
 |---|---|
-| Beneath the build's root is not in the table | Its walk is the one the tree's root read measures, which on MySQL outlasts the run at this size |
-| One sample per figure | Five were taken; they agree within about ten percent |
+| One build | Nothing else in the deployment shares a name |
+| Each run settles its own statistics | A plan can differ between runs: MySQL 8.4 read the kernel's name in 469 ms on one run and 37 ms on another |

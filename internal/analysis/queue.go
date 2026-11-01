@@ -107,7 +107,7 @@ func (scope Scope) resolved(ctx context.Context, db bun.IDB) (Scope, error) {
 			if err != nil {
 				return scope, err
 			}
-			if scope.adopted, err = replacedWithin(ctx, db, *scope.BuildID, *scope.Beneath, replaced); err != nil {
+			if scope.adopted, err = graph.ReplacedWithin(ctx, db, *scope.BuildID, *scope.Beneath, replaced); err != nil {
 				return scope, err
 			}
 		}

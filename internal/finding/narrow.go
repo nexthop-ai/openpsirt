@@ -773,12 +773,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// bound back in: under a build's root that list is the whole build.
 		// A finding on a version a rescan replaced is beneath wherever the
 		// present version of its name is.
-		walked := graph.Within(q.DB(), f.BuildID, *f.Beneath)
-		if len(f.replaced) == 0 {
-			q = q.Where(`"f"."component_id" IN (?)`, walked)
-		} else {
-			q = q.Where(`("f"."component_id" IN (?) OR "f"."component_id" IN (?))`, walked, bun.List(f.replaced))
-		}
+		q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), f.BuildID, *f.Beneath, f.replaced))
 	}
 	q = f.byState(q)
 	if !f.BelowMinimumSeverity {

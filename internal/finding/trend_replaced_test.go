@@ -211,3 +211,63 @@ func TestAVersionTheBuildHoldsAgainIsBeneathOnlyWhereItSits(t *testing.T) {
 		}
 	})
 }
+
+func TestARuleBeneathAComponentPlacesAFlawOnAVersionARescanReplaced(t *testing.T) {
+	// A flaw recorded on libnl 3.7.0 and held by nobody stays on 3.7.0 once a
+	// rescan moves libnl to 3.9.0. A rule beneath teamd, written after, matches
+	// it in its preview and places it in its sweep, as the tree's count
+	// beneath teamd carries it. A rule beneath lldpd, which reaches no libnl,
+	// matches nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, withLone(twoConsumers()))
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), nil); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage, access.Assigner)
+		if _, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The netlink parser reads past the end of a short message.",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		replaced := f.componentID(t, libnl.Name)
+		f.shipped(t, withLone(movedTo(libnlNew)))
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), nil); err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range f.open(t) {
+			if row.ComponentID != replaced {
+				t.Fatalf("the flaw sits on component %d after the rescan, want %d, the version it replaced",
+					row.ComponentID, replaced)
+			}
+		}
+
+		caught, err := f.store.WouldMatch(ctx, who, f.productID, "", lone.Name, 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if caught.Work != 0 {
+			t.Errorf("a rule beneath %s matches %d pieces of work, want none", lone.Name, caught.Work)
+		}
+		caught, err = f.store.WouldMatch(ctx, who, f.productID, "", teamd.Name, 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if caught.Work != 1 || caught.Unheld != 1 {
+			t.Errorf("a rule beneath teamd matches %d pieces of work, %d unheld, want the flaw",
+				caught.Work, caught.Unheld)
+		}
+		if _, err := f.store.AddRule(ctx, who, f.productID, f.team(t, "netlink"), "netlink", "",
+			teamd.Name); err != nil {
+			t.Fatal(err)
+		}
+		placed, _, _, err := f.store.ApplyRules(ctx, f.productID, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if placed != 2 {
+			t.Errorf("the rule beneath teamd placed %d rows, want the flaw at its two occurrences", placed)
+		}
+	})
+}

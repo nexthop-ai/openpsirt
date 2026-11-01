@@ -191,17 +191,17 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		if err != nil {
 			return nil, err
 		}
-		walked := graph.Within(moments.DB(), buildIDs[0], *within.Beneath)
 		under, err := graph.ReplacedWithin(ctx, s.db, buildIDs[0], *within.Beneath, replaced)
 		if err != nil {
 			return nil, err
 		}
-		if len(under) == 0 {
-			moments = moments.Where(`"f"."component_id" IN (?)`, walked)
-		} else {
-			moments = moments.Where(`("f"."component_id" IN (?) OR "f"."component_id" IN (?))`,
-				walked, bun.List(under))
+		// Only what can fall in the range, as below.
+		if under, err = holding(ctx, s.db, buildIDs[0], under,
+			`"f"."opened_at" <= ? AND ("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, until, since); err != nil {
+			return nil, err
 		}
+		moments = moments.Where(`"f"."component_id" IN (?)`,
+			graph.WithinAnd(moments.DB(), buildIDs[0], *within.Beneath, under))
 	}
 
 	query := s.db.NewSelect().
