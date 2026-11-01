@@ -51,8 +51,13 @@ func nearby(lines int) string {
 
 // corroboratedIn is the code findings of the scope's builds that another
 // analyzer's code finding is the same flaw as: nearby within the lines of a
-// group, worked out over every code finding of those builds, whoever reads
+// group, worked out over the code findings of those builds, whoever reads
 // it, because where a code finding sorts does not depend on who is looking.
+// A closed code finding never agrees, so the set reads the open code findings
+// and, where closed is set and the list holds closed ones, the closed ones
+// still listed: those not opened anew on their build. Over rescan history on
+// MySQL 8.4, reading every closed one took 2.2 s for the fixed list's page,
+// against 1.3 s.
 //
 // Each code finding is read once for each weakness family of its rule, and
 // the rows of one build, file and family are compared within those lines as
@@ -65,22 +70,34 @@ func nearby(lines int) string {
 // findings with statistics as loaded, and every other pairing was planned by
 // some engine through every open finding of a build or of a rule
 // (design-docs/analysis-measurements.md § Code finding queue). The set is
-// asked of each row of the page.
-func (scope Scope) corroboratedIn(db bun.IDB) *bun.SelectQuery {
-	n := strconv.Itoa(groupLines)
-	open := `CASE WHEN "f"."closed_at" IS NULL AND "f"."kind" = '` + string(kind.Analysis) + `' THEN "fa"."tool" END`
-	near := ` OVER (PARTITION BY "f"."build_id", "ar"."last_path_identity", "ar"."last_path", "fa"."family"
-		ORDER BY "ar"."last_line" RANGE BETWEEN ` + n + ` PRECEDING AND ` + n + ` FOLLOWING)`
+// asked of each row of the page. The first and last share one named window,
+// because MySQL 8.4 sorts and passes over the rows once for each window
+// written out: 3.9 s against 1.8 s over 104,000 code findings. A file is
+// told by the SHA-256 digest of its path alone, since the path as written
+// puts a text column in MySQL's sort: 0.46 s against 0.35 s over 36,000 open
+// code findings.
+func (scope Scope) corroboratedIn(db bun.IDB, closed bool) *bun.SelectQuery {
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	placed := scope.builtIn(db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "rule_family" AS "fa" ON "fa"."vulnerability_id" = "f"."vulnerability_id"`).
-		ColumnExpr(`"f"."id", "fa"."tool"`).
-		ColumnExpr(`MIN(`+open+`)`+near+` AS "first_tool"`).
-		ColumnExpr(`MAX(`+open+`)`+near+` AS "last_tool"`).
+		ColumnExpr(`"f"."id", "fa"."tool", "fa"."family", "f"."build_id"`).
+		ColumnExpr(`"ar"."last_path_identity", "ar"."last_line"`).
+		ColumnExpr(`CASE WHEN "f"."closed_at" IS NULL AND "f"."kind" = ? THEN "fa"."tool" END AS "open_tool"`, kind.Analysis).
 		Where(`"ar"."last_line" IS NOT NULL`).
 		Where(kinds, kindArgs...))
-	return identifiers(db, db.NewSelect().TableExpr(`(?) AS "nw"`, placed).
+	if closed {
+		placed = placed.Where(`("f"."closed_at" IS NULL OR "f"."id" NOT IN (?))`, scope.reopenedIn(db))
+	} else {
+		placed = placed.Where(`"f"."closed_at" IS NULL`)
+	}
+	windowed := db.NewRaw(`SELECT "pl"."id", "pl"."tool",
+		MIN("pl"."open_tool") OVER "near" AS "first_tool", MAX("pl"."open_tool") OVER "near" AS "last_tool"
+		FROM (?) AS "pl"
+		WINDOW "near" AS (PARTITION BY "pl"."build_id", "pl"."last_path_identity", "pl"."family"
+			ORDER BY "pl"."last_line" RANGE BETWEEN ? PRECEDING AND ? FOLLOWING)`,
+		placed, bun.Safe(strconv.Itoa(groupLines)), bun.Safe(strconv.Itoa(groupLines)))
+	return identifiers(db, db.NewSelect().TableExpr(`(?) AS "nw"`, windowed).
 		ColumnExpr(`"nw"."id"`).
 		Where(`("nw"."first_tool" <> "nw"."tool" OR "nw"."last_tool" <> "nw"."tool")`).
 		GroupExpr(`"nw"."id"`))

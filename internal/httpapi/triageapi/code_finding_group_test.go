@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -135,6 +136,49 @@ func TestASecondAnalyzerSortsAFlawFirstWhateverNarrowsTheList(t *testing.T) {
 		queue = codeFindingsOf(t, r, "security-testing-reader", "?series=clang-tidy/default")
 		if len(queue.Items) != 2 || queue.Items[0].Path != "src/z.c" || queue.Items[1].Occurrence != occurrence {
 			t.Errorf("the seeded series' queue is %+v; want the newer overflow first once cppcheck's code finding closed", queue.Items)
+		}
+	})
+}
+
+func TestAFixedCodeFindingASecondAnalyzerStillReportsSortsFirst(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		// cppcheck reports the leak's flaw a line past its last place, and
+		// the seeded series' next run an overflow of the leak's weakness
+		// alone in another file, newer than the leak.
+		overflowsBesideTheLeak(t, r, "416", "416", 4)
+		alone := strings.Replace(taggedLeak("416"), `{"id":"overflow"}`,
+			`{"id":"overflow","properties":{"tags":["external/cwe/cwe-416"]}}`, 1)
+		alone = strings.Replace(alone, `"results":[`, `"results":[{"ruleId":"overflow","message":{"text":"n overflows"},`+
+			`"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/z.c","uriBaseId":"SRCROOT"},`+
+			`"region":{"startLine":50}}}]},`, 1)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-30*time.Minute), alone)
+		closed := func(where string) {
+			t.Helper()
+			if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).Set(`"closed_at" = ?`, time.Now().UTC()).
+				Where(`"kind" = ?`, kind.Analysis).Where(`"closed_at" IS NULL`).
+				Where(`"vulnerability_id" ` + where + ` (SELECT "id" FROM "vulnerability" WHERE "identifier" = 'cppcheck/overflow')`).
+				Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// The seeded series' code findings fixed, cppcheck's still open
+		// agrees with the leak, which the fixed list sorts first.
+		closed("NOT IN")
+		fixed := codeFindingsOf(t, r, "security-testing-reader", "?state=fixed")
+		if len(fixed.Items) != 2 || fixed.Items[0].Occurrence != occurrence || fixed.Items[1].Path != "src/z.c" {
+			t.Errorf("the fixed list is %+v; want the leak cppcheck still reports first, then the newer overflow", fixed.Items)
+		}
+		// cppcheck's code finding fixed too, nothing open agrees with the
+		// leak, and the newer overflow comes first.
+		closed("IN")
+		fixed = codeFindingsOf(t, r, "security-testing-reader", "?state=fixed")
+		var order []string
+		for _, item := range fixed.Items {
+			order = append(order, item.Path)
+		}
+		if len(fixed.Items) != 3 || fixed.Items[0].Path != "src/z.c" {
+			t.Errorf("the fixed list is %v; want the newer overflow first once cppcheck's code finding is fixed", order)
 		}
 	})
 }
