@@ -72,6 +72,82 @@ func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 		buildID, bun.List(componentIDs), buildID)
 }
 
+// Replaced is the components a build held and holds no longer, each with the
+// live components of the build carrying its name. A finding keeps the
+// component it opened on, so a rescan at a new version replaces the component
+// and not the finding, and what was found on the old version is counted
+// wherever the present one sits. A component no live one names is left out.
+//
+// Two reads of the build's own nodes, on the index the build leads, matched by
+// name here. Joined to the live nodes by name in one statement, MySQL 8.4 probes
+// every component of each name in the deployment, so the read grows with every
+// build sharing a name (`design-docs/analytics-measurements.md` § Trend beneath
+// a replaced version).
+func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64, error) {
+	type named struct {
+		Component int64  `bun:"component_id"`
+		Name      string `bun:"name_folded"`
+	}
+	read := func(live bool) ([]named, error) {
+		var rows []named
+		q := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+			ColumnExpr(`"n"."component_id", "c"."name_folded"`).
+			Where(`"n"."build_id" = ?`, buildID).
+			Distinct()
+		if live {
+			q = q.Where(`"n"."closed_scan_id" IS NULL`)
+		} else {
+			q = q.Where(`"n"."closed_scan_id" IS NOT NULL`)
+		}
+		if err := q.Scan(ctx, &rows); err != nil {
+			return nil, err
+		}
+		return rows, nil
+	}
+	held, err := read(true)
+	if err != nil {
+		return nil, fmt.Errorf("read the components build %d holds: %w", buildID, err)
+	}
+	closed, err := read(false)
+	if err != nil {
+		return nil, fmt.Errorf("read the components build %d held: %w", buildID, err)
+	}
+	live := map[int64]bool{}
+	byName := map[string][]int64{}
+	for _, row := range held {
+		live[row.Component] = true
+		byName[row.Name] = append(byName[row.Name], row.Component)
+	}
+	out := map[int64][]int64{}
+	for _, row := range closed {
+		if live[row.Component] || len(byName[row.Name]) == 0 {
+			continue
+		}
+		out[row.Component] = byName[row.Name]
+	}
+	return out, nil
+}
+
+// WithinAnd is Within with the components also added, in one statement whose
+// answer a caller tests membership in once: the walk's answer and the
+// components named, united inside a derived table. Each form measured in its
+// place was slow beneath some component on some engine
+// (`design-docs/analytics-measurements.md` § Trend beneath a replaced version):
+// two membership tests joined by OR, which MySQL and MariaDB never make a
+// semi-join and answer by reading every finding of the build; the components
+// named beside the walk in its last step; and the components named as a second
+// start of the walk.
+func WithinAnd(db bun.IDB, buildID, componentID int64, also []int64) *bun.RawQuery {
+	if len(also) == 0 {
+		return WithinAny(db, buildID, []int64{componentID})
+	}
+	return db.NewRaw(`SELECT "u"."component_id" FROM (?
+	UNION
+	SELECT "c"."id" FROM "component" AS "c" WHERE "c"."id" IN (?)) AS "u"`,
+		WithinAny(db, buildID, []int64{componentID}), bun.List(also))
+}
+
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
 // `JOIN ... ON`, and the difference is not cosmetic. It is standard SQL and
 // an inner join on every engine; on SQLite it is also an instruction about
@@ -655,4 +731,80 @@ func (s *Store) codeBeneath(ctx context.Context, buildID int64, reached []reachi
 		out.beneath[start] = len(occurrences)
 	}
 	return out, nil
+}
+
+// withReplaced is reached with each replaced component reached from every
+// start reaching a live component of its name.
+func withReplaced(reached []reaching, replaced map[int64][]int64) []reaching {
+	if len(replaced) == 0 {
+		return reached
+	}
+	named := map[int64][]int64{}
+	for old, live := range replaced {
+		for _, l := range live {
+			named[l] = append(named[l], old)
+		}
+	}
+	out := slices.Clone(reached)
+	added := map[reaching]bool{}
+	for _, row := range reached {
+		for _, old := range named[row.Reached] {
+			if pair := (reaching{Start: row.Start, Reached: old}); !added[pair] {
+				added[pair] = true
+				out = append(out, pair)
+			}
+		}
+	}
+	return out
+}
+
+// ReplacedWithin is the components of replaced whose name a component at the
+// component named or anywhere under it carries, sorted. A finding on one is
+// beneath the component as one on its live namesake is.
+//
+// Answered as values and named beside the walk rather than matched to it by
+// name in the walk's own statement: on MySQL 8.4 the trend beneath the bench
+// kernel took 1.72 s that way.
+func ReplacedWithin(ctx context.Context, db bun.IDB, buildID, componentID int64,
+	replaced map[int64][]int64) ([]int64, error) {
+
+	if len(replaced) == 0 {
+		return nil, nil
+	}
+	seen := map[int64]bool{}
+	var namesakes []int64
+	for _, live := range replaced {
+		for _, l := range live {
+			if !seen[l] {
+				seen[l] = true
+				namesakes = append(namesakes, l)
+			}
+		}
+	}
+	var reached []int64
+	if err := db.NewSelect().TableExpr(`(?) AS "w"`, WithinAny(db, buildID, []int64{componentID})).
+		ColumnExpr(`"w"."component_id"`).
+		Where(`"w"."component_id" IN (?)`, bun.List(namesakes)).
+		Scan(ctx, &reached); err != nil {
+		return nil, fmt.Errorf("read which replaced components are beneath component %d of build %d: %w",
+			componentID, buildID, err)
+	}
+	return ReplacedAmong(replaced, reached), nil
+}
+
+// ReplacedAmong is the components of replaced whose name a component of
+// reached carries, sorted.
+func ReplacedAmong(replaced map[int64][]int64, reached []int64) []int64 {
+	in := map[int64]bool{}
+	for _, id := range reached {
+		in[id] = true
+	}
+	var out []int64
+	for old, live := range replaced {
+		if slices.ContainsFunc(live, func(l int64) bool { return in[l] }) {
+			out = append(out, old)
+		}
+	}
+	slices.Sort(out)
+	return out
 }

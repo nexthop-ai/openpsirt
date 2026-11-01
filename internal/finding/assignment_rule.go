@@ -598,7 +598,8 @@ func (s *Store) codeFindingsInSupport(ctx context.Context, q *bun.SelectQuery, p
 }
 
 // beneathIn is every component sitting at or under a named one, across a
-// product's builds.
+// product's builds, with each component a rescan replaced whose name sits
+// there.
 //
 // Per build because a walk is over one build's edges, and unioned because a
 // rule is about the product. A name the build does not hold contributes
@@ -657,7 +658,13 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 		if err := graph.WithinAny(s.db, build, roots).Scan(ctx, &found); err != nil {
 			return nil, fmt.Errorf("walk what sits under it: %w", err)
 		}
-		for _, id := range found {
+		// A finding on a version a rescan replaced is under wherever the
+		// present version of its name is, as the tree counts it.
+		replaced, err := graph.Replaced(ctx, s.db, build)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range append(found, graph.ReplacedAmong(replaced, found)...) {
 			if !seen[id] {
 				seen[id] = true
 				under = append(under, id)

@@ -52,48 +52,8 @@ func replacedIn(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int
 	return out, nil
 }
 
-// replacedWithin is the components of replaced whose live namesake is at the
-// component beneath or anywhere under it, by the walk the tree counts with.
-func replacedWithin(ctx context.Context, db bun.IDB, buildID, beneath int64,
-	replaced map[int64][]int64) ([]int64, error) {
-
-	if len(replaced) == 0 {
-		return nil, nil
-	}
-	var namesakes []int64
-	for _, live := range replaced {
-		namesakes = append(namesakes, live...)
-	}
-	var within []int64
-	if err := db.NewSelect().TableExpr(`(?) AS "w"`, graph.WithinAny(db, buildID, []int64{beneath})).
-		ColumnExpr(`"w"."component_id"`).
-		Where(`"w"."component_id" IN (?)`, bun.List(namesakes)).
-		Scan(ctx, &within); err != nil {
-		return nil, fmt.Errorf("read which namesakes of replaced components are beneath component %d of build %d: %w",
-			beneath, buildID, err)
-	}
-	in := map[int64]bool{}
-	for _, id := range within {
-		in[id] = true
-	}
-	var out []int64
-	for id, live := range replaced {
-		for _, l := range live {
-			if in[l] {
-				out = append(out, id)
-				break
-			}
-		}
-	}
-	return out, nil
-}
-
 // beneathOrAdopted is the condition keeping a finding, as "f", at the
 // component beneath or anywhere under it, or on a component adopted there.
 func beneathOrAdopted(db bun.IDB, buildID, beneath int64, adopted []int64) (string, []any) {
-	within := graph.WithinAny(db, buildID, []int64{beneath})
-	if len(adopted) == 0 {
-		return `"f"."component_id" IN (?)`, []any{within}
-	}
-	return `("f"."component_id" IN (?) OR "f"."component_id" IN (?))`, []any{within, bun.List(adopted)}
+	return `"f"."component_id" IN (?)`, []any{graph.WithinAnd(db, buildID, beneath, adopted)}
 }

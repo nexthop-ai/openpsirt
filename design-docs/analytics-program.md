@@ -47,6 +47,7 @@ The three series for an area: a team owns a kernel or a runtime, not an image.
 | Rule | Reason |
 |---|---|
 | It takes the findings list's two narrowings: a component at any version, or a component and everything under it | |
+| Under a component, a finding on a version a rescan replaced counts where the build's present version of its name sits, for opened, resolved and open alike (`design-docs/data-model-graph.md` § Path traversal) | A bump closes what it fixed on the version it replaced |
 | Across several builds it refuses | A subtree is one build's walk |
 | A selection naming no product refuses before any build is counted | |
 | The component resolves as on the findings list, after the selection is authorized | An unreadable product refuses the same whatever it holds |
@@ -175,3 +176,4 @@ deferral counts for the part that ran, and overlapping stretches count once.
 | Limit | Detail |
 |---|---|
 | An issue rated differently in two products counts once, in the strictest band | Trends, aging buckets and fixes agree on one screen |
+| A component a rescan removed, with no component of its name left in the build, sits beneath nothing | Its closures leave the trend of the component it sat beneath; there is no present version to count them at, as for code findings |

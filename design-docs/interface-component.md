@@ -45,6 +45,7 @@ carries) and the act hangs off it.
 | Furthest along first where versions order; unranked where any comparison refuses, the two counts then equal and the screen saying so | An ordering is per ecosystem |
 | The second count is consumers; occurrences are the row's title | The ceiling on one action is in occurrences |
 | It carries where the component sits: what pulls it in, what it pulls in, and twelve weeks of what opened and closed under it | Arriving from the tree is a question about the graph |
+| The twelve weeks follow the component by name on the graph's build: a finding on a version a rescan replaced counts at the present version, so the weeks before a bump keep what was open and the bump's closures count as resolved (`design-docs/analytics-program.md` § Subtree trends) | A finding keeps the component it opened on |
 | The graph answers for one build, picked from the rows; a link naming a build arrives on it | An edge is a fact about one build |
 | Releases are picked inside the promise form, ticked to those shipping this version | One bump moves every release at that version |
 | The version to move to is offered and never required | A version newer than any advisory can be named; the server refuses an unknown one |
@@ -145,6 +146,7 @@ as on it, worked out when read, never stored, because findings move.
 | For a reader of security testing material in the product, each row and search hit carries a code findings badge of its own: open code findings at it and under it, the whole build's on the root, opening the queue beneath it on the build. Asked for only then; held elsewhere, one line says so | The families are different units, so the badge sits beside the issue count, never added to it |
 | Under the root row, a line states how many open code findings are unplaced, on the build itself, every root it has had included, with a link to Repositories, zero included | Code findings in files no repository holds sit on the root; a repository's settings are what place them |
 | A code finding on a version of a component a rescan replaced is counted on the row of the component's present version, and under every row above it | The card and the chooser count it by name, and the badge matches them (`design-docs/analysis-queue.md` § Queue file) |
+| A flaw recorded by hand on a version a rescan replaced is counted under every row reaching the present version of its name, and the list beneath holds it (`design-docs/data-model-graph.md` § Path traversal) | No scan closes a recorded flaw, so it stays open on the version it was recorded on |
 
 ## Tree search
 

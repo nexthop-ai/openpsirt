@@ -314,11 +314,56 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	switch {
 	case len(buildIDs) == 1:
 		filter.BuildID = buildIDs[0]
+		if filter.Beneath != nil {
+			replaced, err := graph.Replaced(ctx, s.db, filter.BuildID)
+			if err != nil {
+				return 0, nil, nil, err
+			}
+			under, err := graph.ReplacedWithin(ctx, s.db, filter.BuildID, *filter.Beneath, replaced)
+			if err != nil {
+				return 0, nil, nil, err
+			}
+			// Every read narrowed here is over open rows.
+			if filter.replaced, err = holding(ctx, s.db, filter.BuildID, under,
+				`"f"."closed_at" IS NULL`); err != nil {
+				return 0, nil, nil, err
+			}
+		}
 	case filter.Beneath != nil:
 		return 0, nil, nil, refusal.Errorf("read findings beneath a component: a subtree is a walk"+
 			" over one build's edges, and %d builds are in scope", len(buildIDs))
 	}
 	return productID, visible, buildIDs, nil
+}
+
+// holding is the components of ids holding a finding in the build that where
+// keeps, as "f".
+//
+// A replaced component holds the history of every scan that reached it, and
+// a read names it only where it holds a row the read can keep. Named beside a
+// walk, MariaDB 11.4 reads such a component's findings on the index of the
+// component alone, every closed row with it: 374 ms for the list beneath a
+// kernel a year of rescans replaced, against 17 ms naming only the components
+// holding an open row (`design-docs/analytics-measurements.md` § Trend beneath
+// a replaced version). Asked with the components as values, each engine answers
+// from the index the build, the component and the closing lead.
+func holding(ctx context.Context, db bun.IDB, buildID int64, ids []int64, where string,
+	args ...any) ([]int64, error) {
+
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var out []int64
+	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`DISTINCT "f"."component_id"`).
+		Where(`"f"."build_id" = ?`, buildID).
+		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
+		Where(where, args...).
+		OrderExpr(`"f"."component_id"`).
+		Scan(ctx, &out); err != nil {
+		return nil, fmt.Errorf("read which replaced components of build %d hold a finding: %w", buildID, err)
+	}
+	return out, nil
 }
 
 // Groups returns what is open in a selection, as the things somebody decides
