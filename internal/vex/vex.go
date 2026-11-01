@@ -520,7 +520,8 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 // each issue and component in HAVING, where every engine asks them per row with
 // the keys bound. In WHERE an engine estimating the finding table at a few rows
 // joins them unkeyed, reading the build's graph or its open findings once per
-// closed finding.
+// closed finding: past 30 s for the patched findings on PostgreSQL never
+// analyzed, against 4.2 s in HAVING.
 func (s *Store) closedPairs(buildID int64, visible []access.Visibility,
 	because finding.Closure) *bun.SelectQuery {
 

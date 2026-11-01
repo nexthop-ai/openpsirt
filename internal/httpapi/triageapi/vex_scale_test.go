@@ -33,8 +33,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
@@ -45,12 +47,38 @@ const vexDecisions = 100
 // TestMeasureTheVEXDocumentOfTheHubBuild times the reads a VEX document of the
 // hub's build makes, on the statistics the load leaves and again after every
 // table is analyzed, as a server start does.
+//
+// Once for the build alone, and once as a long-lived product holds it: the
+// kernel binaries and the root images rebuilt vexRebuilds times before, and
+// vexElsewhere issues the build does not hold decided in the product.
 func TestMeasureTheVEXDocumentOfTheHubBuild(t *testing.T) {
 	const n = 16000
+	for _, lived := range []bool{false, true} {
+		name := "one build"
+		if lived {
+			name = "a long-lived product"
+		}
+		t.Run(name, func(t *testing.T) { measureTheVEXDocument(t, n, lived) })
+	}
+}
+
+// vexRebuilds is how many closed versions each rebuilt image of the long-lived
+// product has behind its open one: a nightly build for three years.
+const vexRebuilds = 1000
+
+// vexElsewhere is how many issues the long-lived product decided that the build
+// does not hold.
+const vexElsewhere = 100000
+
+func measureTheVEXDocument(t *testing.T, n int, lived bool) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		began := time.Now()
 		vexSeeded(t, r, n)
+		if lived {
+			vexImaged(t, r, vexRebuilds)
+			vexDecidedElsewhere(t, r, vexElsewhere)
+		}
 		t.Logf("%d components: seeded in %s", n, time.Since(began).Round(time.Second))
 		slowest := &longestStatement{}
 		deps := r.Deps
@@ -217,6 +245,102 @@ func vexSeeded(t *testing.T, r *httpapitest.Reach, n int) {
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// vexImaged makes each kernel binary and the root of the hub's build an image
+// stating its own identifier, with history closed versions behind it, as
+// nightly rebuilds of one image leave them.
+func vexImaged(t *testing.T, r *httpapitest.Reach, history int) {
+	t.Helper()
+	ctx := t.Context()
+	build := r.BuildOf(t, httpapitest.SeededBuild)
+	var scan int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"scan"`).ColumnExpr(`MIN("id")`).
+		Where(`"build_id" = ?`, build).Scan(ctx, &scan); err != nil {
+		t.Fatal(err)
+	}
+	var nodes []struct {
+		ID   int64  `bun:"id"`
+		Name string `bun:"name"`
+		Purl string `bun:"purl"`
+	}
+	if err := r.DB.DB.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"n"."id", "c"."name", COALESCE("n"."purl", "c"."purl", '') AS "purl"`).
+		Where(`"n"."build_id" = ?`, build).Where(`"n"."closed_scan_id" IS NULL`).
+		Scan(ctx, &nodes); err != nil {
+		t.Fatal(err)
+	}
+	var closed, open []graph.ImageVersion
+	for _, n := range nodes {
+		if n.Name != "sonic-image" && !strings.HasPrefix(n.Name, "linux-image-") {
+			continue
+		}
+		for v := range history {
+			closed = append(closed, graph.ImageVersion{NodeID: n.ID, Version: fmt.Sprintf("0.%d", v),
+				Purl: fmt.Sprintf("%s-rebuild.%d", n.Purl, v), OpenedScanID: scan, ClosedScanID: &scan})
+		}
+		open = append(open, graph.ImageVersion{NodeID: n.ID, Version: "1.0", Purl: n.Purl, OpenedScanID: scan})
+	}
+	for _, rows := range [][]graph.ImageVersion{closed, open} {
+		if err := database.InBatches(ctx, r.DB.DB, rows); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// vexDecidedElsewhere files count issues the hub's build does not hold, each
+// with an agreed decision in the product, as builds a long-lived product no
+// longer ships leave them.
+func vexDecidedElsewhere(t *testing.T, r *httpapitest.Reach, count int) {
+	t.Helper()
+	ctx := t.Context()
+	var model triage.DecisionOccurrence
+	if err := r.DB.DB.NewSelect().Model(&model).
+		Where(`"de"."live_key" IS NOT NULL`).Where(`"de"."state" = ?`, triage.Approved).
+		OrderExpr(`"de"."id"`).Limit(1).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var issueKind finding.Vulnerability
+	if err := r.DB.DB.NewSelect().Model(&issueKind).Where(`"vu"."id" = ?`, model.VulnerabilityID).
+		Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	const batch = 500
+	for from := 0; from < count; from += batch {
+		issues := make([]finding.Vulnerability, 0, batch)
+		for i := from; i < min(from+batch, count); i++ {
+			name := fmt.Sprintf("CVE-2020-%d", 100000+i)
+			issues = append(issues, finding.Vulnerability{Identifier: name, IdentifierFolded: strings.ToLower(name),
+				Kind: issueKind.Kind, Severity: "low", FirstSeenAt: model.ProposedAt})
+		}
+		if _, err := r.DB.DB.NewInsert().Model(&issues).Value("issue_id", "0").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := r.DB.DB.NewUpdate().TableExpr(`"vulnerability"`).Set(`"issue_id" = "id"`).
+		Where(`"issue_id" = 0`).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"vulnerability"`).Column("id").
+		Where(`"identifier_folded" LIKE 'cve-2020-%'`).Scan(ctx, &ids); err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != count {
+		t.Fatalf("filed %d issues elsewhere, want %d", len(ids), count)
+	}
+	decided := make([]triage.DecisionOccurrence, 0, count)
+	for _, id := range ids {
+		row := model
+		row.ID, row.VulnerabilityID = 0, id
+		key := fmt.Sprintf("elsewhere-%d", id)
+		row.LiveKey = &key
+		decided = append(decided, row)
+	}
+	if err := database.InBatches(ctx, r.DB.DB, decided); err != nil {
+		t.Fatal(err)
 	}
 }
 

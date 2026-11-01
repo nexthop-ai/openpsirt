@@ -31,20 +31,20 @@ import (
 // build of 16,000 components. A build holds one open node per component and a
 // node one open image version, so the least is the one.
 //
-// The image versions are reached through the node alone and the open one picked
-// out in the aggregate. A version's being open, asked where an index can serve
-// it, lets an engine with no statistics read every open version of every build
-// once per row through the index on the closing scan: 31 s a statement on
-// MariaDB, for 2,700 rows.
+// The open image version is asked of each open node with its keys bound,
+// through the index on the node and its closing scan: one probe however many
+// times the image was rebuilt. Picked out in an aggregate over every version of
+// the node, each row read the image's whole history: 4.9 s against 0.21 s for
+// the document on MariaDB, analyzed, with 1,000 rebuilds behind each image.
 func StatedPurl(component string) string {
 	switch component {
 	case `"f"."component_id"`, `"f"."consumer_id"`:
 	default:
 		panic("finding.StatedPurl: " + component + " is not a component of a finding the statement names")
 	}
-	return `(SELECT COALESCE(MIN(CASE WHEN "sv"."closed_scan_id" IS NULL THEN "sv"."purl" END), MIN("sn"."purl"))
+	return `(SELECT COALESCE(MIN((SELECT MIN("sv"."purl") FROM "image_version" AS "sv"
+			WHERE "sv"."node_id" = "sn"."id" AND "sv"."closed_scan_id" IS NULL)), MIN("sn"."purl"))
 		FROM "graph_node" AS "sn"
-		LEFT JOIN "image_version" AS "sv" ON "sv"."node_id" = "sn"."id"
 		WHERE "sn"."build_id" = "f"."build_id" AND "sn"."component_id" = ` + component + `
 			AND "sn"."closed_scan_id" IS NULL)`
 }
@@ -93,7 +93,7 @@ type AffectedGroup struct {
 func CoveredInBuild(ctx context.Context, db bun.IDB, productID, buildID int64,
 	visible []access.Visibility, reader Reader, most int) ([]CoveredGroup, error) {
 
-	issues, err := issuesDecided(ctx, db, productID, visible, `"de"."state" = 'approved'`, nil,
+	issues, err := issuesDecided(ctx, db, productID, buildID, visible, `"de"."state" = 'approved'`, nil,
 		coveringOutcomes(reader))
 	if err != nil || len(issues) == 0 {
 		return nil, err
@@ -121,7 +121,7 @@ func AffectedInBuild(ctx context.Context, db bun.IDB, productID, buildID int64,
 	visible []access.Visibility, most int) ([]AffectedGroup, error) {
 
 	standing, args := InForce()
-	issues, err := issuesDecided(ctx, db, productID, visible, standing, args, affectingOutcomes())
+	issues, err := issuesDecided(ctx, db, productID, buildID, visible, standing, args, affectingOutcomes())
 	if err != nil || len(issues) == 0 {
 		return nil, err
 	}
@@ -141,10 +141,19 @@ func AffectedInBuild(ctx context.Context, db bun.IDB, productID, buildID int64,
 
 // issuesDecided is every issue a live decision occurrence of the product, at
 // the visibilities given, in the state given and with an outcome `cl` the
-// condition given accepts, is filed under.
-func issuesDecided(ctx context.Context, db bun.IDB, productID int64, visible []access.Visibility,
+// condition given accepts, is filed under, and the build holds open at those
+// visibilities.
+//
+// The build bounds the list. A product decides issues across every build it
+// ever had, and a long-lived one decides far more than one build holds: with
+// 100,000 decided issues outside the build, the findings are otherwise read
+// against 100,300 issues where the build holds 300. The bound costs one build
+// 54 ms a statement on PostgreSQL against 2 ms.
+func issuesDecided(ctx context.Context, db bun.IDB, productID, buildID int64, visible []access.Visibility,
 	state string, stateArgs []any, outcomes string) ([]int64, error) {
 
+	kinds, kindArgs := kind.VEX.Where(`"bf"."kind"`)
+	held := append([]any{buildID, bun.List(visible)}, kindArgs...)
 	var issues []int64
 	if err := db.NewSelect().
 		TableExpr(DecisionOccurrences).
@@ -155,6 +164,9 @@ func issuesDecided(ctx context.Context, db bun.IDB, productID int64, visible []a
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"de"."visibility" IN (?)`, bun.List(visible)).
 		Where(outcomes).
+		Where(`EXISTS (SELECT 1 FROM "finding" AS "bf" WHERE "bf"."build_id" = ?
+			AND "bf"."closed_at" IS NULL AND "bf"."visibility" IN (?) AND `+kinds+`
+			AND `+DecisionOccurrenceOf("bf")+`)`, held...).
 		GroupExpr(`"dv"."issue_id"`).
 		Scan(ctx, &issues); err != nil {
 		return nil, fmt.Errorf("read the issues decided in this product: %w", err)

@@ -231,7 +231,7 @@ func (r statedOccurrence) occurrence() coveredOccurrence {
 func decidedOccurrences(ctx context.Context, db bun.IDB, productID, buildID int64,
 	visible []access.Visibility) (map[int64]coveredOccurrence, error) {
 
-	issues, err := issuesDecided(ctx, db, productID, visible, `"de"."state" = 'approved'`, nil,
+	issues, err := issuesDecided(ctx, db, productID, buildID, visible, `"de"."state" = 'approved'`, nil,
 		coveringOutcomes(ForStatements))
 	if err != nil || len(issues) == 0 {
 		return nil, err
