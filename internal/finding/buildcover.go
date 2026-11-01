@@ -5,6 +5,7 @@ package finding
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/uptrace/bun"
@@ -36,6 +37,9 @@ import (
 // times the image was rebuilt. Picked out in an aggregate over every version of
 // the node, each row read the image's whole history: 4.9 s against 0.21 s for
 // the document on MariaDB, analyzed, with 1,000 rebuilds behind each image.
+//
+// StatedPurls reads the same identifier as sets, for the closed reads of a VEX
+// document; a change to which identifier wins is made in both.
 func StatedPurl(component string) string {
 	switch component {
 	case `"f"."component_id"`, `"f"."consumer_id"`:
@@ -47,6 +51,74 @@ func StatedPurl(component string) string {
 		FROM "graph_node" AS "sn"
 		WHERE "sn"."build_id" = "f"."build_id" AND "sn"."component_id" = ` + component + `
 			AND "sn"."closed_scan_id" IS NULL)`
+}
+
+// StatedPurls is, for each component given with an open node in the build, the
+// package identifier StatedPurl reads for it, null where the build states none.
+// A component with no open node is absent, so the map also says what still
+// ships. A change to which identifier wins is made in both.
+//
+// Read as three sets keyed by constant lists: the open nodes, the nodes' own
+// identifiers, and their open image versions. A statement reading one table by
+// constants, or joining another by its primary key, has no plan that reads a
+// table once per row, whatever the statistics say.
+func StatedPurls(ctx context.Context, db bun.IDB, buildID int64,
+	components []int64) (map[int64]sql.NullString, error) {
+
+	if len(components) == 0 {
+		return nil, nil
+	}
+	byComponent, args := database.InAnyOf(`"n"."component_id"`, components)
+	var nodes []int64
+	if err := db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."id"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(byComponent, args...).
+		Scan(ctx, &nodes); err != nil {
+		return nil, fmt.Errorf("read the components the build still ships: %w", err)
+	}
+	if len(nodes) == 0 {
+		return nil, nil
+	}
+	type stated struct {
+		ComponentID int64          `bun:"component_id"`
+		Purl        sql.NullString `bun:"purl"`
+	}
+	var placed, imaged []stated
+	byNode, args := database.InAnyOf(`"n"."id"`, nodes)
+	if err := db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."component_id" AS "component_id"`).
+		ColumnExpr(`MIN("n"."purl") AS "purl"`).
+		Where(byNode, args...).
+		GroupExpr(`"n"."component_id"`).
+		Scan(ctx, &placed); err != nil {
+		return nil, fmt.Errorf("read the package identifiers the build states: %w", err)
+	}
+	byVersion, args := database.InAnyOf(`"sv"."node_id"`, nodes)
+	if err := db.NewSelect().
+		TableExpr(`"image_version" AS "sv"`).
+		Join(`JOIN "graph_node" AS "n" ON "n"."id" = "sv"."node_id"`).
+		ColumnExpr(`"n"."component_id" AS "component_id"`).
+		ColumnExpr(`MIN("sv"."purl") AS "purl"`).
+		Where(byVersion, args...).
+		Where(`"sv"."closed_scan_id" IS NULL`).
+		GroupExpr(`"n"."component_id"`).
+		Scan(ctx, &imaged); err != nil {
+		return nil, fmt.Errorf("read the package identifiers the build's images state: %w", err)
+	}
+	purls := make(map[int64]sql.NullString, len(placed))
+	for _, row := range placed {
+		purls[row.ComponentID] = row.Purl
+	}
+	for _, row := range imaged {
+		if row.Purl.Valid {
+			purls[row.ComponentID] = row.Purl
+		}
+	}
+	return purls, nil
 }
 
 // Grouped is what one statement about a build is about: an issue, and a

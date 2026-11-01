@@ -108,10 +108,13 @@ reads and § A long-lived product.
 |---|---|
 | The issues a covering decision exists for in the product, at an occurrence the build holds open, are read first, and only their findings after | Most of a build's open findings are undecided, and a product decides issues across every build it had |
 | A statement about the build is grouped in two levels: each issue at each component, then each name and stated package identifier | The stated identifier is asked once per component |
-| A component's stated package identifier is asked of each row with its keys bound, never joined | Joined, an engine with no statistics reads the build's graph once per finding |
-| The open image version is asked of each open node with its keys bound | An image keeps every version it was rebuilt at; read through all of them, each row costs the image's history |
+| In a statement read as one query, a component's stated package identifier is asked of each row with its keys bound, never joined | Joined, an engine with no statistics reads the build's graph once per finding |
+| In a statement read as one query, the open image version is asked of each open node with its keys bound | An image keeps every version it was rebuilt at; read through all of them, each row costs the image's history |
 | A statement occurrence by occurrence reads the same issues first | |
-| Whether a closed finding's component still ships and has nothing open of its name is asked per issue and component in HAVING | Each engine asks it with the keys bound; in WHERE an engine with no statistics joins it unkeyed, and analyzed, a set read once is slower on MariaDB and SQLite |
+| The patches and suppliers' statements are read as sets and grouped in the application: the build's closed findings, what closed them, the findings of their issues, the open nodes and image versions of their components, and the components' names | Asked per row or per group inside one statement, every engine picks a plan reading the build's findings or graph once per closed finding on the statistics a bulk load leaves |
+| Each of those statements reads one table by constants, and joins another only by its primary key | A primary key lookup is the one plan every engine picks whatever its statistics say |
+| The findings of the closed issues are read once: open and closed for the suppliers' statements, serving both the open check and the latest row at each occurrence; the open ones for the patches | Read twice, the suppliers' statements take 202 ms against 119 ms on SQLite, analyzed |
+| The findings of the closed issues are read at every visibility, whatever the document is read at | An undisclosed occurrence still open holds back a disclosed statement |
 
 ## Identity and revisions
 

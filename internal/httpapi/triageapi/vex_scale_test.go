@@ -15,6 +15,7 @@ package triageapi_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -80,18 +81,18 @@ func measureTheVEXDocument(t *testing.T, n int, lived bool) {
 			vexDecidedElsewhere(t, r, vexElsewhere)
 		}
 		t.Logf("%d components: seeded in %s", n, time.Since(began).Round(time.Second))
-		slowest := &longestStatement{}
+		slowest := &longestStatement{db: r.DB}
 		deps := r.Deps
 		deps.DB = dbtest.Hooked(r.DB, slowest)
 		measured := *r
 		measured.Handler, _ = httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, deps)
 		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
-		reads := map[string]func() string{}
+		reads := map[string]func() (string, error){}
 		for _, path := range []string{build, build + "?kind=with-suppliers"} {
-			reads["GET "+path] = func() string {
+			reads["GET "+path] = func() (string, error) {
 				got := httpapitest.AsPerson(t, &measured, "private", http.MethodGet, path, "")
 				if got.Code != http.StatusOK {
-					t.Fatalf("GET %s answered %d: %s", path, got.Code, got.Body.String())
+					return "", fmt.Errorf("GET %s answered %d: %s", path, got.Code, got.Body.String())
 				}
 				var doc struct {
 					Statements []json.RawMessage `json:"statements"`
@@ -99,7 +100,7 @@ func measureTheVEXDocument(t *testing.T, n int, lived bool) {
 				if err := json.Unmarshal(got.Body.Bytes(), &doc); err != nil {
 					t.Fatal(err)
 				}
-				return fmt.Sprintf("%d statements", len(doc.Statements))
+				return fmt.Sprintf("%d statements", len(doc.Statements)), nil
 			}
 		}
 		product, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
@@ -112,12 +113,12 @@ func measureTheVEXDocument(t *testing.T, n int, lived bool) {
 			t.Fatal(err)
 		}
 		published := vex.NewStore(deps.DB.DB)
-		reads["the statements published"] = func() string {
+		reads["the statements published"] = func() (string, error) {
 			built, err := published.Public(ctx, subject, named, r.BuildOf(t, httpapitest.SeededBuild))
 			if err != nil {
-				t.Fatal(err)
+				return "", err
 			}
-			return fmt.Sprintf("%d facts", len(built.Facts))
+			return fmt.Sprintf("%d facts", len(built.Facts)), nil
 		}
 		names := make([]string, 0, len(reads))
 		for name := range reads {
@@ -134,16 +135,27 @@ func measureTheVEXDocument(t *testing.T, n int, lived bool) {
 				var took []time.Duration
 				var statement time.Duration
 				var said, which string
+				var err error
 				for i := range 4 {
 					slowest.reset()
 					began := time.Now()
-					said = reads[name]()
+					if said, err = reads[name](); err != nil {
+						break
+					}
 					if i > 0 {
 						took = append(took, time.Since(began))
 						if longest, query := slowest.took(); longest > statement {
 							statement, which = longest, query
 						}
 					}
+				}
+				if err != nil {
+					query := slowest.stopped()
+					if query == "" {
+						t.Fatal(err)
+					}
+					t.Logf("%s, %s: stopped at a statement past %s: %s", stats, name, vexStatementCap, query)
+					continue
 				}
 				slices.Sort(took)
 				t.Logf("%s, %s: %s, %s; slowest statement %s: %s", stats, name,
@@ -344,38 +356,81 @@ func vexDecidedElsewhere(t *testing.T, r *httpapitest.Reach, count int) {
 	}
 }
 
+// vexStatementCap is how long one statement runs before it is stopped, so a
+// plan reading the build once per row is reported as past it rather than run
+// for hours.
+const vexStatementCap = 30 * time.Second
+
 // longestStatement keeps how long the longest statement since the last reset
-// took, and the head of it.
+// took, and the head of it, and stops a statement past vexStatementCap in the
+// driver and on the server.
 type longestStatement struct {
+	db      *database.DB
 	mu      sync.Mutex
 	longest time.Duration
 	query   string
+	past    string
+	cancels map[*bun.QueryEvent]context.CancelFunc
 }
 
-func (s *longestStatement) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
-	return ctx
+func (s *longestStatement) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	capped, cancel := context.WithTimeout(ctx, vexStatementCap)
+	context.AfterFunc(capped, func() {
+		if !errors.Is(capped.Err(), context.DeadlineExceeded) {
+			return
+		}
+		s.mu.Lock()
+		s.past = head(event.Query)
+		s.mu.Unlock()
+		_ = dbtest.StopPast(s.db, vexStatementCap-time.Second)
+	})
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancels == nil {
+		s.cancels = map[*bun.QueryEvent]context.CancelFunc{}
+	}
+	s.cancels[event] = cancel
+	return capped
 }
 
 func (s *longestStatement) AfterQuery(_ context.Context, event *bun.QueryEvent) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if cancel := s.cancels[event]; cancel != nil {
+		cancel()
+		delete(s.cancels, event)
+	}
 	if took := time.Since(event.StartTime); took > s.longest {
 		s.longest = took
-		s.query = strings.Join(strings.Fields(event.Query), " ")
-		if len(s.query) > 160 {
-			s.query = s.query[:160]
-		}
+		s.query = head(event.Query)
 	}
+}
+
+// head is the start of a statement, on one line.
+func head(query string) string {
+	query = strings.Join(strings.Fields(query), " ")
+	if len(query) > 160 {
+		query = query[:160]
+	}
+	return query
 }
 
 func (s *longestStatement) reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.longest, s.query = 0, ""
+	s.longest, s.query, s.past = 0, "", ""
 }
 
 func (s *longestStatement) took() (time.Duration, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.longest, s.query
+}
+
+// stopped is the statement stopped past the cap since the last reset, empty
+// where none was.
+func (s *longestStatement) stopped() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.past
 }
