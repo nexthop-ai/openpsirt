@@ -8,6 +8,7 @@ Benchmark runs behind the remediation rules.
 - [A long-lived product](#a-long-lived-product)
 - [Statements as loaded](#statements-as-loaded)
 - [Closed reads as sets](#closed-reads-as-sets)
+- [Open reads as sets](#open-reads-as-sets)
 - [Failed alternatives](#failed-alternatives)
 
 ## VEX document reads
@@ -24,7 +25,10 @@ statement among them. Each engine runs alone.
 
 The joined form joins the build's open node and image version beside every
 finding and works out the decisions of every open finding of the build. The
-two-level form is the one `design-docs/remediation-vex.md` § Reads describes.
+two-level form groups each issue at each component, then each name and stated
+package identifier, asking the stated identifier and the open image version of
+each row; § Open reads as sets holds the form `design-docs/remediation-vex.md`
+§ Reads describes.
 
 | Engine | Read, analyzed | Joined | Two levels |
 |---|---|---|---|
@@ -208,7 +212,65 @@ suppliers, and the statements published.
 | Sets as loaded, many builds | MySQL reads the findings of the closed issues through the issue index across every build holding them: 2.6 s with 11 builds holding the issues, against 0.22 s analyzed |
 | Sets analyzed | As fast as grouped or faster on every engine but MySQL, where the suppliers' statements read the findings of their issues once more: 200 to 213 ms against 129 to 139 ms, 50 ms more for the document with suppliers |
 | Sets, a long history | With 50 rows at each occurrence, 310,000 findings closed and 620,000 rows of their issues, SQLite reads the suppliers' statements in 1.4 to 1.6 s against 0.55 to 0.61 s grouped, analyzed, since every row of the issues reaches the application. The other three engines stay faster than grouped |
-| As loaded, what remains | The open reads: the occurrences stated one by one on MariaDB and MySQL, the decided groups and occurrences on SQLite, the decided issues on MySQL for a long-lived product |
+| As loaded, what remains | The open reads: the occurrences stated one by one on MariaDB and MySQL, the decided groups and occurrences on SQLite, the decided issues on MySQL for a long-lived product. § Open reads as sets holds them read as sets |
+
+## Open reads as sets
+
+Justifies the reads from decisions in `design-docs/remediation-vex.md` § Reads.
+The statement form asks each finding's decisions inside one statement: the
+decided groups, and each occurrence's matching decisions one by one, beside
+the decided issues bounded by each decision occurrence's occurrence in the
+build. The sets form is the one `design-docs/remediation-vex.md` § Reads
+describes, with the closed reads as sets in both.
+
+Through `TestMeasureTheVEXDocumentOfTheHubBuild`, over the fixture of § VEX
+document reads and its long-lived product: the document, with suppliers, and
+the statements published. A statement past 30 s is stopped.
+
+| Engine | Product | Statistics | Statement form | Sets |
+|---|---|---|---|---|
+| PostgreSQL 16 | One build | As loaded | 623 / 784 / 809 ms | 265 / 405 / 333 ms |
+| PostgreSQL 16 | One build | Analyzed | 351 / 466 / 424 ms | 174 / 286 / 187 ms |
+| PostgreSQL 16 | Long-lived | As loaded | 796 / 947 ms / 1.03 s | 321 / 487 / 418 ms |
+| PostgreSQL 16 | Long-lived | Analyzed | 523 / 655 / 662 ms | 232 / 357 / 288 ms |
+| MySQL 8.4 | One build | As loaded | Stopped past 30 s at the occurrences stated one by one; 597 ms; 392 ms | 398 / 580 / 413 ms |
+| MySQL 8.4 | One build | Analyzed | 387 / 605 / 388 ms | 360 / 575 / 367 ms |
+| MySQL 8.4 | Long-lived | As loaded | Stopped past 30 s at the decided issues; 1.22 s; 1.21 s | 747 / 934 / 883 ms, the slowest statement 279 to 362 ms, the decided issues |
+| MySQL 8.4 | Long-lived | Analyzed | 1.06 / 1.25 / 1.19 s | 606 / 681 / 755 ms, the slowest statement 195 to 223 ms |
+| MariaDB 11.4 | One build | As loaded | 28.5 / 28.5 / 30.5 s, 11.6 s of it the occurrences stated one by one | 186 / 315 / 227 ms |
+| MariaDB 11.4 | One build | Analyzed | 221 / 325 / 230 ms | 184 / 288 / 189 ms |
+| MariaDB 11.4 | Long-lived | As loaded | 26.6 / 27.0 / 29.3 s | 473 / 578 / 544 ms, the slowest statement about 200 ms, the decided issues |
+| MariaDB 11.4 | Long-lived | Analyzed | 678 / 759 / 803 ms | 227 / 359 / 288 ms |
+| SQLite | One build | As loaded | 1.31 / 1.73 / 1.46 s | 311 / 786 / 375 ms |
+| SQLite | One build | Analyzed | 415 / 600 / 434 ms | 273 / 465 / 293 ms |
+| SQLite | Long-lived | As loaded | 47.3 / 47.4 / 55.0 s, 23.6 s of it the decided groups | 429 / 845 / 493 ms |
+| SQLite | Long-lived | Analyzed | 973 ms / 1.14 / 1.27 s | 242 / 392 / 249 ms |
+
+The decided issues alone, each form timed three times on the statistics the
+load leaves and after analysis. The occurrence form asks, of each decision
+occurrence, an open finding of the build at its occurrence and issue; the
+issue form asks, of each issue, such a finding; the set form bounds the issue
+by the build's open issues as one set.
+
+| Engine | Product | Occurrence form, as loaded / analyzed | Issue form | Set form |
+|---|---|---|---|---|
+| PostgreSQL 16 | One build | 126 to 130 / 51 to 55 ms | 37 to 39 / 4 ms | 36 to 38 / 4 ms |
+| PostgreSQL 16 | Long-lived | 124 to 140 / 130 to 144 ms | 43 to 46 / 45 to 49 ms | 43 to 50 / 45 to 47 ms |
+| MySQL 8.4 | One build | 14 to 16 / 9 to 12 ms | 13 / 13 ms | 13 / 13 ms |
+| MySQL 8.4 | Long-lived | Past 30 s / 133 to 135 ms | 209 to 212 / 129 to 132 ms | 208 to 214 / 128 to 129 ms |
+| MariaDB 11.4 | One build | 11 to 14 / 5 to 7 ms | Not run | 11 to 13 / 10 to 11 ms |
+| MariaDB 11.4 | Long-lived | 186 / 168 to 218 ms | 180 to 184 / 57 to 59 ms | 174 to 179 / 56 to 60 ms |
+| SQLite | One build | 7 / 7 to 9 ms | 4 / 4 ms | 11 / 14 ms |
+| SQLite | Long-lived | 103 to 105 / 98 to 99 ms | 167 to 168 / 164 to 170 ms | 45 / 17 to 18 ms |
+
+| Reading | |
+|---|---|
+| The causes | As loaded, MariaDB and MySQL read every decision of the product at each open occurrence stated one by one, SQLite every open finding of the build per decided group, and MySQL every finding at the kernel occurrence per decision occurrence for the decided issues |
+| Sets as loaded | On this fixture every read of a document stays under 1 s on every engine. The slowest statement is the decided issues on MySQL and MariaDB for a long-lived product, 0.2 to 0.36 s, which reads the product's decision occurrences of the build's open issues |
+| Sets analyzed | Faster than the statement form on every engine and fixture |
+| What grows with rows | The set form reads the build's open issues once per document, so it grows with the build's open findings, never with the product's decisions per finding. Against the occurrence form on one build it costs 4 ms more on MySQL, 5 ms on MariaDB and 7 ms on SQLite, and the document reads it once where the statement form read it twice |
+| What is fixed | The sets add a statement per document for the issues each decision occurrence is filed under, and one for the identifiers |
+| The answers | Matched in the application against the statement form, on SQLite for one build and a long-lived product, public and public with private: the same covered and affected groups and occurrences, row for row |
 
 ## Failed alternatives
 
@@ -236,3 +298,8 @@ lost to.
 | The latest row read apart from the open findings of the closed issues, as grouped maxima | 178 to 225 ms against 115 to 120 ms for the suppliers' statements on SQLite, analyzed | The findings of the closed issues read once |
 | The latest row read by the closed findings' occurrences as a constant list | 359 to 411 ms against 115 to 120 ms for the suppliers' statements on SQLite, analyzed | The findings of the closed issues read once |
 | Every finding of the build read once for the suppliers' statements | 180 to 213 ms against 200 to 213 ms on MySQL, analyzed, and every finding of a build read where no supplier's statement closed any | The closed findings read first, then the findings of their issues |
+| The decided issues asked of each decision occurrence at its occurrence in the build | Past 30 s on MySQL as loaded, long-lived, against 208 to 214 ms | The build's open issues as one set |
+| The decided issues asked of each issue as a correlated open finding of the build | 167 ms against 45 ms on SQLite as loaded, long-lived; elsewhere within the set form's runs | The build's open issues as one set |
+| Every issue the product decided read whole, and met with the build's in the application | Long-lived, as loaded: 188 to 194 ms on MySQL, 111 to 142 ms on MariaDB, 76 to 100 ms on PostgreSQL, 70 to 79 ms on SQLite, and it grows with every build the product had | The build's open issues as one set |
+| The decided groups and occurrences asked of each finding inside one statement | Past 30 s on MySQL, 28.5 s on MariaDB, 23.6 s on SQLite, as loaded | The sets matched in the application |
+| The decided issues bounded by the names filed under the build's open issues | 273 to 283 ms against 222 to 224 ms on MySQL as loaded, long-lived; the same analyzed | The build's open issues as one set |

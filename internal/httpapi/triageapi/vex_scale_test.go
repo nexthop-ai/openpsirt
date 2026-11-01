@@ -14,12 +14,15 @@ package triageapi_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -100,7 +103,7 @@ func measureTheVEXDocument(t *testing.T, n int, lived bool) {
 				if err := json.Unmarshal(got.Body.Bytes(), &doc); err != nil {
 					t.Fatal(err)
 				}
-				return fmt.Sprintf("%d statements", len(doc.Statements)), nil
+				return fmt.Sprintf("%d statements %s", len(doc.Statements), digest(doc.Statements)), nil
 			}
 		}
 		product, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
@@ -118,7 +121,7 @@ func measureTheVEXDocument(t *testing.T, n int, lived bool) {
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("%d facts", len(built.Facts)), nil
+			return fmt.Sprintf("%d facts %s", len(built.Facts), digest(built.Facts)), nil
 		}
 		names := make([]string, 0, len(reads))
 		for name := range reads {
@@ -405,6 +408,21 @@ func (s *longestStatement) AfterQuery(_ context.Context, event *bun.QueryEvent) 
 		s.query = head(event.Query)
 	}
 }
+
+// digest is a short hash of what a read answered, with every moment taken
+// out, so two runs over fixtures seeded at different times are seen to answer
+// the same.
+func digest(answered any) string {
+	body, err := json.Marshal(answered)
+	if err != nil {
+		panic(err)
+	}
+	sum := sha256.Sum256(moment.ReplaceAll(body, []byte(`"moment"`)))
+	return hex.EncodeToString(sum[:6])
+}
+
+// moment is a moment as JSON writes one.
+var moment = regexp.MustCompile(`"\d{4}-\d{2}-\d{2}T[^"]*"`)
 
 // head is the start of a statement, on one line.
 func head(query string) string {
