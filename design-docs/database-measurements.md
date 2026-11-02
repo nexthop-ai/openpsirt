@@ -9,6 +9,7 @@ it and points here for the run.
 - [Bulk insert statements](#bulk-insert-statements)
 - [The v0.11.0 upgrade](#the-v0110-upgrade)
 - [Index reads](#index-reads)
+- [Statistics after an upgrade](#statistics-after-an-upgrade)
 
 ## Statement preparation modes
 
@@ -82,3 +83,22 @@ named. `design-docs/database-schema.md` § Indexes holds the rules.
 | Who is being told | 152,859 open conditions over 204 people, the kind holding every row | MySQL 106 ms, MariaDB 22 ms, SQLite 36 ms | MySQL 15 ms, MariaDB 17 ms, SQLite 12 ms |
 | Who is being told | A read averaged over every kind, PostgreSQL | 46 ms | 0.33 ms |
 | Who is being told | All 28 kinds once, MySQL | 2.9 s | 18 ms |
+
+## Statistics after an upgrade
+
+A database v0.9.0's demo built and filled on SQLite, 414,681 findings, upgraded
+to v0.11.0's schema and served with the start's own refresh cut off by its
+deadline. Each read is one request as the administrator, cut off at 120 s.
+`design-docs/database-schema.md` § Planner statistics holds the rule.
+
+| Read | What the migrations left | Analyzed as the upgrade finishes |
+|---|---|---|
+| Upstream offers | Past 120 s | 1.3 to 1.4 s |
+| Findings export, 1.9 MB | Past 120 s, 0.26 MB written; a page 7 to 12 s | 30 s; a page 0.5 to 0.66 s |
+| Audit export | Past 120 s, nothing written; its first page alone past 200 s | 0.05 s |
+
+What the migrations left held statistics for five of the finding table's ten
+indexes, none for the indexes on its kind and its occurrence, and none for 93
+tables, the renamed ones among them. Each slow read began at the index on a
+finding's kind, which 414,681 of 414,683 findings share. Analyzing every table
+of the upgraded database took 1.2 s.

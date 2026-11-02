@@ -28,6 +28,7 @@ upgrade is deploying it.
 | Automatic application can be turned off, and `openpsirt migrate up\|status` runs migrations separately | An operator may use other credentials at a time they choose |
 | The command refuses an unknown action before contacting anything | |
 | It connects within the startup timeout; the migration itself is unbounded | A schema change on a large table takes longer than a start |
+| A run that applied a migration to a database holding a schema ends by analyzing every table, inside the lock | The statistics describe the schema before it (`design-docs/database-schema.md` § Planner statistics) |
 | With automatic application off, the schema version is compared before anything is served | Uncompared, a build with a new migration passes the readiness probe, a ping, fails every request touching the new table, and in a rolling deployment retires the last working replica |
 | The version a binary carries is the highest among its embedded migrations, read from their file names | The migration library applies the same rule |
 | Migrations are written in Go | They branch on the engine. A timestamp has no portable spelling: PostgreSQL has no `DATETIME`, and MySQL's `TIMESTAMP` is 32-bit and can acquire an implicit default and on-update clause from server configuration |

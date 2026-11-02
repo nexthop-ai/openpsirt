@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/pressly/goose/v3"
 
@@ -102,11 +103,45 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 		}
 		if before == after {
 			logger.Info("schema is current", "version", after)
-		} else {
-			logger.Info("schema migrated", "from", before, "to", after)
+			return nil
+		}
+		logger.Info("schema migrated", "from", before, "to", after)
+		// An empty database has nothing for statistics to describe.
+		if before != 0 {
+			refreshStatistics(ctx, db, logger)
 		}
 		return nil
 	})
+}
+
+// refreshStatistics analyzes every table once migrations have changed the
+// schema, under the lock and with no deadline, as the migration has none.
+//
+// An upgrade leaves the planner's statistics describing a schema that is
+// gone. On SQLite an index the upgrade adds has none beside indexes that keep
+// theirs, and SQLite prefers the index it knows nothing about. A v0.9.0 demo
+// of 414,681 findings upgraded to v0.11.0 kept statistics for five of the
+// finding table's ten indexes and none for the decision occurrences, and
+// planned the audit export, the findings export and the upstream offers
+// through the index on a finding's kind, which nearly every finding shares:
+// each ran past five minutes, and analyzed they take 0.6 s, 0.55 s a page and
+// 1.7 s. The start's own refresh is bounded by the startup deadline, so it
+// cannot be what repairs this.
+//
+// A failed refresh is logged and the upgrade stands: stale estimates make a
+// statement slow, never wrong, and the next start asks again.
+func refreshStatistics(ctx context.Context, db *database.DB, logger *slog.Logger) {
+	started := time.Now()
+	done, err := database.AnalyzeEveryTable(ctx, db)
+	if err != nil {
+		logger.Error("could not refresh the planner's statistics after the upgrade", "error", err)
+		return
+	}
+	if len(done.Skipped) > 0 {
+		logger.Warn("tables held by something else were not analyzed after the upgrade", "tables", done.Skipped)
+	}
+	logger.Info("refreshed the planner's statistics after the upgrade", "tables", done.Tables,
+		"took", time.Since(started).Round(time.Millisecond))
 }
 
 // upEnded says why an upgrade ended part way: stopped by its caller, or

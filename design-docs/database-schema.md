@@ -58,9 +58,12 @@ rest.
 | Rule | Reason |
 |---|---|
 | Every table is analyzed at start, on every engine | A server refreshes estimates after about a tenth of a table changes, so a database loaded before that, restored, or on a stalled server arrives with estimates that describe nothing |
-| An upgrade is followed by a start that analyzes | MySQL and MariaDB analyze only tables an upgrade rebuilds. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, beside an accurate 2,202 decision occurrences, and a decision audit page ran over four hours; analyzed, 5 ms |
+| An upgrade analyzes every table as it finishes, under its lock and with no deadline | MySQL and MariaDB analyze only tables an upgrade rebuilds. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, beside an accurate 2,202 decision occurrences, and a decision audit page ran over four hours; analyzed, 5 ms |
+| The start's own refresh is no substitute | It has a quarter of the startup deadline, and a start that misses it serves on what the upgrade left |
+| On SQLite an index without statistics beside indexes with them is the worst case | SQLite prefers the index it knows nothing about. A v0.9.0 demo of 414,681 findings upgraded to v0.11.0 kept statistics for five of the finding table's ten indexes and none for a renamed table; the audit export, the findings export and the upstream offers each read through the index on a finding's kind and ran past five minutes (`design-docs/database-measurements.md` § Statistics after an upgrade) |
+| An upgrade of an empty database analyzes nothing | No row is there to describe |
 | A server is not asked again after a scan | Its own background refresh follows the writes. SQLite is asked after every scan (`design-docs/database.md` § SQLite settings) |
-| A failed refresh is logged and the start goes on | Stale estimates make a statement slow, never wrong |
+| A failed refresh is logged, and the start or the upgrade goes on | Stale estimates make a statement slow, never wrong |
 | The refresh has a quarter of the startup deadline | The rest of the start keeps its time |
 | A table something else holds is stepped over and named in the log | An analysis needs a shared lock, so waits only behind a schema change or a vacuum, never another replica's start. PostgreSQL steps over it in the statement and says so as a warning alone; MySQL and MariaDB wait a second for the metadata lock, where the server default is a year |
 | The startup deadline starts again once an automatic migration finishes | A migration is unbounded |
