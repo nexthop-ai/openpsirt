@@ -252,7 +252,7 @@ describe("the rail for a reader without dependency findings", () => {
   });
 });
 
-describe("the Unassigned entry, one count per family", () => {
+describe("the Unassigned entry, one count", () => {
   // The rail with work nobody holds answered per family: four dependency
   // findings and three code findings.
   async function unassigned(reach: Record<string, unknown>[]) {
@@ -281,7 +281,7 @@ describe("the Unassigned entry, one count per family", () => {
     return { href: link?.getAttribute("href"), badges, asked };
   }
 
-  it("draws each family's badge apart for a reader of both, opening the screen offering both", async () => {
+  it("draws the dependency count alone for a reader of both, opening the screen offering both", async () => {
     const got = await unassigned([
       {
         product: "sonic",
@@ -294,8 +294,8 @@ describe("the Unassigned entry, one count per family", () => {
     expect(got.href).toBe("/unassigned");
     expect(got.badges).toEqual([
       ["4", "4 dependency findings nobody holds and nobody has decided"],
-      ["3", "3 code findings nobody holds"],
     ]);
+    expect(got.asked).not.toContain("/v1/code-findings");
   });
 
   it("asks no code count for a reader of no code finding", async () => {

@@ -118,11 +118,27 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // Rulings on vulnerability reports waiting for this reader, which sit in the
   // same queue as the decisions.
   const approvable = useApprovable();
-  // Work nobody holds, one badge per family, across every product a reader
-  // can see, like the entry they sit beside and unlike the scoped count below:
-  // what the entry opens names no product.
-  const unowned = useUnowned(who);
+  // Work nobody holds, across every product a reader can see, like the entry
+  // it sits beside and unlike the scoped count below: what the entry opens
+  // names no product. One badge, the dependency findings' where the reader
+  // counts them and the code findings' otherwise; the rail has room for one
+  // number, and the families are never summed into it.
+  const unowned = useUnowned(who, true);
   const unownedOpens = unownedAt(unowned);
+  const unownedBadge = counted(unowned.dependency.at)
+    ? {
+        count: unowned.dependency.count.data?.total,
+        unread: unowned.dependency.count.isError,
+        unit: withLine(
+          "dependency findings nobody holds and nobody has decided",
+          heldLine(dependencies),
+        ),
+      }
+    : {
+        count: unowned.code.count.data?.total,
+        unread: unowned.code.count.isError,
+        unit: "code findings nobody holds",
+      };
   // Counted for whatever is selected rather than only for a whole build : the
   // entry beside this number opens the list that produced it, and a rail that
   // goes quiet the moment somebody widens the scope is one that looks broken
@@ -225,21 +241,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 mark={unownedOpens.mark}
                 icon="nobody"
                 label="Unassigned"
-                counts={[
-                  {
-                    count: unowned.dependency.count.data?.total,
-                    unread: unowned.dependency.count.isError,
-                    unit: withLine(
-                      "dependency findings nobody holds and nobody has decided",
-                      heldLine(dependencies),
-                    ),
-                  },
-                  {
-                    count: unowned.code.count.data?.total,
-                    unread: unowned.code.count.isError,
-                    unit: "code findings nobody holds",
-                  },
-                ]}
+                count={unownedBadge.count}
+                unread={unownedBadge.unread}
+                unit={unownedBadge.unit}
                 quiet
               />
             )}
@@ -578,7 +582,6 @@ function Rail({
   count,
   unread,
   unit,
-  counts,
   quiet,
   end,
   needs = true,
@@ -604,9 +607,6 @@ function Rail({
   // — enough that "Unassigned 7,616" beside "5,803 open issues" stops being
   // two numbers that look like they should agree.
   unit?: string;
-  // Several badges, one per thing counted, where an entry opens more than one
-  // list: each family's count stands apart, never summed.
-  counts?: Badge[];
   quiet?: boolean;
   end?: boolean;
   needs?: boolean;
@@ -633,9 +633,7 @@ function Rail({
     <>
       <Icon name={icon} />
       {label}
-      {(counts ?? [{ count, unread, unit }]).map((badge, i) => (
-        <BadgeOf key={i} badge={badge} quiet={quiet} />
-      ))}
+      <BadgeOf badge={{ count, unread, unit }} quiet={quiet} />
     </>
   );
   if (mark !== undefined) {
