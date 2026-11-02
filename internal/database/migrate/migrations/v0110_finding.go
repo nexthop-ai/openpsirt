@@ -13,6 +13,9 @@ package migrations
 // holds. The occurrence index carries the build, the kind and the row after
 // the occurrence and issue, so the rows of one build after a given row at an
 // occurrence are one range of it, however many builds hold the occurrence.
+// The kind index answers whether an issue has a flaw recorded here from the
+// few rows of that kind; through the issue index every finding of the issue
+// is read for its kind.
 func findingV0110(t *columnTypes) []string {
 	statements := findingV0100(t)
 	statements = withIndex(statements, "finding_group_idx",
@@ -23,5 +26,7 @@ func findingV0110(t *columnTypes) []string {
 		`CREATE INDEX "finding_closed_run_idx" ON "finding" ("target_id", "closed_run_id", "vulnerability_id", "component_id", "visibility", "kind", "opened_run_id")`)
 	statements = withIndex(statements, "finding_place_idx",
 		`CREATE INDEX "finding_place_idx" ON "finding" ("place_identity", "vulnerability_id", "target_id", "kind", "id")`)
+	statements = append(statements,
+		`CREATE INDEX "finding_kind_idx" ON "finding" ("kind", "vulnerability_id")`)
 	return renamedV0110(statements)
 }

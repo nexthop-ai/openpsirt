@@ -235,78 +235,79 @@ cells but PostgreSQL's, are the runs of § Closed reads as sets.
 
 | Engine | Shape | Statistics | Grouped | Every row | Bounded |
 |---|---|---|---|---|---|
-| PostgreSQL 16 | One build | As loaded | 283 ms / past 30 s / 284 ms | 575 / 753 / 700 ms | 509 ms / 4.58 s / 676 ms |
-| PostgreSQL 16 | One build | Analyzed | 348 / 462 / 406 ms | 333 / 435 / 403 ms | 299 / 632 / 379 ms |
-| PostgreSQL 16 | Long-lived | As loaded | 597 / 714 / 687 ms | 1.20 / 1.29 / 1.62 s | 816 ms / 1.11 s / 1.00 s |
-| PostgreSQL 16 | Long-lived | Analyzed | 606 / 738 / 752 ms | 463 / 577 / 553 ms | 484 / 809 / 587 ms |
-| PostgreSQL 16 | Long history | As loaded | 394 ms / 1.08 s / 407 ms | 422 ms / 1.27 s / 418 ms | 363 / 790 / 374 ms |
-| PostgreSQL 16 | Long history | Analyzed | 1.31 / 3.27 / 1.17 s | 419 ms / 1.34 s / 475 ms | 377 / 812 / 407 ms |
-| PostgreSQL 16 | Many builds | As loaded | 1.29 s / 1.23 s / 983 ms | 319 / 417 / 323 ms | 262 / 593 / 278 ms |
-| PostgreSQL 16 | Many builds | Analyzed | 962 ms / 1.21 s / 981 ms | 287 / 383 / 327 ms | 270 / 589 / 292 ms |
-| MySQL 8.4 | One build | As loaded | past 30 s / 549 ms / 394 ms | past 30 s / 579 ms / 385 ms | past 30 s / 613 ms / 394 ms |
-| MySQL 8.4 | One build | Analyzed | 385 / 534 / 372 ms | 389 / 564 / 364 ms | 404 / 628 / 402 ms |
-| MySQL 8.4 | Long-lived | As loaded | past 30 s / 1.08 s / 1.04 s | past 30 s / 1.11 s / 1.08 s | past 30 s / 1.24 s / 1.13 s |
-| MySQL 8.4 | Long-lived | Analyzed | 688 / 897 / 825 ms | 707 / 877 / 841 ms | 742 / 939 / 887 ms |
-| MySQL 8.4 | Long history | As loaded | past 30 s / past 30 s / past 30 s | past 30 s / 3.47 s / 1.45 s | past 30 s / 2.63 s / 1.40 s |
-| MySQL 8.4 | Long history | Analyzed | 1.36 / 6.86 / 1.37 s | 2.25 / 3.60 / 2.28 s | 1.38 / 2.69 / 1.61 s |
-| MySQL 8.4 | Many builds | As loaded | past 30 s / 1.44 s / 862 ms | past 30 s / 848 ms / 936 ms | past 30 s / 843 ms / 576 ms |
-| MySQL 8.4 | Many builds | Analyzed | 852 ms / 1.35 s / 847 ms | 588 / 790 / 598 ms | 574 / 832 / 598 ms |
-| MariaDB 11.4 | One build | As loaded | past 30 s / past 30 s / past 30 s | 28.4 / 27.9 / 30.6 s | 26.9 / 27.7 / 28.9 s |
-| MariaDB 11.4 | One build | Analyzed | 228 / 330 / 227 ms | 258 / 375 / 264 ms | 211 / 452 / 213 ms |
-| MariaDB 11.4 | Long-lived | As loaded | past 30 s / past 30 s / past 30 s | 25.9 / 26.1 / 27.4 s | 26.2 / 27.0 / 27.7 s |
-| MariaDB 11.4 | Long-lived | Analyzed | 599 / 716 / 739 ms | 575 / 671 / 705 ms | 624 / 854 / 760 ms |
-| MariaDB 11.4 | Long history | As loaded | past 30 s / past 30 s / past 30 s | 29.5 / 32.2 / 31.5 s | 29.2 / 28.7 / 29.8 s |
-| MariaDB 11.4 | Long history | Analyzed | 26.3 / 52.6 / 25.9 s | 649 ms / 1.34 s / 648 ms | 579 ms / 1.21 s / 615 ms |
-| MariaDB 11.4 | Many builds | As loaded | past 30 s / past 30 s / past 30 s | 30.8 / 31.7 / 32.4 s | 28.1 / 28.4 / 29.6 s |
-| MariaDB 11.4 | Many builds | Analyzed | 25.5 / 52.6 / 26.9 s | 671 ms / 1.09 s / 689 ms | 395 / 674 / 419 ms |
-| SQLite | One build | As loaded | 15.2 / 29.3 / 15.7 s | 1.11 / 1.48 / 1.24 s | 1.07 / 1.19 / 1.18 s |
-| SQLite | One build | Analyzed | 396 / 599 / 398 ms | 338 / 518 / 346 ms | 279 / 463 / 290 ms |
-| SQLite | Long-lived | As loaded | 71.4 / 75.0 / 70.6 s | 46.5 / 47.5 / 55.9 s | 49.3 / 50.5 / 58.7 s |
-| SQLite | Long-lived | Analyzed | 993 ms / 1.20 s / 1.31 s | 1.01 / 1.22 / 1.29 s | 980 ms / 1.13 s / 1.19 s |
-| SQLite | Long history | As loaded | 17.1 / 32.4 / 17.4 s | 3.02 / 6.68 / 3.20 s | 2.29 / 3.40 / 2.46 s |
-| SQLite | Long history | Analyzed | 2.03 / 2.75 / 1.97 s | 566 ms / 2.81 s / 583 ms | 462 / 976 / 493 ms |
-| SQLite | Many builds | As loaded | 15.7 / 30.9 / 16.3 s | 1.64 / 2.29 / 1.79 s | 1.53 / 2.04 / 1.69 s |
-| SQLite | Many builds | Analyzed | 1.30 / 2.15 / 1.32 s | 1.01 / 1.67 / 1.04 s | 866 ms / 1.38 s / 909 ms |
+| PostgreSQL 16 | One build | As loaded | 283 ms / past 30 s / 284 ms | 575 / 753 / 700 ms | 1.86 s / 536 ms / 211 ms |
+| PostgreSQL 16 | One build | Analyzed | 348 / 462 / 406 ms | 333 / 435 / 403 ms | 301 / 637 / 370 ms |
+| PostgreSQL 16 | Long-lived | As loaded | 597 / 714 / 687 ms | 1.20 / 1.29 / 1.62 s | 523 / 829 / 531 ms |
+| PostgreSQL 16 | Long-lived | Analyzed | 606 / 738 / 752 ms | 463 / 577 / 553 ms | 487 / 849 / 649 ms |
+| PostgreSQL 16 | Long history | As loaded | 394 ms / 1.08 s / 407 ms | 422 ms / 1.27 s / 418 ms | 359 / 845 / 381 ms |
+| PostgreSQL 16 | Long history | Analyzed | 1.31 / 3.27 / 1.17 s | 419 ms / 1.34 s / 475 ms | 391 / 903 / 426 ms |
+| PostgreSQL 16 | Many builds | As loaded | 1.29 s / 1.23 s / 983 ms | 319 / 417 / 323 ms | 286 / 626 / 272 ms |
+| PostgreSQL 16 | Many builds | Analyzed | 962 ms / 1.21 s / 981 ms | 287 / 383 / 327 ms | 241 / 576 / 270 ms |
+| MySQL 8.4 | One build | As loaded | past 30 s / 549 ms / 394 ms | past 30 s / 579 ms / 385 ms | past 30 s / 610 ms / 374 ms |
+| MySQL 8.4 | One build | Analyzed | 385 / 534 / 372 ms | 389 / 564 / 364 ms | 374 / 612 / 382 ms |
+| MySQL 8.4 | Long-lived | As loaded | past 30 s / 1.08 s / 1.04 s | past 30 s / 1.11 s / 1.08 s | past 30 s / 1.28 s / 1.13 s |
+| MySQL 8.4 | Long-lived | Analyzed | 688 / 897 / 825 ms | 707 / 877 / 841 ms | 703 / 972 / 882 ms |
+| MySQL 8.4 | Long history | As loaded | past 30 s / past 30 s / past 30 s | past 30 s / 3.47 s / 1.45 s | past 30 s / 2.86 s / 1.48 s |
+| MySQL 8.4 | Long history | Analyzed | 1.36 / 6.86 / 1.37 s | 2.25 / 3.60 / 2.28 s | 1.27 / 2.69 / 1.32 s |
+| MySQL 8.4 | Many builds | As loaded | past 30 s / 1.44 s / 862 ms | past 30 s / 848 ms / 936 ms | past 30 s / 794 ms / 512 ms |
+| MySQL 8.4 | Many builds | Analyzed | 852 ms / 1.35 s / 847 ms | 588 / 790 / 598 ms | 454 / 802 / 470 ms |
+| MariaDB 11.4 | One build | As loaded | past 30 s / past 30 s / past 30 s | 28.4 / 27.9 / 30.6 s | 28.8 / 30.7 / 31.7 s |
+| MariaDB 11.4 | One build | Analyzed | 228 / 330 / 227 ms | 258 / 375 / 264 ms | 204 / 484 / 215 ms |
+| MariaDB 11.4 | Long-lived | As loaded | past 30 s / past 30 s / past 30 s | 25.9 / 26.1 / 27.4 s | 29.1 / 28.9 / 30.8 s |
+| MariaDB 11.4 | Long-lived | Analyzed | 599 / 716 / 739 ms | 575 / 671 / 705 ms | 596 / 869 / 721 ms |
+| MariaDB 11.4 | Long history | As loaded | past 30 s / past 30 s / past 30 s | 29.5 / 32.2 / 31.5 s | 31.1 / 30.0 / 31.7 s |
+| MariaDB 11.4 | Long history | Analyzed | 26.3 / 52.6 / 25.9 s | 649 ms / 1.34 s / 648 ms | 467 ms / 1.11 s / 482 ms |
+| MariaDB 11.4 | Many builds | As loaded | past 30 s / past 30 s / past 30 s | 30.8 / 31.7 / 32.4 s | 34.2 / 33.5 / 33.8 s |
+| MariaDB 11.4 | Many builds | Analyzed | 25.5 / 52.6 / 26.9 s | 671 ms / 1.09 s / 689 ms | 260 / 551 / 268 ms |
+| SQLite | One build | As loaded | 15.2 / 29.3 / 15.7 s | 1.11 / 1.48 / 1.24 s | 1.11 / 1.26 / 1.31 s |
+| SQLite | One build | Analyzed | 396 / 599 / 398 ms | 338 / 518 / 346 ms | 265 / 464 / 271 ms |
+| SQLite | Long-lived | As loaded | 71.4 / 75.0 / 70.6 s | 46.5 / 47.5 / 55.9 s | 50.7 / 50.5 / 60.4 s |
+| SQLite | Long-lived | Analyzed | 993 ms / 1.20 s / 1.31 s | 1.01 / 1.22 / 1.29 s | 938 ms / 1.10 s / 1.20 s |
+| SQLite | Long history | As loaded | 17.1 / 32.4 / 17.4 s | 3.02 / 6.68 / 3.20 s | 1.29 / 1.90 / 1.45 s |
+| SQLite | Long history | Analyzed | 2.03 / 2.75 / 1.97 s | 566 ms / 2.81 s / 583 ms | 408 / 896 / 454 ms |
+| SQLite | Many builds | As loaded | 15.7 / 30.9 / 16.3 s | 1.64 / 2.29 / 1.79 s | 984 ms / 1.17 s / 1.15 s |
+| SQLite | Many builds | Analyzed | 1.30 / 2.15 / 1.32 s | 1.01 / 1.67 / 1.04 s | 328 / 495 / 343 ms |
 
 Each closed read alone, through the store: the patches / the suppliers'
 statements.
 
 | Engine | Shape | Statistics | Grouped | Every row | Bounded |
 |---|---|---|---|---|---|
-| PostgreSQL 16 | One build | As loaded | 88 ms / past 30 s | 100 / 124 ms | 81 ms / 4.07 s |
-| PostgreSQL 16 | One build | Analyzed | 113 / 93 ms | 79 / 91 ms | 75 / 318 ms |
-| PostgreSQL 16 | Long history | As loaded | 229 / 795 ms | 265 / 837 ms | 202 / 430 ms |
-| PostgreSQL 16 | Long history | Analyzed | 1.12 / 1.73 s | 262 / 874 ms | 202 / 428 ms |
-| PostgreSQL 16 | Many builds | As loaded | 752 / 249 ms | 57 / 69 ms | 66 / 291 ms |
-| PostgreSQL 16 | Many builds | Analyzed | 716 / 240 ms | 58 / 69 ms | 63 / 303 ms |
-| MySQL 8.4 | One build | As loaded | 153 / 145 ms | 130 / 203 ms | 145 / 195 ms |
-| MySQL 8.4 | One build | Analyzed | 139 / 146 ms | 128 / 177 ms | 145 / 189 ms |
-| MySQL 8.4 | Long history | As loaded | 1.19 / 5.52 s | 1.07 / 2.10 s | 1.08 / 1.20 s |
-| MySQL 8.4 | Long history | Analyzed | 1.10 / 5.28 s | 1.09 / 2.19 s | 1.12 / 1.19 s |
-| MySQL 8.4 | Many builds | As loaded | 19.9 s / 525 ms | 211 / 183 ms | 183 / 240 ms |
-| MySQL 8.4 | Many builds | Analyzed | 385 / 481 ms | 179 / 187 ms | 180 / 247 ms |
-| MariaDB 11.4 | One build | As loaded | past 30 s / past 30 s | 66 / 80 ms | 64 / 207 ms |
-| MariaDB 11.4 | One build | Analyzed | 78 / 88 ms | 70 / 80 ms | 66 / 210 ms |
-| MariaDB 11.4 | Long history | As loaded | past 30 s / past 30 s | 287 ms / 1.85 s | 244 / 588 ms |
-| MariaDB 11.4 | Long history | Analyzed | 25.4 / 27.1 s | 263 / 658 ms | 242 / 595 ms |
-| MariaDB 11.4 | Many builds | As loaded | past 30 s / past 30 s | 687 / 989 ms | 78 / 253 ms |
-| MariaDB 11.4 | Many builds | Analyzed | 25.6 / 25.8 s | 231 / 389 ms | 78 / 238 ms |
-| SQLite | One build | As loaded | 14.5 / 14.3 s | 158 / 311 ms | 70 / 117 ms |
-| SQLite | One build | Analyzed | 160 / 173 ms | 105 / 125 ms | 58 / 134 ms |
-| SQLite | Long history | As loaded | 15.3 / 15.6 s | 1.20 / 3.04 s | 377 / 527 ms |
-| SQLite | Long history | Analyzed | 1.76 s / 690 ms | 380 ms / 2.24 s | 295 / 460 ms |
-| SQLite | Many builds | As loaded | 14.3 / 14.3 s | 170 / 306 ms | 74 / 128 ms |
-| SQLite | Many builds | Analyzed | 447 / 487 ms | 183 / 309 ms | 67 / 155 ms |
+| PostgreSQL 16 | One build | As loaded | 88 ms / past 30 s | 100 / 124 ms | 75 / 308 ms |
+| PostgreSQL 16 | One build | Analyzed | 113 / 93 ms | 79 / 91 ms | 73 / 317 ms |
+| PostgreSQL 16 | Long history | As loaded | 229 / 795 ms | 265 / 837 ms | 213 / 447 ms |
+| PostgreSQL 16 | Long history | Analyzed | 1.12 / 1.73 s | 262 / 874 ms | 217 / 533 ms |
+| PostgreSQL 16 | Many builds | As loaded | 752 / 249 ms | 57 / 69 ms | 58 / 305 ms |
+| PostgreSQL 16 | Many builds | Analyzed | 716 / 240 ms | 58 / 69 ms | 48 / 325 ms |
+| MySQL 8.4 | One build | As loaded | 153 / 145 ms | 130 / 203 ms | 149 / 214 ms |
+| MySQL 8.4 | One build | Analyzed | 139 / 146 ms | 128 / 177 ms | 157 / 222 ms |
+| MySQL 8.4 | Long history | As loaded | 1.19 / 5.52 s | 1.07 / 2.10 s | 1.24 / 1.31 s |
+| MySQL 8.4 | Long history | Analyzed | 1.10 / 5.28 s | 1.09 / 2.19 s | 1.13 / 1.30 s |
+| MySQL 8.4 | Many builds | As loaded | 19.9 s / 525 ms | 211 / 183 ms | 218 / 292 ms |
+| MySQL 8.4 | Many builds | Analyzed | 385 / 481 ms | 179 / 187 ms | 193 / 293 ms |
+| MariaDB 11.4 | One build | As loaded | past 30 s / past 30 s | 66 / 80 ms | 70 / 267 ms |
+| MariaDB 11.4 | One build | Analyzed | 78 / 88 ms | 70 / 80 ms | 66 / 255 ms |
+| MariaDB 11.4 | Long history | As loaded | past 30 s / past 30 s | 287 ms / 1.85 s | 253 / 620 ms |
+| MariaDB 11.4 | Long history | Analyzed | 25.4 / 27.1 s | 263 / 658 ms | 252 / 635 ms |
+| MariaDB 11.4 | Many builds | As loaded | past 30 s / past 30 s | 687 / 989 ms | 63 / 289 ms |
+| MariaDB 11.4 | Many builds | Analyzed | 25.6 / 25.8 s | 231 / 389 ms | 58 / 272 ms |
+| SQLite | One build | As loaded | 14.5 / 14.3 s | 158 / 311 ms | 72 / 128 ms |
+| SQLite | One build | Analyzed | 160 / 173 ms | 105 / 125 ms | 62 / 156 ms |
+| SQLite | Long history | As loaded | 15.3 / 15.6 s | 1.20 / 3.04 s | 387 / 519 ms |
+| SQLite | Long history | Analyzed | 1.76 s / 690 ms | 380 ms / 2.24 s | 299 / 462 ms |
+| SQLite | Many builds | As loaded | 14.3 / 14.3 s | 170 / 306 ms | 71 / 129 ms |
+| SQLite | Many builds | Analyzed | 447 / 487 ms | 183 / 309 ms | 68 / 162 ms |
 
 | Reading | |
 |---|---|
 | Grouped over history | Each check is asked per closed row, so the history multiplies it: analyzed, 52.6 s with suppliers on MariaDB for a long history and for many builds, and 5.3 s for the suppliers' statements on MySQL with a long history |
 | Every row over history | Every row of the closed issues reaches the application: 2.24 s for the suppliers' statements on SQLite with a long history, analyzed, and 1.85 s on MariaDB as loaded |
 | Bounded, per row | The grouping statements read each closed row of the build once, as grouped does: with a long history, 267,750 rows, 1.1 s for the patches on MySQL in either form, 0.2 to 0.4 s on MariaDB and SQLite, 0.12 to 0.16 s on PostgreSQL |
-| Bounded, per occurrence | The latest row check costs each highest closed row one range: about 84 µs on PostgreSQL, 52 µs on MariaDB, 26 µs on SQLite and 16 µs on MySQL, analyzed, 43 to 226 ms for the 2,678 of one build. On one build analyzed it is what the suppliers' statements cost beyond grouped: 318 ms against 93 ms on PostgreSQL, 210 ms against 88 ms on MariaDB |
+| Bounded, per occurrence | The latest row check costs each highest closed row one range, asked 200 at a time by constants: analyzed, about 84 µs on PostgreSQL, 12.7 ms of each statement's 16.4 ms the planning of its 200 terms, 51 to 67 µs on MariaDB, 16 to 31 µs on SQLite and 15 to 37 µs on MySQL. On one build analyzed it is what the suppliers' statements cost beyond grouped: 317 ms against 93 ms on PostgreSQL, 255 ms against 88 ms on MariaDB. Every form asking it by correlation is faster analyzed and stops past 20 s on MySQL as loaded (§ Failed alternatives) |
+| Issues with a flaw recorded here | Asked of every issue a document names. Through the issue index, every finding of each issue is read for its kind: 1.3 s on MySQL with a long history analyzed, 1.0 to 1.7 s on SQLite as loaded. Through the kind index, 2.5 ms and 7 to 14 ms |
 | PostgreSQL never analyzed | It takes the build named in every term of the latest row check to the build's own index, then tests every row of the build against the terms: 280 ms a statement, 4.07 s for the suppliers' statements of one build, where grouped stops past 30 s |
-| Past 1 s as loaded | The open reads: the occurrences stated one by one on MariaDB and MySQL, the decided issues on MySQL and the decided groups on SQLite for a long-lived product, and on SQLite the issues recorded elsewhere, 0.9 to 1.6 s with a long history. MySQL with a long history: the patches' grouping, 1.1 s, as grouped takes it |
-| Past 1 s analyzed | MySQL with a long history: the patches' grouping, 1.1 s, as grouped takes it. MariaDB with a long history: 1.21 s with suppliers, 0.58 s of it the two groupings. SQLite: 1.38 s with suppliers for many builds, 0.88 s of it the issues recorded elsewhere, and 1.13 to 1.19 s for a long-lived product, from the open reads |
+| Past 1 s as loaded | The open reads: the occurrences stated one by one on MariaDB, 27 to 34 s a document in every shape, and on MySQL; the decided issues on MySQL and the decided groups on SQLite for a long-lived product; on SQLite two of them 0.4 to 0.5 s each in every shape, the document 1.1 to 1.9 s; on PostgreSQL never analyzed two of them 0.85 s each for one build, the document 0.5 to 1.9 s from run to run. MySQL with a long history: the two groupings, 1.19 s each |
+| Past 1 s analyzed | MySQL with a long history: the patches' grouping 1.03 s and the suppliers' 1.12 s, each reading 267,750 rows at about 4 µs, as grouped reads the patches; the document 1.27 s, with suppliers 2.69 s, published 1.32 s against 1.37 s grouped. MariaDB with a long history: 1.11 s with suppliers, 0.55 s of it the two groupings. SQLite: 0.94 to 1.20 s for a long-lived product, from the open reads |
 
 ## Failed alternatives
 
@@ -340,7 +341,6 @@ lost to.
 | The same, with the build compared as an expression MySQL cannot look up | 267 to 282 ms for 500 rows on MySQL as loaded, against about 3 ms for 200 as a set | The rows after it asked as a set |
 | The highest row at each occurrence read as a set, with no row to follow | 40 ms for 200 occurrences on MySQL as loaded, against about 3 ms | The rows after the highest closed row |
 | The build asked once, outside the terms | 66 s for the suppliers' statements on SQLite as loaded with a long history, 5 s a statement through the build's index, against 50 ms | The build named in every term |
-| The terms as a row value `IN` a list of keys | 17 ms against 10 ms for 200 on MariaDB, one build | The terms as conjunctions |
 | 500 occurrences to a statement | 78 ms against 9.4 ms for 200 on MariaDB, one build: the cost of the list grows faster than its length. 25 and 50 cost 40 µs an occurrence against 50 µs | 200 occurrences to a statement |
 | Each key column as its own `IN` list, with the lowest row to follow | Faster on PostgreSQL: 35 ms against 305 ms a statement never analyzed, through the build's index, and 4.7 ms against 20 ms with a long history on background statistics, through the primary key from the lowest row. The ranges are the product of the lists, 1,900 for 200 keys with 10 occurrences and 190 issues, past what MySQL and MariaDB cost by looking in the index; through the primary key, a statement grows with the age of its oldest row | The terms as conjunctions |
 | The occurrence index without the build | 923 ms against 161 ms for the latest row check on MariaDB as loaded with many builds, 416 ms against 156 ms analyzed. No difference on SQLite with a long history | The occurrence index carrying the build, the kind and the row |
@@ -348,3 +348,13 @@ lost to.
 | The open findings of the closed issues with no visibility named | With many builds as loaded, MariaDB reads each issue's open rows of every build, 458 ms against 28 ms a read, and MySQL the build's open findings, 55 ms against 10 ms | Every visibility named |
 | The closed findings with no closing time named | MariaDB as loaded with many builds reads the whole table, 193 ms against 28 ms | The closed findings named closed |
 | An index leading with the build and the closing reason | SQLite with statistics then read the issues recorded elsewhere without the index it skips through, about 1 s | The closed findings named closed |
+| The rows after each highest closed row asked by a correlated subquery through the occurrence index, the rows named by identifier | Analyzed, 7 to 47 ms against 47 to 302 ms as a set on every engine and shape. MySQL as loaded counts the build as one distinct value, takes the build's open index for each row, and stops past 20 s in some runs and not others | The rows after it asked as a set |
+| The same, the highest row at the occurrence in the select list | 20 to 30 ms on MySQL and PostgreSQL analyzed; MySQL as loaded past 20 s through the build's open index | The rows after it asked as a set |
+| The same, with the build a constant or compared as an expression | MySQL as loaded reads every finding of the issue through the issue index | The rows after it asked as a set |
+| The build's rows at the closed issues read once, the highest at each occurrence | With a long history: 1.7 s on SQLite, 2.7 s on MariaDB and 1.4 s on MySQL analyzed, against 76 ms, 180 ms and 81 ms | The rows after it asked as a set |
+| The build's open rows and rows closed for another reason at the closed issues, the highest at each occurrence | 63 ms against 225 ms on PostgreSQL for one build analyzed; with a long history 1.6 s on SQLite, 742 ms on MariaDB and 1.42 s on MySQL, against 83 ms, 164 ms and 96 ms | The rows after it asked as a set |
+| The grouping and the latest row check in one statement | 19 ms on PostgreSQL analyzed for one build; past 20 s never analyzed | The rows after it asked as a set |
+| Each occurrence its own statement, joined by `UNION ALL` | One build: 322 to 346 ms on PostgreSQL and 115 to 154 ms on MySQL, against 216 to 233 ms and 47 to 53 ms | The terms as conjunctions |
+| The terms as a row value `IN` a list, the highest row read | One build: 204 ms against 216 ms on PostgreSQL analyzed and 212 ms against 4.2 s never analyzed; 30 ms against 47 to 53 ms on MySQL. Slower on MariaDB, 17 ms against 10 ms a statement | The terms as conjunctions |
+| The issues listed once each for the flaws recorded here | No change: 1.19 s against 1.28 s on MySQL with a long history analyzed | The kind and issue index |
+| The issue index carrying the kind | MySQL refuses to drop it: a foreign key needs it | The kind and issue index |

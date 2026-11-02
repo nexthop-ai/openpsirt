@@ -60,6 +60,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     flaw minted here, or an analyzer's rule.
 //   - The finding indexes a read answers from without the table carry the
 //     finding's kind.
+//   - A finding's kind and issue are indexed together, for whether an issue
+//     has a flaw recorded here.
 //   - Results a producer sends per series arrive as runs of a series against
 //     a build, and a finding they report records the runs that saw it.
 //   - An analyzer's result records where it is and what it said.
@@ -115,7 +117,7 @@ func changeV0110(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := u.index(findingV0110(u.t), "finding",
-		"finding_group_idx", "finding_opened_run_idx", "finding_closed_run_idx", "finding_occurrence_idx"); err != nil {
+		"finding_group_idx", "finding_opened_run_idx", "finding_closed_run_idx", "finding_occurrence_idx", "finding_kind_idx"); err != nil {
 		return err
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
