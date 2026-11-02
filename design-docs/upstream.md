@@ -145,6 +145,9 @@ A statement depending on the upstream's own build is offered, never applied.
 | Accepting one proposes an ordinary decision citing it, through approval; a later revision raises the alert a cited statement raises | |
 | Dismissing one declines it | |
 | At most 200, oldest statement first | A person reads the list |
+| Nothing is read past whether any statement awaits review where none does | It is the usual case, and answering it takes under 4 ms on every engine (`design-docs/upstream-measurements.md` § Offers for review) |
+| A finding is reached through the issue a statement names, joined on each of the issue's names | As a filter beside the component, every engine read every finding at the component, or every open finding, and 2,472 statements over 414,683 findings ran past 120 s; joined, 91 to 280 ms |
+| A statement reaches an issue once, however many of its names fold to the one stated | |
 
 ## Declined statements
 

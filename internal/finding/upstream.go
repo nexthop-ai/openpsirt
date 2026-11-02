@@ -156,15 +156,41 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 			return nil, nil
 		}
 	}
-	issued := `SELECT "vv"."id" FROM "vulnerability" AS "vv" WHERE "vv"."identifier_folded" = "ss"."vulnerability"
-		UNION SELECT "vl"."vulnerability_id" FROM "vulnerability_alias" AS "vl"
-		WHERE "vl"."identifier_folded" = "ss"."vulnerability"`
+	// Most deployments hold no upstream statement awaiting review. Asked
+	// first, that takes 4 ms on PostgreSQL over 414,683 findings, where the
+	// read below takes 37 ms finding nothing, most of it planning.
+	waiting := s.db.NewSelect().TableExpr(`"received_vex_statement" AS "ss"`).
+		Where(`"ss"."source" = ?`, FromUpstream).
+		Where(`"ss"."placement" IS NULL`).
+		Where(`"ss"."superseded_at" IS NULL`).
+		Where(`"ss"."declined_at" IS NULL`)
+	if !all {
+		waiting = waiting.Where(`"ss"."product_id" IN (?)`, bun.List(products))
+	}
+	if held, err := waiting.Exists(ctx); err != nil {
+		return nil, fmt.Errorf("read whether an upstream offers anything for review: %w", err)
+	} else if !held {
+		return nil, nil
+	}
+	// Every name an issue goes by, beside the issue: its own and each
+	// alias. Distinct on the pair, so a statement reaches an issue once
+	// however many of its names it was stated under.
+	//
+	// Joined by equality, so a finding is read through the issue the
+	// statement names. As a correlated IN the issue is a filter rather than
+	// a key: SQLite then read every open finding and looked for a statement
+	// for each, past 120 s over 414,683 findings and 2,472 statements, and
+	// PostgreSQL read every finding at a statement's component
+	// (design-docs/upstream-measurements.md § Offers for review).
+	named := `(SELECT "vv"."identifier_folded" AS "folded", "vv"."id" AS "issue_id" FROM "vulnerability" AS "vv"
+		UNION SELECT "vl"."identifier_folded", "vl"."vulnerability_id" FROM "vulnerability_alias" AS "vl")`
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var out []Offer
 	q := s.db.NewSelect().
 		TableExpr(`"received_vex_statement" AS "ss"`).
 		Join(`JOIN "component" AS "c" ON "c"."name_folded" = "ss"."component" AND "c"."version" = "ss"."about"`).
-		Join(`JOIN "finding" AS "f" ON "f"."component_id" = "c"."id"`).
+		Join(`JOIN `+named+` AS "names" ON "names"."folded" = "ss"."vulnerability"`).
+		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "names"."issue_id" AND "f"."component_id" = "c"."id"`).
 		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" AND "st"."product_id" = "ss"."product_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
@@ -194,7 +220,6 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" = ?`, access.Public).
 		Where(kinds, kindArgs...).
-		Where(`"f"."vulnerability_id" IN (`+issued+`)`).
 		Where(`NOT EXISTS (SELECT 1 FROM `+DecisionOccurrences+` WHERE `+DecisionOccurrenceAt(`"st"."product_id"`)+`
 			AND "de"."live_key" IS NOT NULL AND "de"."state" IN (?))`,
 			bun.List([]string{"approved", "proposed"})).

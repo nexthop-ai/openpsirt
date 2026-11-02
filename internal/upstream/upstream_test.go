@@ -644,3 +644,63 @@ func TestADocumentNotMatchingItsDigestIsNotTaken(t *testing.T) {
 		}
 	})
 }
+
+// An upstream naming an issue by an alias is offered beside the issue's
+// findings, and a statement reaches a finding once however many of the
+// issue's names fold to the name it gave.
+func TestAStatementIsOfferedOnceByAnyOfAnIssuesNames(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		w.rescan()
+		ctx := t.Context()
+		said := w.statement(ownBuild, "")
+		if said == nil {
+			t.Fatal("the statement about the upstream's own build was not recorded for review")
+		}
+		issue, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, ownBuild)
+		if err != nil {
+			t.Fatal(err)
+		}
+		const alias = "GHSA-2026-aaaa-bbbb"
+		for _, statement := range []struct {
+			query string
+			args  []any
+		}{
+			// A second name folding to the issue's own.
+			{`INSERT INTO "vulnerability_alias" ("vulnerability_id", "identifier", "identifier_folded")
+				VALUES (?, ?, ?)`, []any{issue, strings.ToLower(ownBuild), strings.ToLower(ownBuild)}},
+			{`INSERT INTO "vulnerability_alias" ("vulnerability_id", "identifier", "identifier_folded")
+				VALUES (?, ?, ?)`, []any{issue, alias, strings.ToLower(alias)}},
+			// The same statement made under the alias.
+			{`INSERT INTO "received_vex_statement" ("product_id", "publisher", "source", "document_id",
+				"vulnerability", "purl", "component", "placement", "about", "status", "justification",
+				"statement_id", "document", "digest", "uploaded_by", "uploaded_at")
+				SELECT "product_id", "publisher", "source", "document_id", ?, "purl", "component",
+				"placement", "about", "status", "justification", "statement_id", "document", "digest",
+				"uploaded_by", "uploaded_at"
+				FROM "received_vex_statement" WHERE "id" = ?`, []any{strings.ToLower(alias), said.ID}},
+		} {
+			if _, err := w.DB.DB.NewRaw(statement.query, statement.args...).Exec(ctx); err != nil {
+				t.Fatalf("%v\n%s", err, statement.query)
+			}
+		}
+
+		offers, err := w.findings.Offers(ctx, w.proposer, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		per := map[int64]int{}
+		for _, one := range offers {
+			if one.Issue != ownBuild {
+				t.Errorf("offered %s, want only %s", one.Issue, ownBuild)
+			}
+			per[one.Statement]++
+		}
+		if len(per) != 2 || per[said.ID] != 2 {
+			t.Errorf("offers per statement %v, want the statement and its copy under the alias each "+
+				"beside the fork's two findings", per)
+		}
+	})
+}
