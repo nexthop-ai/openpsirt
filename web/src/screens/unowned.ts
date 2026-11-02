@@ -36,12 +36,7 @@ export type Unowned = {
   count: { data?: { total?: number }; isError: boolean; isPending: boolean; error: unknown };
 };
 
-// The rail draws one badge, so asked for the rail the code count is asked only
-// where the dependency count is not.
-export function useUnowned(
-  who: Who | null | undefined,
-  rail = false,
-): { dependency: Unowned; code: Unowned } {
+export function useUnowned(who: Who | null | undefined): { dependency: Unowned; code: Unowned } {
   const dependencies = holding(who, "dependency");
   const code = holding(who, "code");
   const dependencyCount = useQuery({
@@ -54,7 +49,7 @@ export function useUnowned(
   // Keyed under the code findings, so every act that moves one moves this.
   const codeCount = useQuery({
     queryKey: ["code-findings", "", "unowned"],
-    enabled: counted(code) && !(rail && counted(dependencies)),
+    enabled: counted(code),
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/code-findings", { params: { query: { assigned: "nobody", limit: 1 } } }),

@@ -252,14 +252,15 @@ describe("the rail for a reader without dependency findings", () => {
   });
 });
 
-describe("the Unassigned entry, one count", () => {
+describe("the Unassigned entry, one count of work", () => {
   // The rail with work nobody holds answered per family: four dependency
-  // findings and three code findings.
-  async function unassigned(reach: Record<string, unknown>[]) {
+  // findings and three code findings, unless one count fails.
+  async function unassigned(reach: Record<string, unknown>[], failing?: string) {
     window.sessionStorage.clear();
     const asked: string[] = [];
     serve((path) => {
       asked.push(path);
+      if (path === failing) return { status: 500 };
       if (path === "/v1/findings") return { data: { items: [], total: 4 } };
       if (path === "/v1/code-findings") return { data: { items: [], total: 3 } };
       return { data: { items: [], total: 0 } };
@@ -281,7 +282,7 @@ describe("the Unassigned entry, one count", () => {
     return { href: link?.getAttribute("href"), badges, asked };
   }
 
-  it("draws the dependency count alone for a reader of both, opening the screen offering both", async () => {
+  it("adds both families' work into one badge for a reader of both, naming each on hover", async () => {
     const got = await unassigned([
       {
         product: "sonic",
@@ -293,9 +294,27 @@ describe("the Unassigned entry, one count", () => {
     ]);
     expect(got.href).toBe("/unassigned");
     expect(got.badges).toEqual([
-      ["4", "4 dependency findings nobody holds and nobody has decided"],
+      [
+        "7",
+        "7 items nobody holds: 4 dependency findings nobody holds and nobody has decided, and 3 code findings nobody holds",
+      ],
     ]);
-    expect(got.asked).not.toContain("/v1/code-findings");
+  });
+
+  it("draws no total for a reader of both where one family's count fails", async () => {
+    const got = await unassigned(
+      [
+        {
+          product: "sonic",
+          may_see: true,
+          reads_public: true,
+          reads_private: true,
+          reads_security_testing: true,
+        },
+      ],
+      "/v1/code-findings",
+    );
+    expect(got.badges).toEqual([["—", "This count could not be read"]]);
   });
 
   it("asks no code count for a reader of no code finding", async () => {
