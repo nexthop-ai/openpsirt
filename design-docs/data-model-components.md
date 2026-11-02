@@ -28,6 +28,7 @@ hashed to a fixed width.
 | A package identifier is read for what it says: escapes decoded, the ecosystem lowercased, the qualifiers excluded | On a public switch image 8,374 described components named 7,858 packages, every collision one package described with and without qualifiers |
 | Architecture is among the qualifiers excluded | It is already the variant |
 | One reduction, the identifier specification's, for every ecosystem | Nothing here knows which producer wrote a document |
+| The row holds every text a producer states with surrounding space taken off: identifiers, name, version, source package and version, supplier and license | Identity already reads the name and version trimmed. MySQL and MariaDB ignore a trailing space in an equality and PostgreSQL, SQLite and the application do not, so an untrimmed version matches the decision keyed on it, trimmed, on two engines of four |
 
 ### Container images
 

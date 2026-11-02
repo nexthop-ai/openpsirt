@@ -119,7 +119,7 @@ type AffectedGroup struct {
 // findings whose every open occurrence is covered by approved, live decisions
 // agreeing on one outcome, as WhollyCovered asks it, and what is stated
 // occurrence by occurrence where a group's occurrences disagree
-// (CoveredAtOccurrences). Each is up to one past most, so that reaching the
+// (coveredAtOccurrences). Each is up to one past most, so that reaching the
 // ceiling is distinguishable from landing on it.
 //
 // A group is an issue and a component by its name and stated package
@@ -194,10 +194,13 @@ func decidedOf(ctx context.Context, db bun.IDB, productID, buildID int64, visibl
 // condition given accepts, is filed under, that the build holds open at those
 // visibilities.
 //
-// The build bounds the list. A product decides issues across every build it
-// ever had, and a long-lived one decides far more than one build holds: with
-// 100,000 decided issues outside the build, the findings are otherwise read
-// against 100,300 issues where the build holds 300.
+// Every condition here bounds the work and no answer: readDecided applies each
+// of them again, and an issue with no decision the read counts has no group a
+// statement comes from. The list changes an answer only by leaving out an
+// issue that has one. A product decides issues across every build it ever had, and a
+// long-lived one decides far more than one build holds: with 100,000 decided
+// issues outside the build, the findings are otherwise read against 100,300
+// issues where the build holds 300.
 //
 // The build is asked by issue alone, as a set the statement reads once, and
 // the occurrence is matched by readDecided. Asked of each decision occurrence

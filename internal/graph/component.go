@@ -364,6 +364,21 @@ func NewComponents(db bun.IDB) *Components {
 	return &Components{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
+// trimmed is the description with surrounding space taken off every text a
+// row stores, as identity already reads the name and version.
+//
+// Stored with it, a version compares differently by engine: MySQL and MariaDB
+// ignore trailing spaces in an equality, PostgreSQL and SQLite do not, and the
+// application compares bytes. A decision is keyed on the trimmed version, and
+// untrimmed, a component stated at "1.0 " matches it on two engines of four.
+func (d Described) trimmed() Described {
+	for _, field := range []*string{&d.Purl, &d.CPE, &d.Name, &d.Version, &d.UpstreamName,
+		&d.UpstreamVersion, &d.Supplier, &d.License} {
+		*field = strings.TrimSpace(*field)
+	}
+	return d
+}
+
 // Intern returns the identifiers for these components, inserting any that are
 // new.
 //
@@ -377,8 +392,9 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		if err := d.Valid(); err != nil {
 			return nil, err
 		}
-		d.Supplier = bound.HeadRunes(strings.TrimSpace(d.Supplier), statedWidth)
-		d.License = bound.HeadRunes(strings.TrimSpace(d.License), statedWidth)
+		d = d.trimmed()
+		d.Supplier = bound.HeadRunes(d.Supplier, statedWidth)
+		d.License = bound.HeadRunes(d.License, statedWidth)
 		byIdentity[d.Identity()] = d
 	}
 	if len(byIdentity) == 0 {

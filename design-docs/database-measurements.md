@@ -59,6 +59,18 @@ A notification link matched by its prefix, `/decisions/`, over a million
 notifications, timed alone: 734 ms on MySQL, 575 ms on MariaDB, 114 ms on
 PostgreSQL.
 
+The component trimming of the changes phase alone, over 1,000, 100,000 and
+1,000,000 components, 1,000 of them stated with a trailing space, one engine at
+a time. It reads every row, about 1 to 2 µs a row; the 1,000 rewritten rows are
+most of the smallest run.
+
+| Engine | 1,000 | 100,000 | 1,000,000 |
+|---|---|---|---|
+| PostgreSQL | 191 ms | 688 ms | 2.19 s |
+| MySQL | 113 ms | 224 ms | 1.27 s |
+| MariaDB | 118 ms | 215 ms | 1.15 s |
+| SQLite | 14 ms | 190 ms | 1.95 s |
+
 ## Index reads
 
 PostgreSQL 16 with one processor, one database at a time, unless an engine is

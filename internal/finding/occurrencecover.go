@@ -63,14 +63,13 @@ type statedGroup struct {
 // An occurrence is stated only where all of these hold:
 //
 //   - its consumer's package identifier names a version, because a statement
-//     naming a product at no version is about every release of it. An occurrence
-//     the build holds directly has no consumer, and so no product but the
-//     build, which a statement about the whole build names
-//
-// - every open occurrence of the component beneath the consumer, at any depth,
-// is
-//
-//	covered with the same outcome
+//     naming a product at no version is about every release of it. An
+//     occurrence the build holds directly has no consumer, and so no product
+//     but the build, which a statement about the whole build names
+//   - every open occurrence of its group beneath the consumer, at any depth, is
+//     covered with the same outcome. The group is every component of the
+//     name and stated package identifier, decided or not, because the
+//     statement names them and a reader applies it to each
 //
 // Where several occurrences beneath one consumer were decided in separate
 // sittings, the earliest decision speaks, as it does for a whole component.
@@ -173,8 +172,9 @@ func (s *decidedSets) coveredAtOccurrences(ctx context.Context, db bun.IDB, buil
 
 // everyOccurrence is every open occurrence of the issues decided, grouped by
 // what one statement is about, with whether each is covered: approved, live
-// decisions agreeing on one outcome. A group no decision covers an occurrence
-// of states nothing.
+// decisions agreeing on one outcome. A group holds every component of its name
+// and stated package identifier, those with no decided occurrence included. A
+// group no decision covers an occurrence of states nothing.
 func (s *decidedSets) everyOccurrence() map[statedGroup][]coveredOccurrence {
 	out := map[statedGroup][]coveredOccurrence{}
 	for _, f := range s.findings {

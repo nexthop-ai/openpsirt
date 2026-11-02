@@ -86,6 +86,15 @@ func RunV0110ReportStep(ctx context.Context, db *database.DB) error {
 	})
 }
 
+// TrimV0110Components runs the v0.11.0 upgrade's component trimming alone,
+// reading batch components at a time, against a database at v0.11.0's schema.
+func TrimV0110Components(ctx context.Context, db *database.DB, batch int) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		return trimComponentsInBatchesV0110(ctx, tx, batch)
+	})
+}
+
 // renamedForV0110 runs a step of the v0.11.0 upgrade against the names it is
 // written for, as a start that stopped after that step left them. MySQL and
 // MariaDB commit each rename as it runs, so such a start had made every one.

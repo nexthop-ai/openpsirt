@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // recorded is one decision occurrence a case records at the occurrence of
@@ -275,4 +276,143 @@ func TestTheGroupsCoveredStopOnePastTheMost(t *testing.T) {
 			}
 		}
 	})
+}
+
+// A statement about one occurrence names the component by its name and stated
+// package identifier, so a reader applies it to every component the build
+// holds under them. Beneath its consumer, each of them counts: libz at 1.0
+// decided beneath cons-one is no statement while libz at 2.0, of the same name
+// and no package identifier, sits undecided beside it.
+func TestAnOccurrenceIsStatedOnlyWhereEveryComponentOfItsNameBeneathIsDecided(t *testing.T) {
+	consOne, consTwo := at("cons-one", "1.0"), at("cons-two", "1.0")
+	older := graph.Described{Name: "libz", Version: "1.0"}
+	newer := graph.Described{Name: "libz", Version: "2.0"}
+	for _, tc := range []struct {
+		name string
+		// decided is the versions of libz decided beneath cons-one.
+		decided []string
+		stated  int
+	}{
+		{name: "the other version undecided", decided: []string{"1.0"}},
+		{name: "both versions decided", decided: []string{"1.0", "2.0"}, stated: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				f.shipped(t, graph.Snapshot{
+					Root:       root,
+					Components: []graph.Described{consOne, consTwo, older, newer},
+					Dependencies: []graph.Dependency{
+						{Parent: root, Child: consOne},
+						{Parent: root, Child: consTwo},
+						{Parent: consOne, Child: older},
+						{Parent: consOne, Child: newer},
+						{Parent: consTwo, Child: older},
+					},
+				})
+				f.applied(t, found("CVE-2026-1", older), found("CVE-2026-1", newer))
+				var open []struct {
+					Issue      int64  `bun:"vulnerability_id"`
+					Occurrence string `bun:"occurrence_identity"`
+					Version    string `bun:"version"`
+					Consumer   string `bun:"consumer"`
+				}
+				if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+					Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+					Join(`JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+					ColumnExpr(`"f"."vulnerability_id", "f"."occurrence_identity"`).
+					ColumnExpr(`"c"."version" AS "version", "uc"."name" AS "consumer"`).
+					Where(`"f"."build_id" = ?`, f.build).Where(`"f"."closed_at" IS NULL`).
+					Scan(ctx, &open); err != nil {
+					t.Fatal(err)
+				}
+				if len(open) != 3 {
+					t.Fatalf("the build holds %d open occurrences, want 3: %+v", len(open), open)
+				}
+				by := f.somebodyElse(t)
+				for i, version := range tc.decided {
+					for _, row := range open {
+						if row.Consumer != consOne.Name || row.Version != version {
+							continue
+						}
+						component, consumer := version, consOne.Version
+						f.decision(t, decisionRow{By: by, Issue: row.Issue, Occurrence: row.Occurrence,
+							State: "approved", Component: &component, Consumer: &consumer,
+							Key: fmt.Sprintf("libz-%d", i)})
+					}
+				}
+				groups, placed, err := finding.CoveredInBuild(ctx, f.db.DB, f.productID, f.build,
+					[]access.Visibility{access.Public}, 100)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(groups) != 0 {
+					t.Errorf("stated %+v about the whole build, where cons-two's libz is undecided", groups)
+				}
+				if len(placed) != tc.stated {
+					t.Fatalf("stated %d occurrences, want %d: %+v", len(placed), tc.stated, placed)
+				}
+				for _, one := range placed {
+					if one.Component != "libz" || one.Consumer != consOne.Name {
+						t.Errorf("stated %+v, want libz inside %s", one, consOne.Name)
+					}
+				}
+			})
+		})
+	}
+}
+
+// A version a producer states with spaces around it is the version a decision
+// is keyed on, trimmed, on every engine: the VEX document and an advisory both
+// state libnl, first described with spaces, covered by decisions keyed "3.7.0".
+// A trailing space alone is the one MySQL and MariaDB ignore in an equality
+// and PostgreSQL, SQLite and the application do not.
+func TestAVersionStatedWithSpacesIsCoveredByItsDecisionOnEveryEngine(t *testing.T) {
+	for name, version := range map[string]string{
+		"trailing": libnl.Version + " ",
+		"around":   " " + libnl.Version + " ",
+	} {
+		t.Run(name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				spaced := libnl
+				spaced.Version = version
+				f.shipped(t, graph.Snapshot{
+					Root:       root,
+					Components: []graph.Described{swss, teamd, spaced},
+					Dependencies: []graph.Dependency{
+						{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+						{Parent: swss, Child: spaced}, {Parent: teamd, Child: spaced},
+					},
+				})
+				f.decidedBeneath(t, []recorded{{under: swss.Name}, {under: teamd.Name}})
+
+				visible := []access.Visibility{access.Public}
+				groups, _, err := finding.CoveredInBuild(ctx, f.db.DB, f.productID, f.build, visible, 100)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(groups) != 1 {
+					t.Errorf("the document states %d groups, want libnl covered: %+v", len(groups), groups)
+				}
+				var asked []struct {
+					Component string `bun:"component"`
+					finding.Covering
+				}
+				q := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+					Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+					Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+					ColumnExpr(`"c"."name" AS "component"`).
+					Where(`"f"."build_id" = ?`, f.build).
+					GroupExpr(`"f"."vulnerability_id", "c"."name"`)
+				if err := finding.WhollyCovered(q, f.productID, visible, finding.ForStatements).
+					Scan(ctx, &asked); err != nil {
+					t.Fatal(err)
+				}
+				if len(asked) != 1 {
+					t.Errorf("an advisory counts %d groups covered, want libnl: %+v", len(asked), asked)
+				}
+			})
+		})
+	}
 }

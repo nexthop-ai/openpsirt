@@ -19,9 +19,12 @@ import (
 // one outcome every open occurrence in it was decided with, and the earliest
 // decision occurrence among them.
 //
-// Both documents a customer reads ask it — the VEX document of one build per
-// component, and an advisory per release — and one spelling of the rule keeps
-// the two from saying different things about the same occurrences.
+// Both documents a customer reads ask it: the VEX document of one build per
+// component, counted in the application over sets (decisionTally), and an
+// advisory per release, counted in one statement (WhollyCovered). The two
+// countings are two spellings of one rule, and
+// TestTheVEXDocumentCountsAGroupAsCoveredAsAnAdvisoryDoes holds them to the
+// same answer about the same occurrences.
 type Covering struct {
 	Outcome   string `bun:"outcome"`
 	DecidedBy int64  `bun:"decided_by"`

@@ -25,9 +25,9 @@ import (
 // Read as sets, each statement reading one table by constants or joining
 // another by its primary key, and matched here. Asked of each finding inside
 // one statement, an engine on the statistics a bulk load leaves picks a plan
-// that reads the build's graph or the product's decisions once per finding:
-// past 30 s a read on MySQL and MariaDB, and 23.7 s on SQLite for a long-lived
-// product.
+// that reads the build's graph or the product's decisions once per finding: a
+// statement stopped past 30 s on MySQL, 11.6 s of a 28.5 s document on
+// MariaDB, and 23.6 s on SQLite for a long-lived product.
 type decidedSets struct {
 	findings    []decidedFinding
 	components  map[int64]decidedComponent
@@ -259,6 +259,10 @@ func readDecided(ctx context.Context, db bun.IDB, productID, buildID int64, visi
 			consumer = sets.components[f.ConsumerID].Version
 		}
 		matched := 0
+		// Compared byte for byte, as PostgreSQL and SQLite compare in a
+		// statement. MySQL and MariaDB ignore trailing spaces there, and agree
+		// only because a component stores its versions trimmed, as a decision
+		// is keyed.
 		for _, d := range byOccurrence[at{f.VulnerabilityID, f.Occurrence}] {
 			if d.AnyVersion == 0 && (d.Component != component || d.Consumer != consumer) {
 				continue
@@ -295,6 +299,9 @@ func (s *decidedSets) groups() map[Grouped]*decisionTally {
 // firstGroups is rows in the order of the groups they are about, up to one
 // past most, so that reaching the ceiling is distinguishable from landing on
 // it.
+//
+// The order makes the slice the same from run to run, and is no control: each
+// caller refuses a build past the ceiling and orders what it publishes.
 func firstGroups[T any](rows []T, key func(T) Grouped, most int) []T {
 	slices.SortFunc(rows, func(a, b T) int {
 		x, y := key(a), key(b)

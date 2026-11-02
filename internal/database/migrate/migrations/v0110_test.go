@@ -361,6 +361,7 @@ func TestAV0100DatabaseHoldingEverySeedUpgradesToV0110(t *testing.T) {
 		rules := seedRulesV0100(t, ctx, db)
 		words := seedWordsV0100(t, ctx, db)
 		role := seedRoleV0100(t, ctx, db)
+		seedSpacedComponentsV0100(t, ctx, db)
 		var findings int
 		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "finding"`).Scan(ctx, &findings); err != nil {
 			t.Fatal(err)
@@ -412,6 +413,11 @@ func TestAV0100DatabaseHoldingEverySeedUpgradesToV0110(t *testing.T) {
 			declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 			incidents.renamedAs(t, ctx, db)
 			incidents.numberedAfter(t, ctx, db)
+		})
+		// A component a producer stated with space around its text holds it
+		// trimmed, as v0.11.0 stores it.
+		t.Run("AComponentIsTrimmedByTheV0110Upgrade", func(t *testing.T) {
+			componentsAreTrimmed(t, ctx, db)
 		})
 		t.Run("EveryRoleColumnHoldsTheLongestRoleAfterTheV0110Upgrade", func(t *testing.T) {
 			role.holdsTheLongest(t, ctx, db)

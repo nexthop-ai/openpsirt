@@ -542,3 +542,34 @@ func TestABuildHoldsTheRepositoryItsNewestInventoryStates(t *testing.T) {
 		}
 	})
 }
+
+// A component's row holds every text a producer stated with surrounding space
+// taken off, so an engine ignoring trailing spaces in an equality and one
+// comparing them answer alike, and alike with a decision keyed trimmed.
+func TestAComponentIsStoredWithoutSurroundingSpace(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		spaced := graph.Described{
+			Purl: " pkg:deb/debian/libz@1.0?upstream=zlib%401.0 ", CPE: " cpe:2.3:a:zlib:zlib:1.0:*:*:*:*:*:*:* ",
+			Name: " libz ", Version: " 1.0 ", UpstreamName: " zlib ", UpstreamVersion: " 1.0 ",
+			Supplier: " Debian ", License: " Zlib ",
+		}
+		ids, err := graph.NewComponents(f.db.DB).Intern(ctx, []graph.Described{spaced})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var row graph.Component
+		if err := f.db.DB.NewSelect().Model(&row).Where(`"id" = ?`, ids[spaced.Identity()]).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for column, got := range map[string]string{
+			"purl": row.Purl, "cpe": row.CPE, "name": row.Name, "version": row.Version,
+			"upstream name": row.UpstreamName, "upstream version": row.UpstreamVersion,
+			"supplier": row.Supplier, "license": row.License,
+		} {
+			if got != strings.TrimSpace(got) || got == "" {
+				t.Errorf("the %s is stored as %q", column, got)
+			}
+		}
+	})
+}
