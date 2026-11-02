@@ -299,3 +299,92 @@ func TestAnUndisclosedOpenOccurrenceHoldsBackASuppliersStatement(t *testing.T) {
 		}
 	})
 }
+
+// An occurrence a supplier's statement closed, and another supplier's
+// statement closed again by a later row, is stated once, by the later: the
+// later row is the latest at the occurrence.
+func TestAnOccurrenceAStatementClosedAgainIsStatedByTheLatest(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+		var acme finding.Statement
+		if err := r.DB.DB.NewSelect().Model(&acme).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		other := acme
+		other.ID, other.Publisher = 0, "other"
+		if _, err := r.DB.DB.NewInsert().Model(&other).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.DB.ExecContext(ctx, `INSERT INTO "finding" ("build_id", "kind", "vulnerability_id",
+				"visibility", "component_id", "occurrence_identity", "urgency",
+				"urgency_exploited", "urgency_incident", "urgency_shipped",
+				"opened_at", "closed_at", "closed_because", "stated_by")
+			SELECT "build_id", "kind", "vulnerability_id", "visibility", "component_id",
+				"occurrence_identity", "urgency", "urgency_exploited", "urgency_incident",
+				"urgency_shipped", "opened_at", "closed_at", "closed_because", ?
+			FROM "finding" WHERE "closed_because" = 'disclaimed'`, other.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 1 {
+			t.Errorf("with the occurrence closed again, the document with suppliers says %+v, want the later statement alone", said)
+		}
+	})
+}
+
+// An occurrence a patch closed, and closed again by a later row, is dated by
+// the first row the patch closed.
+func TestAnOccurrencePatchedAgainIsDatedByTheFirstClosing(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.PatchedKernel(t)
+		var first finding.Finding
+		if err := r.DB.DB.NewSelect().Model(&first).Where(`"f"."closed_because" = 'patched'`).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.DB.ExecContext(t.Context(), `INSERT INTO "finding" ("build_id", "kind", "vulnerability_id",
+				"visibility", "component_id", "occurrence_identity", "urgency",
+				"urgency_exploited", "urgency_incident", "urgency_shipped",
+				"opened_at", "closed_at", "closed_because", "suppressed_by")
+			SELECT "build_id", "kind", "vulnerability_id", "visibility", "component_id",
+				"occurrence_identity", "urgency", "urgency_exploited", "urgency_incident",
+				"urgency_shipped", "opened_at", ?, "closed_because", "suppressed_by"
+			FROM "finding" WHERE "closed_because" = 'patched'`, first.ClosedAt.Add(24*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Statements []struct {
+				Timestamp time.Time `json:"timestamp"`
+			} `json:"statements"`
+		}
+		httpapitest.Read(t, r, "triager", httpapitest.ABuild, &doc)
+		if len(doc.Statements) != 1 || !doc.Statements[0].Timestamp.Equal(*first.ClosedAt) {
+			t.Errorf("the document says %+v, want one statement dated %s, when the patch first closed the occurrence",
+				doc.Statements, first.ClosedAt)
+		}
+	})
+}
+
+// An occurrence one supplier's statement closed twice, the second time by a
+// later row, is stated once.
+func TestAnOccurrenceOneStatementClosedTwiceIsStillStated(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+		r.PatchedRows(t, `INSERT INTO "finding" ("build_id", "kind", "vulnerability_id",
+				"visibility", "component_id", "occurrence_identity", "urgency",
+				"urgency_exploited", "urgency_incident", "urgency_shipped",
+				"opened_at", "closed_at", "closed_because", "stated_by")
+			SELECT "build_id", "kind", "vulnerability_id", "visibility", "component_id",
+				"occurrence_identity", "urgency", "urgency_exploited", "urgency_incident",
+				"urgency_shipped", "opened_at", "closed_at", "closed_because", "stated_by"
+			FROM "finding" WHERE "closed_because" = 'disclaimed'`)
+		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 1 {
+			t.Errorf("with the occurrence closed twice, the document with suppliers says %+v, want the statement of not affected", said)
+		}
+	})
+}

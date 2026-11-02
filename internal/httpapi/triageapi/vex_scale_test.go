@@ -20,6 +20,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -49,19 +50,28 @@ const vexDecisions = 100
 // hub's build makes, on the statistics the load leaves and again after every
 // table is analyzed, as a server start does.
 //
-// Once for the build alone, and once as a long-lived product holds it: the
-// kernel binaries and the root images rebuilt vexRebuilds times before, and
-// vexElsewhere issues the build does not hold decided in the product.
+// Once for the build alone; once as a long-lived product holds it, the kernel
+// binaries and the root images rebuilt vexRebuilds times before and
+// vexElsewhere issues the build does not hold decided in the product; once
+// with vexHistory rows recorded at each occurrence of the issues the build's
+// patches and suppliers' statements closed; and once with the build's findings
+// held by vexBuilds builds of the product.
 func TestMeasureTheVEXDocumentOfTheHubBuild(t *testing.T) {
 	const n = 16000
-	for _, lived := range []bool{false, true} {
-		name := "one build"
-		if lived {
-			name = "a long-lived product"
-		}
-		t.Run(name, func(t *testing.T) { measureTheVEXDocument(t, n, lived) })
+	for _, shape := range []vexShape{oneBuild, longLived, longHistory, manyBuilds} {
+		t.Run(string(shape), func(t *testing.T) { measureTheVEXDocument(t, n, shape) })
 	}
 }
+
+// vexShape is what the hub's build holds beside its own findings.
+type vexShape string
+
+const (
+	oneBuild    vexShape = "one build"
+	longLived   vexShape = "a long-lived product"
+	longHistory vexShape = "a long history"
+	manyBuilds  vexShape = "many builds"
+)
 
 // vexRebuilds is how many closed versions each rebuilt image of the long-lived
 // product has behind its open one: a nightly build for three years.
@@ -71,16 +81,30 @@ const vexRebuilds = 1000
 // does not hold.
 const vexElsewhere = 100000
 
-func measureTheVEXDocument(t *testing.T, n int, lived bool) {
+// vexHistory is how many rows the long history records at each occurrence of
+// an issue a patch or a supplier's statement closed: a weekly scan for a year,
+// each recording a new row.
+const vexHistory = 50
+
+// vexBuilds is how many builds of the product hold the hub build's findings in
+// the many-builds shape, the hub's own included.
+const vexBuilds = 11
+
+func measureTheVEXDocument(t *testing.T, n int, shape vexShape) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		began := time.Now()
 		vexSeeded(t, r, n)
-		if lived {
+		switch shape {
+		case longLived:
 			vexImaged(t, r, vexRebuilds)
 			vexDecidedElsewhere(t, r, vexElsewhere)
+		case longHistory:
+			vexRecordedOver(t, r, vexHistory)
+		case manyBuilds:
+			vexHeldBy(t, r, vexBuilds)
 		}
-		t.Logf("%d components: seeded in %s", n, time.Since(began).Round(time.Second))
+		t.Logf("%d components, %s: seeded in %s", n, shape, time.Since(began).Round(time.Second))
 		slowest := &longestStatement{db: r.DB}
 		deps := r.Deps
 		deps.DB = dbtest.Hooked(r.DB, slowest)
@@ -433,4 +457,89 @@ func (s *longestStatement) stopped() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.past
+}
+
+// vexRecordedOver records rows rows at each closed occurrence of the hub's
+// build of an issue a patch or a supplier's statement closed there, as a scan
+// recording a new row each time it closes the occurrence again leaves them:
+// every row closed as the occurrence is.
+func vexRecordedOver(t *testing.T, r *httpapitest.Reach, rows int) {
+	t.Helper()
+	ctx := t.Context()
+	build := r.BuildOf(t, httpapitest.SeededBuild)
+	var last int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`MAX("id")`).Scan(ctx, &last); err != nil {
+		t.Fatal(err)
+	}
+	closedBy := bun.List([]finding.Closure{finding.Patched, finding.Disclaimed})
+	held := `"build_id" = ? AND "id" <= ? AND "closed_at" IS NOT NULL AND "vulnerability_id" IN
+		(SELECT "c"."vulnerability_id" FROM "finding" AS "c" WHERE "c"."build_id" = ? AND "c"."closed_because" IN (?))`
+	for range rows - 1 {
+		vexCopied(t, r, nil, []any{build, last, build, closedBy}, held)
+	}
+	var issues, closed int
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).
+		Where(`"build_id" = ?`, build).
+		Where(`"vulnerability_id" IN (SELECT "c"."vulnerability_id" FROM "finding" AS "c"
+			WHERE "c"."build_id" = ? AND "c"."closed_because" IN (?))`, build, closedBy).
+		Scan(ctx, &issues); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).
+		Where(`"build_id" = ?`, build).Where(`"closed_because" IN (?)`, closedBy).
+		Scan(ctx, &closed); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%d rows at each closed occurrence: %d rows closed by a patch or a statement, %d rows of their issues",
+		rows, closed, issues)
+}
+
+// vexHeldBy declares builds-1 variants of the product beside the hub's, each
+// holding a copy of every finding of the hub's build.
+func vexHeldBy(t *testing.T, r *httpapitest.Reach, builds int) {
+	t.Helper()
+	ctx := t.Context()
+	build := r.BuildOf(t, httpapitest.SeededBuild)
+	product, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i < builds; i++ {
+		variant := fmt.Sprintf("held-%d", i)
+		if _, err := catalog.NewStore(r.DB.DB).DeclareVariant(ctx, product.ID, variant, true); err != nil {
+			t.Fatal(err)
+		}
+		other := r.BuildOf(t, httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: variant})
+		vexCopied(t, r, map[string]string{"build_id": "?"}, []any{other, build}, `"build_id" = ?`)
+	}
+	var held int
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).Where(`"build_id" = ?`, build).
+		Scan(ctx, &held); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%d findings held by %d builds", held, builds)
+}
+
+// vexCopied inserts a copy of every finding the condition given keeps, with
+// the columns given replaced by the expressions beside them. The arguments
+// are those of the replacements, in column order, then the condition's.
+func vexCopied(t *testing.T, r *httpapitest.Reach, replaced map[string]string, args []any, where string) {
+	t.Helper()
+	table := r.DB.DB.Dialect().Tables().Get(reflect.TypeFor[finding.Finding]())
+	var into, from []string
+	for _, field := range table.Fields {
+		if field.Name == "id" {
+			continue
+		}
+		into = append(into, `"`+field.Name+`"`)
+		if expr, ok := replaced[field.Name]; ok {
+			from = append(from, expr)
+		} else {
+			from = append(from, `"`+field.Name+`"`)
+		}
+	}
+	if _, err := r.DB.DB.NewRaw(`INSERT INTO "finding" (`+strings.Join(into, ", ")+`) SELECT `+
+		strings.Join(from, ", ")+` FROM "finding" WHERE `+where, args...).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 }

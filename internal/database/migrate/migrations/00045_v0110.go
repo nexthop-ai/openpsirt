@@ -115,7 +115,7 @@ func changeV0110(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	if err := u.index(findingV0110(u.t), "finding",
-		"finding_group_idx", "finding_opened_run_idx", "finding_closed_run_idx"); err != nil {
+		"finding_group_idx", "finding_opened_run_idx", "finding_closed_run_idx", "finding_occurrence_idx"); err != nil {
 		return err
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{

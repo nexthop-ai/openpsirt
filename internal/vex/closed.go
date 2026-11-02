@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -44,12 +45,8 @@ type closedRow struct {
 // heldRow is a finding of a build of an issue a closed finding is of, open or
 // closed.
 type heldRow struct {
-	ID              int64  `bun:"id"`
-	VulnerabilityID int64  `bun:"vulnerability_id"`
-	ComponentID     int64  `bun:"component_id"`
-	Occurrence      string `bun:"occurrence_identity"`
-	Kind            string `bun:"kind"`
-	Open            int    `bun:"open"`
+	VulnerabilityID int64 `bun:"vulnerability_id"`
+	ComponentID     int64 `bun:"component_id"`
 }
 
 // atComponent is an issue at one component.
@@ -105,13 +102,9 @@ func (s *Store) closed(ctx context.Context, buildID int64, visible []access.Visi
 	for _, row := range rows {
 		issues = append(issues, row.VulnerabilityID)
 	}
-	issues = distinct(issues)
-	held, err := s.findingsOf(ctx, buildID, issues, because)
+	held, err := s.openOf(ctx, buildID, distinct(issues))
 	if err != nil {
 		return nil, err
-	}
-	if because == finding.Disclaimed {
-		rows = latest(rows, held)
 	}
 
 	// Each issue at each component.
@@ -137,9 +130,7 @@ func (s *Store) closed(ctx context.Context, buildID int64, visible []access.Visi
 	}
 	named := slices.Clone(components)
 	for _, row := range held {
-		if row.Open == 1 {
-			named = append(named, row.ComponentID)
-		}
+		named = append(named, row.ComponentID)
 	}
 	names, err := s.componentNames(ctx, distinct(named))
 	if err != nil {
@@ -150,10 +141,8 @@ func (s *Store) closed(ctx context.Context, buildID int64, visible []access.Visi
 	// affected, and a statement naming both would say otherwise.
 	openByName := map[atName]bool{}
 	for _, row := range held {
-		if row.Open == 1 {
-			name := names[row.ComponentID]
-			openByName[atName{issue: row.VulnerabilityID, name: name.name, purl: name.purl}] = true
-		}
+		name := names[row.ComponentID]
+		openByName[atName{issue: row.VulnerabilityID, name: name.name, purl: name.purl}] = true
 	}
 
 	// Each issue, name and stated package identifier.
@@ -217,25 +206,56 @@ func (s *Store) closed(ctx context.Context, buildID int64, visible []access.Visi
 // closedRows is the findings of a build closed for the reason given at the
 // visibilities given whose closure still stands, and for a supplier's
 // statement what each statement said.
+//
+// Grouped in the statement, so an occurrence closed again and again reaches
+// the application once per closure rather than once per row: for the patches
+// the lowest row at each issue, component and patch, which dates the
+// statement; for the suppliers' statements the highest at each occurrence,
+// component and statement, of which latest keeps the one still the latest.
+// Every row of their issues read into the application, the suppliers'
+// statements take 2.2 s against 0.46 s with 50 rows at each closed occurrence
+// on SQLite.
+//
+// Grouped by the closure first: no index leads with it, so no engine walks an
+// index for the grouping's order. Led by the issue, SQLite with statistics
+// walks the occurrence index over the whole table: 1.6 s against 0.3 s.
+//
+// Every closing sets the closing time with its reason, so the closed findings
+// are named as such: the build's closed rows are then one range of an index
+// leading with the build. Left out, MariaDB on the statistics a bulk load
+// leaves reads the whole table, 193 ms against 28 ms with eleven builds
+// holding the build's findings.
 func (s *Store) closedRows(ctx context.Context, buildID int64, visible []access.Visibility,
 	because finding.Closure) ([]closedRow, map[int64]string, error) {
 
-	by := `"f"."suppressed_by"`
-	if because == finding.Disclaimed {
-		by = `"f"."stated_by"`
-	}
 	kinds, kindArgs := findingkind.VEX.Where(`"f"."kind"`)
 	var rows []closedRow
-	if err := s.idb().NewSelect().
+	q := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`"f"."id", "f"."vulnerability_id", "f"."component_id", "f"."occurrence_identity", "f"."kind"`).
-		ColumnExpr(by+` AS "by"`).
-		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_because" = ?`, because).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(kinds, kindArgs...).
-		Scan(ctx, &rows); err != nil {
+		Where(`"f"."closed_at" IS NOT NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible))
+	if because == finding.Patched {
+		q = q.ColumnExpr(`MIN("f"."id") AS "id", "f"."vulnerability_id", "f"."component_id"`).
+			ColumnExpr(`"f"."suppressed_by" AS "by"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(kinds, kindArgs...).
+			GroupExpr(`"f"."suppressed_by", "f"."vulnerability_id", "f"."component_id"`)
+	} else {
+		q = q.ColumnExpr(`MAX("f"."id") AS "id", "f"."vulnerability_id", "f"."component_id"`).
+			ColumnExpr(`"f"."occurrence_identity", "f"."kind", "f"."stated_by" AS "by"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(kinds, kindArgs...).
+			GroupExpr(`"f"."stated_by", "f"."kind", "f"."vulnerability_id", "f"."occurrence_identity", "f"."component_id"`)
+	}
+	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, nil, fmt.Errorf("read the findings closed as %s: %w", because, err)
+	}
+	if because == finding.Disclaimed {
+		var err error
+		if rows, err = s.latest(ctx, buildID, rows); err != nil {
+			return nil, nil, err
+		}
 	}
 	closures := make([]int64, 0, len(rows))
 	for _, row := range rows {
@@ -251,7 +271,7 @@ func (s *Store) closedRows(ctx context.Context, buildID int64, visible []access.
 		ID     int64  `bun:"id"`
 		Status string `bun:"status"`
 	}
-	q := s.idb().NewSelect().TableExpr(`"suppression"`).ColumnExpr(`"id", '' AS "status"`).
+	q = s.idb().NewSelect().TableExpr(`"suppression"`).ColumnExpr(`"id", '' AS "status"`).
 		Where(`"closed_scan_id" IS NULL`)
 	if because == finding.Disclaimed {
 		q = s.idb().NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"id", "status"`).
@@ -273,63 +293,114 @@ func (s *Store) closedRows(ctx context.Context, buildID int64, visible []access.
 	return kept, status, nil
 }
 
-// findingsOf is the findings of a build of the issues given at the kinds a VEX
-// document states. For the build's patches, the open ones, one per issue and
-// component; for suppliers' statements every one, which latest needs as well.
+// openOf is the open findings of a build of the issues given at the kinds a
+// VEX document states, one per issue and component.
 //
 // Read at every visibility, whatever the document is read at: an undisclosed
 // occurrence still open holds back a disclosed statement, which would otherwise
-// say fixed or not affected about a component the build has open.
-func (s *Store) findingsOf(ctx context.Context, buildID int64, issues []int64,
-	because finding.Closure) ([]heldRow, error) {
-
+// say fixed or not affected about a component the build has open. Every
+// visibility is named all the same, so the read is the build's own open rows of
+// each issue in the index leading with the build; left out, MySQL and MariaDB
+// read each issue's open rows of every build holding it, 55 ms against 10 ms on
+// MySQL with eleven builds holding the issues.
+func (s *Store) openOf(ctx context.Context, buildID int64, issues []int64) ([]heldRow, error) {
 	kinds, kindArgs := findingkind.VEX.Where(`"f"."kind"`)
 	byIssue, args := database.InAnyOf(`"f"."vulnerability_id"`, issues)
-	q := s.idb().NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(kinds, kindArgs...).
-		Where(byIssue, args...)
-	if because == finding.Disclaimed {
-		q = q.ColumnExpr(`"f"."id", "f"."vulnerability_id", "f"."component_id", "f"."occurrence_identity", "f"."kind"`).
-			ColumnExpr(`CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END AS "open"`)
-	} else {
-		q = q.ColumnExpr(`"f"."vulnerability_id", "f"."component_id", 1 AS "open"`).
-			Where(`"f"."closed_at" IS NULL`).
-			GroupExpr(`"f"."vulnerability_id", "f"."component_id"`)
-	}
 	var rows []heldRow
-	if err := q.Scan(ctx, &rows); err != nil {
+	if err := s.idb().NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`"f"."vulnerability_id", "f"."component_id"`).
+		Where(`"f"."build_id" = ?`, buildID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(access.Visibilities())).
+		Where(kinds, kindArgs...).
+		Where(byIssue, args...).
+		GroupExpr(`"f"."vulnerability_id", "f"."component_id"`).
+		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the findings of the issues closed in this build: %w", err)
 	}
 	return rows, nil
 }
 
 // latest keeps the closed rows that are the latest row of their kind and issue
-// at their occurrence, as finding.latestAtItsOccurrence asks it, over every
-// row held of their issues.
+// at their occurrence in the build, as the decidable findings ask it.
 //
-// A run records a new row rather than reopening a closed one, so the later row,
-// patched by the build or open again, is what the document goes by.
-func latest(rows []closedRow, held []heldRow) []closedRow {
-	type at struct {
-		issue      int64
-		occurrence string
-		kind       string
-	}
-	last := make(map[at]int64, len(held))
-	for _, row := range held {
-		k := at{row.VulnerabilityID, row.Occurrence, row.Kind}
-		last[k] = max(last[k], row.ID)
-	}
-	kept := rows[:0]
+// Only the highest of the rows given at an occurrence can be, so the rows after
+// it at each such occurrence are read, and an occurrence holding any is
+// dropped. A run records a new row rather than reopening a closed one, so an
+// occurrence closed and closed again holds a row per closing; asked by
+// identifier from the highest row up, the read never sees that history.
+//
+// Read as a set, the occurrences named a bounded number at a time, so MySQL and
+// MariaDB cost each list by looking in the index rather than from statistics.
+// Asked of each row, MySQL and MariaDB on the statistics a bulk load leaves
+// read the build's whole open index once per row: past 30 s for 2,678 rows with
+// 50 rows at each closed occurrence.
+//
+// Each term names the build, and nothing stands outside the terms: each is
+// then one range of the occurrence index, which carries the build, the kind
+// and the row. With the build asked once outside them, SQLite with no
+// statistics reads the build's whole index once per statement, 5 s each with
+// 50 rows at each closed occurrence.
+func (s *Store) latest(ctx context.Context, buildID int64, rows []closedRow) ([]closedRow, error) {
+	last := make(map[atOccurrence]closedRow, len(rows))
 	for _, row := range rows {
-		if last[at{row.VulnerabilityID, row.Occurrence, row.Kind}] <= row.ID {
+		k := atOccurrence{row.VulnerabilityID, row.Occurrence, row.Kind}
+		if have, ok := last[k]; !ok || have.ID < row.ID {
+			last[k] = row
+		}
+	}
+	asked := make([]atOccurrence, 0, len(last))
+	for k := range last {
+		asked = append(asked, k)
+	}
+	later := map[atOccurrence]bool{}
+	for start := 0; start < len(asked); start += occurrencesAsked {
+		at := asked[start:min(start+occurrencesAsked, len(asked))]
+		terms := make([]string, 0, len(at))
+		args := make([]any, 0, 5*len(at))
+		for _, k := range at {
+			terms = append(terms, `("lt"."occurrence_identity" = ? AND "lt"."vulnerability_id" = ? AND "lt"."build_id" = ? AND "lt"."kind" = ? AND "lt"."id" > ?)`)
+			args = append(args, k.occurrence, k.issue, buildID, k.kind, last[k].ID)
+		}
+		var after []struct {
+			VulnerabilityID int64  `bun:"vulnerability_id"`
+			Occurrence      string `bun:"occurrence_identity"`
+			Kind            string `bun:"kind"`
+		}
+		if err := s.idb().NewSelect().
+			TableExpr(`"finding" AS "lt"`).
+			ColumnExpr(`"lt"."vulnerability_id", "lt"."occurrence_identity", "lt"."kind"`).
+			Where(strings.Join(terms, " OR "), args...).
+			GroupExpr(`"lt"."kind", "lt"."vulnerability_id", "lt"."occurrence_identity"`).
+			Scan(ctx, &after); err != nil {
+			return nil, fmt.Errorf("read the rows after the closed findings at their occurrences: %w", err)
+		}
+		for _, row := range after {
+			later[atOccurrence{row.VulnerabilityID, row.Occurrence, row.Kind}] = true
+		}
+	}
+	kept := make([]closedRow, 0, len(last))
+	for _, row := range rows {
+		k := atOccurrence{row.VulnerabilityID, row.Occurrence, row.Kind}
+		if last[k].ID == row.ID && !later[k] {
 			kept = append(kept, row)
 		}
 	}
-	return kept
+	return kept, nil
 }
+
+// atOccurrence is an issue at an occurrence, in findings of one kind.
+type atOccurrence struct {
+	issue      int64
+	occurrence string
+	kind       string
+}
+
+// occurrencesAsked is how many occurrences one read of the latest rows names:
+// at most what MySQL and MariaDB cost by looking in the index, 200 ranges by
+// default, past which they cost a list from statistics.
+const occurrencesAsked = 200
 
 // componentName is a component's name and its own package identifier, empty
 // where it has none.

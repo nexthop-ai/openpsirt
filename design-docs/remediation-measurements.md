@@ -8,6 +8,7 @@ Benchmark runs behind the remediation rules.
 - [A long-lived product](#a-long-lived-product)
 - [Statements as loaded](#statements-as-loaded)
 - [Closed reads as sets](#closed-reads-as-sets)
+- [Closed reads over history](#closed-reads-over-history)
 - [Failed alternatives](#failed-alternatives)
 
 ## VEX document reads
@@ -146,17 +147,20 @@ Two runs, the slower shown.
 
 ## Closed reads as sets
 
-Justifies the closed reads of `design-docs/remediation-vex.md` § Reads. The
-grouped form asks the shipping, open and latest checks of each issue and
-component in `HAVING`, in one statement. The sets form is the one
-`design-docs/remediation-vex.md` § Reads describes.
+Justifies reading the closed findings as sets, in
+`design-docs/remediation-vex.md` § Reads. The grouped form asks the shipping,
+open and latest checks of each issue and component in `HAVING`, in one
+statement. The every-row form reads the build's closed findings into the
+application row by row, then the findings of their issues, every row of them
+for the suppliers' statements. The bounded form § Reads describes is measured
+against both in § Closed reads over history.
 
 Each closed read on its own, over the fixture of § VEX document reads, timed
 three times. Never analyzed is every table's statistics removed and background
 statistics off before the load; background is the statistics the server
 gathers on its own during the load. A statement past 30 s is stopped.
 
-| Engine | Statistics | Read | Grouped | Sets |
+| Engine | Statistics | Read | Grouped | Every row |
 |---|---|---|---|---|
 | PostgreSQL 16 | Never analyzed | Patched | 72 to 80 ms | 83 to 85 ms |
 | PostgreSQL 16 | Never analyzed | Suppliers' statements | 76 to 80 ms | 122 to 125 ms |
@@ -182,7 +186,7 @@ gathers on its own during the load. A statement past 30 s is stopped.
 The same, through `TestMeasureTheVEXDocumentOfTheHubBuild`: the document, with
 suppliers, and the statements published.
 
-| Engine | Product | Statistics | Grouped | Sets |
+| Engine | Product | Statistics | Grouped | Every row |
 |---|---|---|---|---|
 | PostgreSQL 16 | One build | As loaded | 532 ms; stopped past 30 s at the suppliers' statements; 687 ms | 511 / 645 / 639 ms |
 | PostgreSQL 16 | One build | Analyzed | 361 / 486 / 407 ms | 313 / 426 / 365 ms |
@@ -204,11 +208,105 @@ suppliers, and the statements published.
 | Reading | |
 |---|---|
 | Plans as loaded | Grouped, each engine probes the build's findings or graph per closed finding through whichever index its statistics favor: PostgreSQL the build's whole finding index for the latest row, SQLite and MySQL the build's open findings for the open check, MySQL every open node through the closing scan's index for the shipping check. Which statistics turn it catastrophic differs by run, so never analyzed is no worst case on PostgreSQL |
-| Sets as loaded | On this fixture every closed read stays under 0.35 s on every engine, never analyzed or as the background left it |
-| Sets as loaded, many builds | MySQL reads the findings of the closed issues through the issue index across every build holding them: 2.6 s with 11 builds holding the issues, against 0.22 s analyzed |
-| Sets analyzed | As fast as grouped or faster on every engine but MySQL, where the suppliers' statements read the findings of their issues once more: 200 to 213 ms against 129 to 139 ms, 50 ms more for the document with suppliers |
-| Sets, a long history | With 50 rows at each occurrence, 310,000 findings closed and 620,000 rows of their issues, SQLite reads the suppliers' statements in 1.4 to 1.6 s against 0.55 to 0.61 s grouped, analyzed, since every row of the issues reaches the application. The other three engines stay faster than grouped |
+| Every row as loaded | On this fixture every closed read stays under 0.35 s on every engine, never analyzed or as the background left it |
+| Every row as loaded, many builds | MySQL reads the findings of the closed issues through the issue index across every build holding them: 2.6 s with 11 builds holding the issues, against 0.22 s analyzed |
+| Every row analyzed | As fast as grouped or faster on every engine but MySQL, where the suppliers' statements read the findings of their issues once more: 200 to 213 ms against 129 to 139 ms, 50 ms more for the document with suppliers |
+| Every row, a long history | With 50 rows at each occurrence, 310,000 findings closed and 620,000 rows of their issues, SQLite reads the suppliers' statements in 1.4 to 1.6 s against 0.55 to 0.61 s grouped, analyzed, since every row of the issues reaches the application. The other three engines stay faster than grouped |
 | As loaded, what remains | The open reads: the occurrences stated one by one on MariaDB and MySQL, the decided groups and occurrences on SQLite, the decided issues on MySQL for a long-lived product |
+
+## Closed reads over history
+
+Justifies the bounded closed reads of `design-docs/remediation-vex.md` § Reads:
+the closed findings grouped in their statement, the latest row asked by key,
+and the open findings of the closed issues read once. Grouped and every row are
+the forms of § Closed reads as sets; bounded is the form § Reads describes.
+
+| Shape | What the build holds |
+|---|---|
+| One build | The build of § VEX document reads |
+| Long-lived | The build as § A long-lived product holds it |
+| Long history | 50 rows at each occurrence of an issue a patch or a supplier's statement closed in the build, each closed as the occurrence is: 267,750 rows closed by them among about 785,000 rows of their issues |
+| Many builds | Every finding of the build, copied into ten more builds of the product: 84,319 findings in each of eleven |
+
+Timed as § VEX document reads times it: the document / with suppliers / the
+statements published, as loaded and after every table is analyzed. A statement
+past 30 s is stopped. The long-lived product's every-row cells, and its grouped
+cells but PostgreSQL's, are the runs of § Closed reads as sets.
+
+| Engine | Shape | Statistics | Grouped | Every row | Bounded |
+|---|---|---|---|---|---|
+| PostgreSQL 16 | One build | As loaded | 283 ms / past 30 s / 284 ms | 575 / 753 / 700 ms | 509 ms / 4.58 s / 676 ms |
+| PostgreSQL 16 | One build | Analyzed | 348 / 462 / 406 ms | 333 / 435 / 403 ms | 299 / 632 / 379 ms |
+| PostgreSQL 16 | Long-lived | As loaded | 597 / 714 / 687 ms | 1.20 / 1.29 / 1.62 s | 816 ms / 1.11 s / 1.00 s |
+| PostgreSQL 16 | Long-lived | Analyzed | 606 / 738 / 752 ms | 463 / 577 / 553 ms | 484 / 809 / 587 ms |
+| PostgreSQL 16 | Long history | As loaded | 394 ms / 1.08 s / 407 ms | 422 ms / 1.27 s / 418 ms | 363 / 790 / 374 ms |
+| PostgreSQL 16 | Long history | Analyzed | 1.31 / 3.27 / 1.17 s | 419 ms / 1.34 s / 475 ms | 377 / 812 / 407 ms |
+| PostgreSQL 16 | Many builds | As loaded | 1.29 s / 1.23 s / 983 ms | 319 / 417 / 323 ms | 262 / 593 / 278 ms |
+| PostgreSQL 16 | Many builds | Analyzed | 962 ms / 1.21 s / 981 ms | 287 / 383 / 327 ms | 270 / 589 / 292 ms |
+| MySQL 8.4 | One build | As loaded | past 30 s / 549 ms / 394 ms | past 30 s / 579 ms / 385 ms | past 30 s / 613 ms / 394 ms |
+| MySQL 8.4 | One build | Analyzed | 385 / 534 / 372 ms | 389 / 564 / 364 ms | 404 / 628 / 402 ms |
+| MySQL 8.4 | Long-lived | As loaded | past 30 s / 1.08 s / 1.04 s | past 30 s / 1.11 s / 1.08 s | past 30 s / 1.24 s / 1.13 s |
+| MySQL 8.4 | Long-lived | Analyzed | 688 / 897 / 825 ms | 707 / 877 / 841 ms | 742 / 939 / 887 ms |
+| MySQL 8.4 | Long history | As loaded | past 30 s / past 30 s / past 30 s | past 30 s / 3.47 s / 1.45 s | past 30 s / 2.63 s / 1.40 s |
+| MySQL 8.4 | Long history | Analyzed | 1.36 / 6.86 / 1.37 s | 2.25 / 3.60 / 2.28 s | 1.38 / 2.69 / 1.61 s |
+| MySQL 8.4 | Many builds | As loaded | past 30 s / 1.44 s / 862 ms | past 30 s / 848 ms / 936 ms | past 30 s / 843 ms / 576 ms |
+| MySQL 8.4 | Many builds | Analyzed | 852 ms / 1.35 s / 847 ms | 588 / 790 / 598 ms | 574 / 832 / 598 ms |
+| MariaDB 11.4 | One build | As loaded | past 30 s / past 30 s / past 30 s | 28.4 / 27.9 / 30.6 s | 26.9 / 27.7 / 28.9 s |
+| MariaDB 11.4 | One build | Analyzed | 228 / 330 / 227 ms | 258 / 375 / 264 ms | 211 / 452 / 213 ms |
+| MariaDB 11.4 | Long-lived | As loaded | past 30 s / past 30 s / past 30 s | 25.9 / 26.1 / 27.4 s | 26.2 / 27.0 / 27.7 s |
+| MariaDB 11.4 | Long-lived | Analyzed | 599 / 716 / 739 ms | 575 / 671 / 705 ms | 624 / 854 / 760 ms |
+| MariaDB 11.4 | Long history | As loaded | past 30 s / past 30 s / past 30 s | 29.5 / 32.2 / 31.5 s | 29.2 / 28.7 / 29.8 s |
+| MariaDB 11.4 | Long history | Analyzed | 26.3 / 52.6 / 25.9 s | 649 ms / 1.34 s / 648 ms | 579 ms / 1.21 s / 615 ms |
+| MariaDB 11.4 | Many builds | As loaded | past 30 s / past 30 s / past 30 s | 30.8 / 31.7 / 32.4 s | 28.1 / 28.4 / 29.6 s |
+| MariaDB 11.4 | Many builds | Analyzed | 25.5 / 52.6 / 26.9 s | 671 ms / 1.09 s / 689 ms | 395 / 674 / 419 ms |
+| SQLite | One build | As loaded | 15.2 / 29.3 / 15.7 s | 1.11 / 1.48 / 1.24 s | 1.07 / 1.19 / 1.18 s |
+| SQLite | One build | Analyzed | 396 / 599 / 398 ms | 338 / 518 / 346 ms | 279 / 463 / 290 ms |
+| SQLite | Long-lived | As loaded | 71.4 / 75.0 / 70.6 s | 46.5 / 47.5 / 55.9 s | 49.3 / 50.5 / 58.7 s |
+| SQLite | Long-lived | Analyzed | 993 ms / 1.20 s / 1.31 s | 1.01 / 1.22 / 1.29 s | 980 ms / 1.13 s / 1.19 s |
+| SQLite | Long history | As loaded | 17.1 / 32.4 / 17.4 s | 3.02 / 6.68 / 3.20 s | 2.29 / 3.40 / 2.46 s |
+| SQLite | Long history | Analyzed | 2.03 / 2.75 / 1.97 s | 566 ms / 2.81 s / 583 ms | 462 / 976 / 493 ms |
+| SQLite | Many builds | As loaded | 15.7 / 30.9 / 16.3 s | 1.64 / 2.29 / 1.79 s | 1.53 / 2.04 / 1.69 s |
+| SQLite | Many builds | Analyzed | 1.30 / 2.15 / 1.32 s | 1.01 / 1.67 / 1.04 s | 866 ms / 1.38 s / 909 ms |
+
+Each closed read alone, through the store: the patches / the suppliers'
+statements.
+
+| Engine | Shape | Statistics | Grouped | Every row | Bounded |
+|---|---|---|---|---|---|
+| PostgreSQL 16 | One build | As loaded | 88 ms / past 30 s | 100 / 124 ms | 81 ms / 4.07 s |
+| PostgreSQL 16 | One build | Analyzed | 113 / 93 ms | 79 / 91 ms | 75 / 318 ms |
+| PostgreSQL 16 | Long history | As loaded | 229 / 795 ms | 265 / 837 ms | 202 / 430 ms |
+| PostgreSQL 16 | Long history | Analyzed | 1.12 / 1.73 s | 262 / 874 ms | 202 / 428 ms |
+| PostgreSQL 16 | Many builds | As loaded | 752 / 249 ms | 57 / 69 ms | 66 / 291 ms |
+| PostgreSQL 16 | Many builds | Analyzed | 716 / 240 ms | 58 / 69 ms | 63 / 303 ms |
+| MySQL 8.4 | One build | As loaded | 153 / 145 ms | 130 / 203 ms | 145 / 195 ms |
+| MySQL 8.4 | One build | Analyzed | 139 / 146 ms | 128 / 177 ms | 145 / 189 ms |
+| MySQL 8.4 | Long history | As loaded | 1.19 / 5.52 s | 1.07 / 2.10 s | 1.08 / 1.20 s |
+| MySQL 8.4 | Long history | Analyzed | 1.10 / 5.28 s | 1.09 / 2.19 s | 1.12 / 1.19 s |
+| MySQL 8.4 | Many builds | As loaded | 19.9 s / 525 ms | 211 / 183 ms | 183 / 240 ms |
+| MySQL 8.4 | Many builds | Analyzed | 385 / 481 ms | 179 / 187 ms | 180 / 247 ms |
+| MariaDB 11.4 | One build | As loaded | past 30 s / past 30 s | 66 / 80 ms | 64 / 207 ms |
+| MariaDB 11.4 | One build | Analyzed | 78 / 88 ms | 70 / 80 ms | 66 / 210 ms |
+| MariaDB 11.4 | Long history | As loaded | past 30 s / past 30 s | 287 ms / 1.85 s | 244 / 588 ms |
+| MariaDB 11.4 | Long history | Analyzed | 25.4 / 27.1 s | 263 / 658 ms | 242 / 595 ms |
+| MariaDB 11.4 | Many builds | As loaded | past 30 s / past 30 s | 687 / 989 ms | 78 / 253 ms |
+| MariaDB 11.4 | Many builds | Analyzed | 25.6 / 25.8 s | 231 / 389 ms | 78 / 238 ms |
+| SQLite | One build | As loaded | 14.5 / 14.3 s | 158 / 311 ms | 70 / 117 ms |
+| SQLite | One build | Analyzed | 160 / 173 ms | 105 / 125 ms | 58 / 134 ms |
+| SQLite | Long history | As loaded | 15.3 / 15.6 s | 1.20 / 3.04 s | 377 / 527 ms |
+| SQLite | Long history | Analyzed | 1.76 s / 690 ms | 380 ms / 2.24 s | 295 / 460 ms |
+| SQLite | Many builds | As loaded | 14.3 / 14.3 s | 170 / 306 ms | 74 / 128 ms |
+| SQLite | Many builds | Analyzed | 447 / 487 ms | 183 / 309 ms | 67 / 155 ms |
+
+| Reading | |
+|---|---|
+| Grouped over history | Each check is asked per closed row, so the history multiplies it: analyzed, 52.6 s with suppliers on MariaDB for a long history and for many builds, and 5.3 s for the suppliers' statements on MySQL with a long history |
+| Every row over history | Every row of the closed issues reaches the application: 2.24 s for the suppliers' statements on SQLite with a long history, analyzed, and 1.85 s on MariaDB as loaded |
+| Bounded, per row | The grouping statements read each closed row of the build once, as grouped does: with a long history, 267,750 rows, 1.1 s for the patches on MySQL in either form, 0.2 to 0.4 s on MariaDB and SQLite, 0.12 to 0.16 s on PostgreSQL |
+| Bounded, per occurrence | The latest row check costs each highest closed row one range: about 84 µs on PostgreSQL, 52 µs on MariaDB, 26 µs on SQLite and 16 µs on MySQL, analyzed, 43 to 226 ms for the 2,678 of one build. On one build analyzed it is what the suppliers' statements cost beyond grouped: 318 ms against 93 ms on PostgreSQL, 210 ms against 88 ms on MariaDB |
+| PostgreSQL never analyzed | It takes the build named in every term of the latest row check to the build's own index, then tests every row of the build against the terms: 280 ms a statement, 4.07 s for the suppliers' statements of one build, where grouped stops past 30 s |
+| Past 1 s as loaded | The open reads: the occurrences stated one by one on MariaDB and MySQL, the decided issues on MySQL and the decided groups on SQLite for a long-lived product, and on SQLite the issues recorded elsewhere, 0.9 to 1.6 s with a long history. MySQL with a long history: the patches' grouping, 1.1 s, as grouped takes it |
+| Past 1 s analyzed | MySQL with a long history: the patches' grouping, 1.1 s, as grouped takes it. MariaDB with a long history: 1.21 s with suppliers, 0.58 s of it the two groupings. SQLite: 1.38 s with suppliers for many builds, 0.88 s of it the issues recorded elsewhere, and 1.13 to 1.19 s for a long-lived product, from the open reads |
 
 ## Failed alternatives
 
@@ -226,13 +324,27 @@ lost to.
 | The open occurrences as a row value `NOT IN` a subquery | Past a minute on MySQL | The closed findings read as sets |
 | The open occurrences as `NOT IN` the build's whole open set | 0.60 s on MySQL and 0.66 s on MariaDB, analyzed | The closed findings read as sets |
 | The open occurrences as `NOT IN` the open set of the closed issues, read once | MySQL as loaded 0.28 s; analyzed, MariaDB 0.26 s against 0.07 s and SQLite 0.8 s to 1.15 s against 0.13 s | The closed findings read as sets |
-| The latest row at an occurrence as `IN` the grouped maxima | 1.7 s on PostgreSQL as loaded | The latest row asked of each row |
-| The latest row as a scalar maximum per row | Past a minute on MySQL as loaded | The latest row asked of each row |
+| The latest row at an occurrence as `IN` the grouped maxima | 1.7 s on PostgreSQL as loaded | The closed findings read as sets |
+| The latest row as a scalar maximum per row | Past a minute on MySQL as loaded | The closed findings read as sets |
 | The component's shipping asked with its open check in the aggregate | 1.15 s on PostgreSQL as loaded, through the root index | The closed findings read as sets |
 | The shipping and none-open checks in WHERE | Past 30 s for the patched findings on PostgreSQL never analyzed, against 4.27 s in HAVING | The closed findings read as sets |
 | The build's open issues read apart and met with the decided issues in the application | Analyzed, one build: 20 ms against 54 ms on PostgreSQL, 56 ms against 10 ms on MySQL. Long-lived: 250 ms against 130 ms on MySQL | The build asked in the statement |
 | The build asked of each decision occurrence as a value | Analyzed, long-lived: 187 ms against 130 ms on PostgreSQL, 338 ms against 130 ms on MySQL, 223 ms against 166 ms on MariaDB | The build asked in the statement |
 | The shipping, open and latest checks asked per issue and component in `HAVING`, in one statement | Past 30 s for a closed read as loaded on PostgreSQL, MySQL and MariaDB, 13.5 s on SQLite with no statistics | The closed findings read as sets |
-| The latest row read apart from the open findings of the closed issues, as grouped maxima | 178 to 225 ms against 115 to 120 ms for the suppliers' statements on SQLite, analyzed | The findings of the closed issues read once |
-| The latest row read by the closed findings' occurrences as a constant list | 359 to 411 ms against 115 to 120 ms for the suppliers' statements on SQLite, analyzed | The findings of the closed issues read once |
-| Every finding of the build read once for the suppliers' statements | 180 to 213 ms against 200 to 213 ms on MySQL, analyzed, and every finding of a build read where no supplier's statement closed any | The closed findings read first, then the findings of their issues |
+| The latest row read apart from the open findings of the closed issues, as grouped maxima | 178 to 225 ms against 115 to 120 ms for the suppliers' statements on SQLite, analyzed, read with every row | The latest row asked by key |
+| The latest row read by the closed findings' occurrences as a constant list | 359 to 411 ms against 115 to 120 ms for the suppliers' statements on SQLite, analyzed, read with every row | The latest row asked by key |
+| Every finding of the build read once for the suppliers' statements | 180 to 213 ms against 200 to 213 ms on MySQL, analyzed, and every finding of a build read where no supplier's statement closed any | The closed findings read first, then the open findings of their issues |
+| Every row of the closed issues read into the application, open and closed | With a long history, analyzed: 2.24 s against 460 ms for the suppliers' statements on SQLite, 2.19 s against 1.19 s on MySQL. As loaded with many builds, MySQL 2.6 s in one run and 183 ms in another, against 240 ms | The closed findings grouped in their statement |
+| The closed findings grouped by the issue first | 1.6 s against 0.3 s for the suppliers' statements on SQLite with a long history, analyzed, walking the occurrence index over the whole table | The groups led by the closure |
+| The latest row asked of each highest closed row by a correlated subquery | Past 30 s on MariaDB as loaded in every shape; on MySQL as loaded, 8 to 10 minutes for 2,678 rows with a long history, through the build's open index | The rows after it asked as a set |
+| The same, with the build compared as an expression MySQL cannot look up | 267 to 282 ms for 500 rows on MySQL as loaded, against about 3 ms for 200 as a set | The rows after it asked as a set |
+| The highest row at each occurrence read as a set, with no row to follow | 40 ms for 200 occurrences on MySQL as loaded, against about 3 ms | The rows after the highest closed row |
+| The build asked once, outside the terms | 66 s for the suppliers' statements on SQLite as loaded with a long history, 5 s a statement through the build's index, against 50 ms | The build named in every term |
+| The terms as a row value `IN` a list of keys | 17 ms against 10 ms for 200 on MariaDB, one build | The terms as conjunctions |
+| 500 occurrences to a statement | 78 ms against 9.4 ms for 200 on MariaDB, one build: the cost of the list grows faster than its length. 25 and 50 cost 40 µs an occurrence against 50 µs | 200 occurrences to a statement |
+| Each key column as its own `IN` list, with the lowest row to follow | Faster on PostgreSQL: 35 ms against 305 ms a statement never analyzed, through the build's index, and 4.7 ms against 20 ms with a long history on background statistics, through the primary key from the lowest row. The ranges are the product of the lists, 1,900 for 200 keys with 10 occurrences and 190 issues, past what MySQL and MariaDB cost by looking in the index; through the primary key, a statement grows with the age of its oldest row | The terms as conjunctions |
+| The occurrence index without the build | 923 ms against 161 ms for the latest row check on MariaDB as loaded with many builds, 416 ms against 156 ms analyzed. No difference on SQLite with a long history | The occurrence index carrying the build, the kind and the row |
+| The grouping index carrying the patch, the statement and the occurrence | MySQL with a long history: 1.07 s against 1.12 s for the patches, analyzed, and the documents stopped past 30 s at an open read | The closed findings named closed |
+| The open findings of the closed issues with no visibility named | With many builds as loaded, MariaDB reads each issue's open rows of every build, 458 ms against 28 ms a read, and MySQL the build's open findings, 55 ms against 10 ms | Every visibility named |
+| The closed findings with no closing time named | MariaDB as loaded with many builds reads the whole table, 193 ms against 28 ms | The closed findings named closed |
+| An index leading with the build and the closing reason | SQLite with statistics then read the issues recorded elsewhere without the index it skips through, about 1 s | The closed findings named closed |

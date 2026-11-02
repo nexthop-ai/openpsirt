@@ -102,7 +102,7 @@ libswsscommon 1.0.0: not affected".
 The document of a build and the statements published about it
 (`design-docs/publishing.md`) read through the same statements. The runs behind
 these rules are in `design-docs/remediation-measurements.md` § VEX document
-reads and § A long-lived product.
+reads, § A long-lived product and § Closed reads as sets.
 
 | Rule | Reason |
 |---|---|
@@ -111,10 +111,17 @@ reads and § A long-lived product.
 | In a statement read as one query, a component's stated package identifier is asked of each row with its keys bound, never joined | Joined, an engine with no statistics reads the build's graph once per finding |
 | In a statement read as one query, the open image version is asked of each open node with its keys bound | An image keeps every version it was rebuilt at; read through all of them, each row costs the image's history |
 | A statement occurrence by occurrence reads the same issues first | |
-| The patches and suppliers' statements are read as sets and grouped in the application: the build's closed findings, what closed them, the findings of their issues, the open nodes and image versions of their components, and the components' names | Asked per row or per group inside one statement, every engine picks a plan reading the build's findings or graph once per closed finding on the statistics a bulk load leaves |
+| The patches and suppliers' statements are read as sets and grouped in the application: the build's closed findings, what closed them, the open findings of their issues, the open nodes and image versions of their components, and the components' names | Asked per row or per group inside one statement, every engine picks a plan reading the build's findings or graph once per closed finding on the statistics a bulk load leaves |
 | Each of those statements reads one table by constants, and joins another only by its primary key | A primary key lookup is the one plan every engine picks whatever its statistics say |
-| The findings of the closed issues are read once: open and closed for the suppliers' statements, serving both the open check and the latest row at each occurrence; the open ones for the patches | Read twice, the suppliers' statements take 202 ms against 119 ms on SQLite, analyzed |
-| The findings of the closed issues are read at every visibility, whatever the document is read at | An undisclosed occurrence still open holds back a disclosed statement |
+| The closed findings are grouped in the statement that reads them: for the patches the lowest row at each issue, component and patch; for the suppliers' statements the highest at each occurrence, component and statement | An occurrence closed again and again holds a row per closing, and read row by row the application receives its whole history |
+| Those groups are led by the closure | No index leads with it, so no engine walks an index for the grouping's order; led by the issue, SQLite with statistics walks the occurrence index over the whole table |
+| Whether a closed row is the latest at its occurrence is asked of the highest closed row at each occurrence alone, as whether the build holds a row after it at that occurrence | Only that row can be; asked of every row, each costs the occurrence's history |
+| Those rows are asked as a set, at most 200 occurrences to a statement, each named by its occurrence, issue, build and kind with the row it must follow, and nothing outside those terms | Asked row by row, MySQL and MariaDB on the statistics a bulk load leaves read the build's open findings once per row; past 200 ranges, they cost the list from statistics; with the build asked outside the terms, SQLite with no statistics reads the build's whole index once per statement |
+| The occurrence index carries the build, the kind and the row after the occurrence and issue | Each term is then one range of it, whatever other builds hold the occurrence |
+| The closed findings are named closed, though their closing reason implies it | The build's closed rows are then one range of an index leading with the build; MariaDB on the statistics a bulk load leaves otherwise reads the whole table |
+| The open findings of the closed issues are named at every visibility | The build's own open rows of each issue are then ranges of the grouping index; MySQL and MariaDB otherwise read each issue's open rows of every build holding it |
+| The open findings of the closed issues are read once, one row per issue and component | Read with their closed rows, the application receives every closing of every occurrence of the issues |
+| The open findings of the closed issues are read at every visibility, whatever the document is read at | An undisclosed occurrence still open holds back a disclosed statement |
 
 ## Identity and revisions
 
