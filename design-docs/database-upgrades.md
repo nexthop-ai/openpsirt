@@ -61,8 +61,8 @@ Each index builds in 0.7 s on PostgreSQL over 1,159,943 findings, at 21 to
 
 ## The v0.11.0 upgrade
 
-Migration 45, the untagged release's own, in three phases: renames, stored
-values, then changes. Each phase logs its duration.
+Migration 45, in three phases: renames, stored values, then changes. Each phase
+logs its duration.
 `design-docs/findings-reports.md` § The case says what a report's case holds.
 
 The renames come first, so the rest and the release's declarations use the new

@@ -74,7 +74,7 @@ The chain is the baseline, then one migration per release.
 |---|---|
 | 43 | The baseline: v0.9.0's schema, made at once on an empty database (§ The baseline) |
 | 44 | v0.9.0's schema into v0.10.0's |
-| 45 | v0.10.0's schema into v0.11.0's, the untagged release's own |
+| 45 | v0.10.0's schema into v0.11.0's |
 
 `design-docs/database-upgrades.md` says what each does. A tagged release's
 migration, and every declaration it reads, never changes again, because a

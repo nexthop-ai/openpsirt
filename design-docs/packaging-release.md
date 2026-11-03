@@ -146,12 +146,12 @@ build arguments, so labels, inventories and `openpsirt -version` agree.
 A release is a tag on a commit that froze its migrations; the `Release`
 workflow does the rest.
 
-1. Rehearse the upgrade from every earlier release the baseline upgrades, on
-   each engine. `design-docs/database-migrations.md` § Upgrade rehearsal says what it checks.
+1. Rehearse the upgrade from the newest patch of every earlier release line the
+   baseline upgrades, on each engine; a line's patches share its schema. `design-docs/database-migrations.md` § Upgrade rehearsal says what it checks.
 
    ```
    make engines-up
-   for from in v0.9.0 v0.10.0 v0.10.1 v0.10.2; do for engine in sqlite postgres mysql mariadb; do
+   for from in v0.9.0 v0.10.2; do for engine in sqlite postgres mysql mariadb; do
      make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
    done; done
    ```

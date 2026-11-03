@@ -208,7 +208,7 @@ is the shape 1.0 will have, and promises nothing.
 - What a tagged release shipped never changes; each release's declarations sit beside its upgrade migration (`design-docs/database-migrations.md` § Migrations).
 - Migration 43 is the baseline, v0.9.0's schema at once. An older database is refused, naming v0.10.2 to upgrade it with first.
 - Migrations 44 and 45 upgrade databases v0.9.0 and v0.10.x built.
-- The next schema change is migration 45, edited until a tag ships it.
+- The next schema change is migration 46, edited until a tag ships it.
 - At 1.0 the baseline becomes 1.0's schema, beside one migration from the last 0.x release, which `TODO.md` records.
 
 ## Evidence beside a decision
