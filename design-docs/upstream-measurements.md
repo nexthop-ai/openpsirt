@@ -48,6 +48,12 @@ whether it is closed and looked for a statement beside each. PostgreSQL, MySQL
 and MariaDB read every finding at each statement's component and tested the
 issue on each. Joined through the issue, every engine starts from the
 statements and reads a finding through the index on its issue. Read through
-the join with nothing waiting, PostgreSQL takes 37 ms, most of it planning. On
+the join with nothing waiting, PostgreSQL takes 37 ms, most of it planning. An
+issue's own name is joined as the issue its row is read as, so a name merged
+into another issue reaches that issue's findings. The table measured the row
+the name is filed under. On a second seed of the same demo, 2,524 statements
+waiting on SQLite and 2,466 on PostgreSQL, the row took 100 ms and the issue
+it is read as 117 ms on SQLite, and both 270 ms on PostgreSQL, each still
+reading a finding through the index on its issue. On
 SQLite, without the analysis an upgrade makes, both forms run past 120 s
 (`design-docs/database-measurements.md` § Statistics after an upgrade).

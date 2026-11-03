@@ -148,6 +148,7 @@ A statement depending on the upstream's own build is offered, never applied.
 | Nothing is read past whether any statement awaits review where none does | It is the usual case, and answering it takes under 4 ms on every engine (`design-docs/upstream-measurements.md` § Offers for review) |
 | A finding is reached through the issue a statement names, joined on each of the issue's names | As a filter beside the component, every engine read every finding at the component, or every open finding, and 2,472 statements over 414,683 findings ran past 120 s; joined, 91 to 280 ms |
 | A statement reaches an issue once, however many of its names fold to the one stated | |
+| A name merged into another issue reaches the issue it merged into | Its own row holds no findings once merged (`design-docs/findings-issues.md` § Merged issues) |
 
 ## Declined statements
 

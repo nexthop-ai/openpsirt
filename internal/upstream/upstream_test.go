@@ -704,3 +704,57 @@ func TestAStatementIsOfferedOnceByAnyOfAnIssuesNames(t *testing.T) {
 		}
 	})
 }
+
+func TestAStatementUnderANameMergedIntoAnotherIssueIsOfferedAgainstThatIssuesFindings(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		w.rescan()
+		ctx := t.Context()
+		said := w.statement(ownBuild, "")
+		if said == nil {
+			t.Fatal("the statement about the upstream's own build was not recorded for review")
+		}
+		issue, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, ownBuild)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A merge leaves the absorbed row under its own name, read as the
+		// issue it merged into, holding no findings and no alias.
+		const merged = "CVE-2026-1099"
+		for _, statement := range []struct {
+			query string
+			args  []any
+		}{
+			{`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "kind", "exploited", "first_seen_at", "issue_id")
+				SELECT ?, ?, "kind", ?, "first_seen_at", ? FROM "vulnerability" WHERE "id" = ?`,
+				[]any{merged, strings.ToLower(merged), false, issue, issue}},
+			// The statement made under the merged name instead.
+			{`UPDATE "received_vex_statement" SET "vulnerability" = ? WHERE "id" = ?`,
+				[]any{strings.ToLower(merged), said.ID}},
+		} {
+			if _, err := w.DB.DB.NewRaw(statement.query, statement.args...).Exec(ctx); err != nil {
+				t.Fatalf("%v\n%s", err, statement.query)
+			}
+		}
+
+		offers, err := w.findings.Offers(ctx, w.proposer, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		held := 0
+		for _, one := range offers {
+			if one.Statement != said.ID || one.Issue != ownBuild {
+				t.Errorf("offered statement %d on %s, want statement %d on %s",
+					one.Statement, one.Issue, said.ID, ownBuild)
+				continue
+			}
+			held++
+		}
+		if held != 2 {
+			t.Errorf("%d offers of the statement under the merged name, want one beside each of the fork's two findings",
+				held)
+		}
+	})
+}

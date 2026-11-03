@@ -172,9 +172,11 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 	} else if !held {
 		return nil, nil
 	}
-	// Every name an issue goes by, beside the issue: its own and each
-	// alias. Distinct on the pair, so a statement reaches an issue once
-	// however many of its names it was stated under.
+	// Every name an issue goes by, beside the issue: its own, each alias,
+	// and the name of each issue merged into it, whose row is read as the
+	// issue it merged into and holds no findings. Distinct on the pair, so a
+	// statement reaches an issue once however many of its names it was
+	// stated under.
 	//
 	// Joined by equality, so a finding is read through the issue the
 	// statement names. As a correlated IN the issue is a filter rather than
@@ -182,7 +184,7 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 	// for each, past 120 s over 414,683 findings and 2,472 statements, and
 	// PostgreSQL read every finding at a statement's component
 	// (design-docs/upstream-measurements.md § Offers for review).
-	named := `(SELECT "vv"."identifier_folded" AS "folded", "vv"."id" AS "issue_id" FROM "vulnerability" AS "vv"
+	named := `(SELECT "vv"."identifier_folded" AS "folded", "vv"."issue_id" AS "issue_id" FROM "vulnerability" AS "vv"
 		UNION SELECT "vl"."identifier_folded", "vl"."vulnerability_id" FROM "vulnerability_alias" AS "vl")`
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var out []Offer
