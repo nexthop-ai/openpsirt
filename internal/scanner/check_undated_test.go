@@ -1,0 +1,170 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package scanner_test
+
+import (
+	"context"
+	"io"
+	"log/slog"
+	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/issuedate"
+	"github.com/nexthop-ai/openpsirt/internal/scanner"
+)
+
+// osvSays answers one date for every name, or none.
+type osvSays struct{ published time.Time }
+
+func (o osvSays) Dates(context.Context, string) (issuedate.Dates, error) {
+	if o.published.IsZero() {
+		return issuedate.Dates{}, issuedate.ErrUnknown
+	}
+	return issuedate.Dates{Published: o.published}, nil
+}
+
+// undatedMatch records a check's match on an issue OSV was asked about and
+// gave no date, first seen here after the replacement, with the last scan's
+// data dated twelve hours after the inventory arrived.
+func undatedMatch(t *testing.T, w *fixture.World) (*checkFixture, *scanner.Checking) {
+	t.Helper()
+	ctx := t.Context()
+	f := replacedInventory(t, w)
+	f.since = f.arrived.Add(12 * time.Hour)
+	if _, err := f.db.NewUpdate().Table("scan_run").
+		Set(`"database_version" = ?`, f.since.Format(time.RFC3339)).
+		Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+		[]finding.Named{{Identifier: "CVE-2026-0011", Severity: "high"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.NewUpdate().Table("vulnerability").
+		Set(`"dates_asked_at" = ?`, time.Now().UTC().Add(-60*24*time.Hour)).
+		Set(`"first_seen_at" = ?`, f.replaced.Add(5*24*time.Hour)).
+		Where(`"identifier" = ?`, "CVE-2026-0011").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0011", libnl)}}
+	checking := f.check(t, s)
+	if checking == nil {
+		t.Fatal("the check waited on an issue OSV was already asked about")
+	}
+	return f, checking
+}
+
+// matchOf reads the one finding the check recorded and whether it is marked.
+func matchOf(t *testing.T, f *checkFixture) (finding.Finding, bool) {
+	t.Helper()
+	var rows []finding.Finding
+	if err := f.db.NewSelect().Model(&rows).Where(`"build_id" = ?`, f.build).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("%d findings, want the check's one", len(rows))
+	}
+	marked, err := f.db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Where(`"f"."id" = ?`, rows[0].ID).Where(finding.PublicationUnknown("f")).Count(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows[0], marked == 1
+}
+
+// redate runs the date pass once with OSV giving this date.
+func redate(t *testing.T, f *checkFixture, published time.Time) {
+	t.Helper()
+	p := issuedate.NewPass(f.db.DB, slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
+	p.Asker, p.Pause = osvSays{published}, 0
+	if _, err := p.Once(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// foundAfter is what the replaced upload's receipt counts as found after fixed.
+func foundAfter(t *testing.T, f *checkFixture, runID int64) int {
+	t.Helper()
+	changed, err := finding.NewStore(f.db.DB).Changes(t.Context(),
+		access.Everything("a test counting a check"), f.build, []int64{runID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return changed[runID].Opened
+}
+
+func TestAMatchOnAnIssueOSVNeverDatesIsRecordedMarked(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, checking := undatedMatch(t, w)
+		if checking.Checked.Recorded != 1 {
+			t.Fatalf("recorded %d, want the match on the undated issue", checking.Checked.Recorded)
+		}
+		got, marked := matchOf(t, f)
+		switch {
+		case !marked:
+			t.Error("the match is not marked publication date unknown")
+		case !got.OpenedAt.Equal(f.since):
+			t.Errorf("opened at %s, want the last scan's data date %s", got.OpenedAt, f.since)
+		case got.ClosedAt == nil || !got.ClosedAt.Equal(f.replaced):
+			t.Errorf("closed at %v, want the replacement at %s", got.ClosedAt, f.replaced)
+		}
+		// The list read on a day inside the stretch carries the marker.
+		var productID int64
+		if err := f.db.NewSelect().TableExpr(`"build" AS "b"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+			ColumnExpr(`"st"."product_id"`).Where(`"b"."id" = ?`, f.build).Scan(t.Context(), &productID); err != nil {
+			t.Fatal(err)
+		}
+		who := access.NewPerson(1, "someone", false, map[int64][]access.Role{productID: {access.PublicTriage}}, 101)
+		day := f.since.Truncate(24 * time.Hour).Add(24 * time.Hour)
+		groups, _, err := finding.NewStore(f.db.DB).Groups(t.Context(), who,
+			finding.Scope{ProductID: &productID}, 50, 0, finding.Filter{OpenOn: &day})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(groups) != 1 || !groups[0].PublicationUnknown {
+			t.Errorf("the list on %s holds %+v, want the one match marked", day, groups)
+		}
+		if n := foundAfter(t, f, checking.RunID); n != 1 {
+			t.Errorf("found after fixed counts %d, want 1", n)
+		}
+	})
+}
+
+func TestAMatchDatedBeforeTheReplacementOpensAtItsDate(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatch(t, w)
+		when := f.arrived.Add(36 * time.Hour)
+		redate(t, f, when)
+		got, marked := matchOf(t, f)
+		switch {
+		case marked:
+			t.Error("the match is still marked publication date unknown")
+		case !got.OpenedAt.Equal(when):
+			t.Errorf("opened at %s, want the publication at %s", got.OpenedAt, when)
+		case got.ClosedBecause != finding.Upgraded:
+			t.Errorf("closed because %q, want the replacement's upgraded kept", got.ClosedBecause)
+		}
+	})
+}
+
+func TestAMatchDatedAfterTheReplacementIsWithdrawn(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, checking := undatedMatch(t, w)
+		redate(t, f, f.replaced.Add(24*time.Hour))
+		got, _ := matchOf(t, f)
+		if got.ClosedBecause != finding.Invalid {
+			t.Errorf("closed because %q, want invalid: it was never exposed", got.ClosedBecause)
+		}
+		if !got.OpenedAt.Equal(f.since) {
+			t.Errorf("opened at %s, want the stretch left as recorded", got.OpenedAt)
+		}
+		if n := foundAfter(t, f, checking.RunID); n != 0 {
+			t.Errorf("found after fixed counts %d, want none once it is withdrawn", n)
+		}
+	})
+}

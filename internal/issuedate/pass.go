@@ -15,6 +15,8 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -308,20 +310,47 @@ func ordered(own string, others []string) []string {
 // record writes when the issue was asked about, and the dates where OSV gave
 // them. An empty answer leaves dates already held: a record OSV stops serving
 // was still published when it said.
+//
+// A first date also rewrites what a replaced inventory's check recorded of the
+// issue without one, in the same transaction, so a match never reads as dated
+// while its stretch still assumes it was not.
 func (p *Pass) record(ctx context.Context, id int64, dates Dates) error {
-	q := p.db.NewUpdate().Table("vulnerability").
-		Set(`"dates_asked_at" = ?`, p.Now().UTC().Truncate(time.Microsecond)).
-		Where(`"id" = ?`, id)
-	if !dates.Published.IsZero() {
-		q = q.Set(`"published_at" = ?`, dates.Published.Truncate(time.Microsecond))
-		if dates.Modified.IsZero() {
-			q = q.Set(`"modified_at" = NULL`)
-		} else {
-			q = q.Set(`"modified_at" = ?`, dates.Modified.Truncate(time.Microsecond))
+	asked := p.Now().UTC().Truncate(time.Microsecond)
+	var redated finding.Redated
+	err := database.Within(ctx, p.db, func(ctx context.Context, tx bun.IDB) error {
+		redated = finding.Redated{}
+		q := tx.NewUpdate().Table("vulnerability").
+			Set(`"dates_asked_at" = ?`, asked).
+			Where(`"id" = ?`, id)
+		if !dates.Published.IsZero() {
+			var held struct {
+				PublishedAt *time.Time `bun:"published_at"`
+			}
+			if err := tx.NewSelect().Table("vulnerability").Column("published_at").
+				Where(`"id" = ?`, id).Scan(ctx, &held); err != nil {
+				return fmt.Errorf("read an issue's dates: %w", err)
+			}
+			if held.PublishedAt == nil {
+				var err error
+				if redated, err = finding.Redate(ctx, tx, id, dates.Published); err != nil {
+					return err
+				}
+			}
+			q = q.Set(`"published_at" = ?`, dates.Published.Truncate(time.Microsecond))
+			if dates.Modified.IsZero() {
+				q = q.Set(`"modified_at" = NULL`)
+			} else {
+				q = q.Set(`"modified_at" = ?`, dates.Modified.Truncate(time.Microsecond))
+			}
 		}
+		if _, err := q.Exec(ctx); err != nil {
+			return fmt.Errorf("record an issue's dates: %w", err)
+		}
+		return nil
+	})
+	if err == nil && redated.Moved+redated.Withdrawn > 0 {
+		p.logger.Info("dated what a check recorded without a date", "issue", id,
+			"moved", redated.Moved, "withdrawn", redated.Withdrawn)
 	}
-	if _, err := q.Exec(ctx); err != nil {
-		return fmt.Errorf("record an issue's dates: %w", err)
-	}
-	return nil
+	return err
 }

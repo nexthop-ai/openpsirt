@@ -11002,6 +11002,8 @@ export interface components {
             product?: string;
             /** @description That product's display name, or its name where it has none */
             product_name?: string;
+            /** @description Publication date unknown: an occurrence a replaced inventory's check recorded opens from that inventory's last scan, because no date is known for the issue. Only on a list read with open_on */
+            publication_unknown?: boolean;
             /**
              * Format: double
              * @description The severity as a number, which is what the order compares

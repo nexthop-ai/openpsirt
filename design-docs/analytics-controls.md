@@ -50,7 +50,9 @@ it shows it among the filters in force, removable.
 | Rows | Every finding open at any moment of that day in UTC, closed since or not, in place of what is open now |
 | Reach | The findings list by issue and by component, their totals, the count below the minimum severity, and their files (REQ-50), through the same visibility as the list |
 | Decisions, assignment, deadlines and ratings | As they stand now; nothing about them is kept by day |
-| A finding a replaced inventory's check recorded | Open on the days between its opening and its replacement (`design-docs/findings-closure.md` § Replaced inventories) |
+| A finding a replaced inventory's check recorded | Open on the days between its opening and its replacement (`design-docs/findings-closure.md` § Replaced inventories); a row says publication date unknown where its opening assumed the widest stretch |
+| A finding never present, `invalid` or `unaffected` | Open on no day, as in every trend step |
+| A finding one run recorded already closed, other than a check's | Open on no day; it was never open |
 
 ## The exception report
 

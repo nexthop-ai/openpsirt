@@ -110,6 +110,10 @@ type Group struct {
 	// recorded flaw rendered identically to any other row.
 	Undisclosed bool
 	DiscloseAt  *time.Time
+	// PublicationUnknown says an occurrence a replaced inventory's check
+	// recorded opens over the widest stretch, because OSV gave the issue no
+	// date. Only on a list read on a day.
+	PublicationUnknown bool
 	// Labels are the words somebody put on this, as they were typed.
 	Labels []string
 	// OpenedAt is when the earliest of these occurrences opened here, which is
@@ -570,8 +574,9 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		State:        stateWord(row.Occurrences, row.Waiting, row.Approved, row.Lapsed),
 		SentBack:     row.SentBack > 0,
 		OpenedAt:     row.OpenedAt, DueAt: row.DueAt,
-		Undisclosed: row.Undisclosed,
-		DiscloseAt:  row.DiscloseAt,
+		Undisclosed:        row.Undisclosed,
+		DiscloseAt:         row.DiscloseAt,
+		PublicationUnknown: row.PublicationUnknown > 0,
 	}
 	if issue, held := named[row.VulnerabilityID]; held {
 		issue = issue.RatedIn(rated[RatedKey{floor.ProductID, row.VulnerabilityID}])
@@ -778,6 +783,9 @@ type decorated struct {
 	Approved            int   `bun:"approved_here"`
 	Lapsed              int   `bun:"lapsed_here"`
 	SentBack            int   `bun:"sent_back_here"`
+	// PublicationUnknown is how many occurrences open over the widest
+	// stretch because no date was known for the issue.
+	PublicationUnknown int `bun:"publication_unknown"`
 }
 
 // heads reads one page of the findings list's groups, most urgent first, from
@@ -1019,6 +1027,10 @@ func (s *Store) decorate(ctx context.Context, buildIDs []int64, productID int64,
 	// The decision state of each group, counted the way the state filter
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.
+	if filter.OpenOn != nil {
+		// Only on a day: a row open now was never a check's match.
+		q = q.ColumnExpr(`SUM(CASE WHEN ` + PublicationUnknown("f") + ` THEN 1 ELSE 0 END) AS "publication_unknown"`)
+	}
 	held, heldArgs := openOn("f", filter.OpenOn)
 	q = decisionCounts(q, "?", []any{productID},
 		decisionWaiting, decisionApproved, decisionLapsed, decisionSentBack).
@@ -1116,10 +1128,17 @@ func firstLineOf(description string) string {
 
 // openOn is the condition that a finding under this alias is open: now, or at
 // any moment of a day, in UTC, where one is given.
+//
+// On a day, a row never present is left out, as every trend step leaves it
+// out, and so is a row one run recorded already closed, which was never open,
+// unless a check recorded it.
 func openOn(alias string, on *time.Time) (string, []any) {
 	if on == nil {
 		return fmt.Sprintf(`"%s"."closed_at" IS NULL`, alias), nil
 	}
-	return fmt.Sprintf(`"%[1]s"."opened_at" < ? AND ("%[1]s"."closed_at" IS NULL OR "%[1]s"."closed_at" > ?)`, alias),
-		[]any{on.Add(24 * time.Hour), *on}
+	return fmt.Sprintf(`"%[1]s"."opened_at" < ? AND ("%[1]s"."closed_at" IS NULL OR "%[1]s"."closed_at" > ?)
+	AND COALESCE("%[1]s"."closed_because", '') NOT IN (?)
+	AND ("%[1]s"."opened_run_id" IS NULL OR "%[1]s"."closed_run_id" IS NULL
+		OR "%[1]s"."opened_run_id" <> "%[1]s"."closed_run_id" OR (%[2]s))`, alias, checkRecorded(alias)),
+		[]any{on.Add(24 * time.Hour), *on, bun.List(NeverPresent())}
 }

@@ -71,3 +71,59 @@ func TestTheListOnADayHoldsWhatWasOpenThatDay(t *testing.T) {
 		}
 	})
 }
+
+// closedOnADay is a build holding CVE-2026-1 open and CVE-2026-2 closed, both
+// opened five days ago, the second closed three days ago, and the reader
+// counting them on the day between.
+func closedOnADay(t *testing.T, f *fixture) func(t *testing.T) int {
+	t.Helper()
+	ctx := t.Context()
+	f.shipped(t, through(libnl))
+	f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
+	f.applied(t, found("CVE-2026-1", libnl))
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	if _, err := f.db.NewUpdate().Table("finding").Set(`"opened_at" = ?`, today.Add(-5*24*time.Hour)).
+		Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.NewUpdate().Table("finding").Set(`"closed_at" = ?`, today.Add(-3*24*time.Hour)).
+		Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NOT NULL`).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	who := f.holding(t, access.PublicTriage)
+	between := today.Add(-4 * 24 * time.Hour)
+	return func(t *testing.T) int {
+		t.Helper()
+		_, total, err := f.store.Groups(t.Context(), who, f.wholeProduct(), 50, 0, finding.Filter{OpenOn: &between})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return total
+	}
+}
+
+func TestTheListOnADayLeavesOutWhatWasNeverPresent(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		count := closedOnADay(t, f)
+		if _, err := f.db.NewUpdate().Table("finding").Set(`"closed_because" = ?`, finding.Invalid).
+			Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NOT NULL`).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := count(t); got != 1 {
+			t.Errorf("%d open on the day, want 1: a record taken back was never open", got)
+		}
+	})
+}
+
+func TestTheListOnADayLeavesOutWhatOneRunRecordedClosed(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		count := closedOnADay(t, f)
+		if _, err := f.db.NewUpdate().Table("finding").Set(`"opened_run_id" = "closed_run_id"`).
+			Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NOT NULL`).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := count(t); got != 1 {
+			t.Errorf("%d open on the day, want 1: a row first seen closed was never open", got)
+		}
+	})
+}

@@ -356,6 +356,15 @@ export function FindingsTable({
                           </span>
                         ) : null;
                       })()}
+                      {row.publication_unknown && (
+                        <span
+                          className="hint"
+                          style={{ marginLeft: 6 }}
+                          title="No date is known for this issue, so it counts as open from the inventory's last scan"
+                        >
+                          publication date unknown
+                        </span>
+                      )}
                       {/* The words people put on this. On the row
                                 because the point of marking work is finding it
                                 again in a list — a mark only the finding screen

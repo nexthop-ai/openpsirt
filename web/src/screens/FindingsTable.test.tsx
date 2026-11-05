@@ -82,3 +82,12 @@ describe("the confirmation of a decision taken from a row's preview", () => {
     expect(mount.host().querySelectorAll('[role="status"]').length).toBe(1);
   });
 });
+
+describe("a row whose issue has no known date", () => {
+  it("says the publication date is unknown", async () => {
+    const undated = { ...row("CVE-2026-1"), publication_unknown: true } as Row;
+    await draw([undated, row("CVE-2026-2")], decided("none", null));
+    const said = mount.host().textContent ?? "";
+    expect(said.match(/publication date unknown/g)).toHaveLength(1);
+  });
+});

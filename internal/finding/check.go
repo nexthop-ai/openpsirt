@@ -106,6 +106,14 @@ func (d issueDating) at() time.Time {
 	return d.firstSeen
 }
 
+// unknown says OSV was asked and gave no date, and nothing here carried the
+// issue before the replacement, so neither dates it while the inventory was
+// current. An issue nobody asked about is dated by its sighting instead: with
+// the date pass off, every issue new to this deployment would read as one.
+func (d issueDating) unknown(replacedAt time.Time) bool {
+	return d.published == nil && d.asked != nil && !d.firstSeen.Before(replacedAt)
+}
+
 // knownIssues dates every reported issue this deployment holds, by the
 // normalized identifier each report names it by and by the issue it stands as.
 func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[string]issueDating, error) {
@@ -188,7 +196,8 @@ func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[stri
 //
 // Each is written closed, opening at the later of its publication and the
 // inventory's arrival and closing at the replacement, for the reason the
-// replacement gives. Nothing is told of it and nothing is assigned: it was
+// replacement gives. An issue OSV gives no date opens at the later of the
+// last scan's data date and the arrival, until Redate corrects it. Nothing is told of it and nothing is assigned: it was
 // fixed before anybody could act. A run stays the authority on what it
 // reported, so an occurrence any row already covers over that stretch is left
 // alone.
@@ -215,6 +224,14 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 				continue
 			}
 			when := d.at()
+			if d.unknown(r.ReplacedAt) {
+				// The widest stretch it could have been held over; the date
+				// pass corrects it once OSV dates the issue.
+				when = r.ArrivedAt
+				if r.Since != nil && r.Since.After(when) {
+					when = *r.Since
+				}
+			}
 			if (r.Since != nil && when.Before(*r.Since)) || !when.Before(r.ReplacedAt) {
 				continue
 			}

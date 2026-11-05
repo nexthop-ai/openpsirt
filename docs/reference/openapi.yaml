@@ -5586,6 +5586,9 @@ components:
         product_name:
           description: That product's display name, or its name where it has none
           type: string
+        publication_unknown:
+          description: "Publication date unknown: an occurrence a replaced inventory's check recorded opens from that inventory's last scan, because no date is known for the issue. Only on a list read with open_on"
+          type: boolean
         score:
           description: The severity as a number, which is what the order compares
           format: double

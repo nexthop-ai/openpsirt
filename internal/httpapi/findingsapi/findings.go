@@ -100,9 +100,11 @@ type FindingBody struct {
 	// finding's own rather than the year in the identifier, which the
 	// identifier already carries: an issue assigned in 2019 that first
 	// appeared here last week has been somebody's problem for a week.
-	Opened   string `json:"opened,omitempty" doc:"The earliest of these occurrences opening here, as a date. The age a deadline relates to"`
-	Due      string `json:"due,omitempty" doc:"The date it is due. Absent where there is none, and then no_deadline gives the reason"`
-	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue. Absent where there is no deadline"`
+	Opened string `json:"opened,omitempty" doc:"The earliest of these occurrences opening here, as a date. The age a deadline relates to"`
+	// PublicationUnknown says the opening above is the widest it could be.
+	PublicationUnknown bool   `json:"publication_unknown,omitempty" doc:"Publication date unknown: an occurrence a replaced inventory's check recorded opens from that inventory's last scan, because no date is known for the issue. Only on a list read with open_on"`
+	Due                string `json:"due,omitempty" doc:"The date it is due. Absent where there is none, and then no_deadline gives the reason"`
+	DaysLeft           *int   `json:"days_left,omitempty" doc:"Negative once it is overdue. Absent where there is no deadline"`
 	// Undisclosed says nothing here has been announced, and DiscloseAt
 	// when the embargo ends. On the row because a person deciding what may
 	// be said about something has to be told before they say it, and the
@@ -277,11 +279,12 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Occurrences: group.Occurrences, Answered: group.Answered,
 		State: core.Standing(group.State), SentBack: group.SentBack,
 		Exploited: group.Exploited, Incident: group.Incident,
-		Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
-		Score:        float64(group.ScoreCenti) / 100,
-		ScoreVersion: group.ScoreVersion,
-		NoDeadline:   core.NoDeadline(group.NoDeadline),
-		Undisclosed:  group.Undisclosed,
+		Likelihood:         float64(group.LikelihoodPPM) / 1_000_000,
+		Score:              float64(group.ScoreCenti) / 100,
+		ScoreVersion:       group.ScoreVersion,
+		NoDeadline:         core.NoDeadline(group.NoDeadline),
+		Undisclosed:        group.Undisclosed,
+		PublicationUnknown: group.PublicationUnknown,
 	}
 	if group.DiscloseAt != nil {
 		row.DiscloseAt = group.DiscloseAt.UTC().Format(time.DateOnly)
