@@ -94,6 +94,17 @@ export function Issue() {
           Also known as <span className="id">{(it?.aliases ?? []).join(" · ")}</span>
         </p>
       )}
+      {it?.dates === "stated" && it.published && (
+        <p className="hint" style={{ marginBottom: 10 }} title="As OSV states">
+          Published {on(it.published)}
+          {it.modified && <> · updated {on(it.modified)}</>}
+        </p>
+      )}
+      {it?.dates === "unknown" && (
+        <p className="hint" style={{ marginBottom: 10 }} title="OSV has no record of it">
+          Publication date unknown
+        </p>
+      )}
       {(it?.merged ?? []).map((one) => (
         <p key={one.vulnerability} className="hint" style={{ marginBottom: 10 }}>
           Merged from <span className="id">{one.vulnerability}</span> on {on(one.merged_at)}, when a

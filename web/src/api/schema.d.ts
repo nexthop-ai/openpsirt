@@ -1795,7 +1795,7 @@ export interface paths {
          *
          *     Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
          *
-         *     Answers by any name the issue goes by.
+         *     Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -11700,16 +11700,25 @@ export interface components {
             readonly $schema?: string;
             /** @description Every other name it answers to */
             aliases?: string[] | null;
+            /**
+             * @description Where the two dates stand: stated by OSV, unknown to OSV, or not yet asked. Absent where nothing affected is visible
+             * @enum {string}
+             */
+            dates?: "stated" | "unknown" | "unasked";
             description?: string;
             exploited?: boolean;
             items: components["schemas"]["SightingBody"][] | null;
             /** @description Issues held apart until a report named them together, and merged into this one. What was decided under each applies here */
             merged?: components["schemas"]["MergedBody"][] | null;
+            /** @description When OSV last recorded a change to the issue */
+            modified?: string;
             /**
              * Format: int64
              * @description The number of your products carrying it
              */
             products: number;
+            /** @description When the issue was published, as OSV states. Absent where OSV holds no record of it or was not asked */
+            published?: string;
             /** @description Every published rating of the issue, one per generation of the scoring system, newest first */
             ratings?: components["schemas"]["RatingBody"][] | null;
             /** Format: double */

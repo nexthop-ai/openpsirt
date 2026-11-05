@@ -144,15 +144,6 @@ A decision in `REQUIREMENTS.md` is in force and nothing implements it.
 | Work | Export high-volume history to a compressed file, then drop it a whole partition at a time |
 | Waits on | Which column to partition on and at what granularity, both undecided (`design-docs/database.md`). SQLite has no partitions, and MySQL and MariaDB refuse foreign keys on a partitioned table. Partition names would need an allowlist like any other SQL identifier |
 
-### TODO-16 Issue publication dates
-
-| | |
-|---|---|
-| Today | The scanner supplies neither the date an issue was published nor the date it last changed. What is stored is when this deployment first saw the issue and when a fix became available |
-| Problem | Time to fix measured from public disclosure cannot be reported. An issue published in 2023 and first scanned here last week reads as a week old (REQ-82) |
-| Work | Add a background pass that asks OSV, in batches and with no key, for each issue's published and modified dates, and stores only the dates. Show an issue OSV does not know as unknown wherever a figure needs a date |
-| Waits on | Nothing decided. No OSV client exists, and no report design says where the dates are used. A scan must not wait on the lookup (REQ-12) |
-
 ## Known gaps
 
 Missing or wrong. Where fixing one needs the owner, the item says which question.

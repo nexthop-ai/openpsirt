@@ -204,3 +204,12 @@ func StopV0110RewritingAfter(ctx context.Context, db *database.DB, step string) 
 
 // SavedQueryV0110 is a kept filter's query string in v0.11.0's words.
 func SavedQueryV0110(query string) string { return savedQueryV0110(query) }
+
+// StatementsV0120 is v0.12.0's declaration of each table it changes.
+func StatementsV0120(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{
+		"vulnerability": vulnerabilityV0120(t),
+		"scan_run":      scanRunV0120(t),
+	}
+}

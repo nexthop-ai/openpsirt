@@ -11,6 +11,7 @@ Satisfies REQ-72.
 - [Release upgrades](#release-upgrades)
 - [The v0.10.0 upgrade](#the-v0100-upgrade)
 - [The v0.11.0 upgrade](#the-v0110-upgrade)
+- [The v0.12.0 upgrade](#the-v0120-upgrade)
 - [Limits](#limits)
 
 ## Release upgrades
@@ -186,6 +187,21 @@ times on each engine.
 | The trimming alone over four components two at a time, twice | Every batch is read, the last included, and the second run leaves what the first did |
 | A v0.10.0 database holding a role grant | The grant keeps its role, and every table holding a role takes the longest role name |
 | Every check above that does not stop, at once | One v0.10.0 database per engine holds all their seeds and is upgraded once; each check reads its own seed's rows or counts every seed's, so no seed changes what another's check expects, and the checks that write run last |
+
+## The v0.12.0 upgrade
+
+Migration 46, untagged. No row moves. Each addition is stepped over where a
+stopped upgrade made it already.
+
+| Table | Gains |
+|---|---|
+| `vulnerability` | When the issue was published and last modified, and when that was last asked, all empty (`design-docs/findings-issues.md` § Issue dates) |
+| `scan_run` | The replaced inventory a run checked, empty, with a foreign key to `scan` and an index (`design-docs/findings-closure.md` § Replaced inventories) |
+
+| Check, on each engine | What it holds |
+|---|---|
+| A v0.11.0 database | Upgraded, each changed table's declaration describing the built table |
+| A v0.11.0 database already holding the issue date columns | Upgraded the same, the run column and its index made |
 
 ## Limits
 

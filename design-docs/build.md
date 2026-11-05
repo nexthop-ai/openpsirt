@@ -55,7 +55,7 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | `internal/notify/` | Notifications. See `design-docs/notifications.md` |
 | `internal/weblink/` | Interface addresses the server hands out. See `design-docs/notifications.md` § Links |
 | `internal/incident/` | Incident response windows, notices, the shelf. See `design-docs/incidents.md` |
-| `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, upstream version lookups |
+| `internal/markdown/`, `internal/setting/`, `internal/currency/`, `internal/issuedate/` | Text policy, administrator settings, upstream version lookups, issue publication dates |
 | `internal/attach/` | Files on an issue. See `design-docs/attachments.md` |
 | `internal/trail/` | Changes to how this deployment works. See `design-docs/access-trail.md` |
 | `internal/saved/` | Saved list narrowings. See `design-docs/interface-filters.md` |

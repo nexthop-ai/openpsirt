@@ -21,6 +21,7 @@ finding.Vulnerabilities.Rule A background pass: it files the rules an analyzer r
 finding.Vulnerabilities.ByName Not varying by reader: resolving a name to an issue. Every route asks who may be told of it before answering.
 finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
 finding.Vulnerabilities.Ratings Not varying by reader: the ratings held for an issue. Read beside a finding the caller was authorized for.
+finding.Vulnerabilities.DatesOf Not varying by reader: when an issue was published, as OSV states. Read beside the issue after the caller was told of it.
 triage.Store.NoteVisibility Not varying by reader: how disclosed a note is, which the caller then asks of its own reader.
 triage.Store.DeferredSoFar A helper over a narrowed read: the second-person rule asks it of a place the write already authorized.
 triage.Store.NeedsApproval A helper over a narrowed read: the second-person rule asks it of a proposal the write already authorized.

@@ -30,6 +30,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/issuedate"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -611,6 +612,10 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// is built around is a rate per deployment, so which replica asks is
 	// settled by a lease rather than by all of them asking at once.
 	current := currency.NewRefresher(db.DB, logger, name, ours)
+	// Asks OSV when each issue was published and last modified. On unless
+	// the deployment turns it off, read each cycle; one replica asks, under
+	// a lease of its own.
+	dates := issuedate.NewPass(db.DB, logger, name)
 	// Places work nobody holds onto the team an assignment rule names. Queued
 	// work rather than part of the request that saved the rule: one rule
 	// sweeps thousands of findings, and saving a form must not hold a
@@ -691,7 +696,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 			"written to it: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE")
 	}
 	return handler, passes{
-		reader: reader, runner: runner, schedule: schedule, upstream: current,
+		reader: reader, runner: runner, schedule: schedule, upstream: current, dates: dates,
 		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, assigning: assigning, analyze: analyze,
 		undertaker: undertaker, publish: writer, suppliers: suppliers, forks: forks,
 		branches:  branches,

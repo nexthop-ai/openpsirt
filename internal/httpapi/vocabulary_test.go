@@ -225,6 +225,7 @@ func statedVocabularies() map[string][]string {
 		"spread over variants":                words(finding.VariantSpreads()),
 		"repository styles":                   words(sourcelink.Styles()),
 		"families":                            words(kind.Families()),
+		"issue date standings":                words(finding.DateStandings()),
 	}
 }
 

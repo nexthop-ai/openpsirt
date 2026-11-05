@@ -3,7 +3,7 @@
 One issue across every name it goes by, what a report says about it, and how
 reports that disagree are merged.
 
-Satisfies REQ-18, REQ-22. Names REQ-82, not built.
+Satisfies REQ-18, REQ-22, REQ-82.
 
 ## Contents
 
@@ -125,14 +125,25 @@ all 11,435.
 ## Issue dates
 
 An issue's published and last-modified dates are read from OSV, asked in the
-background, because no scanner report carries either (REQ-82). Not built.
+background, because no scanner report carries either (REQ-82).
 
 | Rule | Reason |
 |---|---|
-| The source is OSV | Answers national and advisory identifiers, in batches, without a key |
-| Asked in the background | A scan never waits on the network (REQ-12) |
-| Only the dates are taken | Severity and fix state stay the scanner's |
-| An issue OSV does not know has no date; a figure needing one says unknown | |
+| The source is OSV | It answers national, advisory and distribution identifiers without a key |
+| One request per name, `GET /v1/vulns/{id}` | OSV has no lookup of several identifiers at once; its batch query takes packages and commits and answers no publication date |
+| Asked in the background, by one replica under a lease, 200 issues a pass, a tenth of a second apart | A scan never waits on the network (REQ-12) |
+| On unless turned off, a setting read before every request | An identifier is public; an air-gapped deployment turns it off |
+| Only a published vulnerability, by the row it stands as | A flaw minted here and an analyzer's rule are known to nobody outside |
+| The issue's own identifier is asked first, then its CVE names, its GitHub names and the rest, five at most, until one answers | |
+| A name is sent as OSV spells it: a GitHub advisory's suffix lower case, openSUSE's prefix mixed | Names are stored in capitals and OSV matches exactly |
+| A name that is no advisory identifier is never sent | |
+| Only the two dates are taken | Severity and fix state stay the scanner's |
+| An issue OSV does not know is recorded as asked with no date; a figure needing one says unknown | |
+| An empty answer keeps dates already held | A record OSV stops serving was still published when it said |
+| A known issue is asked again after thirty days; an unknown one daily for its first fourteen days here, then every thirty | OSV revises records; a fresh issue reaches it within hours, and an unknown answer rarely changes |
+| OSV not answering ends the pass and leaves the issue due | |
+| The client reaches `api.osv.dev` alone, follows no redirect and connects nowhere inside this network (REQ-69) | |
+| The issue page states both dates and whether they are stated, unknown or not yet asked | |
 
 ## Limits
 

@@ -251,6 +251,20 @@ const (
 	// made of it, so names this deployment calls its own are held back and the
 	// report says which.
 	UpstreamCurrency = "upstream.currency"
+	// IssueDates is whether this deployment asks OSV for each issue's
+	// published and last-modified dates.
+	//
+	// On unless somebody turns it off. What leaves is an issue's public
+	// identifier, which every advisory database already publishes; nothing
+	// about a build, a component or a product goes with it. An air-gapped
+	// deployment turns it off, and every figure needing a publication date
+	// then dates the issue by when this deployment first saw it.
+	IssueDates = "issues.dates"
+	// CheckSettle is how long after a branch inventory is replaced its check
+	// waits: the check runs on the first scanner data dated at least this
+	// long after the replacement. An issue reaches the scanner's data up to a
+	// day after it is published.
+	CheckSettle = "scanning.check-settle"
 	// AttachmentMaxSize is the largest single file this deployment
 	// accepts, in bytes, and AttachmentQuota is how much it will hold in
 	// total.
@@ -556,6 +570,11 @@ const DefaultAnalysisDropFloor = 20
 // it against a release that has not been rebuilt in a year.
 const DefaultScanEvery = 24 * time.Hour
 
+// DefaultCheckSettle is how long a replaced inventory's check waits where
+// nobody has said: two days, a day for an issue to reach the scanner's data
+// and a day for that data to be published.
+const DefaultCheckSettle = 48 * time.Hour
+
 // DefaultSupplierSilentAfter is how long a supplier may go unread before the
 // deployment is told, where nobody has said.
 //
@@ -620,6 +639,15 @@ const (
 	On  = "on"
 	Off = "off"
 )
+
+// Switch reports whether a switch is on, answering fallback where it is unset.
+func (s *Store) Switch(ctx context.Context, name string, fallback bool) (bool, error) {
+	value, set, err := s.Get(ctx, name)
+	if err != nil || !set {
+		return fallback, err
+	}
+	return value == On, nil
+}
 
 // Store reads and writes settings.
 type Store struct {

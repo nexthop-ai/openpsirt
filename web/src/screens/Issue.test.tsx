@@ -72,6 +72,29 @@ describe("one issue, everywhere it sits", () => {
     );
   });
 
+  it("says when the issue was published", async () => {
+    await drawn({
+      data: {
+        vulnerability: "CVE-2026-1",
+        products: 0,
+        total: 0,
+        items: [],
+        dates: "stated",
+        published: "2026-03-04T00:00:00Z",
+        modified: "2026-05-06T00:00:00Z",
+      },
+    });
+    expect(text()).toContain("Published");
+    expect(text()).toContain("updated");
+  });
+
+  it("says nobody knows when the issue was published", async () => {
+    await drawn({
+      data: { vulnerability: "CVE-2026-1", products: 0, total: 0, items: [], dates: "unknown" },
+    });
+    expect(text()).toContain("Publication date unknown");
+  });
+
   it("says nothing carries it rather than drawing an empty table", async () => {
     await drawn({ data: { vulnerability: "CVE-2026-1", products: 0, total: 0, items: [] } });
     expect(text()).toContain("Nothing carries it.");

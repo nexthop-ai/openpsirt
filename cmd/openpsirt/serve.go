@@ -23,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/adminapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/issuedate"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
@@ -72,6 +73,8 @@ type passes struct {
 	runner   *scanner.Runner
 	schedule *scanner.Schedule
 	upstream *currency.Refresher
+	// dates asks OSV when each issue was published.
+	dates *issuedate.Pass
 	// suppliers reads what configured publishers say about their own flaws.
 	suppliers *supplier.Pass
 	// forks reads what the upstream each product trusts publishes.
@@ -140,6 +143,7 @@ func (p passes) loops() []loop {
 		{"scan what arrived", p.runner.Run, readInterval},
 		{"schedule rescans", p.schedule.Run, scheduleInterval},
 		{"ask upstream what is current", p.upstream.Run, askInterval},
+		{"ask when issues were published", p.dates.Run, askInterval},
 		{"read what suppliers publish", p.suppliers.Run, scheduleInterval},
 		{"read what upstreams publish", p.forks.Run, scheduleInterval},
 		{"look up the branches patches are on", p.branches.Run, 0},

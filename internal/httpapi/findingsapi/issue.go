@@ -42,16 +42,19 @@ type MergedBody struct {
 // IssueOutput is one issue, everywhere the caller may see it.
 type IssueOutput struct {
 	Body struct {
-		Vulnerability string         `json:"vulnerability"`
-		Aliases       []string       `json:"aliases,omitempty" doc:"Every other name it answers to"`
-		Severity      string         `json:"severity,omitempty"`
-		Score         float64        `json:"score,omitempty"`
-		ScoreVersion  string         `json:"score_version,omitempty" doc:"The scoring system the number is on"`
-		Ratings       []RatingBody   `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first"`
-		Exploited     bool           `json:"exploited,omitempty"`
-		Description   string         `json:"description,omitempty"`
-		Merged        []MergedBody   `json:"merged,omitempty" doc:"Issues held apart until a report named them together, and merged into this one. What was decided under each applies here"`
-		Items         []SightingBody `json:"items"`
+		Vulnerability string            `json:"vulnerability"`
+		Aliases       []string          `json:"aliases,omitempty" doc:"Every other name it answers to"`
+		Severity      string            `json:"severity,omitempty"`
+		Score         float64           `json:"score,omitempty"`
+		ScoreVersion  string            `json:"score_version,omitempty" doc:"The scoring system the number is on"`
+		Ratings       []RatingBody      `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first"`
+		Exploited     bool              `json:"exploited,omitempty"`
+		Description   string            `json:"description,omitempty"`
+		Published     string            `json:"published,omitempty" doc:"When the issue was published, as OSV states. Absent where OSV holds no record of it or was not asked"`
+		Modified      string            `json:"modified,omitempty" doc:"When OSV last recorded a change to the issue"`
+		Dates         core.DateStanding `json:"dates,omitempty" doc:"Where the two dates stand: stated by OSV, unknown to OSV, or not yet asked. Absent where nothing affected is visible"`
+		Merged        []MergedBody      `json:"merged,omitempty" doc:"Issues held apart until a report named them together, and merged into this one. What was decided under each applies here"`
+		Items         []SightingBody    `json:"items"`
 		// Total counts build-and-component pairs, which is what a row is.
 		Total    int `json:"total"`
 		Products int `json:"products" doc:"The number of your products carrying it"`
@@ -81,7 +84,8 @@ func registerIssue(api huma.API, in core.Deps) {
 			"here has seen answers the same way as one that sits only in products you " +
 			"cannot read — told apart, the pair would say which issues this deployment " +
 			"holds, one guess at a time.\n\n" +
-			"Answers by any name the issue goes by.",
+			"Answers by any name the issue goes by, with when it was published and last " +
+			"modified as OSV states them.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
@@ -140,6 +144,17 @@ func registerIssue(api huma.API, in core.Deps) {
 		out.Body.Ratings = ratingBodies(known.Ratings)
 		out.Body.Exploited = known.Exploited
 		out.Body.Description = known.Description
+		dated, err := issues.DatesOf(ctx, id)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "when this issue was published could not be read", err)
+		}
+		out.Body.Dates = core.DateStanding(dated.Standing())
+		if dated.Published != nil {
+			out.Body.Published = core.Stamp(*dated.Published)
+		}
+		if dated.Modified != nil {
+			out.Body.Modified = core.Stamp(*dated.Modified)
+		}
 		merged, err := finding.MergesInto(ctx, in.DB.DB, id)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what merged into this issue could not be read", err)

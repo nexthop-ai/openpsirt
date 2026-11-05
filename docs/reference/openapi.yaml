@@ -6848,6 +6848,13 @@ components:
           type:
             - array
             - "null"
+        dates:
+          description: "Where the two dates stand: stated by OSV, unknown to OSV, or not yet asked. Absent where nothing affected is visible"
+          enum:
+            - stated
+            - unknown
+            - unasked
+          type: string
         description:
           type: string
         exploited:
@@ -6865,10 +6872,16 @@ components:
           type:
             - array
             - "null"
+        modified:
+          description: When OSV last recorded a change to the issue
+          type: string
         products:
           description: The number of your products carrying it
           format: int64
           type: integer
+        published:
+          description: When the issue was published, as OSV states. Absent where OSV holds no record of it or was not asked
+          type: string
         ratings:
           description: Every published rating of the issue, one per generation of the scoring system, newest first
           items:
@@ -20334,7 +20347,7 @@ paths:
 
         Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
 
-        Answers by any name the issue goes by.
+        Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-issue

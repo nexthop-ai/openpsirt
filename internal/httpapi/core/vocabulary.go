@@ -510,6 +510,12 @@ type Unanswered string
 // Schema offers every reason a component has no upstream answer.
 func (Unanswered) Schema(huma.Registry) *huma.Schema { return words(currency.Whys()) }
 
+// DateStanding is where an issue's publication dates stand.
+type DateStanding string
+
+// Schema offers every way an issue's publication dates can stand.
+func (DateStanding) Schema(huma.Registry) *huma.Schema { return words(finding.DateStandings()) }
+
 // TrailKind is the kind of thing an administrative change changed.
 type TrailKind string
 

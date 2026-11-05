@@ -24,6 +24,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Scheduled rescanning](#scanning) | On, daily | `scanning.every` under Settings sets how often |
 | [Vulnerability data updates](#an-air-gapped-install) | On | `GRYPE_DB_AUTO_UPDATE`; set it to `false` where the deployment cannot reach the network |
 | [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
+| [Issue publication dates](#issue-publication-dates) | On | `issues.dates` under Settings turns it off |
 | [Patch branches](#patch-branches) | Off | `OPENPSIRT_PATCH_BRANCHES`, or `patchBranches.enabled` in the chart. [What to set first](#enabling) |
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
 | [Upstream statements](#upstream-statements) | Off | Naming an upstream from a product's row under Products |
@@ -948,6 +949,21 @@ Read what it held back, and what no index knew or answered. The report is at
 the default is costing; names no public index knew or answered are mostly
 private modules and vendored forks, and they are the candidates to promote into
 `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
+
+## Issue publication dates
+
+On unless an administrator turns it off, under Settings. A background pass asks
+OSV, at `api.osv.dev`, when each issue was published and last modified, and
+stores the two dates. What goes out is the issue's public identifier, one
+request per name asked, and nothing about a build, a component or a product.
+
+| | |
+|---|---|
+| Asked | Each published vulnerability once, then again monthly. An issue OSV does not know is asked daily for its first two weeks here, then monthly |
+| Names | The issue's own identifier first, then its other names, until OSV knows one |
+| Unknown | An issue OSV holds no record of has no date, and the issue page says so |
+| Turned off | Nothing is asked. A replaced inventory's check dates every issue by when this deployment first saw it |
+| Egress | Allow `api.osv.dev`. Nothing else is reached and a redirect is not followed. A pass that cannot reach it stops, and the issues stay due |
 
 ## Outbound exclusions
 

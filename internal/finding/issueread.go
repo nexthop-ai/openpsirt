@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -338,4 +339,49 @@ func (v *Vulnerabilities) describe(ctx context.Context, id int64) (Named, error)
 		}
 	}
 	return known, nil
+}
+
+// IssueDates is what is known of when an issue became public.
+type IssueDates struct {
+	// Published and Modified are OSV's dates, absent where it holds none.
+	Published, Modified *time.Time
+	// Asked says OSV was asked; asked with no date, it knows no record.
+	Asked bool
+}
+
+// DateStanding is where an issue's publication dates stand.
+type DateStanding string
+
+const (
+	// DatesStated is an issue OSV gave a publication date for.
+	DatesStated DateStanding = "stated"
+	// DatesUnknown is an issue OSV was asked about and holds no record of.
+	DatesUnknown DateStanding = "unknown"
+	// DatesUnasked is an issue OSV has not been asked about.
+	DatesUnasked DateStanding = "unasked"
+)
+
+// DateStandings is every way an issue's publication dates can stand.
+func DateStandings() []DateStanding { return []DateStanding{DatesStated, DatesUnknown, DatesUnasked} }
+
+// Standing is where these dates stand.
+func (d IssueDates) Standing() DateStanding {
+	switch {
+	case d.Published != nil:
+		return DatesStated
+	case d.Asked:
+		return DatesUnknown
+	}
+	return DatesUnasked
+}
+
+// DatesOf reads an issue's publication dates.
+func (v *Vulnerabilities) DatesOf(ctx context.Context, id int64) (IssueDates, error) {
+	var row Vulnerability
+	if err := v.db.NewSelect().Model(&row).
+		Column("published_at", "modified_at", "dates_asked_at").
+		Where(`"id" = ?`, id).Scan(ctx); err != nil {
+		return IssueDates{}, fmt.Errorf("read when this issue was published: %w", err)
+	}
+	return IssueDates{Published: row.PublishedAt, Modified: row.ModifiedAt, Asked: row.DatesAskedAt != nil}, nil
 }

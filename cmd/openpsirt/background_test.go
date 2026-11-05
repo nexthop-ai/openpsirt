@@ -28,6 +28,7 @@ var alwaysRuns = []string{
 	"scan what arrived",
 	"schedule rescans",
 	"ask upstream what is current",
+	"ask when issues were published",
 	"read what suppliers publish",
 	"read what upstreams publish",
 	"look up the branches patches are on",
