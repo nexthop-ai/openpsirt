@@ -230,6 +230,7 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 		TableExpr(`"scan_run" AS "sr"`).
 		ColumnExpr(`"sr"."finished_at"`).
 		Where(`"sr"."build_id" = ?`, standing.BuildID).
+		Where(`"sr"."checked_scan_id" IS NULL`).
 		Where(`"sr"."finished_at" IS NOT NULL`).
 		OrderExpr(`"sr"."finished_at" DESC`).
 		Limit(1).

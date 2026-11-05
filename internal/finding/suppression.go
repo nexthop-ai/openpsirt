@@ -302,7 +302,8 @@ func pointAtWords(ctx context.Context, tx bun.IDB, claims []Claim) error {
 	return nil
 }
 
-func openClaims(ctx context.Context, db bun.IDB, buildID int64) ([]Claim, error) {
+func openClaims(ctx context.Context, db bun.IDB, buildID int64, at graph.Moment) ([]Claim, error) {
+	held, args := at.Held("sup")
 	// Ordered so that reading them twice gives the same answer. Where two
 	// claims cover one finding and neither is the precise sort, which one is
 	// recorded should not depend on what a map felt like doing.
@@ -313,7 +314,7 @@ func openClaims(ctx context.Context, db bun.IDB, buildID int64) ([]Claim, error)
 		Join(`JOIN "scan" AS "latest" ON "latest"."id" = "t"."last_scan_id"`).
 		Join(`LEFT JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
 		ColumnExpr(`COALESCE("ss"."restated_at", "ss"."uploaded_at", "latest"."received_at") AS "said"`).
-		Where(`"sup"."build_id" = ?`, buildID).Where(`"sup"."closed_scan_id" IS NULL`).
+		Where(`"sup"."build_id" = ?`, buildID).Where(held, args...).
 		Order("sup.id").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build argues: %w", err)

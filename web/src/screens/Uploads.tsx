@@ -288,6 +288,15 @@ function SBOMs({ build }: { build: Build }) {
                         ⚠ {scan.caution}
                       </div>
                     )}
+                    {scan.checked?.found_after_fixed ? (
+                      <div
+                        className="hint"
+                        style={{ marginTop: 4 }}
+                        title="Published while this inventory was current, and gone from the one that replaced it"
+                      >
+                        {counted(scan.checked.found_after_fixed)} found after fixed
+                      </div>
+                    ) : null}
                   </td>
                   {/* Grouped, like every other count here. Seven thousand
                       findings written as 7587 is a number somebody has to

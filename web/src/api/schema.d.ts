@@ -9005,6 +9005,20 @@ export interface components {
             /** @description What a channel carries is sent to them directly as well */
             shared: boolean;
         };
+        CheckedBody: {
+            /** @description When the check finished */
+            at: string;
+            /**
+             * Format: int64
+             * @description Findings the check recorded, each published after the inventory was last scanned and gone from its replacement, so recorded closed. Absent where you may read none of its findings
+             */
+            found_after_fixed?: number;
+            /**
+             * Format: int64
+             * @description The run that checked it
+             */
+            run_id: number;
+        };
         "Clear-incidentRequest": {
             /**
              * Format: uri
@@ -14088,6 +14102,8 @@ export interface components {
             built_at?: string;
             /** @description The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours */
             caution?: string;
+            /** @description The check of this inventory against issues published while it was current, made once a later upload replaced it. Absent until it has finished, and on a tag */
+            checked?: components["schemas"]["CheckedBody"];
             /**
              * Format: int64
              * @description Issues that were open and are not any more. Absent for the same reasons as the count beside it

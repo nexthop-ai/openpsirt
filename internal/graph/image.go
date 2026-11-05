@@ -177,7 +177,9 @@ func reconcileImageVersions(ctx context.Context, tx bun.IDB, buildID, scanID int
 // A claim or a statement naming an image at a version is about the image the
 // build states at that version, and the component row carries no version to
 // compare it with.
-func StatedImages(ctx context.Context, db bun.IDB, buildID int64) (map[int64]ImageVersion, error) {
+func StatedImages(ctx context.Context, db bun.IDB, buildID int64, at Moment) (map[int64]ImageVersion, error) {
+	node, nodeArgs := at.Held("n")
+	image, imageArgs := at.Held("iv")
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
 		Version     string `bun:"version"`
@@ -190,8 +192,8 @@ func StatedImages(ctx context.Context, db bun.IDB, buildID int64) (map[int64]Ima
 		ColumnExpr(`"iv"."version" AS "version"`).
 		ColumnExpr(`COALESCE("iv"."purl", '') AS "purl"`).
 		Where(`"n"."build_id" = ?`, buildID).
-		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`"iv"."closed_scan_id" IS NULL`).
+		Where(node, nodeArgs...).
+		Where(image, imageArgs...).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the versions the build states for its images: %w", err)
 	}

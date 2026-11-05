@@ -269,6 +269,13 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 // product's scanner matches. The component row is not read for them at all,
 // because it holds whichever report first described the component.
 func (s *Store) CurrentComponents(ctx context.Context, buildID int64) ([]Described, error) {
+	return s.ComponentsAt(ctx, buildID, Now)
+}
+
+// ComponentsAt is what a build contained at a moment, as CurrentComponents
+// gives it to the scanner.
+func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]Described, error) {
+	held, args := at.Held("n")
 	var rows []struct {
 		ComponentID     int64  `bun:"component_id"`
 		Name            string `bun:"name"`
@@ -289,7 +296,7 @@ func (s *Store) CurrentComponents(ctx context.Context, buildID int64) ([]Describ
 		ColumnExpr(`"n"."purl" AS "purl"`).
 		ColumnExpr(`"n"."cpe" AS "cpe"`).
 		Where(`"n"."build_id" = ?`, buildID).
-		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(held, args...).
 		Where(`"n"."is_root" = ?`, false).
 		Scan(ctx, &rows)
 	if err != nil {

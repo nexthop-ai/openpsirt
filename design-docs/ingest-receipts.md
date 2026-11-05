@@ -53,6 +53,8 @@ first with how far it got.
 | Each finding records its opening and closing runs, and every receipt item each run's scanner and database versions (REQ-13) | Work done on a bad feed week has to be found |
 | The opening run is recorded, never the newest | |
 | No run is invented where there is none: a recorded finding (REQ-19), or a pruned run | |
+| A replaced branch upload carries its check once one finished, with what it found after fixed (`design-docs/findings-closure.md` § Replaced inventories) | |
+| A check run answers no upload and is never attributed to one | It read an inventory no longer current |
 
 ## Receipt cost
 

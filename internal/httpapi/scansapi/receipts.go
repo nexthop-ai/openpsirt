@@ -76,7 +76,15 @@ type ReceiptBody struct {
 	// RunID is the run that answered this upload, so what it did can be
 	// asked for. On every receipt that run answers, like the versions beside
 	// it — the counts above are the thing that belongs to one upload only.
-	RunID int64 `json:"run_id,omitempty" doc:"The run that answered this upload. Absent until one has"`
+	RunID   int64        `json:"run_id,omitempty" doc:"The run that answered this upload. Absent until one has"`
+	Checked *CheckedBody `json:"checked,omitempty" doc:"The check of this inventory against issues published while it was current, made once a later upload replaced it. Absent until it has finished, and on a tag"`
+}
+
+// CheckedBody is the one check a replaced branch inventory owes.
+type CheckedBody struct {
+	RunID      int64  `json:"run_id" doc:"The run that checked it"`
+	At         string `json:"at" doc:"When the check finished"`
+	FoundAfter *int   `json:"found_after_fixed,omitempty" doc:"Findings the check recorded, each published after the inventory was last scanned and gone from its replacement, so recorded closed. Absent where you may read none of its findings"`
 }
 
 // InventoryBody is what one upload changed about what a build is made of.
@@ -180,6 +188,9 @@ func registerReceipts(api huma.API, in core.Deps) {
 			if r.RunID != nil {
 				runs = append(runs, *r.RunID)
 			}
+			if r.Checked != nil {
+				runs = append(runs, r.Checked.ID)
+			}
 		}
 		changed, err := finding.NewStore(in.DB.DB).Changes(ctx, subject, build.ID, runs)
 		switch {
@@ -232,6 +243,13 @@ func registerReceipts(api huma.API, in core.Deps) {
 			// reaches the receipts and reads no findings in the product — a
 			// pipeline key is one — is told nothing about what a run changed,
 			// which is not the same as being told it changed nothing.
+			if r.Checked != nil && r.Checked.FinishedAt != nil {
+				body.Checked = &CheckedBody{RunID: r.Checked.ID, At: core.Stamp(*r.Checked.FinishedAt)}
+				if change, counted := changed[r.Checked.ID]; counted {
+					found := change.Opened
+					body.Checked.FoundAfter = &found
+				}
+			}
 			if r.RunID != nil {
 				if change, counted := changed[*r.RunID]; counted {
 					opened, closed := change.Opened, change.Closed

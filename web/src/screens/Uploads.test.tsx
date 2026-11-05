@@ -183,3 +183,33 @@ describe("the tabs", () => {
     );
   });
 });
+
+describe("a replaced upload's check", () => {
+  it("says how many findings it found after they were fixed", async () => {
+    serve((path) => {
+      if (path === SCANS) {
+        return {
+          data: {
+            items: [
+              {
+                ...receipt("scanned"),
+                checked: { run_id: 9, at: "2026-10-04T00:00:00Z", found_after_fixed: 3 },
+              },
+            ],
+            total: 1,
+          },
+        };
+      }
+      return { data: { items: [], total: 0, quiet: 0 } };
+    });
+    mount.render(
+      screen(
+        <Uploads />,
+        "/products/sonic/branches-and-tags/master/variants/x/uploads",
+        "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads",
+      ),
+    );
+    await settle();
+    expect(mount.host().textContent).toContain("3 found after fixed");
+  });
+});

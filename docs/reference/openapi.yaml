@@ -2294,6 +2294,24 @@ components:
         - direct
         - shared
       type: object
+    CheckedBody:
+      additionalProperties: false
+      properties:
+        at:
+          description: When the check finished
+          type: string
+        found_after_fixed:
+          description: Findings the check recorded, each published after the inventory was last scanned and gone from its replacement, so recorded closed. Absent where you may read none of its findings
+          format: int64
+          type: integer
+        run_id:
+          description: The run that checked it
+          format: int64
+          type: integer
+      required:
+        - run_id
+        - at
+      type: object
     Clear-incidentRequest:
       additionalProperties: false
       properties:
@@ -11143,6 +11161,9 @@ components:
         caution:
           description: "The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"
           type: string
+        checked:
+          $ref: "#/components/schemas/CheckedBody"
+          description: The check of this inventory against issues published while it was current, made once a later upload replaced it. Absent until it has finished, and on a tag
         closed:
           description: Issues that were open and are not any more. Absent for the same reasons as the count beside it
           format: int64

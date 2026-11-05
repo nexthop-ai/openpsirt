@@ -89,7 +89,7 @@ type placer struct {
 
 // placing reads the build's root and turns its places into a placer.
 func placing(ctx context.Context, db bun.IDB, buildID int64, inv inventory,
-	places consumers) (*placer, error) {
+	places consumers, at graph.Moment) (*placer, error) {
 
 	p := &placer{inv: inv, children: map[int64][]int64{}, placed: map[string]*placement{},
 		names: map[string]bool{}}
@@ -101,11 +101,12 @@ func placing(ctx context.Context, db bun.IDB, buildID int64, inv inventory,
 		}
 	}
 	var roots []int64
+	rootHeld, rootArgs := at.Held("n")
 	if err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id"`).
 		Where(`"n"."build_id" = ?`, buildID).
-		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(rootHeld, rootArgs...).
 		Where(`"n"."is_root" = ?`, true).
 		Scan(ctx, &roots); err != nil {
 		return nil, fmt.Errorf("read the build's own component: %w", err)
@@ -113,7 +114,7 @@ func placing(ctx context.Context, db bun.IDB, buildID int64, inv inventory,
 	if len(roots) > 0 {
 		p.root = roots[0]
 	}
-	images, err := graph.StatedImages(ctx, db, buildID)
+	images, err := graph.StatedImages(ctx, db, buildID, at)
 	if err != nil {
 		return nil, err
 	}

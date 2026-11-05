@@ -139,13 +139,14 @@ func withStated(ctx context.Context, db bun.IDB, buildID int64, byID map[int64]g
 	return nil
 }
 
-// openComponents reads what a variant currently contains.
-func openComponents(ctx context.Context, db bun.IDB, buildID int64) (inventory, error) {
+// openComponents reads what a variant contains at a moment.
+func openComponents(ctx context.Context, db bun.IDB, buildID int64, at graph.Moment) (inventory, error) {
+	holding, args := at.Held("n")
 	var rows []graph.Component
 	err := db.NewSelect().Model(&rows).
 		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
 		Where(`"n"."build_id" = ?`, buildID).
-		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(holding, args...).
 		Scan(ctx)
 	if err != nil {
 		return inventory{}, fmt.Errorf("read what the variant contains: %w", err)
@@ -187,9 +188,9 @@ func (c consumers) of(componentID int64) []int64 {
 	return []int64{0}
 }
 
-// openOccurrences reads every occurrence in a variant.
-func openOccurrences(ctx context.Context, db bun.IDB, buildID int64) (consumers, error) {
-	return occurrenceEdges(ctx, db, buildID, 0)
+// openOccurrences reads every occurrence in a variant at a moment.
+func openOccurrences(ctx context.Context, db bun.IDB, buildID int64, at graph.Moment) (consumers, error) {
+	return occurrenceEdges(ctx, db, buildID, 0, at)
 }
 
 // sits is one occurrence of a component occupies: what pulls it in, by
@@ -210,7 +211,7 @@ type sits struct {
 // answer is a list — and which is why a form asking "where does it sit" could
 // not express it.
 func sittingsOf(ctx context.Context, db bun.IDB, buildID, componentID int64) ([]sits, error) {
-	at, err := occurrenceEdges(ctx, db, buildID, componentID)
+	at, err := occurrenceEdges(ctx, db, buildID, componentID, graph.Now)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +264,9 @@ func componentNames(ctx context.Context, db bun.IDB, ids []int64) (map[int64]str
 // A component under the product itself is recorded as being under nothing: the
 // product's name differs per variant, so keying on it would stop the same
 // occurrence being recognized across them.
-func occurrenceEdges(ctx context.Context, db bun.IDB, buildID, componentID int64) (consumers, error) {
+func occurrenceEdges(ctx context.Context, db bun.IDB, buildID, componentID int64,
+	moment graph.Moment) (consumers, error) {
+	held, args := moment.Held("e")
 	var edges []struct {
 		ChildComponentID  int64 `bun:"child_component_id"`
 		ParentComponentID int64 `bun:"parent_component_id"`
@@ -277,7 +280,7 @@ func occurrenceEdges(ctx context.Context, db bun.IDB, buildID, componentID int64
 		ColumnExpr(`"parent"."component_id" AS "parent_component_id"`).
 		ColumnExpr(`"parent"."is_root" AS "parent_is_root"`).
 		Where(`"e"."build_id" = ?`, buildID).
-		Where(`"e"."closed_scan_id" IS NULL`).
+		Where(held, args...).
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if componentID == 0 {
 				return q

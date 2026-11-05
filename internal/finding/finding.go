@@ -249,6 +249,9 @@ type Run struct {
 	// with, as the moment it describes. Empty where it read none, and nothing
 	// was narrowed.
 	RecordsVersion string `bun:"records_version"`
+	// CheckedScanID is the replaced inventory a check run read, absent on a
+	// scan of what the build holds.
+	CheckedScanID *int64 `bun:"checked_scan_id"`
 }
 
 // Finding is a vulnerability at an occurrence.

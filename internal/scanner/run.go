@@ -132,8 +132,19 @@ const betweenRuns = 5 * time.Second
 func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 	background.Drain(ctx, interval, betweenRuns, func(ctx context.Context) (bool, error) {
 		outcome, err := r.Once(ctx)
-		if err != nil || outcome == nil {
+		if err != nil {
 			return false, err
+		}
+		if outcome == nil {
+			checking, err := r.Check(ctx)
+			if err != nil || checking == nil {
+				return false, err
+			}
+			r.logger.Info("checked a replaced inventory",
+				"build", checking.BuildID, "scan", checking.ScanID, "run", checking.RunID,
+				"published_meanwhile", checking.Checked.Dated,
+				"found_after_fixed", checking.Checked.Recorded)
+			return true, nil
 		}
 		r.logger.Info("scanned a build",
 			"build", outcome.BuildID, "run", outcome.RunID,

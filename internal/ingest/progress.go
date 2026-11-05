@@ -74,6 +74,9 @@ type Receipt struct {
 	// vulnerability database produced the finding somebody dismissed on a
 	// given day.
 	Measured *finding.Run
+	// Checked is the check of this inventory once a later one replaced it,
+	// absent until one has finished.
+	Checked *finding.Run
 }
 
 // Of is one scan of one build, narrowed the way the receipts are.
@@ -184,9 +187,28 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, buildID in
 	var runs []finding.Run
 	if err := s.db.NewSelect().Model(&runs).
 		Where(`"build_id" = ?`, buildID).
+		Where(`"checked_scan_id" IS NULL`).
 		Where(`"finished_at" IS NOT NULL`).
 		Order("finished_at DESC", "id DESC").Scan(ctx); err != nil {
 		return nil, 0, err
+	}
+	// The check each replaced inventory owed, where one has finished: a run
+	// of its own, which answers no upload.
+	ids := make([]int64, 0, len(scans))
+	for _, sc := range scans {
+		ids = append(ids, sc.ID)
+	}
+	var checks []finding.Run
+	if err := s.db.NewSelect().Model(&checks).
+		Where(`"checked_scan_id" IN (?)`, bun.List(ids)).
+		Where(`"finished_at" IS NOT NULL`).
+		Where(`COALESCE("failure", '') = ''`).
+		Order("id ASC").Scan(ctx); err != nil {
+		return nil, 0, err
+	}
+	checkOf := make(map[int64]*finding.Run, len(checks))
+	for i := range checks {
+		checkOf[*checks[i].CheckedScanID] = &checks[i]
 	}
 
 	// The upload each run is attributed to, worked out over *every* scan
@@ -204,7 +226,8 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, buildID in
 	receipts := make([]Receipt, 0, len(scans))
 	for _, sc := range scans {
 		state, failure, caution, run := progressOf(sc, read[strconv.FormatInt(sc.ID, 10)], runs)
-		receipt := Receipt{Scan: sc, State: state, Failure: failure, Caution: caution}
+		receipt := Receipt{Scan: sc, State: state, Failure: failure, Caution: caution,
+			Checked: checkOf[sc.ID]}
 		if run != nil {
 			// The tooling it was measured with, on every receipt the run
 			// answers — and the counts only on the one it is attributed to.

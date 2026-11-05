@@ -204,6 +204,7 @@ func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
 	var runs []Run
 	err = s.db.NewSelect().Model(&runs).
 		Where(`"build_id" = ?`, buildID).
+		Where(`"checked_scan_id" IS NULL`).
 		Where(`"finished_at" IS NOT NULL`).
 		Order("id DESC").
 		Limit(1).

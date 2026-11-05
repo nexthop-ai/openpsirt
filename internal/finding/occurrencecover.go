@@ -80,7 +80,7 @@ func (s *decidedSets) coveredAtOccurrences(ctx context.Context, db bun.IDB, buil
 	if len(every) == 0 {
 		return nil, nil
 	}
-	occurrences, err := occurrenceEdges(ctx, db, buildID, 0)
+	occurrences, err := occurrenceEdges(ctx, db, buildID, 0, graph.Now)
 	if err != nil {
 		return nil, err
 	}

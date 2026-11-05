@@ -259,18 +259,35 @@ closures under their reason with the lines, judged against no deadline.
 
 ## Replaced inventories
 
-Not built. A branch inventory a later one replaced is checked once more, against
-issues published while it was current, so an exposure fixed before any scan saw
-it is still recorded (REQ-88).
+A branch inventory a later one replaced is checked once more, against issues
+published while it was current, so an exposure fixed before any scan saw it is
+still recorded (REQ-88).
 
 | Rule | Reason |
 |---|---|
-| Each replaced branch inventory owes one check, recorded when done | How long it was current does not matter |
-| The check covers issues published between its last scan and its replacement | Everything earlier was checked while it was current |
-| It runs on the first scanner data dated a settle delay after the replacement, a setting shipping at two days | An issue reaches the scanner's data up to a day after publication |
-| A match opens from the later of publication and the inventory's arrival, and closes at the replacement for the reason the replacement gives | |
-| A tag is never checked this way | A tag is scanned against today's data already |
-| A finding found closed raises no alert | Nothing is left to act on |
+| Each replaced branch inventory owes one check, recorded when a check run of it finishes; no lookback window | How long it was current does not matter |
+| A tag is never checked | A tag is scanned against today's data already |
+| The replaced inventory and its replacement are rebuilt from the graph's intervals at their two scans and given to the scanner as one inventory | Nothing a build sent is kept, and one scan answers both |
+| The check covers issues published from the data date of the last successful scan that started while the inventory was current, until the replacement arrived | Everything earlier that matched was reported then |
+| An inventory no scan reached is checked against every issue published before its replacement | |
+| A data date is the scanner's database build time, or the run's start where it names none | |
+| It runs on the first scanner data dated at least the settle delay after the replacement, a setting shipping at two days; data dated earlier hands the job back for six hours | An issue reaches the scanner's data up to a day after publication |
+| The scheduling pass asks for checks owed by the newest data any scan has used, fifty at a time, newest inventory first | A backlog never holds the queue |
+| A scan of what a build holds is always claimed before a check | |
+| An issue is dated by its published date from OSV (`design-docs/findings-issues.md` § Issue dates), or by when this deployment first carried it where OSV has none | |
+| An issue nobody here has carried is filed and the check waits an hour for the date pass, for up to a day after it was first seen; then it is dated by that sighting | |
+| A match is written closed: opening at the later of publication and the inventory's arrival, closing at the replacement | |
+| Its closure reason is the replacement's: patched or disclaimed where the replacement's claims say so there, unaffected where its record says so, otherwise upgraded, revised, removed or unexplained as for a run (§ Closure reasons) | |
+| Where the replacement is affected at the same occurrence, nothing is written | The replacement's own scan reports it |
+| A match the replaced inventory had patched, cleared or disclaimed is not written | It was never exposed |
+| A match any row of the build already covers at that occurrence identity over any part of the stretch is not written | A run stays the authority on what it reported |
+| The check is a run of its own, naming the inventory it checked, and opens and closes every row it writes | Every row keeps its provenance (REQ-13) |
+| It takes the build as applying a scan does, and writes in one retryable transaction | A scan and a check of one build never interleave |
+| Nothing is notified, assigned or given a deadline | Nothing is left to act on |
+| The replaced upload's receipt counts what it found as found after fixed; no other receipt answers from it | |
+| A check run is never a build's last scan: rescheduling, readiness and the latest run ignore it | |
+
+The cost, measured in `design-docs/findings-measurements.md` § Replaced inventory check, is the scanner's run plus about a second.
 
 ## Limits
 
@@ -281,4 +298,7 @@ it is still recorded (REQ-88).
 | A corrected record reaches findings at the next scan | The run is the one writer of what it closes; a snapshot arriving between scans writes nothing |
 | The finding screen reads open findings; an unaffected closure is read in the register with the lines | |
 | A wrong record cannot be overridden here. Not built | A run consults no decision before closing. Correcting it is correcting the record, which the next snapshot carries |
+| An issue OSV never dates is dated by when this deployment first carried it | An issue first seen by the check itself falls after the replacement and is never recorded; one first seen here late is recorded from a later opening than its publication |
+| A check that recorded nothing is still the one check | Data published to the scanner after the settle delay is not seen |
+| Every replaced branch inventory a deployment holds is owed a check after upgrading | The backlog drains fifty an interval behind the ordinary scans |
 | The outbound VEX document says nothing about an unaffected closure | Telling customers a release is unaffected is a decision, never a closure |

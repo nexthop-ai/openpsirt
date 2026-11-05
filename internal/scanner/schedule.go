@@ -93,7 +93,19 @@ func (s *Schedule) Once(ctx context.Context) (int, error) {
 		// case on every replica but one.
 		return 0, err
 	}
+	asked, err := s.rescans(ctx)
+	if err != nil {
+		return asked, err
+	}
+	checks, err := s.owedChecks(ctx)
+	if checks > 0 {
+		s.logger.Info("asked for replaced inventories to be checked", "inventories", checks)
+	}
+	return asked, err
+}
 
+// rescans asks for every build due a scan.
+func (s *Schedule) rescans(ctx context.Context) (int, error) {
 	every, err := s.every(ctx)
 	if err != nil {
 		return 0, err
@@ -184,11 +196,16 @@ const dueLimit = 200
 // Bounded by the queue's own backlog limit, and the caller stops before using
 // this when there is already a cycle's worth waiting.
 func (s *Schedule) alreadyQueued(ctx context.Context) ([]int64, error) {
+	return s.queuedOf(ctx, queue.Scan)
+}
+
+// queuedOf is the references of every job of a kind waiting or running.
+func (s *Schedule) queuedOf(ctx context.Context, kind string) ([]int64, error) {
 	var references []string
 	err := s.db.NewSelect().
 		Model((*queue.Job)(nil)).
 		Column("reference").
-		Where(`"kind" = ?`, queue.Scan).
+		Where(`"kind" = ?`, kind).
 		Where(`"state" IN (?)`, bun.List([]queue.State{queue.Pending, queue.Running})).
 		Scan(ctx, &references)
 	if err != nil {
@@ -224,7 +241,8 @@ func (s *Schedule) due(ctx context.Context, every time.Duration, queued []int64)
 		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "gn"
 			WHERE "gn"."build_id" = "tg"."id" AND "gn"."closed_scan_id" IS NULL)`).
 		Where(`NOT EXISTS (SELECT 1 FROM "scan_run" AS "r"
-			WHERE "r"."build_id" = "tg"."id" AND "r"."started_at" >= ?)`, before).
+			WHERE "r"."build_id" = "tg"."id" AND "r"."checked_scan_id" IS NULL
+			AND "r"."started_at" >= ?)`, before).
 		OrderExpr(`"tg"."id"`).
 		Limit(dueLimit)
 	if len(queued) > 0 {

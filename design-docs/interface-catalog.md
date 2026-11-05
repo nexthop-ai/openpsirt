@@ -79,6 +79,7 @@ changed.
 | A run that changed nothing says 0; a row with nothing to report is blank, and the wire tells them apart | A superseded upload must not read as a clean scan |
 | Opened and Closed are dependency findings, drawn under `design-docs/interface.md` § Families a reader holds: no column for a reader not reading them in the product, with the line where they are read in another; the receipts stay | Every row would read 0 |
 | Each receipt says what its upload did to the build's contents and opens the names: removals marked and first; an upload that moved nothing says so; a build's first upload says nothing | A removal looks like a stopped dependency |
+| A replaced upload whose check found anything says how many were found after fixed, explained on hover | A count with no column: most uploads never carry one |
 | What a new line inherits: the line it carries from, how many reach this one, how many are past their date, how many cover nothing here, the rest a list to tick. A promised upgrade that moved is a line of its own saying to plan again from the component. Two of the six groups are questions, and it says which | Asked when a line has its first scan |
 
 ## Inventory changes

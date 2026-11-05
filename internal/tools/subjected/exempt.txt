@@ -3,6 +3,8 @@
 # § Store methods with no subject holds the three kinds of reason there are.
 
 finding.Store.Apply A background pass: it records what a scanner run found, for the deployment.
+finding.Store.CheckReplaced A background pass: it records what a replaced inventory held that no scan saw.
+finding.Store.Undated A background pass: it files the issues a check reports so their dates can be asked.
 finding.Store.Begin A background pass: it records that a scanner run started.
 finding.Store.Finish A background pass: it records how a scanner run ended.
 finding.Store.LastRecordsVersion A background pass: the scanner asks which CVE record snapshot a build last read.
@@ -33,6 +35,7 @@ triage.Store.PeopleNamed Not varying by reader: who an identifier is, for a reco
 triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
 triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
 graph.Store.CurrentComponents A background pass: the scanner is fed a build's components from here.
+graph.Store.ComponentsAt A background pass: the scanner reads what a build held at a scan, to check a replaced inventory.
 graph.Store.Stated A background pass: applying a scan matches the build's claims against what the build states for its components.
 graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail reads it after authorizing the finding.
 graph.Store.Moved A background pass: the inventory watch reads what one scan changed before deciding who hears of it.

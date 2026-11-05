@@ -466,6 +466,20 @@ so a credential the scanner needs has to be given under a name of its own. The
 `GRYPE_` variables have no key in a configuration file: they are the scanner's,
 and stay in the environment in both modes.
 
+### Replaced inventories
+
+Each branch inventory a later upload replaced is scanned once more, against
+issues published while it was current, and what it finds is recorded as fixed
+when the replacement arrived. The upload's receipt counts it as found after
+fixed. Nothing is notified or assigned. A tag is never checked.
+
+| | |
+|---|---|
+| When | On the first scanner data dated at least `scanning.check-settle` after the replacement arrived, two days unless an administrator changes it under Settings |
+| Dates | Each issue's publication date from [Issue publication dates](#issue-publication-dates), or when this deployment first saw it where OSV has none or the dates are off |
+| Cost | One more scan per replaced inventory, behind every waiting scan of a build, fifty asked for at a time |
+| After upgrading | Every replaced branch inventory already held is owed its check |
+
 ### CVE records
 
 A scanner matching by version range reports some versions the issue's own CVE
