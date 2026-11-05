@@ -123,8 +123,15 @@ func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 			t.Fatalf("past the fortnight a day after asking answered %d (%v), want none: %v", asked, err, answers.asked)
 		}
 		now = now.Add(11 * 24 * time.Hour)
+		// OSV no longer serves the first: the dates it gave are kept.
+		answers.mu.Lock()
+		delete(answers.says, "CVE-2026-0001")
+		answers.mu.Unlock()
 		if asked, err := pass.Once(ctx); err != nil || asked != 3 {
 			t.Fatalf("a month on answered %d (%v), want all three", asked, err)
+		}
+		if kept := datesOf(t, db, "CVE-2026-0001"); kept.Published == nil || !kept.Published.Equal(published) {
+			t.Errorf("an issue OSV stopped serving holds %+v, want the dates it gave kept", kept)
 		}
 	})
 }

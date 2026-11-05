@@ -105,6 +105,11 @@ export function Issue() {
           Publication date unknown
         </p>
       )}
+      {it?.dates === "unasked" && (
+        <p className="hint" style={{ marginBottom: 10 }} title="OSV hasn't been asked about it yet">
+          Publication date not asked yet
+        </p>
+      )}
       {(it?.merged ?? []).map((one) => (
         <p key={one.vulnerability} className="hint" style={{ marginBottom: 10 }}>
           Merged from <span className="id">{one.vulnerability}</span> on {on(one.merged_at)}, when a

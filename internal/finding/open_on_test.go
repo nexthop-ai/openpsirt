@@ -205,3 +205,30 @@ func TestTheListOnADayCountsNothingFixedSinceAsOverdue(t *testing.T) {
 		}
 	})
 }
+
+func TestTheHiddenCountAndTheBumpsOnADayHoldWhatWasOpenThatDay(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		closedOnADay(t, f)
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		between, before := today.Add(-4*24*time.Hour), today.Add(-6*24*time.Hour)
+		who := f.holding(t, access.PublicTriage)
+		// Both are high, so a line at critical hides both that were open then.
+		line := finding.MinimumSeverity{Word: "critical"}
+		hidden, err := f.store.Hidden(ctx, who, f.wholeProduct(), finding.Filter{OpenOn: &between, MinimumSeverity: line})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hidden != 2 {
+			t.Errorf("hiding %d on the day, want the two open then", hidden)
+		}
+		// Before either opened there is nothing to bump.
+		_, bumps, err := f.store.PlannedUpgrades(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{OpenOn: &before})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bumps != 0 {
+			t.Errorf("%d bumps before anything opened, want none", bumps)
+		}
+	})
+}

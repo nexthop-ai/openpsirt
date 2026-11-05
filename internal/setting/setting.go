@@ -257,8 +257,8 @@ const (
 	// On unless somebody turns it off. What leaves is an issue's public
 	// identifier, which every advisory database already publishes; nothing
 	// about a build, a component or a product goes with it. An air-gapped
-	// deployment turns it off, and every figure needing a publication date
-	// then dates the issue by when this deployment first saw it.
+	// deployment turns it off; an issue never dated is then dated by when
+	// this deployment first saw it, and dates already held stay.
 	IssueDates = "issues.dates"
 	// CheckSettle is how long after a branch inventory is replaced its check
 	// waits: the check runs on the first scanner data dated at least this

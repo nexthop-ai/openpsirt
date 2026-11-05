@@ -159,6 +159,7 @@ The first night is 1,605 statements.
 
 Not measured: reads narrowed by product (run as an administrator), several
 builds, and observed churn. The harness constants are the model.
+
 ## Replaced inventory check
 
 Justifies running the check as one transaction per replaced inventory

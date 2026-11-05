@@ -48,8 +48,8 @@ const betweenAsks = 100 * time.Millisecond
 // betweenCycles is how often the pass looks where the caller says nothing.
 const betweenCycles = time.Minute
 
-// renewEvery is how many requests a pass makes before it takes the lease
-// again.
+// renewEvery is how many issues a pass asks about before it takes the lease
+// again; one issue is up to five requests.
 const renewEvery = 25
 
 // Lease names the work of asking OSV, so one replica asks.

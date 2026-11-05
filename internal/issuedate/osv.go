@@ -90,19 +90,20 @@ func (o *OSV) Dates(ctx context.Context, name string) (Dates, error) {
 	req.Header.Set("Accept", "application/json")
 	resp, err := o.HTTP.Do(req)
 	if err != nil {
-		if errors.Is(err, outward.ErrRefused) {
-			return Dates{}, fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
-		}
+		// A refusal by the outbound guard is the network, not the name: a
+		// redirect, or the host resolving inside this network.
 		return Dates{}, fmt.Errorf("%w: %s: %w", ErrNotAnswering, at, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	switch {
 	case resp.StatusCode == http.StatusNotFound:
 		return Dates{}, ErrUnknown
-	case resp.StatusCode == http.StatusTooManyRequests, resp.StatusCode >= 500:
-		return Dates{}, fmt.Errorf("%w: %s answered %s", ErrNotAnswering, at, resp.Status)
-	case resp.StatusCode != http.StatusOK:
+	case resp.StatusCode == http.StatusBadRequest:
 		return Dates{}, fmt.Errorf("%w: %s answered %s", ErrUnaskable, at, resp.Status)
+	case resp.StatusCode != http.StatusOK:
+		// A proxy's 403 or anything else unexpected says nothing about the
+		// issue, so it stays due.
+		return Dates{}, fmt.Errorf("%w: %s answered %s", ErrNotAnswering, at, resp.Status)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, mostBody+1))
 	if err != nil {

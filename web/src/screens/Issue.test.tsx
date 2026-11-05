@@ -95,6 +95,13 @@ describe("one issue, everywhere it sits", () => {
     expect(text()).toContain("Publication date unknown");
   });
 
+  it("says OSV has not been asked yet", async () => {
+    await drawn({
+      data: { vulnerability: "CVE-2026-1", products: 0, total: 0, items: [], dates: "unasked" },
+    });
+    expect(text()).toContain("Publication date not asked yet");
+  });
+
   it("says nothing carries it rather than drawing an empty table", async () => {
     await drawn({ data: { vulnerability: "CVE-2026-1", products: 0, total: 0, items: [] } });
     expect(text()).toContain("Nothing carries it.");

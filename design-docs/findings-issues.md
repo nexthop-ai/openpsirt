@@ -142,7 +142,7 @@ background, because no scanner report carries either (REQ-82).
 | An empty answer keeps dates already held | A record OSV stops serving was still published when it said |
 | A first published date rewrites what a replaced inventory's check recorded of the issue undated, in the same transaction (`design-docs/findings-closure.md` § Replaced inventories) | |
 | A known issue is asked again after thirty days; an unknown one daily for its first fourteen days here, then every thirty | OSV revises records; a fresh issue reaches it within hours, and an unknown answer rarely changes |
-| OSV not answering ends the pass and leaves the issue due | |
+| OSV not answering ends the pass and leaves the issue due: a failed connection, a refusal by the outbound guard, a status other than success, not found or a bad request | A proxy or a resolver inside the network says nothing about the issue |
 | The client reaches `api.osv.dev` alone, follows no redirect and connects nowhere inside this network (REQ-69) | |
 | The issue page states both dates and whether they are stated, unknown or not yet asked | |
 

@@ -24,7 +24,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Scheduled rescanning](#scanning) | On, daily | `scanning.every` under Settings sets how often |
 | [Vulnerability data updates](#an-air-gapped-install) | On | `GRYPE_DB_AUTO_UPDATE`; set it to `false` where the deployment cannot reach the network |
 | [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
-| [Issue publication dates](#issue-publication-dates) | On | `issues.dates` under Settings turns it off |
+| [Issue publication dates](#issue-publication-dates) | On | `issues.dates` under Settings turns it off; turn it off where the deployment cannot reach the network |
 | [Patch branches](#patch-branches) | Off | `OPENPSIRT_PATCH_BRANCHES`, or `patchBranches.enabled` in the chart. [What to set first](#enabling) |
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
 | [Upstream statements](#upstream-statements) | Off | Naming an upstream from a product's row under Products |
@@ -550,6 +550,10 @@ is replaced in the same way: the file read is the newest one placed there.
 | `openpsirt records import <archive>` | Reads a CVE List archive downloaded some other way, a `_all_CVEs_at_midnight.zip.zip`, into the same place |
 | `openpsirt records status` | Says which snapshot is held, and how many records it keeps |
 
+Turn `issues.dates` off under Settings as well. With no route to OSV the date
+pass warns every minute, and a replaced inventory's check that files a new
+issue waits for it, an hour at a time, for up to a day.
+
 ## Attachment storage
 
 Absent is ordinary: with none of this set, attachments are off and everything
@@ -976,7 +980,7 @@ request per name asked, and nothing about a build, a component or a product.
 | Asked | Each published vulnerability once, then again monthly. An issue OSV does not know is asked daily for its first two weeks here, then monthly |
 | Names | The issue's own identifier first, then its other names, until OSV knows one |
 | Unknown | An issue OSV holds no record of has no date, and the issue page says so |
-| Turned off | Nothing is asked. A replaced inventory's check dates every issue by when this deployment first saw it |
+| Turned off | Nothing is asked. A replaced inventory's check dates an issue never dated by when this deployment first saw it; dates already held stay |
 | Egress | Allow `api.osv.dev`. Nothing else is reached and a redirect is not followed. A pass that cannot reach it stops, and the issues stay due |
 
 ## Outbound exclusions

@@ -7,13 +7,16 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/issuedate"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
@@ -345,6 +348,93 @@ func TestACheckWritesNothingARowCoversOverPartOfTheStretch(t *testing.T) {
 		}
 		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 0 {
 			t.Fatalf("the second check recorded %+v, want nothing", checking)
+		}
+	})
+}
+
+func TestACheckWhoseJobFailedIsNotAskedForAgain(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		schedule := scanner.NewSchedule(f.db, f.queue, quiet, "test")
+		cycle := func() {
+			t.Helper()
+			if err := queue.NewLeases(f.db.DB).Release(ctx, scanner.ScheduleLease, "test"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := schedule.Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// A scan with data new enough makes the check owed.
+		s := &dated{at: time.Now().UTC()}
+		f.waiting(t)
+		if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		cycle()
+		checks := func(state queue.State) int {
+			t.Helper()
+			n, err := f.db.NewSelect().Table("job").Where(`"kind" = ?`, queue.Check).
+				Where(`"state" = ?`, state).Count(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return int(n)
+		}
+		if checks(queue.Pending) != 1 {
+			t.Fatalf("%d checks asked for, want the one owed", checks(queue.Pending))
+		}
+		if _, err := f.db.NewUpdate().Table("job").Set(`"state" = ?`, queue.Failed).
+			Where(`"kind" = ?`, queue.Check).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		cycle()
+		if n := checks(queue.Pending); n != 0 {
+			t.Errorf("%d checks asked for again after the job failed, want none until it is put back", n)
+		}
+	})
+}
+
+func TestACheckRunIsNeverABuildsLastScan(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0020", f.arrived.Add(24*time.Hour))
+		// Both uploads read when they arrived, so a run finishing after the
+		// replacement's would answer it.
+		for scan, at := range map[int64]time.Time{f.old: f.arrived, f.replacement: f.replaced} {
+			job, err := f.queue.Add(ctx, queue.Parse, strconv.FormatInt(scan, 10))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.db.NewUpdate().Table("job").Set(`"state" = ?`, queue.Done).
+				Set(`"updated_at" = ?`, at).Where(`"id" = ?`, job.ID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0020", libnl)}}
+		checking := f.check(t, s)
+		if checking == nil {
+			t.Fatal("nothing was checked")
+		}
+		// The build's own scan was ten days ago; the check just now is not one.
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := scanner.NewSchedule(f.db, f.queue, quiet, "test").Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if f.queued(t) != 1 {
+			t.Error("the build is not asked to be scanned again: the check read as its last scan")
+		}
+		receipts, _, err := ingest.NewStore(f.db.DB).Receipts(ctx, access.Everything("a test reading receipts"), f.build, 10, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range receipts {
+			if (r.RunID != nil && *r.RunID == checking.RunID) || (r.Measured != nil && r.Measured.ID == checking.RunID) {
+				t.Errorf("upload %d answers from the check run as its scan", r.Scan.ID)
+			}
 		}
 	})
 }

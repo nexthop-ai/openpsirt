@@ -25,6 +25,10 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 				`"modified":"2026-11-05T10:31:12.351990229Z"}`))
 		case "/v1/vulns/CVE-2026-0500":
 			w.WriteHeader(http.StatusServiceUnavailable)
+		case "/v1/vulns/CVE-2026-0403":
+			w.WriteHeader(http.StatusForbidden)
+		case "/v1/vulns/CVE-2026-0400":
+			w.WriteHeader(http.StatusBadRequest)
 		case "/v1/vulns/CVE-2026-0501":
 			_, _ = w.Write([]byte(`{"id":"CVE-2026-0501"}`))
 		default:
@@ -49,6 +53,8 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 	for name, want := range map[string]error{
 		"CVE-1999-99999": issuedate.ErrUnknown,
 		"CVE-2026-0500":  issuedate.ErrNotAnswering,
+		"CVE-2026-0403":  issuedate.ErrNotAnswering,
+		"CVE-2026-0400":  issuedate.ErrUnaskable,
 		"CVE-2026-0501":  issuedate.ErrUnknown,
 		"../admin":       issuedate.ErrUnaskable,
 		"CVE-1 2":        issuedate.ErrUnaskable,
@@ -82,7 +88,8 @@ func TestNamesAreSentAsOSVSpellsThem(t *testing.T) {
 func TestTheOSVClientReachesNoOtherHost(t *testing.T) {
 	client := issuedate.NewOSV()
 	client.Base = "https://example.com"
-	if _, err := client.Dates(t.Context(), "CVE-2024-3094"); !errors.Is(err, issuedate.ErrUnaskable) {
-		t.Fatalf("a request to another host answered %v, want it refused", err)
+	// Refused, and left due: the network refused it, not the name.
+	if _, err := client.Dates(t.Context(), "CVE-2024-3094"); !errors.Is(err, issuedate.ErrNotAnswering) {
+		t.Fatalf("a request to another host answered %v, want it refused as not answering", err)
 	}
 }

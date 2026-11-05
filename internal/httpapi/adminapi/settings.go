@@ -254,7 +254,7 @@ var settable = []struct {
 		setting.Switch, theSwitch, func(core.Deps) string { return setting.Off }, false},
 	{setting.IssueDates, "Issue publication dates", setting.Outbound,
 		"Ask OSV when each issue was published and last changed",
-		"One request per issue, carrying its public identifier and nothing else. Off, an issue is dated by when this deployment first saw it.",
+		"One request per issue, carrying its public identifier and nothing else. Off, an issue never dated is dated by when this deployment first saw it; dates already held stay.",
 		setting.Switch, theSwitch, func(core.Deps) string { return setting.On }, false},
 	{setting.PublishedStatuses, "Published statuses", setting.Outbound,
 		"Which statuses the security documents served to anybody state",

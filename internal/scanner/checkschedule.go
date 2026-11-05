@@ -25,7 +25,7 @@ const checksLimit = 50
 
 // owedChecks asks for every replaced branch inventory whose check is due:
 // the newest scanner data is dated at least the settle delay after its
-// replacement, and no check of it has finished.
+// replacement, no check of it has finished, and its job has not failed.
 func (s *Schedule) owedChecks(ctx context.Context) (int, error) {
 	settle, err := setting.NewStore(s.db.DB).Duration(ctx, setting.CheckSettle, setting.DefaultCheckSettle)
 	if err != nil {
@@ -41,6 +41,13 @@ func (s *Schedule) owedChecks(ctx context.Context) (int, error) {
 	}
 	if len(queued) >= checksLimit {
 		return 0, nil
+	}
+	// A check whose job ran out of attempts is settled until somebody puts
+	// the job back: asked again each cycle, one that always fails would hold
+	// the worker with a scan of two inventories every time.
+	failed, err := s.jobsOf(ctx, queue.Check, queue.Failed)
+	if err != nil {
+		return 0, err
 	}
 	cutoff := newest.Add(-settle)
 
@@ -60,8 +67,8 @@ func (s *Schedule) owedChecks(ctx context.Context) (int, error) {
 			AND COALESCE("cr"."failure", '') = '')`).
 		OrderExpr(`"sc"."id" DESC`).
 		Limit(int64(checksLimit - len(queued)))
-	if len(queued) > 0 {
-		q = q.Where(`"sc"."id" NOT IN (?)`, bun.List(queued))
+	if held := append(queued, failed...); len(held) > 0 {
+		q = q.Where(`"sc"."id" NOT IN (?)`, bun.List(held))
 	}
 	var owed []int64
 	if err := q.Scan(ctx, &owed); err != nil {

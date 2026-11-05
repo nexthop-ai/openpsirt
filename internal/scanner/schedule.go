@@ -201,12 +201,17 @@ func (s *Schedule) alreadyQueued(ctx context.Context) ([]int64, error) {
 
 // queuedOf is the references of every job of a kind waiting or running.
 func (s *Schedule) queuedOf(ctx context.Context, kind string) ([]int64, error) {
+	return s.jobsOf(ctx, kind, queue.Pending, queue.Running)
+}
+
+// jobsOf is what the jobs of a kind in these states name.
+func (s *Schedule) jobsOf(ctx context.Context, kind string, states ...queue.State) ([]int64, error) {
 	var references []string
 	err := s.db.NewSelect().
 		Model((*queue.Job)(nil)).
 		Column("reference").
 		Where(`"kind" = ?`, kind).
-		Where(`"state" IN (?)`, bun.List([]queue.State{queue.Pending, queue.Running})).
+		Where(`"state" IN (?)`, bun.List(states)).
 		Scan(ctx, &references)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already queued for scanning: %w", err)
