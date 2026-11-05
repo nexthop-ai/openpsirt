@@ -31,8 +31,10 @@ func upV0120(ctx context.Context, sqldb *sql.DB) error {
 //     vulnerability database answers, and when that database was last asked.
 //   - A scan run records the replaced inventory it checked, where it is the
 //     check a replaced branch inventory owes.
+//   - A scan records that it was replaced before the upgrade, and so owes no
+//     check.
 func upgradeV0120(ctx context.Context, tx bun.Tx) error {
-	for _, step := range []func(context.Context, bun.Tx) error{issueDatesV0120, checkedScanV0120} {
+	for _, step := range []func(context.Context, bun.Tx) error{issueDatesV0120, checkedScanV0120, uncheckedV0120} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

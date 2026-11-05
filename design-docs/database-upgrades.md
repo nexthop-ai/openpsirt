@@ -190,18 +190,24 @@ times on each engine.
 
 ## The v0.12.0 upgrade
 
-Migration 46, untagged. No row moves. Each addition is stepped over where a
-stopped upgrade made it already.
+Migration 46, untagged. No row moves; one column is filled. Each addition is
+stepped over where a stopped upgrade made it already.
 
 | Table | Gains |
 |---|---|
 | `vulnerability` | When the issue was published and last modified, and when that was last asked, all empty (`design-docs/findings-issues.md` § Issue dates) |
 | `scan_run` | The replaced inventory a run checked, empty, with a foreign key to `scan` and an index (`design-docs/findings-closure.md` § Replaced inventories) |
+| `scan` | Whether an inventory was replaced before the upgrade: true on every accepted, applied scan with a later one of its build, false on the rest and on every scan after |
+
+| Upgrade note | Detail |
+|---|---|
+| Replaced inventories | An inventory replaced before the upgrade is never checked; one replaced after it is, once |
 
 | Check, on each engine | What it holds |
 |---|---|
 | A v0.11.0 database | Upgraded, each changed table's declaration describing the built table |
 | A v0.11.0 database already holding the issue date columns | Upgraded the same, the run column and its index made |
+| A v0.11.0 database holding a replaced and a current inventory | The replaced one marked, the current one and any later one not |
 
 ## Limits
 

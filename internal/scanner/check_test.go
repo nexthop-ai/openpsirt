@@ -347,3 +347,27 @@ func TestEveryReplacedBranchInventoryIsOwedOneCheck(t *testing.T) {
 		}
 	})
 }
+
+func TestAnInventoryReplacedBeforeTheUpgradeIsNeverAskedFor(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		if _, err := f.db.NewUpdate().Table("scan").Set(`"replaced_unchecked" = ?`, true).
+			Where(`"id" = ?`, f.old).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		s := &dated{at: time.Now().UTC()}
+		f.waiting(t)
+		if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := scanner.NewSchedule(f.db, f.queue, quiet, "test").Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		n, err := f.db.NewSelect().Table("job").Where(`"kind" = ?`, queue.Check).Count(ctx)
+		if err != nil || n != 0 {
+			t.Fatalf("%d checks asked for, %v; want none", n, err)
+		}
+	})
+}

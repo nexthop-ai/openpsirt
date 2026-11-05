@@ -478,7 +478,7 @@ fixed. Nothing is notified or assigned. A tag is never checked.
 | When | On the first scanner data dated at least `scanning.check-settle` after the replacement arrived, two days unless an administrator changes it under Settings |
 | Dates | Each issue's publication date from [Issue publication dates](#issue-publication-dates), or when this deployment first saw it where OSV has none or the dates are off |
 | Cost | One more scan per replaced inventory, behind every waiting scan of a build, fifty asked for at a time |
-| After upgrading | Every replaced branch inventory already held is owed its check |
+| After upgrading | An inventory already replaced is never checked; one replaced after the upgrade is |
 
 ### CVE records
 

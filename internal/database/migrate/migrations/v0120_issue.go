@@ -81,3 +81,57 @@ func checkedScanV0120(ctx context.Context, tx bun.Tx) error {
 	}
 	return u.index(scanRunV0120(u.t), "scan_run", "scan_run_checked_idx")
 }
+
+// scanV0120 is v0.12.0's declaration of the scan table.
+//
+// v0.11.0's, with whether a branch inventory was replaced before replaced
+// inventories were checked, which owes no check.
+func scanV0120(t *columnTypes) []string {
+	statements := declaredV0110(t, "scan")
+	statements[0] = withColumn(statements[0], `"placed"         INTEGER NULL,`,
+		`-- True on an inventory already replaced when this deployment began
+			-- checking replaced inventories: it owes no check, since its
+			-- history would be checked only against today's data.
+			"replaced_unchecked" `+t.boolean+` DEFAULT FALSE NOT NULL,`)
+	return statements
+}
+
+// uncheckedV0120 marks every branch inventory v0.11.0 left replaced as owing
+// no check. An inventory replaced after the upgrade owes one, and a fresh
+// install holds none to mark.
+func uncheckedV0120(ctx context.Context, tx bun.Tx) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	present, err := u.hasColumn("scan", "replaced_unchecked")
+	if err != nil || present {
+		return err
+	}
+	if err := u.change(scanV0120(u.t), change{table: "scan",
+		add: []added{{column: "replaced_unchecked"}}}); err != nil {
+		return err
+	}
+	// Every applied scan with a later applied scan of its build: what was
+	// replaced by the moment of the upgrade. A tag is marked too, and is
+	// never checked either way. Read first and written by identifier, since
+	// MySQL refuses an update naming its own table in a subquery.
+	var replaced []int64
+	if err := tx.NewSelect().TableExpr(`"scan" AS "sc"`).ColumnExpr(`"sc"."id"`).
+		Where(`"sc"."status" = ? AND "sc"."components" IS NOT NULL`, "accepted").
+		Where(`EXISTS (SELECT 1 FROM "scan" AS "nx" WHERE "nx"."build_id" = "sc"."build_id"
+			AND "nx"."id" > "sc"."id" AND "nx"."status" = ? AND "nx"."components" IS NOT NULL)`, "accepted").
+		Scan(ctx, &replaced); err != nil {
+		return err
+	}
+	const batch = 500
+	for from := 0; from < len(replaced); from += batch {
+		if _, err := tx.NewUpdate().Table("scan").
+			Set(`"replaced_unchecked" = ?`, true).
+			Where(`"id" IN (?)`, bun.List(replaced[from:min(from+batch, len(replaced))])).
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}

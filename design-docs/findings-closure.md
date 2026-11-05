@@ -265,7 +265,8 @@ still recorded (REQ-88).
 
 | Rule | Reason |
 |---|---|
-| Each replaced branch inventory owes one check, recorded when a check run of it finishes; no lookback window | How long it was current does not matter |
+| Each branch inventory replaced after the upgrade that introduced the check owes one check, recorded when a check run of it finishes; no lookback window | How long it was current does not matter |
+| An inventory already replaced at that upgrade owes none, marked by the upgrade; a fresh install marks nothing | Its history would be checked only against today's data |
 | A tag is never checked | A tag is scanned against today's data already |
 | The replaced inventory and its replacement are rebuilt from the graph's intervals at their two scans and given to the scanner as one inventory | Nothing a build sent is kept, and one scan answers both |
 | The check covers issues published from the data date of the last successful scan that started while the inventory was current, until the replacement arrived | Everything earlier that matched was reported then |
@@ -300,5 +301,4 @@ The cost, measured in `design-docs/findings-measurements.md` § Replaced invento
 | A wrong record cannot be overridden here. Not built | A run consults no decision before closing. Correcting it is correcting the record, which the next snapshot carries |
 | An issue OSV never dates is dated by when this deployment first carried it | An issue first seen by the check itself falls after the replacement and is never recorded; one first seen here late is recorded from a later opening than its publication |
 | A check that recorded nothing is still the one check | Data published to the scanner after the settle delay is not seen |
-| Every replaced branch inventory a deployment holds is owed a check after upgrading | The backlog drains fifty an interval behind the ordinary scans |
 | The outbound VEX document says nothing about an unaffected closure | Telling customers a release is unaffected is a decision, never a closure |

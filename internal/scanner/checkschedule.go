@@ -50,7 +50,8 @@ func (s *Schedule) owedChecks(ctx context.Context) (int, error) {
 		Join(`JOIN "build" AS "b" ON "b"."id" = "sc"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"sc"."id"`).
-		Where(`"bt"."kind" = ?`, catalog.Branch), "sc").
+		Where(`"bt"."kind" = ?`, catalog.Branch).
+		Where(`"sc"."replaced_unchecked" = ?`, false), "sc").
 		Where(`EXISTS (SELECT 1 FROM "scan" AS "nx"
 			WHERE "nx"."build_id" = "sc"."build_id" AND "nx"."id" > "sc"."id"
 			AND `+applied+` AND "nx"."received_at" <= ?)`, appliedArgs, cutoff).
