@@ -33,23 +33,24 @@ func TestAV0110DatabaseUpgradesToV0120(t *testing.T) {
 // column carries on, and makes the index. On MySQL and MariaDB each column
 // commits by itself.
 func TestTheV0120UpgradeStepsOverColumnsAlreadyThere(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0110)
-		for _, stmt := range []string{
-			`ALTER TABLE "vulnerability" ADD COLUMN "published_at" ` + timestampOn(db.Server.Engine) + ` NULL`,
-			`ALTER TABLE "vulnerability" ADD COLUMN "modified_at" ` + timestampOn(db.Server.Engine) + ` NULL`,
-			`ALTER TABLE "vulnerability" ADD COLUMN "dates_asked_at" ` + timestampOn(db.Server.Engine) + ` NULL`,
-		} {
-			if _, err := db.ExecContext(ctx, stmt); err != nil {
-				t.Fatalf("make what a stopped upgrade left: %v", err)
-			}
-		}
-		dbtest.MigrateTo(t, db, v0120)
-		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0120(db.Server.Engine))
-		leaveAtLatest(t, ctx, db)
-	})
+	for _, made := range []int{1, 3} {
+		t.Run(fmt.Sprintf("%d of the dates", made), func(t *testing.T) {
+			dbtest.Each(t, func(t *testing.T, db *database.DB) {
+				ctx := t.Context()
+				dbtest.Empty(t, db)
+				dbtest.MigrateTo(t, db, v0110)
+				for _, column := range []string{"published_at", "modified_at", "dates_asked_at"}[:made] {
+					if _, err := db.ExecContext(ctx, `ALTER TABLE "vulnerability" ADD COLUMN "`+column+`" `+
+						timestampOn(db.Server.Engine)+` NULL`); err != nil {
+						t.Fatalf("make what a stopped upgrade left: %v", err)
+					}
+				}
+				dbtest.MigrateTo(t, db, v0120)
+				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0120(db.Server.Engine))
+				leaveAtLatest(t, ctx, db)
+			})
+		})
+	}
 }
 
 // timestampOn is how an engine declares a moment, as the migrations do.
@@ -68,6 +69,27 @@ func timestampOn(engine database.Engine) string {
 // still current owes one once something replaces it.
 func TestABranchInventoryReplacedBeforeTheUpgradeOwesNoCheck(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		replacedBeforeTheUpgrade(t, db, func() {})
+	})
+}
+
+// An upgrade stopped after adding the column still marks what was replaced.
+func TestAV0120UpgradeStoppedAfterItsColumnStillMarks(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		replacedBeforeTheUpgrade(t, db, func() {
+			if _, err := db.ExecContext(t.Context(),
+				`ALTER TABLE "scan" ADD COLUMN "replaced_unchecked" BOOLEAN DEFAULT FALSE NOT NULL`); err != nil {
+				t.Fatalf("make what a stopped upgrade left: %v", err)
+			}
+		})
+	})
+}
+
+// replacedBeforeTheUpgrade seeds a v0.11.0 build with a replaced inventory and
+// a current one, runs stopped, then upgrades, and checks which owes a check.
+func replacedBeforeTheUpgrade(t *testing.T, db *database.DB, stopped func()) {
+	t.Helper()
+	{
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v0110)
@@ -105,6 +127,7 @@ func TestABranchInventoryReplacedBeforeTheUpgradeOwesNoCheck(t *testing.T) {
 		}
 		replaced, current := scanned(1), scanned(2)
 
+		stopped()
 		dbtest.MigrateTo(t, db, v0120)
 		after := scanned(3)
 		unchecked := func(scan int64) bool {
@@ -124,5 +147,34 @@ func TestABranchInventoryReplacedBeforeTheUpgradeOwesNoCheck(t *testing.T) {
 			t.Error("an inventory arriving after the upgrade owes none")
 		}
 		leaveAtLatest(t, ctx, db)
-	})
+	}
+}
+
+// An upgrade stopped after the run's column, or after its key and index, makes
+// what is missing and replaces nothing already made.
+func TestAV0120UpgradeStoppedPartWayThroughTheCheckedRunResumes(t *testing.T) {
+	for _, stop := range []string{"after the column", "after the index"} {
+		t.Run(stop, func(t *testing.T) {
+			dbtest.Each(t, func(t *testing.T, db *database.DB) {
+				ctx := t.Context()
+				if stop == "after the column" && db.Server.Engine == database.SQLite {
+					t.Skip("SQLite changes a table in one transaction, so it never stops there")
+				}
+				dbtest.Empty(t, db)
+				dbtest.MigrateTo(t, db, v0110)
+				if stop == "after the column" {
+					reference := "BIGINT"
+					if _, err := db.ExecContext(ctx,
+						`ALTER TABLE "scan_run" ADD COLUMN "checked_scan_id" `+reference+` NULL`); err != nil {
+						t.Fatalf("make what a stopped upgrade left: %v", err)
+					}
+				} else if err := migrations.RunV0120CheckedStep(ctx, db); err != nil {
+					t.Fatalf("make what a stopped upgrade left: %v", err)
+				}
+				dbtest.MigrateTo(t, db, v0120)
+				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0120(db.Server.Engine))
+				leaveAtLatest(t, ctx, db)
+			})
+		})
+	}
 }

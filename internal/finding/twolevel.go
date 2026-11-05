@@ -353,7 +353,7 @@ func (f Filter) partialColumns() []partColumn {
 		columns = append(columns, partColumn{`MAX("f"."closed_at")`, "MAX", "closed_at"})
 	}
 	if f.Overdue || f.DueBefore != nil || f.SortBy == ByDeadline {
-		columns = append(columns, partColumn{`MIN("f"."due_at")`, "MIN", "due_at"})
+		columns = append(columns, partColumn{openDue, "MIN", "due_at"})
 	}
 	if len(f.fixStates()) > 0 {
 		columns = append(columns, partColumn{`MIN("f"."fix_state")`, "MIN", "fix_least"},

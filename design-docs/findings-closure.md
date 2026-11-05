@@ -269,14 +269,14 @@ still recorded (REQ-88).
 | An inventory already replaced at that upgrade owes none, marked by the upgrade; a fresh install marks nothing | Its history would be checked only against today's data |
 | A tag is never checked | A tag is scanned against today's data already |
 | The replaced inventory and its replacement are rebuilt from the graph's intervals at their two scans and given to the scanner as one inventory | Nothing a build sent is kept, and one scan answers both |
-| The check covers issues published from the data date of the last successful scan that started while the inventory was current, until the replacement arrived | Everything earlier that matched was reported then |
+| The check covers issues published from the settle delay before the data date of the last successful scan that started while the inventory was current, until the replacement arrived | Data dated a moment need not yet carry an issue published just before it; a match that scan did report is covered already |
 | An inventory no scan reached is checked against every issue published before its replacement | |
 | A data date is the scanner's database build time, or the run's start where it names none | |
 | It runs on the first scanner data dated at least the settle delay after the replacement, a setting shipping at two days; data dated earlier hands the job back for six hours | An issue reaches the scanner's data up to a day after publication |
 | The scheduling pass asks for checks owed by the newest data any scan has used, fifty at a time, newest inventory first | A backlog never holds the queue |
 | A scan of what a build holds is always claimed before a check | |
 | An issue is dated by its published date from OSV (`design-docs/findings-issues.md` § Issue dates), or by when this deployment first carried it where OSV has none | |
-| An issue nobody here has carried is filed and the check waits an hour for the date pass, for up to a day after it was first seen; then it is dated by that sighting | |
+| An issue nobody here has carried is filed, and the check waits an hour at a time while any issue it reports has not been asked of OSV, for up to a day after the later of that issue's first sighting and the check falling due; then it is dated by that sighting | Bounded from the check falling due, so a backlog the date pass has not reached does not spend the one check; bounded at all, so an OSV outage holds no check |
 | A match is written closed: opening at the later of publication and the inventory's arrival, closing at the replacement | |
 | A match on an issue OSV was asked about and gave no date, first carried here at or after the replacement, is written too, marked publication date unknown | Dropping it loses an exposure that may have been real |
 | A marked match opens at the later of the last scan's data date and the inventory's arrival, the widest stretch it could have been held over | A day in that stretch counts it open |
@@ -288,6 +288,7 @@ still recorded (REQ-88).
 | A date at or after the replacement withdraws the match as `invalid` (§ Closure reasons) | It was never exposed: out of every open set and of found after fixed |
 | A match counts toward no time-to-fix or other duration | One run opened and closed it, so it never reads as open in the remediation figures |
 | Its closure reason is the replacement's: patched or disclaimed where the replacement's claims say so there, unaffected where its record says so, otherwise upgraded, revised, removed or unexplained as for a run (§ Closure reasons) | |
+| A match closed patched names the claim it stands on, one closed disclaimed the statement, one closed unaffected the record | It is the latest row at its occurrence, which the VEX document and the disclaimer reads take their evidence from |
 | Where the replacement is affected at the same occurrence, nothing is written | The replacement's own scan reports it |
 | A match the replaced inventory had patched, cleared or disclaimed is not written | It was never exposed |
 | A match any row of the build already covers at that occurrence identity over any part of the stretch is not written | A run stays the authority on what it reported |

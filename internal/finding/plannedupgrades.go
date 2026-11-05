@@ -223,7 +223,7 @@ func (s *Store) bumps(buildIDs []int64, visible []access.Visibility, filter Filt
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."build_id", "f"."fixed_in"`)
 	if filter.PlannedUpgradeSort == PlannedUpgradesByDeadline {
 		// Under the column's own name, so the order reads the same.
-		inner = inner.ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
+		inner = inner.ColumnExpr(openDue + ` AS "due_at"`)
 	}
 	return s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, buildIDs, visible)).
@@ -502,7 +502,7 @@ func (s *Store) byComponent(buildIDs []int64, visible []access.Visibility,
 	case ByAge:
 		inner = inner.ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`)
 	case ByDeadline:
-		inner = inner.ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
+		inner = inner.ColumnExpr(openDue + ` AS "due_at"`)
 	}
 	return s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, buildIDs, visible)).

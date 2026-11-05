@@ -86,6 +86,14 @@ func RunV0110ReportStep(ctx context.Context, db *database.DB) error {
 	})
 }
 
+// RunV0120CheckedStep runs the v0.12.0 upgrade's checked-run step alone, in a
+// transaction of its own as on MySQL and MariaDB: a start that stopped after
+// it, at a later step.
+func RunV0120CheckedStep(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, checkedScanV0120)
+}
+
 // TrimV0110Components runs the v0.11.0 upgrade's component trimming alone,
 // reading batch components at a time, against a database at v0.11.0's schema.
 func TrimV0110Components(ctx context.Context, db *database.DB, batch int) error {

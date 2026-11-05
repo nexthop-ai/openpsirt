@@ -143,8 +143,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-			Where(kinds, kindArgs...).
-			Where(`"f"."closed_at" IS NULL`)
+			Where(kinds, kindArgs...)
+		held, heldArgs := openOn("f", filter.OpenOn)
+		q = q.Where(held, heldArgs...)
 		return onlyReadable(q, subject, products, all)
 	}
 	// withRating joins the issue and whatever the row's own product rates it: a
@@ -322,7 +323,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`MAX(COALESCE(`+ScoreVersionHere+`, '')) AS "score_version"`).
 		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
-		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
+		ColumnExpr(openDue+` AS "due_at"`).
 		// One undisclosed occurrence makes the group undisclosed, counted rather
 		// than aggregated over the word — a maximum of the word returns
 		// "public" for a mixed group, which is the one case it matters for.

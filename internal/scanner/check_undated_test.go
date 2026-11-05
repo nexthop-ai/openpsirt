@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/issuedate"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
 
@@ -165,6 +166,185 @@ func TestAMatchDatedAfterTheReplacementIsWithdrawn(t *testing.T) {
 		}
 		if n := foundAfter(t, f, checking.RunID); n != 0 {
 			t.Errorf("found after fixed counts %d, want none once it is withdrawn", n)
+		}
+	})
+}
+
+func TestALongKnownIssueNobodyAskedAboutWaitsForTheDatePass(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		// The check fell due an hour ago.
+		f.replaced = time.Now().UTC().Add(-49 * time.Hour).Truncate(time.Second)
+		if _, err := f.db.NewUpdate().Table("scan").Set(`"received_at" = ?`, f.replaced).
+			Where(`"id" = ?`, f.replacement).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Carried here long before, and never asked about.
+		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "CVE-2026-0012", Severity: "high"}}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.NewUpdate().Table("vulnerability").
+			Set(`"first_seen_at" = ?`, f.arrived.Add(-30*24*time.Hour)).
+			Where(`"identifier" = ?`, "CVE-2026-0012").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0012", libnl)}}
+		if checking := f.check(t, s); checking != nil {
+			t.Fatalf("checked before OSV was asked about the issue: %+v", checking)
+		}
+	})
+}
+
+func TestAnIssuePublishedJustBeforeTheLastScansDataIsChecked(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f := replacedInventory(t, w)
+		// Twelve hours before the data the last scan read, which need not yet
+		// have carried it.
+		f.published(t, "CVE-2026-0013", f.since.Add(-12*time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0013", libnl)}}
+		checking := f.check(t, s)
+		if checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want the issue recorded", checking)
+		}
+	})
+}
+
+func TestACheckClosedAsPatchedNamesTheClaimItStandsOn(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0014", f.arrived.Add(24*time.Hour))
+		// The replacement still holds the issue at the library, and says it is
+		// fixed there.
+		if _, err := fixture.RecordClaims(ctx, f.db.DB, f.build, f.replacement, []sbom.Suppression{{
+			Vulnerability: "CVE-2026-0014", Status: sbom.AlreadyFixed,
+			Targets: []sbom.Target{{Name: libnlFixed.Name, Version: libnlFixed.Version}},
+			Origin:  sbom.FromStatement,
+		}}, map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
+			t.Fatal(err)
+		}
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{
+			reportAt("CVE-2026-0014", libnl), reportAt("CVE-2026-0014", libnlFixed),
+		}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		got, _ := matchOf(t, f)
+		if got.ClosedBecause != finding.Patched || got.SuppressedBy == nil || got.ClaimedBy == nil {
+			t.Errorf("closed because %q by claim %v claimed by %v, want patched naming the replacement's claim",
+				got.ClosedBecause, got.SuppressedBy, got.ClaimedBy)
+		}
+	})
+}
+
+func TestACheckClosedAsDisclaimedNamesTheStatementItStandsOn(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0015", f.arrived.Add(24*time.Hour))
+		// A supplier says the library its product ships at the new version is
+		// not affected, on every route to it.
+		var productID int64
+		if err := f.db.NewSelect().TableExpr(`"build" AS "b"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+			ColumnExpr(`"st"."product_id"`).Where(`"b"."id" = ?`, f.build).Scan(ctx, &productID); err != nil {
+			t.Fatal(err)
+		}
+		person := w.DeclarePerson("supplier-reader@example.com", "Supplier reader", false)
+		who := access.NewPerson(person.ID, "supplier-reader@example.com", false,
+			map[int64][]access.Role{productID: {access.PublicTriage}}, person.PartyID)
+		claim := sbom.Suppression{Vulnerability: "CVE-2026-0015", Status: sbom.NotAffected,
+			Justification: "vulnerable_code_not_present"}
+		target := sbom.Target{Purl: libnlFixed.Purl, Name: libnlFixed.Name, Version: libnlFixed.Version,
+			Within: &sbom.Target{Purl: swss.Purl, Name: swss.Name}}
+		if _, _, err := finding.NewStore(f.db.DB).RecordStatements(ctx, who, productID, finding.Supplied{
+			Source: finding.FromVex, Publisher: "Acme Security", Document: "swss.openvex.json", Digest: "sha256:1",
+		}, []finding.Statement{finding.StatementOf(claim, target)}); err != nil {
+			t.Fatal(err)
+		}
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{
+			reportAt("CVE-2026-0015", libnl), reportAt("CVE-2026-0015", libnlFixed),
+		}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		got, _ := matchOf(t, f)
+		if got.ClosedBecause != finding.Disclaimed || got.StatedBy == nil {
+			t.Errorf("closed because %q by statement %v, want disclaimed naming the statement",
+				got.ClosedBecause, got.StatedBy)
+		}
+	})
+}
+
+func TestACheckWritesNothingTheReplacedInventoryHadPatched(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0016", f.arrived.Add(24*time.Hour))
+		if _, err := fixture.RecordClaims(ctx, f.db.DB, f.build, f.old, []sbom.Suppression{{
+			Vulnerability: "CVE-2026-0016", Status: sbom.AlreadyFixed,
+			Targets: []sbom.Target{{Name: libnl.Name, Version: libnl.Version}},
+			Origin:  sbom.FromStatement,
+		}}, map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
+			t.Fatal(err)
+		}
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0016", libnl)}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 0 {
+			t.Fatalf("checked %+v, want nothing recorded: it was never exposed", checking)
+		}
+	})
+}
+
+func TestACheckLeavesOutWhatWasPublishedAfterTheReplacement(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0017", f.replaced.Add(time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0017", libnl)}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 0 {
+			t.Fatalf("checked %+v, want nothing recorded", checking)
+		}
+	})
+}
+
+func TestACheckOpensNoEarlierThanTheInventoryArrived(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		// Data a day older than the inventory, and an issue published between.
+		if _, err := f.db.NewUpdate().Table("scan_run").
+			Set(`"database_version" = ?`, f.arrived.Add(-24*time.Hour).Format(time.RFC3339)).
+			Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.published(t, "CVE-2026-0018", f.arrived.Add(-12*time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0018", libnl)}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		if got, _ := matchOf(t, f); !got.OpenedAt.Equal(f.arrived) {
+			t.Errorf("opened at %s, want the inventory's arrival %s", got.OpenedAt, f.arrived)
+		}
+	})
+}
+
+func TestACheckWritesNothingARowCoversOverPartOfTheStretch(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0019", f.arrived.Add(24*time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0019", libnl)}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("the first check recorded %+v, want 1", checking)
+		}
+		// The row now covers only the second half of the stretch.
+		if _, err := f.db.NewUpdate().Table("finding").Set(`"opened_at" = ?`, f.arrived.Add(48*time.Hour)).
+			Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 0 {
+			t.Fatalf("the second check recorded %+v, want nothing", checking)
 		}
 	})
 }

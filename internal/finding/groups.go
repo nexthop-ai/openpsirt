@@ -327,9 +327,10 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 			if err != nil {
 				return 0, nil, nil, err
 			}
-			// Every read narrowed here is over open rows.
+			// Over the rows the read lists: open now, or on the day asked.
+			held, heldArgs := openOn("f", filter.OpenOn)
 			if filter.replaced, err = holding(ctx, s.db, filter.BuildID, under,
-				`"f"."closed_at" IS NULL`); err != nil {
+				held, heldArgs...); err != nil {
 				return 0, nil, nil, err
 			}
 		}
@@ -980,7 +981,7 @@ func (s *Store) decorate(ctx context.Context, buildIDs []int64, productID int64,
 		// any of them carries. The age a deadline relates to is this one, not
 		// the year in the identifier.
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
-		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
+		ColumnExpr(openDue+` AS "due_at"`).
 		// Anything here undisclosed, and the earliest embargo
 		// ends. One undisclosed occurrence among fifty makes the group
 		// undisclosed, which is what it is for anybody deciding what may be
@@ -1125,6 +1126,11 @@ func firstLineOf(description string) string {
 	}
 	return strings.TrimSpace(said)
 }
+
+// openDue is the earliest deadline among a group's open rows. A row closed
+// since keeps its deadline, which no longer stands, so a list read on a day
+// judges what was due by the rows still open.
+const openDue = `MIN(CASE WHEN "f"."closed_at" IS NULL THEN "f"."due_at" END)`
 
 // openOn is the condition that a finding under this alias is open: now, or at
 // any moment of a day, in UTC, where one is given.

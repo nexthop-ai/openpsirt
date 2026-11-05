@@ -19462,12 +19462,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
             type: string
         - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
           explode: false
@@ -19992,12 +19992,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
             type: string
         - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
           explode: false
@@ -28651,12 +28651,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
             type: string
         - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
           explode: false
@@ -29295,12 +29295,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
             type: string
         - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
           explode: false
@@ -29857,12 +29857,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
             type: string
         - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
           explode: false
@@ -30433,12 +30433,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
             type: string
         - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
           explode: false
@@ -31019,12 +31019,12 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
             type: string
         - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
           explode: false

@@ -41,9 +41,10 @@ it was met. A page of the catalog's own (`design-docs/analytics-catalog.md`
 
 Findings and decisions filter instead on opened after, opened before, closed
 after, proposed after, and an age in days from either side; an age and a date on
-one side keep the tighter. Closed after reaches nothing on the findings lists,
-which read open rows, so the filter panel does not offer it; an address carrying
-it shows it among the filters in force, removable.
+one side keep the tighter. Closed after reaches nothing on a findings list of
+open rows, and reaches what closed since on one read on a day; the filter panel
+does not offer it, and an address carrying it shows it among the filters in
+force, removable.
 
 | Open on a day | Rule |
 |---|---|

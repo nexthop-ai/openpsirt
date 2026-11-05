@@ -26,6 +26,10 @@ type Replaced struct {
 	// Since is the date of the vulnerability data the replaced inventory was
 	// last scanned with, absent where no scan reached it.
 	Since *time.Time
+	// Lag is how long an issue may take to reach the scanner's data after it
+	// is published: the window opens that long before Since, since data dated
+	// Since need not yet carry an issue published just before it.
+	Lag time.Duration
 }
 
 // DataDate is when the vulnerability data a run matched against was built,
@@ -45,16 +49,20 @@ type Checked struct {
 	Dated, Recorded int
 }
 
-// datesSettle is how long an issue first seen here waits for OSV to be asked
-// about it before a check dates it by its first sighting.
+// datesSettle is how long a check waits for OSV to be asked about an issue
+// before dating it by its first sighting.
 const datesSettle = 24 * time.Hour
 
 // Undated files the issues a check reports that nothing here holds, so the
-// date pass can ask about them, and counts those still waiting on it.
+// date pass can ask about them, and counts those still waiting on it: every
+// issue not yet asked about, for a day after the later of its first sighting
+// and owed, when the check fell due. Bounded from the check falling due, so a
+// backlog the pass has not reached waits rather than spending the one check;
+// bounded at all, so an OSV outage cannot hold every check.
 //
 // Only while the dates are asked: with the pass off, an issue first seen by
 // the check is dated by that sighting, which falls after the replacement.
-func (s *Store) Undated(ctx context.Context, reported []Reported, asking bool) (int, error) {
+func (s *Store) Undated(ctx context.Context, reported []Reported, asking bool, owed time.Time) (int, error) {
 	if !asking || len(reported) == 0 {
 		return 0, nil
 	}
@@ -81,7 +89,11 @@ func (s *Store) Undated(ctx context.Context, reported []Reported, asking bool) (
 		}
 		recent := s.now().Add(-datesSettle)
 		for _, d := range known {
-			if d.asked == nil && d.firstSeen.After(recent) {
+			from := d.firstSeen
+			if owed.After(from) {
+				from = owed
+			}
+			if d.asked == nil && from.After(recent) {
 				waiting++
 			}
 		}
@@ -232,7 +244,7 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 					when = *r.Since
 				}
 			}
-			if (r.Since != nil && when.Before(*r.Since)) || !when.Before(r.ReplacedAt) {
+			if (r.Since != nil && when.Before(r.Since.Add(-r.Lag))) || !when.Before(r.ReplacedAt) {
 				continue
 			}
 			kept = append(kept, one)
@@ -266,9 +278,14 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 			return err
 		}
 		// Where the replacement stands at each occurrence identity.
+		// The claim a patch stands on and the statement a disclaimer does are
+		// carried onto the row, as a run records them, so what reads the
+		// latest row at an occurrence still finds them.
 		type standing struct {
 			open, patched, disclaimed bool
 			cleared                   string
+			suppressedBy, claimedBy   *int64
+			statedBy                  int64
 		}
 		afterAt := map[at]standing{}
 		for k, f := range wantAfter.findings {
@@ -276,10 +293,12 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 			switch {
 			case wantAfter.patched[k]:
 				was.patched = true
+				was.suppressedBy, was.claimedBy = f.SuppressedBy, f.ClaimedBy
 			case wantAfter.cleared[k] != "":
 				was.cleared = wantAfter.cleared[k]
 			case wantAfter.disclaimed[k] != 0:
 				was.disclaimed = true
+				was.statedBy = wantAfter.disclaimed[k]
 			default:
 				was.open = true
 			}
@@ -300,11 +319,11 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 			var reason Closure
 			switch {
 			case then.patched:
-				reason = Patched
+				reason, f.SuppressedBy, f.ClaimedBy = Patched, then.suppressedBy, then.claimedBy
 			case then.cleared != "":
 				reason, f.UnaffectedBy = Unaffected, then.cleared
 			case then.disclaimed:
-				reason = Disclaimed
+				reason, f.StatedBy = Disclaimed, &then.statedBy
 			default:
 				reason, f.MovedTo = after.present.why(before.present.byID[k.occurrence.componentID])
 			}

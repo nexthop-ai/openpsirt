@@ -123,7 +123,7 @@ func (r *Runner) checkOne(ctx context.Context, reference string) (*Checking, *wa
 		return nil, nil, err
 	}
 	findings := finding.NewStore(r.db.DB)
-	undated, err := findings.Undated(ctx, result.Reported, asking)
+	undated, err := findings.Undated(ctx, result.Reported, asking, owed)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -139,6 +139,7 @@ func (r *Runner) checkOne(ctx context.Context, reference string) (*Checking, *wa
 	if err != nil {
 		return nil, nil, err
 	}
+	replaced.Lag = settle
 	checked, err := findings.CheckReplaced(ctx, replaced, run.ID, result.Reported)
 	settled, done := queue.Settling(ctx)
 	defer done()

@@ -18879,7 +18879,7 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
                 /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
                 open_on?: string;
@@ -18997,7 +18997,7 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
                 /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
                 open_on?: string;
@@ -23967,7 +23967,7 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
                 /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
                 open_on?: string;
@@ -24136,7 +24136,7 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
                 /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
                 open_on?: string;
@@ -24267,7 +24267,7 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
                 /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
                 open_on?: string;
@@ -24403,7 +24403,7 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
                 /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
                 open_on?: string;
@@ -24537,7 +24537,7 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
                 /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
                 open_on?: string;

@@ -127,3 +127,81 @@ func TestTheListOnADayLeavesOutWhatOneRunRecordedClosed(t *testing.T) {
 		}
 	})
 }
+
+func TestTheListAcrossProductsOnADayHoldsWhatWasOpenThatDay(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		closedOnADay(t, f)
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		between := today.Add(-4 * 24 * time.Hour)
+		who := f.holding(t, access.PublicTriage)
+		_, total, err := f.store.Anywhere(t.Context(), who, 50, 0, finding.Filter{OpenOn: &between})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 2 {
+			t.Errorf("%d open across products on the day, want both", total)
+		}
+	})
+}
+
+func TestTheListOnADayBeneathAComponentHoldsWhatARescanReplaced(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
+		// The library moves, closing both.
+		moved := at(libnl.Name, "3.9.0")
+		f.shipped(t, through(moved))
+		f.applied(t)
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		if _, err := f.db.NewUpdate().Table("finding").Set(`"opened_at" = ?`, today.Add(-5*24*time.Hour)).
+			Set(`"closed_at" = ?`, today.Add(-3*24*time.Hour)).
+			Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		between := today.Add(-4 * 24 * time.Hour)
+		under := f.componentID(t, swss.Name)
+		_, total, err := f.store.Groups(ctx, f.holding(t, access.PublicTriage), f.scope, 50, 0,
+			finding.Filter{OpenOn: &between, Beneath: &under})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 2 {
+			t.Errorf("%d open on the day beneath %s, want both on the library it replaced", total, swss.Name)
+		}
+	})
+}
+
+func TestTheListOnADayCountsNothingFixedSinceAsOverdue(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		closedOnADay(t, f)
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		// The one fixed three days ago was due yesterday.
+		if _, err := f.db.NewUpdate().Table("finding").Set(`"due_at" = ?`, today.Add(-24*time.Hour)).
+			Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NOT NULL`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		between := today.Add(-4 * 24 * time.Hour)
+		who := f.holding(t, access.PublicTriage)
+		for name, filter := range map[string]finding.Filter{
+			"overdue":    {OpenOn: &between, Overdue: true},
+			"due before": {OpenOn: &between, DueBefore: new(today)},
+		} {
+			_, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != 0 {
+				t.Errorf("%s: %d, want none: the late one was fixed before its deadline", name, total)
+			}
+			_, across, err := f.store.Anywhere(ctx, who, 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if across != 0 {
+				t.Errorf("%s across products: %d, want none", name, across)
+			}
+		}
+	})
+}
