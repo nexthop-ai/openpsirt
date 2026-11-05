@@ -3,7 +3,7 @@
 How a scan opens and closes findings, why each closure happened, and the claims
 and records that close a finding without a version change.
 
-Satisfies REQ-11, REQ-14, REQ-20, REQ-21, REQ-31.
+Satisfies REQ-11, REQ-14, REQ-20, REQ-21, REQ-31, REQ-88.
 
 ## Contents
 
@@ -15,6 +15,7 @@ Satisfies REQ-11, REQ-14, REQ-20, REQ-21, REQ-31.
 - [Affected build sets](#affected-build-sets)
 - [Build-declared claims](#build-declared-claims)
 - [CVE record ranges](#cve-record-ranges)
+- [Replaced inventories](#replaced-inventories)
 - [Limits](#limits)
 
 ## Scans as separate work
@@ -255,6 +256,21 @@ A scan that waits is asked before its run begins. Its job returns to the queue f
 attempt (`design-docs/queue.md` § Failure handling). The register lists these
 closures under their reason with the lines, judged against no deadline.
 `design-docs/ingest-scanner.md` § CVE records holds where the snapshot comes from.
+
+## Replaced inventories
+
+Not built. A branch inventory a later one replaced is checked once more, against
+issues published while it was current, so an exposure fixed before any scan saw
+it is still recorded (REQ-88).
+
+| Rule | Reason |
+|---|---|
+| Each replaced branch inventory owes one check, recorded when done | How long it was current does not matter |
+| The check covers issues published between its last scan and its replacement | Everything earlier was checked while it was current |
+| It runs on the first scanner data dated a settle delay after the replacement, a setting shipping at two days | An issue reaches the scanner's data up to a day after publication |
+| A match opens from the later of publication and the inventory's arrival, and closes at the replacement for the reason the replacement gives | |
+| A tag is never checked this way | A tag is scanned against today's data already |
+| A finding found closed raises no alert | Nothing is left to act on |
 
 ## Limits
 
