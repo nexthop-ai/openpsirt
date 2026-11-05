@@ -18879,6 +18879,8 @@ export interface operations {
                 opened_by_run?: number;
                 /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -18995,6 +18997,8 @@ export interface operations {
                 opened_by_run?: number;
                 /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -23963,6 +23967,8 @@ export interface operations {
                 opened_by_run?: number;
                 /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24130,6 +24136,8 @@ export interface operations {
                 opened_by_run?: number;
                 /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24259,6 +24267,8 @@ export interface operations {
                 opened_by_run?: number;
                 /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24393,6 +24403,8 @@ export interface operations {
                 opened_by_run?: number;
                 /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24525,6 +24537,8 @@ export interface operations {
                 opened_by_run?: number;
                 /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */

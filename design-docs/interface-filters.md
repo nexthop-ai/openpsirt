@@ -33,6 +33,7 @@ address can set is a narrowing nobody uses.
 | Filtering is the server's | Filtering in the browser narrows one page |
 | The bar holds decision state, severity, holder and due, each one button naming itself and its value, with New today beside them. Everything else is behind More filters, whose control says how many of its filters are on. A filter is on the bar or in the panel, never both | The daily questions |
 | New today writes the date a day back, never the word, as the panel's First seen after; it is pressed only while that date is a day back, and does not clear another date | A sent list means the same thing when opened |
+| Open on is a date in the panel and a chip, and reads the list as it stood that day, closed rows included (`design-docs/analytics-controls.md` § The disposition register) | "What were we carrying on the day of the audit" |
 | A bar filter is one control: name, value and menu. A value in force tints it. A multi-answer filter (decision state, holder) ticks and stays open; a step on a scale (severity, due) picks one and closes | A name cannot wrap away from its value |
 | A control holding several answers says the first and how many more: "Undecided +1". The bar's menus and the panel's tick lists keep the offered order, open on an arrow key, move with arrows, Home and End, and close on Escape back to the control | |
 | The panel is shut until opened, whatever the address narrows by | It is most of a screen, and the chips already say it |

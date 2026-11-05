@@ -403,6 +403,7 @@ export function listQuery(params: URLSearchParams) {
   const openedBefore = day(params.get("opened_before"));
   const proposedAfter = day(params.get("proposed_after"));
   const closedAfter = day(params.get("closed_after"));
+  const openOn = day(params.get("open_on"));
   return {
     limit: pageSize(params),
     offset: num(params.get("offset"), 0, Number.MAX_SAFE_INTEGER) ?? 0,
@@ -423,6 +424,7 @@ export function listQuery(params: URLSearchParams) {
       : {}),
     ...(proposedAfter ? { proposed_after: proposedAfter } : {}),
     ...(closedAfter ? { closed_after: closedAfter } : {}),
+    ...(openOn ? { open_on: openOn } : {}),
     ...(params.get("q") ? { q: params.get("q") ?? "" } : {}),
     ...(ecosystems.length > 0 ? { ecosystem: ecosystems } : {}),
     ...(releases.length > 0 ? { on: releases } : {}),

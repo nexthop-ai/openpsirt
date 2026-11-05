@@ -38,7 +38,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	if err := s.decidedIssuesFor(ctx, &below, []int64{productID}, false); err != nil {
 		return 0, err
 	}
-	rows := openRows(s.db, buildIDs, visible)
+	rows := rowsOn(s.db, buildIDs, visible, filter.OpenOn)
 	if words := filter.MinimumSeverity.admits(); len(words) > 0 {
 		// The line's own condition, negated: no exploitation signal at
 		// all, and rated beneath the line. Both read the way

@@ -138,6 +138,7 @@ func (n Narrowing) Filter(floor finding.MinimumSeverity) (finding.Filter, error)
 		{n.OpenedBefore, &openedBefore},
 		{n.ClosedAfter, &narrowed.ClosedAfter},
 		{n.DecidedAfter, &narrowed.ProposedAfter},
+		{n.OpenOn, &narrowed.OpenOn},
 	} {
 		when, err := finding.Since(each.text)
 		if err != nil {
@@ -221,6 +222,7 @@ type Narrowing struct {
 	OpenedBefore  string                 `query:"opened_before" doc:"Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included"`
 	OpenedByRun   int64                  `query:"opened_by_run" minimum:"1" doc:"Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it"`
 	ClosedAfter   string                 `query:"closed_after" doc:"Accepted and matches nothing: this list holds open rows only"`
+	OpenOn        string                 `query:"open_on" doc:"List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now"`
 	DecidedAfter  string                 `query:"proposed_after" doc:"Keep only what somebody proposed a decision about after this date"`
 	Said          []vexStatus            `query:"vex_status,explode" uniqueItems:"true" doc:"Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold"`
 	BuildSays     []buildSaying          `query:"build_says,explode" uniqueItems:"true" doc:"Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the occurrences the build says the flaw applies at, with its workaround"`

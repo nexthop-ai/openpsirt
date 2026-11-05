@@ -410,4 +410,11 @@ describe("a date filter the address carries", () => {
     expect(query).not.toHaveProperty("proposed_after");
     expect(query).toMatchObject({ closed_after: "2026-01-01" });
   });
+
+  it("sends the day the list is read on", () => {
+    expect(listQuery(new URLSearchParams("open_on=2026-03-31"))).toMatchObject({
+      open_on: "2026-03-31",
+    });
+    expect(listQuery(new URLSearchParams("open_on=last-week"))).not.toHaveProperty("open_on");
+  });
 });

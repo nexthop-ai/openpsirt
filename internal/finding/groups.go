@@ -853,7 +853,7 @@ func (s *Store) heads(ctx context.Context, buildIDs []int64, visible []access.Vi
 // are one row, because upgrading them is one act, deciding about them is one
 // decision and assigning them is one rule.
 func (s *Store) foldGroups(buildIDs []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	return filter.folded(s.db, openRows(s.db, buildIDs, visible), issueAndComponent).
+	return filter.folded(s.db, rowsOn(s.db, buildIDs, visible, filter.OpenOn), issueAndComponent).
 		GroupExpr(GroupedOn)
 }
 
@@ -886,14 +886,16 @@ func paged(db bun.IDB, grouped *bun.SelectQuery, columns ...string) *bun.SelectQ
 	return q.ColumnExpr(`COUNT(*) OVER () AS "total"`)
 }
 
-// openRows is open findings in these builds that the reader may see, read as
-// "f" and not yet grouped.
-func openRows(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.SelectQuery {
+// rowsOn is open findings in these builds that the reader may see, read as
+// "f" and not yet grouped: open now, or at any moment of a day where one is
+// given, closed since or not.
+func rowsOn(db bun.IDB, buildIDs []int64, visible []access.Visibility, on *time.Time) *bun.SelectQuery {
 	kinds, args := kind.Triage.Where(`"f"."kind"`)
+	held, heldArgs := openOn("f", on)
 	return db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
-		Where(`"f"."closed_at" IS NULL`).
+		Where(held, heldArgs...).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, args...)
 }
@@ -906,8 +908,8 @@ func openRows(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.Se
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
 // decision and assigning them is one rule.
-func openGroups(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.SelectQuery {
-	return openRows(db, buildIDs, visible).
+func openGroups(db bun.IDB, buildIDs []int64, visible []access.Visibility, on *time.Time) *bun.SelectQuery {
+	return rowsOn(db, buildIDs, visible, on).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		GroupExpr(GroupedOn)
 }
@@ -1017,10 +1019,11 @@ func (s *Store) decorate(ctx context.Context, buildIDs []int64, productID int64,
 	// The decision state of each group, counted the way the state filter
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.
+	held, heldArgs := openOn("f", filter.OpenOn)
 	q = decisionCounts(q, "?", []any{productID},
 		decisionWaiting, decisionApproved, decisionLapsed, decisionSentBack).
 		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
-		Where(`"f"."closed_at" IS NULL`).
+		Where(held, heldArgs...).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
 		// The page's issues and the page's folds, as two lists. That admits an
@@ -1109,4 +1112,14 @@ func firstLineOf(description string) string {
 		return cut + "…"
 	}
 	return strings.TrimSpace(said)
+}
+
+// openOn is the condition that a finding under this alias is open: now, or at
+// any moment of a day, in UTC, where one is given.
+func openOn(alias string, on *time.Time) (string, []any) {
+	if on == nil {
+		return fmt.Sprintf(`"%s"."closed_at" IS NULL`, alias), nil
+	}
+	return fmt.Sprintf(`"%[1]s"."opened_at" < ? AND ("%[1]s"."closed_at" IS NULL OR "%[1]s"."closed_at" > ?)`, alias),
+		[]any{on.Add(24 * time.Hour), *on}
 }

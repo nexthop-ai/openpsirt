@@ -348,6 +348,10 @@ type Filter struct {
 	OpenedAfter   *time.Time
 	ClosedAfter   *time.Time
 	ProposedAfter *time.Time
+	// OpenOn keeps what was open at any moment of a day, in UTC, closed since
+	// or not, in place of what is open now. Decisions, assignment and
+	// deadlines are read as they stand now.
+	OpenOn *time.Time
 	// OpenedByRun keeps only what one scan run opened. A run says how much it
 	// opened and at what severities, and the list it says that about could not
 	// be reached: somebody looking at a build that jumped by four thousand
@@ -503,9 +507,9 @@ func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 // occurrences name (see decidedIssuesFor).
 func (f Filter) listed(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.SelectQuery {
 	if f.asksDecided() {
-		return f.folded(db, openRows(db, buildIDs, visible), issueAndComponent).GroupExpr(GroupedOn)
+		return f.folded(db, rowsOn(db, buildIDs, visible, f.OpenOn), issueAndComponent).GroupExpr(GroupedOn)
 	}
-	return f.narrow(openGroups(db, buildIDs, visible))
+	return f.narrow(openGroups(db, buildIDs, visible, f.OpenOn))
 }
 
 // narrow applies the filter to a grouped query over finding AS f.
@@ -915,13 +919,14 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 	// build is added by the caller.
 	heldElsewhere := func() *bun.SelectQuery {
 		kinds, args := kind.Triage.Where(`"f2"."kind"`)
+		held, heldArgs := openOn("f2", f.OpenOn)
 		return q.NewSelect().TableExpr(`"finding" AS "f2"`).
 			Join(`JOIN "component" AS "c2" ON "c2"."id" = "f2"."component_id"`).
 			ColumnExpr("1").
 			Where(`"f2"."vulnerability_id" = "f"."vulnerability_id"`).
 			Where(`"c2"."fold_key" = (SELECT "c1"."fold_key" FROM "component" AS "c1"`+
 				` WHERE "c1"."id" = "f"."component_id")`).
-			Where(`"f2"."closed_at" IS NULL`).
+			Where(held, heldArgs...).
 			Where(`"f2"."visibility" IN (?)`, bun.List(f.Visible)).
 			Where(kinds, args...)
 	}

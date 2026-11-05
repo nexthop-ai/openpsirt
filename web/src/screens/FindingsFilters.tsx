@@ -361,6 +361,7 @@ export function activeFilters(
   add("open_under", "Open for", at("open_under") && `under ${at("open_under")} days`);
   add("opened_after", "First seen after", at("opened_after"));
   add("opened_before", "First seen before", at("opened_before"));
+  add("open_on", "Open on", at("open_on"));
   // A chip rather than a control in the panel: nobody types a run identifier,
   // and what puts it in the address is a link from the run that reports it.
   // It removes itself like every other chip, which is how somebody arriving
@@ -770,6 +771,13 @@ export function Filters({
             type="date"
             value={at("opened_after")}
             onChange={(event) => set("opened_after", event.target.value)}
+          />
+        </Field>
+        <Field label="Open on" hint="Closed since or not; decisions as they stand now">
+          <input
+            type="date"
+            value={at("open_on")}
+            onChange={(event) => set("open_on", event.target.value)}
           />
         </Field>
         <Field label="Decided after">

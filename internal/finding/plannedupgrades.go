@@ -212,7 +212,7 @@ func (s *Store) countBumps(ctx context.Context, buildIDs []int64,
 // and everything it reports decomposes over the first: occurrences are summed,
 // and the issues and the builds are distinct counts over far fewer rows.
 func (s *Store) bumps(buildIDs []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	inner := occurrenceHeads(openRows(s.db, buildIDs, visible)).
+	inner := occurrenceHeads(rowsOn(s.db, buildIDs, visible, filter.OpenOn)).
 		// An upgrade is a version to move to.
 		Where(`"f"."fixed_in" IS NOT NULL`).
 		Where(`"f"."fixed_in" <> ?`, "").
@@ -302,7 +302,7 @@ func (s *Store) namesIn(ctx context.Context, buildIDs []int64, visible []access.
 		return fmt.Errorf("read which components a bump moves: %w", err)
 	}
 	inFolds, args := database.InAnyOf(`"f"."component_id"`, components)
-	under := filter.asListed(s.db, openRows(s.db, buildIDs, visible).
+	under := filter.asListed(s.db, rowsOn(s.db, buildIDs, visible, filter.OpenOn).
 		Where(inFolds, args...).
 		Where(`"f"."fixed_in" IN (?)`, bun.List(distinct(versions))).
 		ColumnExpr(`"f"."fixed_in"`).
@@ -492,7 +492,7 @@ func (s *Store) countByComponent(ctx context.Context, buildIDs []int64,
 func (s *Store) byComponent(buildIDs []int64, visible []access.Visibility,
 	filter Filter) *bun.SelectQuery {
 
-	inner := occurrenceHeads(openRows(s.db, buildIDs, visible)).
+	inner := occurrenceHeads(rowsOn(s.db, buildIDs, visible, filter.OpenOn)).
 		ColumnExpr(`"f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id"`)
@@ -636,7 +636,7 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, buildIDs []int64,
 	// The issues open against each component, once each, and only then the
 	// rating: a rating is per issue, so reading it for every occurrence would
 	// read it again for every occurrence the issue sits at.
-	pairs := openRows(s.db, buildIDs, visible).
+	pairs := rowsOn(s.db, buildIDs, visible, filter.OpenOn).
 		ColumnExpr(`"f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
@@ -700,7 +700,7 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 		Issue       int64  `bun:"vulnerability_id"`
 		FixedIn     string `bun:"fixed_in"`
 	}
-	query := openRows(s.db, buildIDs, visible).
+	query := rowsOn(s.db, buildIDs, visible, filter.OpenOn).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).

@@ -19466,6 +19466,13 @@ paths:
           schema:
             description: "Accepted and matches nothing: this list holds open rows only"
             type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+            type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
           in: query
@@ -19988,6 +19995,13 @@ paths:
           name: closed_after
           schema:
             description: "Accepted and matches nothing: this list holds open rows only"
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -28641,6 +28655,13 @@ paths:
           schema:
             description: "Accepted and matches nothing: this list holds open rows only"
             type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+            type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
           in: query
@@ -29278,6 +29299,13 @@ paths:
           schema:
             description: "Accepted and matches nothing: this list holds open rows only"
             type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+            type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
           in: query
@@ -29832,6 +29860,13 @@ paths:
           name: closed_after
           schema:
             description: "Accepted and matches nothing: this list holds open rows only"
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -30401,6 +30436,13 @@ paths:
           name: closed_after
           schema:
             description: "Accepted and matches nothing: this list holds open rows only"
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -30980,6 +31022,13 @@ paths:
           name: closed_after
           schema:
             description: "Accepted and matches nothing: this list holds open rows only"
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
