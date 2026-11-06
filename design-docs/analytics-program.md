@@ -153,7 +153,7 @@ trend's identity rules (§ Counting by identity).
 ### The projection
 
 The pace of the latest 14 days, a fixed span, and the day the line reaches zero
-at it.
+at it (REQ-54).
 
 | Rule | Reason |
 |---|---|
