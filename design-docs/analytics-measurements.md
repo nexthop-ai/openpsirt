@@ -229,39 +229,39 @@ removed it.
 Justifies `design-docs/analytics-program.md` § Burndown and
 `design-docs/findings-queries.md` § Component groups. The full-size image with
 thirteen weeks of history: a first scan of one issue per package and the
-kernel's 4,942, twelve weekly rescans each dropping a hundredth of the packages'
-issues and a third of the kernel's at the sixth, a few brought back at the last,
-and 50 dismissals agreed four weeks back. Thirty source repositories are hung in
-pulled in by nothing, each over one of the root's 30 children, beside the 15 the
-image names. Each figure is the median of five reads after a warm one, each
-engine run alone.
+kernel's 4,942, and twelve weekly rescans. Each rescan takes a hundredth of the
+packages' issues away, half of them by moving the package to a new version,
+which fixes them and replaces the component; the sixth takes a third of the
+kernel's, and the last brings a few back. 50 dismissals are agreed four weeks
+back. Thirty source repositories are hung in pulled in by nothing, each over
+one of the root's 30 children, beside the 15 the image names. Each figure is
+the median of five reads after a warm one, each engine run alone.
 
-| Burndown, from the first scan | SQLite | PostgreSQL |
-|---|--:|--:|
-| The product | 860 ms | 266 ms |
-| The product, high and worse | 823 ms | 224 ms |
-| The kernel by its name | 621 ms | 358 ms |
-| `pkg:deb/` as a prefix | 1,189 ms | 261 ms |
-| Beneath the root | 1,512 ms | 374 ms |
-| Beneath the kernel | 600 ms | 258 ms |
+| Burndown, from the first scan | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|--:|--:|--:|--:|
+| The product | 1,086 ms | 397 ms | 1,031 ms | 511 ms |
+| The product, high and worse | 1,064 ms | 282 ms | 764 ms | 397 ms |
+| The kernel by its name | 861 ms | 473 ms | 1,799 ms | 1,265 ms |
+| `pkg:deb/` as a prefix | 1,240 ms | 414 ms | 930 ms | 516 ms |
+| Beneath the root | 1,970 ms | 832 ms | 1,358 ms | 730 ms |
+| Beneath the kernel | 863 ms | 530 ms | 1,098 ms | 584 ms |
 
-| Component groups | SQLite | PostgreSQL |
-|---|--:|--:|
-| By repository, 45 rows | 515 ms | 310 ms |
-| By ecosystem, 9 rows | 446 ms | 279 ms |
-| The 758 deb packages | 387 ms | 160 ms |
+| Component groups | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|--:|--:|--:|--:|
+| By repository, 45 rows | 647 ms | 361 ms | 651 ms | 473 ms |
+| By ecosystem, 9 rows | 542 ms | 275 ms | 490 ms | 401 ms |
+| The 758 deb packages | 462 ms | 178 ms | 399 ms | 401 ms |
 
 | Reading | Detail |
 |---|---|
-| A burndown costs what the trend's identity reads cost, plus the dismissals | 9,227 issues at components left over 92 days in 266 ms on PostgreSQL |
-| A prefix costs a read of the whole selection on SQLite | It is tested on the rows read, so `pkg:deb/` reads every row: 1,189 ms against 860 for the product |
-| Beneath the root is the dearest read on both engines | 1,512 ms on SQLite and 374 ms on PostgreSQL, the walk added to the product's read |
-| A repository row costs its walk | 45 repositories reaching the whole image in 310 ms on PostgreSQL |
-| MySQL 8.4 and MariaDB were not measured | Neither PostgreSQL nor SQLite showed a read past two seconds |
+| A burndown costs what the trend's identity reads cost, plus the dismissals and the replaced components | 9,227 issues at components left over 92 days, 402 of them fixed, in 397 ms on PostgreSQL |
+| A prefix costs a read of the whole selection | It is tested on the rows read, so `pkg:deb/` reads every row: 1,240 ms against 1,086 for the product on SQLite |
+| Beneath the root is the dearest read on SQLite and PostgreSQL | The walk added to the product's read: 1,970 ms and 832 ms |
+| The kernel by its name is the dearest read on MySQL and MariaDB | 1,799 ms and 1,265 ms: its 3,295 issues at one component are read through the name |
+| A repository row costs its walk | 45 repositories reaching the whole image in 361 ms on PostgreSQL |
 
 | Caveat | Detail |
 |---|---|
-| Closures here are unexplained | No rescan moves a version, so nothing counts as fixed; the rows read are the same either way |
 | One build | The image's repositories reach every top-level component, the widest walk a repository row takes |
-| Seeding took 28 minutes per engine | The history is built by applying each scan in turn |
-
+| Thirteen weeks | A year of weekly rescans holds four times the closed rows; the replaced components a narrowing reads grow with it |
+| Seeding took 6 minutes on SQLite and 16 to 39 on the servers | The history is built by applying each scan in turn |
