@@ -96,7 +96,7 @@ The same series for an area: a team owns a kernel or a runtime, not an image.
 |---|---|
 | It takes the findings list's two narrowings: a component at any version, or a component and everything under it | |
 | Under a component, a finding on a version a rescan replaced counts where the build's present version of its name sits, for every series alike (`design-docs/data-model-graph.md` § Path traversal) | A bump closes what it fixed on the version it replaced |
-| Whether an issue was present before the window is asked under the same narrowing | An issue that sat elsewhere in the build is new to the area |
+| Whether an issue was present before the window is asked under the same narrowing | An issue that sat elsewhere in the build is new to the area; by a component's name it costs 722 ms on MySQL 8.4 and 471 ms on MariaDB against 45 ms on PostgreSQL, accepted until a deployment shows it as a problem (`design-docs/analytics-measurements.md` § Daily trend) |
 | Across several builds it refuses | A subtree is one build's walk |
 | A selection naming no product refuses before any build is counted | |
 | The component resolves as on the findings list, after the selection is authorized | An unreadable product refuses the same whatever it holds |

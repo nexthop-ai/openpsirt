@@ -135,19 +135,19 @@ trend.
 
 | Window, one rescan | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| 12 weeks | 629 ms | 288 ms | 541 ms | 356 ms |
-| 104 weeks | 650 ms | 286 ms | 416 ms | 383 ms |
-| 30 days | 640 ms | 285 ms | 405 ms | 350 ms |
-| 365 days | 638 ms | 275 ms | 508 ms | 371 ms |
-| 730 days | 640 ms | 291 ms | 474 ms | 357 ms |
+| 12 weeks | 629 ms | 288 ms | 660 ms | 377 ms |
+| 104 weeks | 650 ms | 286 ms | 620 ms | 380 ms |
+| 30 days | 640 ms | 285 ms | 625 ms | 413 ms |
+| 365 days | 638 ms | 275 ms | 600 ms | 497 ms |
+| 730 days | 640 ms | 291 ms | 715 ms | 469 ms |
 
 | Window, a year of weekly rescans | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| 12 weeks | 61 ms | 35 ms | 58 ms | 36 ms |
-| 104 weeks | 1,352 ms | 397 ms | 836 ms | 578 ms |
-| 30 days | 50 ms | 33 ms | 45 ms | 31 ms |
-| 365 days | 1,258 ms | 366 ms | 694 ms | 604 ms |
-| 730 days | 1,211 ms | 448 ms | 803 ms | 555 ms |
+| 12 weeks | 61 ms | 35 ms | 74 ms | 64 ms |
+| 104 weeks | 1,352 ms | 397 ms | 1,041 ms | 696 ms |
+| 30 days | 50 ms | 33 ms | 45 ms | 36 ms |
+| 365 days | 1,258 ms | 366 ms | 916 ms | 694 ms |
+| 730 days | 1,211 ms | 448 ms | 1,031 ms | 823 ms |
 
 ### Identity against the counts it replaced
 
@@ -156,24 +156,43 @@ opening and closing and by the one counting issues at components by identity.
 
 | Read, rows counted, then by identity | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| One rescan, beneath the root | 902 ms, 1,449 ms | 333 ms, 405 ms | 1,733 ms, 1,592 ms | 766 ms, 732 ms |
-| One rescan, beneath the kernel | 684 ms, 689 ms | 195 ms, 244 ms | 1,132 ms, 1,169 ms | 879 ms, 654 ms |
-| A year, beneath the root | 139 ms, 143 ms | 127 ms, 142 ms | 111 ms, 146 ms | 118 ms, 100 ms |
-| A year, the kernel by its name | 93 ms, 151 ms | 28 ms, 45 ms | 60 ms, 610 ms | 67 ms, 436 ms |
+| One rescan, beneath the root | 902 ms, 1,449 ms | 333 ms, 405 ms | 1,733 ms, 1,797 ms | 766 ms, 729 ms |
+| One rescan, beneath the kernel | 684 ms, 689 ms | 195 ms, 244 ms | 1,132 ms, 1,214 ms | 879 ms, 642 ms |
+| A year, beneath the root | 139 ms, 143 ms | 127 ms, 142 ms | 111 ms, 151 ms | 118 ms, 162 ms |
+| A year, the kernel by its name | 93 ms, 151 ms | 28 ms, 45 ms | 60 ms, 722 ms | 67 ms, 471 ms |
 
 ### A year of nightly scans
 
 700 components under 34 consumers, 260 issues, 148,614 findings after 365
-nights. Read beside the two full-size measurements on the same engine.
+nights, read by somebody holding public and private reading. Each figure is
+one read after a warm one.
 
 | Window | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| 12 weeks | 247 ms | 131 ms | 126 ms | 193 ms |
-| 52 weeks | 241 ms | 108 ms | 142 ms | 126 ms |
-| 104 weeks | 275 ms | 116 ms | 128 ms | 123 ms |
-| 30 days | 249 ms | 125 ms | 121 ms | 120 ms |
-| 365 days | 270 ms | 113 ms | 123 ms | 118 ms |
-| 730 days | 248 ms | 108 ms | 128 ms | 124 ms |
+| 12 weeks | 309 ms | 97 ms | 163 ms | 116 ms |
+| 52 weeks | 251 ms | 97 ms | 252 ms | 113 ms |
+| 104 weeks | 326 ms | 98 ms | 236 ms | 185 ms |
+| 30 days | 290 ms | 95 ms | 163 ms | 117 ms |
+| 365 days | 256 ms | 96 ms | 183 ms | 122 ms |
+| 730 days | 246 ms | 109 ms | 207 ms | 169 ms |
+
+### Nightly removals
+
+The full-size image, 60 nightly uploads after the first scan, each dropping one
+leaf package in 30 and restoring the previous night's, so every night both
+removes and returns. A return is judged against the upload that removed it.
+
+| Window | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|--:|--:|--:|--:|
+| 7 days | 136 ms | 101 ms | 241 ms | 123 ms |
+| 30 days | 299 ms | 249 ms | 379 ms | 249 ms |
+| 365 days | 408 ms | 412 ms | 623 ms | 332 ms |
+
+| Read on SQLite | 7 days | 30 days | 365 days |
+|---|--:|--:|--:|
+| Every removing upload the build ever received worked out | 731 ms | 2,473 ms | 2,636 ms |
+| Only the uploads deciding a return, each build's in one comparison | 136 ms | 299 ms | 408 ms |
+| No upload worked out | 86 ms | 143 ms | 188 ms |
 
 | Reading | Detail |
 |---|---|
@@ -182,11 +201,12 @@ nights. Read beside the two full-size measurements on the same engine.
 | The first scan is a baseline | One rescan, 11,751 issues the first scan brought in, which the row counts drew as 11,673 opened |
 | The build grouped on doubles a product's trend on SQLite | 1,230 ms against 629 ms after one rescan, so it is read off the group, which the opening run decides |
 | Present before costs most on SQLite | Beneath the root after one rescan, 11,751 issues entering in the window are asked about in batches: 547 ms more on SQLite, 72 ms more on PostgreSQL |
-| Present before by a name costs most on MySQL and MariaDB | A year of rescans, the kernel by its name: 610 ms against 60 ms on MySQL 8.4, 436 ms against 67 ms on MariaDB |
+| Present before by a name costs most on MySQL and MariaDB | A year of rescans, the kernel by its name: 722 ms against 60 ms on MySQL 8.4, 471 ms against 67 ms on MariaDB, and 45 ms on PostgreSQL |
+| Working out a sharp upload costs the uploads a return reverses | Nightly removals, 30 days: 299 ms on SQLite, against 2,473 ms working out every removing upload and 143 ms working out none |
 
 | Caveat | Detail |
 |---|---|
 | One build | Nothing else in the deployment shares a name or a first scan |
 | One issue per package | The issue and the issue at a component count alike here, so the counts above hold for either unit |
-| MySQL 8.4 and MariaDB were read keyed by issue | SQLite and PostgreSQL were read again keyed by issue and component, with returns after a sharp removal counted apart; the key added a group column and a join to the component |
-| The nightly history ran beside two others | Its figures are each engine's own, read under load |
+| Every engine was read keyed by issue and component | The key added a group column and a join to the component; the SQLite and PostgreSQL columns of the first three tables were read before sharp uploads were worked out only for returns, which changes nothing in histories that remove no component |
+| Each engine ran alone | Other test runs on the machine were waited out first |
