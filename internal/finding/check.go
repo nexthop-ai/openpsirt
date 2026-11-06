@@ -129,6 +129,8 @@ func (s *Store) Undated(ctx context.Context, reported []Reported, asking bool, o
 
 // issueDating is what dates one issue for a check.
 type issueDating struct {
+	// issue is the row the issue stands as, which holds its dates.
+	issue     int64
 	published *time.Time
 	asked     *time.Time
 	firstSeen time.Time
@@ -194,6 +196,7 @@ func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[stri
 	err := database.IDsInBatches(ctx, rows, func(ctx context.Context, batch []int64) error {
 		var found []struct {
 			ID          int64      `bun:"id"`
+			IssueID     int64      `bun:"issue_id"`
 			PublishedAt *time.Time `bun:"published_at"`
 			AskedAt     *time.Time `bun:"dates_asked_at"`
 			FirstSeenAt time.Time  `bun:"first_seen_at"`
@@ -202,6 +205,7 @@ func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[stri
 			TableExpr(`"vulnerability" AS "v"`).
 			Join(`JOIN "vulnerability" AS "s" ON "s"."id" = "v"."issue_id"`).
 			ColumnExpr(`"v"."id" AS "id"`).
+			ColumnExpr(`"s"."id" AS "issue_id"`).
 			ColumnExpr(`"s"."published_at" AS "published_at"`).
 			ColumnExpr(`"s"."dates_asked_at" AS "dates_asked_at"`).
 			ColumnExpr(`"s"."first_seen_at" AS "first_seen_at"`).
@@ -210,7 +214,7 @@ func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[stri
 			return err
 		}
 		for _, f := range found {
-			dated[f.ID] = issueDating{published: f.PublishedAt,
+			dated[f.ID] = issueDating{issue: f.IssueID, published: f.PublishedAt,
 				asked: f.AskedAt, firstSeen: f.FirstSeenAt}
 		}
 		return nil
@@ -225,6 +229,43 @@ func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[stri
 		}
 	}
 	return out, nil
+}
+
+// takeUndated takes the rows of the issues read with no date, as the date
+// pass takes one before it rewrites the check's matches, and goes again where
+// a date landed since they were read. Without it a date committed between the
+// read and the check's commit finds no match to rewrite, and the match keeps
+// an opening that assumed no date. The write repeats the condition read, so
+// it matches fewer rows where a date arrived.
+func takeUndated(ctx context.Context, tx bun.IDB, known map[string]issueDating) error {
+	seen := map[int64]bool{}
+	var undated []int64
+	for _, d := range known {
+		if d.published == nil && !seen[d.issue] {
+			seen[d.issue] = true
+			undated = append(undated, d.issue)
+		}
+	}
+	taken := int64(0)
+	err := database.IDsInBatches(ctx, undated, func(ctx context.Context, batch []int64) error {
+		res, err := tx.NewUpdate().Table("vulnerability").
+			Set(`"published_at" = "published_at"`).
+			Where(`"id" IN (?)`, bun.List(batch)).
+			Where(`"published_at" IS NULL`).Exec(ctx)
+		if err != nil {
+			return err
+		}
+		n, err := database.Affected(res)
+		taken += n
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("take the issues a check read with no date: %w", err)
+	}
+	if taken != int64(len(undated)) {
+		return database.ErrGoAgain
+	}
+	return nil
 }
 
 // CheckReplaced records what a replaced inventory held that no scan saw: the
@@ -253,6 +294,9 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 		}
 		known, err := knownIssues(ctx, tx, reported)
 		if err != nil {
+			return err
+		}
+		if err := takeUndated(ctx, tx, known); err != nil {
 			return err
 		}
 		var kept []Reported

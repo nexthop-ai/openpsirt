@@ -17,8 +17,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/issuedate"
-	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -43,8 +43,9 @@ func undatedMatch(t *testing.T, w *fixture.World) (*checkFixture, *scanner.Check
 	return undatedMatchOn(t, w, "CVE-2026-0011")
 }
 
-// undatedMatchOn is undatedMatch on an issue of this name.
-func undatedMatchOn(t *testing.T, w *fixture.World, name string) (*checkFixture, *scanner.Checking) {
+// undatedBefore is undatedMatch's issue under this name, with the check not
+// yet run.
+func undatedBefore(t *testing.T, w *fixture.World, name string) *checkFixture {
 	t.Helper()
 	ctx := t.Context()
 	f := replacedInventory(t, w)
@@ -64,6 +65,13 @@ func undatedMatchOn(t *testing.T, w *fixture.World, name string) (*checkFixture,
 		Where(`"identifier" = ?`, name).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
+	return f
+}
+
+// undatedMatchOn is undatedMatch on an issue of this name.
+func undatedMatchOn(t *testing.T, w *fixture.World, name string) (*checkFixture, *scanner.Checking) {
+	t.Helper()
+	f := undatedBefore(t, w, name)
 	s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt(name, libnl)}}
 	checking := f.check(t, s)
 	if checking == nil {

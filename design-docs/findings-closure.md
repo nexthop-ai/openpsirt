@@ -300,6 +300,7 @@ still recorded (REQ-88).
 | A match any row of the build already covers at that occurrence identity over any part of the stretch is not written | A run stays the authority on what it reported |
 | The check is a run of its own, naming the inventory it checked, and opens and closes every row it writes | Every row keeps its provenance (REQ-13) |
 | It takes the build as applying a scan does, and writes in one retryable transaction | A scan and a check of one build never interleave |
+| It takes the issues it read with no date, repeating that they have none, and goes again where one gained a date since; the date pass takes an issue before rewriting its matches | A date committed between the check's read and its commit is either read by the check or finds the match to rewrite |
 | Nothing is notified, assigned or given a deadline | Nothing is left to act on |
 | The replaced upload's receipt counts what it found as found after fixed, less any match withdrawn; no other receipt answers from it | |
 | A check run is never a build's last scan: rescheduling, readiness and the latest run ignore it | |

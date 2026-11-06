@@ -313,35 +313,42 @@ func ordered(own string, others []string) []string {
 //
 // A first date also rewrites what a replaced inventory's check recorded of the
 // issue without one, in the same transaction, so a match never reads as dated
-// while its stretch still assumes it was not.
+// while its stretch still assumes it was not. The issue's row is taken first,
+// by the write of when it was asked, so a check holding it commits its matches
+// before they are read, and a check arriving later waits and reads the date.
 func (p *Pass) record(ctx context.Context, id int64, dates Dates) error {
 	asked := p.Now().UTC().Truncate(time.Microsecond)
 	var redated finding.Redated
 	err := database.Within(ctx, p.db, func(ctx context.Context, tx bun.IDB) error {
 		redated = finding.Redated{}
-		q := tx.NewUpdate().Table("vulnerability").
+		if _, err := tx.NewUpdate().Table("vulnerability").
 			Set(`"dates_asked_at" = ?`, asked).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
+			return fmt.Errorf("record when OSV was asked about an issue: %w", err)
+		}
+		if dates.Published.IsZero() {
+			return nil
+		}
+		var held struct {
+			PublishedAt *time.Time `bun:"published_at"`
+		}
+		if err := tx.NewSelect().Table("vulnerability").Column("published_at").
+			Where(`"id" = ?`, id).Scan(ctx, &held); err != nil {
+			return fmt.Errorf("read an issue's dates: %w", err)
+		}
+		if held.PublishedAt == nil {
+			var err error
+			if redated, err = finding.Redate(ctx, tx, id, dates.Published); err != nil {
+				return err
+			}
+		}
+		q := tx.NewUpdate().Table("vulnerability").
+			Set(`"published_at" = ?`, dates.Published.Truncate(time.Microsecond)).
 			Where(`"id" = ?`, id)
-		if !dates.Published.IsZero() {
-			var held struct {
-				PublishedAt *time.Time `bun:"published_at"`
-			}
-			if err := tx.NewSelect().Table("vulnerability").Column("published_at").
-				Where(`"id" = ?`, id).Scan(ctx, &held); err != nil {
-				return fmt.Errorf("read an issue's dates: %w", err)
-			}
-			if held.PublishedAt == nil {
-				var err error
-				if redated, err = finding.Redate(ctx, tx, id, dates.Published); err != nil {
-					return err
-				}
-			}
-			q = q.Set(`"published_at" = ?`, dates.Published.Truncate(time.Microsecond))
-			if dates.Modified.IsZero() {
-				q = q.Set(`"modified_at" = NULL`)
-			} else {
-				q = q.Set(`"modified_at" = ?`, dates.Modified.Truncate(time.Microsecond))
-			}
+		if dates.Modified.IsZero() {
+			q = q.Set(`"modified_at" = NULL`)
+		} else {
+			q = q.Set(`"modified_at" = ?`, dates.Modified.Truncate(time.Microsecond))
 		}
 		if _, err := q.Exec(ctx); err != nil {
 			return fmt.Errorf("record an issue's dates: %w", err)
