@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // osvSays answers one date for every name, or none.
@@ -169,6 +170,32 @@ func TestAMatchDatedAfterTheReplacementIsWithdrawn(t *testing.T) {
 		}
 		if n := foundAfter(t, f, checking.RunID); n != 0 {
 			t.Errorf("found after fixed counts %d, want none once it is withdrawn", n)
+		}
+	})
+}
+
+func TestAMatchDatedBeforeTheChecksWindowIsWithdrawn(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatch(t, w)
+		// The check would have left it out: the last scan's data carried an
+		// issue published a settle delay before it.
+		redate(t, f, f.since.Add(-setting.DefaultCheckSettle-time.Microsecond))
+		if got, _ := matchOf(t, f); got.ClosedBecause != finding.Invalid {
+			t.Errorf("closed because %q, want invalid: the last scan saw it", got.ClosedBecause)
+		}
+	})
+}
+
+func TestAMatchDatedAtTheChecksWindowOpensAtTheArrival(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatch(t, w)
+		redate(t, f, f.since.Add(-setting.DefaultCheckSettle))
+		got, _ := matchOf(t, f)
+		switch {
+		case got.ClosedBecause != finding.Upgraded:
+			t.Errorf("closed because %q, want the replacement's upgraded kept", got.ClosedBecause)
+		case !got.OpenedAt.Equal(f.arrived):
+			t.Errorf("opened at %s, want the inventory's arrival %s", got.OpenedAt, f.arrived)
 		}
 	})
 }

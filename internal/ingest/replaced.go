@@ -62,24 +62,10 @@ func (s *Store) Replaced(ctx context.Context, scanID int64) (finding.Replaced, e
 	}
 	r.ReplacementID, r.ReplacedAt = next.ID, next.ReceivedAt
 
-	// The scan that last reached the replaced inventory: a successful run of
-	// the build that started while it was current.
-	var last []finding.Run
-	if err := s.db.NewSelect().Model(&last).
-		Column("database_version", "started_at").
-		Where(`"build_id" = ?`, r.BuildID).
-		Where(`"checked_scan_id" IS NULL`).
-		Where(`"finished_at" IS NOT NULL`).
-		Where(`COALESCE("failure", '') = ''`).
-		Where(`"started_at" >= ?`, r.ArrivedAt).
-		Where(`"started_at" < ?`, r.ReplacedAt).
-		Order("started_at DESC", "id DESC").Limit(1).
-		Scan(ctx); err != nil {
-		return finding.Replaced{}, fmt.Errorf("read when the replaced inventory was last scanned: %w", err)
+	since, err := finding.LastScanned(ctx, s.db, r.BuildID, r.ArrivedAt, r.ReplacedAt)
+	if err != nil {
+		return finding.Replaced{}, err
 	}
-	if len(last) > 0 {
-		dated := finding.DataDate(last[0].DatabaseVersion, last[0].StartedAt)
-		r.Since = &dated
-	}
+	r.Since = since
 	return r, nil
 }

@@ -285,8 +285,10 @@ still recorded (REQ-88).
 | The marker is worked out, never stored: a check's match whose issue has no published date and was first carried at or after the match's closing | A date arriving clears it |
 | The marker is shown on the findings list read on a day, as `publication_unknown` and on the row | The finding screen reads open findings |
 | The date pass recording a first published date rewrites the issue's marked matches in the same retryable transaction, and only those | A person's decision is never rewritten |
-| A date before the replacement moves the opening to the later of that date and the inventory's arrival | |
+| A date inside the check's window moves the opening to the later of that date and the inventory's arrival | The row becomes what the check records for a dated issue |
 | A date at or after the replacement withdraws the match as `invalid` (§ Closure reasons) | It was never exposed: out of every open set and of found after fixed |
+| A date before the window, the settle delay before the last scan's data date, withdraws the match as `invalid` | The check would not have recorded it; that scan was the authority. Whether a match exists never depends on when OSV answered |
+| The window is worked out again when the date arrives, from the runs and the settle delay then | |
 | A match on an issue with a known date counts as opened and fixed in the remediation figures, timed from its opening to the replacement (`design-docs/analytics-program.md` § Remediation metrics) | It was open over that stretch |
 | A marked match, and one withdrawn, counts in no remediation figure | A marked duration is a guess; a withdrawn match was never exposed |
 | Its closure reason is the replacement's: patched or disclaimed where the replacement's claims say so there, unaffected where its record says so, otherwise upgraded, revised, removed or unexplained as for a run (§ Closure reasons) | |
@@ -313,4 +315,5 @@ The cost, measured in `design-docs/findings-measurements.md` § Replaced invento
 | A wrong record cannot be overridden here. Not built | A run consults no decision before closing. Correcting it is correcting the record, which the next snapshot carries |
 | An issue OSV never dates that this deployment carried before the replacement is dated by that sighting, unmarked | One first seen here late is recorded from a later opening than its publication |
 | A check that recorded nothing is still the one check | Data published to the scanner after the settle delay is not seen |
+| A settle delay changed between a check and its issue's first date moves the window that date is judged against | The window is worked out, never stored |
 | The outbound VEX document says nothing about an unaffected closure | Telling customers a release is unaffected is a decision, never a closure |

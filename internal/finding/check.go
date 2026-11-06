@@ -41,6 +41,31 @@ func DataDate(databaseVersion string, started time.Time) time.Time {
 	return started.UTC()
 }
 
+// LastScanned is the data date of the scan that last reached an inventory of
+// a build current from arrived until replaced: a successful run of the build,
+// other than a check, that started while it was current. Absent where no scan
+// reached it.
+func LastScanned(ctx context.Context, db bun.IDB, buildID int64, arrived, replaced time.Time) (*time.Time, error) {
+	var last []Run
+	if err := db.NewSelect().Model(&last).
+		Column("database_version", "started_at").
+		Where(`"build_id" = ?`, buildID).
+		Where(`"checked_scan_id" IS NULL`).
+		Where(`"finished_at" IS NOT NULL`).
+		Where(`COALESCE("failure", '') = ''`).
+		Where(`"started_at" >= ?`, arrived).
+		Where(`"started_at" < ?`, replaced).
+		Order("started_at DESC", "id DESC").Limit(1).
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read when the replaced inventory was last scanned: %w", err)
+	}
+	if len(last) == 0 {
+		return nil, nil
+	}
+	dated := DataDate(last[0].DatabaseVersion, last[0].StartedAt)
+	return &dated, nil
+}
+
 // Checked is what checking a replaced inventory recorded.
 type Checked struct {
 	// Dated is how many reports fell between the last scan of the replaced
@@ -208,8 +233,10 @@ func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[stri
 //
 // Each is written closed, opening at the later of its publication and the
 // inventory's arrival and closing at the replacement, for the reason the
-// replacement gives. An issue OSV gives no date opens at the later of the
-// last scan's data date and the arrival, until Redate corrects it. Nothing is told of it and nothing is assigned: it was
+// replacement gives. An issue with no date opens at its first sighting here,
+// except one OSV was asked about and first seen at or after the replacement:
+// that opens at the later of the last scan's data date and the arrival, until
+// Redate corrects it. Nothing is told of it and nothing is assigned: it was
 // fixed before anybody could act. A run stays the authority on what it
 // reported, so an occurrence any row already covers over that stretch is left
 // alone.
