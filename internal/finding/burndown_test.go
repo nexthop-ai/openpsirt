@@ -26,6 +26,8 @@ type dismissal struct {
 	ended             *time.Time
 	needsNobody       bool
 	state             string
+	// oneOccurrence answers only the first open finding of the issue.
+	oneOccurrence bool
 }
 
 func (f *fixture) dismissed(t *testing.T, d dismissal) {
@@ -82,6 +84,9 @@ func (f *fixture) dismissed(t *testing.T, d dismissal) {
 			occurrence.Key = d.issue + string(rune('a'+i))
 		}
 		f.decision(t, occurrence)
+		if d.oneOccurrence {
+			return
+		}
 	}
 }
 
@@ -141,8 +146,13 @@ func (f *fixture) fourIssues(t *testing.T) {
 
 func (f *fixture) burndown(t *testing.T, least string, within finding.Within) *finding.Burndown {
 	t.Helper()
+	return f.burndownSince(t, time.Time{}, least, within)
+}
+
+func (f *fixture) burndownSince(t *testing.T, since time.Time, least string, within finding.Within) *finding.Burndown {
+	t.Helper()
 	b, err := f.store.Burndown(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
-		time.Time{}, least, within)
+		since, least, within)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,6 +319,58 @@ func TestABurndownNarrowsBySeverityAndByPackageIdentifier(t *testing.T) {
 		}
 		if got := burnedOver(f.burndown(t, "", finding.Within{Purl: graph.ParsePurlPrefix("pkg:deb/debian/")})); got.left != 3 {
 			t.Errorf("everything under the path left %d, want all three", got.left)
+		}
+	})
+}
+
+func TestAnIssueAnsweredAtOneOccurrenceAndOpenAtAnotherIsNotDone(t *testing.T) {
+	// CVE-2026-1 sits on libnl under swss and under teamd: one answered is
+	// not the issue at the component answered.
+	each(t, func(t *testing.T, f *fixture) {
+		f.fourIssues(t)
+		agreed := ago(8)
+		f.dismissed(t, dismissal{issue: "CVE-2026-1", proposed: agreed, agreed: &agreed, oneOccurrence: true})
+		if got := burnedOver(f.burndown(t, "", finding.Within{})); got.dismissed != 0 || got.left != 4 {
+			t.Errorf("counted %+v, want nothing dismissed and four left", got)
+		}
+	})
+}
+
+func TestABurndownFromAPickedDayZeroStartsFromWhatWasLeftThen(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.fourIssues(t)
+		b := f.burndownSince(t, ago(12), "", finding.Within{})
+		if b.Start != 4 || !b.Since.Equal(ago(12).Truncate(24*time.Hour)) {
+			t.Errorf("started on %s with %d left, want day 0 as picked with all four", b.Since, b.Start)
+		}
+		if got := burnedOver(b); got.fresh != 0 || got.baseline != 0 || got.left != 4 {
+			t.Errorf("counted %+v, want nothing added after day 0 and four left", got)
+		}
+	})
+}
+
+func TestADayZeroMoreThanTheWidestWindowBackIsMovedToItsStart(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.fourIssues(t)
+		b := f.burndownSince(t, ago(800), "", finding.Within{})
+		want := time.Now().UTC().Truncate(24*time.Hour).Add(-(finding.MostBurndownDays - 1) * 24 * time.Hour)
+		if !b.Since.Equal(want) || len(b.Points) != finding.MostBurndownDays {
+			t.Errorf("started on %s over %d days, want %s over %d", b.Since, len(b.Points), want, finding.MostBurndownDays)
+		}
+	})
+}
+
+func TestAChosenNameIsNamedWhereNothingOfItReachesTheSeverity(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		low := found("CVE-2026-9", teamd)
+		low.Issue.Severity = "low"
+		f.scannedAt(t, twoConsumers(), ago(20), found("CVE-2026-1", libnl), low)
+		b := f.burndown(t, "critical", finding.Within{Component: "teamd"})
+		if got := burnedOver(b); got.left != 0 {
+			t.Errorf("critical on teamd left %d, want none", got.left)
+		}
+		if len(b.Chosen) != 1 || b.MoreChosen {
+			t.Errorf("chose %+v (more: %v), want teamd's one package", b.Chosen, b.MoreChosen)
 		}
 	})
 }

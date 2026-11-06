@@ -8928,6 +8928,8 @@ export interface components {
             readonly $schema?: string;
             /** @description The packages a component name or a purl prefix chose, with the ecosystem each is in, at most 20. Empty where neither was sent */
             chosen: components["schemas"]["ChosenBody"][] | null;
+            /** @description Whether the name or prefix chose more packages than chosen lists */
+            more_chosen: boolean;
             points: components["schemas"]["BurnPointBody"][] | null;
             projection: components["schemas"]["ProjectionBody"];
             /**
@@ -17834,13 +17836,13 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused */
+                /** @description Day 0, as a date. Absent, the day the earliest finding in the selection opened. A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included. A day after today is refused */
                 since?: string;
                 /** @description The least severe band kept: high keeps critical and high. An unrated issue reads as medium */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused */
+                /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused */
                 purl?: string;
                 /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
@@ -17886,13 +17888,13 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused */
+                /** @description Day 0, as a date. Absent, the day the earliest finding in the selection opened. A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included. A day after today is refused */
                 since?: string;
                 /** @description The least severe band kept: high keeps critical and high. An unrated issue reads as medium */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused */
+                /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused */
                 purl?: string;
                 /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;

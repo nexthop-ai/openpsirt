@@ -23,10 +23,10 @@ import (
 // prefix beside the name.
 type BurndownQuery struct {
 	core.ScopeQuery
-	Since     string      `query:"since" format:"date" doc:"Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused"`
+	Since     string      `query:"since" format:"date" doc:"Day 0, as a date. Absent, the day the earliest finding in the selection opened. A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included. A day after today is refused"`
 	Severity  core.Rating `query:"severity" doc:"The least severe band kept: high keeps critical and high. An unrated issue reads as medium"`
 	Component string      `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
-	Purl      string      `query:"purl" doc:"Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused"`
+	Purl      string      `query:"purl" doc:"Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"`
 	Beneath   string      `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
 	Version   string      `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 	Ecosystem string      `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
@@ -119,13 +119,14 @@ type BurndownBody struct {
 	Points     []BurnPointBody `json:"points"`
 	Projection ProjectionBody  `json:"projection"`
 	Chosen     []ChosenBody    `json:"chosen" doc:"The packages a component name or a purl prefix chose, with the ecosystem each is in, at most 20. Empty where neither was sent"`
+	MoreChosen bool            `json:"more_chosen" doc:"Whether the name or prefix chose more packages than chosen lists"`
 }
 
 func burndownBody(b *finding.Burndown) BurndownBody {
 	out := BurndownBody{
 		Since: b.Since.UTC().Format(time.DateOnly), Start: b.Start,
 		Points: make([]BurnPointBody, 0, len(b.Points)),
-		Chosen: make([]ChosenBody, 0, len(b.Chosen)),
+		Chosen: make([]ChosenBody, 0, len(b.Chosen)), MoreChosen: b.MoreChosen,
 		Projection: ProjectionBody{
 			Days: b.Ahead.Days, Done: b.Ahead.Done, Added: b.Ahead.Added,
 			PerDay: b.Ahead.PerDay, Converging: b.Ahead.Converging,
@@ -195,8 +196,9 @@ func registerBurndown(api huma.API, in core.Deps) {
 		Format string `path:"format" enum:"csv,json"`
 		BurndownQuery
 	}) (*huma.StreamResponse, error) {
-		// Read before the file is begun, so a refusal is a status rather than
-		// a file cut short.
+		// Read, and the burndown worked out, before the file is begun, so a
+		// refusal or a failure is a status rather than a file cut short, and
+		// the file states the day 0 that was used.
 		asked, err := input.read(ctx, in)
 		if err != nil {
 			return nil, err
@@ -207,10 +209,20 @@ func registerBurndown(api huma.API, in core.Deps) {
 		for _, band := range bands {
 			header = append(header, "left "+band)
 		}
-		about := []core.Stated{{Label: "day 0", Value: input.Since}}
-		if input.Since == "" {
-			about[0].Value = "the earliest finding"
+		b, err := finding.NewStore(in.DB.DB).Burndown(ctx, asked.subject, asked.scope, asked.since,
+			string(input.Severity), asked.within)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "the burndown could not be worked out", err)
 		}
+		used := b.Since.UTC().Format(time.DateOnly)
+		day0 := used
+		switch {
+		case input.Since == "":
+			day0 = used + ", the day the earliest finding opened"
+		case input.Since != used:
+			day0 = used + ", moved from " + input.Since
+		}
+		about := []core.Stated{{Label: "day 0", Value: day0}, {Label: "left at day 0's start", Value: strconv.Itoa(b.Start)}}
 		if input.Severity != "" {
 			about = append(about, core.Stated{Label: "severity", Value: string(input.Severity) + " and worse"})
 		}
@@ -223,14 +235,9 @@ func registerBurndown(api huma.API, in core.Deps) {
 			Header: header,
 			// Every day in one answer: a burndown is worked out over the whole
 			// window, so there is no offset that means anything.
-			Rows: func(ctx context.Context, _, offset int) ([][]string, error) {
+			Rows: func(_ context.Context, _, offset int) ([][]string, error) {
 				if offset > 0 {
 					return nil, nil
-				}
-				b, err := finding.NewStore(in.DB.DB).Burndown(ctx, asked.subject, asked.scope, asked.since,
-					string(input.Severity), asked.within)
-				if err != nil {
-					return nil, err
 				}
 				rows := make([][]string, 0, len(b.Points))
 				added, done := 0, 0

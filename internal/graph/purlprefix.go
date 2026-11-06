@@ -12,8 +12,9 @@ import "strings"
 // Matched against the package a component's identifier names, reduced the
 // way identity reduces it: version, qualifiers and subpath cut, escapes
 // decoded, the type lowercased. Compared without regard to capitals, as every
-// name people type is. It is never part of a statement: a component's
-// identifier is read and tested here, so a prefix carries no pattern into SQL.
+// name people type is. It is never part of a statement: no stored column holds
+// an identifier reduced and folded this way, so each one is read and tested
+// here.
 type PurlPrefix struct {
 	// wanted is the typed prefix reduced and folded, and under says it ends
 	// on a separator, so it names a path rather than one package.
@@ -46,9 +47,10 @@ func (p PurlPrefix) Empty() bool { return p.wanted == "" }
 func (p PurlPrefix) String() string { return p.wanted }
 
 // Matches says whether a component's package identifier names a package the
-// prefix chooses: the package itself, or one under it a whole segment at a
-// time, so `pkg:github/sonic-net/sonic-swss` takes neither
-// `sonic-swss-common` nor a component with no identifier.
+// prefix chooses: one under the path a prefix ending on a separator names, or
+// else that package alone, so `pkg:golang/go.opentelemetry.io/otel` takes
+// neither `otel/trace`, which is its own package, nor a component with no
+// identifier.
 func (p PurlPrefix) Matches(purl string) bool {
 	if p.wanted == "" {
 		return false
@@ -61,7 +63,7 @@ func (p PurlPrefix) Matches(purl string) bool {
 	if p.under {
 		return strings.HasPrefix(base, p.wanted)
 	}
-	return base == p.wanted || strings.HasPrefix(base, p.wanted+"/")
+	return base == p.wanted
 }
 
 // PackageName is a component's identifier reduced to the package it names,

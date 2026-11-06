@@ -1965,6 +1965,9 @@ components:
           type:
             - array
             - "null"
+        more_chosen:
+          description: Whether the name or prefix chose more packages than chosen lists
+          type: boolean
         points:
           items:
             $ref: "#/components/schemas/BurnPointBody"
@@ -1987,6 +1990,7 @@ components:
         - points
         - projection
         - chosen
+        - more_chosen
       type: object
     CVSSv3:
       additionalProperties: false
@@ -17456,12 +17460,12 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused
+        - description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included. A day after today is refused
           explode: false
           in: query
           name: since
           schema:
-            description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused
+            description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included. A day after today is refused
             format: date
             type: string
         - description: "The least severe band kept: high keeps critical and high. An unrated issue reads as medium"
@@ -17483,12 +17487,12 @@ paths:
           schema:
             description: Keep only what is open against components of this name, whatever version
             type: string
-        - description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused"
+        - description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
           explode: false
           in: query
           name: purl
           schema:
-            description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused"
+            description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
             type: string
         - description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
@@ -17578,12 +17582,12 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused
+        - description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included. A day after today is refused
           explode: false
           in: query
           name: since
           schema:
-            description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused
+            description: Day 0, as a date. Absent, the day the earliest finding in the selection opened. A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included. A day after today is refused
             format: date
             type: string
         - description: "The least severe band kept: high keeps critical and high. An unrated issue reads as medium"
@@ -17605,12 +17609,12 @@ paths:
           schema:
             description: Keep only what is open against components of this name, whatever version
             type: string
-        - description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused"
+        - description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
           explode: false
           in: query
           name: purl
           schema:
-            description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused"
+            description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
             type: string
         - description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false

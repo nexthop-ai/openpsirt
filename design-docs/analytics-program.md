@@ -145,9 +145,9 @@ trend's identity rules (§ Counting by identity).
 
 | Rule | Reason |
 |---|---|
-| Day 0 is a picked day, or the day the earliest finding in the selection opened | The first scan that found anything there |
+| Day 0 is a picked day, or the day the earliest finding in the selection opened at any severity | Every severity of one selection is drawn from one day, so switching the floor never moves the axis |
 | Steps are days ending at midnight UTC, from day 0's start through the coming midnight | The trend's steps |
-| A day 0 more than 730 days back is moved to 730 days back, and the answer names the day it used | Two years is the widest window (`design-docs/analytics.md` § The period a report covers) |
+| A day 0 more than 729 days back is moved to 729 days back, so at most 730 days are drawn, today included, and the answer and the file name the day used | Two years is the widest window (`design-docs/analytics.md` § The period a report covers) |
 | What was left at day 0's start is stated beside the first day | The line starts from it |
 
 ### The projection
@@ -168,7 +168,7 @@ at it (REQ-54).
 |---|---|
 | It takes the subtree trend's two narrowings, with the same refusals (§ Subtree trends) | One meaning of a subtree |
 | A component is chosen by name, or by a package identifier prefix (`design-docs/data-model-components.md` § Package identifier prefixes) | A repository is named by its identifier, never by the name its producer gave it |
-| The answer names the packages a name or a prefix chose, with each one's ecosystem, at most 20 | A name two ecosystems share reads as one otherwise |
+| The answer names the packages a name or a prefix chose before the severity floor, with each one's ecosystem, at most 20, and whether it chose more | A name two ecosystems share reads as one otherwise, and a name with nothing at the floor still names its package |
 | A severity names the least severe band kept; an unrated issue reads as medium | As every band filter reads it |
 | Visibility applies to every read, the dismissals included, and the export reads through the same method (REQ-43, REQ-50) | |
 
@@ -195,7 +195,8 @@ The catalog's findings burndown page draws both panels for the scope picked.
 | Day 0 is a date field, empty for the first scan | |
 | A severity switch keeps a band and worse | |
 | One field takes a name or a purl prefix: text starting `pkg:` is a prefix, anything else a name | Nobody types a prefix not starting with its scheme |
-| The packages a choice matched are listed beneath the controls, each with its ecosystem where two share a name | |
+| The packages a choice matched are listed beneath the controls, each with its ecosystem where two share a name, and "and more" where the answer says it chose more | |
+| A choice matching nothing open since day 0 says so in those words | "Matches nothing" reads as a typo |
 | At or under a component arrives in a link from the dependency tree, a repository row or the component screen, and needs one build; without one the sheet asks for a build and reads nothing | The walk is one build's |
 | The export links carry the same query | |
 
@@ -327,3 +328,4 @@ deferral counts for the part that ran, and overlapping stretches count once.
 | A finding two dismissals answer at once counts twice toward its moment on the burndown | The moment's answered findings are summed over dismissals; one live decision per key keeps it rare |
 | A dismissal needing nobody that was sent back is read as never in force, and one sent back after an agreement keeps the agreement's span | The record keeps whether it is sent back, not when |
 | A build's own suppression or a statement applied to an open finding is no answer on the burndown | Neither records when it took effect |
+| A lapsed or withdrawn dismissal later revised reads as in force across the gap, to the revision where it needs agreement | Revising clears when it stopped applying |

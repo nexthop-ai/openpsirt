@@ -358,6 +358,10 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 		}
 	}
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
+	// The replaced components holding a finding, read once for each condition
+	// a caller asks with: a burndown asks with one condition twice, and on
+	// MySQL 8.4 after a year of weekly rescans each read took 0.9 s.
+	heldFor := map[string][]int64{}
 	return func(ctx context.Context, q *bun.SelectQuery, when string, args ...any) (*bun.SelectQuery, error) {
 		q = q.Where(`COALESCE("f"."closed_because", '') NOT IN (?)`, bun.List(NeverPresent())).
 			Where(kinds, kindArgs...).
@@ -373,9 +377,14 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 		}
 		if within.Beneath != nil {
 			// Only the replaced components holding a finding in the range read.
-			held, err := holding(ctx, s.db, buildID, under, when, args...)
-			if err != nil {
-				return nil, err
+			asked := fmt.Sprint(when, args)
+			held, read := heldFor[asked]
+			if !read {
+				var err error
+				if held, err = holding(ctx, s.db, buildID, under, when, args...); err != nil {
+					return nil, err
+				}
+				heldFor[asked] = held
 			}
 			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), buildID, *within.Beneath, held))
 		}

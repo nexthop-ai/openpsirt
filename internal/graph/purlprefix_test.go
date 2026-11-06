@@ -9,13 +9,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-func TestAPurlPrefixMatchesWholeSegmentsWithTheVersionAndQualifiersCut(t *testing.T) {
+func TestAPurlPrefixMatchesOnePackageOrAPathWithTheVersionAndQualifiersCut(t *testing.T) {
 	cases := []struct {
 		prefix, purl string
 		want         bool
 	}{
 		{"pkg:github/sonic-net/sonic-swss", "pkg:github/sonic-net/sonic-swss@2126d2752826", true},
 		{"pkg:github/sonic-net/sonic-swss", "pkg:github/sonic-net/sonic-swss-common@1a2b", false},
+		// A package is not a path: what sits under it is a package of its own.
+		{"pkg:golang/go.opentelemetry.io/otel", "pkg:golang/go.opentelemetry.io/otel/trace@v1.2.0", false},
+		{"pkg:golang/go.opentelemetry.io/otel/", "pkg:golang/go.opentelemetry.io/otel/trace@v1.2.0", true},
 		{"pkg:github/sonic-net/", "pkg:github/sonic-net/sonic-swss-common@1a2b", true},
 		{"pkg:github/sonic-net/", "pkg:github/sonic-netx/thing@1", false},
 		{"pkg:golang/github.com/sonic-net/", "pkg:golang/github.com/sonic-net/sonic-gnmi@v0.1.0", true},

@@ -6,6 +6,7 @@ package analyticsapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -155,6 +156,31 @@ func TestABurndownIsRefusedWhatItCannotAnswer(t *testing.T) {
 						route, query, got.Code, says, got.Body.String())
 				}
 			}
+		}
+	})
+}
+
+func TestABurndownFileStatesTheDayZeroItUsedAndWhatWasLeftThen(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
+		var body struct {
+			Since string `json:"since"`
+			Start int    `json:"start"`
+		}
+		httpapitest.Read(t, r, "private", "/v1/burndown?product=mine&since=2020-01-01", &body)
+		got := httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/burndown.csv?product=mine&since=2020-01-01", "")
+		file := got.Body.String()
+		for _, says := range []string{
+			body.Since + ", moved from 2020-01-01",
+			"left at day 0's start," + strconv.Itoa(body.Start),
+		} {
+			if !strings.Contains(file, says) {
+				t.Errorf("the file does not say %q:\n%s", says, file)
+			}
+		}
+		got = httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/burndown.csv?product=mine", "")
+		if !strings.Contains(got.Body.String(), ", the day the earliest finding opened") {
+			t.Errorf("a file with no day 0 asked names none:\n%s", got.Body.String())
 		}
 	})
 }

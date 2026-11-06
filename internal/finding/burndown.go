@@ -90,8 +90,9 @@ type Burndown struct {
 	Points []BurnPoint
 	Ahead  Projection
 	// Chosen is the packages the narrowing chose by name or identifier, at
-	// most mostMatched of them.
-	Chosen []ChosenPackage
+	// most mostMatched of them, and MoreChosen whether it chose more.
+	Chosen     []ChosenPackage
+	MoreChosen bool
 }
 
 // mostMatched is how many chosen packages a burndown names back.
@@ -102,8 +103,9 @@ const mostMatched = 20
 // least where one is named.
 //
 // Day 0 is the day since falls on. Zero is the day the earliest finding in the
-// selection opened: the first scan that found anything there. A day 0 more
-// than two years back is moved to two years back.
+// selection opened at any severity: the first scan that found anything there. A day 0 more
+// than 729 days back is moved to 729 days back, so at most MostBurndownDays are
+// drawn, today included.
 func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scope, since time.Time,
 	least string, within Within) (*Burndown, error) {
 
@@ -147,6 +149,9 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 	if err != nil {
 		return nil, err
 	}
+	// What the name or prefix chose, before the floor narrows it: a name
+	// whose issues are all below the floor still names its package.
+	out.Chosen, out.MoreChosen = chosenPackages(rows, within)
 	if band := Band(least); least != "" {
 		// Unrated reads as medium, as everything that filters on a band reads it.
 		floor := Ranks(band)
@@ -158,7 +163,6 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 		}
 		rows = kept
 	}
-	out.Chosen = chosenPackages(rows, within)
 	first, err := s.firstScans(ctx, rows, since)
 	if err != nil {
 		return nil, err
@@ -390,11 +394,12 @@ func projected(points []BurnPoint, now time.Time) Projection {
 	return out
 }
 
-// matched is the packages the rows sit on where the narrowing chose them by
-// name or identifier, with the ecosystem each is in.
-func chosenPackages(rows []trendRow, within Within) []ChosenPackage {
+// chosenPackages is the packages the rows sit on where the narrowing chose
+// them by name or identifier, with the ecosystem each is in, at most
+// mostMatched, and whether there were more.
+func chosenPackages(rows []trendRow, within Within) ([]ChosenPackage, bool) {
 	if within.Component == "" && within.Purl.Empty() {
-		return nil
+		return nil, false
 	}
 	seen := map[string]bool{}
 	var out []ChosenPackage
@@ -419,13 +424,18 @@ func chosenPackages(rows []trendRow, within Within) []ChosenPackage {
 		return 0
 	})
 	if len(out) > mostMatched {
-		out = out[:mostMatched]
+		return out[:mostMatched], true
 	}
-	return out
+	return out, false
 }
 
 // firstOpened is when the earliest finding the narrowing reads opened, or nil
-// where it reads none.
+// where it reads none. It ignores a severity floor, so every floor of one
+// selection draws from one day 0.
+//
+// With a prefix, grouped by component and each component's identifier read
+// after: grouped on the identifier, a long text, MariaDB took 1.0 s after a
+// year of history against 0.14 s on the component.
 func (s *Store) firstOpened(ctx context.Context, narrow trendNarrowing, within Within) (*time.Time, error) {
 	var read []struct {
 		Purl   string    `bun:"purl"`
@@ -437,14 +447,17 @@ func (s *Store) firstOpened(ctx context.Context, narrow trendNarrowing, within W
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened"`)
 	if !within.Purl.Empty() {
-		// By identifier, which is tested here rather than in the statement.
-		q = q.Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
-			ColumnExpr(`"pc"."purl" AS "purl"`).
-			GroupExpr(`"pc"."purl"`)
+		q = q.ColumnExpr(`"f"."component_id" AS "component_id"`).GroupExpr(`"f"."component_id"`)
 	}
 	q, err := narrow(ctx, q, `"f"."opened_at" IS NOT NULL`)
 	if err != nil {
 		return nil, err
+	}
+	if !within.Purl.Empty() {
+		// By identifier, which is tested here rather than in the statement.
+		q = s.db.NewSelect().TableExpr(`(?) AS "g"`, q).
+			Join(`JOIN "component" AS "pc" ON "pc"."id" = "g"."component_id"`).
+			ColumnExpr(`"g"."opened" AS "opened", COALESCE("pc"."purl", '') AS "purl"`)
 	}
 	if err := q.Scan(ctx, &read); err != nil {
 		return nil, fmt.Errorf("read when the selection was first scanned: %w", err)

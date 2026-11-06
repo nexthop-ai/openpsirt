@@ -102,9 +102,9 @@ or `pkg:golang/github.com/sonic-net/`.
 |---|---|
 | A component's identifier is reduced as identity reduces it: version, qualifiers and subpath cut, escapes decoded, the type lowercased | The same package at every version and every qualifier is one choice |
 | The typed prefix is reduced the same way, capitals ignored on both sides | A name people type matches regardless of capitals |
-| A prefix ending on `/` takes every package under the path; any other takes the package and what sits under it a whole segment at a time | `pkg:github/sonic-net/sonic-swss` takes neither `sonic-swss-common` nor a component with no identifier |
-| The prefix is tested in the application on each row read, never placed in a statement | A typed pattern never reaches SQL (REQ-66) |
-| A prefix with no `pkg:` scheme, or nothing past the type, chooses nothing | |
+| A prefix ending on `/` takes every package under the path; any other takes that package alone | `pkg:golang/go.opentelemetry.io/otel` is a package of its own beside `otel/trace`, and `pkg:github/sonic-net/sonic-swss` takes neither `sonic-swss-common` nor a component with no identifier |
+| The prefix is tested in the application on each row read, never placed in a statement | No stored column holds an identifier reduced and folded this way for a statement to compare |
+| A prefix with no `pkg:` scheme, or nothing past the type, is refused | |
 | A bare name chooses by name, at any version, in every ecosystem | The answer names each ecosystem the name matched |
 
 ## Upstream name and version
