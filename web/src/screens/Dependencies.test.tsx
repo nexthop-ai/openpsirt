@@ -135,6 +135,14 @@ async function drawn(reach: object[], at = AT) {
                       namespace: "sonic-net",
                     },
                   },
+                  {
+                    key: "pkg:github/sonic-net/saibcm-modules",
+                    versions: ["1a2b", "3c4d"],
+                    components: 2,
+                    open: 50,
+                    fixed: 0,
+                    open_by_severity: { high: 50 },
+                  },
                 ],
               },
             };
@@ -229,6 +237,13 @@ describe("the components listed by repository and by ecosystem", () => {
     expect(burn).toContain("beneath_namespace=sonic-net");
   });
 
+  it("opens no subtree for a repository shipped as several components", async () => {
+    await drawn(REACH, `${AT}?list=repository`);
+    expect(text()).toContain("pkg:github/sonic-net/saibcm-modules");
+    expect(link("Findings")).toHaveLength(1);
+    expect(link("Burndown")).toHaveLength(1);
+  });
+
   it("chooses an ecosystem's burndown by its purl prefix, and opens its packages", async () => {
     await drawn(REACH, `${AT}?list=ecosystem`);
     expect(link("Burndown")).toEqual([
@@ -242,7 +257,8 @@ describe("the components listed by repository and by ecosystem", () => {
     );
     await settle();
     expect(text()).toContain("pkg:cargo/addr2line");
-    expect(link("Findings")[0]).toContain("component=addr2line");
+    // The list's name filter spans every ecosystem, so a package opens none.
+    expect(link("Findings")).toEqual([]);
     expect(link("Burndown")[0]).toContain("purl=pkg%3Acargo%2Faddr2line");
   });
 

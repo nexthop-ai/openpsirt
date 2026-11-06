@@ -226,6 +226,14 @@ describe("the component screen's security testing", () => {
     expect(mount.host().querySelector('svg[aria-label*="first scans brought 2"]')).not.toBeNull();
   });
 
+  it("opens the burndown of the name at any version with the branch and variant emptied", async () => {
+    await component(BOTH);
+    // Left out, the burndown falls back to the build picked last.
+    expect(hrefOf("any version")).toBe(
+      "/analytics/findings-burndown?component=libnl3&branch_or_tag=&variant=",
+    );
+  });
+
   it("names the code findings on the build itself as unplaced, with the way to the repositories", async () => {
     await component(BOTH, {
       [COUNTS]: {

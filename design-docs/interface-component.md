@@ -161,9 +161,9 @@ by ecosystem. The list is in the address, so a link carries it. The counts are
 |---|---|
 | A repository row is the identifier with the version cut, the commits the build ships, open with its bands, and fixed | The commit is what a source repository ships |
 | An ecosystem row is the type, its component count, open and fixed; its name opens the ecosystem's packages, each a row like a repository's with versions in place of commits | Ecosystems then packages |
-| A repository row of one component opens the findings list and the burndown at or under it on this build | What the row counts |
-| Any other row opens the burndown chosen by its identifier, a prefix ending in a slash for an ecosystem, on the build's branch and variant | A package at any version; an ecosystem as every package of it |
-| A package row of one component opens the findings list on that name | |
+| A repository row of one component opens the findings list and the burndown at or under it on this build; one of several components opens neither | What the row counts; a walk starts at one component |
+| A package or an ecosystem row opens the burndown chosen by its identifier, a prefix ending in a slash for an ecosystem, on the build's branch and variant | A package at any version; an ecosystem as every package of it |
+| A package or an ecosystem row opens no findings list | The list's name filter spans every ecosystem, so it would count more than the row |
 | Components with no identifier are an ecosystem row with no burndown | No prefix chooses them |
 | A note under the list says what a row counts: beneath for a repository, at its own components otherwise | The two read differently |
 

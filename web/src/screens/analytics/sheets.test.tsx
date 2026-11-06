@@ -281,13 +281,14 @@ describe("the findings burndown", () => {
     baseline: 0,
     first_scans: 0,
   });
-  const answer = (projection: Record<string, unknown>, chosen: object[] = []) => ({
+  const answer = (projection: Record<string, unknown>, chosen: object[] = [], more = false) => ({
     data: {
       since: "2026-10-01",
       start: 12,
       points: [point("2026-10-01", 10), point("2026-10-02", 8)],
       projection: { days: 2, done: 6, added: 2, per_day: 2, converging: true, ...projection },
       chosen,
+      more_chosen: more,
     },
   });
 
@@ -352,6 +353,26 @@ describe("the findings burndown", () => {
     expect(text()).toContain("pkg:deb/debian/swss (deb)");
     expect(text()).toContain("pkg:github/sonic-net/sonic-swss (github)");
     expect(text()).not.toContain("(cargo)");
+  });
+
+  it.each([false, true])("says there are more only where the answer says so: %s", async (more) => {
+    const twenty = Array.from({ length: 20 }, (_, i) => ({
+      package: `pkg:deb/debian/p${i}`,
+      name: `p${i}`,
+      ecosystem: "deb",
+    }));
+    serve((path) => (path === "/v1/burndown" ? answer({}, twenty, more) : undefined));
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown?purl=pkg:deb/"));
+    await settle();
+    expect(text()).toContain("pkg:deb/debian/p19");
+    expect(text().includes(" and more")).toBe(more);
+  });
+
+  it("says a choice matching nothing is open since day 0", async () => {
+    serve((path) => (path === "/v1/burndown" ? answer({}) : undefined));
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown?component=nothing"));
+    await settle();
+    expect(text()).toContain("Nothing it matches is open since day 0.");
   });
 
   it("asks nothing at or under a component until one build is picked", async () => {

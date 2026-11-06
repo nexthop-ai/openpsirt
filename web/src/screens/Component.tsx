@@ -1295,7 +1295,12 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
         >
           this and what it pulls in
         </Link>{" "}
-        · <Link to={analyticsReportAt("findings-burndown", { component })}>any version</Link>
+        ·{" "}
+        <Link
+          to={analyticsReportAt("findings-burndown", { component, branch_or_tag: "", variant: "" })}
+        >
+          any version
+        </Link>
       </p>
       {trend.isError ? (
         <p className="hint">Could not be read.</p>

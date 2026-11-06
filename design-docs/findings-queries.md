@@ -125,7 +125,7 @@ per group.
 
 | Rule | Reason |
 |---|---|
-| Counted in the trend's unit, an issue at a component | A row opens the burndown and the findings list for the same selection |
+| Counted in the trend's unit, an issue at a component | A row's burndown counts what the row does; a row whose selection no burndown or list can name links to neither (`design-docs/interface-component.md` § Component lists) |
 | Open is an issue at a component with a finding open in the build; fixed is one left by a resolution and open nowhere in the group | Fixed at one component and open at another is not gone |
 | A finding on a version a rescan replaced counts where the build's present version of its name is | `design-docs/data-model-graph.md` § Path traversal |
 | A repository's versions are what its identifiers state | A SONiC source node states its commit in the identifier and a version its producer made up in the version field |

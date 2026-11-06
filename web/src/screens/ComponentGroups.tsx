@@ -40,16 +40,19 @@ function beneathOf(one: NonNullable<Group["component"]>) {
   };
 }
 
-// The burndown of what a row counts. A repository with one component is its
-// subtree on this build; any other row is chosen by its package identifier,
-// at any version, across the scope.
+// The burndown of what a row counts. A repository is its subtree on this
+// build, and has none where it holds several components, since a subtree
+// starts at one; any other row is chosen by its package identifier, at any
+// version, across the scope.
 function burndownOf(at: Build, by: Listing, row: Group, ecosystem: string): string | null {
-  if (by === "repository" && row.component) {
-    return analyticsReportAt("findings-burndown", {
-      branch_or_tag: at.branch_or_tag,
-      variant: at.variant,
-      ...beneathOf(row.component),
-    });
+  if (by === "repository") {
+    return row.component
+      ? analyticsReportAt("findings-burndown", {
+          branch_or_tag: at.branch_or_tag,
+          variant: at.variant,
+          ...beneathOf(row.component),
+        })
+      : null;
   }
   const purl = by === "ecosystem" && !ecosystem ? `pkg:${row.key}/` : row.key;
   if (!purl.startsWith("pkg:") || row.key === NO_ECOSYSTEM) return null;
@@ -60,16 +63,11 @@ function burndownOf(at: Build, by: Listing, row: Group, ecosystem: string): stri
   });
 }
 
-// The findings list for a row: the subtree for a repository, the component's
-// own name for a package. An ecosystem opens its packages instead, since the
-// list has no ecosystem filter.
-function findingsOf(at: Build, by: Listing, row: Group, ecosystem: string): string | null {
-  if (!row.component) return null;
-  if (by === "repository") return buildFindingsAt(at, beneathOf(row.component));
-  if (by === "ecosystem" && ecosystem) {
-    return buildFindingsAt(at, { component: row.component.name });
-  }
-  return null;
+// The findings list for a repository row: its subtree. A package or an
+// ecosystem has none, since the list's name filter spans every ecosystem.
+function findingsOf(at: Build, by: Listing, row: Group): string | null {
+  if (by !== "repository" || !row.component) return null;
+  return buildFindingsAt(at, beneathOf(row.component));
 }
 
 export function ComponentGroups({
@@ -140,7 +138,7 @@ export function ComponentGroups({
           <tbody>
             {rows.map((row) => {
               const burn = burndownOf(at, by, row, ecosystem);
-              const list = findingsOf(at, by, row, ecosystem);
+              const list = findingsOf(at, by, row);
               return (
                 <tr key={row.key}>
                   <td className="id">

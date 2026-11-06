@@ -199,7 +199,11 @@ export function Burndown() {
         <Failed error={burndown.error} what="The burndown could not be read." />
       ) : (
         <>
-          <ChosenLine chosen={data?.chosen ?? []} asked={!!(narrowed.purl || narrowed.component)} />
+          <ChosenLine
+            chosen={data?.chosen ?? []}
+            more={data?.more_chosen ?? false}
+            asked={!!(narrowed.purl || narrowed.component)}
+          />
           {points.length === 0 ? (
             <Empty title="Nothing to count." detail="Nothing was open here from day 0." />
           ) : (
@@ -272,10 +276,10 @@ function Chooser({ typed, onChoose }: { typed: string; onChoose: (typed: string)
 }
 
 // What a name or a prefix chose, with the ecosystem where two share a name.
-function ChosenLine({ chosen, asked }: { chosen: Chosen[]; asked: boolean }) {
+function ChosenLine({ chosen, more, asked }: { chosen: Chosen[]; more: boolean; asked: boolean }) {
   if (!asked) return null;
   if (chosen.length === 0) {
-    return <p className="hint">Matches nothing in this scope.</p>;
+    return <p className="hint">Nothing it matches is open since day 0.</p>;
   }
   const names = new Map<string, Set<string>>();
   for (const each of chosen) {
@@ -291,7 +295,7 @@ function ChosenLine({ chosen, asked }: { chosen: Chosen[]; asked: boolean }) {
           {(names.get(each.name)?.size ?? 0) > 1 && ` (${each.ecosystem || "no ecosystem"})`}
         </span>
       ))}
-      {chosen.length >= 20 && " and more"}
+      {more && " and more"}
     </p>
   );
 }
