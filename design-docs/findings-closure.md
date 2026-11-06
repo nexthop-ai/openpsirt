@@ -299,8 +299,8 @@ still recorded (REQ-88).
 | A match the replaced inventory had patched, cleared or disclaimed is not written | It was never exposed |
 | A match any row of the build already covers at that occurrence identity over any part of the stretch is not written | A run stays the authority on what it reported |
 | The check is a run of its own, naming the inventory it checked, and opens and closes every row it writes | Every row keeps its provenance (REQ-13) |
-| It takes the build as applying a scan does, and writes in one retryable transaction | A scan and a check of one build never interleave |
-| It takes the issues it read with no date, repeating that they have none, and goes again where one gained a date since; the date pass takes an issue before rewriting its matches | A date committed between the check's read and its commit is either read by the check or finds the match to rewrite |
+| It takes the build by writing a fresh value into its row, and writes in one retryable transaction | A scan and a check of one build never interleave; a write of the value held is skipped on MySQL and MariaDB, so never certified on a cluster |
+| It takes the issues it read with no date by writing a fresh value into their rows, repeating that each has no date and is its own issue, and goes again where one gained a date or merged away since; the date pass and a merge take an issue before rewriting its matches | A date or merge committed between the check's read and its commit is either read by the check or finds the match to rewrite |
 | Nothing is notified, assigned or given a deadline | Nothing is left to act on |
 | The replaced upload's receipt counts what it found as found after fixed, less any match withdrawn; no other receipt answers from it | |
 | A check run is never a build's last scan: rescheduling, readiness and the latest run ignore it | |

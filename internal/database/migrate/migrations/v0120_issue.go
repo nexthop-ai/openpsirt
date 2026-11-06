@@ -25,7 +25,12 @@ func vulnerabilityV0120(t *columnTypes) []string {
 			-- apart.
 			"published_at"   `+t.timestamp+` NULL,
 			"modified_at"    `+t.timestamp+` NULL,
-			"dates_asked_at" `+t.timestamp+` NULL,`)
+			"dates_asked_at" `+t.timestamp+` NULL,
+			-- A fresh value written by a transaction taking the row to wait
+			-- out another: a replaced inventory's check and the pass dating
+			-- the issue. It means nothing; a write of a value already held is
+			-- skipped on MySQL and MariaDB, and a cluster never certifies it.
+			"taken_by"       `+t.free+` NULL,`)
 	return statements
 }
 
@@ -58,7 +63,7 @@ func issueDatesV0120(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	c := change{table: "vulnerability"}
-	for _, column := range []string{"published_at", "modified_at", "dates_asked_at"} {
+	for _, column := range []string{"published_at", "modified_at", "dates_asked_at", "taken_by"} {
 		present, err := u.hasColumn("vulnerability", column)
 		if err != nil {
 			return err
@@ -71,6 +76,34 @@ func issueDatesV0120(ctx context.Context, tx bun.Tx) error {
 		return nil
 	}
 	return u.change(vulnerabilityV0120(u.t), c)
+}
+
+// buildV0120 is v0.12.0's declaration of the build table.
+//
+// v0.11.0's, with a value written by a replaced inventory's check to take the
+// build, which is never the build's last run.
+func buildV0120(t *columnTypes) []string {
+	statements := declaredV0110(t, "build")
+	statements[0] = withColumn(statements[0], `"last_run_id" `+t.refNull+` NULL,`,
+		`-- A fresh value written by a transaction taking the build to wait
+			-- out a scan of it without being its last run. It means nothing; a
+			-- write of a value already held is skipped on MySQL and MariaDB,
+			-- and a cluster never certifies it.
+			"taken_by"    `+t.free+` NULL,`)
+	return statements
+}
+
+// buildTakenV0120 adds the value a check takes the build with.
+func buildTakenV0120(ctx context.Context, tx bun.Tx) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	present, err := u.hasColumn("build", "taken_by")
+	if err != nil || present {
+		return err
+	}
+	return u.change(buildV0120(u.t), change{table: "build", add: []added{{column: "taken_by"}}})
 }
 
 // checkedScanV0120 adds the replaced inventory a run checked, its key and its

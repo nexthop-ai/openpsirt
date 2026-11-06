@@ -220,5 +220,6 @@ func StatementsV0120(engine database.Engine) map[string][]string {
 		"vulnerability": vulnerabilityV0120(t),
 		"scan_run":      scanRunV0120(t),
 		"scan":          scanV0120(t),
+		"build":         buildV0120(t),
 	}
 }

@@ -33,8 +33,10 @@ func upV0120(ctx context.Context, sqldb *sql.DB) error {
 //     check a replaced branch inventory owes.
 //   - A scan records that it was replaced before the upgrade, and so owes no
 //     check.
+//   - An issue and a build each hold a value a check writes to take them.
 func upgradeV0120(ctx context.Context, tx bun.Tx) error {
-	for _, step := range []func(context.Context, bun.Tx) error{issueDatesV0120, checkedScanV0120, uncheckedV0120} {
+	for _, step := range []func(context.Context, bun.Tx) error{issueDatesV0120, checkedScanV0120, uncheckedV0120,
+		buildTakenV0120} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

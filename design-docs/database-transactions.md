@@ -26,6 +26,7 @@ and the one in-memory lock stops a process migrating twice.
 | Two workers taking one job | A conditional update; row locking beside it is for throughput (`design-docs/queue.md` § Exclusive handout) |
 | Two replicas migrating at start | A database-level lock (`design-docs/database-migrations.md` § Migration locks) |
 | Two scans of one build | The apply takes the build's row first, so the second waits rather than interleaving, and a scan applies whole (REQ-06) |
+| A scan and a replaced-inventory check of one build | The check writes a fresh value into the build's row before reading, since a check is never the build's last run, so each waits for the other and a cluster conflicts the two (`design-docs/findings-closure.md` § Replaced inventories) |
 | Two uploads checking the room left | The upload's transaction writes a fresh value into one fixed lock row before summing what is held, so the second waits and a cluster conflicts the two at certification. A write of the value already held is not written on MySQL and MariaDB, so never certified |
 | An administrator changing a setting | Read per request, so it applies on every replica at once |
 

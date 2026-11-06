@@ -5,6 +5,7 @@ package finding
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -233,10 +234,12 @@ func knownIssues(ctx context.Context, db bun.IDB, reported []Reported) (map[stri
 
 // takeUndated takes the rows of the issues read with no date, as the date
 // pass takes one before it rewrites the check's matches, and goes again where
-// a date landed since they were read. Without it a date committed between the
-// read and the check's commit finds no match to rewrite, and the match keeps
-// an opening that assumed no date. The write repeats the condition read, so
-// it matches fewer rows where a date arrived.
+// one is no longer undated or no longer its own issue. Without it a date or a
+// merge committed between the read and the check's commit finds no match to
+// rewrite, and the match keeps an opening or an issue the read assumed. The
+// write repeats the condition read, so it matches fewer rows where either
+// moved. It writes a fresh value, because MySQL and MariaDB skip a write that
+// changes nothing and a cluster never certifies a row nothing changed.
 func takeUndated(ctx context.Context, tx bun.IDB, known map[string]issueDating) error {
 	seen := map[int64]bool{}
 	var undated []int64
@@ -249,8 +252,9 @@ func takeUndated(ctx context.Context, tx bun.IDB, known map[string]issueDating) 
 	taken := int64(0)
 	err := database.IDsInBatches(ctx, undated, func(ctx context.Context, batch []int64) error {
 		res, err := tx.NewUpdate().Table("vulnerability").
-			Set(`"published_at" = "published_at"`).
+			Set(`"taken_by" = ?`, rand.Text()).
 			Where(`"id" IN (?)`, bun.List(batch)).
+			Where(`"issue_id" = "id"`).
 			Where(`"published_at" IS NULL`).Exec(ctx)
 		if err != nil {
 			return err
@@ -286,9 +290,11 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		checked = Checked{}
 		// Taken first, as applying a scan takes it, so a scan of the build
-		// and a check of it do not interleave.
+		// and a check of it do not interleave. A fresh value, because a
+		// check is never the build's last run and a row nothing changed is
+		// never certified on a cluster.
 		if _, err := tx.NewUpdate().Table("build").
-			Set(`"last_run_id" = "last_run_id"`).
+			Set(`"taken_by" = ?`, rand.Text()).
 			Where(`"id" = ?`, r.BuildID).Exec(ctx); err != nil {
 			return fmt.Errorf("take the build: %w", err)
 		}
