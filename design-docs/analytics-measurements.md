@@ -260,6 +260,23 @@ the median of five reads after a warm one, each engine run alone.
 | The kernel by its name is the dearest read on MySQL and MariaDB | 1,799 ms and 1,265 ms: its 3,295 issues at one component are read through the name |
 | A repository row costs its walk | 45 repositories reaching the whole image in 361 ms on PostgreSQL |
 
+A repository shipped at several commits is read from every one of them. The
+widest in the image is `pkg:github/sonic-net/saibcm-modules`, two commits above
+the kernel; every fifth hung repository also ships at a second commit. Read in a
+second run, both forms side by side:
+
+| Beneath `saibcm-modules` | SQLite | PostgreSQL |
+|---|--:|--:|
+| Burndown, from both commits | 1,066 ms | 654 ms |
+| Burndown, from the first commit | 1,601 ms | 637 ms |
+| The list's total, from both commits | 280 ms | 176 ms |
+| The list's total, from the first commit | 367 ms | 195 ms |
+
+| Reading | Detail |
+|---|---|
+| A second start costs nothing measurable | The starts are one walk's seeds, and both commits reach the same 3,295 issues |
+| The second run is slower across the board on SQLite | Its product burndown read 1,515 ms against 1,086 in the first; the machine was shared, so the forms are compared within the run |
+
 | Caveat | Detail |
 |---|---|
 | One build | The image's repositories reach every top-level component, the widest walk a repository row takes |
