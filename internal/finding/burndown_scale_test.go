@@ -83,7 +83,7 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 		report := func(step int) []finding.Reported {
 			var out []finding.Reported
 			for i, c := range packages {
-				if gone[i] && !(step == 12 && i%400 == 1) {
+				if gone[i] && (step != 12 || i%400 != 1) {
 					continue
 				}
 				out = append(out, finding.Reported{
