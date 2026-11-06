@@ -218,6 +218,7 @@ export function Burndown() {
                   />
                   <BurnLegend />
                   <p className="hint">
+                    {data.start > 0 && `${data.start.toLocaleString()} at the start of day 0. `}
                     Pace: the last {data.projection.days} days. Once per issue in each package.
                   </p>
                 </section>

@@ -21,6 +21,12 @@ function dayOf(at: string): number {
   return Date.parse(`${at.slice(0, 10)}T00:00:00Z`);
 }
 
+// Whether a day's date is written under the axis: every few days, and the
+// last, with the one before the last left out within a step of it.
+function labelled(i: number, last: number, every: number): boolean {
+  return i === last || (i % every === 0 && last - i >= every);
+}
+
 // Round values from zero to a top, for a scale that starts at the floor: a
 // burndown is read for how far it is from zero.
 function ticksTo(hi: number, want: number): number[] {
@@ -109,9 +115,9 @@ export function Burn({
   const scale = (botH / 2 - 4) / most;
   const bw = Math.max(2, ((xi(points.length - 1) - L) / Math.max(1, points.length)) * 0.5);
 
-  const line = [`${x(first)},${y(start)}`, ...points.map((p, i) => `${xi(i)},${y(p.left)}`)].join(
-    " ",
-  );
+  // The line starts at day 0's end: its start is the same day on this axis,
+  // and is said beneath the chart.
+  const line = points.map((p, i) => `${xi(i)},${y(p.left)}`).join(" ");
   const n = points.length - 1;
   const tip = points[n]?.left ?? 0;
   const every = Math.max(1, Math.ceil(points.length / 8));
@@ -197,7 +203,7 @@ export function Burn({
         );
       })}
       {points.map((p, i) =>
-        i % every === 0 || i === n ? (
+        labelled(i, n, every) ? (
           <text key={p.at} className="axis" x={xi(i)} y={zero + botH / 2 + 12} textAnchor="middle">
             {md(p.at)}
           </text>
@@ -296,6 +302,8 @@ export function AddedDone({ points, since }: { points: BurnPoint[]; since: strin
   const tip = rows[rows.length - 1] ?? { at: since, added: 0, done: 0 };
   const every = Math.max(1, Math.ceil(rows.length / 8));
   const doneHigher = tip.done >= tip.added;
+  // The lower line's label sits under it, kept above the dates.
+  const below = (v: number) => Math.min(y(v) + 12, T + H - 3);
 
   return (
     <svg
@@ -317,7 +325,7 @@ export function AddedDone({ points, since }: { points: BurnPoint[]; since: strin
       <text
         className="axis"
         x={x(tip.at) - 5}
-        y={y(tip.added) + (doneHigher ? 12 : -6)}
+        y={doneHigher ? below(tip.added) : y(tip.added) - 6}
         textAnchor="end"
         style={{ fill: "var(--sev-high)", fontWeight: 600, fontSize: 11 }}
       >
@@ -326,14 +334,14 @@ export function AddedDone({ points, since }: { points: BurnPoint[]; since: strin
       <text
         className="axis"
         x={x(tip.at) - 5}
-        y={y(tip.done) + (doneHigher ? -6 : 12)}
+        y={doneHigher ? y(tip.done) - 6 : below(tip.done)}
         textAnchor="end"
         style={{ fill: "var(--ok)", fontWeight: 600, fontSize: 11 }}
       >
         {tip.done.toLocaleString()} done
       </text>
       {rows.map((r, i) =>
-        i % every === 0 || i === rows.length - 1 ? (
+        labelled(i, rows.length - 1, every) ? (
           <text key={r.at} className="axis" x={x(r.at)} y={T + H + 14} textAnchor="middle">
             {md(r.at)}
           </text>
