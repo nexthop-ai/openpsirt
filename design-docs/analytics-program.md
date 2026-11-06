@@ -102,6 +102,8 @@ Resolution is computed from scans (REQ-35), and a duration is a subtraction.
 | An occurrence one run recorded already closed is neither opened nor fixed | It was never open |
 | A replaced inventory's check match on an issue with a known publication date is opened and fixed, timed from its opening to the replacement (`design-docs/findings-closure.md` § Replaced inventories) | It was open over that stretch |
 | A check match marked publication date unknown is in no remediation figure | Its opening is the widest stretch it could have, so its duration is a guess |
+| A check match withdrawn as never exposed is in no remediation figure, as in no run's opened count | It was never present |
+| The check matches are one set each row is looked up in, never a condition asked of each row | Asked of each row, PostgreSQL compiles every figure: 1,685 ms against 170 ms at 103,095 findings (`design-docs/findings-measurements.md` § Remediation beside a check) |
 
 Each aging bucket carries its count by severity and how many hold no standing
 decision.

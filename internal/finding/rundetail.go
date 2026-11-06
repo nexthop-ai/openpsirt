@@ -194,7 +194,7 @@ func runChanged(db bun.IDB, buildID int64, column runColumn,
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			// A check's match is opened and closed by one run and still
 			// counts, until a date shows it was never exposed.
-			return q.Where(wasOpen).
-				WhereOr(checkRecorded("f")+` AND "f"."closed_because" <> ?`, Invalid)
+			standing, args := checkStanding("f")
+			return q.Where(wasOpen).WhereOr(standing, args...)
 		}), string(database.Column(db, "f."+string(column)))
 }

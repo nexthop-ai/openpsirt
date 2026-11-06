@@ -288,7 +288,7 @@ still recorded (REQ-88).
 | A date before the replacement moves the opening to the later of that date and the inventory's arrival | |
 | A date at or after the replacement withdraws the match as `invalid` (§ Closure reasons) | It was never exposed: out of every open set and of found after fixed |
 | A match on an issue with a known date counts as opened and fixed in the remediation figures, timed from its opening to the replacement (`design-docs/analytics-program.md` § Remediation metrics) | It was open over that stretch |
-| A marked match counts in no remediation figure | Its duration is a guess |
+| A marked match, and one withdrawn, counts in no remediation figure | A marked duration is a guess; a withdrawn match was never exposed |
 | Its closure reason is the replacement's: patched or disclaimed where the replacement's claims say so there, unaffected where its record says so, otherwise upgraded, revised, removed or unexplained as for a run (§ Closure reasons) | |
 | A match closed patched names the claim it stands on, one closed disclaimed the statement, one closed unaffected the record | It is the latest row at its occurrence, which the VEX document and the disclaimer reads take their evidence from |
 | Where the replacement is affected at the same occurrence, nothing is written | The replacement's own scan reports it |

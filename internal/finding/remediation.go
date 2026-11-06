@@ -96,13 +96,25 @@ func AgingStretches() []Stretch {
 	return out
 }
 
-// timed is the condition that a row counts in the remediation figures: it
-// was open at some point, or a replaced inventory's check recorded it on an
-// issue with a known date, which was open from its opening to the
-// replacement. A check's match with no known date opens over the widest
-// stretch it could have, so it is in no duration figure.
-func timed() string {
-	return `(` + wasOpen + ` OR (` + checkRecorded("f") + ` AND NOT (` + PublicationUnknown("f") + `)))`
+// timed is the condition that a row counts in the remediation figures, with
+// its argument: it was open at some point, or it is a check's match on an
+// issue with a known date, open from its opening to the replacement. A match
+// withdrawn as never exposed counts nowhere, as in what a run opened, and one
+// with no known date opens over the widest stretch it could have, so it is in
+// no duration figure.
+//
+// The matches are one uncorrelated set each row is looked up in. Asked of each
+// row through correlated EXISTS, PostgreSQL prices each figure past its JIT
+// threshold: 1,685 ms against 170 ms at 103,095 findings, most of it
+// compiling.
+func timed() (string, []any) {
+	standing, args := checkStanding("cf")
+	return `(` + wasOpen + ` OR "f"."id" IN (SELECT "cf"."id" FROM "scan_run" AS "cr"
+		JOIN "finding" AS "cf" ON "cf"."build_id" = "cr"."build_id" AND "cf"."closed_run_id" = "cr"."id"
+		JOIN "vulnerability" AS "uv" ON "uv"."id" = "cf"."vulnerability_id"
+		JOIN "vulnerability" AS "us" ON "us"."id" = "uv"."issue_id"
+		WHERE "cr"."checked_scan_id" IS NOT NULL AND ` + standing + `
+		AND NOT (` + undatedAtClosing("cf") + `)))`, args
 }
 
 // resolved keeps only what counts as an issue actually going away.
@@ -171,11 +183,12 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// issue here, so the window's two ends are checked again on what the reader
 	// reads.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
+	counted, countedArgs := timed()
 	closing := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(`"f"."closed_at" IS NOT NULL`).
-		Where(timed()).
+		Where(counted, countedArgs...).
 		Where(kinds, kindArgs...).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {
@@ -200,7 +213,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MAX("f"."closed_at") AS "closed_at"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
 		ColumnExpr(`SUM(CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END) AS "open_places"`).
-		Where(timed()).
+		Where(counted, countedArgs...).
 		Where(kinds, kindArgs...).
 		Where(`"f"."vulnerability_id" IN (?)`, closing).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -253,7 +266,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
-		Where(timed()).
+		Where(counted, countedArgs...).
 		Where(kinds, kindArgs...).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {

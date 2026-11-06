@@ -159,7 +159,7 @@ func TestAMatchDatedBeforeTheReplacementOpensAtItsDate(t *testing.T) {
 func TestAMatchDatedAfterTheReplacementIsWithdrawn(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		f, checking := undatedMatch(t, w)
-		redate(t, f, f.replaced.Add(24*time.Hour))
+		redate(t, f, f.replaced)
 		got, _ := matchOf(t, f)
 		if got.ClosedBecause != finding.Invalid {
 			t.Errorf("closed because %q, want invalid: it was never exposed", got.ClosedBecause)
@@ -475,14 +475,29 @@ func TestADatedCheckMatchCountsAsAFixTimedFromItsOpening(t *testing.T) {
 		if took := got.TimeToFix["high"]; took != 48*time.Hour {
 			t.Errorf("took %s to fix, want the two days from publication to the replacement", took)
 		}
+		if got.Opened != 1 {
+			t.Errorf("%d opened, want the check's match: a counted fix was also opened", got.Opened)
+		}
 	})
 }
 
 func TestAnUndatedCheckMatchIsInNoRemediationFigure(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		f, _ := undatedMatch(t, w)
-		if got := remediationOf(t, w, f); got.Fixed != 0 || len(got.TimeToFix) != 0 {
-			t.Errorf("fixed %d taking %v, want nothing: its opening is a guess", got.Fixed, got.TimeToFix)
+		if got := remediationOf(t, w, f); got.Fixed != 0 || len(got.TimeToFix) != 0 || got.Opened != 0 {
+			t.Errorf("fixed %d taking %v, opened %d, want nothing: its opening is a guess",
+				got.Fixed, got.TimeToFix, got.Opened)
+		}
+	})
+}
+
+func TestAWithdrawnCheckMatchIsInNoRemediationFigure(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatch(t, w)
+		redate(t, f, f.replaced)
+		if got := remediationOf(t, w, f); got.Fixed != 0 || len(got.TimeToFix) != 0 || got.Opened != 0 {
+			t.Errorf("fixed %d taking %v, opened %d, want nothing: it was never exposed",
+				got.Fixed, got.TimeToFix, got.Opened)
 		}
 	})
 }

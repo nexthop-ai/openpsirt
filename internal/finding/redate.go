@@ -31,8 +31,20 @@ func PublicationUnknown(alias string) string {
 	return checkRecorded(alias) + fmt.Sprintf(`
 	AND EXISTS (SELECT 1 FROM "vulnerability" AS "uv"
 		JOIN "vulnerability" AS "us" ON "us"."id" = "uv"."issue_id"
-		WHERE "uv"."id" = "%[1]s"."vulnerability_id"
-		AND "us"."published_at" IS NULL AND "us"."first_seen_at" >= "%[1]s"."closed_at")`, alias)
+		WHERE "uv"."id" = "%[1]s"."vulnerability_id" AND %[2]s)`, alias, undatedAtClosing(alias))
+}
+
+// undatedAtClosing is the condition that the issue under "us" had no date and
+// was first seen here no earlier than the row under this alias closed.
+func undatedAtClosing(alias string) string {
+	return fmt.Sprintf(`"us"."published_at" IS NULL AND "us"."first_seen_at" >= "%s"."closed_at"`, alias)
+}
+
+// checkStanding is the condition that a row under this alias is a check's
+// match not withdrawn as never exposed, with its argument. What a run opened
+// and what opened in a window both count it.
+func checkStanding(alias string) (string, []any) {
+	return checkRecorded(alias) + fmt.Sprintf(` AND "%s"."closed_because" <> ?`, alias), []any{Invalid}
 }
 
 // Redated is what a publication date arriving for an issue rewrote.
