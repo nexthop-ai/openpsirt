@@ -14,12 +14,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/issuedate"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
 // osvSays answers one date for every name, or none.
@@ -367,41 +370,192 @@ func TestACheckClosedAsPatchedNamesTheClaimItStandsOn(t *testing.T) {
 	})
 }
 
-func TestACheckClosedAsDisclaimedNamesTheStatementItStandsOn(t *testing.T) {
+func TestAPatchDroppedAfterACheckArrivesFromTheReplacementsVersion(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
 		f := replacedInventory(t, w)
-		f.published(t, "CVE-2026-0015", f.arrived.Add(24*time.Hour))
-		// A supplier says the library its product ships at the new version is
-		// not affected, on every route to it.
-		var productID int64
-		if err := f.db.NewSelect().TableExpr(`"build" AS "b"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
-			ColumnExpr(`"st"."product_id"`).Where(`"b"."id" = ?`, f.build).Scan(ctx, &productID); err != nil {
+		f.published(t, "CVE-2026-0032", f.arrived.Add(24*time.Hour))
+		if _, err := fixture.RecordClaims(ctx, f.db.DB, f.build, f.replacement, []sbom.Suppression{{
+			Vulnerability: "CVE-2026-0032", Status: sbom.AlreadyFixed,
+			Targets: []sbom.Target{{Name: libnlFixed.Name, Version: libnlFixed.Version}},
+			Origin:  sbom.FromStatement,
+		}}, map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
 			t.Fatal(err)
 		}
-		person := w.DeclarePerson("supplier-reader@example.com", "Supplier reader", false)
-		who := access.NewPerson(person.ID, "supplier-reader@example.com", false,
-			map[int64][]access.Role{productID: {access.PublicTriage}}, person.PartyID)
-		claim := sbom.Suppression{Vulnerability: "CVE-2026-0015", Status: sbom.NotAffected,
-			Justification: "vulnerable_code_not_present"}
-		target := sbom.Target{Purl: libnlFixed.Purl, Name: libnlFixed.Name, Version: libnlFixed.Version,
-			Within: &sbom.Target{Purl: swss.Purl, Name: swss.Name}}
-		if _, _, err := finding.NewStore(f.db.DB).RecordStatements(ctx, who, productID, finding.Supplied{
-			Source: finding.FromVex, Publisher: "Acme Security", Document: "swss.openvex.json", Digest: "sha256:1",
-		}, []finding.Statement{finding.StatementOf(claim, target)}); err != nil {
+		report := func(c graph.Described) *dated {
+			return &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0032", c)}}
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		scan := func(c graph.Described) {
+			t.Helper()
+			f.waiting(t)
+			if _, err := scanner.NewRunner(f.db, f.queue, report(c), quiet, "test").Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// The replacement's scan records the occurrence patched at its version,
+		// then the check records the match at the old one.
+		scan(libnlFixed)
+		if checking := f.check(t, &dated{at: time.Now().UTC(), reported: []finding.Reported{
+			reportAt("CVE-2026-0032", libnl), reportAt("CVE-2026-0032", libnlFixed),
+		}}); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		// A third inventory moves the library on with no claim.
+		moved := at("libnl-3-200", "3.10.0")
+		third, _, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
+			BuildID: f.build, ContentHash: "hash-3", BuiltAt: time.Now().UTC(), ParserVersion: "test",
+		})
+		if err != nil {
 			t.Fatal(err)
 		}
-		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{
-			reportAt("CVE-2026-0015", libnl), reportAt("CVE-2026-0015", libnlFixed),
-		}}
-		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+		if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.build, third.ID, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, moved},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: swss, Child: moved}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		scan(moved)
+		var arrived string
+		if err := f.db.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COALESCE("arrived_from", '')`).
+			Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NULL`).Scan(ctx, &arrived); err != nil {
+			t.Fatal(err)
+		}
+		if arrived != libnlFixed.Version {
+			t.Errorf("arrived from %q, want the replacement's patched %s", arrived, libnlFixed.Version)
+		}
+	})
+}
+
+// disclaimedReplacement has a supplier say the library the replacement ships
+// at the new version is not affected by CVE-2026-0015, on every route to it,
+// and answers the product and the person reading it.
+func disclaimedReplacement(t *testing.T, w *fixture.World, f *checkFixture) (int64, access.Subject) {
+	t.Helper()
+	ctx := t.Context()
+	f.published(t, "CVE-2026-0015", f.arrived.Add(24*time.Hour))
+	var productID int64
+	if err := f.db.NewSelect().TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"st"."product_id"`).Where(`"b"."id" = ?`, f.build).Scan(ctx, &productID); err != nil {
+		t.Fatal(err)
+	}
+	person := w.DeclarePerson("supplier-reader@example.com", "Supplier reader", false)
+	who := access.NewPerson(person.ID, "supplier-reader@example.com", false,
+		map[int64][]access.Role{productID: {access.PublicTriage}}, person.PartyID)
+	claim := sbom.Suppression{Vulnerability: "CVE-2026-0015", Status: sbom.NotAffected,
+		Justification: "vulnerable_code_not_present"}
+	target := sbom.Target{Purl: libnlFixed.Purl, Name: libnlFixed.Name, Version: libnlFixed.Version,
+		Within: &sbom.Target{Purl: swss.Purl, Name: swss.Name}}
+	if _, _, err := finding.NewStore(f.db.DB).RecordStatements(ctx, who, productID, finding.Supplied{
+		Source: finding.FromVex, Publisher: "Acme Security", Document: "swss.openvex.json", Digest: "sha256:1",
+	}, []finding.Statement{finding.StatementOf(claim, target)}); err != nil {
+		t.Fatal(err)
+	}
+	return productID, who
+}
+
+// disclaimedReport is the scanner reporting CVE-2026-0015 at both versions.
+func disclaimedReport() *dated {
+	return &dated{at: time.Now().UTC(), reported: []finding.Reported{
+		reportAt("CVE-2026-0015", libnl), reportAt("CVE-2026-0015", libnlFixed),
+	}}
+}
+
+func TestACheckClosedAsDisclaimedNamesTheStatementItStandsOn(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f := replacedInventory(t, w)
+		disclaimedReplacement(t, w, f)
+		if checking := f.check(t, disclaimedReport()); checking == nil || checking.Checked.Recorded != 1 {
 			t.Fatalf("checked %+v, want one recorded", checking)
 		}
 		got, _ := matchOf(t, f)
 		if got.ClosedBecause != finding.Disclaimed || got.StatedBy == nil {
 			t.Errorf("closed because %q by statement %v, want disclaimed naming the statement",
 				got.ClosedBecause, got.StatedBy)
+		}
+	})
+}
+
+func TestACheckLeavesTheReplacementsStatementTheLatest(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		_, who := disclaimedReplacement(t, w, f)
+		// The replacement's own scan records its occurrence closed by the
+		// statement, before the check writes the match.
+		f.waiting(t)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := scanner.NewRunner(f.db, f.queue, disclaimedReport(), quiet, "test").Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		statements := func() []vex.Statement {
+			t.Helper()
+			doc, err := vex.NewStore(f.db.DB).For(ctx, who,
+				publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
+				fixture.ProductName, fixture.BranchName, fixture.CustomerVariant, false, vex.WithSuppliers)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return doc.Statements
+		}
+		if n := len(statements()); n != 1 {
+			t.Fatalf("%d statements before the check, want the supplier's not_affected", n)
+		}
+		checking := f.check(t, disclaimedReport())
+		if checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		if got := statements(); len(got) != 1 || got[0].Status != "not_affected" {
+			t.Errorf("the document states %+v after the check, want the supplier's not_affected kept", got)
+		}
+		// The replacement's row is the one somebody may decide about.
+		var decidable []int64
+		if err := f.db.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."id"`).
+			Where(`"f"."build_id" = ?`, f.build).Where(`"f"."closed_at" IS NOT NULL`).
+			Where(finding.Decidable).Scan(ctx, &decidable); err != nil {
+			t.Fatal(err)
+		}
+		var match int64
+		if err := f.db.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"id"`).
+			Where(`"closed_run_id" = ?`, checking.RunID).Scan(ctx, &match); err != nil {
+			t.Fatal(err)
+		}
+		if len(decidable) != 1 || decidable[0] == match {
+			t.Errorf("decidable rows %v, want the replacement's alone, not the check's %d", decidable, match)
+		}
+		// A release comparison from a build that held the issue at the old
+		// version says it went by the replacement's run.
+		tagged := w.BuildFor(w.Tag, w.Customer)
+		var oldVersion int64
+		if err := f.db.NewSelect().TableExpr(`"component"`).ColumnExpr(`"id"`).
+			Where(`"purl" = ?`, libnl.Purl).Scan(ctx, &oldVersion); err != nil {
+			t.Fatal(err)
+		}
+		var issue int64
+		if err := f.db.NewSelect().TableExpr(`"vulnerability"`).ColumnExpr(`"id"`).
+			Where(`"identifier" = ?`, "CVE-2026-0015").Scan(ctx, &issue); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.NewInsert().Model(&finding.Finding{
+			BuildID: tagged.ID, Kind: finding.Vulnerable, Visibility: access.Public,
+			VulnerabilityID: issue, ComponentID: oldVersion, OccurrenceIdentity: "tagged libnl",
+			OpenedAt: f.arrived,
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		compared, err := finding.NewStore(f.db.DB).Compare(ctx, who, tagged.ID, f.build, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var replacementRun int64
+		if err := f.db.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"closed_run_id"`).
+			Where(`"build_id" = ?`, f.build).Where(`"id" <> ?`, match).Scan(ctx, &replacementRun); err != nil {
+			t.Fatal(err)
+		}
+		went := append(compared.Fixed, compared.Closed...)
+		if len(went) != 1 || went[0].ClosedRun != replacementRun {
+			t.Errorf("the comparison says %+v went, want it gone by the replacement's run %d", went, replacementRun)
 		}
 	})
 }

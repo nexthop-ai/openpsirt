@@ -1025,8 +1025,10 @@ func latestClosed(ctx context.Context, db bun.IDB, buildID int64,
 					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."component_id", "lf"."consumer_id"`)).
 					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."occurrence_identity"`))
 			}).
-			// Ascending, so the last row read at an occurrence is its latest.
-			OrderExpr(`"id" ASC`).
+			// Ascending, so the last row read at an occurrence is its latest,
+			// in the order Later gives: a replaced inventory's check writes
+			// its rows after the replacement's, about a stretch before them.
+			OrderExpr(`"closed_at" ASC, "id" ASC`).
 			Scan(ctx)
 		if err != nil {
 			return err

@@ -418,10 +418,9 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, fixed []Changed) (ma
 			Where(`"f"."closed_at" IS NOT NULL`).
 			Where(`"v"."identifier" IN (?)`, bun.List(issues)).
 			Where(`"cp"."name" IN (?)`, bun.List(components)).
-			// Ascending, so the last row read for a pair is its highest
-			// identifier — the same row the one-at-a-time form took by
-			// ordering descending and stopping at the first.
-			OrderExpr(`"f"."id" ASC`).
+			// Ascending, so the last row read for a pair is its latest, in the
+			// order Later gives: by closing, then by identifier.
+			OrderExpr(`"f"."closed_at" ASC, "f"."id" ASC`).
 			Scan(ctx, &rows)
 		if err != nil {
 			return nil, fmt.Errorf("read why these went: %w", err)

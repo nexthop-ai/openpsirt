@@ -50,7 +50,7 @@ recorded before the product was read, closes nothing.
 | Only `not_affected` closes, whatever the justification; "will not be fixed" stays a prefilled will-not-fix | |
 | The product must be a component of the build | A distribution's platform is in no build |
 | The build's patch and the CVE record are asked first | |
-| An occurrence somebody marked affected, by a decision standing at its versions, stays open; where the statement already closed it, the finding shows it, it can be decided, and the next run opens it again. Only the latest row at the occurrence counts | Disagreeing with a supplier hides nothing, so needs no second person |
+| An occurrence somebody marked affected, by a decision standing at its versions, stays open; where the statement already closed it, the finding shows it, it can be decided, and the next run opens it again. Only the latest row at the occurrence counts: the one closed last, its identifier breaking a tie | Disagreeing with a supplier hides nothing, so needs no second person |
 | A run no longer reading the statement there reopens: set aside, revised away, another product version, or a route outside | A statement uploaded between scans applies at the next |
 | A version moving to one the statement covers closes the row before as disclaimed | Nothing was fixed |
 | An occurrence closed for any other reason keeps no partial-route answer | |

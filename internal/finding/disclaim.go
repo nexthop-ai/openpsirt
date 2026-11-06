@@ -26,26 +26,37 @@ import (
 // the notifications.
 const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)`
 
-// latestAtItsOccurrence says no row of the same kind and issue has been
-// recorded at the same occurrence in the same build after the finding `f`.
-//
-// A run records a new row rather than reopening a closed one, so an occurrence
-// closed by a supplier's statement and recorded again later, at another
-// version or closed another way, holds rows the later one stands for. Ordered
-// by identifier rather than by moment: a version moving closes the row before
-// and records the row after at one moment. Held to the kind of `f`, so the
-// later rows are of a kind the outer query already reads.
-const latestAtItsOccurrence = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
+// latestAtItsOccurrence says no row of the same kind and issue at the same
+// occurrence in the same build stands after the closed finding `f`, in the
+// order Later gives. Held to the kind of `f`, so the later rows are of a kind
+// the outer query already reads.
+var latestAtItsOccurrence = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 	WHERE "lt"."build_id" = "f"."build_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
 	  AND "lt"."occurrence_identity" = "f"."occurrence_identity" AND "lt"."kind" = "f"."kind"
-	  AND "lt"."id" > "f"."id")`
+	  AND ` + Later("lt", `"f"."closed_at"`, `"f"."id"`) + `)`
+
+// Later is the condition that the row under this alias stands after a closed
+// row whose closing and identifier are the expressions given: still open,
+// closed later, or closed at the same moment and recorded after it.
+//
+// A run records a new row rather than reopening a closed one, so an
+// occurrence closed by a supplier's statement and recorded again later, at
+// another version or closed another way, holds rows the later one stands for.
+// Ordered by closing first: a replaced inventory's check writes its rows after
+// the replacement's own, about a stretch that ended before them. The
+// identifier breaks a tie, since a version moving closes the row before and
+// records the row after at one moment.
+func Later(alias, closedAt, id string) string {
+	return fmt.Sprintf(`("%[1]s"."closed_at" IS NULL OR "%[1]s"."closed_at" > %[2]s`+
+		` OR ("%[1]s"."closed_at" = %[2]s AND "%[1]s"."id" > %[3]s))`, alias, closedAt, id)
+}
 
 // Decidable says a finding `f` is one somebody may decide about: open, or
 // closed by a supplier's statement and the latest row at its occurrence. A
 // person who disagrees with a supplier marks the occurrence affected, and the
 // next run opens it again, so the occurrence has to be reachable while the
 // statement has it closed.
-const Decidable = `("f"."closed_at" IS NULL OR ("f"."closed_because" = '` + string(Disclaimed) + "' AND " +
+var Decidable = `("f"."closed_at" IS NULL OR ("f"."closed_because" = '` + string(Disclaimed) + "' AND " +
 	latestAtItsOccurrence + "))"
 
 // disclaiming is what a run needs to apply suppliers' statements: the

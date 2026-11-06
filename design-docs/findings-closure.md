@@ -293,7 +293,8 @@ still recorded (REQ-88).
 | A match on an issue with a known date counts as opened and fixed in the remediation figures, timed from its opening to the replacement (`design-docs/analytics-program.md` § Remediation metrics) | It was open over that stretch |
 | A marked match, and one withdrawn, counts in no remediation figure | A marked duration is a guess; a withdrawn match was never exposed |
 | Its closure reason is the replacement's: patched or disclaimed where the replacement's claims say so there, unaffected where its record says so, otherwise upgraded, revised, removed or unexplained as for a run (§ Closure reasons) | |
-| A match closed patched names the claim it stands on, one closed disclaimed the statement, one closed unaffected the record | It is the latest row at its occurrence, which the VEX document and the disclaimer reads take their evidence from |
+| A match closed patched names the claim it stands on, one closed disclaimed the statement, one closed unaffected the record | Where it is the latest row at its occurrence, the VEX document and the disclaimer reads take their evidence from it |
+| The latest row at an occurrence is the one closed last, its identifier breaking a tie, for the VEX document, the decidable findings, a release comparison's reason and a run's read of what closed there before | A match is written after the replacement's own rows about a stretch that ended before them, so it never outranks them |
 | Where the replacement is affected at the same occurrence, nothing is written | The replacement's own scan reports it |
 | A match the replaced inventory had patched, cleared or disclaimed is not written | It was never exposed |
 | A match any row of the build already covers at that occurrence identity over any part of the stretch is not written | A run stays the authority on what it reported |

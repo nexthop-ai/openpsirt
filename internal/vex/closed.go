@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -40,6 +41,7 @@ type closedRow struct {
 	Occurrence      string        `bun:"occurrence_identity"`
 	Kind            string        `bun:"kind"`
 	By              sql.NullInt64 `bun:"by"`
+	ClosedAt        time.Time     `bun:"closed_at"`
 }
 
 // heldRow is a finding of a build of an issue a closed finding is of, open or
@@ -244,6 +246,7 @@ func (s *Store) closedRows(ctx context.Context, buildID int64, visible []access.
 	} else {
 		q = q.ColumnExpr(`MAX("f"."id") AS "id", "f"."vulnerability_id", "f"."component_id"`).
 			ColumnExpr(`"f"."occurrence_identity", "f"."kind", "f"."stated_by" AS "by"`).
+			ColumnExpr(`MAX("f"."closed_at") AS "closed_at"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(kinds, kindArgs...).
 			GroupExpr(`"f"."stated_by", "f"."kind", "f"."vulnerability_id", "f"."occurrence_identity", "f"."component_id"`)
@@ -323,11 +326,15 @@ func (s *Store) openOf(ctx context.Context, buildID int64, issues []int64) ([]he
 }
 
 // latest keeps the closed rows that are the latest row of their kind and issue
-// at their occurrence in the build, as the decidable findings ask it.
+// at their occurrence in the build, as the decidable findings ask it, in the
+// order finding.Later gives.
 //
-// Only the highest of the rows given at an occurrence can be, so the rows after
+// Only the last of the rows given at an occurrence can be, so the rows after
 // it at each such occurrence are read, and an occurrence holding any is
-// dropped. A run records a new row rather than reopening a closed one, so an
+// dropped. Only rows recorded after it are asked, which keeps each term one
+// range of the occurrence index: a row recorded earlier and closed later is a
+// replacement's row a check's match was written after, and both are among the
+// rows given. A run records a new row rather than reopening a closed one, so an
 // occurrence closed and closed again holds a row per closing; asked by
 // identifier from the highest row up, the read never sees that history.
 //
@@ -346,7 +353,8 @@ func (s *Store) latest(ctx context.Context, buildID int64, rows []closedRow) ([]
 	last := make(map[atOccurrence]closedRow, len(rows))
 	for _, row := range rows {
 		k := atOccurrence{row.VulnerabilityID, row.Occurrence, row.Kind}
-		if have, ok := last[k]; !ok || have.ID < row.ID {
+		if have, ok := last[k]; !ok || have.ClosedAt.Before(row.ClosedAt) ||
+			(have.ClosedAt.Equal(row.ClosedAt) && have.ID < row.ID) {
 			last[k] = row
 		}
 	}
@@ -360,8 +368,10 @@ func (s *Store) latest(ctx context.Context, buildID int64, rows []closedRow) ([]
 		terms := make([]string, 0, len(at))
 		args := make([]any, 0, 5*len(at))
 		for _, k := range at {
-			terms = append(terms, `("lt"."occurrence_identity" = ? AND "lt"."vulnerability_id" = ? AND "lt"."build_id" = ? AND "lt"."kind" = ? AND "lt"."id" > ?)`)
-			args = append(args, k.occurrence, k.issue, buildID, k.kind, last[k].ID)
+			terms = append(terms, `("lt"."occurrence_identity" = ? AND "lt"."vulnerability_id" = ? AND "lt"."build_id" = ? AND "lt"."kind" = ? AND "lt"."id" > ? AND `+
+				finding.Later("lt", "?", "?")+`)`)
+			args = append(args, k.occurrence, k.issue, buildID, k.kind, last[k].ID,
+				last[k].ClosedAt, last[k].ClosedAt, last[k].ID)
 		}
 		var after []struct {
 			VulnerabilityID int64  `bun:"vulnerability_id"`
