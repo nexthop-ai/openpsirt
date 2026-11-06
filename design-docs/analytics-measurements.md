@@ -135,19 +135,19 @@ trend.
 
 | Window, one rescan | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| 12 weeks | 627 ms | 280 ms | 541 ms | 356 ms |
-| 104 weeks | 656 ms | 248 ms | 416 ms | 383 ms |
-| 30 days | 649 ms | 280 ms | 405 ms | 350 ms |
-| 365 days | 720 ms | 285 ms | 508 ms | 371 ms |
-| 730 days | 711 ms | 294 ms | 474 ms | 357 ms |
+| 12 weeks | 629 ms | 288 ms | 541 ms | 356 ms |
+| 104 weeks | 650 ms | 286 ms | 416 ms | 383 ms |
+| 30 days | 640 ms | 285 ms | 405 ms | 350 ms |
+| 365 days | 638 ms | 275 ms | 508 ms | 371 ms |
+| 730 days | 640 ms | 291 ms | 474 ms | 357 ms |
 
 | Window, a year of weekly rescans | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| 12 weeks | 57 ms | 41 ms | 58 ms | 36 ms |
-| 104 weeks | 1,224 ms | 752 ms | 836 ms | 578 ms |
-| 30 days | 47 ms | 35 ms | 45 ms | 31 ms |
-| 365 days | 1,203 ms | 524 ms | 694 ms | 604 ms |
-| 730 days | 1,212 ms | 660 ms | 803 ms | 555 ms |
+| 12 weeks | 61 ms | 35 ms | 58 ms | 36 ms |
+| 104 weeks | 1,352 ms | 397 ms | 836 ms | 578 ms |
+| 30 days | 50 ms | 33 ms | 45 ms | 31 ms |
+| 365 days | 1,258 ms | 366 ms | 694 ms | 604 ms |
+| 730 days | 1,211 ms | 448 ms | 803 ms | 555 ms |
 
 ### Identity against the counts it replaced
 
@@ -156,10 +156,10 @@ opening and closing and by the one counting issues at components by identity.
 
 | Read, rows counted, then by identity | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
-| One rescan, beneath the root | 902 ms, 1,486 ms | 333 ms, 385 ms | 1,733 ms, 1,592 ms | 766 ms, 732 ms |
-| One rescan, beneath the kernel | 684 ms, 688 ms | 195 ms, 234 ms | 1,132 ms, 1,169 ms | 879 ms, 654 ms |
-| A year, beneath the root | 139 ms, 146 ms | 127 ms, 136 ms | 111 ms, 146 ms | 118 ms, 100 ms |
-| A year, the kernel by its name | 93 ms, 89 ms | 28 ms, 42 ms | 60 ms, 610 ms | 67 ms, 436 ms |
+| One rescan, beneath the root | 902 ms, 1,449 ms | 333 ms, 405 ms | 1,733 ms, 1,592 ms | 766 ms, 732 ms |
+| One rescan, beneath the kernel | 684 ms, 689 ms | 195 ms, 244 ms | 1,132 ms, 1,169 ms | 879 ms, 654 ms |
+| A year, beneath the root | 139 ms, 143 ms | 127 ms, 142 ms | 111 ms, 146 ms | 118 ms, 100 ms |
+| A year, the kernel by its name | 93 ms, 151 ms | 28 ms, 45 ms | 60 ms, 610 ms | 67 ms, 436 ms |
 
 ### A year of nightly scans
 
@@ -178,14 +178,15 @@ nights. Read beside the two full-size measurements on the same engine.
 | Reading | Detail |
 |---|---|
 | A window costs what it reaches, never its steps | 30 days against 12 weeks, and 730 days against 104 weeks, are within the noise on every engine |
-| A long window over a moving history is the closed rows | A year of weekly rescans, 30 days read 62 movements in 35 ms on PostgreSQL and 365 days read 6,402 in 524 ms |
+| A long window over a moving history is the closed rows | A year of weekly rescans, 30 days read 62 movements in 33 ms on PostgreSQL and 365 days read 6,402 in 366 ms |
 | The first scan is a baseline | One rescan, 11,751 issues the first scan brought in, which the row counts drew as 11,673 opened |
-| Present before costs most on SQLite | Beneath the root after one rescan, 11,751 issues entering in the window are asked about in batches: 584 ms more on SQLite, 52 ms more on PostgreSQL |
+| The build grouped on doubles a product's trend on SQLite | 1,230 ms against 629 ms after one rescan, so it is read off the group, which the opening run decides |
+| Present before costs most on SQLite | Beneath the root after one rescan, 11,751 issues entering in the window are asked about in batches: 547 ms more on SQLite, 72 ms more on PostgreSQL |
 | Present before by a name costs most on MySQL and MariaDB | A year of rescans, the kernel by its name: 610 ms against 60 ms on MySQL 8.4, 436 ms against 67 ms on MariaDB |
 
 | Caveat | Detail |
 |---|---|
 | One build | Nothing else in the deployment shares a name or a first scan |
 | One issue per package | The issue and the issue at a component count alike here, so the counts above hold for either unit |
-| MySQL 8.4 and MariaDB were read keyed by issue | SQLite and PostgreSQL were read again keyed by issue and component; the key added a group column and a join to the component |
+| MySQL 8.4 and MariaDB were read keyed by issue | SQLite and PostgreSQL were read again keyed by issue and component, with returns after a sharp removal counted apart; the key added a group column and a join to the component |
 | The nightly history ran beside two others | Its figures are each engine's own, read under load |
