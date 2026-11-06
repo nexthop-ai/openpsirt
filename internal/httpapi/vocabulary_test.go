@@ -226,6 +226,7 @@ func statedVocabularies() map[string][]string {
 		"repository styles":                   words(sourcelink.Styles()),
 		"families":                            words(kind.Families()),
 		"issue date standings":                words(finding.DateStandings()),
+		"component groupings":                 words(finding.GroupedBy()),
 	}
 }
 

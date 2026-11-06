@@ -8,7 +8,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | Document | Covers | Terms |
 |---|---|---|
 | [data-model](design-docs/data-model.md) | What a scan is filed against, and the names it is declared under | vocabulary, product, branch or tag, variant, build, release date, end of support, catalog corrections, retirement, declaration before use, names, engine differences |
-| [data-model-components](design-docs/data-model-components.md) | What a component is and how it is identified | component identity, container images, image versions, component references, upstream name, the fold, duplicate descriptions, qualifiers |
+| [data-model-components](design-docs/data-model-components.md) | What a component is and how it is identified | component identity, container images, image versions, component references, package identifier prefixes, purl, upstream name, the fold, duplicate descriptions, qualifiers |
 | [data-model-graph](design-docs/data-model-graph.md) | The dependency graph, its history, and occurrences | nodes and edges, root, intervals, inventory delta, comparison of two builds, occurrence identity, path traversal, recursive walks |
 | [data-model-measurements](design-docs/data-model-measurements.md) | Benchmark runs behind the graph rules | inventory delta timings, a year of nightly scans |
 | [findings](design-docs/findings.md) | What a finding is, the row a person reads, work across builds | fan-out, occurrence, fold, decision state on a row, partly decided, variants, spread, incomplete upgrade, total above a list |
@@ -19,7 +19,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | [findings-closure](design-docs/findings-closure.md) | How runs open and close findings, and why each closed | scan as separate work, authority of a run, intervals, closure reasons, unexplained, disclaimed, closure by a person, build-declared claims, CVE record ranges, unaffected |
 | [findings-flaws](design-docs/findings-flaws.md) | Flaws recorded here by hand | minted identifier, typed names, CVE assigned later, affected builds, occurrences, recorded words on a shared issue |
 | [findings-reports](design-docs/findings-reports.md) | Vulnerability reports worked as cases | report reference, reporter, received date, acknowledgement, the case, correspondence, notes, judgment, report rule, dispositions, rulings, duplicates, unanswered |
-| [findings-queries](design-docs/findings-queries.md) | How finding lists and totals are read | page statements, decision state filters, two-level grouping, covering index, product totals, across products, deadline rewrites, receipts pairing |
+| [findings-queries](design-docs/findings-queries.md) | How finding lists and totals are read | page statements, decision state filters, two-level grouping, covering index, product totals, across products, deadline rewrites, receipts pairing, component groups, by repository, by ecosystem |
 | [findings-measurements](design-docs/findings-measurements.md) | Benchmark runs behind the findings rules | fan-out cost, batched updates, decision state timings, two-level timings, a year of nightly scans |
 | [kinds](design-docs/kinds.md) | Kinds of finding and what each declares | issue kinds, name resolution, consumers, inclusion, runs and series, sightings, source locations |
 
@@ -94,7 +94,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 |---|---|---|
 | [analytics](design-docs/analytics.md) | The unit figures count, how they are computed, report periods, settings | counting unit, closure reasons, computed on demand, period, rolling window, settings |
 | [analytics-catalog](design-docs/analytics-catalog.md) | The catalog of named reports and its pages | catalog groups, report pages, printing, program overview, last upload per build, releases out of support, advisories issued, unmatched components |
-| [analytics-program](design-docs/analytics-program.md) | How a program is doing over time | trends, subtree trends, deadlines, deadline compliance, remediation metrics, aging buckets, holder workload, effort, triage latency, repeated deferrals |
+| [analytics-program](design-docs/analytics-program.md) | How a program is doing over time | trends, subtree trends, burndown, projection, day 0, added and done, deadlines, deadline compliance, remediation metrics, aging buckets, holder workload, effort, triage latency, repeated deferrals |
 | [analytics-releases](design-docs/analytics-releases.md) | What changed between builds, and readiness to release | build comparison, release note, release readiness, known issues at release, inheritance preview, one issue across the estate |
 | [analytics-controls](design-docs/analytics-controls.md) | What an auditor reads | disposition register, exception report, standing corrections, approval quality, dismissals, audit log, last uploads |
 | [analytics-exports](design-docs/analytics-exports.md) | Files and what each states | CSV, JSON, streaming, incomplete marker, stated facts, code findings in a file |

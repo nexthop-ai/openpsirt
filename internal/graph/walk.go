@@ -808,3 +808,18 @@ func ReplacedAmong(replaced map[int64][]int64, reached []int64) []int64 {
 	slices.Sort(out)
 	return out
 }
+
+// Reaching is, for each of these components, every component of the build at
+// it or beneath it, in one walk: the tree's own walk, for a list that counts
+// beneath several components at once.
+func Reaching(ctx context.Context, db bun.IDB, buildID int64, starts []int64) (map[int64][]int64, error) {
+	reached, err := (&Store{db: db}).reach(ctx, buildID, starts, adoption{})
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64][]int64, len(starts))
+	for _, r := range reached {
+		out[r.Start] = append(out[r.Start], r.Reached)
+	}
+	return out, nil
+}

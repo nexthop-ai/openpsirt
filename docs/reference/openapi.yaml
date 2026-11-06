@@ -6369,6 +6369,65 @@ components:
       required:
         - role
       type: object
+    GroupBody:
+      additionalProperties: false
+      properties:
+        component:
+          $ref: "#/components/schemas/GroupedComponentBody"
+          description: The one component the group holds, where it holds exactly one
+        components:
+          description: How many of the build's components it holds now
+          format: int64
+          type: integer
+        fixed:
+          description: Issues at components that left by a fix and are open nowhere in the group now
+          format: int64
+          type: integer
+        key:
+          description: "The repository's or package's identifier with version and qualifiers cut, such as pkg:github/sonic-net/sonic-swss, or the ecosystem: the identifier's type, or none for components with no identifier"
+          type: string
+        open:
+          description: "Issues at components open in the build: at its components and, for a repository, everything beneath them"
+          format: int64
+          type: integer
+        open_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: Open, split by severity
+          type: object
+        versions:
+          description: "What the build ships of it now, as its identifiers state it: a repository's commits, a package's versions. At most five"
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - key
+        - versions
+        - components
+        - open
+        - fixed
+        - open_by_severity
+      type: object
+    GroupedComponentBody:
+      additionalProperties: false
+      properties:
+        ecosystem:
+          description: Send it back as beneath_ecosystem
+          type: string
+        name:
+          type: string
+        namespace:
+          description: Send it back as beneath_namespace
+          type: string
+        version:
+          type: string
+      required:
+        - name
+        - version
+      type: object
     GrownBody:
       additionalProperties: false
       properties:
@@ -7636,6 +7695,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/EmbargoedBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyGroupBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyGroupBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/GroupBody"
           type:
             - array
             - "null"
@@ -24005,6 +24086,71 @@ paths:
           - security-testing-triage
           - private-triage
         note: Both security-testing-triage and private-triage on the product.
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/component-groups:
+    get:
+      description: |-
+        The build's components grouped instead of drawn as a tree, most open first.
+
+        `by=repository` is one row per source repository a package identifier of type github names, such as pkg:github/sonic-net/sonic-swss, with the commits the build ships; its counts cover its components and everything beneath them, however the inventory places the repository. `by=ecosystem` is one row per identifier type, counting what is at its own components; with `ecosystem` it is one row per package of that type.
+
+        Each count is of an issue at a component, as the trend and the burndown count. Grouping is presentation: nothing is decided or counted per group. Reading the product is required; somebody holding no reading there is answered as though nothing was scanned.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: list-component-groups
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: branch_or_tag
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: repository or ecosystem
+          explode: false
+          in: query
+          name: by
+          required: true
+          schema:
+            description: repository or ecosystem
+            enum:
+              - repository
+              - ecosystem
+            type: string
+        - description: With by=ecosystem, list the packages of this ecosystem instead of the ecosystems
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: With by=ecosystem, list the packages of this ecosystem instead of the ecosystems
+            maxLength: 64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyGroupBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List a build's components by repository or ecosystem
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
   /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components:
     get:
       description: |-

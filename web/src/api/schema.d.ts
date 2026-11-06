@@ -3328,6 +3328,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/component-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a build's components by repository or ecosystem
+         * @description The build's components grouped instead of drawn as a tree, most open first.
+         *
+         *     `by=repository` is one row per source repository a package identifier of type github names, such as pkg:github/sonic-net/sonic-swss, with the commits the build ships; its counts cover its components and everything beneath them, however the inventory places the repository. `by=ecosystem` is one row per identifier type, counting what is at its own components; with `ecosystem` it is one row per package of that type.
+         *
+         *     Each count is of an issue at a component, as the trend and the burndown count. Grouping is presentation: nothing is decided or counted per group. Reading the product is required; somebody holding no reading there is answered as though nothing was scanned.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-component-groups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components": {
         parameters: {
             query?: never;
@@ -11502,6 +11528,41 @@ export interface components {
              */
             role: "approver" | "assigner" | "public-read" | "private-read" | "security-testing-read" | "public-triage" | "private-triage" | "security-testing-triage";
         };
+        GroupBody: {
+            /** @description The one component the group holds, where it holds exactly one */
+            component?: components["schemas"]["GroupedComponentBody"];
+            /**
+             * Format: int64
+             * @description How many of the build's components it holds now
+             */
+            components: number;
+            /**
+             * Format: int64
+             * @description Issues at components that left by a fix and are open nowhere in the group now
+             */
+            fixed: number;
+            /** @description The repository's or package's identifier with version and qualifiers cut, such as pkg:github/sonic-net/sonic-swss, or the ecosystem: the identifier's type, or none for components with no identifier */
+            key: string;
+            /**
+             * Format: int64
+             * @description Issues at components open in the build: at its components and, for a repository, everything beneath them
+             */
+            open: number;
+            /** @description Open, split by severity */
+            open_by_severity: {
+                [key: string]: number;
+            };
+            /** @description What the build ships of it now, as its identifiers state it: a repository's commits, a package's versions. At most five */
+            versions: string[] | null;
+        };
+        GroupedComponentBody: {
+            /** @description Send it back as beneath_ecosystem */
+            ecosystem?: string;
+            name: string;
+            /** @description Send it back as beneath_namespace */
+            namespace?: string;
+            version: string;
+        };
         GrownBody: {
             approved_at: string;
             approved_by: string;
@@ -12186,6 +12247,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["EmbargoedBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyGroupBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyGroupBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["GroupBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -21803,6 +21875,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-component-groups": {
+        parameters: {
+            query: {
+                /** @description repository or ecosystem */
+                by: "repository" | "ecosystem";
+                /** @description With by=ecosystem, list the packages of this ecosystem instead of the ecosystems */
+                ecosystem?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                branch_or_tag: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyGroupBody"];
+                };
             };
             /** @description Error */
             default: {

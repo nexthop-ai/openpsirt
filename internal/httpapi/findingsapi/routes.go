@@ -40,6 +40,7 @@ func Register(api huma.API, in core.Deps) {
 	registerAffects(api, in)
 	registerMovements(api, in)
 	registerGraph(api, in)
+	registerGrouped(api, in)
 	registerComponentChooser(api, in)
 	registerUnmatchedComponents(api, in)
 	registerUnmatchedComponentsExport(api, in)

@@ -601,3 +601,9 @@ func as[To ~string, From ~string](all []From) []To {
 	}
 	return out
 }
+
+// GroupBy is a way a build's components are listed instead of as a tree.
+type GroupBy string
+
+// Schema offers every grouping.
+func (GroupBy) Schema(huma.Registry) *huma.Schema { return words(finding.GroupedBy()) }

@@ -13,6 +13,7 @@ rule is a statement shape a measurement chose; the numbers are in
 - [Across products](#across-products)
 - [Deadline rewrites](#deadline-rewrites)
 - [Receipts pairing](#receipts-pairing)
+- [Component groups](#component-groups)
 - [Limits](#limits)
 
 ## The page
@@ -109,6 +110,31 @@ once, so the last page costs what the first does.
 | Uploads by arrival, never identifier | Two at one moment take identifiers in either order |
 | Runs by when they finished | The order the page reads |
 
+## Component groups
+
+A build's components listed instead of as a tree: by source repository, by
+ecosystem, or the packages of one ecosystem. Grouping is presentation (REQ-17):
+each count is worked out from the findings beneath, nothing is stored or decided
+per group.
+
+| Grouping | One row per | Counts what is |
+|---|---|---|
+| By repository | Package identifier of type `github`, version cut: `pkg:github/<owner>/<repo>` | At its components and everything beneath them, the tree's walk |
+| By ecosystem | Package identifier type, or none for a component with no identifier | At its own components |
+| One ecosystem | Package identifier with the version cut, or the name where there is none | At its own components |
+
+| Rule | Reason |
+|---|---|
+| Counted in the trend's unit, an issue at a component | A row opens the burndown and the findings list for the same selection |
+| Open is an issue at a component with a finding open in the build; fixed is one left by a resolution and open nowhere in the group | Fixed at one component and open at another is not gone |
+| A finding on a version a rescan replaced counts where the build's present version of its name is | `design-docs/data-model-graph.md` § Path traversal |
+| A repository's versions are what its identifiers state | A SONiC source node states its commit in the identifier and a version its producer made up in the version field |
+| A repository counts beneath itself whether the inventory hangs it off the package built from it or leaves it pulled in by nothing | A walk beneath a component starts at it, whatever is above |
+| A row names its one component in the four parts a reference takes, where it holds exactly one | A link beneath it is otherwise refused as ambiguous |
+| Most open first, then by key | |
+| Reading the product is required; a subject reading nothing there is answered as though nothing was scanned | The grouping is the build's inventory, the breadth a narrower reach was not granted |
+| Visibility applies to every count | REQ-43 |
+
 ## Limits
 
 | Limit | Detail |
@@ -118,3 +144,4 @@ once, so the last page costs what the first does.
 | PostgreSQL compiles a plan it costs above 100,000 before running it | 0.36 s of a 1.07 s statement. Moving an estimate across the line moves the time, and only a measurement shows it |
 | On MariaDB a single-product list whose partial groups read only the covering index's columns reads open occurrences through the closed-at index | Nobody's work among them. A table scan takes 0.19 s against 0.45 s. Lists across products do not |
 | The page by component is slower over two levels on SQLite | 0.12 s against 0.10 s; every other statement is faster |
+| A component a rescan removed, with no component of its name left in the build, is in no group | Its fixes leave every row; there is no present version to count them at |
