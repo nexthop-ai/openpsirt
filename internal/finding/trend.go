@@ -579,8 +579,9 @@ type removal struct{ build, component int64 }
 // tied to its upload through the build's graph: the component's node closed by
 // the upload, which arrived before the closure. Only the uploads deciding a
 // closure asked about are worked out, each build's in one comparison, and the
-// graph is read no later than the latest of those closures, so a build's age
-// costs nothing.
+// graph is read no later than the latest of those closures. Every past closure
+// of a returning component is read, so a build that removes nightly costs more
+// as it ages (design-docs/analytics-measurements.md § Nightly removals).
 func (s *Store) sharpRemovals(ctx context.Context, closures []*trendRow) (map[*trendRow]bool, error) {
 	out := map[*trendRow]bool{}
 	asked := map[removal][]*trendRow{}

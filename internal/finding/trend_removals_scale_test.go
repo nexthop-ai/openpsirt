@@ -24,15 +24,25 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// removalNights is how many nightly uploads follow the first scan, and
-// removedShare the one in so many leaf packages each drops; what a night
-// drops comes back the night after, so every night removes and returns.
-const (
-	removalNights = 60
-	removedShare  = 30
-)
+// removedShare is the one in so many leaf packages a night drops; what a
+// night drops comes back the night after, so every night removes and returns.
+const removedShare = 30
 
+// Sixty, 180 and 365 nightly uploads after the first scan: whether the cost
+// follows the build's age.
 func TestMeasureTheTrendOverNightlyRemovals(t *testing.T) {
+	measureNightlyRemovals(t, 60)
+}
+
+func TestMeasureTheTrendOverHalfAYearOfNightlyRemovals(t *testing.T) {
+	measureNightlyRemovals(t, 180)
+}
+
+func TestMeasureTheTrendOverAYearOfNightlyRemovals(t *testing.T) {
+	measureNightlyRemovals(t, 365)
+}
+
+func measureNightlyRemovals(t *testing.T, removalNights int) {
 	doc := fullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()

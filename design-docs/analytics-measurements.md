@@ -178,15 +178,25 @@ one read after a warm one.
 
 ### Nightly removals
 
-The full-size image, 60 nightly uploads after the first scan, each dropping one
-leaf package in 30 and restoring the previous night's, so every night both
-removes and returns. A return is judged against the upload that removed it.
+The full-size image, 60, 180 or 365 nightly uploads after the first scan, each
+dropping one leaf package in 30 and restoring the previous night's, so every
+night both removes and returns. A return is judged against the upload that
+removed it.
 
-| Window | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+| Window, 60 nights | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
 |---|--:|--:|--:|--:|
 | 7 days | 136 ms | 101 ms | 241 ms | 123 ms |
 | 30 days | 299 ms | 249 ms | 379 ms | 249 ms |
 | 365 days | 408 ms | 412 ms | 623 ms | 332 ms |
+
+| Nights, then window | SQLite | PostgreSQL | MySQL 8.4 | MariaDB |
+|---|--:|--:|--:|--:|
+| 60, 30 days | 299 ms | 249 ms | 379 ms | 249 ms |
+| 180, 30 days | 432 ms | 236 ms | | |
+| 365, 30 days | 627 ms | 325 ms | 582 ms | 730 ms |
+| 60, 365 days, 13,129 returns | 408 ms | 412 ms | 623 ms | 332 ms |
+| 180, 365 days, 39,833 returns | 1,112 ms | 705 ms | | |
+| 365, 365 days, 81,004 returns | 2,152 ms | 1,404 ms | 1,879 ms | 2,001 ms |
 
 | Read on SQLite | 7 days | 30 days | 365 days |
 |---|--:|--:|--:|
@@ -203,6 +213,7 @@ removes and returns. A return is judged against the upload that removed it.
 | Present before costs most on SQLite | Beneath the root after one rescan, 11,751 issues entering in the window are asked about in batches: 547 ms more on SQLite, 72 ms more on PostgreSQL |
 | Present before by a name costs most on MySQL and MariaDB | A year of rescans, the kernel by its name: 722 ms against 60 ms on MySQL 8.4, 471 ms against 67 ms on MariaDB, and 45 ms on PostgreSQL |
 | Working out a sharp upload costs the uploads a return reverses | Nightly removals, 30 days: 299 ms on SQLite, against 2,473 ms working out every removing upload and 143 ms working out none |
+| A build that removes nightly costs more as it ages | Every past closure of a returning component is read: 30 days on SQLite take 299, 432 and 627 ms after 60, 180 and 365 nights; a 365-day window also holds six times the returns |
 
 | Caveat | Detail |
 |---|---|
@@ -210,3 +221,4 @@ removes and returns. A return is judged against the upload that removed it.
 | One issue per package | The issue and the issue at a component count alike here, so the counts above hold for either unit |
 | Every engine was read keyed by issue and component | The key added a group column and a join to the component; the SQLite and PostgreSQL columns of the first three tables were read before sharp uploads were worked out only for returns, which changes nothing in histories that remove no component |
 | Each engine ran alone | Other test runs on the machine were waited out first |
+| Nightly removals at 180 nights were read on SQLite and PostgreSQL only | The blank cells were not measured |
