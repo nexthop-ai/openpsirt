@@ -39,6 +39,7 @@ func Register(api huma.API, in core.Deps) {
 	registerRegister(api, in)
 	registerCompliance(api, in)
 	registerAnalytics(api, in)
+	registerBurndown(api, in)
 	registerMeasures(api, in)
 	registerEffort(api, in)
 	registerCarry(api, in)

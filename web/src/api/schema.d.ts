@@ -702,6 +702,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/burndown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show the findings burndown
+         * @description Returns, for each day from day 0 through today, the issues left at its end and the issues that moved in it, with what was left at day 0's start and where the latest 14 days' pace takes the line.
+         *
+         *     Each count is of an issue at a component, as the trend counts. `left` is open and not answered by a dismissal in force: not applicable, wrong match, will not fix or already fixed, agreed by a second person or needing none. `fixed` and `dismissed` pull it down, a statement by a supplier or an upstream that it is not affected counting as dismissed; `new` and `returned` push it up, and a dismissal that lapses or is withdrawn is returned. A deferral, a planned upgrade and a waiting proposal answer nothing. `restored` and `baseline` are marks in no other count.
+         *
+         *     Narrowable as the trend is, and also by `purl`, a package identifier prefix, and by `severity`. `chosen` names the packages a name or a prefix matched, so a name two ecosystems share can be told apart.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-burndown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/burndown.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the findings burndown
+         * @description One row per day from day 0, with what was left at its end, split by severity, what moved in it, and the running totals of added and done since day 0. The counts are the burndown's.
+         *
+         *     Each count is of an issue at a component, as the trend counts. `left` is open and not answered by a dismissal in force: not applicable, wrong match, will not fix or already fixed, agreed by a second person or needing none. `fixed` and `dismissed` pull it down, a statement by a supplier or an upstream that it is not affected counting as dismissed; `new` and `returned` push it up, and a dismissal that lapses or is withdrawn is returned. A deferral, a planned upgrade and a waiting proposal answer nothing. `restored` and `baseline` are marks in no other count.
+         *
+         *     Takes the burndown's parameters. Read with your own visibility, like the chart it comes from.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-burndown"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/code-finding-counts": {
         parameters: {
             query?: never;
@@ -1795,7 +1847,7 @@ export interface paths {
          *
          *     Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
          *
-         *     Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
+         *     Answers by any name the issue goes by.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -8790,6 +8842,79 @@ export interface components {
             /** Format: int64 */
             rows: number;
         };
+        BurnPointBody: {
+            /**
+             * Format: date
+             * @description The day, which ends at midnight UTC after it
+             */
+            at: string;
+            /**
+             * Format: int64
+             * @description Issues at components a build's first scan brought. A mark, in no other count
+             */
+            baseline: number;
+            /**
+             * Format: int64
+             * @description Issues at components a dismissal in force answered, or a publisher stated are not affected, and that have not been left since
+             */
+            dismissed: number;
+            /**
+             * Format: int64
+             * @description Builds whose first scan was on the day
+             */
+            first_scans: number;
+            /**
+             * Format: int64
+             * @description Issues at components that left by a fix and have not been left since
+             */
+            fixed: number;
+            /**
+             * Format: int64
+             * @description Issues at components open at the end of the day and not answered by a dismissal in force
+             */
+            left: number;
+            /** @description Left, split by the severity each held */
+            left_by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Issues at components left for the first time, other than through a build's first scan
+             */
+            new: number;
+            /**
+             * Format: int64
+             * @description Issues at components back after an upload removed them that moved a sharp share of its build's inventory. A mark, in no other count
+             */
+            restored: number;
+            /**
+             * Format: int64
+             * @description Issues at components back after having been in the selection before, a dismissal that lapsed or was withdrawn included
+             */
+            returned: number;
+        };
+        BurndownBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/BurndownBody.json
+             */
+            readonly $schema?: string;
+            /** @description The packages a component name or a purl prefix chose, with the ecosystem each is in, at most 20. Empty where neither was sent */
+            chosen: components["schemas"]["ChosenBody"][] | null;
+            points: components["schemas"]["BurnPointBody"][] | null;
+            projection: components["schemas"]["ProjectionBody"];
+            /**
+             * Format: date
+             * @description Day 0, as used
+             */
+            since: string;
+            /**
+             * Format: int64
+             * @description Left at the start of day 0
+             */
+            start: number;
+        };
         CVSSv3: {
             /** Format: double */
             baseScore: number;
@@ -9005,19 +9130,13 @@ export interface components {
             /** @description What a channel carries is sent to them directly as well */
             shared: boolean;
         };
-        CheckedBody: {
-            /** @description When the check finished */
-            at: string;
-            /**
-             * Format: int64
-             * @description Findings the check recorded, each published after the inventory was last scanned and gone from its replacement, so recorded closed. Absent where you may read none of its findings
-             */
-            found_after_fixed?: number;
-            /**
-             * Format: int64
-             * @description The run that checked it
-             */
-            run_id: number;
+        ChosenBody: {
+            /** @description The package identifier's type */
+            ecosystem?: string;
+            /** @description The component's name, folded for capitals */
+            name: string;
+            /** @description The package identifier with version and qualifiers cut, or the name where the component has none */
+            package: string;
         };
         "Clear-incidentRequest": {
             /**
@@ -11002,8 +11121,6 @@ export interface components {
             product?: string;
             /** @description That product's display name, or its name where it has none */
             product_name?: string;
-            /** @description Publication date unknown: an occurrence a replaced inventory's check recorded opens from that inventory's last scan, because no date is known for the issue. Only on a list read with open_on */
-            publication_unknown?: boolean;
             /**
              * Format: double
              * @description The severity as a number, which is what the order compares
@@ -11716,25 +11833,16 @@ export interface components {
             readonly $schema?: string;
             /** @description Every other name it answers to */
             aliases?: string[] | null;
-            /**
-             * @description Where the two dates stand: stated by OSV, unknown to OSV, or not yet asked. Absent where nothing affected is visible
-             * @enum {string}
-             */
-            dates?: "stated" | "unknown" | "unasked";
             description?: string;
             exploited?: boolean;
             items: components["schemas"]["SightingBody"][] | null;
             /** @description Issues held apart until a report named them together, and merged into this one. What was decided under each applies here */
             merged?: components["schemas"]["MergedBody"][] | null;
-            /** @description When OSV last recorded a change to the issue */
-            modified?: string;
             /**
              * Format: int64
              * @description The number of your products carrying it
              */
             products: number;
-            /** @description When the issue was published, as OSV states. Absent where OSV holds no record of it or was not asked */
-            published?: string;
             /** @description Every published rating of the issue, one per generation of the scoring system, newest first */
             ratings?: components["schemas"]["RatingBody"][] | null;
             /** Format: double */
@@ -13820,6 +13928,35 @@ export interface components {
             full_product_names?: components["schemas"]["Named"][] | null;
             relationships?: components["schemas"]["Relationship"][] | null;
         };
+        ProjectionBody: {
+            /**
+             * Format: int64
+             * @description New and returned over those days
+             */
+            added: number;
+            /** @description Whether done outran added over those days */
+            converging: boolean;
+            /**
+             * Format: int64
+             * @description The latest days the pace is read over: 14, or every day where fewer are drawn
+             */
+            days: number;
+            /**
+             * Format: int64
+             * @description Fixed and dismissed over those days
+             */
+            done: number;
+            /**
+             * Format: double
+             * @description Done less added, a day. Zero or below is a backlog not converging
+             */
+            per_day: number;
+            /**
+             * Format: date
+             * @description The day what is left reaches zero at that pace. Absent where it does not converge, or would take more than ten years
+             */
+            zero_on?: string;
+        };
         "Propose-suppression-ruleRequest": {
             /**
              * Format: uri
@@ -14135,8 +14272,6 @@ export interface components {
             built_at?: string;
             /** @description The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours */
             caution?: string;
-            /** @description The check of this inventory against issues published while it was current, made once a later upload replaced it. Absent until it has finished, and on a tag */
-            checked?: components["schemas"]["CheckedBody"];
             /**
              * Format: int64
              * @description Issues that were open and are not any more. Absent for the same reasons as the count beside it
@@ -17618,6 +17753,110 @@ export interface operations {
             };
         };
     };
+    "get-burndown": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                /** @description Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused */
+                since?: string;
+                /** @description The least severe band kept: high keeps critical and high. An unrated issue reads as medium */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only what is open against components of this name, whatever version */
+                component?: string;
+                /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused */
+                purl?: string;
+                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BurndownBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-burndown": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                /** @description Day 0, as a date. Absent, the day the earliest finding in the selection opened. More than 730 days back is moved to 730 days back. A day after today is refused */
+                since?: string;
+                /** @description The least severe band kept: high keeps critical and high. An unrated issue reads as medium */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only what is open against components of this name, whatever version */
+                component?: string;
+                /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched a whole segment at a time and without regard to capitals. A prefix that does not start with pkg: and a type is refused */
+                purl?: string;
+                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "count-code-findings-across-products": {
         parameters: {
             query?: {
@@ -18914,10 +19153,8 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
-                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
-                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -19032,10 +19269,8 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
-                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
-                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24006,10 +24241,8 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
-                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
-                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24175,10 +24408,8 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
-                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
-                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24306,10 +24537,8 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
-                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
-                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24442,10 +24671,8 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
-                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
-                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24576,10 +24803,8 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
+                /** @description Accepted and matches nothing: this list holds open rows only */
                 closed_after?: string;
-                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
-                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */

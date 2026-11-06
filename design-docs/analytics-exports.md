@@ -19,9 +19,9 @@ audit log, the review queue, what became of the reader's own decisions, the
 by-component view, what is running out of time, the last upload per build, what
 is out of support, a comparison of two builds, a comparison of two builds'
 inventories, the planned upgrades of a product and of one build, the code
-finding queue, what keeps being put off, the backlog over time, administrative
-changes, what a build holds that the scanner cannot match, and the disposition
-register.
+finding queue, what keeps being put off, the backlog over time, the findings
+burndown, administrative changes, what a build holds that the scanner cannot
+match, and the disposition register.
 
 A file is the list's own query with the same subject, written and paged as it
 streams at the screen's page size; no complete list exists to filter afterwards.
@@ -57,6 +57,7 @@ streams at the screen's page size; no complete list exists to filter afterwards.
 | The audit log's file carries who agrees now, standing agreements only, and the whole agreement record with dates, carried and withdrawn marks, in a column of its own | What was agreed and then withdrawn is what an audit looks for; one column mixing the two is the answer it must not be given |
 | The audit log's file includes decisions about code findings, under the same visibility (REQ-50) | |
 | The code finding queue's file is the queue, under its visibility, with no source text | `design-docs/analysis-queue.md` § Queue file |
+| The burndown's file is one row per day from day 0, with the running totals of added and done beside the day's counts, and states day 0, the severity and the prefix asked | The totals are what the second panel draws |
 | The disposition register holds no code finding | It is the Register consumer's (`design-docs/kinds.md` § Consumers) |
 
 ### Code findings in a findings file
