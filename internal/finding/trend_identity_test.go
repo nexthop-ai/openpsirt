@@ -184,3 +184,57 @@ func TestAnIssueIsReturnedOnlyWhereTheReaderCanSeeItWasPresentBefore(t *testing.
 		}
 	})
 }
+
+func TestTheTrendCountsAnIssueAtEachComponentAndAVersionBumpKeepsTheComponent(t *testing.T) {
+	// One issue in two packages is two; a bump fixing it in one is one
+	// corrected; a bump carrying it in the other is the same component and no
+	// flow.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		first := now.Add(-20 * 24 * time.Hour)
+		f.scannedAt(t, twoConsumers(), first, found("CVE-2026-1", libnl), found("CVE-2026-1", teamd))
+		bump := now.Add(-10 * 24 * time.Hour)
+		f.scannedAt(t, bumpedLibnl(), bump, found("CVE-2026-1", teamd), found("CVE-2026-2", libnlNew))
+		carried := now.Add(-5 * 24 * time.Hour)
+		f.scannedAt(t, twoConsumers(), carried, found("CVE-2026-1", teamd), found("CVE-2026-2", libnl))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i := stepHolding(points, first); points[i].Baseline != 2 || points[i].Open != 2 {
+			t.Errorf("the first scan's step says %d baseline and %d open, want the issue at both components",
+				points[i].Baseline, points[i].Open)
+		}
+		if i := stepHolding(points, bump); points[i].Corrected != 1 || points[i].New != 1 || points[i].Open != 2 {
+			t.Errorf("the bump's step says %d corrected, %d new and %d open, want one fixed, one arrived, two open",
+				points[i].Corrected, points[i].New, points[i].Open)
+		}
+		if i := stepHolding(points, carried); points[i].New != 0 || points[i].Corrected != 0 ||
+			points[i].Returned != 0 || points[i].Open != 2 {
+			t.Errorf("the step carrying an issue across a version says %+v, want two open and nothing moved",
+				points[i])
+		}
+	})
+}
+
+func TestAnIssueBeforeTheWindowAtAnotherComponentIsNewAtThisOne(t *testing.T) {
+	// Present before is asked of the issue at its component: the issue fixed
+	// in one package before the window says nothing about another package.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		f.scannedAt(t, twoConsumers(), now.Add(-60*24*time.Hour), found("CVE-2026-1", libnl))
+		f.scannedAt(t, twoConsumers(), now.Add(-50*24*time.Hour))
+		f.scannedAt(t, twoConsumers(), now.Add(-5*24*time.Hour), found("CVE-2026-1", teamd))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := summed(points); got != (totals{open: 1, opened: 1}) {
+			t.Errorf("counted %+v, want the issue new at the package it had never been in", got)
+		}
+	})
+}

@@ -589,9 +589,9 @@ func registerTrendExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-trend", Method: http.MethodGet, Path: "/v1/trend.{format}",
 		Summary: "Export the findings trend",
-		Description: "One row per step, with the issues new, corrected, returned and brought by a " +
-			"first scan in it, and open at its end, each flow and open split by severity. The " +
-			"counts are the trend's.\n\n" +
+		Description: "One row per step, with the issues at components new, corrected, returned and " +
+			"brought by a first scan in it, and open at its end, each flow and open split by " +
+			"severity. The counts are the trend's.\n\n" +
 			"Takes the window and the narrowings the trend takes. Read with your own " +
 			"visibility, like the chart it comes from.",
 		Tags: []string{"Analytics"},

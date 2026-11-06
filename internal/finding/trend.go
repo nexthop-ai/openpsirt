@@ -43,9 +43,10 @@ type Within struct {
 
 // Point is one step of a trend: what was open at its end, and what moved in it.
 //
-// Each count is of issues. An issue is recognized when it comes back, because
-// its identity is derived from content, so an issue that leaves and returns is
-// one issue that returned, never one corrected and one new.
+// Each count is of issues at components: one issue at one component, at any
+// version, however many products, builds and occurrences hold it. The pair is
+// recognized when it comes back, because its identity is derived from content,
+// so one that leaves and returns returned, never was corrected and new.
 type Point struct {
 	At   time.Time
 	Open int
@@ -73,10 +74,11 @@ type Point struct {
 	ReturnedBySeverity  map[string]int
 }
 
-// trendRow is one reduced moment: an issue in one product, opened and closed
-// at one moment each, by one run.
+// trendRow is one reduced moment: an issue at a component in one product,
+// opened and closed at one moment each, by one run.
 type trendRow struct {
 	VulnerabilityID int64      `bun:"vulnerability_id"`
+	Component       string     `bun:"component"`
 	Severity        string     `bun:"severity"`
 	OpenedAt        time.Time  `bun:"opened_at"`
 	OpenedRunID     *int64     `bun:"opened_run_id"`
@@ -135,17 +137,17 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		return nil, err
 	}
 
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].VulnerabilityID < rows[j].VulnerabilityID })
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].key().less(rows[j].key()) })
 	type issue struct {
-		id                   int64
+		id                   trendKey
 		from, to             int
 		minOpened, maxOpened time.Time
 	}
 	var issues []issue
-	var unseen []int64
+	var unseen []trendKey
 	for i := 0; i < len(rows); {
-		one := issue{id: rows[i].VulnerabilityID, from: i, minOpened: rows[i].OpenedAt, maxOpened: rows[i].OpenedAt}
-		for ; i < len(rows) && rows[i].VulnerabilityID == one.id; i++ {
+		one := issue{id: rows[i].key(), from: i, minOpened: rows[i].OpenedAt, maxOpened: rows[i].OpenedAt}
+		for ; i < len(rows) && rows[i].key() == one.id; i++ {
 			if rows[i].OpenedAt.Before(one.minOpened) {
 				one.minOpened = rows[i].OpenedAt
 			}
@@ -356,7 +358,10 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, when st
 		// Grouped on the stored reason: an absent and an empty reason fold to
 		// one word, so at worst one moment arrives twice, and the count reads
 		// it once.
-		GroupExpr(`"f"."vulnerability_id", "st"."product_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because"`)
+		// The component, named below, because a version bump moves a finding
+		// to another component of the same name.
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because"`)
 	moments, err := narrow(ctx, moments, when, args...)
 	if err != nil {
 		return nil, err
@@ -370,7 +375,9 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, when st
 		// published severity is stored as '' and a scanner's "unknown" is a
 		// word of its own; the browser draws one unrated rung for both.
 		Join(rating.For(rating.OnGrouped)).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "grouped"."component_id"`).
 		ColumnExpr(`"grouped"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"c"."name_folded" AS "component"`).
 		ColumnExpr(rating.BandExpr+` AS "severity"`).
 		ColumnExpr(`"grouped"."opened_at" AS "opened_at"`).
 		ColumnExpr(`"grouped"."opened_run_id" AS "opened_run_id"`).
@@ -428,31 +435,64 @@ func (s *Store) firstScans(ctx context.Context, rows []trendRow, since time.Time
 	return out, nil
 }
 
-// presentBefore is which of these issues had a finding in the scope closed at
-// or before the window's start: present once, before the window.
-func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, since time.Time,
-	issues []int64) (map[int64]bool, error) {
+// trendKey is what a trend counts: an issue at a component, by the component's
+// name, so one version replacing another is the same component.
+type trendKey struct {
+	vulnerability int64
+	component     string
+}
 
-	out := map[int64]bool{}
+func (k trendKey) less(o trendKey) bool {
+	if k.vulnerability != o.vulnerability {
+		return k.vulnerability < o.vulnerability
+	}
+	return k.component < o.component
+}
+
+func (r trendRow) key() trendKey {
+	return trendKey{vulnerability: r.VulnerabilityID, component: r.Component}
+}
+
+// presentBefore is which of these issues at components had a finding in the
+// scope closed at or before the window's start: present once, before the
+// window.
+//
+// Asked by issue and answered by pair, because a statement naming each pair is
+// a row-value list the engines spell differently. A pair nobody asked about is
+// never looked up.
+func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, since time.Time,
+	pairs []trendKey) (map[trendKey]bool, error) {
+
+	seen := map[int64]bool{}
+	var issues []int64
+	for _, p := range pairs {
+		if !seen[p.vulnerability] {
+			seen[p.vulnerability] = true
+			issues = append(issues, p.vulnerability)
+		}
+	}
+	out := map[trendKey]bool{}
 	for start := 0; start < len(issues); start += database.BatchSize {
 		chunk := issues[start:min(start+database.BatchSize, len(issues))]
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-			ColumnExpr(`"f"."vulnerability_id"`).
+			Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
+			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+			ColumnExpr(`"pc"."name_folded" AS "component"`).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(chunk)).
-			GroupExpr(`"f"."vulnerability_id"`)
+			GroupExpr(`"f"."vulnerability_id", "pc"."name_folded"`)
 		q, err := narrow(ctx, q, `"f"."closed_at" <= ?`, since)
 		if err != nil {
 			return nil, err
 		}
-		var ids []int64
-		if err := q.Scan(ctx, &ids); err != nil {
+		var read []trendRow
+		if err := q.Scan(ctx, &read); err != nil {
 			return nil, fmt.Errorf("read which issues were present before the trend's window: %w", err)
 		}
-		for _, id := range ids {
-			out[id] = true
+		for _, r := range read {
+			out[r.key()] = true
 		}
 	}
 	return out, nil

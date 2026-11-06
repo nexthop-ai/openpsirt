@@ -24,8 +24,10 @@ Every figure counts in the unit and period `design-docs/analytics.md` defines.
 
 Open at the end of each step, and four flows in it, each split by severity: an
 open count that barely moves while its critical share rises is getting worse.
-The unit is an issue, counted once however many products, builds and
-occurrences hold it, as Home's open figure counts.
+The unit is an issue at a component, the unit of `design-docs/analytics.md`
+§ The counting unit, as Home's open figure counts: one issue in three packages
+is three, each counted once however many products, builds and occurrences hold
+it. A component is its name, at any version.
 
 | Viewing | Axis | Reason |
 |---|---|---|
@@ -34,10 +36,10 @@ occurrences hold it, as Home's open figure counts.
 
 ### Counting by identity
 
-An issue's identity is derived from content (REQ-08), so an issue that leaves
-the open set and comes back is recognized as the same one.
+An issue at a component is an identity derived from content (REQ-08), so one
+that leaves the open set and comes back is recognized as the same one.
 
-| Series | An issue counted in the step |
+| Series | An issue at a component counted in the step |
 |---|---|
 | Open | Open at the step's end: some finding of it in the selection opened at or before that moment and had not closed |
 | New | Open at the step's end, open at no moment before in the selection, and not brought by a build's first scan |
@@ -47,6 +49,8 @@ the open set and comes back is recognized as the same one.
 
 | Rule | Reason |
 |---|---|
+| A component is its name, at any version | A version bump carrying an issue is no flow, and one fixing it is one corrected |
+| Present before is asked of the issue at its component | An issue fixed in one package says nothing about another |
 | A bounce is one return and no correction | A broken inventory that drops every component for a scan otherwise counts the whole estate resolved and then new |
 | A correction stops counting when its issue returns, at whatever later moment | Corrected means still closed now; past bars move when an issue comes back |
 | A build's first scan is its earliest run by start that did not fail | A failed run opened nothing |

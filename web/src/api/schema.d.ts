@@ -7411,7 +7411,7 @@ export interface paths {
          * Show the findings trend
          * @description Returns, per step, the issues open at its end and the issues that moved in it, each split by severity, across every product you can see. Steps are weeks or days, ending at the coming midnight UTC, each dated by its last day.
          *
-         *     An issue is one identity however often it leaves and comes back. `new` is an issue never open before in the selection; `returned` is one open before; `corrected` is one that left by a fix and has stayed out, so an issue that returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is `baseline`, and `first_scans` says how many builds were first scanned in the step.
+         *     Each count is of an issue at a component: one CVE in three packages is three, and a package at a new version is the same package. Each is one identity however often it leaves and comes back. `new` is one never open before in the selection; `returned` is one open before; `corrected` is one that left by a fix and has stayed out, so one that returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is `baseline`, and `first_scans` says how many builds were first scanned in the step.
          *
          *     Narrowable to part of a tree. `component` keeps one package at any version; `beneath` keeps a component and everything under it, which needs a branch and a variant naming exactly one build.
          *
@@ -7437,7 +7437,7 @@ export interface paths {
         };
         /**
          * Export the findings trend
-         * @description One row per step, with the issues new, corrected, returned and brought by a first scan in it, and open at its end, each flow and open split by severity. The counts are the trend's.
+         * @description One row per step, with the issues at components new, corrected, returned and brought by a first scan in it, and open at its end, each flow and open split by severity. The counts are the trend's.
          *
          *     Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
          *
@@ -13693,7 +13693,7 @@ export interface components {
             at: string;
             /**
              * Format: int64
-             * @description Issues a build's first scan brought into the open set. Not new: a first scan is an inventory arriving
+             * @description Issues at components a build's first scan brought into the open set. Not new: a first scan is an inventory arriving
              */
             baseline: number;
             /** @description Open, split by severity */
@@ -13702,7 +13702,7 @@ export interface components {
             };
             /**
              * Format: int64
-             * @description Issues that left the open set in the step by a fix and have not been open since. A later return takes an issue out of this count
+             * @description Issues at components that left the open set in the step by a fix and have not been open since. A later return takes one out of this count
              */
             corrected: number;
             /** @description Corrected, split by the severity each held while it was open */
@@ -13716,7 +13716,7 @@ export interface components {
             first_scans: number;
             /**
              * Format: int64
-             * @description Issues open for the first time ever in the selection, other than through a build's first scan
+             * @description Issues at components open for the first time ever in the selection, other than through a build's first scan
              */
             new: number;
             /** @description New, split by severity */
@@ -13725,12 +13725,12 @@ export interface components {
             };
             /**
              * Format: int64
-             * @description Issues open at the end of the step
+             * @description Issues at components open at the end of the step
              */
             open: number;
             /**
              * Format: int64
-             * @description Issues back in the open set after having been in it before
+             * @description Issues at components back in the open set after having been in it before
              */
             returned: number;
             /** @description Returned, split by severity */

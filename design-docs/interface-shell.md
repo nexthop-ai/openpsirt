@@ -163,7 +163,7 @@ release readiness. Each counts dependency findings, drawn under `design-docs/int
 
 | Rule | Reason |
 |---|---|
-| Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
+| Open is the trend's latest point at every scope, counting an issue at each component | A tile switching unit as the picker moves quotes two figures for one word |
 | The trend panel draws thirty daily steps, or twelve weekly ones once switched; severity over time follows it | A team fixing dozens a day sees it by the day (`design-docs/analytics-program.md` § Trends) |
 | Known exploited is drawn only with a product picked | The list across products counts a row per product |
 

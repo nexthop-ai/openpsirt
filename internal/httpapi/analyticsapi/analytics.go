@@ -21,14 +21,14 @@ import (
 )
 
 // PointBody is one step of the trend: what was open at its end, and what moved
-// in it, each counted as issues.
+// in it, each counted as issues at components.
 type PointBody struct {
 	At         string         `json:"at" format:"date" doc:"The last day of the step, which ends at midnight UTC after it"`
-	Open       int            `json:"open" doc:"Issues open at the end of the step"`
-	New        int            `json:"new" doc:"Issues open for the first time ever in the selection, other than through a build's first scan"`
-	Corrected  int            `json:"corrected" doc:"Issues that left the open set in the step by a fix and have not been open since. A later return takes an issue out of this count"`
-	Returned   int            `json:"returned" doc:"Issues back in the open set after having been in it before"`
-	Baseline   int            `json:"baseline" doc:"Issues a build's first scan brought into the open set. Not new: a first scan is an inventory arriving"`
+	Open       int            `json:"open" doc:"Issues at components open at the end of the step"`
+	New        int            `json:"new" doc:"Issues at components open for the first time ever in the selection, other than through a build's first scan"`
+	Corrected  int            `json:"corrected" doc:"Issues at components that left the open set in the step by a fix and have not been open since. A later return takes one out of this count"`
+	Returned   int            `json:"returned" doc:"Issues at components back in the open set after having been in it before"`
+	Baseline   int            `json:"baseline" doc:"Issues at components a build's first scan brought into the open set. Not new: a first scan is an inventory arriving"`
 	FirstScans int            `json:"first_scans" doc:"Builds whose first scan was in the step"`
 	BySeverity map[string]int `json:"by_severity" doc:"Open, split by severity"`
 	// The flows, split the same way. Arrivals against departures is what a
@@ -89,10 +89,11 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		Description: "Returns, per step, the issues open at its end and the issues that moved in it, " +
 			"each split by severity, across every product you can see. Steps are weeks or days, " +
 			"ending at the coming midnight UTC, each dated by its last day.\n\n" +
-			"An issue is one identity however often it leaves and comes back. `new` is an issue " +
-			"never open before in the selection; `returned` is one open before; `corrected` is one " +
-			"that left by a fix and has stayed out, so an issue that returns stops counting as " +
-			"corrected where it left. A build's first scan is no flow: what it brought is " +
+			"Each count is of an issue at a component: one CVE in three packages is three, and a " +
+			"package at a new version is the same package. Each is one identity however often it " +
+			"leaves and comes back. `new` is one never open before in the selection; `returned` is " +
+			"one open before; `corrected` is one that left by a fix and has stayed out, so one that " +
+			"returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is " +
 			"`baseline`, and `first_scans` says how many builds were first scanned in the step.\n\n" +
 			"Narrowable to part of a tree. `component` keeps one package at any version; " +
 			"`beneath` keeps a component and everything under it, which needs a branch and a " +

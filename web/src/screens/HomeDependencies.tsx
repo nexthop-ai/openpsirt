@@ -98,10 +98,10 @@ export function DependencyFigures({
   // rather than as sparse, so the calendar stays until there are two.
   const byRelease = (releases.data?.items ?? []).length >= 2;
 
-  // One definition at every scope: the trend's latest point, which counts
-  // distinct issues. The findings list counts one row per issue and component,
-  // and a tile that switched between the two as the picker moved would quote
-  // two figures for one word.
+  // One definition at every scope: the trend's latest point, which counts an
+  // issue at each component, at any version, once however many builds hold
+  // it. A tile that switched unit as the picker moved would quote two figures
+  // for one word.
   const exploited = useQuery({
     queryKey: ["home", "exploited", scope],
     // Answered for whatever is selected, like every figure here. Drawn only
@@ -221,7 +221,7 @@ export function DependencyFigures({
             </Count>
           </span>
           {everywhere(known(allOpen) ? allPoints[allPoints.length - 1]?.open : undefined) ?? (
-            <span className="d">distinct issues, not findings</span>
+            <span className="d">an issue once per package</span>
           )}
         </button>
         {!!at.product && (
