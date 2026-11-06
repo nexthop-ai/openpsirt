@@ -126,8 +126,9 @@ export function Backlog() {
             <Pace points={points} unit={daily ? "days" : "weeks"} />
             <PaceLegend />
             <p className="hint">
-              Counted as issues, not as occurrences. An issue that comes back is returned, and stops
-              counting as corrected.
+              Counted once per issue in each package, not per occurrence. An issue that comes back
+              is returned, and stops counting as corrected; one back after an upload lost most of a
+              build is marked instead.
             </p>
           </section>
 
@@ -158,6 +159,7 @@ export function Backlog() {
                         <th key={`in ${band}`}>{band}</th>
                       ))}
                       <th>Returned</th>
+                      <th title="Back after an upload lost most of the build">After a gap</th>
                       <th>Corrected</th>
                       {BANDS.map((band) => (
                         <th key={`out ${band}`}>{band}</th>
@@ -178,6 +180,7 @@ export function Backlog() {
                             </td>
                           ))}
                           <td>{(point.returned ?? 0).toLocaleString()}</td>
+                          <td>{(point.restored ?? 0).toLocaleString()}</td>
                           <td>{(point.corrected ?? 0).toLocaleString()}</td>
                           {BANDS.map((band) => (
                             <td key={`out ${band}`} className="hint">

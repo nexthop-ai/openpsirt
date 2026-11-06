@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,6 +21,12 @@ func rootOnly() graph.Snapshot { return graph.Snapshot{Root: root} }
 func (f *fixture) scannedAt(t *testing.T, snap graph.Snapshot, when time.Time, reported ...finding.Reported) {
 	t.Helper()
 	f.shipped(t, snap)
+	// The upload arrives before the run that reads it, as it does outside a
+	// test.
+	if _, err := f.db.DB.NewUpdate().TableExpr(`"scan"`).Set(`"received_at" = ?`, when.Add(-time.Minute)).
+		Where(`"id" = ?`, f.lastScan).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	run := f.run(t)
 	f.seenAt(t, run, when)
 	if _, err := f.store.Apply(t.Context(), f.build, run, reported); err != nil {
@@ -27,8 +34,37 @@ func (f *fixture) scannedAt(t *testing.T, snap graph.Snapshot, when time.Time, r
 	}
 }
 
+// widened is a graph with twelve more packages beneath the root, big enough
+// that losing all of it passes the floor of names a sharp move needs. Without
+// is the names left out.
+func widened(without ...graph.Described) graph.Snapshot {
+	snap := twoConsumers()
+	for i := range 12 {
+		filler := at(fmt.Sprintf("filler-%d", i), "1.0")
+		snap.Components = append(snap.Components, filler)
+		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: filler})
+	}
+	for _, gone := range without {
+		var kept []graph.Described
+		for _, c := range snap.Components {
+			if c != gone {
+				kept = append(kept, c)
+			}
+		}
+		snap.Components = kept
+		var edges []graph.Dependency
+		for _, e := range snap.Dependencies {
+			if e.Child != gone && e.Parent != gone {
+				edges = append(edges, e)
+			}
+		}
+		snap.Dependencies = edges
+	}
+	return snap
+}
+
 // totals is the sum of each flow over a trend.
-type totals struct{ open, opened, corrected, returned, baseline, firstScans int }
+type totals struct{ open, opened, corrected, returned, restored, baseline, firstScans int }
 
 func summed(points []finding.Point) totals {
 	var out totals
@@ -36,6 +72,7 @@ func summed(points []finding.Point) totals {
 		out.opened += p.New
 		out.corrected += p.Corrected
 		out.returned += p.Returned
+		out.restored += p.Restored
 		out.baseline += p.Baseline
 		out.firstScans += p.FirstScans
 	}
@@ -235,6 +272,133 @@ func TestAnIssueBeforeTheWindowAtAnotherComponentIsNewAtThisOne(t *testing.T) {
 		}
 		if got := summed(points); got != (totals{open: 1, opened: 1}) {
 			t.Errorf("counted %+v, want the issue new at the package it had never been in", got)
+		}
+	})
+}
+
+func TestAReturnAfterASharpRemovalIsAMarkNotAReturnedBar(t *testing.T) {
+	// An upload that lost the whole inventory moved a sharp share of it, so
+	// what comes back after it is the inventory put right.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		f.scannedAt(t, widened(), now.Add(-20*24*time.Hour), found("CVE-2026-1", libnl))
+		f.scannedAt(t, rootOnly(), now.Add(-10*24*time.Hour))
+		back := now.Add(-9 * 24 * time.Hour)
+		f.scannedAt(t, widened(), back, found("CVE-2026-1", libnl))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := summed(points); got != (totals{open: 1, restored: 1, baseline: 1, firstScans: 1}) {
+			t.Errorf("a return after a sharp removal counted %+v, want it restored and no returned bar", got)
+		}
+		if i := stepHolding(points, back); points[i].Restored != 1 || len(points[i].ReturnedBySeverity) != 0 {
+			t.Errorf("step %d says %d restored and %v returned, want the mark alone",
+				i, points[i].Restored, points[i].ReturnedBySeverity)
+		}
+	})
+}
+
+func TestAReturnAfterASmallRemovalIsAReturnedBar(t *testing.T) {
+	// One package of fifteen leaving moves too little of the inventory to be
+	// a broken upload, so its issue coming back is a return.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		f.scannedAt(t, widened(), now.Add(-20*24*time.Hour), found("CVE-2026-1", libnl))
+		f.scannedAt(t, widened(libnl), now.Add(-10*24*time.Hour))
+		f.scannedAt(t, widened(), now.Add(-9*24*time.Hour), found("CVE-2026-1", libnl))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := summed(points); got != (totals{open: 1, returned: 1, baseline: 1, firstScans: 1}) {
+			t.Errorf("a return after a small removal counted %+v, want one returned bar", got)
+		}
+	})
+}
+
+func TestAReturnAfterASharpRemovalBeforeTheWindowIsAMark(t *testing.T) {
+	// The removal is before the window, so only the closure read before it
+	// says what took the issue out.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		f.scannedAt(t, widened(), now.Add(-60*24*time.Hour), found("CVE-2026-1", libnl))
+		f.scannedAt(t, rootOnly(), now.Add(-50*24*time.Hour))
+		f.scannedAt(t, widened(), now.Add(-5*24*time.Hour), found("CVE-2026-1", libnl))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := summed(points); got != (totals{open: 1, restored: 1}) {
+			t.Errorf("counted %+v, want the one issue restored", got)
+		}
+	})
+}
+
+// bumped is widened with every filler and libnl at another version.
+func bumped() graph.Snapshot {
+	snap := widened(libnl)
+	for i, c := range snap.Components {
+		if len(c.Name) > 7 && c.Name[:7] == "filler-" {
+			moved := at(c.Name, "2.0")
+			snap.Components[i] = moved
+			for j, e := range snap.Dependencies {
+				if e.Child == c {
+					snap.Dependencies[j].Child = moved
+				}
+			}
+		}
+	}
+	snap.Components = append(snap.Components, libnlNew)
+	snap.Dependencies = append(snap.Dependencies,
+		graph.Dependency{Parent: swss, Child: libnlNew}, graph.Dependency{Parent: teamd, Child: libnlNew})
+	return snap
+}
+
+func TestAReturnAfterASharpUploadThatUpgradedIsAReturnedBar(t *testing.T) {
+	// Only a removal is the inventory going missing. An upload that moved
+	// most of a build by upgrading it fixed the issue, and its coming back
+	// with a downgrade is a return.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		f.scannedAt(t, widened(), now.Add(-20*24*time.Hour), found("CVE-2026-1", libnl))
+		f.scannedAt(t, bumped(), now.Add(-10*24*time.Hour))
+		f.scannedAt(t, widened(), now.Add(-9*24*time.Hour), found("CVE-2026-1", libnl))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := summed(points); got.returned != 1 || got.restored != 0 {
+			t.Errorf("a return after a sharp upgrade counted %+v, want one returned bar", got)
+		}
+	})
+}
+
+func TestAReturnIsJudgedByTheRemovalThatLastTookItOut(t *testing.T) {
+	// A sharp removal long ago says nothing about the small one since.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		f.scannedAt(t, widened(), now.Add(-25*24*time.Hour), found("CVE-2026-1", libnl))
+		f.scannedAt(t, rootOnly(), now.Add(-20*24*time.Hour))
+		f.scannedAt(t, widened(), now.Add(-15*24*time.Hour), found("CVE-2026-1", libnl))
+		f.scannedAt(t, widened(libnl), now.Add(-10*24*time.Hour))
+		f.scannedAt(t, widened(), now.Add(-5*24*time.Hour), found("CVE-2026-1", libnl))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := summed(points); got.returned != 1 || got.restored != 1 {
+			t.Errorf("counted %+v, want the first return restored and the second returned", got)
 		}
 	})
 }

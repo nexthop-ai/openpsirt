@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // MostTrendSteps is the most steps a trend is worked out over: two years of
@@ -59,6 +60,11 @@ type Point struct {
 	// Returned is issues back in the open set after having been in it before.
 	// The closure that took one out is not corrected.
 	Returned int
+	// Restored is returns whose last departure was a removal by an upload
+	// that moved a sharp share of its build's inventory: a broken inventory
+	// put right. Kept out of Returned, because it is the inventory coming
+	// back, not work arriving.
+	Restored int
 	// Baseline is issues a build's first scan brought into the open set, and
 	// FirstScans the builds first scanned in this step. A first scan is the
 	// inventory arriving, not work arriving, so it is no flow.
@@ -79,6 +85,8 @@ type Point struct {
 type trendRow struct {
 	VulnerabilityID int64      `bun:"vulnerability_id"`
 	Component       string     `bun:"component"`
+	BuildID         int64      `bun:"build_id"`
+	ComponentID     int64      `bun:"component_id"`
 	Severity        string     `bun:"severity"`
 	OpenedAt        time.Time  `bun:"opened_at"`
 	OpenedRunID     *int64     `bun:"opened_run_id"`
@@ -167,6 +175,10 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	if err != nil {
 		return nil, err
 	}
+	sharp, err := s.sharpRemovals(ctx, rows, before)
+	if err != nil {
+		return nil, err
+	}
 
 	end := func(k int) time.Time { return since.Add(time.Duration(k+1) * step) }
 	// The first step whose end is at or after a moment, and -1 where the
@@ -247,9 +259,13 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 				switch {
 				// Present before: a row opened by the previous step's end, or
 				// one closed before the window.
-				case before[one.id] || !one.minOpened.After(end(k-1)):
-					points[k].Returned++
-					points[k].ReturnedBySeverity[held[k+1]]++
+				case before[one.id] != nil || !one.minOpened.After(end(k-1)):
+					if sharp.removed(lastClosure(rows[one.from:one.to], before[one.id], end(k-1))) {
+						points[k].Restored++
+					} else {
+						points[k].Returned++
+						points[k].ReturnedBySeverity[held[k+1]]++
+					}
 				case baseline[k]:
 					points[k].Baseline++
 				default:
@@ -361,7 +377,9 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, when st
 		// The component, named below, because a version bump moves a finding
 		// to another component of the same name.
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because"`)
+		// The build, because a removal is an upload to one build.
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
+		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "f"."build_id", "st"."product_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because"`)
 	moments, err := narrow(ctx, moments, when, args...)
 	if err != nil {
 		return nil, err
@@ -378,6 +396,8 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, when st
 		Join(`JOIN "component" AS "c" ON "c"."id" = "grouped"."component_id"`).
 		ColumnExpr(`"grouped"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"c"."name_folded" AS "component"`).
+		ColumnExpr(`"grouped"."build_id" AS "build_id"`).
+		ColumnExpr(`"grouped"."component_id" AS "component_id"`).
 		ColumnExpr(rating.BandExpr+` AS "severity"`).
 		ColumnExpr(`"grouped"."opened_at" AS "opened_at"`).
 		ColumnExpr(`"grouped"."opened_run_id" AS "opened_run_id"`).
@@ -461,7 +481,7 @@ func (r trendRow) key() trendKey {
 // a row-value list the engines spell differently. A pair nobody asked about is
 // never looked up.
 func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, since time.Time,
-	pairs []trendKey) (map[trendKey]bool, error) {
+	pairs []trendKey) (map[trendKey]*trendRow, error) {
 
 	seen := map[int64]bool{}
 	var issues []int64
@@ -471,7 +491,7 @@ func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, since 
 			issues = append(issues, p.vulnerability)
 		}
 	}
-	out := map[trendKey]bool{}
+	out := map[trendKey]*trendRow{}
 	for start := 0; start < len(issues); start += database.BatchSize {
 		chunk := issues[start:min(start+database.BatchSize, len(issues))]
 		q := s.db.NewSelect().
@@ -481,8 +501,14 @@ func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, since 
 			Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 			ColumnExpr(`"pc"."name_folded" AS "component"`).
+			// The last closure of each, because a return after a removal is
+			// told by what removed it.
+			ColumnExpr(`"f"."build_id" AS "build_id"`).
+			ColumnExpr(`"f"."component_id" AS "component_id"`).
+			ColumnExpr(`"f"."closed_at" AS "closed_at"`).
+			ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(chunk)).
-			GroupExpr(`"f"."vulnerability_id", "pc"."name_folded"`)
+			GroupExpr(`"f"."vulnerability_id", "pc"."name_folded", "f"."build_id", "f"."component_id", "f"."closed_at", "f"."closed_because"`)
 		q, err := narrow(ctx, q, `"f"."closed_at" <= ?`, since)
 		if err != nil {
 			return nil, err
@@ -491,9 +517,154 @@ func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, since 
 		if err := q.Scan(ctx, &read); err != nil {
 			return nil, fmt.Errorf("read which issues were present before the trend's window: %w", err)
 		}
-		for _, r := range read {
-			out[r.key()] = true
+		for i := range read {
+			r := &read[i]
+			if was := out[r.key()]; was == nil || r.ClosedAt.After(*was.ClosedAt) {
+				out[r.key()] = r
+			}
 		}
+	}
+	return out, nil
+}
+
+// lastClosure is the row of an issue at a component that closed last at or
+// before a moment, among those read in the window and the one closed before
+// it, or nil where none closed then.
+func lastClosure(rows []trendRow, before *trendRow, by time.Time) *trendRow {
+	last := before
+	for i := range rows {
+		r := &rows[i]
+		if r.ClosedAt == nil || r.ClosedAt.After(by) {
+			continue
+		}
+		if last == nil || r.ClosedAt.After(*last.ClosedAt) {
+			last = r
+		}
+	}
+	return last
+}
+
+// removal is a component leaving a build.
+type removal struct{ build, component int64 }
+
+// sharpness is, for each removal a closure reads as, the upload that removed
+// it and whether that upload moved a sharp share of its build's inventory.
+type sharpness struct {
+	uploads map[removal][]removedBy
+	sharp   map[int64]bool
+}
+
+// removedBy is one upload that took a component out of a build, and when it
+// arrived.
+type removedBy struct {
+	scan       int64
+	receivedAt time.Time
+}
+
+// removed says whether a closure was a removal by a sharp upload: the latest
+// upload to take the component out of the build at or before the closure.
+func (s sharpness) removed(row *trendRow) bool {
+	if row == nil || row.ClosedAt == nil || Closure(row.ClosedBecause) != Removed {
+		return false
+	}
+	var by *removedBy
+	for i, up := range s.uploads[removal{row.BuildID, row.ComponentID}] {
+		if !up.receivedAt.After(*row.ClosedAt) && (by == nil || up.receivedAt.After(by.receivedAt)) {
+			by = &s.uploads[removal{row.BuildID, row.ComponentID}][i]
+		}
+	}
+	return by != nil && s.sharp[by.scan]
+}
+
+// sharpRemovals reads, for every removal a trend's rows could count a return
+// after, the uploads that removed the component, and which of them moved a
+// sharp share of the build's inventory.
+//
+// Sharp is the rule the alert about an inventory that moved sharply applies,
+// with its two settings, worked out for each upload from the inventories
+// stored. A closure is tied to its upload through the build's graph: the
+// component's node closed by the upload, which arrived before the closure.
+func (s *Store) sharpRemovals(ctx context.Context, rows []trendRow,
+	before map[trendKey]*trendRow) (sharpness, error) {
+
+	out := sharpness{uploads: map[removal][]removedBy{}, sharp: map[int64]bool{}}
+	asked := map[removal]bool{}
+	var builds, components []int64
+	seenBuild, seenComponent := map[int64]bool{}, map[int64]bool{}
+	note := func(r *trendRow) {
+		if r == nil || r.ClosedAt == nil || Closure(r.ClosedBecause) != Removed {
+			return
+		}
+		at := removal{r.BuildID, r.ComponentID}
+		if asked[at] {
+			return
+		}
+		asked[at] = true
+		if !seenBuild[r.BuildID] {
+			seenBuild[r.BuildID] = true
+			builds = append(builds, r.BuildID)
+		}
+		if !seenComponent[r.ComponentID] {
+			seenComponent[r.ComponentID] = true
+			components = append(components, r.ComponentID)
+		}
+	}
+	for i := range rows {
+		note(&rows[i])
+	}
+	for _, r := range before {
+		note(r)
+	}
+	if len(asked) == 0 {
+		return out, nil
+	}
+
+	type closedNode struct {
+		BuildID     int64     `bun:"build_id"`
+		ComponentID int64     `bun:"component_id"`
+		ScanID      int64     `bun:"closed_scan_id"`
+		ReceivedAt  time.Time `bun:"received_at"`
+	}
+	scans := map[int64]int64{}
+	for start := 0; start < len(components); start += database.BatchSize {
+		chunk := components[start:min(start+database.BatchSize, len(components))]
+		var read []closedNode
+		if err := s.db.NewSelect().
+			TableExpr(`"graph_node" AS "n"`).
+			Join(`JOIN "scan" AS "sc" ON "sc"."id" = "n"."closed_scan_id"`).
+			ColumnExpr(`"n"."build_id", "n"."component_id", "n"."closed_scan_id", "sc"."received_at"`).
+			Where(`"n"."build_id" IN (?)`, bun.List(builds)).
+			Where(`"n"."component_id" IN (?)`, bun.List(chunk)).
+			GroupExpr(`"n"."build_id", "n"."component_id", "n"."closed_scan_id", "sc"."received_at"`).
+			Scan(ctx, &read); err != nil {
+			return out, fmt.Errorf("read which uploads removed what a trend counts back: %w", err)
+		}
+		for _, n := range read {
+			at := removal{n.BuildID, n.ComponentID}
+			if !asked[at] {
+				continue
+			}
+			out.uploads[at] = append(out.uploads[at], removedBy{scan: n.ScanID, receivedAt: n.ReceivedAt})
+			scans[n.ScanID] = n.BuildID
+		}
+	}
+
+	settings := setting.NewStore(s.db)
+	share, err := settings.Count(ctx, setting.DeltaShare, setting.DefaultDeltaShare)
+	if err != nil {
+		return out, fmt.Errorf("read how much of a build may move: %w", err)
+	}
+	floor, err := settings.Count(ctx, setting.DeltaFloor, setting.DefaultDeltaFloor)
+	if err != nil {
+		return out, fmt.Errorf("read how few names are worth reporting: %w", err)
+	}
+	graphs := graph.NewStore(s.db)
+	for scan, build := range scans {
+		moved, answered, err := graphs.Moved(ctx, build, scan)
+		if err != nil {
+			return out, err
+		}
+		out.sharp[scan] = answered && moved.Outsized(share, floor)
 	}
 	return out, nil
 }

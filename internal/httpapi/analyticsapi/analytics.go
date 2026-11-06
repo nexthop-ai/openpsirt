@@ -27,7 +27,8 @@ type PointBody struct {
 	Open       int            `json:"open" doc:"Issues at components open at the end of the step"`
 	New        int            `json:"new" doc:"Issues at components open for the first time ever in the selection, other than through a build's first scan"`
 	Corrected  int            `json:"corrected" doc:"Issues at components that left the open set in the step by a fix and have not been open since. A later return takes one out of this count"`
-	Returned   int            `json:"returned" doc:"Issues at components back in the open set after having been in it before"`
+	Returned   int            `json:"returned" doc:"Issues at components back in the open set after having been in it before, other than those counted in restored"`
+	Restored   int            `json:"restored" doc:"Issues at components back in the open set after an upload that moved a sharp share of its build's inventory removed them: a broken inventory put right. Not in returned"`
 	Baseline   int            `json:"baseline" doc:"Issues at components a build's first scan brought into the open set. Not new: a first scan is an inventory arriving"`
 	FirstScans int            `json:"first_scans" doc:"Builds whose first scan was in the step"`
 	BySeverity map[string]int `json:"by_severity" doc:"Open, split by severity"`
@@ -42,7 +43,7 @@ type PointBody struct {
 // pointBody is a step as the chart reads it.
 func pointBody(p finding.Point) PointBody {
 	return PointBody{
-		At: core.LastDay(p.At), Open: p.Open, New: p.New, Corrected: p.Corrected, Returned: p.Returned,
+		At: core.LastDay(p.At), Open: p.Open, New: p.New, Corrected: p.Corrected, Returned: p.Returned, Restored: p.Restored,
 		Baseline: p.Baseline, FirstScans: p.FirstScans, BySeverity: p.BySeverity,
 		NewBySeverity: p.NewBySeverity, CorrectedBySeverity: p.CorrectedBySeverity,
 		ReturnedBySeverity: p.ReturnedBySeverity,
@@ -92,7 +93,9 @@ func registerAnalytics(api huma.API, in core.Deps) {
 			"Each count is of an issue at a component: one CVE in three packages is three, and a " +
 			"package at a new version is the same package. Each is one identity however often it " +
 			"leaves and comes back. `new` is one never open before in the selection; `returned` is " +
-			"one open before; `corrected` is one that left by a fix and has stayed out, so one that " +
+			"one open before; `restored` is one back after an upload removed it that moved as much " +
+			"of its build's inventory as the alert about a sharply moved inventory needs; " +
+			"`corrected` is one that left by a fix and has stayed out, so one that " +
 			"returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is " +
 			"`baseline`, and `first_scans` says how many builds were first scanned in the step.\n\n" +
 			"Narrowable to part of a tree. `component` keeps one package at any version; " +

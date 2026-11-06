@@ -177,8 +177,9 @@ Each screen was compared with the restyled mockup control for control.
 The trend is drawn by hand: open as an area in its own band, and beneath it on
 their own scale new with returned stacked above a zero line and corrected below
 it, one x axis. On the chart library's one scale, open in thousands flattens a
-day's tens to the baseline. A build's first scan is a dashed mark saying what it
-brought, never a bar, so the inventory arriving sets no scale. The severity
+day's tens to the baseline. A build's first scan, and a return after an upload
+that lost most of a build, are dashed marks saying how many, never bars, so the
+inventory arriving or coming back sets no scale. The severity
 split and the ring use the library.
 
 | Rule | Reason |

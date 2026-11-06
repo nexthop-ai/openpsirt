@@ -36,14 +36,16 @@ it. A component is its name, at any version.
 
 ### Counting by identity
 
-An issue at a component is an identity derived from content (REQ-08), so one
-that leaves the open set and comes back is recognized as the same one.
+Each issue at a component is one identity (REQ-54), derived from content
+(REQ-08), so one that leaves the open set and comes back is returned, and a
+build's first scan is a baseline rather than new work.
 
 | Series | An issue at a component counted in the step |
 |---|---|
 | Open | Open at the step's end: some finding of it in the selection opened at or before that moment and had not closed |
 | New | Open at the step's end, open at no moment before in the selection, and not brought by a build's first scan |
-| Returned | Open at the step's end, not at the end of the step before, and open at some moment before that in the selection, the window's start or earlier included |
+| Returned | Open at the step's end, not at the end of the step before, and open at some moment before that in the selection, the window's start or earlier included; not returned after a gap |
+| Returned after a gap | Returned, its last departure a removal by an upload that moved its build's inventory sharply; drawn as a mark, never a bar |
 | Corrected | Open at the end of the step before, not at this one's end, every closure of it in the step a resolution (`design-docs/analytics.md` § The counting unit), and no finding of it opened after this step's end |
 | Baseline | Open at the step's end for the first time, brought by a build's first scan; drawn as a mark, never a bar |
 
@@ -52,6 +54,10 @@ that leaves the open set and comes back is recognized as the same one.
 | A component is its name, at any version | A version bump carrying an issue is no flow, and one fixing it is one corrected |
 | Present before is asked of the issue at its component | An issue fixed in one package says nothing about another |
 | A bounce is one return and no correction | A broken inventory that drops every component for a scan otherwise counts the whole estate resolved and then new |
+| A sharp upload is the one the alert about a sharply moved inventory names, with its share and floor (`design-docs/notifications-alerts.md` § An inventory that moved sharply), worked out from the inventories stored | One rule for one event; nothing new is stored |
+| A removal's upload is the latest to take the component out of the build, arriving at or before the closure | The run that closed the row read that inventory |
+| Only a removal is a gap; an upgrade a sharp upload made is a fix, and its return is returned | A component missing is the inventory broken; a version moved is work |
+| Returned after a gap is out of the arrivals a reading compares with corrected | The inventory coming back is not work arriving |
 | A correction stops counting when its issue returns, at whatever later moment | Corrected means still closed now; past bars move when an issue comes back |
 | A build's first scan is its earliest run by start that did not fail | A failed run opened nothing |
 | A first scan's issues are baseline, and the step says how many builds were first scanned in it | The inventory arriving is not work arriving; a new branch or variant is its own baseline |
@@ -222,5 +228,4 @@ deferral counts for the part that ran, and overlapping stretches count once.
 | Limit | Detail |
 |---|---|
 | An issue rated differently in two products counts once, in the strictest band | Trends, aging buckets and fixes agree on one screen |
-| A return is a returned bar whatever caused it | A broken inventory's bounce and a real regression read alike; the closure reason of the departure is not shown |
 | A component a rescan removed, with no component of its name left in the build, sits beneath nothing | Its closures leave the trend of the component it sat beneath; there is no present version to count them at, as for code findings |

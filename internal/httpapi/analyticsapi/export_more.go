@@ -589,9 +589,10 @@ func registerTrendExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-trend", Method: http.MethodGet, Path: "/v1/trend.{format}",
 		Summary: "Export the findings trend",
-		Description: "One row per step, with the issues at components new, corrected, returned and " +
-			"brought by a first scan in it, and open at its end, each flow and open split by " +
-			"severity. The counts are the trend's.\n\n" +
+		Description: "One row per step, with the issues at components new, corrected, returned, " +
+			"returned after a gap and brought by a first scan in it, and open at its end, the " +
+			"flows other than a return after a gap and open split by severity. The counts are " +
+			"the trend's.\n\n" +
 			"Takes the window and the narrowings the trend takes. Read with your own " +
 			"visibility, like the chart it comes from.",
 		Tags: []string{"Analytics"},
@@ -631,7 +632,7 @@ func registerTrendExport(api huma.API, in core.Deps) {
 		// happens to hold: a file whose columns depend on the data is one a
 		// spreadsheet cannot be built against.
 		bands := append(finding.Bands(), finding.Unrated)
-		header := []string{input.StepEnding(), "new", "corrected", "returned", "baseline", "first scans", "open"}
+		header := []string{input.StepEnding(), "new", "corrected", "returned", "returned after a gap", "baseline", "first scans", "open"}
 		for _, split := range []string{"new", "corrected", "returned", "open"} {
 			for _, band := range bands {
 				header = append(header, split+" "+band)
@@ -658,7 +659,7 @@ func registerTrendExport(api huma.API, in core.Deps) {
 				for _, point := range points {
 					row := []string{
 						core.LastDay(point.At), strconv.Itoa(point.New), strconv.Itoa(point.Corrected),
-						strconv.Itoa(point.Returned), strconv.Itoa(point.Baseline),
+						strconv.Itoa(point.Returned), strconv.Itoa(point.Restored), strconv.Itoa(point.Baseline),
 						strconv.Itoa(point.FirstScans), strconv.Itoa(point.Open),
 					}
 					for _, split := range []map[string]int{

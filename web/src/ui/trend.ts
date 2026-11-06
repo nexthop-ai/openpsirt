@@ -13,6 +13,7 @@ export type Step = {
   new?: number;
   corrected?: number;
   returned?: number;
+  restored?: number;
   baseline?: number;
   first_scans?: number;
   by_severity?: Record<string, number>;
@@ -32,6 +33,7 @@ function moved(p: Step): boolean {
     (p.new ?? 0) > 0 ||
     (p.corrected ?? 0) > 0 ||
     (p.returned ?? 0) > 0 ||
+    (p.restored ?? 0) > 0 ||
     (p.baseline ?? 0) > 0 ||
     (p.first_scans ?? 0) > 0
   );

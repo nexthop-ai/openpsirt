@@ -536,6 +536,27 @@ type Movement struct {
 	Held int
 }
 
+// Outsized says whether an upload moved enough of a build's inventory that
+// somebody should hear about it, with the share as a percentage.
+//
+// Both thresholds, and both have to be passed. The share is what makes the
+// question "is this unlike this build": forty names is a rebuild on an
+// inventory of two thousand and a different build on an inventory of sixty.
+// The floor is what keeps a small inventory from asking it every time three
+// dependencies move.
+func (m Movement) Outsized(share, floor int) bool {
+	names := m.Added + m.Removed + m.Changed
+	if names < floor {
+		return false
+	}
+	// Multiplied out rather than divided, so that the comparison is in whole
+	// names and a share of a small inventory does not round to nothing. It is
+	// also what makes an inventory that held nothing pass whatever the share
+	// is, since whatever arrived is the whole of it, while the floor above
+	// still applies to it, as it does to every upload.
+	return names*100 >= share*m.Held
+}
+
 // Moved is what one scan made of a build's inventory, for the pass that
 // decides whether anybody should hear about it.
 //

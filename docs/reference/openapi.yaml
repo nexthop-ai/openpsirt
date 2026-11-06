@@ -10544,8 +10544,12 @@ components:
           description: Issues at components open at the end of the step
           format: int64
           type: integer
+        restored:
+          description: "Issues at components back in the open set after an upload that moved a sharp share of its build's inventory removed them: a broken inventory put right. Not in returned"
+          format: int64
+          type: integer
         returned:
-          description: Issues at components back in the open set after having been in it before
+          description: Issues at components back in the open set after having been in it before, other than those counted in restored
           format: int64
           type: integer
         returned_by_severity:
@@ -10560,6 +10564,7 @@ components:
         - new
         - corrected
         - returned
+        - restored
         - baseline
         - first_scans
         - by_severity
@@ -36634,7 +36639,7 @@ paths:
       description: |-
         Returns, per step, the issues open at its end and the issues that moved in it, each split by severity, across every product you can see. Steps are weeks or days, ending at the coming midnight UTC, each dated by its last day.
 
-        Each count is of an issue at a component: one CVE in three packages is three, and a package at a new version is the same package. Each is one identity however often it leaves and comes back. `new` is one never open before in the selection; `returned` is one open before; `corrected` is one that left by a fix and has stayed out, so one that returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is `baseline`, and `first_scans` says how many builds were first scanned in the step.
+        Each count is of an issue at a component: one CVE in three packages is three, and a package at a new version is the same package. Each is one identity however often it leaves and comes back. `new` is one never open before in the selection; `returned` is one open before; `restored` is one back after an upload removed it that moved as much of its build's inventory as the alert about a sharply moved inventory needs; `corrected` is one that left by a fix and has stayed out, so one that returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is `baseline`, and `first_scans` says how many builds were first scanned in the step.
 
         Narrowable to part of a tree. `component` keeps one package at any version; `beneath` keeps a component and everything under it, which needs a branch and a variant naming exactly one build.
 
@@ -36741,7 +36746,7 @@ paths:
   /v1/trend.{format}:
     get:
       description: |-
-        One row per step, with the issues at components new, corrected, returned and brought by a first scan in it, and open at its end, each flow and open split by severity. The counts are the trend's.
+        One row per step, with the issues at components new, corrected, returned, returned after a gap and brought by a first scan in it, and open at its end, the flows other than a return after a gap and open split by severity. The counts are the trend's.
 
         Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
 

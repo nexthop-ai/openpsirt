@@ -150,8 +150,9 @@ const ISSUE_WORDS: PaceWords = {
 export type PaceMark = { step: number; said: string };
 
 // The marks a chart draws over the steps it draws: those given, moved to the
-// steps that remain once the leading empty ones are dropped, and one at each
-// first scan saying what it brought. Two on one step are one mark.
+// steps that remain once the leading empty ones are dropped, one at each first
+// scan saying what it brought, and one where a sharply shrunk inventory came
+// back. Two on one step are one mark.
 export function paceMarks(points: Point[], marks: PaceMark[], from: number): PaceMark[] {
   const said = new Map<number, string[]>();
   const add = (step: number, line: string) => said.set(step, [...(said.get(step) ?? []), line]);
@@ -159,6 +160,9 @@ export function paceMarks(points: Point[], marks: PaceMark[], from: number): Pac
   points.slice(from).forEach((p, i) => {
     if ((p.first_scans ?? 0) > 0 || (p.baseline ?? 0) > 0) {
       add(i, `${day(p.at)}: first scan: ${(p.baseline ?? 0).toLocaleString()}`);
+    }
+    if ((p.restored ?? 0) > 0) {
+      add(i, `${day(p.at)}: returned after a gap: ${(p.restored ?? 0).toLocaleString()}`);
     }
   });
   return [...said.entries()]
@@ -311,7 +315,7 @@ export function PaceLegend() {
         <i style={{ background: "var(--ok)" }} /> Corrected
       </span>
       <span>
-        <i className="dashed" /> First scan
+        <i className="dashed" /> First scan or gap
       </span>
     </div>
   );
@@ -338,14 +342,17 @@ function niceTicks(lo: number, hi: number, want: number): number[] {
 }
 
 // What the chart shows, for a screen reader: open from where scanning began,
-// how often arrivals outran corrections, and what first scans brought.
+// how often arrivals outran corrections, what first scans brought, and what
+// came back after a gap.
 export function paceLabel(points: Point[], words: PaceWords, unit: string): string {
   const first = points[0]?.open ?? 0;
   const last = points[points.length - 1]?.open ?? 0;
   const ahead = points.filter(outran).length;
   const baseline = points.reduce((sum, p) => sum + (p.baseline ?? 0), 0);
   const scans = baseline > 0 ? `; first scans brought ${baseline.toLocaleString()}` : "";
-  return `${words.what} from ${first.toLocaleString()} to ${last.toLocaleString()} over ${points.length} ${unit}, with ${words.fresh} and ${words.back} outrunning ${words.done} in ${ahead} of them${scans}`;
+  const restored = points.reduce((sum, p) => sum + (p.restored ?? 0), 0);
+  const gaps = restored > 0 ? `; ${restored.toLocaleString()} returned after a gap` : "";
+  return `${words.what} from ${first.toLocaleString()} to ${last.toLocaleString()} over ${points.length} ${unit}, with ${words.fresh} and ${words.back} outrunning ${words.done} in ${ahead} of them${scans}${gaps}`;
 }
 
 // The same total, split. A flat line with a rising critical share is getting

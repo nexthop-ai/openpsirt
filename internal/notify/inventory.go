@@ -65,7 +65,7 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 	if err != nil {
 		return fmt.Errorf("read how few names are worth reporting: %w", err)
 	}
-	if !outsized(movement, share, floor) {
+	if !movement.Outsized(share, floor) {
 		return nil
 	}
 
@@ -111,27 +111,6 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 		}
 	}
 	return failed
-}
-
-// outsized says whether an upload moved enough of a build's inventory that
-// somebody should hear about it.
-//
-// Both thresholds, and both have to be passed. The share is what makes the
-// question "is this unlike this build" — forty names is a rebuild on an
-// inventory of two thousand and a different build on an inventory of sixty —
-// and the floor is what keeps a small inventory from asking it every time
-// three dependencies move.
-func outsized(movement graph.Movement, share, floor int) bool {
-	names := movement.Added + movement.Removed + movement.Changed
-	if names < floor {
-		return false
-	}
-	// Multiplied out rather than divided, so that the comparison is in whole
-	// names and a share of a small inventory does not round to nothing. It is
-	// also what makes an inventory that held nothing pass whatever the share
-	// is — whatever arrived is the whole of it — while the floor above still
-	// applies to it, as it does to every upload.
-	return names*100 >= share*movement.Held
 }
 
 // saying is what an outsized upload is told as.

@@ -75,6 +75,26 @@ describe("the backlog's pace", () => {
     expect(tickWords([0, 5000])).toEqual(["0", "5.0k"]);
   });
 
+  it("marks a return after a gap and says it beside the first scans", () => {
+    const points = [
+      { ...point("2026-01-01", 5, 0, 0), baseline: 5, first_scans: 1 },
+      { ...point("2026-01-02", 5, 0, 0), restored: 4 },
+    ];
+    expect(paceMarks(points, [], 0)).toEqual([
+      { step: 0, said: "01-01: first scan: 5" },
+      { step: 1, said: "01-02: returned after a gap: 4" },
+    ]);
+    expect(
+      paceLabel(
+        points,
+        { line: "", what: "Open", fresh: "new", back: "back", done: "done" },
+        "days",
+      ),
+    ).toBe(
+      "Open from 5 to 5 over 2 days, with new and back outrunning done in 0 of them; first scans brought 5; 4 returned after a gap",
+    );
+  });
+
   it("moves a mark to the step it stays on once leading steps are dropped", () => {
     const points = [
       point("2026-01-01", 0, 0, 0),
