@@ -63,11 +63,17 @@ function burndownOf(at: Build, by: Listing, row: Group, ecosystem: string): stri
   });
 }
 
-// The findings list for a repository row: its subtree. A package or an
-// ecosystem has none, since the list's name filter spans every ecosystem.
-function findingsOf(at: Build, by: Listing, row: Group): string | null {
-  if (by !== "repository" || !row.component) return null;
-  return buildFindingsAt(at, beneathOf(row.component));
+// The findings list for a row: a repository's subtree on this build, an
+// ecosystem's components, and a package by its name within its ecosystem.
+// Components with no identifier have none, since no kind names them.
+function findingsOf(at: Build, by: Listing, row: Group, ecosystem: string): string | null {
+  if (by === "repository") {
+    return row.component ? buildFindingsAt(at, beneathOf(row.component)) : null;
+  }
+  if (!ecosystem) {
+    return row.key === NO_ECOSYSTEM ? null : buildFindingsAt(at, { ecosystem: row.key });
+  }
+  return row.component ? buildFindingsAt(at, { component: row.component.name, ecosystem }) : null;
 }
 
 export function ComponentGroups({
@@ -138,7 +144,7 @@ export function ComponentGroups({
           <tbody>
             {rows.map((row) => {
               const burn = burndownOf(at, by, row, ecosystem);
-              const list = findingsOf(at, by, row);
+              const list = findingsOf(at, by, row, ecosystem);
               return (
                 <tr key={row.key}>
                   <td className="id">

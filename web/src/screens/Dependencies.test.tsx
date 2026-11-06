@@ -244,12 +244,17 @@ describe("the components listed by repository and by ecosystem", () => {
     expect(link("Burndown")).toHaveLength(1);
   });
 
-  it("chooses an ecosystem's burndown by its purl prefix, and opens its packages", async () => {
+  it("chooses an ecosystem's burndown by purl prefix and its findings by kind, and opens its packages", async () => {
     await drawn(REACH, `${AT}?list=ecosystem`);
     expect(link("Burndown")).toEqual([
       "/analytics/findings-burndown?branch_or_tag=master&variant=arm&purl=pkg%3Acargo%2F",
     ]);
     expect(link("cargo")[0]).toContain("list=ecosystem&ecosystem=cargo");
+    // An ecosystem opens its findings by kind; components with no identifier
+    // have no kind to name.
+    expect(link("Findings")).toEqual([
+      "/products/sonic/branches-and-tags/master/variants/arm/findings?ecosystem=cargo",
+    ]);
     await act(async () =>
       Array.from(mount.host().querySelectorAll("a"))
         .find((a) => a.textContent === "cargo")
@@ -257,8 +262,10 @@ describe("the components listed by repository and by ecosystem", () => {
     );
     await settle();
     expect(text()).toContain("pkg:cargo/addr2line");
-    // The list's name filter spans every ecosystem, so a package opens none.
-    expect(link("Findings")).toEqual([]);
+    // The name within its ecosystem: the list's name filter spans every one.
+    expect(link("Findings")).toEqual([
+      "/products/sonic/branches-and-tags/master/variants/arm/findings?component=addr2line&ecosystem=cargo",
+    ]);
     expect(link("Burndown")[0]).toContain("purl=pkg%3Acargo%2Faddr2line");
   });
 
