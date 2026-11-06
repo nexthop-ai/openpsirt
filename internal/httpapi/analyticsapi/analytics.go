@@ -277,7 +277,7 @@ type ReleasePointBody struct {
 	BranchOrTag     string         `json:"branch_or_tag"`
 	BranchOrTagName string         `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Cut             string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
-	Open            int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
+	Open            int            `json:"open" doc:"Issues at components open against it now, each issue counted once per component name, against today's vulnerability data rather than the day it was cut"`
 	BySeverity      map[string]int `json:"by_severity,omitempty"`
 }
 

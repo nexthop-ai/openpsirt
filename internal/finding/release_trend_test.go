@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 func TestATrendOverReleasesHasOnePointPerReleaseOldestFirst(t *testing.T) {
@@ -47,10 +48,10 @@ func TestATrendOverReleasesHasOnePointPerReleaseOldestFirst(t *testing.T) {
 		if points[0].BranchOrTag != "v1.0" || points[1].BranchOrTag != "v1.1" {
 			t.Errorf("the releases are in the order %q, %q", points[0].BranchOrTag, points[1].BranchOrTag)
 		}
-		// Counted in issues, like the calendar trend, so two charts on one
-		// screen cannot quote different units for the same word.
+		// Counted in issues at components, like the calendar trend, so two
+		// charts on one screen cannot quote different units for the same word.
 		if points[0].Open != 2 {
-			t.Errorf("v1.0 reads %d open, want the 2 distinct issues", points[0].Open)
+			t.Errorf("v1.0 reads %d open, want the 2 issues at libnl", points[0].Open)
 		}
 		if points[1].Open != 1 {
 			t.Errorf("v1.1 reads %d open, want 1", points[1].Open)
@@ -147,6 +148,32 @@ func TestAScannedBuildWithNothingOpenIsStillAReleaseOfItsOwn(t *testing.T) {
 		}
 		if got := byVariant["broadcom"].Open; got == 0 {
 			t.Error("the build with a finding reports nothing open")
+		}
+	})
+}
+
+func TestAReleaseCountsAnIssueAtEachComponent(t *testing.T) {
+	// One issue in two packages is two, as the open figure beside the chart
+	// counts it; the same package at two versions is one component.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		release := f.anotherBuild(t, "v1.0")
+		snap := twoConsumers()
+		snap.Components = append(snap.Components, libnlNew)
+		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: teamd, Child: libnlNew})
+		f.shippedTo(t, release, snap)
+		if _, err := f.store.Apply(ctx, release, f.runOn(t, release), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-1", libnlNew), found("CVE-2026-1", teamd),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		points, err := f.store.ReleaseTrend(ctx, f.holding(t, access.PublicRead), f.wholeProduct(), 12)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(points) != 1 || points[0].Open != 2 || points[0].BySeverity["high"] != 2 {
+			t.Errorf("the release reads %+v, want the issue at libnl and at teamd, two high", points)
 		}
 	})
 }

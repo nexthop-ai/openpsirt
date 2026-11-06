@@ -14432,7 +14432,7 @@ export interface components {
             cut: string;
             /**
              * Format: int64
-             * @description Distinct issues open against it now, against today's vulnerability data rather than the day it was cut
+             * @description Issues at components open against it now, each issue counted once per component name, against today's vulnerability data rather than the day it was cut
              */
             open: number;
         };

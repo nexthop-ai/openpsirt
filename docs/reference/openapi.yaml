@@ -11721,7 +11721,7 @@ components:
           description: The date the release was declared. It orders and labels them; the axis is the sequence
           type: string
         open:
-          description: Distinct issues open against it now, against today's vulnerability data rather than the day it was cut
+          description: Issues at components open against it now, each issue counted once per component name, against today's vulnerability data rather than the day it was cut
           format: int64
           type: integer
       required:

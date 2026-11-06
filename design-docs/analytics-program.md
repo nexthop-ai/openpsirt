@@ -85,6 +85,7 @@ build's first scan is a baseline rather than new work.
 | Rates stay on calendar | Between releases they measure how far apart they were cut |
 | Release over release names a product and needs two releases | Tags across products interleave; one bar reads as broken |
 | A release with nothing open is still a point | Counts attach to the list of every scanned build; absent says never scanned |
+| Release over release counts each issue at a component open against the release, a component by its name | The unit of the calendar trend and of Home's open figure beside it |
 | A corrected issue counts at the severity it held while open, at the end of the step before | |
 
 ## Subtree trends

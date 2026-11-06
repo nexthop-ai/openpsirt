@@ -31,8 +31,8 @@ type ReleasePoint struct {
 	// declared here otherwise. It is what orders them and it is not the axis:
 	// the axis is the sequence, and the dates are labels.
 	Cut time.Time
-	// Open is the distinct issues open against it, and BySeverity the split.
-	// Counted in issues like the calendar trend, so the two charts on one
+	// Open is the issues at components open against it, and BySeverity the
+	// split. Counted in the calendar trend's unit, so the two charts on one
 	// screen cannot be quoting different units for the same word.
 	Open       int
 	BySeverity map[string]int
@@ -97,23 +97,25 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Band            string    `bun:"band"`
 		Open            int       `bun:"open"`
 	}
-	// The distinct issues per release, then the band of each, counted after.
-	// The issues are reduced on the finding alone, before the issue or its
-	// rating is joined: a release holds each issue at many occurrences, and
-	// joining first reads the issue's row once per occurrence only to fold the
-	// copies away. Inside one product an issue has one band, so the pair
-	// is already distinct once it carries one.
+	// The issues at components per release, then the band of each, counted
+	// after. A component is its name, so one name at two versions is one. The
+	// pairs are reduced before the issue or its rating is joined: a release
+	// holds each issue at many occurrences, and joining first reads the
+	// issue's row once per occurrence only to fold the copies away. Inside one
+	// product an issue has one band, so each is already distinct once it
+	// carries one.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	issues := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"tg"."branch_or_tag_id" AS "branch_or_tag_id"`).
+		Join(`JOIN "component" AS "rc" ON "rc"."id" = "f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		Where(`"st"."kind" = ?`, catalog.Tag).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"tg"."branch_or_tag_id", "f"."vulnerability_id"`)
+		GroupExpr(`"tg"."branch_or_tag_id", "f"."vulnerability_id", "rc"."name_folded"`)
 	issues = scope.Narrow(onlyReadable(issues, subject, products, all))
 
 	inner := s.db.NewSelect().
