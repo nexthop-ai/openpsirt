@@ -202,6 +202,27 @@ func TestTheListOnADayCountsNothingFixedSinceAsOverdue(t *testing.T) {
 			if across != 0 {
 				t.Errorf("%s across products: %d, want none", name, across)
 			}
+			components, err := f.store.CountComponentGroups(ctx, who, f.wholeProduct(), filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if components != 0 {
+				t.Errorf("%s by component: %d, want none", name, components)
+			}
+			_, listed, err := f.store.ComponentGroups(ctx, who, f.wholeProduct(), 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if listed != 0 {
+				t.Errorf("%s component list: %d, want none", name, listed)
+			}
+			_, bumps, err := f.store.PlannedUpgrades(ctx, who, f.wholeProduct(), 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bumps != 0 {
+				t.Errorf("%s bumps: %d, want none", name, bumps)
+			}
 		}
 	})
 }

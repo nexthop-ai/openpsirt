@@ -841,9 +841,9 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		q = q.Having(`MIN("f"."opened_at") < ?`, *f.OpenedBefore)
 	}
 	if f.Overdue {
-		q = q.Having(`MIN("f"."due_at") IS NOT NULL AND MIN("f"."due_at") < ?`, f.at())
+		q = q.Having(g.due()+` IS NOT NULL AND `+g.due()+` < ?`, f.at())
 	} else if f.DueBefore != nil {
-		q = q.Having(`MIN("f"."due_at") IS NOT NULL AND MIN("f"."due_at") < ?`, *f.DueBefore)
+		q = q.Having(g.due()+` IS NOT NULL AND `+g.due()+` < ?`, *f.DueBefore)
 	}
 	q = f.whatUpstreamDid(q, g)
 	// The occurrences a promised upgrade covers, or the ones none does. A
