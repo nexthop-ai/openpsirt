@@ -2395,6 +2395,24 @@ components:
         - direct
         - shared
       type: object
+    CheckedBody:
+      additionalProperties: false
+      properties:
+        at:
+          description: When the check finished
+          type: string
+        found_after_fixed:
+          description: Findings the check recorded, each published after the inventory was last scanned and gone from its replacement, so recorded closed. Absent where you may read none of its findings
+          format: int64
+          type: integer
+        run_id:
+          description: The run that checked it
+          format: int64
+          type: integer
+      required:
+        - run_id
+        - at
+      type: object
     ChosenBody:
       additionalProperties: false
       properties:
@@ -5685,6 +5703,9 @@ components:
         product_name:
           description: That product's display name, or its name where it has none
           type: string
+        publication_unknown:
+          description: "Publication date unknown: an occurrence a replaced inventory's check recorded opens from that inventory's last scan, because no date is known for the issue. Only on a list read with open_on"
+          type: boolean
         score:
           description: The severity as a number, which is what the order compares
           format: double
@@ -7024,6 +7045,13 @@ components:
           type:
             - array
             - "null"
+        dates:
+          description: "Where the two dates stand: stated by OSV, unknown to OSV, or not yet asked. Absent where nothing affected is visible"
+          enum:
+            - stated
+            - unknown
+            - unasked
+          type: string
         description:
           type: string
         exploited:
@@ -7041,10 +7069,16 @@ components:
           type:
             - array
             - "null"
+        modified:
+          description: When OSV last recorded a change to the issue
+          type: string
         products:
           description: The number of your products carrying it
           format: int64
           type: integer
+        published:
+          description: When the issue was published, as OSV states. Absent where OSV holds no record of it or was not asked
+          type: string
         ratings:
           description: Every published rating of the issue, one per generation of the scoring system, newest first
           items:
@@ -11391,6 +11425,9 @@ components:
         caution:
           description: "The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"
           type: string
+        checked:
+          $ref: "#/components/schemas/CheckedBody"
+          description: The check of this inventory against issues published while it was current, made once a later upload replaced it. Absent until it has finished, and on a tag
         closed:
           description: Issues that were open and are not any more. Absent for the same reasons as the count beside it
           format: int64
@@ -19960,12 +19997,19 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -20491,12 +20535,19 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -20877,7 +20928,7 @@ paths:
 
         Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
 
-        Answers by any name the issue goes by.
+        Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-issue
@@ -29242,12 +29293,19 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -29895,12 +29953,19 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -30466,12 +30531,19 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -31051,12 +31123,19 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false
@@ -31646,12 +31725,19 @@ paths:
             format: int64
             minimum: 1
             type: integer
-        - description: "Accepted and matches nothing: this list holds open rows only"
+        - description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
           explode: false
           in: query
           name: closed_after
           schema:
-            description: "Accepted and matches nothing: this list holds open rows only"
+            description: Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing
+            type: string
+        - description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
+          explode: false
+          in: query
+          name: open_on
+          schema:
+            description: List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now
             type: string
         - description: Keep only what somebody proposed a decision about after this date
           explode: false

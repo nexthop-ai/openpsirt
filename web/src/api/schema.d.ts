@@ -1847,7 +1847,7 @@ export interface paths {
          *
          *     Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
          *
-         *     Answers by any name the issue goes by.
+         *     Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -9158,6 +9158,20 @@ export interface components {
             /** @description What a channel carries is sent to them directly as well */
             shared: boolean;
         };
+        CheckedBody: {
+            /** @description When the check finished */
+            at: string;
+            /**
+             * Format: int64
+             * @description Findings the check recorded, each published after the inventory was last scanned and gone from its replacement, so recorded closed. Absent where you may read none of its findings
+             */
+            found_after_fixed?: number;
+            /**
+             * Format: int64
+             * @description The run that checked it
+             */
+            run_id: number;
+        };
         ChosenBody: {
             /** @description The package identifier's type */
             ecosystem?: string;
@@ -11149,6 +11163,8 @@ export interface components {
             product?: string;
             /** @description That product's display name, or its name where it has none */
             product_name?: string;
+            /** @description Publication date unknown: an occurrence a replaced inventory's check recorded opens from that inventory's last scan, because no date is known for the issue. Only on a list read with open_on */
+            publication_unknown?: boolean;
             /**
              * Format: double
              * @description The severity as a number, which is what the order compares
@@ -11896,16 +11912,25 @@ export interface components {
             readonly $schema?: string;
             /** @description Every other name it answers to */
             aliases?: string[] | null;
+            /**
+             * @description Where the two dates stand: stated by OSV, unknown to OSV, or not yet asked. Absent where nothing affected is visible
+             * @enum {string}
+             */
+            dates?: "stated" | "unknown" | "unasked";
             description?: string;
             exploited?: boolean;
             items: components["schemas"]["SightingBody"][] | null;
             /** @description Issues held apart until a report named them together, and merged into this one. What was decided under each applies here */
             merged?: components["schemas"]["MergedBody"][] | null;
+            /** @description When OSV last recorded a change to the issue */
+            modified?: string;
             /**
              * Format: int64
              * @description The number of your products carrying it
              */
             products: number;
+            /** @description When the issue was published, as OSV states. Absent where OSV holds no record of it or was not asked */
+            published?: string;
             /** @description Every published rating of the issue, one per generation of the scoring system, newest first */
             ratings?: components["schemas"]["RatingBody"][] | null;
             /** Format: double */
@@ -14346,6 +14371,8 @@ export interface components {
             built_at?: string;
             /** @description The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours */
             caution?: string;
+            /** @description The check of this inventory against issues published while it was current, made once a later upload replaced it. Absent until it has finished, and on a tag */
+            checked?: components["schemas"]["CheckedBody"];
             /**
              * Format: int64
              * @description Issues that were open and are not any more. Absent for the same reasons as the count beside it
@@ -19233,8 +19260,10 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -19351,8 +19380,10 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24365,8 +24396,10 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24536,8 +24569,10 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24669,8 +24704,10 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24807,8 +24844,10 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
@@ -24943,8 +24982,10 @@ export interface operations {
                 opened_before?: string;
                 /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
                 opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
+                /** @description Keep only what closed after this date. Without open_on this list holds open rows only, so it matches nothing */
                 closed_after?: string;
+                /** @description List what was open here at any moment of this day, in UTC, as 2026-03-31, closed since or not, in place of what is open now. Decisions, assignment and deadlines are as they stand now */
+                open_on?: string;
                 /** @description Keep only what somebody proposed a decision about after this date */
                 proposed_after?: string;
                 /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */

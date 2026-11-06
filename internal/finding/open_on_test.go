@@ -162,7 +162,7 @@ func TestTheListOnADayBeneathAComponentHoldsWhatARescanReplaced(t *testing.T) {
 		between := today.Add(-4 * 24 * time.Hour)
 		under := f.componentID(t, swss.Name)
 		_, total, err := f.store.Groups(ctx, f.holding(t, access.PublicTriage), f.scope, 50, 0,
-			finding.Filter{OpenOn: &between, Beneath: &under})
+			finding.Filter{OpenOn: &between, Beneath: []int64{under}})
 		if err != nil {
 			t.Fatal(err)
 		}
