@@ -16,10 +16,10 @@ The rule is in `design-docs/analytics.md` § Computed on demand. Measured on
 
 | Report | Grouped to | Grouped first, against joined first |
 |---|---|---|
-| Backlog trend | Issue, product, and the moments it opened and closed | 15,053 rows sent against 367,577; 0.25 s against 1.58 s |
+| Backlog trend | Issue, component, product, opening run, and the moments it opened and closed | Grouped on issue, product and the moments: 15,053 rows sent against 367,577; 0.25 s against 1.58 s |
 | What each release holds | Build, issue and component | 0.17 s against 1.38 s |
 | Release readiness, what a build holds | Issue and component | 0.09 s against 0.33 s |
-| Release over release | Release and issue | Not measured: the data holds no tags |
+| Release over release | Release, issue and component name | 24 tags, 453,336 open findings: 0.46 to 0.57 s on PostgreSQL and 0.85 to 0.92 s on MySQL 8.4, against 0.24 to 0.28 s and 0.20 to 0.31 s grouped on release and issue; grouping on the component's identifier first measured no faster |
 | Aging buckets | Issue and product, then issue, with a flag per bucket | One statement, 0.9 s, against three per bucket taking 2.1 s together, with 133,000 decision occurrences |
 
 ## Planned upgrades page cost
