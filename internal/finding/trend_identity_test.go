@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -468,6 +469,31 @@ func TestRemovalsNoReturnFollowsAreNeverWorkedOut(t *testing.T) {
 		}
 		if after != before {
 			t.Errorf("three removals no return follows took the graph reads from %d to %d", before, after)
+		}
+	})
+}
+
+func TestAFailedRunIsNoBuildsFirstScan(t *testing.T) {
+	// A failed run opened nothing, so the first run that worked is the
+	// inventory arriving, and its issues are a baseline.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		failed := f.run(t)
+		f.seenAt(t, failed, now.Add(-21*24*time.Hour))
+		if err := f.store.Finish(t.Context(), failed, "0.100.0", "2026-08-28", "",
+			errors.New("the scanner exited 2")); err != nil {
+			t.Fatal(err)
+		}
+		f.scannedAt(t, twoConsumers(), now.Add(-20*24*time.Hour),
+			found("CVE-2026-1", libnl), found("CVE-2026-2", teamd))
+
+		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := summed(points); got != (totals{open: 2, baseline: 2, firstScans: 1}) {
+			t.Errorf("counted %+v, want the run after the failed one as the first scan, its two issues baseline", got)
 		}
 	})
 }
