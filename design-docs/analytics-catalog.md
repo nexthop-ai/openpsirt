@@ -47,7 +47,7 @@ own. The catalog screen also holds the files reachable nowhere else.
 
 | Group | Entries |
 |---|---|
-| Program | Program overview, backlog over time, deadline compliance, effort by component |
+| Program | Program overview, backlog over time, findings burndown, deadline compliance, effort by component |
 | Controls | Approval quality, the exception report, standing corrections, administrative changes |
 | Coverage | Last upload per build, unmatched components, carried patches |
 | Security testing | Code findings by analyzer, code findings over time, time to judge, time to fix, analyzer precision, analysis coverage, code findings by release (`design-docs/analysis-figures.md`); listed only to a reader of security testing material in some product |
@@ -63,6 +63,7 @@ own. The catalog screen also holds the files reachable nowhere else.
 | Last upload per build | The estate, longest silent first: builds scanned, gone quiet, or declared and never filed against |
 | Releases out of support | Releases past their date and, asked for, those about to pass: how long ago or left, and issues still open, ordered by what is open. Past end of life nothing is overdue, so asking is the only way to see it. An inherited date says so |
 | Backlog over time | `design-docs/analytics-program.md` § Trends |
+| Findings burndown | `design-docs/analytics-program.md` § Burndown sheet |
 | Approval quality | `design-docs/analytics-controls.md` § Approval quality |
 | Effort by component | `design-docs/analytics-program.md` § Effort by subject |
 | Deadline compliance | `design-docs/analytics-program.md` § Deadline compliance |

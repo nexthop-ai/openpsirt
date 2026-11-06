@@ -85,6 +85,11 @@ export const GROUPS: Group[] = [
           "Whether the backlog is growing: what arrived, what was answered, and what stood open.",
       },
       {
+        slug: "findings-burndown",
+        name: "Findings burndown",
+        answers: "How much is left from a day 0, and when it reaches zero at this pace.",
+      },
+      {
         slug: "deadline-compliance",
         name: "Deadline compliance",
         answers:

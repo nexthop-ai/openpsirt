@@ -4,11 +4,13 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Backlog } from "./Backlog";
+import { Burndown } from "./Burndown";
 import { Compliance } from "./Compliance";
 import { Register } from "./Register";
 import { Support } from "./Support";
 import { location, mounted, screen, serve, settle, type Answer } from "../../test/mount";
 import { BANDS } from "../../ui/severities";
+import { change } from "../../test/controls";
 
 const mount = mounted();
 
@@ -263,5 +265,101 @@ describe("the backlog over time", () => {
     await settle();
     expect(text()).toContain("Nothing open or moving.");
     expect(text()).not.toContain("Open, new, returned and corrected");
+  });
+});
+
+describe("the findings burndown", () => {
+  const point = (at: string, left: number) => ({
+    at,
+    left,
+    left_by_severity: { high: left },
+    new: 1,
+    returned: 0,
+    fixed: 2,
+    dismissed: 1,
+    restored: 0,
+    baseline: 0,
+    first_scans: 0,
+  });
+  const answer = (projection: Record<string, unknown>, chosen: object[] = []) => ({
+    data: {
+      since: "2026-10-01",
+      start: 12,
+      points: [point("2026-10-01", 10), point("2026-10-02", 8)],
+      projection: { days: 2, done: 6, added: 2, per_day: 2, converging: true, ...projection },
+      chosen,
+    },
+  });
+
+  it("names the day it reaches zero, and asks with the day 0 and floor the address names", async () => {
+    scoped({ product: "sonic" });
+    const spy = serve((path) =>
+      path === "/v1/burndown" ? answer({ zero_on: "2026-11-10" }) : undefined,
+    );
+    mount.render(
+      screen(<Burndown />, "/analytics/findings-burndown?since=2026-10-01&severity=high"),
+    );
+    await settle();
+    expect(askedOf(spy, "/v1/burndown")[0]).toEqual({
+      product: "sonic",
+      since: "2026-10-01",
+      severity: "high",
+    });
+    expect(text()).toContain("Zero by 2026-11-10 at this pace.");
+    expect(text()).toContain("Added and done since day 0");
+    expect(links("CSV")[0]).toContain("severity=high");
+  });
+
+  it("says it is not converging, and by about how much a day", async () => {
+    serve((path) =>
+      path === "/v1/burndown" ? answer({ per_day: -3, converging: false }) : undefined,
+    );
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown"));
+    await settle();
+    expect(text()).toContain("Not converging: backlog growing about 3 a day.");
+  });
+
+  it("chooses by purl where the typed text is one, and by name otherwise", async () => {
+    const spy = serve((path) => (path === "/v1/burndown" ? answer({}) : undefined));
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown"));
+    await settle();
+    const box = mount
+      .host()
+      .querySelector<HTMLInputElement>('input[aria-label="Component or purl"]');
+    const type = async (value: string) => {
+      change(box, value);
+      await act(async () => box?.form?.requestSubmit());
+      await settle();
+    };
+    await type("pkg:github/sonic-net/");
+    expect(askedOf(spy, "/v1/burndown").at(-1)).toEqual({ purl: "pkg:github/sonic-net/" });
+    await type("swss");
+    expect(askedOf(spy, "/v1/burndown").at(-1)).toEqual({ component: "swss" });
+  });
+
+  it("names the ecosystem of a chosen package only where two share a name", async () => {
+    serve((path) =>
+      path === "/v1/burndown"
+        ? answer({}, [
+            { package: "pkg:deb/debian/swss", name: "swss", ecosystem: "deb" },
+            { package: "pkg:github/sonic-net/sonic-swss", name: "swss", ecosystem: "github" },
+            { package: "pkg:cargo/addr2line", name: "addr2line", ecosystem: "cargo" },
+          ])
+        : undefined,
+    );
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown?component=swss"));
+    await settle();
+    expect(text()).toContain("pkg:deb/debian/swss (deb)");
+    expect(text()).toContain("pkg:github/sonic-net/sonic-swss (github)");
+    expect(text()).not.toContain("(cargo)");
+  });
+
+  it("asks nothing at or under a component until one build is picked", async () => {
+    scoped({ product: "sonic" });
+    const spy = serve(() => undefined);
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown?beneath=swss"));
+    await settle();
+    expect(askedOf(spy, "/v1/burndown")).toHaveLength(0);
+    expect(text()).toContain("This needs one build.");
   });
 });

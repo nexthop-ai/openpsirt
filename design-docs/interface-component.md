@@ -11,6 +11,7 @@ Satisfies REQ-42, REQ-56, REQ-60.
 - [Security testing on the component](#security-testing-on-the-component)
 - [Component screen reads](#component-screen-reads)
 - [The dependency tree](#the-dependency-tree)
+- [Component lists](#component-lists)
 - [Tree search](#tree-search)
 - [Limits](#limits)
 
@@ -45,6 +46,7 @@ carries) and the act hangs off it.
 | Furthest along first where versions order; unranked where any comparison refuses, the two counts then equal and the screen saying so | An ordering is per ecosystem |
 | The second count is consumers; occurrences are the row's title | The ceiling on one action is in occurrences |
 | It carries where the component sits: what pulls it in, what it pulls in, and the trend of what opened and closed under it, thirty days or twelve weeks | Arriving from the tree is a question about the graph |
+| The trend's card links to the findings burndown twice: at or under the component on the graph's build, and the component's name at any version across the product | The two narrowings a burndown takes (`design-docs/analytics-program.md` § Narrowing) |
 | The trend follows the component by name on the graph's build: a finding on a version a rescan replaced counts at the present version, so the steps before a bump keep what was open and the bump's closures count as corrected (`design-docs/analytics-program.md` § Subtree trends) | A finding keeps the component it opened on |
 | The graph answers for one build, picked from the rows; a link naming a build arrives on it | An edge is a fact about one build |
 | Releases are picked inside the promise form, ticked to those shipping this version | One bump moves every release at that version |
@@ -138,6 +140,7 @@ as on it, worked out when read, never stored, because findings move.
 | A node count opens its list: `beneath`, every open finding at or under the component by the same walk; `under` stays the direct consumer | The figures need not match; the list is one row per issue and component |
 | A name the build does not hold answers not found | An empty list is a clean subtree |
 | The count is every open issue, answered or not | The screen answers "what is open here" |
+| A row with counts carries a link to the findings burndown at or under it on this build, beside the component's link | |
 | The marker opening a row is a button | Otherwise no node past the first level is reachable without a pointer |
 | A row is keyed by name, version, package kind and namespace: what is open, what was drawn, what sits under it, and the request for children; a request naming two things is refused | A component shipped twice must open |
 | A component's name opens the component; the node name selects, so the link is the row's own control and the names in the two lists beside the tree | |
@@ -147,6 +150,22 @@ as on it, worked out when read, never stored, because findings move.
 | Under the root row, a line states how many open code findings are unplaced, on the build itself, every root it has had included, with a link to Repositories, zero included | Code findings in files no repository holds sit on the root; a repository's settings are what place them |
 | A code finding on a version of a component a rescan replaced is counted on the row of the component's present version, and under every row above it | The card and the chooser count it by name, and the badge matches them (`design-docs/analysis-queue.md` § Queue file) |
 | A flaw recorded by hand on a version a rescan replaced is counted under every row reaching the present version of its name, and the list beneath holds it (`design-docs/data-model-graph.md` § Path traversal) | No scan closes a recorded flaw, so it stays open on the version it was recorded on |
+
+## Component lists
+
+A switch above the tree lists the build three ways: the tree, by repository, and
+by ecosystem. The list is in the address, so a link carries it. The counts are
+`design-docs/findings-queries.md` § Component groups.
+
+| Rule | Reason |
+|---|---|
+| A repository row is the identifier with the version cut, the commits the build ships, open with its bands, and fixed | The commit is what a source repository ships |
+| An ecosystem row is the type, its component count, open and fixed; its name opens the ecosystem's packages, each a row like a repository's with versions in place of commits | Ecosystems then packages |
+| A repository row of one component opens the findings list and the burndown at or under it on this build | What the row counts |
+| Any other row opens the burndown chosen by its identifier, a prefix ending in a slash for an ecosystem, on the build's branch and variant | A package at any version; an ecosystem as every package of it |
+| A package row of one component opens the findings list on that name | |
+| Components with no identifier are an ecosystem row with no burndown | No prefix chooses them |
+| A note under the list says what a row counts: beneath for a repository, at its own components otherwise | The two read differently |
 
 ## Tree search
 

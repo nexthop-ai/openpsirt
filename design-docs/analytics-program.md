@@ -183,6 +183,22 @@ mix stays visible.
 | Totals start at zero on day 0; the baseline and restored marks are out of both | The inventory arriving is not work arriving |
 | The totals need not sum to the line's move | A superseded or unexplained closure lowers the line and neither total, and an issue done and back is counted once, as returned |
 
+### Burndown sheet
+
+The catalog's findings burndown page draws both panels for the scope picked.
+
+| Rule | Reason |
+|---|---|
+| The left panel is the line from day 0's start, the day's added above a zero rule and its fixed and dismissed below, in two colors, and the marks as dashed rules | The trend's chart shape, with done split |
+| A dotted line runs from today's count toward zero at the rate; the chart widens by as much again as is drawn at most, and past that the line ends at the edge at the count it would reach there | Two years of history and a ten-year date on one axis flatten the history |
+| One sentence above the chart names the zero date, more than ten years, or that it is not converging and about how many a day the backlog grows | |
+| Day 0 is a date field, empty for the first scan | |
+| A severity switch keeps a band and worse | |
+| One field takes a name or a purl prefix: text starting `pkg:` is a prefix, anything else a name | Nobody types a prefix not starting with its scheme |
+| The packages a choice matched are listed beneath the controls, each with its ecosystem where two share a name | |
+| At or under a component arrives in a link from the dependency tree, a repository row or the component screen, and needs one build; without one the sheet asks for a build and reads nothing | The walk is one build's |
+| The export links carry the same query | |
+
 ## Deadlines
 
 A configured window from the finding's urgency, counted from first sighting

@@ -5,6 +5,7 @@ import { type ReactElement } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
 import { analyticsReportAt } from "../../app/routes";
 import { Backlog } from "./Backlog";
+import { Burndown } from "./Burndown";
 import { Compliance } from "./Compliance";
 import { LastUploads } from "./LastUploads";
 import { Effort } from "./Effort";
@@ -46,6 +47,7 @@ export const PAGES: Record<string, ReactElement> = {
   "advisories-issued": <Published />,
   "effort-by-component": <Effort />,
   "backlog-over-time": <Backlog />,
+  "findings-burndown": <Burndown />,
 };
 
 // Addresses a report has been reached at under an earlier name. A link to one

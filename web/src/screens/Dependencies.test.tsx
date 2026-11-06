@@ -78,6 +78,66 @@ async function drawn(reach: object[], at = AT) {
                 items: [node("sonic-swss", { children: 2, beneath: 7 })],
               },
             };
+    if (path === `${BUILD}/component-groups`)
+      return query.ecosystem
+        ? {
+            data: {
+              items: [
+                {
+                  key: "pkg:cargo/addr2line",
+                  versions: ["0.25.1"],
+                  components: 1,
+                  open: 1,
+                  fixed: 0,
+                  open_by_severity: { high: 1 },
+                  component: { name: "addr2line", version: "0.25.1", ecosystem: "cargo" },
+                },
+              ],
+            },
+          }
+        : query.by === "ecosystem"
+          ? {
+              data: {
+                items: [
+                  {
+                    key: "cargo",
+                    versions: [],
+                    components: 3,
+                    open: 2,
+                    fixed: 1,
+                    open_by_severity: {},
+                  },
+                  {
+                    key: "none",
+                    versions: [],
+                    components: 1,
+                    open: 0,
+                    fixed: 0,
+                    open_by_severity: {},
+                  },
+                ],
+              },
+            }
+          : {
+              data: {
+                items: [
+                  {
+                    key: "pkg:github/sonic-net/sonic-swss",
+                    versions: ["2126d2752826"],
+                    components: 1,
+                    open: 4,
+                    fixed: 2,
+                    open_by_severity: { critical: 4 },
+                    component: {
+                      name: "swss",
+                      version: "1.0.0",
+                      ecosystem: "github",
+                      namespace: "sonic-net",
+                    },
+                  },
+                ],
+              },
+            };
     if (path === `${BUILD}/components/{component}/around`)
       return { data: { below: [node("libnl"), node("zlib")] } };
     return undefined;
@@ -145,5 +205,56 @@ describe("the whole tree somebody with a role reads", () => {
     await drawn(REACH, `${AT}?q=nothing`);
     expect(text()).toContain('Nothing here is called "nothing".');
     expect(text()).toContain("Back to the tree");
+  });
+});
+
+describe("the components listed by repository and by ecosystem", () => {
+  const REACH = [{ product: "sonic" }];
+  const link = (name: string) =>
+    Array.from(mount.host().querySelectorAll("a"))
+      .filter((a) => a.textContent === name)
+      .map((a) => a.getAttribute("href") ?? "");
+
+  it("lists a repository at the commit it ships, opening its subtree on this build", async () => {
+    await drawn(REACH, `${AT}?list=repository`);
+    expect(text()).toContain("pkg:github/sonic-net/sonic-swss");
+    expect(text()).toContain("2126d2752826");
+    const [findings] = link("Findings");
+    expect(findings).toContain("/variants/arm/findings?");
+    expect(findings).toContain("beneath=swss");
+    expect(findings).toContain("beneath_version=1.0.0");
+    const [burn] = link("Burndown");
+    expect(burn).toContain("/analytics/findings-burndown?");
+    expect(burn).toContain("beneath=swss");
+    expect(burn).toContain("beneath_namespace=sonic-net");
+  });
+
+  it("chooses an ecosystem's burndown by its purl prefix, and opens its packages", async () => {
+    await drawn(REACH, `${AT}?list=ecosystem`);
+    expect(link("Burndown")).toEqual([
+      "/analytics/findings-burndown?branch_or_tag=master&variant=arm&purl=pkg%3Acargo%2F",
+    ]);
+    expect(link("cargo")[0]).toContain("list=ecosystem&ecosystem=cargo");
+    await act(async () =>
+      Array.from(mount.host().querySelectorAll("a"))
+        .find((a) => a.textContent === "cargo")
+        ?.click(),
+    );
+    await settle();
+    expect(text()).toContain("pkg:cargo/addr2line");
+    expect(link("Findings")[0]).toContain("component=addr2line");
+    expect(link("Burndown")[0]).toContain("purl=pkg%3Acargo%2Faddr2line");
+  });
+
+  it("switches back to the tree from a list", async () => {
+    await drawn(REACH, `${AT}?list=repository`);
+    const tree = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Tree",
+    );
+    await act(async () => tree?.click());
+    await settle();
+    expect(location()).not.toContain("list=");
+    expect(mount.host().querySelector(".tree")).not.toBeNull();
+    expect(text()).not.toContain("pkg:github/sonic-net/sonic-swss");
   });
 });

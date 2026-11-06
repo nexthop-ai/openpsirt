@@ -8,6 +8,7 @@ import { Loading } from "../ui/Loading";
 import { STEP, keyOf, partsOf, stepsOf, type At, type Node } from "./treeshape";
 import { aroundKey, fetchAround } from "../api/around";
 import {
+  analyticsReportAt,
   buildFindingsAt,
   codeFindingsAt,
   componentAt,
@@ -27,6 +28,7 @@ import { mayOf, useWho, type Who } from "../app/session";
 import { counted, holding } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
 import { useReseed } from "../ui/reseed";
+import { ComponentGroups, LISTINGS, type Listing } from "./ComponentGroups";
 
 // The counts beneath a node, worst first, as one bar whose widths are them.
 //
@@ -252,6 +254,8 @@ function Whole({ who }: { who: Who | null | undefined }) {
   const [widened, setWidened] = useState<Set<string>>(() => new Set());
   const term = params.get("q") ?? "";
   const [typed, setTyped] = useState(term);
+  const listing: Listing =
+    LISTINGS.find((each) => each.list === params.get("list"))?.list ?? "tree";
 
   const top = useQuery({
     queryKey: ["tree-top", at, term, codeCounts],
@@ -401,97 +405,122 @@ function Whole({ who }: { who: Who | null | undefined }) {
       <HeldLine at={dependencies} />
       <HeldLine at={code} />
 
-      {/* Searching is the way in, and browsing is for answering "what else is
+      <div className="seg" role="group" aria-label="List" style={{ marginBottom: 10 }}>
+        {LISTINGS.map((each) => (
+          <button
+            key={each.list}
+            type="button"
+            aria-pressed={listing === each.list}
+            onClick={() => {
+              const next = new URLSearchParams();
+              if (each.list !== "tree") next.set("list", each.list);
+              setParams(next);
+            }}
+          >
+            {each.words}
+          </button>
+        ))}
+      </div>
+
+      {listing !== "tree" ? (
+        <div className="card">
+          <ComponentGroups at={at} by={listing} ecosystem={params.get("ecosystem") ?? ""} />
+        </div>
+      ) : (
+        <>
+          {/* Searching is the way in, and browsing is for answering "what else is
           under this" once somebody is already somewhere. Eight thousand
           components under a root with five thousand children is not a graph
           anybody reaches the middle of by opening nodes. */}
-      <div className="treehead">
-        <form
-          className="searchbox"
-          onSubmit={(event) => {
-            event.preventDefault();
-            search(typed);
-          }}
-        >
-          <Icon name="search" />
-          <input
-            {...notACredential}
-            type="text"
-            value={typed}
-            aria-label="Find a component"
-            placeholder="Find a component — openssl, linux, python…"
-            onChange={(event) => setTyped(event.target.value)}
-          />
-        </form>
-        {searching && (
-          <button
-            type="button"
-            className="linkish"
-            onClick={() => {
-              setTyped("");
-              search("");
-            }}
-          >
-            Back to the tree
-          </button>
-        )}
-      </div>
-
-      <div className="wholewidth">
-        <div>
-          <div className="card">
-            {top.isPending && <Loading />}
-            {top.isError && (
-              <Failed error={top.error} what="The build's contents could not be read." />
-            )}
-            {!searching && !top.isPending && !top.isError && !root && (
-              <Empty
-                title="This build has no root."
-                detail="Nothing has been scanned here, or the inventory described no component that everything else descends from."
+          <div className="treehead">
+            <form
+              className="searchbox"
+              onSubmit={(event) => {
+                event.preventDefault();
+                search(typed);
+              }}
+            >
+              <Icon name="search" />
+              <input
+                {...notACredential}
+                type="text"
+                value={typed}
+                aria-label="Find a component"
+                placeholder="Find a component — openssl, linux, python…"
+                onChange={(event) => setTyped(event.target.value)}
               />
-            )}
-            {searching &&
-              !top.isPending &&
-              !top.isError &&
-              (found.length === 0 ? (
-                <Empty
-                  title={`Nothing here is called "${term}".`}
-                  detail="Part of a name, ignoring case. Components not in this build will not appear."
-                />
-              ) : (
-                <Matches
-                  at={at}
-                  found={found}
-                  focus={focus}
-                  counts={counts}
-                  code={codeCounts}
-                  onSelect={select}
-                />
-              ))}
-            {!searching && root && (
-              <Branches
-                at={at}
-                root={root}
-                below={below}
-                opened={opened}
-                widened={widened}
-                onPath={onPath}
-                focus={focus}
-                counts={counts}
-                code={codeCounts}
-                onToggle={toggle}
-                onSelect={select}
-                onWiden={(key) => setWidened((prev) => new Set(prev).add(key))}
-              />
-            )}
-            {searching && counts && (
-              <p className="hint" style={{ margin: "12px 0 0" }}>
-                Most findings first
-              </p>
+            </form>
+            {searching && (
+              <button
+                type="button"
+                className="linkish"
+                onClick={() => {
+                  setTyped("");
+                  search("");
+                }}
+              >
+                Back to the tree
+              </button>
             )}
           </div>
-        </div>
-      </div>
+
+          <div className="wholewidth">
+            <div>
+              <div className="card">
+                {top.isPending && <Loading />}
+                {top.isError && (
+                  <Failed error={top.error} what="The build's contents could not be read." />
+                )}
+                {!searching && !top.isPending && !top.isError && !root && (
+                  <Empty
+                    title="This build has no root."
+                    detail="Nothing has been scanned here, or the inventory described no component that everything else descends from."
+                  />
+                )}
+                {searching &&
+                  !top.isPending &&
+                  !top.isError &&
+                  (found.length === 0 ? (
+                    <Empty
+                      title={`Nothing here is called "${term}".`}
+                      detail="Part of a name, ignoring case. Components not in this build will not appear."
+                    />
+                  ) : (
+                    <Matches
+                      at={at}
+                      found={found}
+                      focus={focus}
+                      counts={counts}
+                      code={codeCounts}
+                      onSelect={select}
+                    />
+                  ))}
+                {!searching && root && (
+                  <Branches
+                    at={at}
+                    root={root}
+                    below={below}
+                    opened={opened}
+                    widened={widened}
+                    onPath={onPath}
+                    focus={focus}
+                    counts={counts}
+                    code={codeCounts}
+                    onToggle={toggle}
+                    onSelect={select}
+                    onWiden={(key) => setWidened((prev) => new Set(prev).add(key))}
+                  />
+                )}
+                {searching && counts && (
+                  <p className="hint" style={{ margin: "12px 0 0" }}>
+                    Most findings first
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -588,6 +617,18 @@ function beneathComponent(
   if (row.ecosystem) query.set("beneath_ecosystem", row.ecosystem);
   if (row.namespace) query.set("beneath_namespace", row.namespace);
   return buildFindingsAt(at, query);
+}
+
+// The burndown of a node and everything under it, on this build.
+function burndownBeneath(at: At, node: Node): string {
+  return analyticsReportAt("findings-burndown", {
+    branch_or_tag: at.branch_or_tag,
+    variant: at.variant,
+    beneath: node.component,
+    beneath_version: node.version || undefined,
+    beneath_ecosystem: node.ecosystem || undefined,
+    beneath_namespace: node.namespace || undefined,
+  });
 }
 
 // The open code findings at a node and under it, opening the security testing
@@ -759,6 +800,17 @@ function Branches({
         {/* What pulls it in, what it pulls in, its history and what is open
             against it, on the component's own screen rather than a second
             copy of that page drawn over the tree. */}
+        {counts && (
+          <Link
+            className="look"
+            title={`Burndown of ${name} and everything under it`}
+            aria-label={`Burndown of ${name}`}
+            to={burndownBeneath(at, node)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            ↘
+          </Link>
+        )}
         <Link
           className="look"
           title={`Everything about ${name}`}

@@ -107,7 +107,7 @@
   },
   "dependencies": {
     "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/dependencies",
-    "query": ["at", "ecosystem", "namespace", "path", "q", "version"]
+    "query": ["at", "ecosystem", "list", "namespace", "path", "q", "version"]
   },
   "bulkDecision": {
     "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/components/:component/bulk-decision",
@@ -198,7 +198,10 @@
       "component_version",
       "days",
       "method",
+      "purl",
       "series",
+      "severity",
+      "since",
       "variant"
     ]
   },

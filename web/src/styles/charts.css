@@ -47,6 +47,25 @@
 .chart .bar-res {
   fill: var(--ok);
 }
+.chart .bar-dis {
+  fill: var(--wait);
+}
+.chart .projection {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+}
+.chart .added-line {
+  fill: none;
+  stroke: var(--sev-high);
+  stroke-width: 2;
+}
+.chart .done-line {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 2;
+}
 .chart .mark line {
   stroke: var(--faint);
   stroke-width: 1;
@@ -77,6 +96,12 @@
   border-radius: 2px;
   display: inline-block;
   font-style: normal;
+}
+.legend i.dotted {
+  width: 12px;
+  height: 0;
+  border-radius: 0;
+  border-top: 2px dotted var(--accent);
 }
 .legend i.dashed {
   width: 0;

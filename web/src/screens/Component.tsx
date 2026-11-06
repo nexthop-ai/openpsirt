@@ -8,7 +8,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap, whichOf } from "../api/queries";
-import { decisionAt, componentAt, bulkDecisionAt, dependenciesAt } from "../app/routes";
+import {
+  analyticsReportAt,
+  decisionAt,
+  componentAt,
+  bulkDecisionAt,
+  dependenciesAt,
+} from "../app/routes";
 import { aroundKey, fetchAround } from "../api/around";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
@@ -1275,6 +1281,22 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
         </span>
         <StepSwitch step={step} onStep={setStep} />
       </div>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Burndown:{" "}
+        <Link
+          to={analyticsReportAt("findings-burndown", {
+            branch_or_tag: here.branch_or_tag,
+            variant: here.variant,
+            beneath: component,
+            beneath_version: pkg.version || undefined,
+            beneath_ecosystem: here.ecosystem || undefined,
+            beneath_namespace: pkg.namespace || undefined,
+          })}
+        >
+          this and what it pulls in
+        </Link>{" "}
+        · <Link to={analyticsReportAt("findings-burndown", { component })}>any version</Link>
+      </p>
       {trend.isError ? (
         <p className="hint">Could not be read.</p>
       ) : trend.isPending ? (
