@@ -226,7 +226,8 @@ A statement about a trend waits for enough history (REQ-54). Leading empty steps
 are dropped from the chart and the sentence alike, and the rest kept, since an
 empty step inside the history is real. Four steps of real history come before a
 direction is claimed. The chart still draws what there is; only the sentence is
-held back.
+held back. A window of nothing but empty steps draws no chart, heading or legend,
+and says nothing was scanned in it.
 
 ## Screen copy
 

@@ -205,6 +205,27 @@ describe("the component screen's security testing", () => {
     );
   });
 
+  it("draws the issues of a branch first scanned in the window, which opened nothing new", async () => {
+    await component(BOTH, {
+      "/v1/trend": {
+        items: [
+          { at: "2026-10-21", open: 0, new: 0, corrected: 0, returned: 0 },
+          {
+            at: "2026-10-22",
+            open: 2,
+            new: 0,
+            corrected: 0,
+            returned: 0,
+            baseline: 2,
+            first_scans: 1,
+          },
+        ],
+      },
+    });
+    expect(text()).not.toContain("Nothing opened or closed");
+    expect(mount.host().querySelector('svg[aria-label*="first scans brought 2"]')).not.toBeNull();
+  });
+
   it("names the code findings on the build itself as unplaced, with the way to the repositories", async () => {
     await component(BOTH, {
       [COUNTS]: {

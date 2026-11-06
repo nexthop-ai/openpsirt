@@ -22,6 +22,7 @@ import { ranked, rankedLabel, rankedWhy, upgradeCount } from "../ui/ranked";
 import { ROLLED } from "../ui/severities";
 import { Incident, Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
+import { settled } from "../ui/trend";
 import { Wide } from "../ui/Wide";
 import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
 import { useUpstreamSaid } from "../api/upstream";
@@ -1261,9 +1262,9 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
     retry: false,
   });
   const points = trend.data?.items ?? [];
-  const moved = points.some(
-    (each) => (each.new ?? 0) > 0 || (each.corrected ?? 0) > 0 || (each.returned ?? 0) > 0,
-  );
+  // Anything open or moving, a first scan's baseline and a return after a gap
+  // included: the steps the chart draws.
+  const moved = settled(points).length > 0;
 
   return (
     <div className="card" style={{ marginTop: 12 }}>

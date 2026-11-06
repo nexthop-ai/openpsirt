@@ -28,7 +28,7 @@ import { Loading } from "../ui/Loading";
 import { Reading } from "../ui/Reading";
 import { Severity } from "../ui/Severity";
 import { BANDS } from "../ui/severities";
-import { mixReading, paceReading } from "../ui/trend";
+import { mixReading, paceReading, settled } from "../ui/trend";
 import { Wide } from "../ui/Wide";
 import { SOON_DAYS } from "./FindingsFilters";
 
@@ -317,6 +317,8 @@ export function DependencyFigures({
               <Releases points={releases.data?.items ?? []} />
               <p className="hint">Each release against today&rsquo;s vulnerability data.</p>
             </>
+          ) : settled(points).length === 0 ? (
+            <p className="hint">Nothing scanned in {stepSaid(step)}.</p>
           ) : (
             <>
               <Pace points={points} unit={stepUnit(step)} />

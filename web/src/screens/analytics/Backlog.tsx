@@ -114,10 +114,10 @@ export function Backlog() {
         <Loading />
       ) : trend.isError ? (
         <Failed error={trend.error} what="The backlog could not be read." />
-      ) : points.length === 0 ? (
+      ) : flows.length === 0 ? (
         <Empty
           title="Nothing has been scanned yet."
-          detail="A trend is what changed between scans, so it starts with the second one."
+          detail="Nothing was open or moved in the window."
         />
       ) : (
         <>
@@ -141,57 +141,50 @@ export function Backlog() {
             <p className="hint" style={{ marginTop: 0 }}>
               Both flows, split the same way.
             </p>
-            {flows.length === 0 ? (
-              <Empty
-                title="Nothing moved."
-                detail="Nothing arrived or was corrected in the window."
-              />
-            ) : (
-              <Wide>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>{daily ? "Day" : "Week ending"}</th>
-                      <th>New</th>
-                      {BANDS.map((band) => (
-                        <th key={`in ${band}`}>{band}</th>
-                      ))}
-                      <th>Returned</th>
-                      <th title="Back after an upload lost most of the build">After a gap</th>
-                      <th>Corrected</th>
-                      {BANDS.map((band) => (
-                        <th key={`out ${band}`}>{band}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {flows.map((point) => {
-                      const arrived = folded(point.new_by_severity ?? {});
-                      const answered = folded(point.corrected_by_severity ?? {});
-                      return (
-                        <tr key={point.at}>
-                          <td className="id">{point.at}</td>
-                          <td>{(point.new ?? 0).toLocaleString()}</td>
-                          {BANDS.map((band) => (
-                            <td key={`in ${band}`} className="hint">
-                              {(arrived[band] ?? 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td>{(point.returned ?? 0).toLocaleString()}</td>
-                          <td>{(point.restored ?? 0).toLocaleString()}</td>
-                          <td>{(point.corrected ?? 0).toLocaleString()}</td>
-                          {BANDS.map((band) => (
-                            <td key={`out ${band}`} className="hint">
-                              {(answered[band] ?? 0).toLocaleString()}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Wide>
-            )}
+            <Wide>
+              <table>
+                <thead>
+                  <tr>
+                    <th>{daily ? "Day" : "Week ending"}</th>
+                    <th>New</th>
+                    {BANDS.map((band) => (
+                      <th key={`in ${band}`}>{band}</th>
+                    ))}
+                    <th>Returned</th>
+                    <th title="Back after an upload lost most of the build">After a gap</th>
+                    <th>Corrected</th>
+                    {BANDS.map((band) => (
+                      <th key={`out ${band}`}>{band}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {flows.map((point) => {
+                    const arrived = folded(point.new_by_severity ?? {});
+                    const answered = folded(point.corrected_by_severity ?? {});
+                    return (
+                      <tr key={point.at}>
+                        <td className="id">{point.at}</td>
+                        <td>{(point.new ?? 0).toLocaleString()}</td>
+                        {BANDS.map((band) => (
+                          <td key={`in ${band}`} className="hint">
+                            {(arrived[band] ?? 0).toLocaleString()}
+                          </td>
+                        ))}
+                        <td>{(point.returned ?? 0).toLocaleString()}</td>
+                        <td>{(point.restored ?? 0).toLocaleString()}</td>
+                        <td>{(point.corrected ?? 0).toLocaleString()}</td>
+                        {BANDS.map((band) => (
+                          <td key={`out ${band}`} className="hint">
+                            {(answered[band] ?? 0).toLocaleString()}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Wide>
           </section>
         </>
       )}
