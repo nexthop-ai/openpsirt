@@ -51,7 +51,7 @@ applies the scan, and is a record of its own (REQ-22).
 | One report stands for an issue across its names | A second is refused |
 | A re-affirmation reads the kept issue's rating in force and accepts a decision filed under the absorbed name at the same occurrence | |
 | What a report said moves to the kept issue: names, findings, classification, ratings, references, ranking signals | It is observed state about one issue. The absorbed row keeps its copy |
-| OSV's published and modified dates, and when OSV was asked, move to the kept issue where it holds none | They describe the one issue |
+| OSV's published and modified dates move to the kept issue where it holds none, with when OSV was asked for them; an answer with no date stays with the name asked | The dates describe the one issue; an undated answer says nothing of the name kept |
 | Before the findings move, a replaced inventory's check matches marked publication date unknown under either issue are rewritten as the merged issue dates them (`design-docs/findings-closure.md` § Replaced inventories) | The marker is worked out from the issue a match is read as; a merge clearing it unrewritten counts a guessed opening as dated |
 | A scanned finding open under both names at one occurrence keeps the longer-open row; the other closes `invalid` | One finding held twice. A finding a person entered is never closed this way |
 | The surviving finding takes the other's assignment where it has none | |

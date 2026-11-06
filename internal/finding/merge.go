@@ -419,7 +419,7 @@ func (v *Vulnerabilities) redateMerging(ctx context.Context, kept int64, gone Vu
 
 // describeGaps fills what the issue kept does not say with what the absorbed
 // one did: the published word for how bad it is, when either was first seen,
-// and OSV's dates and when OSV was asked.
+// and OSV's dates with when OSV was asked for them.
 func (v *Vulnerabilities) describeGaps(ctx context.Context, kept int64, gone Vulnerability) error {
 	if strings.TrimSpace(gone.Severity) != "" {
 		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
@@ -439,17 +439,13 @@ func (v *Vulnerabilities) describeGaps(ctx context.Context, kept int64, gone Vul
 		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
 			Set(`"published_at" = ?`, *gone.PublishedAt).
 			Set(`"modified_at" = ?`, gone.ModifiedAt).
+			// Carried only with a date: an undated answer about the absorbed
+			// name says nothing about the name kept, which may never have
+			// been asked about.
+			Set(`"dates_asked_at" = COALESCE("vu"."dates_asked_at", ?)`, gone.DatesAskedAt).
 			Where(`"vu"."id" = ?`, kept).
 			Where(`"vu"."published_at" IS NULL`).Exec(ctx); err != nil {
 			return fmt.Errorf("carry when %s was published: %w", gone.Identifier, err)
-		}
-	}
-	if gone.DatesAskedAt != nil {
-		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
-			Set(`"dates_asked_at" = ?`, *gone.DatesAskedAt).
-			Where(`"vu"."id" = ?`, kept).
-			Where(`"vu"."dates_asked_at" IS NULL`).Exec(ctx); err != nil {
-			return fmt.Errorf("carry when OSV was asked about %s: %w", gone.Identifier, err)
 		}
 	}
 	return nil
