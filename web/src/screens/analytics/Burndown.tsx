@@ -15,7 +15,7 @@ import { Loading } from "../../ui/Loading";
 import { Empty } from "../../ui/Empty";
 import { HeldLine } from "../../ui/HeldLine";
 import { notACredential } from "../../ui/noautofill";
-import { BANDS } from "../../ui/severities";
+import { BANDS, FLOORS } from "../../ui/severities";
 import { AddedDone, Burn, BurnLegend, paceWords } from "../../ui/Burn";
 import { Sheet } from "./Sheet";
 import { scopeWords } from "./catalog";
@@ -37,7 +37,7 @@ const FLOOR_WORDS: Record<Band | "", string> = {
   high: "High+",
   critical: "Critical",
 };
-const FLOORS_OFFERED: (Band | "")[] = ["", "low", "medium", "high", "critical"];
+const FLOORS_OFFERED: (Band | "")[] = ["", ...FLOORS];
 
 // The narrowings a link may arrive with. A typed choice is a name or a
 // package identifier prefix; the subtree comes from the tree or the component
