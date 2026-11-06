@@ -75,12 +75,14 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		w := world.New(t, db)
 		cat, product, branch, variant, build := w.Catalog, w.Product, w.Branch, w.Customer, w.Build
 
-		// Somebody granted reading on the one product these builds
-		// belong to. The narrowing is the ordinary one, which is what
-		// the common plan carries — an administrator is no longer a
-		// way to run without it .
+		// Somebody granted reading, public and private, on the one product
+		// these builds belong to. The narrowing is the ordinary one, which
+		// is what the common plan carries; an administrator is no way to run
+		// without it. Private reading alone reads none of the public
+		// findings a scan opens, so every read here would time an empty
+		// answer.
 		who := access.NewPerson(1, "a reader", false,
-			map[int64][]access.Role{product.ID: {access.PrivateRead}}, 0)
+			map[int64][]access.Role{product.ID: {access.PublicRead, access.PrivateRead}}, 0)
 
 		// A night's cost in statements, not only in seconds.
 		//
