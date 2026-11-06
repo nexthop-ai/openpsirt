@@ -677,7 +677,7 @@ describe("analytics", () => {
   it("draws no backlog and asks for no trend", async () => {
     const spy = await report(<Backlog />, ELSEWHERE);
     expect(text()).toContain("You don't read dependency findings in sonic.");
-    expect(text()).not.toContain("Nothing has been scanned yet.");
+    expect(text()).not.toContain("Nothing open or moving.");
     expect(asked(spy)).not.toContain("/v1/trend");
   });
 

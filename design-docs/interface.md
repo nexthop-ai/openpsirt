@@ -227,7 +227,8 @@ are dropped from the chart and the sentence alike, and the rest kept, since an
 empty step inside the history is real. Four steps of real history come before a
 direction is claimed. The chart still draws what there is; only the sentence is
 held back. A window of nothing but empty steps draws no chart, heading or legend,
-and says nothing was scanned in it.
+and says nothing was open or moving in it, since a clean product scanned nightly
+reads the same.
 
 ## Screen copy
 

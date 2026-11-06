@@ -361,7 +361,7 @@ describe("the Dependencies trend", () => {
     expect(steps.at(-1)).toEqual({ days: undefined, weeks: 12 });
   });
 
-  it("says nothing was scanned, with no legend, where every step is empty", async () => {
+  it("says nothing is open or moving, with no legend, where every step is empty", async () => {
     serve((path) =>
       path === "/v1/trend"
         ? { data: { items: [{ at: "2026-01-04", open: 0, new: 0, corrected: 0, returned: 0 }] } }
@@ -370,7 +370,7 @@ describe("the Dependencies trend", () => {
     mount.render(screen(<Home who={person([readingDependencies("sonic")])} />, "/"));
     await settle();
     const text = mount.host().textContent ?? "";
-    expect(text).toContain("Nothing scanned in 30 days.");
+    expect(text).toContain("Nothing open or moving in 30 days.");
     expect(text).not.toContain("First scan or gap");
   });
 });

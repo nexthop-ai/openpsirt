@@ -318,7 +318,7 @@ export function DependencyFigures({
               <p className="hint">Each release against today&rsquo;s vulnerability data.</p>
             </>
           ) : settled(points).length === 0 ? (
-            <p className="hint">Nothing scanned in {stepSaid(step)}.</p>
+            <p className="hint">Nothing open or moving in {stepSaid(step)}.</p>
           ) : (
             <>
               <Pace points={points} unit={stepUnit(step)} />

@@ -115,10 +115,7 @@ export function Backlog() {
       ) : trend.isError ? (
         <Failed error={trend.error} what="The backlog could not be read." />
       ) : flows.length === 0 ? (
-        <Empty
-          title="Nothing has been scanned yet."
-          detail="Nothing was open or moved in the window."
-        />
+        <Empty title="Nothing open or moving." detail="No issue was open or moved in the window." />
       ) : (
         <>
           <section className="panel">

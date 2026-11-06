@@ -255,13 +255,13 @@ describe("the backlog over time", () => {
     expect(links("CSV")[0]).toContain("weeks=52");
   });
 
-  it("says nothing was scanned, with no panels, where every step is empty", async () => {
+  it("says nothing is open or moving, with no panels, where every step is empty", async () => {
     serve((path) =>
       path === "/v1/trend" ? { data: { items: [empty("2026-01-04")] } } : undefined,
     );
     mount.render(screen(<Backlog />, "/analytics/backlog"));
     await settle();
-    expect(text()).toContain("Nothing has been scanned yet.");
+    expect(text()).toContain("Nothing open or moving.");
     expect(text()).not.toContain("Open, new, returned and corrected");
   });
 });
