@@ -438,3 +438,72 @@ func TestACheckRunIsNeverABuildsLastScan(t *testing.T) {
 		}
 	})
 }
+
+// remediationOf is the build's product's remediation figures over all time.
+func remediationOf(t *testing.T, w *fixture.World, f *checkFixture) *finding.Remediation {
+	t.Helper()
+	ctx := t.Context()
+	var productID int64
+	if err := f.db.NewSelect().TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"st"."product_id"`).Where(`"b"."id" = ?`, f.build).Scan(ctx, &productID); err != nil {
+		t.Fatal(err)
+	}
+	person := w.DeclarePerson("remediation-reader@example.com", "Remediation reader", false)
+	who := access.NewPerson(person.ID, "remediation-reader@example.com", false,
+		map[int64][]access.Role{productID: {access.PublicRead}}, person.PartyID)
+	got, err := finding.NewStore(f.db.DB).Remediation(ctx, who, finding.Scope{ProductID: &productID},
+		time.Time{}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func TestADatedCheckMatchCountsAsAFixTimedFromItsOpening(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0021", f.arrived.Add(24*time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0021", libnl)}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		got := remediationOf(t, w, f)
+		if got.Fixed != 1 {
+			t.Errorf("%d fixed, want the check's match", got.Fixed)
+		}
+		if took := got.TimeToFix["high"]; took != 48*time.Hour {
+			t.Errorf("took %s to fix, want the two days from publication to the replacement", took)
+		}
+	})
+}
+
+func TestAnUndatedCheckMatchIsInNoRemediationFigure(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatch(t, w)
+		if got := remediationOf(t, w, f); got.Fixed != 0 || len(got.TimeToFix) != 0 {
+			t.Errorf("fixed %d taking %v, want nothing: its opening is a guess", got.Fixed, got.TimeToFix)
+		}
+	})
+}
+
+func TestARowRecordedClosedByOneScanIsStillNoFix(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0022", f.arrived.Add(24*time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0022", libnl)}}
+		checking := f.check(t, s)
+		if checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		// The same row, as an ordinary scan records one closed on arrival.
+		if _, err := f.db.NewUpdate().Table("scan_run").Set(`"checked_scan_id" = NULL`).
+			Where(`"id" = ?`, checking.RunID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if got := remediationOf(t, w, f); got.Fixed != 0 || len(got.TimeToFix) != 0 {
+			t.Errorf("fixed %d taking %v, want nothing: it was never open", got.Fixed, got.TimeToFix)
+		}
+	})
+}

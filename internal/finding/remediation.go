@@ -96,6 +96,15 @@ func AgingStretches() []Stretch {
 	return out
 }
 
+// timed is the condition that a row counts in the remediation figures: it
+// was open at some point, or a replaced inventory's check recorded it on an
+// issue with a known date, which was open from its opening to the
+// replacement. A check's match with no known date opens over the widest
+// stretch it could have, so it is in no duration figure.
+func timed() string {
+	return `(` + wasOpen + ` OR (` + checkRecorded("f") + ` AND NOT (` + PublicationUnknown("f") + `)))`
+}
+
 // resolved keeps only what counts as an issue actually going away.
 //
 // A closure is not a fix unless the issue went with it. A bump that
@@ -166,7 +175,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(`"f"."closed_at" IS NOT NULL`).
-		Where(wasOpen).
+		Where(timed()).
 		Where(kinds, kindArgs...).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {
@@ -191,7 +200,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MAX("f"."closed_at") AS "closed_at"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
 		ColumnExpr(`SUM(CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END) AS "open_places"`).
-		Where(wasOpen).
+		Where(timed()).
 		Where(kinds, kindArgs...).
 		Where(`"f"."vulnerability_id" IN (?)`, closing).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -244,7 +253,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
-		Where(wasOpen).
+		Where(timed()).
 		Where(kinds, kindArgs...).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {

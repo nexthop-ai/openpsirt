@@ -99,6 +99,9 @@ Resolution is computed from scans (REQ-35), and a duration is a subtraction.
 | A fix is counted in issues, fixed in the period its last occurrence the reader may see, in any product, closed by a fix | Fixed at one occurrence and open at another is not gone |
 | An issue with any occurrence open is fixed in no period; an occurrence closed for a reason that is no fix is left out | |
 | A fix is timed from the earliest occurrence opening to the last closing | |
+| An occurrence one run recorded already closed is neither opened nor fixed | It was never open |
+| A replaced inventory's check match on an issue with a known publication date is opened and fixed, timed from its opening to the replacement (`design-docs/findings-closure.md` § Replaced inventories) | It was open over that stretch |
+| A check match marked publication date unknown is in no remediation figure | Its opening is the widest stretch it could have, so its duration is a guess |
 
 Each aging bucket carries its count by severity and how many hold no standing
 decision.
