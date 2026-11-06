@@ -8,6 +8,7 @@ Benchmark runs behind the analytics rules.
 - [Planned upgrades page cost](#planned-upgrades-page-cost)
 - [Trend beneath a replaced version](#trend-beneath-a-replaced-version)
 - [Daily trend](#daily-trend)
+- [Burndown and component groups](#burndown-and-component-groups)
 
 ## Grouping before the join
 
@@ -222,3 +223,45 @@ removed it.
 | Every engine was read keyed by issue and component | The key added a group column and a join to the component; the SQLite and PostgreSQL columns of the first three tables were read before sharp uploads were worked out only for returns, which changes nothing in histories that remove no component |
 | Each engine ran alone | Other test runs on the machine were waited out first |
 | Nightly removals at 180 nights were read on SQLite and PostgreSQL only | The blank cells were not measured |
+
+## Burndown and component groups
+
+Justifies `design-docs/analytics-program.md` § Burndown and
+`design-docs/findings-queries.md` § Component groups. The full-size image with
+thirteen weeks of history: a first scan of one issue per package and the
+kernel's 4,942, twelve weekly rescans each dropping a hundredth of the packages'
+issues and a third of the kernel's at the sixth, a few brought back at the last,
+and 50 dismissals agreed four weeks back. Thirty source repositories are hung in
+pulled in by nothing, each over one of the root's 30 children, beside the 15 the
+image names. Each figure is the median of five reads after a warm one, each
+engine run alone.
+
+| Burndown, from the first scan | SQLite | PostgreSQL |
+|---|--:|--:|
+| The product | 860 ms | 266 ms |
+| The product, high and worse | 823 ms | 224 ms |
+| The kernel by its name | 621 ms | 358 ms |
+| `pkg:deb/` as a prefix | 1,189 ms | 261 ms |
+| Beneath the root | 1,512 ms | 374 ms |
+| Beneath the kernel | 600 ms | 258 ms |
+
+| Component groups | SQLite | PostgreSQL |
+|---|--:|--:|
+| By repository, 45 rows | 515 ms | 310 ms |
+| By ecosystem, 9 rows | 446 ms | 279 ms |
+| The 758 deb packages | 387 ms | 160 ms |
+
+| Reading | Detail |
+|---|---|
+| A burndown costs what the trend's identity reads cost, plus the dismissals | 9,227 issues at components left over 92 days in 266 ms on PostgreSQL |
+| A prefix costs a read of the whole selection on SQLite | It is tested on the rows read, so `pkg:deb/` reads every row: 1,189 ms against 860 for the product |
+| Beneath the root is the dearest read on both engines | 1,512 ms on SQLite and 374 ms on PostgreSQL, the walk added to the product's read |
+| A repository row costs its walk | 45 repositories reaching the whole image in 310 ms on PostgreSQL |
+| MySQL 8.4 and MariaDB were not measured | Neither PostgreSQL nor SQLite showed a read past two seconds |
+
+| Caveat | Detail |
+|---|---|
+| Closures here are unexplained | No rescan moves a version, so nothing counts as fixed; the rows read are the same either way |
+| One build | The image's repositories reach every top-level component, the widest walk a repository row takes |
+| Seeding took 28 minutes per engine | The history is built by applying each scan in turn |
+
