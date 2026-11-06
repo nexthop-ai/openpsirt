@@ -523,9 +523,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 			// so name it: what is unknown is the route up to the build, not
 			// what sits directly above.
 			//
-			// It happens where the inventory places a component under
-			// something that is itself not reachable from the root — a
-			// fragment the producer described and never attached — and the
+			// It happens where every way up runs past the bound, and the
 			// honest answer is the half we hold rather than none of it.
 			if group.Owner == "" && group.Parent == "" && row.ConsumerID != nil {
 				if consumer, held := shipped[*row.ConsumerID]; held {
@@ -1073,9 +1071,9 @@ func (s *Store) decorate(ctx context.Context, buildIDs []int64, productID int64,
 func Ends(down []graph.Step) (owner, parent string, middle int) {
 	switch len(down) {
 	case 0:
-		// The inventory placed the component nowhere. Saying so is the honest
-		// answer; claiming the product itself pulls it in is a comfortable
-		// sentence and not a true one.
+		// No way up reaches the root within the bound. Saying so is the
+		// honest answer; claiming the product itself pulls it in is a
+		// comfortable sentence and not a true one.
 		return "", "", 0
 	case 1:
 		// The build pulls it in directly, so both ends are the build.

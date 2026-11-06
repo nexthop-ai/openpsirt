@@ -480,9 +480,9 @@ type Sitting struct {
 	// into identity is what the occurrence identity was measured against and
 	// rejected for, at 49,170 paths against 48 consumers.
 	//
-	// Empty where the build's inventory left this component unplaced,
-	// which is a real state and not an error: a producer that names no
-	// root, or a component nothing was recorded as pulling in.
+	// Empty where no way up reaches the build's root within the bound, which
+	// is a real state and not an error: a producer that names no root. A
+	// component nothing pulls in is the root and itself.
 	Chain []graph.Step
 }
 

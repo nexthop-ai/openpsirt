@@ -785,21 +785,13 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, buildID int6
 func (s *Store) filled(ctx context.Context, productID, buildID int64,
 	readable []access.Visibility, lists ...[]Neighbor) error {
 
-	return s.filledWith(ctx, productID, buildID, readable, adoption{}, lists...)
-}
-
-// filledWith is filled with an adoption: the adopter's number covers what it
-// adopts as well as what is under it.
-func (s *Store) filledWith(ctx context.Context, productID, buildID int64,
-	readable []access.Visibility, adopt adoption, lists ...[]Neighbor) error {
-
 	var ids []int64
 	for _, rows := range lists {
 		for _, row := range rows {
 			ids = append(ids, row.ComponentID)
 		}
 	}
-	reached, err := s.reach(ctx, buildID, ids, adopt)
+	reached, err := s.reach(ctx, buildID, ids)
 	if err != nil {
 		return err
 	}
@@ -897,21 +889,10 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, buildID int64
 	}
 	// The root and its children counted in the one statement. The root's own
 	// number is the whole build's, and it was a second walk of the same edges
-	// when asked for on its own. What nothing pulls in is adopted by the root:
-	// no edge joins the two, so walking from the root alone reads zero above
-	// children that hold thousands.
-	var adopt adoption
-	if loose {
-		// The rows the root holds directly, rather than the orphans alone:
-		// the list does not say which is which, and walking a child of the
-		// root from the root as well reaches nothing it would not reach.
-		adopt.By = rootID
-		for _, row := range kids {
-			adopt.IDs = append(adopt.IDs, row.ComponentID)
-		}
-	}
+	// when asked for on its own. The root's walk reaches what nothing pulls in
+	// as well, as every walk beneath the root does.
 	top := []Neighbor{*root}
-	if err := s.filledWith(ctx, productID, buildID, readable, adopt, top, kids); err != nil {
+	if err := s.filled(ctx, productID, buildID, readable, top, kids); err != nil {
 		return nil, nil, err
 	}
 	root.Beneath = top[0].Beneath

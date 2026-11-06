@@ -6,6 +6,7 @@ package finding_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -125,6 +126,41 @@ func TestAGroupedListCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 		outsider := f.holdingIn(t, []int64{f.productID + 1000}, access.PublicRead)
 		if _, err := f.store.Grouped(t.Context(), outsider, f.build, finding.ByRepository, ""); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("somebody reading another product was answered %v, want refused", err)
+		}
+	})
+}
+
+func TestWhatNothingPullsInIsCountedBeneathTheRoot(t *testing.T) {
+	// The tree draws a component no edge reaches directly under the root, so
+	// the list, the trend and the burndown beneath the root count what is at
+	// it and under it, as the root's own count does.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.scannedAt(t, sourceShapes()["pulled in by nothing"], ago(10),
+			found("CVE-2026-1", swssSource), found("CVE-2026-2", vendored), found("CVE-2026-3", swssDeb))
+		who := f.holding(t, access.PublicRead)
+		under := f.componentID(t, root.Name)
+
+		_, listed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Beneath: &under})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if listed != 3 {
+			t.Errorf("the list beneath the root holds %d, want all three", listed)
+		}
+		points, err := f.store.Trend(ctx, who, f.scope, ago(12), 24*time.Hour, 13, finding.Within{Beneath: &under})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if open := points[len(points)-1].Open; open != 3 {
+			t.Errorf("the trend beneath the root ends at %d open, want all three", open)
+		}
+		b, err := f.store.Burndown(ctx, who, f.scope, time.Time{}, "", finding.Within{Beneath: &under})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left := burnedOver(b).left; left != 3 {
+			t.Errorf("the burndown beneath the root leaves %d, want all three", left)
 		}
 	})
 }

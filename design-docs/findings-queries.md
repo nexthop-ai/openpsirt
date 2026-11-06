@@ -129,7 +129,7 @@ per group.
 | Open is an issue at a component with a finding open in the build; fixed is one left by a resolution and open nowhere in the group | Fixed at one component and open at another is not gone |
 | A finding on a version a rescan replaced counts where the build's present version of its name is | `design-docs/data-model-graph.md` § Path traversal |
 | A repository's versions are what its identifiers state | A SONiC source node states its commit in the identifier and a version its producer made up in the version field |
-| A repository counts beneath itself whether the inventory hangs it off the package built from it or leaves it pulled in by nothing | A walk beneath a component starts at it, whatever is above |
+| A repository counts beneath itself whether the inventory hangs it off the package built from it or leaves it pulled in by nothing | A walk beneath a component starts at it, whatever is above; one pulled in by nothing also sits under the root (`design-docs/data-model-graph.md` § Path traversal) |
 | A row names its one component in the four parts a reference takes, where it holds exactly one | A link beneath it is otherwise refused as ambiguous |
 | Most open first, then by key | |
 | Reading the product is required; a subject reading nothing there is answered as though nothing was scanned | The grouping is the build's inventory, the breadth a narrower reach was not granted |

@@ -50,9 +50,9 @@ type Upward struct {
 	// what the build holds here is not answered.
 	Findings int
 	Beneath  int
-	// Placed is false for a component the inventory put nowhere, or whose
-	// every way up runs past the bound. Those sit at the top with no chain,
-	// which is the honest answer rather than hanging them off the root.
+	// Placed is false for a component whose every way up runs past the
+	// bound. Those sit at the top with no chain. A component nothing pulls in
+	// is placed directly under the root, where the tree draws it.
 	Placed bool
 }
 

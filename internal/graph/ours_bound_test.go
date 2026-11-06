@@ -28,8 +28,8 @@ func holdEverything(t *testing.T, f *fixture, party int64) {
 }
 
 // The tree seen upward assembles over at most graph.Ours components, says it
-// is incomplete past that, and draws a component the inventory placed nowhere
-// at the foot, unplaced.
+// is incomplete past that, and draws a component nothing pulls in directly
+// under the root, where the tree draws it.
 func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		orphan := at("orphan", "1")
@@ -81,12 +81,17 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 		if len(rows) != graph.Ours+1 {
 			t.Fatalf("the tree drew %d nodes, want the root and %d components", len(rows), graph.Ours)
 		}
-		last := rows[len(rows)-1]
-		if last.Component != orphan.Name || last.Placed {
-			t.Errorf("the foot of the tree is %+v, want the orphan, unplaced", last)
+		var held *graph.Upward
+		for i := range rows {
+			if rows[i].Component == orphan.Name {
+				held = &rows[i]
+			}
 		}
-		if last.Findings != 2 || last.Beneath != 2 {
-			t.Errorf("the orphan reads %d on itself and %d beneath, want 2 and 2", last.Findings, last.Beneath)
+		if held == nil || !held.Placed || held.Depth != 1 {
+			t.Fatalf("the orphan is drawn as %+v, want it placed directly under the root", held)
+		}
+		if held.Findings != 2 || held.Beneath != 2 {
+			t.Errorf("the orphan reads %d on itself and %d beneath, want 2 and 2", held.Findings, held.Beneath)
 		}
 	})
 }

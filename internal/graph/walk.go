@@ -58,10 +58,18 @@ func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 	// No depth in the rows, for the reason the count beneath carries none:
 	// 167,785 rows for 10,045 components under one real product, 0.81 s
 	// against 0.10 s, and the union ends a cycle on its own.
+	//
+	// The root's walk also starts from every component nothing pulls in, the
+	// tree's placement of them (§ unplacedSeeds).
 	return db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT "n"."id" AS "node"
-		FROM "graph_node" AS "n"
-		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
+		SELECT "seed"."node" FROM (
+			SELECT "n"."id" AS "node"
+			FROM "graph_node" AS "n"
+			WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
+			UNION ALL
+			SELECT "fn"."id" FROM "graph_node" AS "rn" CROSS JOIN "graph_node" AS "fn"
+			WHERE `+unplacedSeeds+`
+		) AS "seed"
 		UNION
 		SELECT "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
@@ -69,8 +77,21 @@ func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 		  AND "e"."parent_id" <> "e"."child_id"
 	)
 	SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`,
-		buildID, bun.List(componentIDs), buildID)
+		buildID, bun.List(componentIDs), buildID, true, bun.List(componentIDs), false, buildID)
 }
+
+// unplacedSeeds joins a build's root, where it is among the components a walk
+// starts from, to every live component of the build nothing pulls in, as "rn"
+// and "fn". It binds the build, true, the starts and false.
+//
+// A component no edge reaches sits directly under the root: the tree draws it
+// there, and every walk beneath the root reaches it and what it pulls in, so a
+// count beneath the root and the list it opens agree with the tree's. A
+// source repository a SONiC inventory names is one.
+const unplacedSeeds = `"rn"."build_id" = ? AND "rn"."closed_scan_id" IS NULL AND "rn"."is_root" = ?
+			  AND "rn"."component_id" IN (?)
+			  AND "fn"."build_id" = "rn"."build_id" AND "fn"."closed_scan_id" IS NULL AND "fn"."is_root" = ?
+			  AND ` + orphaned
 
 // Replaced is the components a build held and holds no longer, each with the
 // live components of the build carrying its name. A finding keeps the
@@ -166,29 +187,20 @@ type reaching struct {
 
 // reach walks beneath each of these components in one statement, answering
 // every component each one reaches, itself included.
-func (s *Store) reach(ctx context.Context, buildID int64, of []int64, adopt adoption) ([]reaching, error) {
+func (s *Store) reach(ctx context.Context, buildID int64, of []int64) ([]reaching, error) {
 	if len(of) == 0 {
 		return nil, nil
 	}
-	// Every start is walked from itself. An adoption walks the adopted
-	// components as though from the one adopting them, so the adopter's count
-	// is its own subtree and theirs as one set, in the same walk as everything
-	// else being counted.
+	// Every start is walked from itself, and the root from every component
+	// nothing pulls in as well (§ unplacedSeeds), so the root's count is the
+	// whole build's in the same walk as everything else being counted.
 	seeds := `SELECT "n"."id" AS "start", "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-	walkArgs := []any{buildID, bun.List(of)}
-	if len(adopt.IDs) > 0 {
-		seeds += `
+		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
 		UNION ALL
-		SELECT "bn"."id", "n"."id"
-		FROM "graph_node" AS "bn"
-		JOIN "graph_node" AS "n" ON "n"."build_id" = "bn"."build_id"
-		WHERE "bn"."build_id" = ? AND "bn"."closed_scan_id" IS NULL AND "bn"."component_id" = ?
-		  AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-		walkArgs = append(walkArgs, buildID, adopt.By, bun.List(adopt.IDs))
-	}
-	walkArgs = append(walkArgs, buildID)
+		SELECT "rn"."id", "fn"."id" FROM "graph_node" AS "rn" CROSS JOIN "graph_node" AS "fn"
+		WHERE ` + unplacedSeeds
+	walkArgs := []any{buildID, bun.List(of), buildID, true, bun.List(of), false, buildID}
 	// No depth in the rows. With one, the union keeps a node once per depth
 	// it is reached at, and a node reached along many paths is walked again
 	// from each: 1,612,405 rows for 43,904 pairs under one real product's
@@ -357,13 +369,6 @@ func (s *Store) beneath(ctx context.Context, productID, buildID int64,
 	return totals, nil
 }
 
-// adoption names components walked as though the one adopting them pulled
-// them in. The zero value adopts nothing.
-type adoption struct {
-	By  int64
-	IDs []int64
-}
-
 // rise is one node above the components asked about, as the database
 // reports it: where it is, what it is, and one node directly above it. A node
 // with several parents is several rows, and one with none — a root, or a
@@ -430,7 +435,51 @@ func (s *Store) climb(ctx context.Context, buildID int64, componentIDs []int64) 
 	if err != nil {
 		return region{}, fmt.Errorf("walk up from what is on the page: %w", err)
 	}
+	if rows, err = s.underRoot(ctx, buildID, rows); err != nil {
+		return region{}, err
+	}
 	return regionOf(rows, componentIDs), nil
+}
+
+// underRoot hangs every node climb reached that nothing pulls in from the
+// build's root, the place the tree and every walk beneath the root give it
+// (§ unplacedSeeds), so its chain is the root and itself.
+func (s *Store) underRoot(ctx context.Context, buildID int64, rows []rise) ([]rise, error) {
+	parented := map[int64]bool{}
+	for _, row := range rows {
+		if row.Parent != nil {
+			parented[row.Node] = true
+		}
+	}
+	var loose []rise
+	for _, row := range rows {
+		if !row.IsRoot && !parented[row.Node] {
+			loose = append(loose, row)
+		}
+	}
+	if len(loose) == 0 {
+		return rows, nil
+	}
+	var root []rise
+	if err := s.db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"n"."id" AS "node", "n"."component_id" AS "component_id", "n"."is_root" AS "is_root"`).
+		ColumnExpr(`"c"."name" AS "name", "c"."version" AS "version", "c"."purl" AS "purl"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, true).
+		Scan(ctx, &root); err != nil {
+		return nil, fmt.Errorf("read the root of build %d: %w", buildID, err)
+	}
+	if len(root) == 0 {
+		return rows, nil
+	}
+	rows = append(rows, root[0])
+	for _, row := range loose {
+		row.Parent = &root[0].Node
+		rows = append(rows, row)
+	}
+	return rows, nil
 }
 
 // regionOf indexes what climb read. Parents are held in node order, so the
@@ -813,7 +862,7 @@ func ReplacedAmong(replaced map[int64][]int64, reached []int64) []int64 {
 // it or beneath it, in one walk: the tree's own walk, for a list that counts
 // beneath several components at once.
 func Reaching(ctx context.Context, db bun.IDB, buildID int64, starts []int64) (map[int64][]int64, error) {
-	reached, err := (&Store{db: db}).reach(ctx, buildID, starts, adoption{})
+	reached, err := (&Store{db: db}).reach(ctx, buildID, starts)
 	if err != nil {
 		return nil, err
 	}

@@ -40,8 +40,8 @@ func TestTheShortestWayDownIsTheOneShown(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		// openssl is reached directly and through curl; libz only through
 		// curl and then openssl, which is the longer of its two routes to
-		// nothing — it has one. A component listed and placed nowhere has
-		// no way down at all.
+		// nothing — it has one. A component nothing pulls in sits directly
+		// under the root, where the tree draws it.
 		unplaced := at("orphan", "0.1")
 		snap := tree()
 		snap.Components = append(snap.Components, zlib, unplaced)
@@ -68,14 +68,12 @@ func TestTheShortestWayDownIsTheOneShown(t *testing.T) {
 			"curl":    "sonic > curl",
 			"openssl": "sonic > openssl",
 			"zlib":    "sonic > openssl > zlib",
+			"orphan":  "sonic > orphan",
 		}
 		for name, way := range want {
 			if got := chain(chains[ids[name]]); got != way {
 				t.Errorf("%s is reached by %q, wanted %q", name, got, way)
 			}
-		}
-		if _, placed := chains[ids["orphan"]]; placed {
-			t.Errorf("a component placed nowhere came back with a way down: %q", chain(chains[ids["orphan"]]))
 		}
 		// The version at each step, since that is what the complete
 		// chain on a finding asks for.
