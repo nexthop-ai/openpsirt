@@ -20,8 +20,8 @@ import { CODE_FINDING_STATES } from "./codeFindings";
 import { codeTrendAt, marksOf } from "./codeTrend";
 
 // The security testing half of the component screen: what the analyzers hold
-// on the source package, per series and state, and over twelve weeks on one
-// build. Drawn beside the dependency counts and never added to them, because a
+// on the source package, per series and state, and over thirty days or twelve
+// weeks on one build. Drawn beside the dependency counts and never added to them, because a
 // rule at a place and an advisory at a component are different units.
 
 // The columns, in the order a code finding meets them: what is worked first,
@@ -206,7 +206,7 @@ export function SecurityTesting({
   );
 }
 
-// Twelve weeks of code findings at the package and under it on one build: a
+// Thirty days, or twelve weeks once switched, of code findings at the package and under it on one build: a
 // panel of its own beside the dependency one, never a summed line. It is the
 // Security testing statistics read, asked where the reader reads security
 // testing material in the product, and drawn from its own answer; a refusal

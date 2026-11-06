@@ -186,7 +186,7 @@ figure (REQ-87), from the Security testing statistics consumer and the queue
 | No longer detected | Today's count, which has no weekly line | The queue in that state |
 | Analyzers gone quiet | Series with no comparable run within their own expected interval, on a release in support, the first two named | Analysis coverage, with one product counted |
 | Code findings over time | Not fixed, new and fixed per day, or per week once switched, with a mark at each tool, version or rule-set change and each run not comparable | |
-| Not fixed by tier | Not fixed per week, stacked by the tier of the rule's weaknesses as rated now | |
+| Not fixed by tier | Not fixed per step, stacked by the tier of the rule's weaknesses as rated now | |
 
 | Rule | Reason |
 |---|---|
@@ -197,7 +197,7 @@ figure (REQ-87), from the Security testing statistics consumer and the queue
 | A marker and a quiet series name their product where no product is picked | A series name is one product's |
 | Where no series has run in the scope and the queue holds nothing, one line says no analyzer has run there, in place of the figures | A series never run reads as clean at zero; coverage leaves out a retired branch or variant, whose code findings stay in the queue |
 | A product the session does not list is asked, and a refusal draws the family's line in place of the figures and the analyzer lines of the status panel | It is held here until the server says otherwise (`design-docs/interface.md` § Families a reader holds) |
-| This week and Analyzers gone quiet open nothing across products | Both pages are one product's |
+| Today, or this week, and Analyzers gone quiet open nothing across products | Both pages are one product's |
 | The charts plot on when a run was applied, as the dependency trend does | |
 
 ## The search box

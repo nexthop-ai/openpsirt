@@ -126,7 +126,7 @@ export function Backlog() {
             <Pace points={points} unit={daily ? "days" : "weeks"} />
             <PaceLegend />
             <p className="hint">
-              Once per issue in each package. Back after a lost build: a mark, not a bar.
+              Once per issue in each package. Back after a big inventory change: a mark, not a bar.
             </p>
           </section>
 
@@ -151,7 +151,7 @@ export function Backlog() {
                       <th key={`in ${band}`}>{band}</th>
                     ))}
                     <th>Returned</th>
-                    <th title="Back after an upload lost most of the build">After a gap</th>
+                    <th title="Back after an upload that moved much of the build">After a gap</th>
                     <th>Corrected</th>
                     {BANDS.map((band) => (
                       <th key={`out ${band}`}>{band}</th>

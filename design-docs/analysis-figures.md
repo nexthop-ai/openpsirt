@@ -188,7 +188,7 @@ each, across products.
 
 ```
 GET /v1/code-finding-counts
-GET /v1/code-finding-trend?weeks=12
+GET /v1/code-finding-trend?days=30
 GET /v1/code-finding-time-to-judge?weeks=13
 GET /v1/analysis-coverage?weeks=13
 ```
@@ -196,7 +196,7 @@ GET /v1/analysis-coverage?weeks=13
 | Figure | Holds |
 |---|---|
 | Counts | The queue's counts with no rows: its length, each state, waiting for a second person, ruled, past end of life (`design-docs/analysis-queue.md` § Queue across products) |
-| Trend | One product's trend, each week's counts summed; a series of one name in two products is one split; each marker names its product (`design-docs/analysis-statistics.md` § Code findings over time) |
+| Trend | One product's trend, each step's counts summed; a series of one name in two products is one split; each marker names its product (`design-docs/analysis-statistics.md` § Code findings over time) |
 | Time to judge | Every product's waits as one population, the queue's ages summed, the oldest of any product's queue |
 | Analysis coverage | Every product's rows, each naming its product, in one order |
 

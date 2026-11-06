@@ -78,7 +78,7 @@ links here, and what the analyzers hold on it sits beside the issues
 |---|---|
 | The Security testing card, under the heading | Open code findings over every build, opening the queue on the source package; a row per analyzer series with a count per state, each opening the queue at that series and state; the open ones on the build itself, named as unplaced, with a link to Repositories |
 | A code findings column on each build row | The open ones that build places on the source package at the row's version, opening the queue at that build and version |
-| A second twelve-week panel | Code findings at the package and under it on the graph's build not fixed each week, with weekly new and fixed, a mark at each week an analyzer changed, and a link to Code findings over time narrowed beneath the package on that build; its own panel beside the issues' (`design-docs/analysis-statistics.md` § The page) |
+| A second panel of thirty days, or twelve weeks once switched | Code findings at the package and under it on the graph's build not fixed at the end of each step, with new and fixed in each step, a mark at each step an analyzer changed, and a link to Code findings over time narrowed beneath the package on that build; its own panel beside the issues' (`design-docs/analysis-statistics.md` § The page) |
 
 | Rule | Reason |
 |---|---|

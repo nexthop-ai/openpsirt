@@ -41,8 +41,9 @@ import { CODE_FINDING_METHODS } from "./codeFindings";
 import { TIERS, codeTrendAt, marksOf } from "./codeTrend";
 
 // Home's Security testing figures: the code findings to judge and waiting for
-// a judgment, this week's new and fixed, what is no longer detected, the
-// analyzers gone quiet, and twelve weeks of what is not fixed. Counted per
+// a judgment, the last step's new and fixed, what is no longer detected, the
+// analyzers gone quiet, and thirty days, or twelve weeks once switched, of what
+// is not fixed. Counted per
 // testing method and never beside a dependency figure.
 //
 // Every figure is one read: of the product picked, or with none picked one
@@ -224,7 +225,7 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
           </span>
         </button>
         {/* Worked out from the trend, with nothing to open: the queue holds
-            what is open, never what opened or was fixed in a week. One
+            what is open, never what opened or was fixed in a step. One
             product's opens its page of code findings over time. */}
         <button
           type="button"
