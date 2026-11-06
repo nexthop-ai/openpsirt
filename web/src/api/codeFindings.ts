@@ -182,9 +182,8 @@ export type CodeFindingMarker = Body<"CodeFindingMarkerBody">;
 
 // What narrows a trend of code findings: the queue's narrowing but the state
 // and the holder, which a line of what is not fixed does not read.
-type CodeFindingTrendAsked = Omit<CodeFindingsAsked, "state" | "assigned"> & {
-  weeks: number;
-};
+type CodeFindingTrendAsked = Omit<CodeFindingsAsked, "state" | "assigned"> &
+  ({ weeks: number; days?: never } | { days: number; weeks?: never });
 
 // Code findings of a product week by week: not fixed, split by tier, series
 // and method, what opened and was fixed, and the runs that changed what is
@@ -210,7 +209,7 @@ export function codeFindingTrendRead(product: string, asked: CodeFindingTrendAsk
           params: {
             path: { product },
             query: {
-              weeks: asked.weeks,
+              ...(asked.days ? { days: asked.days } : { weeks: asked.weeks }),
               ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
               ...(asked.variant ? { variant: asked.variant } : {}),
               ...(asked.series ? { series: asked.series } : {}),
@@ -596,7 +595,10 @@ export function codeFindingCountsRead(
 }
 
 // The trend of code findings across products, each marker naming its product.
-export function codeFindingTrendAcrossRead(asked: CodeFindingAcrossAsked & { weeks: number }) {
+export function codeFindingTrendAcrossRead(
+  asked: Omit<CodeFindingAcrossAsked, "weeks"> &
+    ({ weeks: number; days?: never } | { days: number; weeks?: never }),
+) {
   return queryOptions({
     queryKey: ["code-findings", "", "trend", asked],
     queryFn: async (): Promise<CodeFindingTrend> =>

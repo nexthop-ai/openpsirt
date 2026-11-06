@@ -190,9 +190,9 @@ describe("the component screen's security testing", () => {
     );
   });
 
-  it("draws twelve weeks of code findings as a panel of their own beside the issues", async () => {
+  it("draws thirty days of code findings as a panel of their own beside the issues", async () => {
     await component(BOTH);
-    expect(text()).toContain("Code findings · 12 weeks");
+    expect(text()).toContain("Code findings · 30 days");
     expect(
       mount.host().querySelector('svg[aria-label^="Code findings not fixed from 4 to 3"]'),
     ).not.toBeNull();
@@ -230,7 +230,7 @@ describe("the component screen's security testing", () => {
     expect(text()).not.toContain("code findings open");
     // A count never asked for is never waited on.
     expect(mount.host().querySelector(".loading")).toBeNull();
-    expect(text()).not.toContain("Code findings · 12 weeks");
+    expect(text()).not.toContain("Code findings · 30 days");
     expect(asked).not.toContain(COUNTS);
     expect(asked).not.toContain(TREND);
   });
@@ -255,7 +255,7 @@ describe("the component screen's security testing", () => {
     await component(BOTH, {}, undefined, { [COUNTS]: 500 });
     expect(mount.host().querySelector("th[title^='Open code findings']")).toBeNull();
     expect(text()).toContain("The code findings could not be counted.");
-    expect(text()).toContain("Code findings · 12 weeks");
+    expect(text()).toContain("Code findings · 30 days");
   });
 
   it("says in one line that the trend is refused where the session lists the product as read", async () => {
@@ -270,7 +270,7 @@ describe("the component screen's security testing", () => {
     expect(text()).toContain("You don't read code findings in sonic.");
     expect(text()).not.toContain("could not be counted");
     expect(mount.host().querySelector("th[title^='Open code findings']")).toBeNull();
-    expect(text()).not.toContain("Code findings · 12 weeks");
+    expect(text()).not.toContain("Code findings · 30 days");
     expect(asked).not.toContain(TREND);
   });
 

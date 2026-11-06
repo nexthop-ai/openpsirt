@@ -41,6 +41,9 @@
 .chart .bar-new {
   fill: var(--sev-high);
 }
+.chart .bar-ret {
+  fill: var(--sev-critical);
+}
 .chart .bar-res {
   fill: var(--ok);
 }
@@ -74,6 +77,12 @@
   border-radius: 2px;
   display: inline-block;
   font-style: normal;
+}
+.legend i.dashed {
+  width: 0;
+  height: 11px;
+  border-radius: 0;
+  border-left: 1px dashed var(--faint);
 }
 .sevring {
   display: flex;

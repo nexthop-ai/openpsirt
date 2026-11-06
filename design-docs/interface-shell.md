@@ -156,14 +156,15 @@ are asked occasionally and are the slowest read.
 
 ### Dependencies figures
 
-Open issues, known exploited, overdue and due soon, then the trend of open, new
-and resolved issues, severity over time, open issues by severity, and release
-readiness. Each counts dependency findings, drawn under `design-docs/interface.md`
+Open issues, known exploited, overdue and due soon, then the trend of open, new,
+returned and corrected issues, severity over time, open issues by severity, and
+release readiness. Each counts dependency findings, drawn under `design-docs/interface.md`
 § Families a reader holds at the picked scope.
 
 | Rule | Reason |
 |---|---|
 | Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
+| The trend panel draws thirty daily steps, or twelve weekly ones once switched; severity over time follows it | A team fixing dozens a day sees it by the day (`design-docs/analytics-program.md` § Trends) |
 | Known exploited is drawn only with a product picked | The list across products counts a row per product |
 
 | Panel | Rule |
@@ -181,10 +182,10 @@ figure (REQ-87), from the Security testing statistics consumer and the queue
 |---|---|---|
 | Open | Code findings to be judged, the queue's open state; split by testing method once there is more than one | The queue in that state |
 | Waiting for a judgment | The queue: open code findings no decision is proposed for, and how long the oldest has waited | The queue |
-| This week | New and fixed in the trend's last week | Code findings over time, with one product counted |
+| Today, or this week | New and fixed in the trend's last step | Code findings over time, with one product counted |
 | No longer detected | Today's count, which has no weekly line | The queue in that state |
 | Analyzers gone quiet | Series with no comparable run within their own expected interval, on a release in support, the first two named | Analysis coverage, with one product counted |
-| Code findings over twelve weeks | Not fixed, new and fixed per week, with a mark at each tool, version or rule-set change and each run not comparable | |
+| Code findings over time | Not fixed, new and fixed per day, or per week once switched, with a mark at each tool, version or rule-set change and each run not comparable | |
 | Not fixed by tier | Not fixed per week, stacked by the tier of the rule's weaknesses as rated now | |
 
 | Rule | Reason |

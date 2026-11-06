@@ -2,13 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { counted, type Holding } from "../app/families";
 import { comparisonAt } from "../app/routes";
 import { findingsPath, scopeQuery, useScope, type Scoped } from "../app/scope";
-import { Mix, Pace, Releases, Ring, TREND_WEEKS, trendSaid } from "../ui/Charts";
+import {
+  Mix,
+  Pace,
+  PaceLegend,
+  Releases,
+  Ring,
+  StepSwitch,
+  type TrendStep,
+  stepQuery,
+  stepSaid,
+  stepUnit,
+} from "../ui/Charts";
 import { Count, known } from "../ui/Count";
 import { Failed } from "../ui/Failed";
 import { HeldLine } from "../ui/HeldLine";
@@ -63,11 +75,13 @@ export function DependencyFigures({
   const navigate = useNavigate();
   const figures = counted(dependencies);
 
+  // Daily by default: a team fixing dozens a day sees it day by day.
+  const [step, setStep] = useState<TrendStep>("day");
   const trend = useQuery({
-    queryKey: ["home", "trend", scope],
+    queryKey: ["home", "trend", scope, step],
     enabled: figures,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/trend", { params: { query: { weeks: TREND_WEEKS, ...scope } } })),
+      unwrap(await api.GET("/v1/trend", { params: { query: { ...stepQuery(step), ...scope } } })),
   });
   const points = trend.data?.items ?? [];
   // The other axis. Asked for whenever a product is picked, and drawn instead
@@ -115,11 +129,11 @@ export function DependencyFigures({
   // where a scope narrows something: unscoped they would be the same number
   // twice.
   const widely = !!at.product;
+  // One day is the least window whose last step is open now.
   const allOpen = useQuery({
     queryKey: ["home", "trend", "all"],
     enabled: figures && widely,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/trend", { params: { query: { weeks: TREND_WEEKS } } })),
+    queryFn: async () => unwrap(await api.GET("/v1/trend", { params: { query: { days: 1 } } })),
   });
   const allLate = useQuery({
     queryKey: ["home", "running-out", "all"],
@@ -285,11 +299,12 @@ export function DependencyFigures({
         <div className="panel wide">
           <header>
             <h3>
-              {byRelease ? "Open issues in each release" : "Trend: open, new and resolved issues"}
+              {byRelease ? "Open issues in each release" : "Trend: open, new and corrected issues"}
             </h3>
             <span className="eyebrow" style={{ marginLeft: "auto" }}>
-              {byRelease ? "release over release" : trendSaid} · {counting}
+              {byRelease ? "release over release" : stepSaid(step)} · {counting}
             </span>
+            {!byRelease && <StepSwitch step={step} onStep={setStep} />}
           </header>
           {trend.isError ? (
             <Failed error={trend.error} what="The trend could not be read." />
@@ -304,19 +319,9 @@ export function DependencyFigures({
             </>
           ) : (
             <>
-              <Pace points={points} />
-              <div className="legend">
-                <span>
-                  <i style={{ background: "var(--accent)" }} /> Open issues
-                </span>
-                <span>
-                  <i style={{ background: "var(--sev-high)" }} /> New
-                </span>
-                <span>
-                  <i style={{ background: "var(--ok)" }} /> Resolved
-                </span>
-              </div>
-              <p className="reading">{paceReading(points)}</p>
+              <Pace points={points} unit={stepUnit(step)} />
+              <PaceLegend />
+              <p className="reading">{paceReading(points, stepUnit(step))}</p>
             </>
           )}
         </div>

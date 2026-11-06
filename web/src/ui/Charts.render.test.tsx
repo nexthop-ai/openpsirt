@@ -2,19 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Pace, Releases, Ring } from "./Charts";
+import { Pace, Releases, Ring, paceLabel, paceMarks } from "./Charts";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
 
-const point = (at: string, open: number, opened: number, resolved: number) => ({
+const point = (at: string, open: number, fresh: number, corrected: number, returned = 0) => ({
   at,
   open,
-  opened,
-  resolved,
+  new: fresh,
+  corrected,
+  returned,
   by_severity: {},
-  opened_by_severity: {},
-  resolved_by_severity: {},
 });
 
 describe("the backlog's pace", () => {
@@ -30,14 +29,75 @@ describe("the backlog's pace", () => {
     );
     const chart = mount.host().querySelector("svg");
     expect(chart?.getAttribute("aria-label")).toBe(
-      "Open findings from 1,200 to 12,500 over 3 steps, with new findings outrunning resolved in 1 of them",
+      "Open issues from 1,200 to 12,500 over 3 steps, with new and returned outrunning corrected in 1 of them",
     );
     expect(mount.host().textContent).toContain("12,500 open issues");
     expect(mount.host().textContent).toContain("5.0k");
     expect(mount.host().textContent).toContain("10k");
     const titles = Array.from(mount.host().querySelectorAll("title")).map((t) => t.textContent);
     expect(titles).toContain("01-11: 40 new");
-    expect(titles).toContain("01-18: 9 resolved");
+    expect(titles).toContain("01-18: 9 corrected");
+  });
+
+  it("starts where scanning began, and marks the first scan rather than drawing it as new", () => {
+    // Before the first scan nothing is open, and drawn, the open line's scale
+    // would run from zero to the whole inventory.
+    mount.render(
+      <Pace
+        points={[
+          point("2026-01-01", 0, 0, 0),
+          point("2026-01-02", 0, 0, 0),
+          { ...point("2026-01-03", 9800, 0, 0), baseline: 9800, first_scans: 1 },
+          point("2026-01-04", 9790, 2, 12),
+          point("2026-01-05", 9785, 0, 8, 3),
+        ]}
+      />,
+    );
+    const host = mount.host();
+    expect(host.querySelector("svg")?.getAttribute("aria-label")).toBe(
+      "Open issues from 9,800 to 9,785 over 3 steps, with new and returned outrunning corrected in 0 of them; first scans brought 9,800",
+    );
+    const titles = Array.from(host.querySelectorAll("title")).map((t) => t.textContent);
+    expect(titles).toContain("01-03: first scan: 9,800");
+    expect(titles).toContain("01-05: 3 returned");
+    expect(titles.some((t) => t?.startsWith("01-01"))).toBe(false);
+    // The bars' scale is the flows': twelve corrected fills the band.
+    const corrected = Array.from(host.querySelectorAll("rect.bar-res")).map((r) =>
+      Number(r.getAttribute("height")),
+    );
+    expect(Math.max(...corrected)).toBeCloseTo(19);
+    // The open line's scale is fitted to what open spans after the first scan.
+    expect(host.textContent).not.toContain("0 open");
+  });
+
+  it("moves a mark to the step it stays on once leading steps are dropped", () => {
+    const points = [
+      point("2026-01-01", 0, 0, 0),
+      { ...point("2026-01-02", 5, 0, 0), baseline: 5, first_scans: 1 },
+      point("2026-01-03", 5, 0, 0),
+    ];
+    expect(
+      paceMarks(
+        points,
+        [
+          { step: 0, said: "before" },
+          { step: 2, said: "a tool changed" },
+        ],
+        1,
+      ),
+    ).toEqual([
+      { step: 0, said: "01-02: first scan: 5" },
+      { step: 1, said: "a tool changed" },
+    ]);
+    expect(
+      paceLabel(
+        points.slice(1),
+        { line: "", what: "Open", fresh: "new", back: "back", done: "done" },
+        "days",
+      ),
+    ).toBe(
+      "Open from 5 to 5 over 2 days, with new and back outrunning done in 0 of them; first scans brought 5",
+    );
   });
 
   it("draws nothing for no steps, and one step in the middle", () => {

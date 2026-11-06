@@ -9,10 +9,11 @@ import { fileAt } from "../../api/links";
 import { scopeQuery, useScope } from "../../app/scope";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
-import { Mix, Pace, folded } from "../../ui/Charts";
+import { Mix, Pace, PaceLegend, folded } from "../../ui/Charts";
+import { settled } from "../../ui/trend";
 import { Empty } from "../../ui/Empty";
 import { Sheet } from "./Sheet";
-import { Segments, boundedAsked } from "./Window";
+import { Segments, StepSegments, boundedAsked } from "./Window";
 import { Wide } from "../../ui/Wide";
 import { useWho } from "../../app/session";
 import { counted, heldLine, holding } from "../../app/families";
@@ -27,40 +28,45 @@ import { BANDS } from "../../ui/severities";
 // The first question a manager asks, with a name, a window, a file, and the
 // scope it is asked of.
 //
-// The two flows are what a backlog is read for. Ten arriving and ten answered
-// is a team keeping pace where both are low, and a team losing ground where
-// what arrives is critical and what leaves is not — which a line of totals
-// draws as flat.
+// The flows are what a backlog is read for. Ten arriving and ten corrected is
+// a team keeping pace where both are low, and a team losing ground where what
+// arrives is critical and what leaves is not, which a line of totals draws as
+// flat.
 
-// The windows worth asking this over. A quarter is the shortest that shows a
-// trend rather than a fortnight's noise, and two years is the longest the
-// server answers for.
+// The windows worth asking this over, by step. Two years is the longest the
+// server answers for in either.
 const WEEKS = [4, 13, 26, 52, 104] as const;
+const DAYS = [14, 30, 90, 365, 730] as const;
 
 export function Backlog() {
   const at = useScope();
   const scope = scopeQuery(at);
   const [params] = useSearchParams();
-  // A value outside the range falls back to a quarter, and a fraction is cut
-  // to its whole number of weeks.
+  // Daily unless the address says weekly. A value outside the range falls
+  // back to the step's default, and a fraction is cut to a whole number.
+  const daily = params.get("step") !== "week";
   const weeks = boundedAsked(params.get("weeks"), 104, 13);
+  const days = boundedAsked(params.get("days"), 730, 30);
+  const window = daily ? { days } : { weeks };
 
   // The backlog is dependency findings, asked and drawn only where the reader
   // reads them at the scope.
   const dependencies = holding(useWho().data, "dependency", at.product);
   const figures = counted(dependencies);
   const trend = useQuery({
-    queryKey: ["backlog", scope, weeks],
+    queryKey: ["backlog", scope, window],
     enabled: figures,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/trend", { params: { query: { ...scope, weeks } } })),
+      unwrap(await api.GET("/v1/trend", { params: { query: { ...scope, ...window } } })),
   });
 
   const points = trend.data?.items ?? [];
-  // The first step has nothing to differ from, so it reports neither flow.
-  // Drawn, it is a zero somebody reads as a quiet week.
-  const flows = points.slice(1);
-  const asked = new URLSearchParams({ ...scope, weeks: String(weeks) }).toString();
+  // From where scanning began: a leading empty step is the absence of us.
+  const flows = settled(points);
+  const asked = new URLSearchParams({
+    ...scope,
+    ...(daily ? { days: String(days) } : { weeks: String(weeks) }),
+  }).toString();
   const file = (format: "csv" | "json") => fileAt("/v1/trend.{format}", format, { query: asked });
 
   return (
@@ -68,16 +74,27 @@ export function Backlog() {
       settled={!figures || trend.isSuccess}
       name="Backlog over time"
       answers="whether the backlog is growing, and what kind of thing is making it grow."
-      asked={`${weeks} weeks`}
+      asked={daily ? `${days} days` : `${weeks} weeks`}
     >
       <div className="controls">
-        <Segments
-          label="Window"
-          param="weeks"
-          offered={WEEKS}
-          chosen={weeks}
-          words={(n) => (n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`)}
-        />
+        <StepSegments daily={daily} />
+        {daily ? (
+          <Segments
+            label="Window"
+            param="days"
+            offered={DAYS}
+            chosen={days}
+            words={(n) => (n === 730 ? "two years" : n === 365 ? "a year" : `${n} days`)}
+          />
+        ) : (
+          <Segments
+            label="Window"
+            param="weeks"
+            offered={WEEKS}
+            chosen={weeks}
+            words={(n) => (n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`)}
+          />
+        )}
         {figures && (
           <span style={{ marginLeft: "auto" }} className="noprint">
             <a className="btn quiet" href={file("csv")}>
@@ -105,20 +122,13 @@ export function Backlog() {
       ) : (
         <>
           <section className="panel">
-            <h3>Open, new and resolved</h3>
-            <Pace points={points} />
-            <div className="legend">
-              <span>
-                <i style={{ background: "var(--accent)" }} /> Open issues
-              </span>
-              <span>
-                <i style={{ background: "var(--sev-high)" }} /> New
-              </span>
-              <span>
-                <i style={{ background: "var(--ok)" }} /> Resolved
-              </span>
-            </div>
-            <p className="hint">Counted as issues, not as occurrences.</p>
+            <h3>Open, new, returned and corrected</h3>
+            <Pace points={points} unit={daily ? "days" : "weeks"} />
+            <PaceLegend />
+            <p className="hint">
+              Counted as issues, not as occurrences. An issue that comes back is returned, and stops
+              counting as corrected.
+            </p>
           </section>
 
           <section className="panel">
@@ -134,20 +144,21 @@ export function Backlog() {
             </p>
             {flows.length === 0 ? (
               <Empty
-                title="One step is not a trend."
-                detail="What arrived and what was answered are the difference between two steps, so this needs a second one."
+                title="Nothing moved."
+                detail="Nothing arrived or was corrected in the window."
               />
             ) : (
               <Wide>
                 <table>
                   <thead>
                     <tr>
-                      <th>Week ending</th>
+                      <th>{daily ? "Day" : "Week ending"}</th>
                       <th>New</th>
                       {BANDS.map((band) => (
                         <th key={`in ${band}`}>{band}</th>
                       ))}
-                      <th>Resolved</th>
+                      <th>Returned</th>
+                      <th>Corrected</th>
                       {BANDS.map((band) => (
                         <th key={`out ${band}`}>{band}</th>
                       ))}
@@ -155,18 +166,19 @@ export function Backlog() {
                   </thead>
                   <tbody>
                     {flows.map((point) => {
-                      const arrived = folded(point.opened_by_severity ?? {});
-                      const answered = folded(point.resolved_by_severity ?? {});
+                      const arrived = folded(point.new_by_severity ?? {});
+                      const answered = folded(point.corrected_by_severity ?? {});
                       return (
                         <tr key={point.at}>
                           <td className="id">{point.at}</td>
-                          <td>{(point.opened ?? 0).toLocaleString()}</td>
+                          <td>{(point.new ?? 0).toLocaleString()}</td>
                           {BANDS.map((band) => (
                             <td key={`in ${band}`} className="hint">
                               {(arrived[band] ?? 0).toLocaleString()}
                             </td>
                           ))}
-                          <td>{(point.resolved ?? 0).toLocaleString()}</td>
+                          <td>{(point.returned ?? 0).toLocaleString()}</td>
+                          <td>{(point.corrected ?? 0).toLocaleString()}</td>
                           {BANDS.map((band) => (
                             <td key={`out ${band}`} className="hint">
                               {(answered[band] ?? 0).toLocaleString()}

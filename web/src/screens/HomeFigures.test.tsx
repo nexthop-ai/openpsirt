@@ -234,7 +234,7 @@ describe("the Security testing figures", () => {
     expect(shown("Open")).toBe("12");
     expect(shown("Waiting for a judgment")).toBe("8");
     expect(tile("Waiting for a judgment")?.textContent).toContain("oldest");
-    expect(shown("This week")).toBe("+6 −2");
+    expect(shown("Today")).toBe("+6 −2");
     expect(shown("No longer detected")).toBe("4");
     expect(tile("Analyzers gone quiet")?.textContent).toContain("sonic clang-tidy on main · arm");
     for (const across of [
@@ -337,5 +337,27 @@ describe("the Security testing figures", () => {
     );
     expect(line?.querySelector(".when")?.textContent).toBe(on("2026-10-20T00:00:00Z"));
     expect(shown("Analyzers gone quiet")).toBe("0");
+  });
+});
+
+describe("the Dependencies trend", () => {
+  it("asks for days by default and weeks once switched", async () => {
+    const steps: unknown[] = [];
+    serve((path, init) => {
+      if (path === "/v1/trend") {
+        const query = (init as { params?: { query?: Record<string, unknown> } }).params?.query;
+        steps.push({ days: query?.days, weeks: query?.weeks });
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Home who={person([readingDependencies("sonic")])} />, "/"));
+    await settle();
+    expect(steps[0]).toEqual({ days: 30, weeks: undefined });
+    const weekly = [...mount.host().querySelectorAll("button")].find(
+      (each) => each.textContent === "Weekly",
+    );
+    await act(async () => weekly?.click());
+    await settle();
+    expect(steps.at(-1)).toEqual({ days: undefined, weeks: 12 });
   });
 });

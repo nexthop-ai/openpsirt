@@ -7,11 +7,14 @@
 // that is arithmetically correct and says something false is worse than a
 // blank line: the blank invites a question, and the sentence answers one.
 
-// One step of the trend, as much of it as the readings use.
-type Step = {
+// One step of the trend, as much of it as the readings and the chart use.
+export type Step = {
   open?: number;
-  opened?: number;
-  resolved?: number;
+  new?: number;
+  corrected?: number;
+  returned?: number;
+  baseline?: number;
+  first_scans?: number;
   by_severity?: Record<string, number>;
 };
 
@@ -22,39 +25,61 @@ type Step = {
 // what there is and claims nothing — and only the sentence is held back.
 const ENOUGH = 4;
 
-// The steps that describe the estate rather than the tool being switched on.
+// Whether anything was open or moved in a step.
+function moved(p: Step): boolean {
+  return (
+    (p.open ?? 0) > 0 ||
+    (p.new ?? 0) > 0 ||
+    (p.corrected ?? 0) > 0 ||
+    (p.returned ?? 0) > 0 ||
+    (p.baseline ?? 0) > 0 ||
+    (p.first_scans ?? 0) > 0
+  );
+}
+
+// The index of the first step that describes the estate rather than the tool
+// being switched on, or the length where none does.
 //
 // The trend answers for a fixed window whether or not this deployment existed
 // through it, so a week-old deployment gets twelve weekly steps of which
 // eleven are zeros. Measured across all twelve, a real week-old deployment
-// reads "open up 5,803 across the range" and "Critical went 0 → 389" — both
-// arithmetically correct, and both describing the first scan landing rather
-// than anything about the estate.
+// reads "open up 5,803 across the range" and "Critical went 0 → 389": both
+// arithmetically correct, and both describing the first scan landing.
 //
-// Leading empty steps are dropped and the rest are kept. An empty week in the
+// Leading empty steps are dropped and the rest are kept. An empty step in the
 // middle is real: nothing opened and nothing closed is something that
 // happened. A leading one is only the absence of us.
-export function settled<T extends Step>(points: T[]): T[] {
-  const began = points.findIndex(
-    (p) => (p.open ?? 0) > 0 || (p.opened ?? 0) > 0 || (p.resolved ?? 0) > 0,
-  );
-  return began < 0 ? [] : points.slice(began);
+export function began(points: Step[]): number {
+  const at = points.findIndex(moved);
+  return at < 0 ? points.length : at;
 }
 
-// The direction of the backlog, or too little history to say.
-export function paceReading(points: Step[]): string {
+// The steps from where the history begins.
+export function settled<T extends Step>(points: T[]): T[] {
+  return points.slice(began(points));
+}
+
+// Whether what arrived in a step outran what was corrected: new and returned
+// alike are work arriving.
+export function outran(p: Step): boolean {
+  return (p.new ?? 0) + (p.returned ?? 0) > (p.corrected ?? 0);
+}
+
+// The direction of the backlog, or too little history to say. The unit is the
+// step's name, "days" or "weeks".
+export function paceReading(points: Step[], unit = "weeks"): string {
   const range = settled(points);
   if (range.length < ENOUGH) return "Not enough history.";
-  const outran = range.filter((p) => (p.opened ?? 0) > (p.resolved ?? 0)).length;
+  const ahead = range.filter(outran).length;
   const first = range[0]?.open ?? 0;
   const last = range[range.length - 1]?.open ?? 0;
-  const moved = last - first;
-  const direction = moved > 0 ? "growing" : moved < 0 ? "shrinking" : "flat";
+  const change = last - first;
+  const direction = change > 0 ? "growing" : change < 0 ? "shrinking" : "flat";
   const open =
-    moved === 0
+    change === 0
       ? `open unchanged at ${last.toLocaleString()}`
-      : `open ${moved > 0 ? "up" : "down"} ${Math.abs(moved).toLocaleString()}`;
-  return `Backlog ${direction} · ${open} · new exceeded resolved in ${outran} of ${range.length} weeks`;
+      : `open ${change > 0 ? "up" : "down"} ${Math.abs(change).toLocaleString()}`;
+  return `Backlog ${direction} · ${open} · new and returned exceeded corrected in ${ahead} of ${range.length} ${unit}`;
 }
 
 // The critical share's direction, over the same history.

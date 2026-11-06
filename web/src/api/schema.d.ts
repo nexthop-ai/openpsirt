@@ -803,7 +803,7 @@ export interface paths {
         };
         /**
          * Trend code findings across products
-         * @description Returns, per week, the code findings not fixed at the end of the week summed over products, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it, as one product's trend counts them. A series of the same name in two products is one split. Each marker names its product.
+         * @description Returns, per week or per day, the code findings not fixed at the end of the step summed over products, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it, as one product's trend counts them. A series of the same name in two products is one split. Each marker names its product.
          *
          *     Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
          *
@@ -4289,9 +4289,9 @@ export interface paths {
         };
         /**
          * Trend code findings
-         * @description Returns, per week, the code findings of a product that are not fixed at the end of the week, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it. Weeks end at the coming midnight UTC and every seven days before, each point dated by its last day; a code finding is dated by when the run that opened it was applied, and counted once however many builds hold it.
+         * @description Returns, per week or per day, the code findings of a product that are not fixed at the end of the step, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it. Steps end at the coming midnight UTC and every step before, each point dated by its last day; a code finding is dated by when the run that opened it was applied, and counted once however many builds hold it.
          *
-         *     A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing. `no_longer_detected` is how many a comparable run did not see, now, and has no weekly history.
+         *     A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing. `no_longer_detected` is how many a comparable run did not see, now, and has no history.
          *
          *     `markers` are the runs that changed what the trend compares: another tool, version or rule set than the run before on the same build, and runs whose absences are no evidence.
          *
@@ -4317,7 +4317,7 @@ export interface paths {
         };
         /**
          * Export the code finding trend
-         * @description The code finding trend as a file: per week, a row with what was not fixed, opened and fixed and the markers of that week, then a row per tier, method and series with what of it was not fixed. The columns are the same whatever the data holds. Takes what the trend takes, and is refused as it is.
+         * @description The code finding trend as a file: per step, a row with what was not fixed, opened and fixed and the markers of that step, then a row per tier, method and series with what of it was not fixed. The columns are the same whatever the data holds. Takes what the trend takes, and is refused as it is.
          *
          *     Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
          */
@@ -7408,12 +7408,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Show new, resolved and open over time
-         * @description Returns the three counts per step, with open split by severity, across every product you can see.
+         * Show the findings trend
+         * @description Returns, per step, the issues open at its end and the issues that moved in it, each split by severity, across every product you can see. Steps are weeks or days, ending at the coming midnight UTC, each dated by its last day.
          *
-         *     Narrowable to part of a tree. `component` keeps one package at any version; `beneath` keeps a component and everything under it, which needs a branch and a variant naming exactly one build. A team that owns one area asks for its own three lines this way.
+         *     An issue is one identity however often it leaves and comes back. `new` is an issue never open before in the selection; `returned` is one open before; `corrected` is one that left by a fix and has stayed out, so an issue that returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is `baseline`, and `first_scans` says how many builds were first scanned in the step.
          *
-         *     Worked out when it is asked for.
+         *     Narrowable to part of a tree. `component` keeps one package at any version; `beneath` keeps a component and everything under it, which needs a branch and a variant naming exactly one build.
+         *
+         *     Sending both `weeks` and `days` is refused.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -7434,10 +7436,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Export new, resolved and open over time
-         * @description One row per step, with what arrived, what was answered and what stood open at the end of it — each split by severity.
-         *
-         *     The two flows are what the backlog is read for. Ten arriving and ten answered is a team keeping pace where both are low, and a team losing ground where what arrives is critical and what leaves is not.
+         * Export the findings trend
+         * @description One row per step, with the issues new, corrected, returned and brought by a first scan in it, and open at its end, each flow and open split by severity. The counts are the trend's.
          *
          *     Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
          *
@@ -9402,14 +9402,14 @@ export interface components {
         CodeFindingPointBody: {
             /**
              * Format: date
-             * @description The last day of the week, which ends at midnight UTC after it
+             * @description The last day of the step, which ends at midnight UTC after it
              */
             at: string;
             /** @description not_fixed by testing method, each named */
             by_method: {
                 [key: string]: number;
             };
-            /** @description not_fixed by analyzer series, naming every series with a code finding counted in any week */
+            /** @description not_fixed by analyzer series, naming every series with a code finding counted in any step */
             by_series: {
                 [key: string]: number;
             };
@@ -9419,17 +9419,17 @@ export interface components {
             };
             /**
              * Format: int64
-             * @description Code findings closed as fixed in the week. Zero on the first week
+             * @description Code findings closed as fixed in the step. Zero on the first step
              */
             fixed: number;
             /**
              * Format: int64
-             * @description Code findings opened and not closed as fixed by the end of the week, whatever was decided about them
+             * @description Code findings opened and not closed as fixed by the end of the step, whatever was decided about them
              */
             not_fixed: number;
             /**
              * Format: int64
-             * @description Code findings not fixed at the end of the week that were not at the end of the one before. Zero on the first week
+             * @description Code findings not fixed at the end of the step that were not at the end of the one before. Zero on the first step
              */
             opened: number;
         };
@@ -9614,14 +9614,14 @@ export interface components {
              * @example https://example.com/schemas/CodeFindingTrendBody.json
              */
             readonly $schema?: string;
-            /** @description Runs applied in the weeks that changed what the trend compares, oldest first, one per day, series and change */
+            /** @description Runs applied in the steps that changed what the trend compares, oldest first, one per day, series and change */
             markers: components["schemas"]["CodeFindingMarkerBody"][] | null;
             /**
              * Format: int64
              * @description Code findings a comparable run did not see, now: the code finding list's no-longer-detected count for the same narrowing. Absence closes nothing, so these are counted in not_fixed too
              */
             no_longer_detected: number;
-            /** @description One per week, oldest first */
+            /** @description One per step, oldest first */
             points: components["schemas"]["CodeFindingPointBody"][] | null;
         };
         CodeFindingWaitBody: {
@@ -13686,29 +13686,55 @@ export interface components {
             elsewhere: string;
         };
         PointBody: {
-            /** @description The end of this step, as a date */
+            /**
+             * Format: date
+             * @description The last day of the step, which ends at midnight UTC after it
+             */
             at: string;
+            /**
+             * Format: int64
+             * @description Issues a build's first scan brought into the open set. Not new: a first scan is an inventory arriving
+             */
+            baseline: number;
+            /** @description Open, split by severity */
             by_severity: {
                 [key: string]: number;
             };
-            /** Format: int64 */
-            open: number;
             /**
              * Format: int64
-             * @description Findings that appeared during this step
+             * @description Issues that left the open set in the step by a fix and have not been open since. A later return takes an issue out of this count
              */
-            opened: number;
-            /** @description Everything that appeared, split by severity */
-            opened_by_severity: {
+            corrected: number;
+            /** @description Corrected, split by the severity each held while it was open */
+            corrected_by_severity: {
                 [key: string]: number;
             };
             /**
              * Format: int64
-             * @description Findings that went away during this step
+             * @description Builds whose first scan was in the step
              */
-            resolved: number;
-            /** @description Everything that went away, split by the severity it held while it was open */
-            resolved_by_severity: {
+            first_scans: number;
+            /**
+             * Format: int64
+             * @description Issues open for the first time ever in the selection, other than through a build's first scan
+             */
+            new: number;
+            /** @description New, split by severity */
+            new_by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Issues open at the end of the step
+             */
+            open: number;
+            /**
+             * Format: int64
+             * @description Issues back in the open set after having been in it before
+             */
+            returned: number;
+            /** @description Returned, split by severity */
+            returned_by_severity: {
                 [key: string]: number;
             };
         };
@@ -17734,8 +17760,10 @@ export interface operations {
                 series?: string;
                 /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
                 method?: "sast";
-                /** @description The number of weeks, ending at the coming midnight UTC */
+                /** @description The number of weekly steps. Twelve where neither this nor days is sent */
                 weeks?: number;
+                /** @description The number of daily steps, in place of weeks. Sending both is refused */
+                days?: number;
             };
             header?: never;
             path?: never;
@@ -17770,8 +17798,10 @@ export interface operations {
                 series?: string;
                 /** @description Limit to the code findings one testing method reported. Left out, every method. sast is static analysis */
                 method?: "sast";
-                /** @description The number of weeks, ending at the coming midnight UTC */
+                /** @description The number of weekly steps. Twelve where neither this nor days is sent */
                 weeks?: number;
+                /** @description The number of daily steps, in place of weeks. Sending both is refused */
+                days?: number;
             };
             header?: never;
             path: {
@@ -23220,8 +23250,10 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
-                /** @description The number of weeks, ending at the coming midnight UTC */
+                /** @description The number of weekly steps. Twelve where neither this nor days is sent */
                 weeks?: number;
+                /** @description The number of daily steps, in place of weeks. Sending both is refused */
+                days?: number;
             };
             header?: never;
             path: {
@@ -23274,8 +23306,10 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
-                /** @description The number of weeks, ending at the coming midnight UTC */
+                /** @description The number of weekly steps. Twelve where neither this nor days is sent */
                 weeks?: number;
+                /** @description The number of daily steps, in place of weeks. Sending both is refused */
+                days?: number;
             };
             header?: never;
             path: {
@@ -28470,7 +28504,10 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description The number of weekly steps. Twelve where neither this nor days is sent */
                 weeks?: number;
+                /** @description The number of daily steps, in place of weeks. Sending both is refused */
+                days?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
                 /** @description Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
@@ -28517,7 +28554,10 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
+                /** @description The number of weekly steps. Twelve where neither this nor days is sent */
                 weeks?: number;
+                /** @description The number of daily steps, in place of weeks. Sending both is refused */
+                days?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
                 /** @description Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */

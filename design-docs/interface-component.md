@@ -28,7 +28,7 @@ carries) and the act hangs off it.
 | The position is drawn before the action | The same numbers read oppositely at the two ends of a graph |
 | One page per source package; a binary whose inventory names no source is its own source | An upgrade is what the page is for |
 | A binary name and a source name open the same page, compared regardless of capitals | A tree link names the binary; a person asking names the source |
-| The binaries are listed and one is picked: the one the address named, else the one carrying most. The graph and the twelve weeks answer for it | What pulls a library in is not what pulls its command in |
+| The binaries are listed and one is picked: the one the address named, else the one carrying most. The graph and the trend answer for it | What pulls a library in is not what pulls its command in |
 | Counts cover the source package, once per issue; each binary carries its own count | |
 | Consumers are counted from outside the source package | |
 | More than one version is a choice offered with what is open at each, never a refusal | Two versions are two pieces of code |
@@ -44,8 +44,8 @@ carries) and the act hangs off it.
 | Where it could go carries two counts: what a release fixed (open issues naming that exact version) and what reaching it closes (that plus everything fixed before) | Sorted on the first, the version worth taking sinks: on the demo kernel the release closing all 158 fixed 2 of its own, and the one fixing 49 led |
 | Furthest along first where versions order; unranked where any comparison refuses, the two counts then equal and the screen saying so | An ordering is per ecosystem |
 | The second count is consumers; occurrences are the row's title | The ceiling on one action is in occurrences |
-| It carries where the component sits: what pulls it in, what it pulls in, and twelve weeks of what opened and closed under it | Arriving from the tree is a question about the graph |
-| The twelve weeks follow the component by name on the graph's build: a finding on a version a rescan replaced counts at the present version, so the weeks before a bump keep what was open and the bump's closures count as resolved (`design-docs/analytics-program.md` § Subtree trends) | A finding keeps the component it opened on |
+| It carries where the component sits: what pulls it in, what it pulls in, and the trend of what opened and closed under it, thirty days or twelve weeks | Arriving from the tree is a question about the graph |
+| The trend follows the component by name on the graph's build: a finding on a version a rescan replaced counts at the present version, so the steps before a bump keep what was open and the bump's closures count as corrected (`design-docs/analytics-program.md` § Subtree trends) | A finding keeps the component it opened on |
 | The graph answers for one build, picked from the rows; a link naming a build arrives on it | An edge is a fact about one build |
 | Releases are picked inside the promise form, ticked to those shipping this version | One bump moves every release at that version |
 | The version to move to is offered and never required | A version newer than any advisory can be named; the server refuses an unknown one |
@@ -59,7 +59,7 @@ findings, drawn under `design-docs/interface.md` § Families a reader holds.
 
 | Rule | Reason |
 |---|---|
-| Where the reader does not read dependency findings in the product, no count, open button, severity band, fix card or twelve weeks is drawn, and nothing calls the component clean | A zero over open code findings reads as a clean component |
+| Where the reader does not read dependency findings in the product, no count, open button, severity band, fix card or trend is drawn, and nothing calls the component clean | A zero over open code findings reads as a clean component |
 | Where they read them in another product, one line says so | |
 | Where nothing is open, the chip says "no dependency findings open" | The page counts one family, and its zero names it |
 | A reader of one half alone has its counts carry the line saying which half | |

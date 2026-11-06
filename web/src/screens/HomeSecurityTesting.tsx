@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   analysisCoverageAcrossRead,
@@ -21,7 +22,16 @@ import { counted, holding, refusedAt, type Holding } from "../app/families";
 import { analyticsReportAt, codeFindingsAcrossAt, codeFindingsAt } from "../app/routes";
 import { useScope, type Scoped } from "../app/scope";
 import type { Who } from "../app/session";
-import { Pace, Stack, type StackPart } from "../ui/Charts";
+import {
+  Pace,
+  Stack,
+  type StackPart,
+  StepSwitch,
+  type TrendStep,
+  stepQuery,
+  stepSaid,
+  stepUnit,
+} from "../ui/Charts";
 import { Count, type Readable } from "../ui/Count";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -40,8 +50,6 @@ import { TIERS, codeTrendAt, marksOf } from "./codeTrend";
 // material, the products the session lists them as reading it in, and the
 // head says how many. The server adds the products together.
 
-// The weeks home's charts cover, as the dependency trend does.
-const WEEKS = 12;
 // The weeks the analyzer run counts cover. Home reads only whether a series
 // is quiet and when it last ran, which no window changes.
 const COVERAGE_WEEKS = 1;
@@ -57,6 +65,7 @@ const WORDS = {
   line: "not fixed",
   what: "Code findings not fixed",
   fresh: "new code findings",
+  back: "returned",
   done: "fixed",
 };
 
@@ -124,10 +133,12 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
   const byMethod = useQueries({
     queries: (split ? methods : []).map((method) => queueRead(one, at, method)),
   });
+  // Daily by default, as the dependency trend is.
+  const [step, setStep] = useState<TrendStep>("day");
   const trends = useQuery({
     ...(one
-      ? codeFindingTrendRead(one, { ...asked, weeks: WEEKS })
-      : codeFindingTrendAcrossRead({ weeks: WEEKS })),
+      ? codeFindingTrendRead(one, { ...asked, ...stepQuery(step) })
+      : codeFindingTrendAcrossRead(stepQuery(step))),
     enabled: reads,
   });
   // The queue's oldest code finding, which the time to judge answers beside
@@ -221,7 +232,7 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
           disabled={!one}
           onClick={() => one && navigate(codeTrendAt())}
         >
-          <span className="l">This week</span>
+          <span className="l">{step === "day" ? "Today" : "This week"}</span>
           <span className="n">
             <Count of={trends}>
               {() =>
@@ -269,10 +280,11 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
       <div className="panels">
         <div className="panel wide">
           <header>
-            <h3>Code findings over twelve weeks</h3>
+            <h3>Code findings over {stepSaid(step)}</h3>
             <span className="eyebrow" style={{ marginLeft: "auto" }}>
               not fixed, new and fixed · {counting}
             </span>
+            <StepSwitch step={step} onStep={setStep} />
           </header>
           <Drawn trends={trends}>
             {() =>
@@ -282,11 +294,12 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
                     points={trend.points.map((point) => ({
                       at: point.at,
                       open: point.not_fixed,
-                      opened: point.opened,
-                      resolved: point.fixed,
+                      new: point.opened,
+                      corrected: point.fixed,
                     }))}
                     words={WORDS}
                     marks={marksOf(trend)}
+                    unit={stepUnit(step)}
                   />
                   <div className="legend">
                     <span>

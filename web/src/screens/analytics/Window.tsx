@@ -248,3 +248,26 @@ export function useSheetWindow(fallback: number) {
   const period = periodAsked(params);
   return { params, setParams, days, period, when: asked(period, days) };
 }
+
+// The step the sheet is drawn in, carried in the address.
+export function StepSegments({ daily }: { daily: boolean }) {
+  const [params, setParams] = useSearchParams();
+  const pick = (week: boolean) => {
+    const next = new URLSearchParams(params);
+    if (week) next.set("step", "week");
+    else next.delete("step");
+    next.delete("days");
+    next.delete("weeks");
+    setParams(next);
+  };
+  return (
+    <div className="seg" role="group" aria-label="Step">
+      <button type="button" aria-pressed={daily} onClick={() => pick(false)}>
+        Daily
+      </button>
+      <button type="button" aria-pressed={!daily} onClick={() => pick(true)}>
+        Weekly
+      </button>
+    </div>
+  );
+}

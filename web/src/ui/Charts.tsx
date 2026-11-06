@@ -17,24 +17,55 @@ import {
 } from "recharts";
 import type { Body } from "../api/client";
 import { BANDS as LADDER, BELOW_LOW, COLORS } from "./severities";
+import { type Step, began, outran, settled } from "./trend";
 
-// The window a trend chart draws when the reader has not chosen one, as a
-// number for the request and as the words its heading carries.
-export const TREND_WEEKS = 12;
-export const trendSaid = `${TREND_WEEKS} weeks`;
+// The step a calendar trend is drawn in, the windows each is asked over, and
+// the words a heading carries. Daily shows a team fixing dozens a day; weekly
+// smooths a quarter.
+export type TrendStep = "day" | "week";
+const TREND_DAYS = 30;
+const TREND_WEEKS = 12;
+
+// The window a step asks the server for.
+export function stepQuery(step: TrendStep): { days: number } | { weeks: number } {
+  return step === "day" ? { days: TREND_DAYS } : { weeks: TREND_WEEKS };
+}
+
+// The window as a heading names it.
+export function stepSaid(step: TrendStep): string {
+  return step === "day" ? `${TREND_DAYS} days` : `${TREND_WEEKS} weeks`;
+}
+
+// The step's plural, as a reading counts steps.
+export function stepUnit(step: TrendStep): string {
+  return step === "day" ? "days" : "weeks";
+}
+
+// The switch between daily and weekly steps on a trend panel.
+export function StepSwitch({
+  step,
+  onStep,
+}: {
+  step: TrendStep;
+  onStep: (step: TrendStep) => void;
+}) {
+  return (
+    <div className="seg" role="group" aria-label="Step">
+      {(["day", "week"] as const).map((each) => (
+        <button key={each} type="button" aria-pressed={step === each} onClick={() => onStep(each)}>
+          {each === "day" ? "Daily" : "Weekly"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 // The three shapes the reporting decisions name, drawn small. They sit inside
 // panels rather than on a page of their own, so they carry no title and no
 // legend — the panel says what they are, and a reading underneath says what
 // they mean, which is the part a number cannot say for itself.
 
-type Point = {
-  at?: string;
-  open?: number;
-  opened?: number;
-  resolved?: number;
-  by_severity?: Record<string, number>;
-};
+type Point = Step & { at?: string };
 
 // The four bands, folded the way the server folds them.
 //
@@ -88,40 +119,68 @@ function day(at?: string): string {
   return (at ?? "").slice(5, 10);
 }
 
-// New, resolved and open together. Separately they are three numbers.
+// Open, with new, returned and corrected beneath it. Separately they are
+// numbers; together they say whether a team is keeping pace.
 //
-// Two bands rather than one axis. Open runs to thousands and a week's new or
-// resolved to tens, so on a shared scale the two lines the chart exists for
-// flatten into the baseline and vanish — which is what the first version did.
-// Open is an area in the upper band with its endpoint named, because that is
-// the number anybody reads; new against resolved sit beneath as paired bars on
-// their own scale, so a week where new outran resolved shows as a taller bar,
-// not as a second axis (the one thing a chart must never grow).
+// Two bands rather than one axis. Open runs to thousands and a step's flows to
+// tens, so on a shared scale the flows flatten into the baseline. Open is an
+// area in the upper band with its endpoint named; new and returned stack above
+// a zero line and corrected hangs below it, on their own scale. A first scan is
+// no bar: it is a dashed mark saying what it brought, so the inventory
+// arriving neither sets the bars' scale nor reads as work.
+//
+// Drawn from the first step that holds anything, so the open line's scale
+// starts where scanning started.
+
 // The words a pace chart is drawn with: its line's name at the endpoint, what
-// the whole chart shows for a screen reader, and what the lower bars count.
-type PaceWords = { line: string; what: string; fresh: string; done: string };
+// the whole chart shows for a screen reader, and what the bars count.
+type PaceWords = { line: string; what: string; fresh: string; back: string; done: string };
 const ISSUE_WORDS: PaceWords = {
   line: "open issues",
-  what: "Open findings",
-  fresh: "new findings",
-  done: "resolved",
+  what: "Open issues",
+  fresh: "new",
+  back: "returned",
+  done: "corrected",
 };
 
 // A mark on a step of a pace chart: what changed in it, said on hover. A
 // step carrying one is drawn with a dashed rule through the upper band, so a
-// jump an analyzer upgrade made does not read as new work or a clean-up.
+// jump a first scan or an analyzer upgrade made does not read as new work or
+// a clean-up.
 export type PaceMark = { step: number; said: string };
 
+// The marks a chart draws over the steps it draws: those given, moved to the
+// steps that remain once the leading empty ones are dropped, and one at each
+// first scan saying what it brought. Two on one step are one mark.
+export function paceMarks(points: Point[], marks: PaceMark[], from: number): PaceMark[] {
+  const said = new Map<number, string[]>();
+  const add = (step: number, line: string) => said.set(step, [...(said.get(step) ?? []), line]);
+  for (const mark of marks) if (mark.step >= from) add(mark.step - from, mark.said);
+  points.slice(from).forEach((p, i) => {
+    if ((p.first_scans ?? 0) > 0 || (p.baseline ?? 0) > 0) {
+      add(i, `${day(p.at)}: first scan: ${(p.baseline ?? 0).toLocaleString()}`);
+    }
+  });
+  return [...said.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([step, lines]) => ({ step, said: lines.join("\n") }));
+}
+
 export function Pace({
-  points,
+  points: all,
   words = ISSUE_WORDS,
-  marks = [],
+  marks: given = [],
+  unit = "steps",
 }: {
   points: Point[];
   words?: PaceWords;
   marks?: PaceMark[];
+  unit?: string;
 }) {
+  const from = began(all);
+  const points = all.slice(from);
   if (points.length === 0) return null;
+  const marks = paceMarks(all, given, from);
   const W = 560,
     L = 40,
     R = 10,
@@ -132,8 +191,9 @@ export function Pace({
   const n = points.length;
   const x = (i: number) => (n === 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (n - 1));
   const opens = points.map((p) => p.open ?? 0);
-  const news = points.map((p) => p.opened ?? 0);
-  const dones = points.map((p) => p.resolved ?? 0);
+  const news = points.map((p) => p.new ?? 0);
+  const backs = points.map((p) => p.returned ?? 0);
+  const dones = points.map((p) => p.corrected ?? 0);
 
   // The upper band's scale is fitted to what open actually spans, so a flat
   // backlog reads as flat rather than as a line pinned to the floor.
@@ -146,19 +206,20 @@ export function Pace({
   const ticks = niceTicks(lo, hi, 3);
 
   const zero = T + topH + gap + botH / 2;
-  const most = Math.max(1, ...news, ...dones);
+  const most = Math.max(1, ...news.map((v, i) => v + (backs[i] ?? 0)), ...dones);
   const scale = (botH / 2 - 4) / most;
   const bw = Math.max(2, ((W - L - R) / n) * 0.34);
 
   const pts = opens.map((v, i) => `${x(i)},${y(v)}`).join(" ");
   const last = n - 1;
+  const every = Math.max(1, Math.ceil(n / 8));
 
   return (
     <svg
       className="chart"
       viewBox={`0 0 ${W} ${T + topH + gap + botH + 18}`}
       role="img"
-      aria-label={paceLabel(points, words)}
+      aria-label={paceLabel(points, words, unit)}
     >
       {ticks.map((v) => (
         <g key={v}>
@@ -192,20 +253,31 @@ export function Pace({
       {points.map((p, i) => {
         const cx = x(i);
         const up = (news[i] ?? 0) * scale;
+        const back = (backs[i] ?? 0) * scale;
         const down = (dones[i] ?? 0) * scale;
         return (
           <g key={p.at ?? i}>
-            <rect className="bar-new" x={cx - bw - 1} y={zero - up} width={bw} height={up} rx={1}>
-              <title>{`${day(p.at)}: ${news[i]} new`}</title>
+            <rect className="bar-new" x={cx - bw / 2} y={zero - up} width={bw} height={up} rx={1}>
+              <title>{`${day(p.at)}: ${news[i]} ${words.fresh}`}</title>
             </rect>
-            <rect className="bar-res" x={cx + 1} y={zero} width={bw} height={down} rx={1}>
+            <rect
+              className="bar-ret"
+              x={cx - bw / 2}
+              y={zero - up - back}
+              width={bw}
+              height={back}
+              rx={1}
+            >
+              <title>{`${day(p.at)}: ${backs[i]} ${words.back}`}</title>
+            </rect>
+            <rect className="bar-res" x={cx - bw / 2} y={zero} width={bw} height={down} rx={1}>
               <title>{`${day(p.at)}: ${dones[i]} ${words.done}`}</title>
             </rect>
           </g>
         );
       })}
       {points.map((p, i) =>
-        i % 3 === 0 || i === last ? (
+        i % every === 0 || i === last ? (
           <text
             key={p.at ?? i}
             className="axis"
@@ -221,6 +293,29 @@ export function Pace({
   );
 }
 
+// The key beneath an issue trend: the line, the three bars and the mark.
+export function PaceLegend() {
+  return (
+    <div className="legend">
+      <span>
+        <i style={{ background: "var(--accent)" }} /> Open issues
+      </span>
+      <span>
+        <i style={{ background: "var(--sev-high)" }} /> New
+      </span>
+      <span>
+        <i style={{ background: "var(--sev-critical)" }} /> Returned
+      </span>
+      <span>
+        <i style={{ background: "var(--ok)" }} /> Corrected
+      </span>
+      <span>
+        <i className="dashed" /> First scan
+      </span>
+    </div>
+  );
+}
+
 // A handful of round values inside a range, for the upper band's grid.
 function niceTicks(lo: number, hi: number, want: number): number[] {
   const span = Math.max(1, hi - lo);
@@ -232,17 +327,21 @@ function niceTicks(lo: number, hi: number, want: number): number[] {
   return out;
 }
 
-function paceLabel(points: Point[], words: PaceWords): string {
+// What the chart shows, for a screen reader: open from where scanning began,
+// how often arrivals outran corrections, and what first scans brought.
+export function paceLabel(points: Point[], words: PaceWords, unit: string): string {
   const first = points[0]?.open ?? 0;
   const last = points[points.length - 1]?.open ?? 0;
-  const outran = points.filter((p) => (p.opened ?? 0) > (p.resolved ?? 0)).length;
-  return `${words.what} from ${first.toLocaleString()} to ${last.toLocaleString()} over ${points.length} steps, with ${words.fresh} outrunning ${words.done} in ${outran} of them`;
+  const ahead = points.filter(outran).length;
+  const baseline = points.reduce((sum, p) => sum + (p.baseline ?? 0), 0);
+  const scans = baseline > 0 ? `; first scans brought ${baseline.toLocaleString()}` : "";
+  return `${words.what} from ${first.toLocaleString()} to ${last.toLocaleString()} over ${points.length} ${unit}, with ${words.fresh} and ${words.back} outrunning ${words.done} in ${ahead} of them${scans}`;
 }
 
 // The same total, split. A flat line with a rising critical share is getting
 // worse, and one line cannot show that.
 export function Mix({ points }: { points: Point[] }) {
-  const data = points.map((p) => {
+  const data = settled(points).map((p) => {
     return { at: day(p.at), ...folded(p.by_severity ?? {}) };
   });
   if (data.length === 0) return null;

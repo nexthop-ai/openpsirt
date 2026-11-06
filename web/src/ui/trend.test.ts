@@ -7,8 +7,15 @@ import { mixReading, paceReading, settled } from "./trend";
 // A week of real data, as the trend endpoint answers it: a fixed window of
 // twelve weekly steps, of which eleven predate this deployment entirely.
 const justSwitchedOn = [
-  ...Array.from({ length: 11 }, () => ({ open: 0, opened: 0, resolved: 0, by_severity: {} })),
-  { open: 5803, opened: 5803, resolved: 0, by_severity: { critical: 389 } },
+  ...Array.from({ length: 11 }, () => ({ open: 0, new: 0, corrected: 0, by_severity: {} })),
+  {
+    open: 5803,
+    new: 0,
+    corrected: 0,
+    baseline: 5803,
+    first_scans: 1,
+    by_severity: { critical: 389 },
+  },
 ];
 
 describe("what the trend panels say", () => {
@@ -22,7 +29,7 @@ describe("what the trend panels say", () => {
   });
 
   it("says nothing at all where nothing has been scanned", () => {
-    const nothing = Array.from({ length: 12 }, () => ({ open: 0, opened: 0, resolved: 0 }));
+    const nothing = Array.from({ length: 12 }, () => ({ open: 0, new: 0, corrected: 0 }));
     expect(settled(nothing)).toEqual([]);
     expect(paceReading(nothing)).toContain("Not enough history");
   });
@@ -32,11 +39,11 @@ describe("what the trend panels say", () => {
     // the range it names, and the direction it claims, both come from what
     // this deployment actually saw.
     const points = [
-      ...Array.from({ length: 8 }, () => ({ open: 0, opened: 0, resolved: 0, by_severity: {} })),
-      { open: 100, opened: 100, resolved: 0, by_severity: { critical: 10 } },
-      { open: 90, opened: 2, resolved: 12, by_severity: { critical: 9 } },
-      { open: 80, opened: 1, resolved: 11, by_severity: { critical: 8 } },
-      { open: 70, opened: 0, resolved: 10, by_severity: { critical: 6 } },
+      ...Array.from({ length: 8 }, () => ({ open: 0, new: 0, corrected: 0, by_severity: {} })),
+      { open: 100, new: 100, corrected: 0, by_severity: { critical: 10 } },
+      { open: 90, new: 2, corrected: 12, by_severity: { critical: 9 } },
+      { open: 80, new: 1, corrected: 11, by_severity: { critical: 8 } },
+      { open: 70, new: 0, corrected: 10, by_severity: { critical: 6 } },
     ];
     const said = paceReading(points);
     expect(said).toContain("Backlog shrinking");
@@ -54,12 +61,12 @@ describe("what the trend panels say", () => {
     // empty step rather than only the run at the front passes too, and a
     // quiet week then disappears from the history it belongs to.
     const points = [
-      { open: 0, opened: 0, resolved: 0 },
-      { open: 50, opened: 50, resolved: 0 },
-      { open: 50, opened: 0, resolved: 0 },
-      { open: 0, opened: 0, resolved: 0 },
-      { open: 50, opened: 0, resolved: 0 },
-      { open: 45, opened: 0, resolved: 5 },
+      { open: 0, new: 0, corrected: 0 },
+      { open: 50, new: 50, corrected: 0 },
+      { open: 50, new: 0, corrected: 0 },
+      { open: 0, new: 0, corrected: 0 },
+      { open: 50, new: 0, corrected: 0 },
+      { open: 45, new: 0, corrected: 5 },
     ];
     expect(settled(points)).toHaveLength(5);
     expect(paceReading(points)).toContain("of 5 weeks");
@@ -67,10 +74,10 @@ describe("what the trend panels say", () => {
 
   it("says a backlog that ends where it began is unchanged", () => {
     const points = [
-      { open: 40, opened: 40, resolved: 0, by_severity: { critical: 4 } },
-      { open: 45, opened: 5, resolved: 0, by_severity: { critical: 4 } },
-      { open: 42, opened: 0, resolved: 3, by_severity: { critical: 4 } },
-      { open: 40, opened: 0, resolved: 2, by_severity: { critical: 4 } },
+      { open: 40, new: 40, corrected: 0, by_severity: { critical: 4 } },
+      { open: 45, new: 5, corrected: 0, by_severity: { critical: 4 } },
+      { open: 42, new: 0, corrected: 3, by_severity: { critical: 4 } },
+      { open: 40, new: 0, corrected: 2, by_severity: { critical: 4 } },
     ];
     const said = paceReading(points);
     expect(said).toContain("Backlog flat");

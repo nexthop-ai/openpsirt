@@ -221,37 +221,46 @@ describe("the backlog over time", () => {
   const point = (at: string, open: number) => ({
     at,
     open,
-    opened: 2,
-    resolved: 1,
+    new: 2,
+    corrected: 1,
+    returned: 0,
     by_severity: { critical: open },
-    opened_by_severity: { critical: 2 },
-    resolved_by_severity: { low: 1 },
+    new_by_severity: { critical: 2 },
+    corrected_by_severity: { low: 1 },
   });
+  const empty = (at: string) => ({ at, open: 0, new: 0, corrected: 0, returned: 0 });
 
-  it("asks for the window picked and leaves the first step out of the flows", async () => {
+  it("asks for days by default, weeks once picked, and lists the steps from the first scan", async () => {
     scoped({ product: "sonic" });
     const spy = serve((path) =>
       path === "/v1/trend"
-        ? { data: { items: [point("2026-01-04", 5), point("2026-01-11", 6)] } }
+        ? {
+            data: {
+              items: [empty("2026-01-03"), point("2026-01-04", 5), point("2026-01-05", 6)],
+            },
+          }
         : undefined,
     );
     mount.render(screen(<Backlog />, "/analytics/backlog"));
     await settle();
-    expect(askedOf(spy, "/v1/trend")[0]).toEqual({ product: "sonic", weeks: 13 });
-    expect(mount.host().querySelectorAll("tbody tr")).toHaveLength(1);
-    expect(text()).toContain("2026-01-11");
+    expect(askedOf(spy, "/v1/trend")[0]).toEqual({ product: "sonic", days: 30 });
+    expect(mount.host().querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(text()).not.toContain("2026-01-03");
+    await press("Weekly");
+    await settle();
+    expect(askedOf(spy, "/v1/trend").at(-1)).toEqual({ product: "sonic", weeks: 13 });
     await press("a year");
     await settle();
     expect(askedOf(spy, "/v1/trend").at(-1)).toEqual({ product: "sonic", weeks: 52 });
     expect(links("CSV")[0]).toContain("weeks=52");
   });
 
-  it("says one step is not a trend", async () => {
+  it("says nothing moved where every step is empty", async () => {
     serve((path) =>
-      path === "/v1/trend" ? { data: { items: [point("2026-01-04", 5)] } } : undefined,
+      path === "/v1/trend" ? { data: { items: [empty("2026-01-04")] } } : undefined,
     );
     mount.render(screen(<Backlog />, "/analytics/backlog"));
     await settle();
-    expect(text()).toContain("One step is not a trend.");
+    expect(text()).toContain("Nothing moved.");
   });
 });

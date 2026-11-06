@@ -29,7 +29,7 @@ import {
 } from "../codeTrend";
 import { scopeWords } from "./catalog";
 import { Sheet } from "./Sheet";
-import { Segments, boundedAsked } from "./Window";
+import { Segments, StepSegments, boundedAsked } from "./Window";
 
 // Whether the code findings backlog is shrinking: what is not fixed week by
 // week, split by tier, series or method, what opened against what was fixed,
@@ -43,6 +43,7 @@ import { Segments, boundedAsked } from "./Window";
 
 // The windows offered, as the backlog offers them.
 const WEEKS = [4, 13, 26, 52, 104] as const;
+const DAYS = [14, 30, 90, 365, 730] as const;
 
 const SPLITS: { by: TrendSplit; words: string }[] = [
   { by: "tier", words: "Tier" },
@@ -85,7 +86,11 @@ export function CodeFindingTrend() {
   const at = useScope();
   const product = at.product ?? "";
   const [params, setParams] = useSearchParams();
+  // Daily unless the address says weekly, as the backlog sheet is.
+  const daily = params.get("step") !== "week";
   const weeks = boundedAsked(params.get("weeks"), 104, 13);
+  const days = boundedAsked(params.get("days"), 730, 30);
+  const window = daily ? { days } : { weeks };
   const by: TrendSplit =
     SPLITS.find((each) => each.by === params.get("by"))?.by ?? ("tier" as TrendSplit);
   const method = (params.get("method") ?? undefined) as CodeFindingMethod | undefined;
@@ -108,7 +113,7 @@ export function CodeFindingTrend() {
     branch_or_tag: branchOrTag,
     variant,
     ...narrowed,
-    weeks,
+    ...window,
   };
 
   const code = holding(useWho().data, "code", product || undefined);
@@ -118,9 +123,10 @@ export function CodeFindingTrend() {
   const trend = useCodeFindingTrend(product, asked, !!product && reads && !needsBuild);
 
   const query = new URLSearchParams(
-    Object.entries({ ...asked, weeks: String(weeks) }).filter(
-      (entry): entry is [string, string] => !!entry[1],
-    ),
+    Object.entries({
+      ...asked,
+      ...(daily ? { days: String(days) } : { weeks: String(weeks) }),
+    }).filter((entry): entry is [string, string] => !!entry[1]),
   ).toString();
   const file = (format: "csv" | "json") =>
     fileAt("/v1/products/{product}/code-finding-trend.{format}", format, {
@@ -154,16 +160,27 @@ export function CodeFindingTrend() {
       name="Code findings over time"
       answers="whether the code findings backlog is shrinking, and where an analyzer change moved it."
       of={of}
-      asked={`${weeks} weeks, by ${by}`}
+      asked={`${daily ? `${days} days` : `${weeks} weeks`}, by ${by}`}
     >
       <div className="controls">
-        <Segments
-          label="Window"
-          param="weeks"
-          offered={WEEKS}
-          chosen={weeks}
-          words={(n) => (n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`)}
-        />
+        <StepSegments daily={daily} />
+        {daily ? (
+          <Segments
+            label="Window"
+            param="days"
+            offered={DAYS}
+            chosen={days}
+            words={(n) => (n === 730 ? "two years" : n === 365 ? "a year" : `${n} days`)}
+          />
+        ) : (
+          <Segments
+            label="Window"
+            param="weeks"
+            offered={WEEKS}
+            chosen={weeks}
+            words={(n) => (n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`)}
+          />
+        )}
         <div className="seg" role="group" aria-label="Split by">
           {SPLITS.map((each) => (
             <button
@@ -217,6 +234,7 @@ export function CodeFindingTrend() {
           by={by}
           product={product}
           narrowed={{ branch_or_tag: branchOrTag, variant, ...narrowed }}
+          unit={daily ? "days" : "weeks"}
         />
       )}
     </Sheet>
@@ -228,18 +246,20 @@ function Drawn({
   by,
   product,
   narrowed,
+  unit,
 }: {
   trend: Trend;
   by: TrendSplit;
   product: string;
   narrowed: NonNullable<Parameters<typeof codeFindingsAt>[1]>;
+  unit: string;
 }) {
   const points = trend.points ?? [];
   const paced = points.map((each) => ({
     at: each.at,
     open: each.not_fixed,
-    opened: each.opened,
-    resolved: each.fixed,
+    new: each.opened,
+    corrected: each.fixed,
   }));
   const parts = partsDrawn(trend, by);
   const split = points.map((point) => ({
@@ -253,7 +273,7 @@ function Drawn({
     return (
       <section className="panel">
         <Empty
-          title="No code finding in these weeks."
+          title="No code finding in these steps."
           detail="Nothing was open here, and no run opened anything."
         />
       </section>
@@ -264,7 +284,7 @@ function Drawn({
     <>
       <section className="panel">
         <h3>Not fixed, new and fixed</h3>
-        <Pace points={paced} words={WORDS} marks={marksOf(trend)} />
+        <Pace points={paced} words={WORDS} marks={marksOf(trend)} unit={unit} />
         <div className="legend">
           <span>
             <i style={{ background: "var(--accent)" }} /> Not fixed
@@ -303,7 +323,7 @@ function Drawn({
       <section className="panel">
         <h3>Not fixed by {by}</h3>
         {parts.length === 0 ? (
-          <Empty title="No series has a code finding in these weeks." />
+          <Empty title="No series has a code finding in these steps." />
         ) : (
           <>
             <Stack rows={split} parts={parts} />
@@ -371,5 +391,6 @@ const WORDS = {
   line: "not fixed",
   what: "Code findings not fixed",
   fresh: "new code findings",
+  back: "returned",
   done: "fixed",
 };
