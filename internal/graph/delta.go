@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -568,53 +569,88 @@ func (m Movement) Outsized(share, floor int) bool {
 // across every product before deciding who may hear each part. Who is told is
 // decided where the telling is.
 func (s *Store) Moved(ctx context.Context, buildID, scanID int64) (Movement, bool, error) {
-	wanted, err := s.comparable(ctx, buildID, []int64{scanID})
+	moved, err := s.Movements(ctx, buildID, []int64{scanID})
 	if err != nil {
 		return Movement{}, false, err
 	}
-	if len(wanted) == 0 {
-		return Movement{}, false, nil
-	}
-
-	rows, err := s.moved(ctx, buildID, wanted)
-	if err != nil {
-		return Movement{}, false, err
-	}
-	moved := Movement{Delta: count(changed(rows)[scanID])}
-
-	held, err := s.held(ctx, buildID, scanID)
-	if err != nil {
-		return Movement{}, false, err
-	}
-	moved.Held = held
-	return moved, true, nil
+	movement, answered := moved[scanID]
+	return movement, answered, nil
 }
 
-// held is how many names stood in a build's inventory immediately before one
-// scan.
+// Movements is what each of these scans made of a build's inventory, in one
+// comparison for them all. A scan with nothing to compare against, the first
+// applied to the build or one of another build, is absent from the answer.
+func (s *Store) Movements(ctx context.Context, buildID int64, scanIDs []int64) (map[int64]Movement, error) {
+	out := map[int64]Movement{}
+	for start := 0; start < len(scanIDs); start += database.BatchSize {
+		chunk := scanIDs[start:min(start+database.BatchSize, len(scanIDs))]
+		wanted, err := s.comparable(ctx, buildID, chunk)
+		if err != nil {
+			return nil, err
+		}
+		if len(wanted) == 0 {
+			continue
+		}
+		rows, err := s.moved(ctx, buildID, wanted)
+		if err != nil {
+			return nil, err
+		}
+		held, err := s.held(ctx, buildID, wanted)
+		if err != nil {
+			return nil, err
+		}
+		changes := changed(rows)
+		for _, scanID := range wanted {
+			out[scanID] = Movement{Delta: count(changes[scanID]), Held: held[scanID]}
+		}
+	}
+	return out, nil
+}
+
+// held is how many names stood in a build's inventory immediately before each
+// of these scans.
 //
-// The same side of the scan the comparison reads — a row the scan closed was
-// still there on the near side of it — and the same exclusion: the build's own
-// root is not one of its components.
-func (s *Store) held(ctx context.Context, buildID, scanID int64) (int, error) {
-	var held int
-	// Scanned rather than counted: the count is of names rather than of rows,
-	// and asking the query builder to count wraps this in a count of its one
-	// row.
+// The same side of the scan the comparison reads, since a row the scan closed
+// was still there on the near side of it, and the same exclusion: the build's
+// own root is not one of its components. One read of the rows standing
+// anywhere between the earliest and the latest scan, counted here per scan,
+// because a count per scan is a statement per scan.
+func (s *Store) held(ctx context.Context, buildID int64, scanIDs []int64) (map[int64]int, error) {
+	earliest, latest := scanIDs[0], scanIDs[0]
+	for _, id := range scanIDs {
+		earliest, latest = min(earliest, id), max(latest, id)
+	}
+	var nodes []struct {
+		Opened int64  `bun:"opened"`
+		Closed *int64 `bun:"closed"`
+		Name   string `bun:"nm"`
+	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		ColumnExpr(`COUNT(DISTINCT "c"."name_folded")`).
+		ColumnExpr(`"n"."opened_scan_id" AS "opened"`).
+		ColumnExpr(`"n"."closed_scan_id" AS "closed"`).
+		ColumnExpr(`"c"."name_folded" AS "nm"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."is_root" = ?`, false).
-		Where(`"n"."opened_scan_id" < ?`, scanID).
+		Where(`"n"."opened_scan_id" < ?`, latest).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where(`"n"."closed_scan_id" IS NULL`).
-				WhereOr(`"n"."closed_scan_id" >= ?`, scanID)
+				WhereOr(`"n"."closed_scan_id" >= ?`, earliest)
 		}).
-		Scan(ctx, &held)
+		Scan(ctx, &nodes)
 	if err != nil {
-		return 0, fmt.Errorf("read how many names this build held: %w", err)
+		return nil, fmt.Errorf("read how many names this build held: %w", err)
 	}
-	return held, nil
+	out := make(map[int64]int, len(scanIDs))
+	for _, scanID := range scanIDs {
+		names := map[string]bool{}
+		for _, node := range nodes {
+			if node.Opened < scanID && (node.Closed == nil || *node.Closed >= scanID) {
+				names[node.Name] = true
+			}
+		}
+		out[scanID] = len(names)
+	}
+	return out, nil
 }

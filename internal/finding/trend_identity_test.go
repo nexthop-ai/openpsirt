@@ -4,11 +4,18 @@
 package finding_test
 
 import (
+	"context"
 	"fmt"
+	"slices"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -399,6 +406,68 @@ func TestAReturnIsJudgedByTheRemovalThatLastTookItOut(t *testing.T) {
 		}
 		if got := summed(points); got.returned != 1 || got.restored != 1 {
 			t.Errorf("counted %+v, want the first return restored and the second returned", got)
+		}
+	})
+}
+
+// inventoryReads counts the statements that read a build's graph.
+type inventoryReads struct{ n atomic.Int64 }
+
+func (c *inventoryReads) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if strings.Contains(e.Query, `"graph_node"`) {
+		c.n.Add(1)
+	}
+	return ctx
+}
+
+func (c *inventoryReads) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+func TestRemovalsNoReturnFollowsAreNeverWorkedOut(t *testing.T) {
+	// Whether an upload was sharp is worked out only for the closures a
+	// return reverses, so a build that keeps dropping packages costs the
+	// trend nothing more.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC()
+		fillers := []graph.Described{at("filler-0", "1.0"), at("filler-1", "1.0"), at("filler-2", "1.0")}
+		reported := func(without ...graph.Described) []finding.Reported {
+			out := []finding.Reported{found("CVE-2026-1", libnl)}
+			for _, c := range fillers {
+				if !slices.Contains(without, c) {
+					out = append(out, found("CVE-2026-9", c))
+				}
+			}
+			return out
+		}
+		f.scannedAt(t, widened(), now.Add(-25*24*time.Hour), reported()...)
+		f.scannedAt(t, rootOnly(), now.Add(-20*24*time.Hour))
+		f.scannedAt(t, widened(), now.Add(-15*24*time.Hour), reported()...)
+
+		reads := &inventoryReads{}
+		store := finding.NewStore(dbtest.Hooked(f.db, reads).DB)
+		read := func() (totals, int64) {
+			reads.n.Store(0)
+			points, err := store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+				now.Add(-30*24*time.Hour), 24*time.Hour, 30, finding.Within{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return summed(points), reads.n.Load()
+		}
+		bounced, before := read()
+		if bounced.restored != 4 {
+			t.Fatalf("the bounce counted %+v, want its four issues at components restored", bounced)
+		}
+
+		for i := range fillers {
+			f.scannedAt(t, widened(fillers[:i+1]...), now.Add(-time.Duration(10-2*i)*24*time.Hour),
+				reported(fillers[:i+1]...)...)
+		}
+		got, after := read()
+		if got.restored != 4 || got.corrected != 3 || got.returned != 0 {
+			t.Errorf("counted %+v, want the four restored and the three removed packages corrected", got)
+		}
+		if after != before {
+			t.Errorf("three removals no return follows took the graph reads from %d to %d", before, after)
 		}
 	})
 }

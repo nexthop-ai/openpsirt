@@ -23,7 +23,7 @@ import (
 
 // MostTrendSteps is the most steps a trend is worked out over: two years of
 // days.
-const MostTrendSteps = 731
+const MostTrendSteps = 730
 
 // Within narrows a trend to part of one build's tree.
 //
@@ -175,10 +175,6 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	if err != nil {
 		return nil, err
 	}
-	sharp, err := s.sharpRemovals(ctx, rows, before)
-	if err != nil {
-		return nil, err
-	}
 
 	end := func(k int) time.Time { return since.Add(time.Duration(k+1) * step) }
 	// The first step whose end is at or after a moment, and -1 where the
@@ -210,6 +206,15 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// held[0] at the window's start, where open says it was open. An issue
 	// open in two products takes the strictest band, the one the aging
 	// figures count it in.
+	// A return is told from a return after a gap by the closure it reverses,
+	// asked once every return is known: only those closures' uploads are
+	// worked out, so the cost follows the returns in the window.
+	type comeBack struct {
+		step     int
+		severity string
+		closure  *trendRow
+	}
+	var returns []comeBack
 	held := make([]string, steps+1)
 	ranked := make([]int, steps+1)
 	open := make([]bool, steps+1)
@@ -260,12 +265,10 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 				// Present before: a row opened by the previous step's end, or
 				// one closed before the window.
 				case before[one.id] != nil || !one.minOpened.After(end(k-1)):
-					if sharp.removed(lastClosure(rows[one.from:one.to], before[one.id], end(k-1))) {
-						points[k].Restored++
-					} else {
-						points[k].Returned++
-						points[k].ReturnedBySeverity[held[k+1]]++
-					}
+					returns = append(returns, comeBack{
+						step: k, severity: held[k+1],
+						closure: lastClosure(rows[one.from:one.to], before[one.id], end(k-1)),
+					})
 				case baseline[k]:
 					points[k].Baseline++
 				default:
@@ -280,6 +283,23 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 					points[k].CorrectedBySeverity[held[k]]++
 				}
 			}
+		}
+	}
+
+	closures := make([]*trendRow, 0, len(returns))
+	for _, r := range returns {
+		closures = append(closures, r.closure)
+	}
+	sharp, err := s.sharpRemovals(ctx, closures)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range returns {
+		if sharp[r.closure] {
+			points[r.step].Restored++
+		} else {
+			points[r.step].Returned++
+			points[r.step].ReturnedBySeverity[r.severity]++
 		}
 	}
 	return points, nil
@@ -550,59 +570,32 @@ func lastClosure(rows []trendRow, before *trendRow, by time.Time) *trendRow {
 // removal is a component leaving a build.
 type removal struct{ build, component int64 }
 
-// sharpness is, for each removal a closure reads as, the upload that removed
-// it and whether that upload moved a sharp share of its build's inventory.
-type sharpness struct {
-	uploads map[removal][]removedBy
-	sharp   map[int64]bool
-}
-
-// removedBy is one upload that took a component out of a build, and when it
-// arrived.
-type removedBy struct {
-	scan       int64
-	receivedAt time.Time
-}
-
-// removed says whether a closure was a removal by a sharp upload: the latest
+// sharpRemovals says, of the closures returns reverse, which were a removal by
+// an upload that moved a sharp share of its build's inventory: the latest
 // upload to take the component out of the build at or before the closure.
-func (s sharpness) removed(row *trendRow) bool {
-	if row == nil || row.ClosedAt == nil || Closure(row.ClosedBecause) != Removed {
-		return false
-	}
-	var by *removedBy
-	for i, up := range s.uploads[removal{row.BuildID, row.ComponentID}] {
-		if !up.receivedAt.After(*row.ClosedAt) && (by == nil || up.receivedAt.After(by.receivedAt)) {
-			by = &s.uploads[removal{row.BuildID, row.ComponentID}][i]
-		}
-	}
-	return by != nil && s.sharp[by.scan]
-}
-
-// sharpRemovals reads, for every removal a trend's rows could count a return
-// after, the uploads that removed the component, and which of them moved a
-// sharp share of the build's inventory.
 //
 // Sharp is the rule the alert about an inventory that moved sharply applies,
-// with its two settings, worked out for each upload from the inventories
-// stored. A closure is tied to its upload through the build's graph: the
-// component's node closed by the upload, which arrived before the closure.
-func (s *Store) sharpRemovals(ctx context.Context, rows []trendRow,
-	before map[trendKey]*trendRow) (sharpness, error) {
-
-	out := sharpness{uploads: map[removal][]removedBy{}, sharp: map[int64]bool{}}
-	asked := map[removal]bool{}
+// with its two settings, worked out from the inventories stored. A closure is
+// tied to its upload through the build's graph: the component's node closed by
+// the upload, which arrived before the closure. Only the uploads deciding a
+// closure asked about are worked out, each build's in one comparison, and the
+// graph is read no later than the latest of those closures, so a build's age
+// costs nothing.
+func (s *Store) sharpRemovals(ctx context.Context, closures []*trendRow) (map[*trendRow]bool, error) {
+	out := map[*trendRow]bool{}
+	asked := map[removal][]*trendRow{}
 	var builds, components []int64
 	seenBuild, seenComponent := map[int64]bool{}, map[int64]bool{}
-	note := func(r *trendRow) {
+	var latest time.Time
+	for _, r := range closures {
 		if r == nil || r.ClosedAt == nil || Closure(r.ClosedBecause) != Removed {
-			return
+			continue
 		}
 		at := removal{r.BuildID, r.ComponentID}
-		if asked[at] {
-			return
+		asked[at] = append(asked[at], r)
+		if r.ClosedAt.After(latest) {
+			latest = *r.ClosedAt
 		}
-		asked[at] = true
 		if !seenBuild[r.BuildID] {
 			seenBuild[r.BuildID] = true
 			builds = append(builds, r.BuildID)
@@ -611,12 +604,6 @@ func (s *Store) sharpRemovals(ctx context.Context, rows []trendRow,
 			seenComponent[r.ComponentID] = true
 			components = append(components, r.ComponentID)
 		}
-	}
-	for i := range rows {
-		note(&rows[i])
-	}
-	for _, r := range before {
-		note(r)
 	}
 	if len(asked) == 0 {
 		return out, nil
@@ -628,7 +615,7 @@ func (s *Store) sharpRemovals(ctx context.Context, rows []trendRow,
 		ScanID      int64     `bun:"closed_scan_id"`
 		ReceivedAt  time.Time `bun:"received_at"`
 	}
-	scans := map[int64]int64{}
+	uploads := map[removal][]closedNode{}
 	for start := 0; start < len(components); start += database.BatchSize {
 		chunk := components[start:min(start+database.BatchSize, len(components))]
 		var read []closedNode
@@ -638,18 +625,43 @@ func (s *Store) sharpRemovals(ctx context.Context, rows []trendRow,
 			ColumnExpr(`"n"."build_id", "n"."component_id", "n"."closed_scan_id", "sc"."received_at"`).
 			Where(`"n"."build_id" IN (?)`, bun.List(builds)).
 			Where(`"n"."component_id" IN (?)`, bun.List(chunk)).
+			Where(`"sc"."received_at" <= ?`, latest).
 			GroupExpr(`"n"."build_id", "n"."component_id", "n"."closed_scan_id", "sc"."received_at"`).
 			Scan(ctx, &read); err != nil {
 			return out, fmt.Errorf("read which uploads removed what a trend counts back: %w", err)
 		}
 		for _, n := range read {
 			at := removal{n.BuildID, n.ComponentID}
-			if !asked[at] {
+			if _, ok := asked[at]; ok {
+				uploads[at] = append(uploads[at], n)
+			}
+		}
+	}
+
+	// Each closure's upload, and each build's uploads to work out.
+	decided := map[*trendRow]int64{}
+	deciding := map[int64][]int64{}
+	seenScan := map[int64]bool{}
+	for at, rows := range asked {
+		for _, r := range rows {
+			var by *closedNode
+			for i, up := range uploads[at] {
+				if !up.ReceivedAt.After(*r.ClosedAt) && (by == nil || up.ReceivedAt.After(by.ReceivedAt)) {
+					by = &uploads[at][i]
+				}
+			}
+			if by == nil {
 				continue
 			}
-			out.uploads[at] = append(out.uploads[at], removedBy{scan: n.ScanID, receivedAt: n.ReceivedAt})
-			scans[n.ScanID] = n.BuildID
+			decided[r] = by.ScanID
+			if !seenScan[by.ScanID] {
+				seenScan[by.ScanID] = true
+				deciding[at.build] = append(deciding[at.build], by.ScanID)
+			}
 		}
+	}
+	if len(decided) == 0 {
+		return out, nil
 	}
 
 	settings := setting.NewStore(s.db)
@@ -661,13 +673,19 @@ func (s *Store) sharpRemovals(ctx context.Context, rows []trendRow,
 	if err != nil {
 		return out, fmt.Errorf("read how few names are worth reporting: %w", err)
 	}
+	sharp := map[int64]bool{}
 	graphs := graph.NewStore(s.db)
-	for scan, build := range scans {
-		moved, answered, err := graphs.Moved(ctx, build, scan)
+	for build, scans := range deciding {
+		moved, err := graphs.Movements(ctx, build, scans)
 		if err != nil {
 			return out, err
 		}
-		out.sharp[scan] = answered && moved.Outsized(share, floor)
+		for scan, m := range moved {
+			sharp[scan] = m.Outsized(share, floor)
+		}
+	}
+	for r, scan := range decided {
+		out[r] = sharp[scan]
 	}
 	return out, nil
 }

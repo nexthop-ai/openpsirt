@@ -76,6 +76,7 @@ build's first scan is a baseline rather than new work.
 | A step holds the interval after the previous step's end, up to and including its own end | A moment on a boundary belongs to the step it ends |
 | The read covers findings open at the window's start or opened since, through now; whether an issue was present before the window is asked of the findings closed before it, for the issues the window's read did not reach opened at or before the start | Cost follows the window's start, not the deployment's age (REQ-74) |
 | A build's first scan is asked only for the runs that opened something in the window | |
+| Whether an upload was sharp is worked out only for the uploads deciding a closure a return in the window reverses, each build's in one comparison, from the graph up to the latest such closure | A build that drops packages every night otherwise costs a read per removing upload it ever received (`design-docs/analytics-measurements.md` § Daily trend) |
 | The backlog over time sheet steps daily unless weekly is picked: 14, 30, 90, 365 or 730 days, thirty unless picked, or 4, 13, 26, 52 or 104 weeks, thirteen unless picked, both in the address | |
 
 | Rule | Reason |
