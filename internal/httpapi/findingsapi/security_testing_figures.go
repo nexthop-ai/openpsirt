@@ -377,7 +377,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 
 // coverageBody is analysis coverage as its figure reads it.
 func coverageBody(got []analysis.Analyzed, since, until time.Time) AnalysisCoverageBody {
-	out := AnalysisCoverageBody{Since: since.UTC().Format(time.DateOnly), Until: lastDay(until),
+	out := AnalysisCoverageBody{Since: since.UTC().Format(time.DateOnly), Until: core.LastDay(until),
 		Items: make([]AnalyzedBody, 0, len(got))}
 	for _, a := range got {
 		if a.Quiet() {

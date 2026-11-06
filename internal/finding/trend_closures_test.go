@@ -42,7 +42,7 @@ func TestTheTrendCountsOnlyAFixAsResolved(t *testing.T) {
 				}
 				resolved, present := 0, false
 				for _, point := range points {
-					resolved += point.Resolved
+					resolved += point.Corrected
 					if point.Open > 0 {
 						present = true
 					}

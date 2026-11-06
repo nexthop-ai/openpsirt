@@ -46,7 +46,7 @@ func TestABumpThatFixedNothingIsNotCountedAsResolved(t *testing.T) {
 		}
 		var resolved int
 		for _, point := range points {
-			resolved += point.Resolved
+			resolved += point.Corrected
 		}
 		if resolved != 0 {
 			t.Errorf("a bump that fixed nothing counted %d findings as resolved", resolved)
@@ -88,7 +88,7 @@ func TestAnUpgradeThatFixedSomethingIsCountedAsResolved(t *testing.T) {
 		}
 		var resolved int
 		for _, point := range points {
-			resolved += point.Resolved
+			resolved += point.Corrected
 		}
 		// One issue went away, not two occurrences. What somebody reads as work
 		// completed is the issue.
@@ -125,9 +125,9 @@ func TestATrendCountsNothingFromOutsideTheRangeItDraws(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, point := range points {
-			if point.Open != 0 || point.Opened != 0 || point.Resolved != 0 {
+			if point.Open != 0 || point.New != 0 || point.Corrected != 0 {
 				t.Fatalf("a point in the last fortnight counted %d open, %d new, %d resolved "+
-					"from a year ago", point.Open, point.Opened, point.Resolved)
+					"from a year ago", point.Open, point.New, point.Corrected)
 			}
 		}
 	})
@@ -290,7 +290,7 @@ func TestAScannerGoingQuietIsNotCountedAsWorkDone(t *testing.T) {
 		}
 		var resolved int
 		for _, point := range points {
-			resolved += point.Resolved
+			resolved += point.Corrected
 		}
 		if resolved != 0 {
 			t.Errorf("a scanner going quiet counted %d findings as resolved", resolved)

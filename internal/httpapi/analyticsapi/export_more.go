@@ -583,25 +583,22 @@ func registerChangeExport(api huma.API, in core.Deps) {
 
 // registerTrendExport writes out the backlog over time.
 //
-// A growing backlog is the first thing a manager asks about. As a panel on one
-// screen at a fixed twelve weeks — no catalog entry, no window, no file — the
-// answer can be looked at and not taken to the meeting it was asked in.
+// A growing backlog is the first thing a manager asks about, and the file is
+// the answer taken to the meeting it was asked in.
 func registerTrendExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-trend", Method: http.MethodGet, Path: "/v1/trend.{format}",
-		Summary: "Export new, resolved and open over time",
-		Description: "One row per step, with what arrived, what was answered and what stood " +
-			"open at the end of it — each split by severity.\n\n" +
-			"The two flows are what the backlog is read for. Ten arriving and ten " +
-			"answered is a team keeping pace where both are low, and a team losing ground " +
-			"where what arrives is critical and what leaves is not.\n\n" +
+		Summary: "Export the findings trend",
+		Description: "One row per step, with the issues new, corrected, returned and brought by a " +
+			"first scan in it, and open at its end, each flow and open split by severity. The " +
+			"counts are the trend's.\n\n" +
 			"Takes the window and the narrowings the trend takes. Read with your own " +
 			"visibility, like the chart it comes from.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
 		core.ScopeQuery
-		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
+		core.Steps
 		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
 		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
 		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
@@ -609,6 +606,10 @@ func registerTrendExport(api huma.API, in core.Deps) {
 		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		since, step, steps, err := input.Window(time.Now())
 		if err != nil {
 			return nil, err
 		}
@@ -624,27 +625,21 @@ func registerTrendExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		const week = 7 * 24 * time.Hour
-		since := time.Now().UTC().Add(-time.Duration(input.Weeks) * week)
 		// The bands the file carries, worst first, from the one place the
 		// ladder is written down — and what nothing rated, which ranks below
 		// all of them. Fixed rather than taken from whatever the first row
 		// happens to hold: a file whose columns depend on the data is one a
 		// spreadsheet cannot be built against.
 		bands := append(finding.Bands(), finding.Unrated)
-		header := []string{"week ending", "opened", "resolved", "open"}
-		for _, band := range bands {
-			header = append(header, "opened "+band)
-		}
-		for _, band := range bands {
-			header = append(header, "resolved "+band)
-		}
-		for _, band := range bands {
-			header = append(header, "open "+band)
+		header := []string{input.StepEnding(), "new", "corrected", "returned", "baseline", "first scans", "open"}
+		for _, split := range []string{"new", "corrected", "returned", "open"} {
+			for _, band := range bands {
+				header = append(header, split+" "+band)
+			}
 		}
 		out := core.Exporting{
 			What:   "the backlog over time",
-			About:  []core.Stated{{Label: "weeks", Value: strconv.Itoa(input.Weeks)}},
+			About:  []core.Stated{input.Stated()},
 			Header: header,
 			// Every step in one answer, because a trend is worked out over the
 			// whole window rather than a page at a time: there is no offset
@@ -655,18 +650,19 @@ func registerTrendExport(api huma.API, in core.Deps) {
 					return nil, nil
 				}
 				points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope,
-					since, week, input.Weeks, finding.Within{Component: input.Component, Beneath: beneath})
+					since, step, steps, finding.Within{Component: input.Component, Beneath: beneath})
 				if err != nil {
 					return nil, err
 				}
 				rows := make([][]string, 0, len(points))
 				for _, point := range points {
 					row := []string{
-						point.At.UTC().Format(time.DateOnly), strconv.Itoa(point.Opened),
-						strconv.Itoa(point.Resolved), strconv.Itoa(point.Open),
+						core.LastDay(point.At), strconv.Itoa(point.New), strconv.Itoa(point.Corrected),
+						strconv.Itoa(point.Returned), strconv.Itoa(point.Baseline),
+						strconv.Itoa(point.FirstScans), strconv.Itoa(point.Open),
 					}
 					for _, split := range []map[string]int{
-						point.OpenedBySeverity, point.ResolvedBySeverity, point.BySeverity,
+						point.NewBySeverity, point.CorrectedBySeverity, point.ReturnedBySeverity, point.BySeverity,
 					} {
 						for _, band := range bands {
 							row = append(row, strconv.Itoa(split[band]))

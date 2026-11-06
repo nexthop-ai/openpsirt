@@ -2875,7 +2875,7 @@ components:
       additionalProperties: false
       properties:
         at:
-          description: The last day of the week, which ends at midnight UTC after it
+          description: The last day of the step, which ends at midnight UTC after it
           format: date
           type: string
         by_method:
@@ -2888,7 +2888,7 @@ components:
           additionalProperties:
             format: int64
             type: integer
-          description: not_fixed by analyzer series, naming every series with a code finding counted in any week
+          description: not_fixed by analyzer series, naming every series with a code finding counted in any step
           type: object
         by_tier:
           additionalProperties:
@@ -2897,15 +2897,15 @@ components:
           description: "not_fixed by the tier of the rule's weaknesses as rated now: memory-safety, input, resource and other, each named"
           type: object
         fixed:
-          description: Code findings closed as fixed in the week. Zero on the first week
+          description: Code findings closed as fixed in the step. Zero on the first step
           format: int64
           type: integer
         not_fixed:
-          description: Code findings opened and not closed as fixed by the end of the week, whatever was decided about them
+          description: Code findings opened and not closed as fixed by the end of the step, whatever was decided about them
           format: int64
           type: integer
         opened:
-          description: Code findings not fixed at the end of the week that were not at the end of the one before. Zero on the first week
+          description: Code findings not fixed at the end of the step that were not at the end of the one before. Zero on the first step
           format: int64
           type: integer
       required:
@@ -3193,7 +3193,7 @@ components:
           readOnly: true
           type: string
         markers:
-          description: Runs applied in the weeks that changed what the trend compares, oldest first, one per day, series and change
+          description: Runs applied in the steps that changed what the trend compares, oldest first, one per day, series and change
           items:
             $ref: "#/components/schemas/CodeFindingMarkerBody"
           type:
@@ -3204,7 +3204,7 @@ components:
           format: int64
           type: integer
         points:
-          description: One per week, oldest first
+          description: One per step, oldest first
           items:
             $ref: "#/components/schemas/CodeFindingPointBody"
           type:
@@ -10503,44 +10503,69 @@ components:
       additionalProperties: false
       properties:
         at:
-          description: The end of this step, as a date
+          description: The last day of the step, which ends at midnight UTC after it
+          format: date
           type: string
+        baseline:
+          description: "Issues a build's first scan brought into the open set. Not new: a first scan is an inventory arriving"
+          format: int64
+          type: integer
         by_severity:
           additionalProperties:
             format: int64
             type: integer
+          description: Open, split by severity
+          type: object
+        corrected:
+          description: Issues that left the open set in the step by a fix and have not been open since. A later return takes an issue out of this count
+          format: int64
+          type: integer
+        corrected_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: Corrected, split by the severity each held while it was open
+          type: object
+        first_scans:
+          description: Builds whose first scan was in the step
+          format: int64
+          type: integer
+        new:
+          description: Issues open for the first time ever in the selection, other than through a build's first scan
+          format: int64
+          type: integer
+        new_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: New, split by severity
           type: object
         open:
+          description: Issues open at the end of the step
           format: int64
           type: integer
-        opened:
-          description: Findings that appeared during this step
+        returned:
+          description: Issues back in the open set after having been in it before
           format: int64
           type: integer
-        opened_by_severity:
+        returned_by_severity:
           additionalProperties:
             format: int64
             type: integer
-          description: Everything that appeared, split by severity
-          type: object
-        resolved:
-          description: Findings that went away during this step
-          format: int64
-          type: integer
-        resolved_by_severity:
-          additionalProperties:
-            format: int64
-            type: integer
-          description: Everything that went away, split by the severity it held while it was open
+          description: Returned, split by severity
           type: object
       required:
         - at
         - open
-        - opened
-        - resolved
+        - new
+        - corrected
+        - returned
+        - baseline
+        - first_scans
         - by_severity
-        - opened_by_severity
-        - resolved_by_severity
+        - new_by_severity
+        - corrected_by_severity
+        - returned_by_severity
       type: object
     PreparedBody:
       additionalProperties: false
@@ -17416,7 +17441,7 @@ paths:
   /v1/code-finding-trend:
     get:
       description: |-
-        Returns, per week, the code findings not fixed at the end of the week summed over products, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it, as one product's trend counts them. A series of the same name in two products is one split. Each marker names its product.
+        Returns, per week or per day, the code findings not fixed at the end of the step summed over products, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it, as one product's trend counts them. A series of the same name in two products is one split. Each marker names its product.
 
         Counts every product in use where you read security testing material, each at the visibilities you read in it: a retired product, a product you read at another visibility and a product you cannot see contribute nothing, and a reader of security testing material in no product is answered with nothing counted. Refused to a pipeline key.
 
@@ -17440,15 +17465,24 @@ paths:
             enum:
               - sast
             type: string
-        - description: The number of weeks, ending at the coming midnight UTC
+        - description: The number of weekly steps. Twelve where neither this nor days is sent
           explode: false
           in: query
           name: weeks
           schema:
-            default: 12
-            description: The number of weeks, ending at the coming midnight UTC
+            description: The number of weekly steps. Twelve where neither this nor days is sent
             format: int64
             maximum: 104
+            minimum: 1
+            type: integer
+        - description: The number of daily steps, in place of weeks. Sending both is refused
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: The number of daily steps, in place of weeks. Sending both is refused
+            format: int64
+            maximum: 730
             minimum: 1
             type: integer
       responses:
@@ -17495,15 +17529,24 @@ paths:
             enum:
               - sast
             type: string
-        - description: The number of weeks, ending at the coming midnight UTC
+        - description: The number of weekly steps. Twelve where neither this nor days is sent
           explode: false
           in: query
           name: weeks
           schema:
-            default: 12
-            description: The number of weeks, ending at the coming midnight UTC
+            description: The number of weekly steps. Twelve where neither this nor days is sent
             format: int64
             maximum: 104
+            minimum: 1
+            type: integer
+        - description: The number of daily steps, in place of weeks. Sending both is refused
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: The number of daily steps, in place of weeks. Sending both is refused
+            format: int64
+            maximum: 730
             minimum: 1
             type: integer
         - in: path
@@ -26837,9 +26880,9 @@ paths:
   /v1/products/{product}/code-finding-trend:
     get:
       description: |-
-        Returns, per week, the code findings of a product that are not fixed at the end of the week, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it. Weeks end at the coming midnight UTC and every seven days before, each point dated by its last day; a code finding is dated by when the run that opened it was applied, and counted once however many builds hold it.
+        Returns, per week or per day, the code findings of a product that are not fixed at the end of the step, split by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many were opened and fixed in it. Steps end at the coming midnight UTC and every step before, each point dated by its last day; a code finding is dated by when the run that opened it was applied, and counted once however many builds hold it.
 
-        A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing. `no_longer_detected` is how many a comparable run did not see, now, and has no weekly history.
+        A code finding stays counted until somebody closes it as fixed: a decision answers it without closing it, and a run missing it closes nothing. `no_longer_detected` is how many a comparable run did not see, now, and has no history.
 
         `markers` are the runs that changed what the trend compares: another tool, version or rule set than the run before on the same build, and runs whose absences are no evidence.
 
@@ -26932,15 +26975,24 @@ paths:
             description: The namespace, for the few names a build holds at one version in one ecosystem as two components
             maxLength: 200
             type: string
-        - description: The number of weeks, ending at the coming midnight UTC
+        - description: The number of weekly steps. Twelve where neither this nor days is sent
           explode: false
           in: query
           name: weeks
           schema:
-            default: 12
-            description: The number of weeks, ending at the coming midnight UTC
+            description: The number of weekly steps. Twelve where neither this nor days is sent
             format: int64
             maximum: 104
+            minimum: 1
+            type: integer
+        - description: The number of daily steps, in place of weeks. Sending both is refused
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: The number of daily steps, in place of weeks. Sending both is refused
+            format: int64
+            maximum: 730
             minimum: 1
             type: integer
       responses:
@@ -26965,7 +27017,7 @@ paths:
   /v1/products/{product}/code-finding-trend.{format}:
     get:
       description: |-
-        The code finding trend as a file: per week, a row with what was not fixed, opened and fixed and the markers of that week, then a row per tier, method and series with what of it was not fixed. The columns are the same whatever the data holds. Takes what the trend takes, and is refused as it is.
+        The code finding trend as a file: per step, a row with what was not fixed, opened and fixed and the markers of that step, then a row per tier, method and series with what of it was not fixed. The columns are the same whatever the data holds. Takes what the trend takes, and is refused as it is.
 
         Requires: any signed-in person, and not a pipeline key. Requires security-testing-read on the product.
       operationId: export-code-finding-trend
@@ -27054,15 +27106,24 @@ paths:
             description: The namespace, for the few names a build holds at one version in one ecosystem as two components
             maxLength: 200
             type: string
-        - description: The number of weeks, ending at the coming midnight UTC
+        - description: The number of weekly steps. Twelve where neither this nor days is sent
           explode: false
           in: query
           name: weeks
           schema:
-            default: 12
-            description: The number of weeks, ending at the coming midnight UTC
+            description: The number of weekly steps. Twelve where neither this nor days is sent
             format: int64
             maximum: 104
+            minimum: 1
+            type: integer
+        - description: The number of daily steps, in place of weeks. Sending both is refused
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: The number of daily steps, in place of weeks. Sending both is refused
+            format: int64
+            maximum: 730
             minimum: 1
             type: integer
         - in: path
@@ -36571,11 +36632,13 @@ paths:
   /v1/trend:
     get:
       description: |-
-        Returns the three counts per step, with open split by severity, across every product you can see.
+        Returns, per step, the issues open at its end and the issues that moved in it, each split by severity, across every product you can see. Steps are weeks or days, ending at the coming midnight UTC, each dated by its last day.
 
-        Narrowable to part of a tree. `component` keeps one package at any version; `beneath` keeps a component and everything under it, which needs a branch and a variant naming exactly one build. A team that owns one area asks for its own three lines this way.
+        An issue is one identity however often it leaves and comes back. `new` is an issue never open before in the selection; `returned` is one open before; `corrected` is one that left by a fix and has stayed out, so an issue that returns stops counting as corrected where it left. A build's first scan is no flow: what it brought is `baseline`, and `first_scans` says how many builds were first scanned in the step.
 
-        Worked out when it is asked for.
+        Narrowable to part of a tree. `component` keeps one package at any version; `beneath` keeps a component and everything under it, which needs a branch and a variant naming exactly one build.
+
+        Sending both `weeks` and `days` is refused.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-trend
@@ -36601,13 +36664,24 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - explode: false
+        - description: The number of weekly steps. Twelve where neither this nor days is sent
+          explode: false
           in: query
           name: weeks
           schema:
-            default: 12
+            description: The number of weekly steps. Twelve where neither this nor days is sent
             format: int64
             maximum: 104
+            minimum: 1
+            type: integer
+        - description: The number of daily steps, in place of weeks. Sending both is refused
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: The number of daily steps, in place of weeks. Sending both is refused
+            format: int64
+            maximum: 730
             minimum: 1
             type: integer
         - description: Keep only what is open against components of this name, whatever version
@@ -36658,7 +36732,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Show new, resolved and open over time
+      summary: Show the findings trend
       tags:
         - Findings
       x-openpsirt-requires:
@@ -36667,9 +36741,7 @@ paths:
   /v1/trend.{format}:
     get:
       description: |-
-        One row per step, with what arrived, what was answered and what stood open at the end of it — each split by severity.
-
-        The two flows are what the backlog is read for. Ten arriving and ten answered is a team keeping pace where both are low, and a team losing ground where what arrives is critical and what leaves is not.
+        One row per step, with the issues new, corrected, returned and brought by a first scan in it, and open at its end, each flow and open split by severity. The counts are the trend's.
 
         Takes the window and the narrowings the trend takes. Read with your own visibility, like the chart it comes from.
 
@@ -36705,13 +36777,24 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - explode: false
+        - description: The number of weekly steps. Twelve where neither this nor days is sent
+          explode: false
           in: query
           name: weeks
           schema:
-            default: 12
+            description: The number of weekly steps. Twelve where neither this nor days is sent
             format: int64
             maximum: 104
+            minimum: 1
+            type: integer
+        - description: The number of daily steps, in place of weeks. Sending both is refused
+          explode: false
+          in: query
+          name: days
+          schema:
+            description: The number of daily steps, in place of weeks. Sending both is refused
+            format: int64
+            maximum: 730
             minimum: 1
             type: integer
         - description: Keep only what is open against components of this name, whatever version
@@ -36758,7 +36841,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Export new, resolved and open over time
+      summary: Export the findings trend
       tags:
         - Analytics
       x-openpsirt-requires:

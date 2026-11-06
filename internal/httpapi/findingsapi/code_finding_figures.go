@@ -226,7 +226,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 		}
 		out := &struct{ Body CodeFindingFixingBody }{}
 		out.Body = CodeFindingFixingBody{
-			Since: since.UTC().Format(time.DateOnly), Until: lastDay(until), Fixed: waitsBody(got.Fixed),
+			Since: since.UTC().Format(time.DateOnly), Until: core.LastDay(until), Fixed: waitsBody(got.Fixed),
 			Dismissed: got.Dismissed, NoLongerDetected: waitsBody(got.NoLongerDetected),
 		}
 		return out, nil
@@ -257,7 +257,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 // judgingBody is the time to judge as its figure reads it.
 func judgingBody(got *analysis.Judging, since, until time.Time) CodeFindingJudgingBody {
 	out := CodeFindingJudgingBody{
-		Since: since.UTC().Format(time.DateOnly), Until: lastDay(until), Judged: waitsBody(got.Judged),
+		Since: since.UTC().Format(time.DateOnly), Until: core.LastDay(until), Judged: waitsBody(got.Judged),
 		NoLongerDetected: got.NoLongerDetected, Waiting: make([]CodeFindingAgedBody, 0, len(got.Waiting)),
 	}
 	if got.Oldest != nil {

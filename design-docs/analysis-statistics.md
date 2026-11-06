@@ -35,14 +35,14 @@ and another testing method's kinds join it by inclusion.
 ## Code findings over time
 
 ```
-GET /v1/products/{product}/code-finding-trend?weeks=12
+GET /v1/products/{product}/code-finding-trend?days=30
 ```
 
 | Part | Holds |
 |---|---|
-| A point per week | Its last day; the code findings not fixed at its end; those opened and fixed in the week |
+| A point per step, a day or a week | Its last day; the code findings not fixed at its end; those opened and fixed in the step |
 | Not fixed by tier | Memory safety, input, resource, other: the tier of the rule's weaknesses (`design-docs/analysis-queue.md` § Weakness families), every tier named, zero included |
-| Not fixed by series | Each series with a code finding counted anywhere in the window, zero in the weeks it has none |
+| Not fixed by series | Each series with a code finding counted anywhere in the window, zero in the steps it has none |
 | Not fixed by method | Every testing method, zero included |
 | Markers | § Analyzer markers |
 | No longer detected | § No longer detected |
@@ -50,16 +50,16 @@ GET /v1/products/{product}/code-finding-trend?weeks=12
 | Rule | Reason |
 |---|---|
 | Not fixed runs from a code finding's opening until a person closes it as fixed | A decision answers a code finding and closes nothing; absence closes nothing |
-| Opened and fixed are the difference between one week's set and the one before, so the three numbers agree; the first week has no difference | |
+| Opened and fixed are the difference between one step's set and the one before, so the three numbers agree; the first step has no difference | |
 | Counted by occurrence, once however many builds in the scope hold it, and not fixed while any of them holds it unfixed (REQ-17) | A code finding carried to the next build is one piece of work |
 | Plotted on when a run was applied, the time a code finding opened, as the dependency trend is | A built-time axis would differ from every other chart |
-| Weeks end at midnight UTC, the last at the coming one; a week holds its start and not its end | A marker is dated by its UTC day, so it falls in the week its runs moved the line |
-| A code finding open only in releases past their end of life counts, as the backlog trend counts a vulnerability | End of life is a state of today; applied to past weeks it rewrites them |
-| On calendar weeks, the axis REQ-54 gives a branch; release over release for tags is Code findings by release (`design-docs/analysis-figures.md` § Code findings by release) | |
+| Steps end at midnight UTC, the last at the coming one; a step holds its start and not its end | A marker is dated by its UTC day, so it falls in the step its runs moved the line |
+| A code finding open only in releases past their end of life counts, as the backlog trend counts a vulnerability | End of life is a state of today; applied to past steps it rewrites them |
+| On the calendar, the axis REQ-54 gives a branch; release over release for tags is Code findings by release (`design-docs/analysis-figures.md` § Code findings by release) | |
 | The tier is the rule's as rated now | No rating history is stored, as for the vulnerability trend |
-| No table of presence spans; every week is worked out from opening and closing times (REQ-74) | A return after absence is mostly analyzer nondeterminism, and absence closes nothing |
-| Each occurrence's weeks are one bit each, read in one statement and counted in the application | A statement per week is a hundred round trips; one statement takes 46 ms on PostgreSQL and 257 ms on MySQL 8.4 for 104 weeks of 4,000 code findings on a 16,000-component build (`design-docs/analysis-measurements.md` § Trend of code findings) |
-| The weeks are 1 to 104, twelve unless named | Two years is the backlog's widest window |
+| No table of presence spans; every step is worked out from opening and closing times (REQ-74) | A return after absence is mostly analyzer nondeterminism, and absence closes nothing |
+| Each occurrence's steps are one bit each, read in one statement and counted in the application | A statement per step is hundreds of round trips; one statement takes 46 ms on PostgreSQL and 257 ms on MySQL 8.4 for 104 weeks of 4,000 code findings on a 16,000-component build (`design-docs/analysis-measurements.md` § Trend of code findings) |
+| A window is 1 to 730 days or 1 to 104 weeks, twelve weeks unless named; both in one request is refused | Two years is the backlog's widest window, in the steps the dependency trend takes (`design-docs/analytics-program.md` § Trends) |
 
 ## Analyzer markers
 
@@ -127,7 +127,7 @@ GET /v1/products/{product}/code-finding-trend.json
 | Rule | Reason |
 |---|---|
 | The page's own read, narrowing and access, as a file (REQ-50) | A list and its file are one read |
-| CSV is long-format: week ending, split, part, not fixed, opened, fixed, and the week's changes in words; a row for the whole, then one per tier, method and series | A spreadsheet pivots one table |
+| CSV is long-format: the step's last day, split, part, not fixed, opened, fixed, and the step's changes in words; a row for the whole, then one per tier, method and series | A spreadsheet pivots one table |
 | JSON is the trend's own answer | |
 
 ## The page
@@ -135,17 +135,17 @@ GET /v1/products/{product}/code-finding-trend.json
 Code findings over time is a page of the analytics catalog, in its Security
 testing group (`design-docs/analytics-catalog.md` § Catalog groups), reached
 from the rail, the Security testing screen, a component's trend panel and home's
-This week figure (`design-docs/interface-security-testing.md` § Security
+Today figure (`design-docs/interface-security-testing.md` § Security
 testing, `design-docs/interface-component.md` § Security testing on the
 component, `design-docs/interface-shell.md` § Security testing figures).
 
 | Part | Holds |
 |---|---|
-| Controls | The window (4, 13, 26, 52 or 104 weeks, thirteen unless picked) and the split (tier, series, method), both in the address; CSV and JSON with the narrowing on screen |
-| Pace chart | Not fixed, new and fixed per week, with a dashed mark at each week holding a marker, said on hover |
+| Controls | The step, daily unless weekly is picked; the window (14, 30, 90, 365 or 730 days, thirty unless picked; or 4, 13, 26, 52 or 104 weeks, thirteen unless picked); and the split (tier, series, method), all in the address; CSV and JSON with the narrowing on screen |
+| Pace chart | Not fixed, new and fixed per step, with a dashed mark at each step holding a marker, said on hover |
 | Split chart | Not fixed, stacked by the split picked |
 | Today's count | No longer detected, opening the queue in that state with the same narrowing |
-| Week by week | Each week's three numbers, its split, and its markers in words |
+| Step by step | Each step's three numbers, its split, and its markers in words |
 
 | Rule | Reason |
 |---|---|
@@ -161,5 +161,5 @@ component, `design-docs/interface-shell.md` § Security testing figures).
 
 | Limit | Detail |
 |---|---|
-| A tier reads as rated now | A rule rated anew moves every week it counted in |
+| A tier reads as rated now | A rule rated anew moves every step it counted in |
 | A version change is unseen where a tool states no version at both ends | Its runs read as one version |

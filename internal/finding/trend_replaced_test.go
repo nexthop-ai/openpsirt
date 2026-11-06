@@ -60,13 +60,15 @@ func TestATrendBeneathAComponentFollowsItAcrossAVersionARescanReplaced(t *testin
 				if got := points[len(points)-1].Open; got != 1 {
 					t.Errorf("%d open beneath %s after the bump, want the issue it carried", got, name)
 				}
-				var opened, resolved int
+				var baseline, opened, resolved int
 				for _, point := range points {
-					opened += point.Opened
-					resolved += point.Resolved
+					baseline += point.Baseline
+					opened += point.New
+					resolved += point.Corrected
 				}
-				if opened != 2 {
-					t.Errorf("%d opened beneath %s, want the two issues the first scan found", opened, name)
+				if baseline != 2 || opened != 0 {
+					t.Errorf("beneath %s the first scan is %d baseline and %d new, want its two issues as baseline",
+						name, baseline, opened)
 				}
 				if resolved != 1 {
 					t.Errorf("%d resolved beneath %s, want the issue the bump fixed", resolved, name)
@@ -84,9 +86,9 @@ func TestATrendBeneathAComponentFollowsItAcrossAVersionARescanReplaced(t *testin
 			t.Fatal(err)
 		}
 		for _, point := range points {
-			if point.Open != 0 || point.Opened != 0 || point.Resolved != 0 {
+			if point.Open != 0 || point.New != 0 || point.Corrected != 0 {
 				t.Fatalf("beneath %s, which reaches no libnl, a day counts %d open, %d opened and %d resolved",
-					lone.Name, point.Open, point.Opened, point.Resolved)
+					lone.Name, point.Open, point.New, point.Corrected)
 			}
 		}
 	})

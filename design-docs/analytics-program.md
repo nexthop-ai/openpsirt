@@ -22,13 +22,51 @@ Every figure counts in the unit and period `design-docs/analytics.md` defines.
 
 ## Trends
 
-New, resolved and open, each split by severity: an open count that barely moves
-while its critical share rises is getting worse.
+Open at the end of each step, and four flows in it, each split by severity: an
+open count that barely moves while its critical share rises is getting worse.
+The unit is an issue, counted once however many products, builds and
+occurrences hold it, as Home's open figure counts.
 
 | Viewing | Axis | Reason |
 |---|---|---|
-| A branch | Calendar time | Scanned nightly (REQ-54) |
+| A branch | Calendar time, in daily or weekly steps | Scanned nightly (REQ-54); a team fixing dozens a day sees it by the day |
 | Tagged releases | Release over release, oldest first, as bars | Frozen points; a line between them draws a path nothing traveled |
+
+### Counting by identity
+
+An issue's identity is derived from content (REQ-08), so an issue that leaves
+the open set and comes back is recognized as the same one.
+
+| Series | An issue counted in the step |
+|---|---|
+| Open | Open at the step's end: some finding of it in the selection opened at or before that moment and had not closed |
+| New | Open at the step's end, open at no moment before in the selection, and not brought by a build's first scan |
+| Returned | Open at the step's end, not at the end of the step before, and open at some moment before that in the selection, the window's start or earlier included |
+| Corrected | Open at the end of the step before, not at this one's end, every closure of it in the step a resolution (`design-docs/analytics.md` § The counting unit), and no finding of it opened after this step's end |
+| Baseline | Open at the step's end for the first time, brought by a build's first scan; drawn as a mark, never a bar |
+
+| Rule | Reason |
+|---|---|
+| A bounce is one return and no correction | A broken inventory that drops every component for a scan otherwise counts the whole estate resolved and then new |
+| A correction stops counting when its issue returns, at whatever later moment | Corrected means still closed now; past bars move when an issue comes back |
+| A build's first scan is its earliest run by start that did not fail | A failed run opened nothing |
+| A first scan's issues are baseline, and the step says how many builds were first scanned in it | The inventory arriving is not work arriving; a new branch or variant is its own baseline |
+| An issue already open elsewhere in the selection is no flow when another build's first scan finds it | It was already open |
+| An issue present before, counted again only through a first scan, is returned | It was in the selection once |
+| A finding recorded by hand has no run and is never baseline | |
+| The first step's flows are its difference from the window's start | The moment before the first step is in the read |
+| A finding the reader cannot read says nothing about whether its issue was present before | Returned against new would disclose it (REQ-43) |
+
+### Steps and windows
+
+| Rule | Reason |
+|---|---|
+| A step is a day or a week, sent as a count of days (1 to 730) or of weeks (1 to 104); both in one request is refused; neither is twelve weeks | Two years is the widest window (`design-docs/analytics.md` § The period a report covers) |
+| Steps end at midnight UTC, the last at the coming one; each point is dated by its last day | A day holds whole days, and a fix at 23:00 lands on its own date |
+| A step holds the interval after the previous step's end, up to and including its own end | A moment on a boundary belongs to the step it ends |
+| The read covers findings open at the window's start or opened since, through now; whether an issue was present before the window is asked of the findings closed before it, for the issues the window's read did not reach opened at or before the start | Cost follows the window's start, not the deployment's age (REQ-74) |
+| A build's first scan is asked only for the runs that opened something in the window | |
+| The backlog over time sheet steps daily unless weekly is picked: 14, 30, 90, 365 or 730 days, thirty unless picked, or 4, 13, 26, 52 or 104 weeks, thirteen unless picked, both in the address | |
 
 | Rule | Reason |
 |---|---|
@@ -36,18 +74,17 @@ while its critical share rises is getting worse.
 | Rates stay on calendar | Between releases they measure how far apart they were cut |
 | Release over release names a product and needs two releases | Tags across products interleave; one bar reads as broken |
 | A release with nothing open is still a point | Counts attach to the list of every scanned build; absent says never scanned |
-| A resolved issue counts at the severity it held while open | |
-| The window becomes predicates before the statement runs | Cost follows the range asked, not the deployment's age |
-| The step and the number of steps are bounded | They arrive as parameters |
+| A corrected issue counts at the severity it held while open, at the end of the step before | |
 
 ## Subtree trends
 
-The three series for an area: a team owns a kernel or a runtime, not an image.
+The same series for an area: a team owns a kernel or a runtime, not an image.
 
 | Rule | Reason |
 |---|---|
 | It takes the findings list's two narrowings: a component at any version, or a component and everything under it | |
-| Under a component, a finding on a version a rescan replaced counts where the build's present version of its name sits, for opened, resolved and open alike (`design-docs/data-model-graph.md` § Path traversal) | A bump closes what it fixed on the version it replaced |
+| Under a component, a finding on a version a rescan replaced counts where the build's present version of its name sits, for every series alike (`design-docs/data-model-graph.md` § Path traversal) | A bump closes what it fixed on the version it replaced |
+| Whether an issue was present before the window is asked under the same narrowing | An issue that sat elsewhere in the build is new to the area |
 | Across several builds it refuses | A subtree is one build's walk |
 | A selection naming no product refuses before any build is counted | |
 | The component resolves as on the findings list, after the selection is authorized | An unreadable product refuses the same whatever it holds |
@@ -181,4 +218,5 @@ deferral counts for the part that ran, and overlapping stretches count once.
 | Limit | Detail |
 |---|---|
 | An issue rated differently in two products counts once, in the strictest band | Trends, aging buckets and fixes agree on one screen |
+| A return is a returned bar whatever caused it | A broken inventory's bounce and a real regression read alike; the closure reason of the departure is not shown |
 | A component a rescan removed, with no component of its name left in the build, sits beneath nothing | Its closures leave the trend of the component it sat beneath; there is no present version to count them at, as for code findings |

@@ -20,8 +20,8 @@ import (
 )
 
 // MostTrendSteps is the most steps a trend is worked out over: two years of
-// weeks.
-const MostTrendSteps = 104
+// days.
+const MostTrendSteps = 730
 
 // TrendPoint is the code findings at a moment: those not fixed, split by the
 // tier of their rule's weaknesses, by series and by testing method, and those
@@ -173,9 +173,10 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		return nil, err
 	}
 
+	words := (steps + 63) / 64
 	type occurrence struct {
 		series, method, tier string
-		open                 [2]uint64
+		open                 []uint64
 	}
 	at := map[string]*occurrence{}
 	for _, row := range rows {
@@ -183,7 +184,7 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 		if one == nil {
 			one = &occurrence{
 				series: names[row.SeriesID], method: string(methodOf(row.Kind)),
-				tier: weakness.Tier(row.Tier).Name(),
+				tier: weakness.Tier(row.Tier).Name(), open: make([]uint64, words),
 			}
 			at[row.Occurrence] = one
 		}
@@ -199,8 +200,11 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 
 	counted := map[string]bool{}
 	for _, o := range at {
-		if o.open != [2]uint64{} {
-			counted[o.series] = true
+		for _, word := range o.open {
+			if word != 0 {
+				counted[o.series] = true
+				break
+			}
 		}
 	}
 	points := make([]TrendPoint, steps)

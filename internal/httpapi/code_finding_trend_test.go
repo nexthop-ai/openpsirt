@@ -142,6 +142,25 @@ func TestATrendCountsWhatIsNotFixedBySplitAndMarksWhatChanged(t *testing.T) {
 	})
 }
 
+func TestATrendInDaysCountsEachDay(t *testing.T) {
+	// Two hundred days need more than two words of the per-step bits.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		trendSeeded(t, r)
+		got := readTrend(t, r, "security-testing-reader", "?days=200")
+		if len(got.Points) != 200 {
+			t.Fatalf("two hundred days are %d points", len(got.Points))
+		}
+		today := got.Points[199]
+		if today.At != time.Now().UTC().Format(time.DateOnly) || today.NotFixed != 3 ||
+			today.Opened != 1 || today.Fixed != 1 {
+			t.Errorf("today is %+v; want three not fixed, one opened and one fixed", today)
+		}
+		if arrived := got.Points[189]; arrived.Opened != 3 || got.Points[188].NotFixed != 0 {
+			t.Errorf("ten days ago is %+v after %+v; want the hub's three arriving that day", arrived, got.Points[188])
+		}
+	})
+}
+
 func TestATrendNarrowsAsTheQueueDoes(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		trendSeeded(t, r)

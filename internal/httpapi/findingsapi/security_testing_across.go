@@ -48,11 +48,11 @@ type CodeFindingAcrossWindowAsked struct {
 	Weeks int `query:"weeks" default:"13" minimum:"1" maximum:"104" doc:"The number of weeks, ending at the coming midnight UTC"`
 }
 
-// CodeFindingAcrossTrendAsked is the trend across products, over twelve weeks
-// unless named, as one product's is.
+// CodeFindingAcrossTrendAsked is the trend across products, over the steps one
+// product's takes.
 type CodeFindingAcrossTrendAsked struct {
 	CodeFindingAcrossAsked
-	Weeks int `query:"weeks" default:"12" minimum:"1" maximum:"104" doc:"The number of weeks, ending at the coming midnight UTC"`
+	core.Steps
 }
 
 // scoped is the reader and the products the figure counts: every product in
@@ -180,8 +180,11 @@ func registerTrendAcross(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		since, _ := weeksEnding(input.Weeks)
-		got, err := analysis.Trend(ctx, in.DB.DB, subject, scope, since, 7*24*time.Hour, input.Weeks)
+		since, step, steps, err := input.Window(time.Now())
+		if err != nil {
+			return nil, err
+		}
+		got, err := analysis.Trend(ctx, in.DB.DB, subject, scope, since, step, steps)
 		if err != nil {
 			return nil, core.Refused(in.Logger, err, "the code findings over time could not be worked out")
 		}
@@ -189,7 +192,7 @@ func registerTrendAcross(api huma.API, in core.Deps) {
 	}
 	huma.Register(api, acrossOperation("trend-code-findings-across-products", "/v1/code-finding-trend",
 		"Trend code findings across products",
-		"Returns, per week, the code findings not fixed at the end of the week summed over products, split "+
+		"Returns, per week or per day, the code findings not fixed at the end of the step summed over products, split "+
 			"by the tier of the rule's weaknesses, by analyzer series and by testing method, and how many "+
 			"were opened and fixed in it, as one product's trend counts them. A series of the same name in "+
 			"two products is one split. Each marker names its product.\n\n"+acrossProducts),
@@ -214,7 +217,9 @@ func registerTrendAcross(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		return file.stream(input.Format, "", weeksStated(input.Weeks), trendRows(got, true)), nil
+		stepped := file
+		stepped.header = append([]string{input.StepEnding()}, file.header[1:]...)
+		return stepped.stream(input.Format, "", []core.Stated{input.Stated()}, trendRows(got, true)), nil
 	})
 }
 
