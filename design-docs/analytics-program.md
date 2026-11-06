@@ -9,6 +9,7 @@ Satisfies REQ-33, REQ-35, REQ-53, REQ-54.
 
 - [Trends](#trends)
 - [Subtree trends](#subtree-trends)
+- [Burndown](#burndown)
 - [Deadlines](#deadlines)
 - [Deadline compliance](#deadline-compliance)
 - [Remediation metrics](#remediation-metrics)
@@ -105,6 +106,82 @@ The same series for an area: a team owns a kernel or a runtime, not an image.
 A carried patch shows as a step down: one naming what it resolves closes the
 finding as patched on the first scan carrying it, one moving the version closes
 it as revised (`design-docs/findings-closure.md` § Build-declared claims).
+
+## Burndown
+
+The backlog of one selection from a day 0, in daily steps, and where the recent
+pace takes it. Counted in the trend's unit, an issue at a component, with the
+trend's identity rules (§ Counting by identity).
+
+| Term | Meaning |
+|---|---|
+| **Left** | Open at a moment, with some finding of it in the selection open and not answered by a dismissal in force |
+| **Done** | Left the backlog by a fix, a dismissal in force, or a publisher's statement that it is not affected, and not left since through now |
+| **Added** | New or returned |
+
+| Series | An issue at a component counted in the day |
+|---|---|
+| Left | Left at the day's end, split by the severity it held |
+| New | Left at the day's end for the first time, open at no moment before in the selection, not brought by a build's first scan |
+| Returned | Left at the day's end, not at the end of the day before, and open at some moment before; a dismissal that lapsed or was withdrawn is one |
+| Fixed | Left at the end of the day before, closed at this one's end, every closure in the day a resolution or a statement and one a resolution, and done |
+| Dismissed | Left at the end of the day before, open at this one's end with every finding answered, or closed in the day by statements alone, and done |
+| Returned after a gap | As on the trend; a mark |
+| Baseline | As on the trend; a mark |
+
+### Answered by a dismissal
+
+| Rule | Reason |
+|---|---|
+| The dismissals are not applicable, wrong match, will not fix and already fixed (`design-docs/analytics-controls.md` § Dismissals and last uploads) | A dismissal is part of the work |
+| A dismissal answers a finding where the deadline's test matches it: the product, the issue under any name it merged into, the occurrence, and the versions the finding holds, a wrong match at any version | One test for what a decision answers |
+| One needing a second person is in force from each agreement to its withdrawal; one needing nobody from its proposal; either until the decision stopped applying | The deadline stops for a decision in force and for nothing else |
+| A waiting proposal, a deferral, a planned upgrade and a promised patch answer nothing | A promise is not the fix |
+| An issue at a component is answered only where every finding of it open at the moment is | Answered at one occurrence and open at another is not done (REQ-17) |
+| A dismissal that lapses or is withdrawn puts the issue back, counted as returned, and its dismissed day stops counting | Done means still done now |
+| A disclaimed closure counts as dismissed; a superseded or unexplained one is no departure that counts | `design-docs/analytics.md` § The counting unit |
+
+### Day 0 and steps
+
+| Rule | Reason |
+|---|---|
+| Day 0 is a picked day, or the day the earliest finding in the selection opened | The first scan that found anything there |
+| Steps are days ending at midnight UTC, from day 0's start through the coming midnight | The trend's steps |
+| A day 0 more than 730 days back is moved to 730 days back, and the answer names the day it used | Two years is the widest window (`design-docs/analytics.md` § The period a report covers) |
+| What was left at day 0's start is stated beside the first day | The line starts from it |
+
+### The projection
+
+The pace of the latest 14 days, a fixed span, and the day the line reaches zero
+at it.
+
+| Rule | Reason |
+|---|---|
+| The rate is done less added over the latest 14 days, or every day where fewer are drawn, a day | Two weeks: a quiet weekend does not swing it, and a change of pace shows within a sprint |
+| Where the rate is above zero, the zero date is today plus left over the rate; past ten years no date is given | A date nobody plans by is noise |
+| Where the rate is zero or below, there is no zero date; the screen says it is not converging and how many a day the backlog grows by | A line drawn to a date that never comes reads as a plan |
+| Marks are out of the rate | A first scan or a restored inventory is not work |
+
+### Narrowing
+
+| Rule | Reason |
+|---|---|
+| It takes the subtree trend's two narrowings, with the same refusals (§ Subtree trends) | One meaning of a subtree |
+| A component is chosen by name, or by a package identifier prefix (`design-docs/data-model-components.md` § Package identifier prefixes) | A repository is named by its identifier, never by the name its producer gave it |
+| The answer names the packages a name or a prefix chose, with each one's ecosystem, at most 20 | A name two ecosystems share reads as one otherwise |
+| A severity names the least severe band kept; an unrated issue reads as medium | As every band filter reads it |
+| Visibility applies to every read, the dismissals included, and the export reads through the same method (REQ-43, REQ-50) | |
+
+### Added and done
+
+Two running totals from day 0, on one axis: added, and done. The gap between
+them is the net move. Each day's done is split into fixed and dismissed, so the
+mix stays visible.
+
+| Rule | Reason |
+|---|---|
+| Totals start at zero on day 0; the baseline and restored marks are out of both | The inventory arriving is not work arriving |
+| The totals need not sum to the line's move | A superseded or unexplained closure lowers the line and neither total, and an issue done and back is counted once, as returned |
 
 ## Deadlines
 
@@ -231,3 +308,6 @@ deferral counts for the part that ran, and overlapping stretches count once.
 |---|---|
 | An issue rated differently in two products counts once, in the strictest band | Trends, aging buckets and fixes agree on one screen |
 | A component a rescan removed, with no component of its name left in the build, sits beneath nothing | Its closures leave the trend of the component it sat beneath; there is no present version to count them at, as for code findings |
+| A finding two dismissals answer at once counts twice toward its moment on the burndown | The moment's answered findings are summed over dismissals; one live decision per key keeps it rare |
+| A dismissal needing nobody that was sent back is read as never in force, and one sent back after an agreement keeps the agreement's span | The record keeps whether it is sent back, not when |
+| A build's own suppression or a statement applied to an open finding is no answer on the burndown | Neither records when it took effect |
