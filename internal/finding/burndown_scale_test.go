@@ -260,6 +260,16 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 			})
 			t.Logf("the list beneath the widest repository's %s: %d rows; read in %v", name, total, took)
 		}
+		kernelPackage, _ := graph.PackageOf(packages[kernel].Purl)
+		for _, typed := range []string{kernelPackage, "pkg:deb/", "pkg:generic/"} {
+			var total int
+			took := timed(func() (err error) {
+				_, total, err = f.store.Groups(ctx, who, f.scope, 50, 0,
+					finding.Filter{Purl: mustPrefix(t, typed)})
+				return err
+			})
+			t.Logf("the list of %s: %d rows; read in %v", typed, total, took)
+		}
 		for _, read := range []struct {
 			name      string
 			by        finding.GroupBy

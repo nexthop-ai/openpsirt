@@ -277,6 +277,18 @@ second run, both forms side by side:
 | A second start costs nothing measurable | The starts are one walk's seeds, and both commits reach the same 3,295 issues |
 | The second run is slower across the board on SQLite | Its product burndown read 1,515 ms against 1,086 in the first; the machine was shared, so the forms are compared within the run |
 
+The findings list's package filter, one page and its total, in a third run:
+
+| The list of | Rows | SQLite | PostgreSQL |
+|---|--:|--:|--:|
+| The kernel's package | 3,295 | 215 ms | 75 ms |
+| `pkg:deb/` | 3,959 | 229 ms | 75 ms |
+| `pkg:generic/`, 3,872 components chosen | 3,423 | 70 ms | 82 ms |
+
+| Reading | Detail |
+|---|---|
+| Choosing every component of a type costs no more than one package | The chosen set is read once and held to by the occurrences' component |
+
 | Caveat | Detail |
 |---|---|
 | One build | The image's repositories reach every top-level component, the widest walk a repository row takes |

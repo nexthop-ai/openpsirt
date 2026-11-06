@@ -17,6 +17,7 @@ import (
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // unconnected formats statements and connects to nothing.
@@ -86,6 +87,8 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 			*v = []int64{1}
 		case *[]access.Visibility:
 			*v = []access.Visibility{access.Public}
+		case *graph.PurlPrefix:
+			*v = graph.ParsePurlPrefix("pkg:deb/debian/curl")
 		default:
 			// A field of a named type this does not know how to set. The
 			// ones named here write no condition over a group; any other is

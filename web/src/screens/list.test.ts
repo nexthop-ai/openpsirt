@@ -406,6 +406,13 @@ describe("a subtree's root", () => {
     expect(withinBuild(query, false)).not.toHaveProperty("beneath_purl");
     expect(acrossProducts(query)).not.toHaveProperty("beneath_purl");
   });
+
+  it("keeps a package identifier in one build, any selection and across products", () => {
+    const query = listQuery(new URLSearchParams("purl=pkg:cargo/gimli"));
+    expect(query).toMatchObject({ purl: "pkg:cargo/gimli" });
+    expect(withinBuild(query, false)).toMatchObject({ purl: "pkg:cargo/gimli" });
+    expect(acrossProducts(query)).toMatchObject({ purl: "pkg:cargo/gimli" });
+  });
 });
 
 describe("a date filter the address carries", () => {

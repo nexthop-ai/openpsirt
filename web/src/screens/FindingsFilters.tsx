@@ -342,6 +342,7 @@ export function activeFilters(
       clears: [["ecosystem", kind]],
     });
   }
+  add("purl", "Package", at("purl"));
   each("declared_as", "Producer said", DECLARED_AS);
   add("under", "Inside container", at("under"));
   // With what qualifies it, which goes when the chip does.

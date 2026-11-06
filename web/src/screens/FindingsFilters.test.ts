@@ -142,6 +142,13 @@ describe("the package kinds the filter offers", () => {
     const cargo = activeFilters(asked)[0]!;
     expect(without(asked, cargo).toString()).toBe("ecosystem=swift");
   });
+
+  it("draw a chip naming a package identifier, and removing it removes it", () => {
+    const asked = address("purl=pkg%3Acargo%2Fgimli&ecosystem=cargo");
+    expect(chips(asked)).toEqual(["Package type: Rust (cargo)", "Package: pkg:cargo/gimli"]);
+    const purl = activeFilters(asked)[1]!;
+    expect(without(asked, purl).toString()).toBe("ecosystem=cargo");
+  });
 });
 
 describe("the weakness chips", () => {

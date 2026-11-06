@@ -131,6 +131,15 @@ type Filter struct {
 	// other — which is a question about two or three kinds at once as
 	// readily as one, so it is a set.
 	Ecosystems []string
+	// Purl keeps what is open against components whose package identifier
+	// the prefix chooses, at any version, as the burndown chooses them. The
+	// store resolves it to purlComponents before the list is read.
+	Purl graph.PurlPrefix
+	// purlComponents is the components Purl chooses, set by the store: the
+	// type narrows the statement reading them and the package is tested on
+	// each identifier read, since no stored column holds it reduced. Nil asks
+	// nothing, and empty answers nothing.
+	purlComponents []int64
 	// Under keeps what sits inside one container, by its name. UnderTheBuild
 	// asks for the other case: what the build holds directly, which has no
 	// consumer to name.
@@ -611,6 +620,15 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if names := trimmed(f.Exclude); len(names) > 0 {
 		q = q.Where(`"f"."component_id" NOT IN (?)`,
 			componentsWhere(q, `"c"."name_folded" IN (?)`, bun.List(foldedNames(names))))
+	}
+	if !f.Purl.Empty() {
+		if len(f.purlComponents) == 0 {
+			// An empty list is a syntax error on two of the engines, and an
+			// empty set holds nothing.
+			q = q.Where("1 = 0")
+		} else {
+			q = q.Where(`"f"."component_id" IN (?)`, bun.List(f.purlComponents))
+		}
 	}
 	if kinds := trimmed(f.Ecosystems); len(kinds) > 0 {
 		// One subquery holding an OR rather than one per kind, because a

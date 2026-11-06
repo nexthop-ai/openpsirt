@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // KeyMatches says a decision occurrence `de` covers the versions a finding's
@@ -354,6 +356,9 @@ func neededByEach(states []DecisionStanding) (string, []any, bool) {
 // or one holding its key. Only the decided occurrences are read among them (see
 // decidedBeside).
 func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products []int64, all bool) error {
+	if err := s.purlComponentsFor(ctx, filter, products, all); err != nil {
+		return err
+	}
 	needed, args := filter.decisionNeeded()
 	into := &filter.decidedIssues
 	if needed == "" {
@@ -467,4 +472,45 @@ func (f Filter) fixStates() []FixState {
 		}
 	}
 	return kept
+}
+
+// purlComponentsFor sets the components a filter's package identifier
+// chooses, among those holding a finding in these products. All is every
+// product. Read with every other set a filter is resolved to before the list
+// is, so each read that prepares a filter resolves it.
+//
+// The type narrows the statement, bound and escaped; the package is tested on
+// each identifier read, as the burndown tests it, since no stored column
+// holds the identifier reduced and folded.
+func (s *Store) purlComponentsFor(ctx context.Context, filter *Filter, products []int64, all bool) error {
+	if filter.Purl.Empty() {
+		return nil
+	}
+	filter.purlComponents = []int64{}
+	if !all && len(products) == 0 {
+		return nil
+	}
+	q := s.db.NewSelect().TableExpr(`"component" AS "c"`).
+		ColumnExpr(`"c"."id" AS "id", "c"."purl" AS "purl"`).
+		Where(`LOWER("c"."purl") LIKE ?`+database.LikeClause, filter.Purl.TypePattern())
+	if !all {
+		q = q.Where(`"c"."id" IN (?)`, s.db.NewSelect().TableExpr(`"finding" AS "pf"`).
+			Join(`JOIN "build" AS "pb" ON "pb"."id" = "pf"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "pt" ON "pt"."id" = "pb"."branch_or_tag_id"`).
+			ColumnExpr(`"pf"."component_id"`).
+			Where(`"pt"."product_id" IN (?)`, bun.List(products)))
+	}
+	var read []struct {
+		ID   int64  `bun:"id"`
+		Purl string `bun:"purl"`
+	}
+	if err := q.Scan(ctx, &read); err != nil {
+		return fmt.Errorf("read the components %s chooses: %w", filter.Purl, err)
+	}
+	for _, c := range read {
+		if filter.Purl.Matches(c.Purl) {
+			filter.purlComponents = append(filter.purlComponents, c.ID)
+		}
+	}
+	return nil
 }

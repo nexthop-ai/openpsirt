@@ -92,6 +92,14 @@ async function drawn(reach: object[], at = AT) {
                   open_by_severity: { high: 1 },
                   component: { name: "addr2line", version: "0.25.1", ecosystem: "cargo" },
                 },
+                {
+                  key: "pkg:cargo/gimli",
+                  versions: ["0.31.1", "0.32.0"],
+                  components: 2,
+                  open: 3,
+                  fixed: 0,
+                  open_by_severity: { high: 3 },
+                },
               ],
             },
           }
@@ -268,8 +276,10 @@ describe("the components listed by repository and by ecosystem", () => {
     await settle();
     expect(text()).toContain("pkg:cargo/addr2line");
     // The name within its ecosystem: the list's name filter spans every one.
+    // A package at several versions is chosen by its identifier at every one.
     expect(link("Findings")).toEqual([
       "/products/sonic/branches-and-tags/master/variants/arm/findings?component=addr2line&ecosystem=cargo",
+      "/products/sonic/branches-and-tags/master/variants/arm/findings?purl=pkg%3Acargo%2Fgimli",
     ]);
     expect(link("Burndown")[0]).toContain("purl=pkg%3Acargo%2Faddr2line");
   });

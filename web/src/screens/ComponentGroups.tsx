@@ -67,14 +67,16 @@ function burndownOf(at: Build, by: Listing, row: Group, ecosystem: string): stri
 }
 
 // The findings list for a row: a repository's subtree on this build, an
-// ecosystem's components, and a package by its name within its ecosystem.
-// Components with no identifier have none, since no kind names them.
+// ecosystem's components, and a package by its name within its ecosystem, or
+// by its package identifier where it is several components. Components with
+// no identifier have none, since no kind names them.
 function findingsOf(at: Build, by: Listing, row: Group, ecosystem: string): string | null {
   if (by === "repository") return buildFindingsAt(at, beneathRow(row));
   if (!ecosystem) {
     return row.key === NO_ECOSYSTEM ? null : buildFindingsAt(at, { ecosystem: row.key });
   }
-  return row.component ? buildFindingsAt(at, { component: row.component.name, ecosystem }) : null;
+  if (row.component) return buildFindingsAt(at, { component: row.component.name, ecosystem });
+  return row.key.startsWith("pkg:") ? buildFindingsAt(at, { purl: row.key }) : null;
 }
 
 export function ComponentGroups({

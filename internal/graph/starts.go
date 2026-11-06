@@ -26,7 +26,6 @@ func (s *Store) ComponentsOf(ctx context.Context, buildID int64, pkg PurlPrefix)
 	if pkg.Empty() {
 		return nil, nil
 	}
-	kind := PartsOfPurl(pkg.String()).Type
 	var rows []struct {
 		ID   int64  `bun:"id"`
 		Purl string `bun:"purl"`
@@ -37,8 +36,7 @@ func (s *Store) ComponentsOf(ctx context.Context, buildID int64, pkg PurlPrefix)
 		ColumnExpr(`DISTINCT "c"."id" AS "id", "c"."purl" AS "purl"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`LOWER("c"."purl") LIKE ?`+database.LikeClause,
-			"pkg:"+database.LikeEscaped(strings.ToLower(kind))+"/%").
+		Where(`LOWER("c"."purl") LIKE ?`+database.LikeClause, pkg.TypePattern()).
 		OrderExpr(`"c"."id"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the components of build %d named %s: %w", buildID, pkg, err)
@@ -50,6 +48,17 @@ func (s *Store) ComponentsOf(ctx context.Context, buildID int64, pkg PurlPrefix)
 		}
 	}
 	return out, nil
+}
+
+// TypePattern is a pattern for a lowercased identifier, bound beside the
+// engine's escape clause, keeping those of the prefix's type: the part of the
+// choice a statement can make, the package being tested on each one read.
+//
+// The type is read off the prefix itself, since a path naming only a type,
+// such as `pkg:deb/`, names no package to parse.
+func (p PurlPrefix) TypePattern() string {
+	kind, _, _ := strings.Cut(strings.TrimPrefix(p.wanted, "pkg:"), "/")
+	return "pkg:" + database.LikeEscaped(kind) + "/%"
 }
 
 // Path is whether the prefix names everything under a path rather than one

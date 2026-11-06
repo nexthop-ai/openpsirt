@@ -131,6 +131,12 @@ func (n Narrowing) Filter(floor finding.MinimumSeverity) (finding.Filter, error)
 		BuildSays:         plainly(n.BuildSays),
 		OpenedByRun:       n.OpenedByRun,
 	}
+	if strings.TrimSpace(n.Purl) != "" {
+		if narrowed.Purl = graph.ParsePurlPrefix(n.Purl); narrowed.Purl.Empty() {
+			return narrowed, huma.Error422UnprocessableEntity(
+				"purl is a package identifier, such as pkg:deb/debian/curl, or a path ending in a slash, such as pkg:github/sonic-net/")
+		}
+	}
 	var openedBefore *time.Time
 	for _, each := range []struct {
 		text string
@@ -195,6 +201,7 @@ type Narrowing struct {
 	Component            []string `query:"component,explode" maxItems:"200" maxLength:"191" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
 	Label                []string `query:"label,explode" maxItems:"200" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels"`
 	Search               string   `query:"q" maxLength:"200" doc:"Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name"`
+	Purl                 string   `query:"purl" maxLength:"512" doc:"Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused"`
 	Ecosystem            []string `query:"ecosystem,explode" maxItems:"200" maxLength:"64" doc:"Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi"`
 	// The two questions about the release itself, kept apart because a tag
 	// can be in support and a branch can be past end-of-life. Both default to

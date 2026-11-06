@@ -427,6 +427,7 @@ export function listQuery(params: URLSearchParams) {
     ...(openOn ? { open_on: openOn } : {}),
     ...(params.get("q") ? { q: params.get("q") ?? "" } : {}),
     ...(ecosystems.length > 0 ? { ecosystem: ecosystems } : {}),
+    ...(params.get("purl") ? { purl: params.get("purl") ?? "" } : {}),
     ...(releases.length > 0 ? { on: releases } : {}),
     ...(support.length > 0 ? { support } : {}),
     ...(declaredAs.length > 0 ? { declared_as: declaredAs } : {}),

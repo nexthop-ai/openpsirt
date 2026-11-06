@@ -14,6 +14,7 @@ rule is a statement shape a measurement chose; the numbers are in
 - [Deadline rewrites](#deadline-rewrites)
 - [Receipts pairing](#receipts-pairing)
 - [Component groups](#component-groups)
+- [Package filter](#package-filter)
 - [Limits](#limits)
 
 ## The page
@@ -134,6 +135,21 @@ per group.
 | Most open first, then by key | |
 | Reading the product is required; a subject reading nothing there is answered as though nothing was scanned | The grouping is the build's inventory, the breadth a narrower reach was not granted |
 | Visibility applies to every count | REQ-43 |
+
+## Package filter
+
+A package identifier narrows the list to the components it chooses, at every
+version, by the rule in `design-docs/data-model-components.md` § Package identifier prefixes.
+
+| Rule | Reason |
+|---|---|
+| The chosen components are read before the list, with the other sets a filter is resolved to, among the components holding a finding in the list's products | The package is tested in the application, so it cannot be a clause inside the grouping |
+| The list, its total and its file hold occurrences to the chosen components through the same clause | |
+| A choice holding no component keeps nothing | |
+| Visibility is the list's own: the chosen set only narrows what the subject already reads | A component read to choose among is never shown |
+| A typed value naming no package is refused, after the selection is authorized | A refused product answers the same whatever is asked of it |
+| Across products it is kept: the identifier names no build | |
+| A choice of thousands of components is one list of them | `pkg:generic/` chooses 3,872 and reads a page in 70 ms on SQLite and 82 ms on PostgreSQL (`design-docs/analytics-measurements.md` § Burndown and component groups) |
 
 ## Limits
 

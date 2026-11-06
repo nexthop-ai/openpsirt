@@ -164,6 +164,7 @@ by ecosystem. The list is in the address, so a link carries it. The counts are
 | A repository row opens the findings list and the burndown at or under it on this build: its one component, or every component of its identifier where it ships several commits | What the row counts |
 | A package or an ecosystem row opens the burndown chosen by its identifier, a prefix ending in a slash for an ecosystem, on the build's branch and variant | A package at any version; an ecosystem as every package of it |
 | An ecosystem row opens the findings list narrowed to its kind; a package row of one component opens it narrowed to its name and its kind | The list's name filter spans every ecosystem, so the kind keeps it to the row |
+| A package row of several components opens the findings list narrowed to its package identifier, at every version | The row names no one component; the identifier chooses as the burndown does |
 | Components with no identifier are an ecosystem row with no burndown and no findings list | No prefix or kind chooses them |
 | A note under the list says what a row counts: beneath for a repository, at its own components otherwise | The two read differently |
 
@@ -187,4 +188,3 @@ occurrences is one answer.
 |---|---|
 | The component read has a floor of one pass over a source package's occurrences | Fix, deadline and occurrence are read from the table, as no index carries them: 100 ms of 243 on PostgreSQL. Lower needs a stored per-issue total rewritten as findings move |
 | Sibling components are not folded on the tree | Folding removes 281 of 36,991 child rows and shrinks the largest level from 4,867 to 4,679, still too large to browse |
-| A package row of several components opens no findings list | The row names no one component, and the list chooses by name and kind rather than by package identifier |

@@ -19185,6 +19185,8 @@ export interface operations {
                 label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
+                /** @description Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused */
+                purl?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
@@ -19301,6 +19303,8 @@ export interface operations {
                 label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
+                /** @description Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused */
+                purl?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
@@ -24313,6 +24317,8 @@ export interface operations {
                 label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
+                /** @description Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused */
+                purl?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
@@ -24482,6 +24488,8 @@ export interface operations {
                 label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
+                /** @description Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused */
+                purl?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
@@ -24613,6 +24621,8 @@ export interface operations {
                 label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
+                /** @description Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused */
+                purl?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
@@ -24749,6 +24759,8 @@ export interface operations {
                 label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
+                /** @description Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused */
+                purl?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
@@ -24883,6 +24895,8 @@ export interface operations {
                 label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
+                /** @description Keep only what is open against components whose package identifier this chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss alone, or everything under a path ending in a slash such as pkg:github/sonic-net/. Matched without regard to capitals. One that does not start with pkg: and a type is refused */
+                purl?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
                 ecosystem?: string[] | null;
                 /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
