@@ -37,6 +37,12 @@ func (o osvSays) Dates(context.Context, string) (issuedate.Dates, error) {
 // data dated twelve hours after the inventory arrived.
 func undatedMatch(t *testing.T, w *fixture.World) (*checkFixture, *scanner.Checking) {
 	t.Helper()
+	return undatedMatchOn(t, w, "CVE-2026-0011")
+}
+
+// undatedMatchOn is undatedMatch on an issue of this name.
+func undatedMatchOn(t *testing.T, w *fixture.World, name string) (*checkFixture, *scanner.Checking) {
+	t.Helper()
 	ctx := t.Context()
 	f := replacedInventory(t, w)
 	f.since = f.arrived.Add(12 * time.Hour)
@@ -46,16 +52,16 @@ func undatedMatch(t *testing.T, w *fixture.World) (*checkFixture, *scanner.Check
 		t.Fatal(err)
 	}
 	if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-		[]finding.Named{{Identifier: "CVE-2026-0011", Severity: "high"}}); err != nil {
+		[]finding.Named{{Identifier: name, Severity: "high"}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.NewUpdate().Table("vulnerability").
 		Set(`"dates_asked_at" = ?`, time.Now().UTC().Add(-60*24*time.Hour)).
 		Set(`"first_seen_at" = ?`, f.replaced.Add(5*24*time.Hour)).
-		Where(`"identifier" = ?`, "CVE-2026-0011").Exec(ctx); err != nil {
+		Where(`"identifier" = ?`, name).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0011", libnl)}}
+	s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt(name, libnl)}}
 	checking := f.check(t, s)
 	if checking == nil {
 		t.Fatal("the check waited on an issue OSV was already asked about")
@@ -196,6 +202,98 @@ func TestAMatchDatedAtTheChecksWindowOpensAtTheArrival(t *testing.T) {
 			t.Errorf("closed because %q, want the replacement's upgraded kept", got.ClosedBecause)
 		case !got.OpenedAt.Equal(f.arrived):
 			t.Errorf("opened at %s, want the inventory's arrival %s", got.OpenedAt, f.arrived)
+		}
+	})
+}
+
+// merge interns one report naming both issues, which merges them.
+func merge(t *testing.T, f *checkFixture, name string, alias string) {
+	t.Helper()
+	if _, err := finding.NewVulnerabilities(f.db.DB).Intern(t.Context(),
+		[]finding.Named{{Identifier: name, Aliases: []string{alias}, Severity: "high"}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// issueOfMatch is the identifier of the issue the check's match is read as.
+func issueOfMatch(t *testing.T, f *checkFixture) string {
+	t.Helper()
+	got, _ := matchOf(t, f)
+	var name string
+	if err := f.db.NewSelect().TableExpr(`"vulnerability" AS "v"`).
+		Join(`JOIN "vulnerability" AS "s" ON "s"."id" = "v"."issue_id"`).
+		ColumnExpr(`"s"."identifier"`).Where(`"v"."id" = ?`, got.VulnerabilityID).
+		Scan(t.Context(), &name); err != nil {
+		t.Fatal(err)
+	}
+	return name
+}
+
+func TestAMarkedMatchAbsorbedIntoADatedIssueIsDatedByIt(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatchOn(t, w, "GHSA-AAAA-BBBB-CCCC")
+		when := f.arrived.Add(36 * time.Hour)
+		f.published(t, "CVE-2026-0031", when)
+		merge(t, f, "CVE-2026-0031", "GHSA-AAAA-BBBB-CCCC")
+		if name := issueOfMatch(t, f); name != "CVE-2026-0031" {
+			t.Fatalf("the match is read as %s, want the issue kept", name)
+		}
+		got, marked := matchOf(t, f)
+		switch {
+		case marked:
+			t.Error("the match is still marked publication date unknown")
+		case !got.OpenedAt.Equal(when):
+			t.Errorf("opened at %s, want the kept issue's publication at %s", got.OpenedAt, when)
+		}
+	})
+}
+
+func TestAMarkedMatchKeptTakesTheDateOfTheIssueItAbsorbs(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatch(t, w)
+		when := f.arrived.Add(36 * time.Hour)
+		f.published(t, "GHSA-DDDD-EEEE-FFFF", when)
+		merge(t, f, "CVE-2026-0011", "GHSA-DDDD-EEEE-FFFF")
+		if name := issueOfMatch(t, f); name != "CVE-2026-0011" {
+			t.Fatalf("the match is read as %s, want the issue kept", name)
+		}
+		got, marked := matchOf(t, f)
+		switch {
+		case marked:
+			t.Error("the match is still marked publication date unknown")
+		case !got.OpenedAt.Equal(when):
+			t.Errorf("opened at %s, want the absorbed issue's publication at %s", got.OpenedAt, when)
+		}
+		var published *time.Time
+		if err := f.db.NewSelect().Table("vulnerability").Column("published_at").
+			Where(`"identifier" = ?`, "CVE-2026-0011").Scan(t.Context(), &published); err != nil {
+			t.Fatal(err)
+		}
+		if published == nil || !published.Equal(when) {
+			t.Errorf("the issue kept is published %v, want the absorbed issue's %s", published, when)
+		}
+	})
+}
+
+func TestAMarkedMatchMergedWithAnEarlierSightingIsDatedByIt(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		f, _ := undatedMatch(t, w)
+		seen := f.arrived.Add(36 * time.Hour)
+		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(t.Context(),
+			[]finding.Named{{Identifier: "GHSA-GGGG-HHHH-IIII", Severity: "high"}}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.NewUpdate().Table("vulnerability").Set(`"first_seen_at" = ?`, seen).
+			Where(`"identifier" = ?`, "GHSA-GGGG-HHHH-IIII").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		merge(t, f, "CVE-2026-0011", "GHSA-GGGG-HHHH-IIII")
+		got, marked := matchOf(t, f)
+		switch {
+		case marked:
+			t.Error("the match is still marked: the merged issue was carried here before the replacement")
+		case !got.OpenedAt.Equal(seen):
+			t.Errorf("opened at %s, want the earlier sighting at %s", got.OpenedAt, seen)
 		}
 	})
 }

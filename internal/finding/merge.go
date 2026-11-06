@@ -273,6 +273,9 @@ func (v *Vulnerabilities) absorb(ctx context.Context, kept int64, gone Vulnerabi
 	if _, err := v.db.NewInsert().Model(record).Exec(ctx); err != nil {
 		return fmt.Errorf("record %s merging into the issue it is: %w", gone.Identifier, err)
 	}
+	if err := v.redateMerging(ctx, kept, gone); err != nil {
+		return err
+	}
 	// Every row read as the issue absorbed, itself and anything merged into it
 	// before, is read as the one kept.
 	if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
@@ -372,9 +375,51 @@ func (v *Vulnerabilities) saidOf(ctx context.Context, row Vulnerability) (Named,
 	return said, nil
 }
 
+// redateMerging rewrites a replaced inventory's check matches marked
+// publication date unknown under either issue as the merged issue dates them,
+// before the absorbed issue is read as the one kept. The marker is worked out
+// from the issue a match is read as, so a merge clearing it with no rewrite
+// leaves a guessed opening counted as dated.
+//
+// The merged issue has the date either held, and the earlier first sighting.
+// A side with no date of its own is rewritten by that date where there is one,
+// and otherwise by the earlier sighting where it moved, which dates a match
+// closing after it as an issue carried here before its replacement.
+func (v *Vulnerabilities) redateMerging(ctx context.Context, kept int64, gone Vulnerability) error {
+	var held Vulnerability
+	if err := v.db.NewSelect().Model(&held).Where(`"vu"."id" = ?`, kept).Scan(ctx); err != nil {
+		return fmt.Errorf("read the issue %s merges into: %w", gone.Identifier, err)
+	}
+	published := held.PublishedAt
+	if published == nil {
+		published = gone.PublishedAt
+	}
+	sighted := held.FirstSeenAt
+	if gone.FirstSeenAt.Before(sighted) {
+		sighted = gone.FirstSeenAt
+	}
+	for _, side := range []Vulnerability{held, gone} {
+		if side.PublishedAt != nil {
+			continue
+		}
+		var err error
+		switch {
+		case published != nil:
+			_, err = Redate(ctx, v.db, side.ID, *published)
+		case sighted.Before(side.FirstSeenAt):
+			_, err = redate(ctx, v.db, side.ID, sighted, true)
+		}
+		if err != nil {
+			return fmt.Errorf("date what a check recorded of %s as the issue it merges into: %w",
+				side.Identifier, err)
+		}
+	}
+	return nil
+}
+
 // describeGaps fills what the issue kept does not say with what the absorbed
-// one did: the published word for how bad it is, and when either was first
-// seen.
+// one did: the published word for how bad it is, when either was first seen,
+// and OSV's dates and when OSV was asked.
 func (v *Vulnerabilities) describeGaps(ctx context.Context, kept int64, gone Vulnerability) error {
 	if strings.TrimSpace(gone.Severity) != "" {
 		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
@@ -389,6 +434,23 @@ func (v *Vulnerabilities) describeGaps(ctx context.Context, kept int64, gone Vul
 		Where(`"vu"."id" = ?`, kept).
 		Where(`"vu"."first_seen_at" > ?`, gone.FirstSeenAt).Exec(ctx); err != nil {
 		return fmt.Errorf("carry when %s was first seen: %w", gone.Identifier, err)
+	}
+	if gone.PublishedAt != nil {
+		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
+			Set(`"published_at" = ?`, *gone.PublishedAt).
+			Set(`"modified_at" = ?`, gone.ModifiedAt).
+			Where(`"vu"."id" = ?`, kept).
+			Where(`"vu"."published_at" IS NULL`).Exec(ctx); err != nil {
+			return fmt.Errorf("carry when %s was published: %w", gone.Identifier, err)
+		}
+	}
+	if gone.DatesAskedAt != nil {
+		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
+			Set(`"dates_asked_at" = ?`, *gone.DatesAskedAt).
+			Where(`"vu"."id" = ?`, kept).
+			Where(`"vu"."dates_asked_at" IS NULL`).Exec(ctx); err != nil {
+			return fmt.Errorf("carry when OSV was asked about %s: %w", gone.Identifier, err)
+		}
 	}
 	return nil
 }

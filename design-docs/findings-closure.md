@@ -289,6 +289,7 @@ still recorded (REQ-88).
 | A date at or after the replacement withdraws the match as `invalid` (§ Closure reasons) | It was never exposed: out of every open set and of found after fixed |
 | A date before the window, the settle delay before the last scan's data date, withdraws the match as `invalid` | The check would not have recorded it; that scan was the authority. Whether a match exists never depends on when OSV answered |
 | The window is worked out again when the date arrives, from the runs and the settle delay then | |
+| A merge rewrites the marked matches of either issue before they are read as one: by the date either held, otherwise by the earlier first sighting where it moved, leaving marked a match closing at or before it | `design-docs/findings-issues.md` § Merged issues |
 | A match on an issue with a known date counts as opened and fixed in the remediation figures, timed from its opening to the replacement (`design-docs/analytics-program.md` § Remediation metrics) | It was open over that stretch |
 | A marked match, and one withdrawn, counts in no remediation figure | A marked duration is a guess; a withdrawn match was never exposed |
 | Its closure reason is the replacement's: patched or disclaimed where the replacement's claims say so there, unaffected where its record says so, otherwise upgraded, revised, removed or unexplained as for a run (§ Closure reasons) | |

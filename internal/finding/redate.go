@@ -64,6 +64,13 @@ type Redated struct {
 // delay before the last scan's data date, which is worked out again here. Only
 // rows a check wrote are touched, and a row already withdrawn is left alone.
 func Redate(ctx context.Context, tx bun.IDB, issueID int64, published time.Time) (Redated, error) {
+	return redate(ctx, tx, issueID, published, false)
+}
+
+// redate is Redate, or, where sighted, the same for an issue that is still
+// undated but now first seen at this moment: a match closing at or before it
+// stays marked rather than withdrawn, since the issue still has no date there.
+func redate(ctx context.Context, tx bun.IDB, issueID int64, published time.Time, sighted bool) (Redated, error) {
 	var out Redated
 	var rows []struct {
 		ID        int64     `bun:"id"`
@@ -107,6 +114,9 @@ func Redate(ctx context.Context, tx bun.IDB, issueID int64, published time.Time)
 				return out, err
 			}
 			floors[w] = since
+		}
+		if sighted && !published.Before(row.ClosedAt) {
+			continue
 		}
 		if !published.Before(row.ClosedAt) || (since != nil && published.Before(since.Add(-lag))) {
 			withdrawing = append(withdrawing, row.ID)
