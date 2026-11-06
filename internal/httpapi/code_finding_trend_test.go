@@ -385,3 +385,16 @@ func TestWhoMayTrendCodeFindings(t *testing.T) {
 		}
 	})
 }
+
+func TestACodeFindingTrendAskedInWeeksAndDaysIsRefused(t *testing.T) {
+	// A refusal, not a trend that could not be worked out.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for _, route := range []string{trendOf, trendOf + ".csv", "/v1/code-finding-trend", "/v1/code-finding-trend.csv"} {
+			got := httpapitest.AsPerson(t, r, "security-testing-reader", http.MethodGet, route+"?weeks=4&days=30", "")
+			if got.Code != http.StatusUnprocessableEntity || !strings.Contains(got.Body.String(), "send one") {
+				t.Errorf("%s with weeks and days answered %d, want 422 saying to send one: %s",
+					route, got.Code, got.Body.String())
+			}
+		}
+	})
+}

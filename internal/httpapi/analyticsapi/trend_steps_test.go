@@ -10,8 +10,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
+
+func TestStepsEndAtTheComingMidnightUTC(t *testing.T) {
+	// Mid-afternoon, so a window ending now and one ending at midnight differ
+	// by the hours left in the day, and a fix at 23:00 lands on its own date.
+	now := time.Date(2026, 1, 10, 15, 0, 0, 0, time.FixedZone("UTC+5", 5*3600))
+	for _, one := range []struct {
+		steps core.Steps
+		since time.Time
+	}{
+		{core.Steps{Days: 3}, time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC)},
+		{core.Steps{Weeks: 2}, time.Date(2025, 12, 28, 0, 0, 0, 0, time.UTC)},
+	} {
+		since, step, steps, err := one.steps.Window(now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		until := since.Add(time.Duration(steps) * step)
+		if !since.Equal(one.since) || !until.Equal(time.Date(2026, 1, 11, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("%+v runs from %s to %s, want from %s to the coming midnight UTC, 2026-01-11",
+				one.steps, since.UTC(), until.UTC(), one.since)
+		}
+	}
+}
 
 func TestATrendInDaysHasADailyStepEndingToday(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {

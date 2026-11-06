@@ -44,10 +44,11 @@ func figuresScoped(ctx context.Context, in core.Deps, product string, n CodeFind
 	return subject, out, err
 }
 
-// weeksEnding is the window of whole weeks ending at the coming midnight UTC.
+// weeksEnding is the window of whole weeks ending at the coming midnight UTC,
+// the trend's own window, so a figure and a trend over the same weeks agree.
 func weeksEnding(weeks int) (since, until time.Time) {
-	until = time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
-	return until.Add(-time.Duration(weeks) * 7 * 24 * time.Hour), until
+	since, step, steps, _ := core.Steps{Weeks: weeks}.Window(time.Now())
+	return since, since.Add(time.Duration(steps) * step)
 }
 
 // weeksStated is the window a figure's file covers, as the trend's file
