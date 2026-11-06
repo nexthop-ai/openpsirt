@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Pace, Releases, Ring, paceLabel, paceMarks } from "./Charts";
+import { Pace, Releases, Ring, paceLabel, paceMarks, tickWords } from "./Charts";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
@@ -68,6 +68,11 @@ describe("the backlog's pace", () => {
     expect(Math.max(...corrected)).toBeCloseTo(19);
     // The open line's scale is fitted to what open spans after the first scan.
     expect(host.textContent).not.toContain("0 open");
+  });
+
+  it("labels a fitted axis in whole numbers where brief labels would read the same", () => {
+    expect(tickWords([8270, 8290])).toEqual([(8270).toLocaleString(), (8290).toLocaleString()]);
+    expect(tickWords([0, 5000])).toEqual(["0", "5.0k"]);
   });
 
   it("moves a mark to the step it stays on once leading steps are dropped", () => {

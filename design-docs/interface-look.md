@@ -185,6 +185,7 @@ split and the ring use the library.
 |---|---|
 | Every trend panel offers Daily and Weekly, daily first | |
 | The chart starts at the first step holding anything, so the open line's scale starts where scanning began | Before the first scan nothing is open, and drawn, the line spans zero to the whole inventory |
+| The open axis is labeled in whole numbers where brief labels would read the same | A fitted scale over a backlog moving by tens puts 8,271 and 8,290 both at 8.3k |
 
 ## Limits
 

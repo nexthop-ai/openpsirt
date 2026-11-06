@@ -204,6 +204,7 @@ export function Pace({
     hi = hiOpen + pad;
   const y = (v: number) => T + topH - ((v - lo) / (hi - lo)) * topH;
   const ticks = niceTicks(lo, hi, 3);
+  const said = tickWords(ticks);
 
   const zero = T + topH + gap + botH / 2;
   const most = Math.max(1, ...news.map((v, i) => v + (backs[i] ?? 0)), ...dones);
@@ -221,11 +222,11 @@ export function Pace({
       role="img"
       aria-label={paceLabel(points, words, unit)}
     >
-      {ticks.map((v) => (
+      {ticks.map((v, i) => (
         <g key={v}>
           <line className="gridline" x1={L} x2={W - R} y1={y(v)} y2={y(v)} />
           <text className="axis" x={2} y={y(v) + 3}>
-            {brief(v)}
+            {said[i]}
           </text>
         </g>
       ))}
@@ -317,6 +318,15 @@ export function PaceLegend() {
 }
 
 // A handful of round values inside a range, for the upper band's grid.
+// The labels of a fitted axis: brief where that tells them apart, whole numbers
+// where two brief labels would read the same, as 8,271 and 8,290 both read 8.3k.
+export function tickWords(ticks: number[]): string[] {
+  const brieflySaid = ticks.map(brief);
+  return new Set(brieflySaid).size === brieflySaid.length
+    ? brieflySaid
+    : ticks.map((v) => v.toLocaleString());
+}
+
 function niceTicks(lo: number, hi: number, want: number): number[] {
   const span = Math.max(1, hi - lo);
   const raw = span / want;
