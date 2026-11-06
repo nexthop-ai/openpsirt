@@ -19,6 +19,7 @@ package finding_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -446,18 +447,38 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 	}
 	bundled := time.Since(start)
 
-	start = time.Now()
-	points, err := store.Trend(ctx, who, finding.Scope{},
-		time.Now().UTC().Add(-12*7*24*time.Hour), 7*24*time.Hour, 12, finding.Within{})
-	if err != nil {
-		t.Fatalf("trend: %v", err)
+	// The trend in each step over the windows a panel and the backlog sheet
+	// offer, each read twice and the second kept: the first warms the cache.
+	day, week := 24*time.Hour, 7*24*time.Hour
+	var trends []string
+	var trend time.Duration
+	var points []finding.Point
+	for _, window := range []struct {
+		step  time.Duration
+		steps int
+		said  string
+	}{
+		{week, 12, "12 weeks"}, {week, 52, "52 weeks"}, {week, 104, "104 weeks"},
+		{day, 30, "30 days"}, {day, 365, "365 days"}, {day, 730, "730 days"},
+	} {
+		for range 2 {
+			start = time.Now()
+			points, err = store.Trend(ctx, who, finding.Scope{},
+				time.Now().UTC().Add(-time.Duration(window.steps)*window.step), window.step, window.steps,
+				finding.Within{})
+			if err != nil {
+				t.Fatalf("trend: %v", err)
+			}
+			trend = time.Since(start)
+		}
+		trends = append(trends, fmt.Sprintf("%s %s", window.said, trend.Round(time.Millisecond)))
 	}
-	trend := time.Since(start)
 
 	t.Logf("    findings list %s (%d rows) · running out %s (%d) · trend %s (%d points)",
 		list.Round(time.Millisecond), total,
 		out.Round(time.Millisecond), len(due),
 		trend.Round(time.Millisecond), len(points))
+	t.Logf("    trend by window: %s", strings.Join(trends, " · "))
 	t.Logf("    planned upgrades %s (%d of %d bumps)",
 		bundled.Round(time.Millisecond), len(bumps), upgrades)
 }

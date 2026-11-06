@@ -295,8 +295,8 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 			})
 			opened, resolved := 0, 0
 			for _, p := range points {
-				opened += p.Opened
-				resolved += p.Resolved
+				opened += p.New
+				resolved += p.Corrected
 			}
 			t.Logf("trend beneath %s: open %d eleven weeks back and %d now, %d opened, %d resolved; read in %v",
 				at.name, points[0].Open, points[len(points)-1].Open, opened, resolved, trendTook)
@@ -362,6 +362,32 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 				})
 				t.Logf("findings beneath %s, %s: %d, counted in %v", at.name, form.name, count, formTook)
 			}
+		}
+
+		// The whole product's trend in each step, over the windows a panel and
+		// the backlog sheet offer.
+		day, week := 24*time.Hour, 7*24*time.Hour
+		for _, window := range []struct {
+			step  time.Duration
+			steps int
+			said  string
+		}{
+			{week, 12, "12 weeks"}, {week, 52, "52 weeks"}, {week, 104, "104 weeks"},
+			{day, 30, "30 days"}, {day, 90, "90 days"}, {day, 365, "365 days"}, {day, 730, "730 days"},
+		} {
+			var points []finding.Point
+			took := timed(func() (err error) {
+				points, err = store.Trend(ctx, who, scope, now.Add(-time.Duration(window.steps)*window.step),
+					window.step, window.steps, finding.Within{})
+				return err
+			})
+			var flows, baseline int
+			for _, p := range points {
+				flows += p.New + p.Corrected + p.Returned
+				baseline += p.Baseline
+			}
+			t.Logf("trend of the product over %s: %d open now, %d moved, %d baseline; read in %v",
+				window.said, points[len(points)-1].Open, flows, baseline, took)
 		}
 
 		// The tree's step around the kernel, which counts beneath each

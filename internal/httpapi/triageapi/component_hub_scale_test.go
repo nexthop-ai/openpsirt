@@ -153,6 +153,7 @@ func TestMeasureTheComponentHub(t *testing.T) {
 					build + "/components/pkg-17/around?code_findings=true",
 					"/v1/products/mine/code-finding-trend?branch_or_tag=master&variant=broadcom&beneath=sonic-image",
 					"/v1/products/mine/code-finding-trend?weeks=104",
+					"/v1/products/mine/code-finding-trend?days=730",
 					"/v1/components?q=linux",
 					"/v1/components?q=pkg-1",
 				}
