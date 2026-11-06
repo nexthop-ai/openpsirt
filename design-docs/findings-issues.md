@@ -154,4 +154,4 @@ background, because no scanner report carries either (REQ-82).
 |---|---|
 | A merge is not undone | Nothing a report says unmerges, and unmerging divides findings and decisions made since |
 | An absorbed issue's filed name is not taken by the kept issue | Where the best-known name is the absorbed row's, the kept issue stays filed where it is |
-| Time to fix is measured from the first sighting here, never from publication | No remediation figure reads the dates; the issue page shows them |
+| Time to fix is measured from a finding's opening, never from publication, except that a replaced inventory's dated check match opens at the later of its publication and the inventory's arrival | The issue page shows the dates |
