@@ -17,6 +17,7 @@ import {
   windowFor,
   withEach,
   withinBuild,
+  acrossProducts,
   type Row,
 } from "./list";
 
@@ -395,6 +396,15 @@ describe("a subtree's root", () => {
     expect(withinBuild(query, true)).toMatchObject({ beneath: "curl", beneath_version: "8" });
     expect(withinBuild(query, false)).not.toHaveProperty("beneath");
     expect(withinBuild(query, false)).not.toHaveProperty("beneath_version");
+  });
+
+  it("starts at every component of a package where the address names one", () => {
+    const query = listQuery(new URLSearchParams("beneath_purl=pkg:github/sonic-net/sonic-swss"));
+    expect(withinBuild(query, true)).toMatchObject({
+      beneath_purl: "pkg:github/sonic-net/sonic-swss",
+    });
+    expect(withinBuild(query, false)).not.toHaveProperty("beneath_purl");
+    expect(acrossProducts(query)).not.toHaveProperty("beneath_purl");
   });
 });
 

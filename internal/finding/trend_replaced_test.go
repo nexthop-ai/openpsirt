@@ -47,7 +47,7 @@ func TestATrendBeneathAComponentFollowsItAcrossAVersionARescanReplaced(t *testin
 					t.Fatal(err)
 				}
 				points, err := f.store.Trend(t.Context(), who, f.wholeProduct(), since,
-					24*time.Hour, 30, finding.Within{Beneath: &under})
+					24*time.Hour, 30, finding.Within{Beneath: []int64{under}})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -81,7 +81,7 @@ func TestATrendBeneathAComponentFollowsItAcrossAVersionARescanReplaced(t *testin
 			t.Fatal(err)
 		}
 		points, err := f.store.Trend(t.Context(), who, f.wholeProduct(), since,
-			24*time.Hour, 30, finding.Within{Beneath: &under})
+			24*time.Hour, 30, finding.Within{Beneath: []int64{under}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -153,7 +153,7 @@ func TestAFlawRecordedOnAVersionARescanReplacedStaysBeneathItsName(t *testing.T)
 					kid.Beneath, kid.Name)
 			}
 			under := kid.ComponentID
-			_, total, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, finding.Filter{Beneath: &under})
+			_, total, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, finding.Filter{Beneath: []int64{under}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -161,7 +161,7 @@ func TestAFlawRecordedOnAVersionARescanReplacedStaysBeneathItsName(t *testing.T)
 				t.Errorf("the list beneath %s holds %d, want the flaw its count names", kid.Name, total)
 			}
 			points, err := f.store.Trend(t.Context(), who, f.scope, minting().Add(-7*24*time.Hour),
-				24*time.Hour, 7, finding.Within{Beneath: &under})
+				24*time.Hour, 7, finding.Within{Beneath: []int64{under}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -204,7 +204,7 @@ func TestAVersionTheBuildHoldsAgainIsBeneathOnlyWhereItSits(t *testing.T) {
 			t.Fatal(err)
 		}
 		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), f.wholeProduct(),
-			time.Now().UTC().Add(-7*24*time.Hour), 24*time.Hour, 8, finding.Within{Beneath: &under})
+			time.Now().UTC().Add(-7*24*time.Hour), 24*time.Hour, 8, finding.Within{Beneath: []int64{under}})
 		if err != nil {
 			t.Fatal(err)
 		}

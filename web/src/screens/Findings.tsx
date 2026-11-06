@@ -143,6 +143,9 @@ export function Findings() {
   // so the tree's count and this list agree. Read here because the notice
   // above the list names it; the query it narrows is built elsewhere.
   const beneath = params.get("beneath") ?? "";
+  // Every component of one package, as a repository shipped at several
+  // commits is asked.
+  const beneathPackage = params.get("beneath_purl") ?? "";
   // Everything else the list narrows by is read where the panel draws it.
   // Pulled apart here, one variable per filter, each would have to be threaded
   // through to the control that sets it, and the count of what is on would
@@ -771,6 +774,21 @@ export function Findings() {
             onClick={() => set("beneath", "")}
           >
             Under {beneath} ×
+          </button>
+        </div>
+      )}
+
+      {beneathPackage && (
+        <div className="filters" style={{ marginTop: -4 }}>
+          <span style={{ color: "var(--faint)" }}>Beneath</span>
+          <button
+            type="button"
+            className="chip"
+            aria-pressed
+            title="Show the whole build again"
+            onClick={() => set("beneath_purl", "")}
+          >
+            Under {beneathPackage} ×
           </button>
         </div>
       )}

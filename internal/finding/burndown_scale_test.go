@@ -60,6 +60,18 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 			for i := r; i < len(tops); i += repositories {
 				snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: repo, Child: tops[i]})
 			}
+			// Every fifth also ships at a second commit, over the same
+			// components and the next repository's.
+			if r%5 == 0 {
+				again := repo
+				again.Purl = fmt.Sprintf("pkg:github/sonic-net/sonic-repo-%02d@%012x", r, 0xdef000+r)
+				snap.Components = append(snap.Components, again)
+				for i := r; i < len(tops); i += repositories {
+					snap.Dependencies = append(snap.Dependencies,
+						graph.Dependency{Parent: again, Child: tops[i]},
+						graph.Dependency{Parent: again, Child: tops[(i+1)%len(tops)]})
+				}
+			}
 		}
 
 		// Every package carries one issue and the kernel a real one's.
@@ -195,6 +207,25 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 			t.Fatal(err)
 		}
 		build := finding.Scope{ProductID: &f.productID, BranchOrTagID: &c.branchOrTag, VariantID: &c.variant}
+		// The repository the build holds as the most components.
+		var widest []int64
+		var widestPurl string
+		seen := map[string]bool{}
+		for _, c := range snap.Components {
+			pkg := graph.PackageName(c.Purl)
+			if !strings.HasPrefix(pkg, "pkg:github/") || seen[pkg] {
+				continue
+			}
+			seen[pkg] = true
+			starts, err := f.graph.ComponentsOf(ctx, f.build, graph.ParsePurlPrefix(pkg))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(starts) > len(widest) {
+				widest, widestPurl = starts, pkg
+			}
+		}
+		t.Logf("the widest repository is %s, at %d components", widestPurl, len(widest))
 		for _, read := range []struct {
 			name   string
 			scope  finding.Scope
@@ -205,8 +236,10 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 			{"the product, high and worse", f.scope, "high", finding.Within{}},
 			{"the kernel by its name", f.scope, "", finding.Within{Component: packages[kernel].Name}},
 			{"pkg:deb/ as a prefix", f.scope, "", finding.Within{Purl: mustPrefix(t, "pkg:deb/")}},
-			{"beneath the root", build, "", finding.Within{Beneath: &rootID}},
-			{"beneath the kernel", build, "", finding.Within{Beneath: &kernelID}},
+			{"beneath the root", build, "", finding.Within{Beneath: []int64{rootID}}},
+			{"beneath the kernel", build, "", finding.Within{Beneath: []int64{kernelID}}},
+			{"beneath the widest repository's every commit", build, "", finding.Within{Beneath: widest}},
+			{"beneath the widest repository's first commit", build, "", finding.Within{Beneath: widest[:1]}},
 		} {
 			var b *finding.Burndown
 			took := timed(func() (err error) {
@@ -216,6 +249,16 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 			got := burnedOver(b)
 			t.Logf("burndown of %s: %d days, %d at day 0, %d left, %d new, %d returned, %d fixed, %d dismissed; read in %v",
 				read.name, len(b.Points), b.Start, got.left, got.fresh, got.returned, got.fixed, got.dismissed, took)
+		}
+		for name, starts := range map[string][]int64{
+			"every commit": widest, "the first commit": widest[:1],
+		} {
+			var total int
+			took := timed(func() (err error) {
+				_, total, err = f.store.Groups(ctx, who, build, 50, 0, finding.Filter{Beneath: starts})
+				return err
+			})
+			t.Logf("the list beneath the widest repository's %s: %d rows; read in %v", name, total, took)
 		}
 		for _, read := range []struct {
 			name      string

@@ -126,7 +126,7 @@ func TestTheListAcrossProductsAnswersOnlyForWhatIsHeld(t *testing.T) {
 		// than answered from whichever build sorted first.
 		component := f.componentID(t, libnl.Name)
 		if _, _, err := f.store.Anywhere(t.Context(), both, 50, 0,
-			finding.Filter{Beneath: &component}); err == nil {
+			finding.Filter{Beneath: []int64{component}}); err == nil {
 			t.Error("a subtree was answered across products")
 		}
 	})

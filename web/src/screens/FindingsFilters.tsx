@@ -351,6 +351,7 @@ export function activeFilters(
     at("beneath") && [at("beneath"), at("beneath_version")].filter(Boolean).join(" "),
     [["beneath", ""], ...BENEATH_PARTS.map((part): [string, string] => [part, ""])],
   );
+  add("beneath_purl", "At or under", at("beneath_purl"));
   if (at("under_build") === "yes") add("under_build", "Held directly by the build", "only");
   // One chip per component hidden, and the page has no second list of them:
   // hiding drew its own row saying the same names the summary already said,

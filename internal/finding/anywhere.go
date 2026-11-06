@@ -65,7 +65,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	if !all && len(products) == 0 {
 		return nil, 0, nil
 	}
-	if filter.Beneath != nil {
+	if len(filter.Beneath) > 0 {
 		return nil, 0, refusal.Errorf("read findings beneath a component: a subtree is a walk over" +
 			" one build's edges, and this list spans products")
 	}

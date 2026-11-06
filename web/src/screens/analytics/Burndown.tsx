@@ -49,6 +49,7 @@ const NARROWINGS = [
   "beneath_version",
   "beneath_ecosystem",
   "beneath_namespace",
+  "beneath_purl",
 ] as const;
 
 export function Burndown() {
@@ -67,6 +68,7 @@ export function Burndown() {
     beneath_version: params.get("beneath_version") ?? undefined,
     beneath_ecosystem: params.get("beneath_ecosystem") ?? undefined,
     beneath_namespace: params.get("beneath_namespace") ?? undefined,
+    beneath_purl: params.get("beneath_purl") ?? undefined,
   };
   const asked = {
     ...(at.product ? { product: at.product } : {}),
@@ -76,7 +78,8 @@ export function Burndown() {
     ...(floor ? { severity: floor } : {}),
     ...Object.fromEntries(Object.entries(narrowed).filter((entry) => !!entry[1])),
   } as Record<string, string>;
-  const needsBuild = !!narrowed.beneath && !(at.product && branchOrTag && variant);
+  const needsBuild =
+    !!(narrowed.beneath || narrowed.beneath_purl) && !(at.product && branchOrTag && variant);
 
   const dependencies = holding(useWho().data, "dependency", at.product);
   const figures = counted(dependencies);
@@ -108,6 +111,7 @@ export function Burndown() {
     narrowed.component && `on ${narrowed.component}`,
     narrowed.purl && `on ${narrowed.purl}`,
     narrowed.beneath && `at or under ${narrowed.beneath}`,
+    narrowed.beneath_purl && `at or under ${narrowed.beneath_purl}`,
   ]
     .filter(Boolean)
     .join(" · ");

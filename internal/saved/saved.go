@@ -113,7 +113,7 @@ func NewStore(db bun.IDB) *Store {
 // web test each compare their own copy with it.
 var scope = [...]string{
 	"branch_or_tag", "variant",
-	"beneath", "beneath_version", "beneath_ecosystem", "beneath_namespace",
+	"beneath", "beneath_version", "beneath_ecosystem", "beneath_namespace", "beneath_purl",
 	"differs", "variants", "opened_by_run", "view",
 }
 

@@ -283,7 +283,7 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 			} else {
 				beneath = idOf(at.component)
 			}
-			within := finding.Within{Beneath: &beneath}
+			within := finding.Within{Beneath: []int64{beneath}}
 			if at.byName {
 				within = finding.Within{Component: at.component.Name}
 			}
@@ -305,7 +305,7 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 			}
 			var total int
 			listTook := timed(func() (err error) {
-				_, total, err = store.Groups(ctx, who, scope, 50, 0, finding.Filter{Beneath: &beneath})
+				_, total, err = store.Groups(ctx, who, scope, 50, 0, finding.Filter{Beneath: []int64{beneath}})
 				return err
 			})
 			t.Logf("list beneath %s: %d rows, first page read in %v", at.name, total, listTook)
@@ -314,7 +314,7 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 			// united with the walk and, the forms not taken, named as a
 			// second start of the walk, in its last step, or as a second
 			// membership test joined by OR.
-			under, err := graph.ReplacedWithin(ctx, db.DB, w.Build.ID, beneath, replaced)
+			under, err := graph.ReplacedWithin(ctx, db.DB, w.Build.ID, []int64{beneath}, replaced)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -324,7 +324,7 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 				args  []any
 			}{
 				{"united with the walk", `"f"."component_id" IN (?)`,
-					[]any{graph.WithinAnd(db.DB, w.Build.ID, beneath, under)}},
+					[]any{graph.WithinAnd(db.DB, w.Build.ID, []int64{beneath}, under)}},
 				{"named as a second start of the walk", `"f"."component_id" IN (?)`,
 					[]any{db.NewRaw(`WITH RECURSIVE "down" AS (
 		SELECT "n"."id" AS "node" FROM "graph_node" AS "n"

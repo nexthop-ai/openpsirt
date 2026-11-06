@@ -34,12 +34,12 @@ type Within struct {
 	// Component keeps what is open against components of this name, at any
 	// version.
 	Component string
-	// Beneath is what sits at a component or anywhere under it, by the
-	// component's identifier, resolved by the caller in the one build the
-	// scope holds. A subtree is a walk over one build's edges, so it is
-	// answerable only where the selection names exactly one build. Nil is no
+	// Beneath is what sits at one of these components or anywhere under one,
+	// by the components' identifiers, resolved by the caller in the one build
+	// the scope holds. A subtree is a walk over one build's edges, so it is
+	// answerable only where the selection names exactly one build. Empty is no
 	// narrowing.
-	Beneath *int64
+	Beneath []int64
 	// Purl keeps what is open against components whose package identifier
 	// the prefix chooses, at any version. Tested on each row read, never
 	// placed in a statement.
@@ -334,7 +334,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 
 	var buildID int64
 	var under []int64
-	if within.Beneath != nil {
+	if len(within.Beneath) > 0 {
 		buildIDs, err := s.Builds(ctx, scope)
 		if err != nil {
 			return nil, err
@@ -353,7 +353,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 		if err != nil {
 			return nil, err
 		}
-		if under, err = graph.ReplacedWithin(ctx, s.db, buildID, *within.Beneath, replaced); err != nil {
+		if under, err = graph.ReplacedWithin(ctx, s.db, buildID, within.Beneath, replaced); err != nil {
 			return nil, err
 		}
 	}
@@ -375,7 +375,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 			q = q.Where(`"f"."component_id" IN (?)`,
 				componentsWhere(q, `"c"."name_folded" = ?`, graph.Folded(name)))
 		}
-		if within.Beneath != nil {
+		if len(within.Beneath) > 0 {
 			// Only the replaced components holding a finding in the range read.
 			asked := fmt.Sprint(when, args)
 			held, read := heldFor[asked]
@@ -386,7 +386,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 				}
 				heldFor[asked] = held
 			}
-			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), buildID, *within.Beneath, held))
+			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), buildID, within.Beneath, held))
 		}
 		return q, nil
 	}, nil

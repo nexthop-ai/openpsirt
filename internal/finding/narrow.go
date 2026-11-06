@@ -149,11 +149,12 @@ type Filter struct {
 	// costs is stated where the filter is: it is a question about a component
 	// in a build rather than about one route to it.
 	DeclaredAs []string
-	// Beneath keeps what sits at a component or anywhere under it, by the
-	// component's identifier: the same walk over the build's edges the
-	// dependency tree's cumulative count makes, so the number the tree draws
-	// and the list it opens agree. Nil is no narrowing.
-	Beneath *int64
+	// Beneath keeps what sits at one of these components or anywhere under
+	// one, by the components' identifiers: the same walk over the build's
+	// edges the dependency tree's cumulative count makes, so the number the
+	// tree draws and the list it opens agree. A finding under two starts is
+	// one row. Empty is no narrowing.
+	Beneath []int64
 	// BuildID is which build the query is over, set by the store rather than
 	// by a caller, for the same reason ProductID is: the walk beneath a
 	// component is a walk over one build's edges.
@@ -772,12 +773,12 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where(held+")", asked...)
 	}
 	q = f.acrossVariants(q)
-	if f.Beneath != nil {
+	if len(f.Beneath) > 0 {
 		// The subtree as the engine walks it, not as a list of identifiers
 		// bound back in: under a build's root that list is the whole build.
 		// A finding on a version a rescan replaced is beneath wherever the
 		// present version of its name is.
-		q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), f.BuildID, *f.Beneath, f.replaced))
+		q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), f.BuildID, f.Beneath, f.replaced))
 	}
 	q = f.byState(q)
 	if !f.BelowMinimumSeverity {

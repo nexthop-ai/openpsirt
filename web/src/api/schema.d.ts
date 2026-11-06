@@ -7132,7 +7132,7 @@ export interface paths {
          * Keep a filter under a name
          * @description Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
          *
-         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `branch_or_tag`, `variant`, `beneath`, `beneath_version`, `beneath_ecosystem`, `beneath_namespace`, `differs`, `variants`, `opened_by_run`, `view`. Every other parameter is kept as sent.
+         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `branch_or_tag`, `variant`, `beneath`, `beneath_version`, `beneath_ecosystem`, `beneath_namespace`, `beneath_purl`, `differs`, `variants`, `opened_by_run`, `view`. Every other parameter is kept as sent.
          *
          *     Refused with 422 where adding the name would take you past the per-person limit.
          *
@@ -17852,6 +17852,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
             };
             header?: never;
             path?: never;
@@ -17904,6 +17906,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
             };
             header?: never;
             path: {
@@ -24289,6 +24293,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -24456,6 +24462,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -24585,6 +24593,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -24719,6 +24729,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -24851,6 +24863,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
                 /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
@@ -28860,6 +28874,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
             };
             header?: never;
             path?: never;
@@ -28910,6 +28926,8 @@ export interface operations {
                 beneath_ecosystem?: string;
                 /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
                 beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
             };
             header?: never;
             path: {

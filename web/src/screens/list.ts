@@ -441,6 +441,7 @@ export function listQuery(params: URLSearchParams) {
     ...(params.get("beneath") && params.get("beneath_namespace")
       ? { beneath_namespace: params.get("beneath_namespace") ?? "" }
       : {}),
+    ...(params.get("beneath_purl") ? { beneath_purl: params.get("beneath_purl") ?? "" } : {}),
     ...(params.get("under_build") === "yes" ? { under_build: true } : {}),
     ...(states.length > 0 ? { state: states } : {}),
     ...(outcomes.length > 0 ? { outcome: outcomes } : {}),
@@ -480,6 +481,7 @@ export function acrossProducts(query: ReturnType<typeof listQuery>) {
     beneath_version,
     beneath_ecosystem,
     beneath_namespace,
+    beneath_purl,
     differs,
     across_variants,
     ...rest
@@ -488,6 +490,7 @@ export function acrossProducts(query: ReturnType<typeof listQuery>) {
     beneath_version?: string;
     beneath_ecosystem?: string;
     beneath_namespace?: string;
+    beneath_purl?: string;
     differs?: boolean;
     across_variants?: string;
   };
@@ -495,6 +498,7 @@ export function acrossProducts(query: ReturnType<typeof listQuery>) {
   void beneath_version;
   void beneath_ecosystem;
   void beneath_namespace;
+  void beneath_purl;
   void differs;
   void across_variants;
   return rest;
@@ -516,17 +520,19 @@ export function withinVariant(query: ReturnType<typeof listQuery>, named: boolea
 // build, for the reason the variant's filter is dropped above.
 export function withinBuild(query: ReturnType<typeof listQuery>, oneBuild: boolean) {
   if (oneBuild) return query;
-  const { beneath, beneath_version, beneath_ecosystem, beneath_namespace, ...rest } =
+  const { beneath, beneath_version, beneath_ecosystem, beneath_namespace, beneath_purl, ...rest } =
     query as ReturnType<typeof listQuery> & {
       beneath?: string;
       beneath_version?: string;
       beneath_ecosystem?: string;
       beneath_namespace?: string;
+      beneath_purl?: string;
     };
   void beneath;
   void beneath_version;
   void beneath_ecosystem;
   void beneath_namespace;
+  void beneath_purl;
   return rest;
 }
 

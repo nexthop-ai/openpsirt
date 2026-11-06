@@ -198,13 +198,13 @@ func TestATrendCanBeAskedForOnePartOfTheTree(t *testing.T) {
 			return points[len(points)-1]
 		}
 
-		beneath := func(t *testing.T, name string) *int64 {
+		beneath := func(t *testing.T, name string) []int64 {
 			t.Helper()
 			id, err := f.graph.ComponentAs(t.Context(), f.build, name, graph.Choice{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			return &id
+			return []int64{id}
 		}
 
 		// Both issues, unnarrowed.
@@ -248,7 +248,7 @@ func TestASubtreeTrendIsRefusedWhereTheSelectionIsNotOneBuild(t *testing.T) {
 		}
 		_, err = f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), f.wholeProduct(),
 			time.Now().UTC().Add(-30*24*time.Hour), 24*time.Hour, 30,
-			finding.Within{Beneath: &under})
+			finding.Within{Beneath: []int64{under}})
 		if err == nil {
 			t.Fatal("a subtree trend across two builds was answered rather than refused")
 		}

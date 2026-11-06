@@ -40,19 +40,22 @@ function beneathOf(one: NonNullable<Group["component"]>) {
   };
 }
 
+// Where a repository row's subtree starts: its one component, or every
+// component of its package identifier where it ships several commits.
+function beneathRow(row: Group) {
+  return row.component ? beneathOf(row.component) : { beneath_purl: row.key };
+}
+
 // The burndown of what a row counts. A repository is its subtree on this
-// build, and has none where it holds several components, since a subtree
-// starts at one; any other row is chosen by its package identifier, at any
-// version, across the scope.
+// build; any other row is chosen by its package identifier, at any version,
+// across the scope.
 function burndownOf(at: Build, by: Listing, row: Group, ecosystem: string): string | null {
   if (by === "repository") {
-    return row.component
-      ? analyticsReportAt("findings-burndown", {
-          branch_or_tag: at.branch_or_tag,
-          variant: at.variant,
-          ...beneathOf(row.component),
-        })
-      : null;
+    return analyticsReportAt("findings-burndown", {
+      branch_or_tag: at.branch_or_tag,
+      variant: at.variant,
+      ...beneathRow(row),
+    });
   }
   const purl = by === "ecosystem" && !ecosystem ? `pkg:${row.key}/` : row.key;
   if (!purl.startsWith("pkg:") || row.key === NO_ECOSYSTEM) return null;
@@ -67,9 +70,7 @@ function burndownOf(at: Build, by: Listing, row: Group, ecosystem: string): stri
 // ecosystem's components, and a package by its name within its ecosystem.
 // Components with no identifier have none, since no kind names them.
 function findingsOf(at: Build, by: Listing, row: Group, ecosystem: string): string | null {
-  if (by === "repository") {
-    return row.component ? buildFindingsAt(at, beneathOf(row.component)) : null;
-  }
+  if (by === "repository") return buildFindingsAt(at, beneathRow(row));
   if (!ecosystem) {
     return row.key === NO_ECOSYSTEM ? null : buildFindingsAt(at, { ecosystem: row.key });
   }

@@ -318,12 +318,12 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	switch {
 	case len(buildIDs) == 1:
 		filter.BuildID = buildIDs[0]
-		if filter.Beneath != nil {
+		if len(filter.Beneath) > 0 {
 			replaced, err := graph.Replaced(ctx, s.db, filter.BuildID)
 			if err != nil {
 				return 0, nil, nil, err
 			}
-			under, err := graph.ReplacedWithin(ctx, s.db, filter.BuildID, *filter.Beneath, replaced)
+			under, err := graph.ReplacedWithin(ctx, s.db, filter.BuildID, filter.Beneath, replaced)
 			if err != nil {
 				return 0, nil, nil, err
 			}
@@ -334,7 +334,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 				return 0, nil, nil, err
 			}
 		}
-	case filter.Beneath != nil:
+	case len(filter.Beneath) > 0:
 		return 0, nil, nil, refusal.Errorf("read findings beneath a component: a subtree is a walk"+
 			" over one build's edges, and %d builds are in scope", len(buildIDs))
 	}

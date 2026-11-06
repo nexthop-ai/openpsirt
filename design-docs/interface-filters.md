@@ -27,6 +27,7 @@ address can set is a narrowing nobody uses.
 | Removing a selection chip widens by a level and carries the filters, but not the branch and variant, which the new address puts back | |
 | A subtree goes with the build it was walked in; widening out of the build drops it, and a selection that is not one build does not send it | The server refuses it over anything else |
 | What qualifies a subtree's root (version, ecosystem, namespace) goes with the root: a new root, a cleared root and a removed chip drop them | |
+| A subtree started at every component of one package identifier is a chip of its own, and goes with the build as a subtree does | A repository row at several commits arrives this way |
 | A date the server does not take as YYYY-MM-DD, or that rolls over such as February 30, is left off the request | The server refuses the whole list over it |
 | A cleared filter drops its key and never writes its default | The list's three silent-address defaults apply only where the key is absent |
 | The count of filters in force is read from the address | |
@@ -96,7 +97,7 @@ Personal; nothing is shared.
 | Rule | Reason |
 |---|---|
 | A saved filter keeps what the list is narrowed by, never where; one list per person, offered on every findings list, across products included | A PSIRT working several products keeps a filter once |
-| Left out as scope: the product, branch and variant; a subtree of one build with its version, ecosystem and namespace; what differs between a selection's builds; what spreads over one branch's variants; the run that opened it; and the grouping | The list across products groups by issue alone |
+| Left out as scope: the product, branch and variant; a subtree of one build with its version, ecosystem and namespace, or its package identifier; what differs between a selection's builds; what spreads over one branch's variants; the run that opened it; and the grouping | The list across products groups by issue alone |
 | Picking one applies it within the scope on screen | Across products from home, within one product where one is picked |
 | Server and interface drop the same scope words, byte for byte, from one test-data list each side's test compares with | A word dropped on one side fails on the other |
 | The open filter is named in the address as `rule`, the word a finding reads it from; the open marker, Forget and the prepared decision follow the name | Two filters can keep one query |

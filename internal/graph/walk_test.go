@@ -145,7 +145,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, total, err := findings.Groups(t.Context(), everyone(f), f.scope, 50, 0,
-			finding.Filter{Beneath: &aID})
+			finding.Filter{Beneath: []int64{aID}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -157,7 +157,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, total, err = findings.Groups(t.Context(), everyone(f), f.scope, 50, 0,
-			finding.Filter{Beneath: &bID})
+			finding.Filter{Beneath: []int64{bID}})
 		if err != nil {
 			t.Fatal(err)
 		}

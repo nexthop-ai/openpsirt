@@ -141,26 +141,64 @@ func TestWhatNothingPullsInIsCountedBeneathTheRoot(t *testing.T) {
 		who := f.holding(t, access.PublicRead)
 		under := f.componentID(t, root.Name)
 
-		_, listed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Beneath: &under})
+		_, listed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Beneath: []int64{under}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if listed != 3 {
 			t.Errorf("the list beneath the root holds %d, want all three", listed)
 		}
-		points, err := f.store.Trend(ctx, who, f.scope, ago(12), 24*time.Hour, 13, finding.Within{Beneath: &under})
+		points, err := f.store.Trend(ctx, who, f.scope, ago(12), 24*time.Hour, 13, finding.Within{Beneath: []int64{under}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if open := points[len(points)-1].Open; open != 3 {
 			t.Errorf("the trend beneath the root ends at %d open, want all three", open)
 		}
-		b, err := f.store.Burndown(ctx, who, f.scope, time.Time{}, "", finding.Within{Beneath: &under})
+		b, err := f.store.Burndown(ctx, who, f.scope, time.Time{}, "", finding.Within{Beneath: []int64{under}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if left := burnedOver(b).left; left != 3 {
 			t.Errorf("the burndown beneath the root leaves %d, want all three", left)
+		}
+	})
+}
+
+func TestASubtreeFromSeveralStartsCountsWhatIsUnderBothOnce(t *testing.T) {
+	// libnl sits under swss and under teamd: beneath each it is one issue,
+	// and beneath both together it is still one, beside each start's own.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.scannedAt(t, twoConsumers(), ago(10),
+			found("CVE-2026-1", libnl), found("CVE-2026-2", swss), found("CVE-2026-3", teamd))
+		who := f.holding(t, access.PublicRead)
+		swssID, teamdID := f.componentID(t, swss.Name), f.componentID(t, teamd.Name)
+		for name, c := range map[string]struct {
+			starts []int64
+			want   int
+		}{
+			"swss":           {[]int64{swssID}, 2},
+			"teamd":          {[]int64{teamdID}, 2},
+			"swss and teamd": {[]int64{swssID, teamdID}, 3},
+		} {
+			_, listed, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Beneath: c.starts})
+			if err != nil {
+				t.Fatal(err)
+			}
+			points, err := f.store.Trend(ctx, who, f.scope, ago(12), 24*time.Hour, 13, finding.Within{Beneath: c.starts})
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, err := f.store.Burndown(ctx, who, f.scope, time.Time{}, "", finding.Within{Beneath: c.starts})
+			if err != nil {
+				t.Fatal(err)
+			}
+			open, left := points[len(points)-1].Open, burnedOver(b).left
+			if listed != c.want || open != c.want || left != c.want {
+				t.Errorf("beneath %s the list holds %d, the trend %d and the burndown %d, want %d each",
+					name, listed, open, left, c.want)
+			}
 		}
 	})
 }

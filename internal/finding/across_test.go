@@ -148,7 +148,7 @@ func TestASubtreeIsRefusedWhereTheSelectionHoldsMoreThanOneBuild(t *testing.T) {
 
 		// It answers for one build.
 		rows, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
-			finding.Filter{Beneath: &under})
+			finding.Filter{Beneath: []int64{under}})
 		if err != nil {
 			t.Fatalf("beneath a component in one build: %v", err)
 		}
@@ -158,7 +158,7 @@ func TestASubtreeIsRefusedWhereTheSelectionHoldsMoreThanOneBuild(t *testing.T) {
 
 		// And refuses across several rather than answering emptily.
 		if _, _, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0,
-			finding.Filter{Beneath: &under}); err == nil {
+			finding.Filter{Beneath: []int64{under}}); err == nil {
 			t.Error("a subtree across two builds was answered rather than refused")
 		}
 	})

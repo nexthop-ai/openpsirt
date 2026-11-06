@@ -237,11 +237,16 @@ describe("the components listed by repository and by ecosystem", () => {
     expect(burn).toContain("beneath_namespace=sonic-net");
   });
 
-  it("opens no subtree for a repository shipped as several components", async () => {
+  it("opens a repository shipped as several components beneath every one of them", async () => {
     await drawn(REACH, `${AT}?list=repository`);
     expect(text()).toContain("pkg:github/sonic-net/saibcm-modules");
-    expect(link("Findings")).toHaveLength(1);
-    expect(link("Burndown")).toHaveLength(1);
+    const several = "beneath_purl=pkg%3Agithub%2Fsonic-net%2Fsaibcm-modules";
+    expect(link("Findings")[1]).toBe(
+      `/products/sonic/branches-and-tags/master/variants/arm/findings?${several}`,
+    );
+    expect(link("Burndown")[1]).toBe(
+      `/analytics/findings-burndown?branch_or_tag=master&variant=arm&${several}`,
+    );
   });
 
   it("chooses an ecosystem's burndown by purl prefix and its findings by kind, and opens its packages", async () => {

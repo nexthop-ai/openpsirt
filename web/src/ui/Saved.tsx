@@ -66,6 +66,7 @@ export const SCOPE = [
   "beneath_version",
   "beneath_ecosystem",
   "beneath_namespace",
+  "beneath_purl",
   "differs",
   "variants",
   "opened_by_run",

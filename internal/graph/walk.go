@@ -150,7 +150,7 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 	return out, nil
 }
 
-// WithinAnd is Within with the components also added, in one statement whose
+// WithinAnd is WithinAny from the starts with the components also added, in one statement whose
 // answer a caller tests membership in once: the walk's answer and the
 // components named, united inside a derived table. Each form measured in its
 // place was slow beneath some component on some engine
@@ -159,14 +159,14 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 // semi-join and answer by reading every finding of the build; the components
 // named beside the walk in its last step; and the components named as a second
 // start of the walk.
-func WithinAnd(db bun.IDB, buildID, componentID int64, also []int64) *bun.RawQuery {
+func WithinAnd(db bun.IDB, buildID int64, starts, also []int64) *bun.RawQuery {
 	if len(also) == 0 {
-		return WithinAny(db, buildID, []int64{componentID})
+		return WithinAny(db, buildID, starts)
 	}
 	return db.NewRaw(`SELECT "u"."component_id" FROM (?
 	UNION
 	SELECT "c"."id" FROM "component" AS "c" WHERE "c"."id" IN (?)) AS "u"`,
-		WithinAny(db, buildID, []int64{componentID}), bun.List(also))
+		WithinAny(db, buildID, starts), bun.List(also))
 }
 
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
@@ -807,14 +807,14 @@ func withReplaced(reached []reaching, replaced map[int64][]int64) []reaching {
 	return out
 }
 
-// ReplacedWithin is the components of replaced whose name a component at the
-// component named or anywhere under it carries, sorted. A finding on one is
+// ReplacedWithin is the components of replaced whose name a component at one
+// of the starts or anywhere under one carries, sorted. A finding on one is
 // beneath the component as one on its live namesake is.
 //
 // Answered as values and named beside the walk rather than matched to it by
 // name in the walk's own statement: on MySQL 8.4 the trend beneath the bench
 // kernel took 1.72 s that way.
-func ReplacedWithin(ctx context.Context, db bun.IDB, buildID, componentID int64,
+func ReplacedWithin(ctx context.Context, db bun.IDB, buildID int64, starts []int64,
 	replaced map[int64][]int64) ([]int64, error) {
 
 	if len(replaced) == 0 {
@@ -831,12 +831,12 @@ func ReplacedWithin(ctx context.Context, db bun.IDB, buildID, componentID int64,
 		}
 	}
 	var reached []int64
-	if err := db.NewSelect().TableExpr(`(?) AS "w"`, WithinAny(db, buildID, []int64{componentID})).
+	if err := db.NewSelect().TableExpr(`(?) AS "w"`, WithinAny(db, buildID, starts)).
 		ColumnExpr(`"w"."component_id"`).
 		Where(`"w"."component_id" IN (?)`, bun.List(namesakes)).
 		Scan(ctx, &reached); err != nil {
-		return nil, fmt.Errorf("read which replaced components are beneath component %d of build %d: %w",
-			componentID, buildID, err)
+		return nil, fmt.Errorf("read which replaced components are beneath components %v of build %d: %w",
+			starts, buildID, err)
 	}
 	return ReplacedAmong(replaced, reached), nil
 }

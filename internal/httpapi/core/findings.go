@@ -6,9 +6,11 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -299,6 +301,7 @@ type AtOneBuild struct {
 	BeneathVersion   string        `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 	BeneathEcosystem string        `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
 	BeneathNamespace string        `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
+	BeneathPurl      string        `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
 	Differs          bool          `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
 	AcrossVariants   VariantSpread `query:"across_variants" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
@@ -330,6 +333,54 @@ func BeneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 	return componentID, err
 }
 
+// BeneathStarts resolves what a list, a trend or a burndown is narrowed
+// beneath: one component by name, as BeneathIn, or every component of one
+// package identifier the build holds live, which is how a repository shipped
+// at several commits is asked. Empty where nothing was asked.
+//
+// Called with a scope the caller has already been authorized for, as
+// BeneathIn is. A package holding more than graph.MostStarts components is
+// refused, naming the single start to send instead.
+func BeneathStarts(ctx context.Context, in Deps, scope finding.Scope, name string,
+	which graph.Choice, pkg string) ([]int64, error) {
+
+	pkg = strings.TrimSpace(pkg)
+	switch {
+	case name != "" && pkg != "":
+		return nil, huma.Error422UnprocessableEntity(
+			"beneath and beneath_purl each name where a subtree starts: send one")
+	case pkg == "":
+		id, err := BeneathIn(ctx, in, scope, name, which)
+		if err != nil || id == nil {
+			return nil, err
+		}
+		return []int64{*id}, nil
+	}
+	chosen := graph.ParsePurlPrefix(pkg)
+	if chosen.Empty() || chosen.Path() {
+		return nil, huma.Error422UnprocessableEntity(
+			"beneath_purl is one package's identifier, such as pkg:github/sonic-net/sonic-swss;" +
+				" a path ending in a slash is many packages, which purl chooses")
+	}
+	buildID, err := oneBuild(ctx, in, scope)
+	if err != nil {
+		return nil, err
+	}
+	starts, err := graph.NewStore(in.DB.DB).ComponentsOf(ctx, buildID, chosen)
+	if err != nil {
+		return nil, WentWrong(in.Logger, "the components to narrow beneath could not be looked up", err)
+	}
+	switch {
+	case len(starts) == 0:
+		return nil, huma.Error404NotFound("this build holds no component of the package " + pkg)
+	case len(starts) > graph.MostStarts:
+		return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+			"this build holds %d components of the package %s, more than %d to start a subtree at:"+
+				" send beneath with beneath_version to start at one", len(starts), pkg, graph.MostStarts))
+	}
+	return starts, nil
+}
+
 // BeneathAt is BeneathIn answering the one build the walk is over as well.
 // Both nil where nothing was asked.
 func BeneathAt(ctx context.Context, in Deps, scope finding.Scope, name string,
@@ -337,21 +388,11 @@ func BeneathAt(ctx context.Context, in Deps, scope finding.Scope, name string,
 	if name == "" {
 		return nil, nil, nil
 	}
-	if scope.ProductID == nil {
-		return nil, nil, huma.Error422UnprocessableEntity(
-			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
-				" needs a product, a branch and a variant that name exactly one build")
-	}
-	buildIDs, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
+	buildID, err := oneBuild(ctx, in, scope)
 	if err != nil {
-		return nil, nil, WentWrong(in.Logger, "cannot tell which builds are in scope", err)
+		return nil, nil, err
 	}
-	if len(buildIDs) != 1 {
-		return nil, nil, huma.Error422UnprocessableEntity(
-			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
-				" needs a branch and a variant that name exactly one build")
-	}
-	componentID, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, buildIDs[0], name, which)
+	componentID, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, buildID, name, which)
 	if err != nil {
 		var several *graph.Ambiguous
 		if errors.As(err, &several) {
@@ -363,7 +404,27 @@ func BeneathAt(ctx context.Context, in Deps, scope finding.Scope, name string,
 				return huma.Error404NotFound("this build does not hold a component called " + name)
 			})
 	}
-	return &buildIDs[0], &componentID, nil
+	return &buildID, &componentID, nil
+}
+
+// oneBuild is the one build a subtree is walked over, refused where the scope
+// names no product or holds several builds.
+func oneBuild(ctx context.Context, in Deps, scope finding.Scope) (int64, error) {
+	if scope.ProductID == nil {
+		return 0, huma.Error422UnprocessableEntity(
+			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
+				" needs a product, a branch and a variant that name exactly one build")
+	}
+	buildIDs, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
+	if err != nil {
+		return 0, WentWrong(in.Logger, "cannot tell which builds are in scope", err)
+	}
+	if len(buildIDs) != 1 {
+		return 0, huma.Error422UnprocessableEntity(
+			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
+				" needs a branch and a variant that name exactly one build")
+	}
+	return buildIDs[0], nil
 }
 
 // RefusedFinding turns a store's refusal about a finding into an answer.

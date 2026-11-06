@@ -75,9 +75,9 @@ func ListNarrowed(ctx context.Context, in Deps, q ScopeQuery,
 			"across_variants=only needs a variant: name the one to ask what is specific to")
 	}
 	out.Store = finding.NewStore(in.DB.DB)
-	if filter.Beneath, err = BeneathIn(ctx, in, scope, at.Beneath, graph.Choice{
+	if filter.Beneath, err = BeneathStarts(ctx, in, scope, at.Beneath, graph.Choice{
 		Version: at.BeneathVersion, Ecosystem: at.BeneathEcosystem, Namespace: at.BeneathNamespace,
-	}); err != nil {
+	}, at.BeneathPurl); err != nil {
 		return out, err
 	}
 	out.Filter = filter

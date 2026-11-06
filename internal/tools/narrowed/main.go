@@ -69,6 +69,7 @@ var resolving = map[string]string{
 	"Describe":      "how a build is spelled on screen",
 	"ComponentAs":   "which component in that build a name stands for, at a stated version",
 	"ComponentAsIn": "the same, refused where the name is held twice",
+	"ComponentsOf":  "which components in that build a package identifier stands for",
 	"append":        "collecting resolved builds to ask about together",
 }
 
