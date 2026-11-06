@@ -568,6 +568,85 @@ func TestACheckLeavesTheReplacementsStatementTheLatest(t *testing.T) {
 	})
 }
 
+func TestARevisedStatementReachesTheReplacementsRowBesideACheckMatch(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		agent := at("acme-agent", "2.0.0")
+		route := at("libnl-route-3-200", "3.7.0")
+		// The library's consumer is reached through swss and acme-agent, then
+		// through acme-agent alone: the supplier's statement answers the
+		// occurrence in the replacement and not in the inventory it replaced,
+		// so the check's match shares the replacement's occurrence.
+		f := replacedInventoryOf(t, w, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, agent, route, libnl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: swss, Child: route},
+				{Parent: root, Child: agent}, {Parent: agent, Child: route},
+				{Parent: route, Child: libnl},
+			},
+		}, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, agent, route, libnl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss},
+				{Parent: root, Child: agent}, {Parent: agent, Child: route},
+				{Parent: route, Child: libnl},
+			},
+		})
+		f.published(t, "CVE-2026-0015", f.arrived.Add(24*time.Hour))
+		var productID int64
+		if err := f.db.NewSelect().TableExpr(`"build" AS "b"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+			ColumnExpr(`"st"."product_id"`).Where(`"b"."id" = ?`, f.build).Scan(ctx, &productID); err != nil {
+			t.Fatal(err)
+		}
+		person := w.DeclarePerson("supplier-reader@example.com", "Supplier reader", false)
+		who := access.NewPerson(person.ID, "supplier-reader@example.com", false,
+			map[int64][]access.Role{productID: {access.PublicTriage}}, person.PartyID)
+		state := func(justification, digest string) {
+			t.Helper()
+			claim := sbom.Suppression{Vulnerability: "CVE-2026-0015", Status: sbom.NotAffected,
+				Justification: justification}
+			target := sbom.Target{Purl: libnl.Purl, Name: libnl.Name, Version: libnl.Version,
+				Within: &sbom.Target{Purl: agent.Purl, Name: agent.Name}}
+			if _, _, err := finding.NewStore(f.db.DB).RecordStatements(ctx, who, productID, finding.Supplied{
+				Source: finding.FromVex, Publisher: "Acme Security", Document: "agent.openvex.json", Digest: digest,
+			}, []finding.Statement{finding.StatementOf(claim, target)}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		report := func() *dated {
+			return &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0015", libnl)}}
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		scan := func() {
+			t.Helper()
+			f.waiting(t)
+			if _, err := scanner.NewRunner(f.db, f.queue, report(), quiet, "test").Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		state("vulnerable_code_not_present", "sha256:1")
+		scan()
+		checking := f.check(t, report())
+		if checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want the replaced inventory's occurrence recorded", checking)
+		}
+		// The supplier revises the statement, and the next scan points the
+		// replacement's row at it.
+		state("vulnerable_code_not_in_execute_path", "sha256:2")
+		scan()
+		doc, err := vex.NewStore(f.db.DB).For(ctx, who,
+			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
+			fixture.ProductName, fixture.BranchName, fixture.CustomerVariant, false, vex.WithSuppliers)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(doc.Statements) != 1 || doc.Statements[0].Status != "not_affected" {
+			t.Errorf("the document states %+v after the revision, want the supplier's not_affected", doc.Statements)
+		}
+	})
+}
+
 func TestACheckWritesNothingTheReplacedInventoryHadPatched(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()

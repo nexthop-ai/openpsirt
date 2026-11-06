@@ -53,9 +53,23 @@ var libnlFixed = at("libnl-3-200", "3.9.0")
 // both and the scan of the first.
 func replacedInventory(t *testing.T, w *fixture.World) *checkFixture {
 	t.Helper()
-	ctx := t.Context()
 	f := &checkFixture{runFixture: newRun(t, w)}
 	f.rebuilt(t, libnlFixed)
+	return f.dated(t)
+}
+
+// replacedInventoryOf is replacedInventory with these two inventories.
+func replacedInventoryOf(t *testing.T, w *fixture.World, first, second graph.Snapshot) *checkFixture {
+	t.Helper()
+	f := &checkFixture{runFixture: newRunOf(t, w, first)}
+	f.rebuiltAs(t, second)
+	return f.dated(t)
+}
+
+// dated dates the two inventories and the scan of the first.
+func (f *checkFixture) dated(t *testing.T) *checkFixture {
+	t.Helper()
+	ctx := t.Context()
 
 	var scans []int64
 	if err := f.db.NewSelect().TableExpr(`"scan"`).ColumnExpr(`"id"`).

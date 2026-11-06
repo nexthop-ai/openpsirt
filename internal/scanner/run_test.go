@@ -91,6 +91,17 @@ func eachRun(t *testing.T, fn func(t *testing.T, f *runFixture)) {
 // newRun stores the inventory the build shipped in the world w seeded.
 func newRun(t *testing.T, w *fixture.World) *runFixture {
 	t.Helper()
+	return newRunOf(t, w, graph.Snapshot{
+		Root: root, Components: []graph.Described{swss, libnl},
+		Dependencies: []graph.Dependency{
+			{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
+		},
+	})
+}
+
+// newRunOf is newRun with the build shipping this inventory.
+func newRunOf(t *testing.T, w *fixture.World, shipped graph.Snapshot) *runFixture {
+	t.Helper()
 	ctx := t.Context()
 	db := w.DB
 	build := w.Build
@@ -103,12 +114,7 @@ func newRun(t *testing.T, w *fixture.World) *runFixture {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	_, err = fixture.ApplyGraph(ctx, db.DB, build.ID, scan.ID, graph.Snapshot{
-		Root: root, Components: []graph.Described{swss, libnl},
-		Dependencies: []graph.Dependency{
-			{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
-		},
-	})
+	_, err = fixture.ApplyGraph(ctx, db.DB, build.ID, scan.ID, shipped)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,6 +330,17 @@ func (f *runFixture) decided(t *testing.T) int64 {
 // rebuilt stores a second inventory, optionally moving the library's version.
 func (f *runFixture) rebuilt(t *testing.T, library graph.Described) {
 	t.Helper()
+	f.rebuiltAs(t, graph.Snapshot{
+		Root: root, Components: []graph.Described{swss, library},
+		Dependencies: []graph.Dependency{
+			{Parent: root, Child: swss}, {Parent: swss, Child: library},
+		},
+	})
+}
+
+// rebuiltAs stores a second inventory holding this graph.
+func (f *runFixture) rebuiltAs(t *testing.T, shipped graph.Snapshot) {
+	t.Helper()
 	ctx := t.Context()
 	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
 		BuildID: f.build, ContentHash: "hash-2",
@@ -332,12 +349,7 @@ func (f *runFixture) rebuilt(t *testing.T, library graph.Described) {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.build, scan.ID, graph.Snapshot{
-		Root: root, Components: []graph.Described{swss, library},
-		Dependencies: []graph.Dependency{
-			{Parent: root, Child: swss}, {Parent: swss, Child: library},
-		},
-	}); err != nil {
+	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.build, scan.ID, shipped); err != nil {
 		t.Fatal(err)
 	}
 }
