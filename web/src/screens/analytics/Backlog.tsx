@@ -126,9 +126,7 @@ export function Backlog() {
             <Pace points={points} unit={daily ? "days" : "weeks"} />
             <PaceLegend />
             <p className="hint">
-              Counted once per issue in each package, not per occurrence. An issue that comes back
-              is returned, and stops counting as corrected; one back after an upload lost most of a
-              build is marked instead.
+              Once per issue in each package. Back after a lost build: a mark, not a bar.
             </p>
           </section>
 
