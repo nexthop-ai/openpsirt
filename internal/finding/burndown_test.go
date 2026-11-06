@@ -353,7 +353,7 @@ func TestADayZeroMoreThanTheWidestWindowBackIsMovedToItsStart(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.fourIssues(t)
 		b := f.burndownSince(t, ago(800), "", finding.Within{})
-		want := time.Now().UTC().Truncate(24*time.Hour).Add(-(finding.MostBurndownDays - 1) * 24 * time.Hour)
+		want := time.Now().UTC().Truncate(24 * time.Hour).Add(-(finding.MostBurndownDays - 1) * 24 * time.Hour)
 		if !b.Since.Equal(want) || len(b.Points) != finding.MostBurndownDays {
 			t.Errorf("started on %s over %d days, want %s over %d", b.Since, len(b.Points), want, finding.MostBurndownDays)
 		}
@@ -373,4 +373,26 @@ func TestAChosenNameIsNamedWhereNothingOfItReachesTheSeverity(t *testing.T) {
 			t.Errorf("chose %+v (more: %v), want teamd's one package", b.Chosen, b.MoreChosen)
 		}
 	})
+}
+
+func TestABurndownMarksAReturnAfterASharpRemovalAndCountsASmallOneAsReturned(t *testing.T) {
+	for name, c := range map[string]struct {
+		removed            func() graph.Snapshot
+		restored, returned int
+	}{
+		"the whole inventory lost": {rootOnly, 1, 0},
+		"one package of fifteen":   {func() graph.Snapshot { return widened(libnl) }, 0, 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				f.scannedAt(t, widened(), ago(20), found("CVE-2026-1", libnl))
+				f.scannedAt(t, c.removed(), ago(10))
+				f.scannedAt(t, widened(), ago(9), found("CVE-2026-1", libnl))
+				got := burnedOver(f.burndown(t, "", finding.Within{}))
+				if got.restored != c.restored || got.returned != c.returned || got.left != 1 {
+					t.Errorf("counted %+v, want %d restored, %d returned and one left", got, c.restored, c.returned)
+				}
+			})
+		})
+	}
 }

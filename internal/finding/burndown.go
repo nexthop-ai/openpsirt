@@ -197,11 +197,6 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 	if err != nil {
 		return nil, err
 	}
-	sharp, err := s.sharpRemovals(ctx, rows, before)
-	if err != nil {
-		return nil, err
-	}
-
 	day := 24 * time.Hour
 	// bound(j) is the j-th boundary: day 0's start, then each day's end.
 	bound := func(j int) time.Time { return since.Add(time.Duration(j) * day) }
@@ -222,6 +217,13 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 		}
 	}
 
+	// A return back from absent is judged after every identity is read, so
+	// the uploads deciding them are worked out in one pass.
+	type comeBack struct {
+		day     int
+		closure *trendRow
+	}
+	var absent []comeBack
 	present := make([]bool, days+1)
 	left := make([]bool, days+1)
 	held := make([]string, days+1)
@@ -286,8 +288,8 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 					// Back from absent after a sharp removal is the inventory
 					// put right; anything else back is returned, a dismissal
 					// that stopped standing included.
-					if !present[k] && sharp.removed(lastClosure(group, before[one.id], bound(k))) {
-						points[k].Restored++
+					if !present[k] {
+						absent = append(absent, comeBack{k, lastClosure(group, before[one.id], bound(k))})
 					} else {
 						points[k].Returned++
 					}
@@ -312,6 +314,21 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 					points[k].Dismissed++
 				}
 			}
+		}
+	}
+	closures := make([]*trendRow, 0, len(absent))
+	for _, r := range absent {
+		closures = append(closures, r.closure)
+	}
+	sharp, err := s.sharpRemovals(ctx, closures)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range absent {
+		if sharp[r.closure] {
+			points[r.day].Restored++
+		} else {
+			points[r.day].Returned++
 		}
 	}
 	out.Points = points
