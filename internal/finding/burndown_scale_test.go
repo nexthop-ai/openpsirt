@@ -4,8 +4,10 @@
 //go:build measure
 
 // What the burndown and the by-repository list cost on the full-size image
-// with thirteen weeks of history: a first scan, twelve weekly rescans fixing
-// some of it and bringing a little back, and dismissals in force.
+// with thirteen weeks of history: a first scan, and twelve weekly rescans each
+// moving the version of some packages, which fixes their issues and replaces
+// their components, dropping the issue from as many more without a move, and
+// the last bringing a little back; and dismissals in force.
 //
 // Behind a build tag because it is a measurement and not a gate. `make
 // measure` runs it.
@@ -33,7 +35,7 @@ const repositories = 30
 
 func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 	doc := fullSizeImage(t)
-	catalogSeed.Two(t, func(t *testing.T, db *database.DB, c seededCatalog) {
+	catalogSeed.Each(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		f := &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
 			build: c.build, productID: c.product, tag: c.tag, variant: c.variant,
@@ -80,15 +82,24 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 		t.Logf("%d packages by type %v, %d repositories over %d top-level components",
 			len(packages), types, repositories, len(tops))
 		gone := map[int]bool{}
+		// moved is the packages whose version a rescan moved, each with what
+		// it moved to.
+		moved := map[int]graph.Described{}
+		at := func(i int) graph.Described {
+			if c, ok := moved[i]; ok {
+				return c
+			}
+			return packages[i]
+		}
 		report := func(step int) []finding.Reported {
 			var out []finding.Reported
-			for i, c := range packages {
+			for i := range packages {
 				if gone[i] && (step != 12 || i%400 != 1) {
 					continue
 				}
 				out = append(out, finding.Reported{
 					Issue:     finding.Named{Identifier: fmt.Sprintf("CVE-2026-%05d", i), Severity: []string{"critical", "high", "medium", "low"}[i%4]},
-					Component: c,
+					Component: at(i),
 				})
 			}
 			for k := range kernelIssues - 1 {
@@ -101,15 +112,50 @@ func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
 			}
 			return out
 		}
+		// scanned is the image as a rescan describes it: each moved package
+		// at its new version, wherever it appears.
+		scanned := func() graph.Snapshot {
+			to := map[string]graph.Described{}
+			for i, c := range moved {
+				to[packages[i].Purl] = c
+			}
+			swap := func(d graph.Described) graph.Described {
+				if c, ok := to[d.Purl]; ok && d.Purl != "" {
+					return c
+				}
+				return d
+			}
+			out := snap
+			out.Components = make([]graph.Described, len(snap.Components))
+			for i, c := range snap.Components {
+				out.Components[i] = swap(c)
+			}
+			out.Dependencies = make([]graph.Dependency, len(snap.Dependencies))
+			for i, d := range snap.Dependencies {
+				out.Dependencies[i] = graph.Dependency{Parent: swap(d.Parent), Child: swap(d.Child)}
+			}
+			return out
+		}
 		for step := 0; step <= 12; step++ {
 			if step > 0 {
-				for i := range packages {
-					if i%100 == step {
-						gone[i] = true
+				for i, c := range packages {
+					if i%100 != step || i == kernel {
+						continue
+					}
+					gone[i] = true
+					if i%200 < 100 {
+						c.Version += ".1"
+						base, rest, _ := strings.Cut(c.Purl, "@")
+						version, tail, found := strings.Cut(rest, "?")
+						c.Purl = base + "@" + version + ".1"
+						if found {
+							c.Purl += "?" + tail
+						}
+						moved[i] = c
 					}
 				}
 			}
-			f.scannedAt(t, snap, ago(7*(13-step)), report(step)...)
+			f.scannedAt(t, scanned(), ago(7*(13-step)), report(step)...)
 		}
 		// Fifty package issues dismissed and agreed four weeks back.
 		agreed := ago(28)
