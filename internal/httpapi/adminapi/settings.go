@@ -206,7 +206,8 @@ var settable = []struct {
 		setting.Duration, nil, func(core.Deps) string { return setting.DefaultVulnerabilityDataStaleAfter.String() }, false},
 	{setting.DeltaShare, "Inventory change share", setting.Scanning,
 		"The share of a build's inventory one upload may move before readers are told",
-		"Both this and the inventory change floor have to be passed, so three names moving in a small inventory is not reported every time.",
+		"Both this and the inventory change floor have to be passed, so three names moving in a small inventory is not reported every time. " +
+			"Together they also decide which returns the backlog trend marks as after a gap, past ones included, so a change re-reads its history.",
 		setting.Percent, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultDeltaShare) }, false},
 	{setting.PairShare, "Approval pair share", setting.Triage,
 		"The share of a product's agreements one pair may reach before administrators are told",
@@ -218,7 +219,7 @@ var settable = []struct {
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultPairApprovers) }, false},
 	{setting.DeltaFloor, "Inventory change floor", setting.Scanning,
 		"The fewest component names an upload must move to be reported",
-		"",
+		"With the inventory change share, it also decides which returns the backlog trend marks as after a gap, past ones included.",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultDeltaFloor) }, false},
 	{setting.AnalysisDropShare, "Analyzer drop share", setting.Scanning,
 		"The share of a build's analyzer results one run no longer detects, to raise an alert",
