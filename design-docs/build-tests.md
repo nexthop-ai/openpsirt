@@ -15,6 +15,7 @@ Satisfies REQ-75.
 - [The race pass](#the-race-pass)
 - [Engine selection](#engine-selection)
 - [Commit durability](#commit-durability)
+- [In-package test files](#in-package-test-files)
 - [Limits](#limits)
 
 ## Database engines
@@ -227,6 +228,18 @@ durability protects nothing and is most of a run's cost.
 
 `design-docs/build-measurements.md` § Commit durability has the timings.
 
+## In-package test files
+
+A test file in a package's own namespace builds a variant of the package for
+its test binary, and every package that binary holds which imports it is
+compiled again against that variant: the harness, the seeded world, and the
+findings package between them.
+
+| Rule | Reason |
+|---|---|
+| A package the harness or the seeded world imports tests through its exported surface where it can | The trail's tests build in 0.67 s against 2.4 to 3.1 s after a change to the findings package |
+| A test needing a moment the store stamps writes the row, then moves its timestamp in the database | The store's clock is unexported, and exporting it for a test is exported code with no caller |
+
 ## Limits
 
 | Limit | Detail |
@@ -236,3 +249,4 @@ durability protects nothing and is most of a run's cost.
 | Checkouts of two schemas running at once drop each other's free databases | Each drop costs the other one build |
 | The clean trusts the slot lock alone | A database used without its lock is dropped in use |
 | A check needing a running server refuses, never skips | A skip passes |
+| The graph, inventory reader, currency and access packages keep in-package test files | Each exposes an unexported value, bound or clock to its tests, and exporting one would be for a test alone; their test binaries still compile the packages between them and the harness twice |

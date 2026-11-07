@@ -134,8 +134,10 @@ four minutes four seconds.
 
 ## Gate build work
 
-Rules in `design-docs/build.md` § Make targets and `design-docs/build-tests.md`
-§ The race pass. Twelve local cores, Go 1.27.3.
+Rules in `design-docs/build.md` § Make targets, `design-docs/build.md` § Static
+analysis, `design-docs/build-tests.md` § The race pass and
+`design-docs/build-tests.md` § In-package test files. Twelve local cores, Go
+1.27.3.
 
 | Work | Before | After |
 |---|---|---|
@@ -146,3 +148,4 @@ Rules in `design-docs/build.md` § Make targets and `design-docs/build-tests.md`
 | Linking the largest API test binary | 1.25 s wall, 1.65 s processor; 52 MB | 0.93 s, 1.10 s; 41 MB |
 | The server pass over the packages reaching no database, cold build cache | 3.2 s wall, 10.8 s processor | Not run |
 | The same, warm | 2.3 to 3.1 s wall, 7.4 s processor | Not run |
+| Building the trail's test binary after an exported change in the findings package | 2.4 to 3.1 s wall, 5.8 s processor | 0.67 s, 0.85 s |

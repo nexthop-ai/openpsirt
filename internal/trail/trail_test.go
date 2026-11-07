@@ -23,23 +23,41 @@ import (
 // state this store exists to end.
 func each(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject)) {
 	t.Helper()
+	eachOn(t, func(t *testing.T, s *trail.Store, by access.Subject, _ bun.IDB) { fn(t, s, by) })
+}
+
+// eachOn is each with the database, for a test that restamps what it wrote.
+func eachOn(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject, db bun.IDB)) {
+	t.Helper()
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		admin := w.DeclarePerson("admin@example.com", "Alex Admin", true)
 		fn(t, trail.NewStore(w.DB.DB),
-			access.NewPerson(admin.ID, admin.Identity, true, nil, 0))
+			access.NewPerson(admin.ID, admin.Identity, true, nil, 0), w.DB.DB)
 	})
+}
+
+// restamp moves the changes recorded about a name, or every change where the
+// name is empty, to one moment: rows sharing a timestamp, or sitting either
+// side of a boundary, are what a reader is tested against, and the store
+// stamps the time it writes.
+func restamp(t *testing.T, db bun.IDB, at time.Time, name string) {
+	t.Helper()
+	q := db.NewUpdate().Table("admin_change").Set(`"at" = ?`, at)
+	if name == "" {
+		q = q.Where(`"id" IS NOT NULL`)
+	} else {
+		q = q.Where(`"about" = ?`, name)
+	}
+	if _, err := q.Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 	// The store's writes and the ordering its reader depends on run here on
 	// all four engines; the handlers above it run on two.
-	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+	eachOn(t, func(t *testing.T, s *trail.Store, by access.Subject, db bun.IDB) {
 		ctx := t.Context()
-		// Every row shares one instant, so the order below is the tie-break
-		// alone: changes written inside one microsecond — one request
-		// granting several roles — are the case a paged reader meets.
-		at := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
-		s.SetClock(func() time.Time { return at })
 
 		// Absent before means nobody had set it; absent after means it was
 		// cleared. The two are different acts and a blank cannot tell them
@@ -58,6 +76,10 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		// Every row shares one instant, so the order below is the tie-break
+		// alone: changes written inside one microsecond — one request
+		// granting several roles — are the case a paged reader meets.
+		restamp(t, db, time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC), "")
 
 		all, total, err := s.Changes(ctx, by, "", trail.Over{}, 100, 0)
 		if err != nil {
@@ -362,7 +384,7 @@ func TestConfigurationsAdministratorsAreRecordedAgainstConfiguration(t *testing.
 // the boundary belongs to one of the two and never both, so the start is
 // included and the end is not.
 func TestTheTrailPeriodIsHalfOpen(t *testing.T) {
-	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
+	eachOn(t, func(t *testing.T, s *trail.Store, by access.Subject, db bun.IDB) {
 		ctx := t.Context()
 		boundary := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		for _, one := range []struct {
@@ -373,10 +395,10 @@ func TestTheTrailPeriodIsHalfOpen(t *testing.T) {
 			{"at", boundary},
 			{"after", boundary.Add(time.Second)},
 		} {
-			s.SetClock(func() time.Time { return one.at })
 			if err := s.Record(ctx, by, trail.Setting, one.name, nil, trail.Said("x", true)); err != nil {
 				t.Fatal(err)
 			}
+			restamp(t, db, one.at, one.name)
 		}
 
 		for _, want := range []struct {
