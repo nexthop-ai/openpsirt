@@ -305,7 +305,7 @@ func TestTheCleanLeavesAHeldSlotAndDropsAnUnheldOne(t *testing.T) {
 			}
 		}
 
-		dropped, kept, err := dropUnheld(ctx, engine, base, namespace, nil)
+		dropped, kept, err := dropUnheld(ctx, engine, base, namespace, nil, true)
 		if err != nil {
 			t.Fatalf("clean: %v", err)
 		}
@@ -401,6 +401,12 @@ func TestAStaleDatabaseThatWillNotDropLeavesTheLeaseStanding(t *testing.T) {
 			}
 			if !slices.Contains(left, stale.key) {
 				t.Errorf("the stale database was dropped, so no drop was refused: %v", left)
+			}
+			// A binary killed before its cleanup leaves the mark, and the
+			// clean drops the database regardless.
+			dropped, _, err := dropUnheld(ctx, engine, base, namespace, nil, true)
+			if err != nil || !slices.Contains(dropped, stale.key) {
+				t.Errorf("the clean dropped %v, want the template %s among them: %v", dropped, stale.key, err)
 			}
 		}
 	})

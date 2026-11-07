@@ -243,7 +243,7 @@ func dropStale(ctx context.Context, engine database.Engine, base, namespace, own
 		match := shape.FindStringSubmatch(name)
 		return match != nil && (mine == nil || match[1] != mine[1])
 	}
-	_, _, err := dropUnheld(ctx, engine, base, namespace, stale)
+	_, _, err := dropUnheld(ctx, engine, base, namespace, stale, false)
 	return err
 }
 
@@ -266,7 +266,7 @@ func CleanServers(ctx context.Context, out io.Writer) error {
 			continue
 		}
 		cleaned++
-		dropped, held, err := dropUnheld(ctx, c.name, base, harnessPrefix, nil)
+		dropped, held, err := dropUnheld(ctx, c.name, base, harnessPrefix, nil, true)
 		_, _ = fmt.Fprintf(out, "%s: dropped %d databases, left %d a running test holds\n",
 			c.name, len(dropped), len(held))
 		if err != nil {
@@ -284,11 +284,18 @@ func CleanServers(ctx context.Context, out io.Writer) error {
 // It returns the names it dropped and the names it left because a lease holds
 // them.
 //
+// Where templates is set, a PostgreSQL database is first marked not a
+// template, which PostgreSQL refuses to drop. A test marks a stale database a
+// template to have its drop refused at once, and a binary killed before its
+// cleanup leaves the mark; the clean sets it, and a lease's housekeeping does
+// not, so the refusal still reaches the lease.
+//
 // Whether a database is held is asked by taking each of its locks without
 // waiting, on a connection of this function's own, and the locks are kept
 // across the drop. A check followed by a drop would leave a moment in which a
 // test binary leases the slot and starts using the database being dropped.
-func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string, want func(string) bool) (dropped, held []string, err error) {
+func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string, want func(string) bool,
+	templates bool) (dropped, held []string, err error) {
 	locks, err := lockBase(base, engine)
 	if err != nil {
 		return nil, nil, err
@@ -319,6 +326,11 @@ func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string
 		}
 		if err == nil && !free {
 			held = append(held, name)
+		}
+		if err == nil && free && templates && engine == database.Postgres {
+			if _, err := conn.ExecContext(ctx, `ALTER DATABASE "`+name+`" IS_TEMPLATE false`); err != nil {
+				errs = append(errs, fmt.Errorf("mark %s not a template: %w", name, err))
+			}
 		}
 		if err == nil && free {
 			if _, err := conn.ExecContext(ctx, `DROP DATABASE IF EXISTS "`+name+`"`); err != nil {
