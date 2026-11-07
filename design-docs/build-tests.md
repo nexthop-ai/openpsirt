@@ -32,7 +32,10 @@ writes their URLs to the git-ignored `local.mk`, which the makefile includes.
 | Each listens on loopback alone | They carry the password `test` |
 | `local.mk` is never overwritten | It may point at an operator's own servers |
 | Starting is idempotent: a running engine is left, a stopped container started | |
-| Images are pinned by tag and digest, compared against CI's in both directions by CI, and `pins-check` refuses a workflow service named by tag alone | A local pass means CI's only on the same servers. Dependabot reads no workflow service, so both lists move by hand |
+| CI starts its servers with `make engines-up`, from the same one list | A local pass means CI's only on the same servers |
+| Images are pinned by tag and digest; `pins-check` refuses one named by tag alone, a list naming none, and a workflow declaring a container of its own | A tag moves under a rebuild, and a workflow's container is a second list. Dependabot reads no makefile, so the list moves by hand |
+| The four are pulled and started at once, and a failure in any fails the target | |
+| Each data directory is in memory under a cap: 1 GB PostgreSQL, 3 GB MySQL and MariaDB, 256 MB the floor server | Past it a write fails as a full disk on that server; unbounded, the four grow into the memory the tests run in. Two weeks of a workstation's runs left 349 MB, 1.6 GB, 1.6 GB and 47 MB, and the caps leave a 16 GB runner over 8 GB |
 | One server is below the supported version floor | The old-server refusal is exercised |
 | The URLs are read when make starts | The run writing `local.mk` is not the run using it |
 
@@ -262,10 +265,9 @@ durability protects nothing and is most of a run's cost.
 |---|---|
 | A server's globals change only where it is declared a throwaway | `make engines-up` writes `OPENPSIRT_TEST_RELAX_DURABILITY ?= 1` into a new `local.mk`, and CI sets it. Elsewhere the server keeps its durability and the test pinning the settings skips |
 | Nothing a test observes changes | The settings govern crash survival alone |
-| The harness asks from the connection | It reaches a workflow's service container, which takes no command line. Relaxed, the server packages take 77 s against 240 s on a workstation; a GitHub runner's pass does not move |
+| The harness asks from the connection | It reaches a server somebody else started, which takes no command line from here. Relaxed, the server packages take 77 s against 240 s on a workstation; a GitHub runner's pass on disk did not move |
 | `make engines-up` also passes the same intent on the server's command line at startup | It reaches settings an engine accepts only there |
-| A server `make engines-up` starts keeps its data directory in memory | A schema change syncs its files whatever the settings: 0.83 s against 9.8 s on MySQL |
-| CI services keep their data on disk | A runner's memory is what the suite runs in, and its disk pays little for a schema change |
+| A server `make engines-up` starts keeps its data directory in memory, CI's included | A schema change syncs its files whatever the settings: 0.83 s against 9.8 s on MySQL. The cap bounds what it takes (§ Database engines) |
 | A restarted container has lost its databases, and the harness migrates new ones | |
 | A test reads the setting back and fails where it is durable on a connection that could change it | It separates a harness that stopped asking from a server nobody may configure, which runs slower |
 

@@ -5,16 +5,14 @@
 # and emptying them, and the check that all four engines ran and were the
 # engines they claimed to be.
 
-.PHONY: check-engines engines-up engines-down engines-clean engines-status engines-check
+.PHONY: check-engines engines-up engines-down engines-clean engines-status
 
-# The servers the test URLs point at, as containers. Pinned for the same reason
-# every Go tool is, and to the versions CI runs: an engine that has drifted
-# from CI's turns "it passed locally" into a different claim from "it passes".
-# Two pinned lists in two files drift silently, so "engines-check" asserts they
-# still agree rather than trusting that whoever moved one moved the other. Each
-# is named by digest as well as tag, because a tag is moved by a rebuild
-# upstream, and "pins-check" refuses one named by tag alone. Dependabot reads
-# no workflow service, so these move by hand, the two lists together.
+# The servers the test URLs point at, as containers, and the one list of them:
+# CI starts its servers with "engines-up" too, so a local pass and CI's run the
+# same servers. Each is named by digest as well as tag, because a tag is moved
+# by a rebuild upstream, and "pins-check" refuses one named by tag alone and a
+# workflow declaring a server of its own. Dependabot reads no makefile, so these
+# move by hand.
 ENGINE_PG_IMAGE      ?= postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
 ENGINE_MYSQL_IMAGE   ?= mysql:8.4@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70
 ENGINE_MARIADB_IMAGE ?= mariadb:11.4@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6
@@ -29,6 +27,17 @@ ENGINE_PREFIX        ?= openpsirt
 # Seconds to wait for a server to start accepting connections. A container
 # reported "Up" is not one that answers yet, and MySQL takes the longest.
 ENGINE_WAIT          ?= 120
+# The most each server's data directory holds in memory. Past it a write fails
+# as a full disk on that server alone, where an unbounded directory grows into
+# the memory the suite runs in. After two weeks of a workstation's runs the
+# directories held 349 MB on PostgreSQL, 1.6 GB on MySQL and on MariaDB, and
+# 47 MB on the floor server; each cap is about twice that, and the four
+# together leave a 16 GB runner over 8 GB for the servers' own memory and the
+# tests.
+ENGINE_PG_DATA       ?= 1g
+ENGINE_MYSQL_DATA    ?= 3g
+ENGINE_MARIADB_DATA  ?= 3g
+ENGINE_FLOOR_DATA    ?= 256m
 
 # Everything CI's test job asserts beyond the suite passing.
 #
@@ -126,19 +135,20 @@ PG_AS_A_TEST_SERVER := -c fsync=off -c synchronous_commit=off -c full_page_write
 MY_AS_A_TEST_SERVER := --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=0 \
 	--sync-binlog=0 --skip-log-bin
 
-# The data directories are in memory. The settings above govern commits, and a
-# schema change syncs the files it creates whatever they say: building the
-# schema took MySQL 9.8 s and MariaDB 7.2 s on a workstation's disk and
-# 0.83 s and 0.18 s in memory. A stopped container loses its databases, which
-# the harness answers by migrating again. CI keeps its servers on disk: the
-# runner's memory is what the suite runs in, and its disk pays little for DDL.
-PG_TEST_DATA := --tmpfs /var/lib/postgresql/data
-MY_TEST_DATA := --tmpfs /var/lib/mysql
+# The data directories are in memory, each under its cap above. The settings
+# above govern commits, and a schema change syncs the files it creates whatever
+# they say: building the schema took MySQL 9.8 s and MariaDB 7.2 s on a
+# workstation's disk and 0.83 s and 0.18 s in memory. A stopped container loses
+# its databases, which the harness answers by migrating again.
+PG_DATA_DIR := /var/lib/postgresql/data
+MY_DATA_DIR := /var/lib/mysql
 
-engines-up: engines-check
+engines-up:
 	@# Everything up to "--" belongs to docker and everything after it to the
 	@# server: the tuning below is the server's own command line, and passed as
 	@# a docker option it is read as one — "-c fsync=off" is --cpu-shares.
+	@# The four are pulled and started at once, and a failure in any fails the
+	@# target.
 	@set -u; \
 	up() { \
 	  name="$$1"; image="$$2"; ports="$$3"; shift 3; \
@@ -155,13 +165,18 @@ engines-up: engines-check
 	  echo "  $$name: created from $$image"; \
 	}; \
 	up $(ENGINE_PREFIX)-pg16 $(ENGINE_PG_IMAGE) 127.0.0.1:$(ENGINE_PG_PORT):5432 \
-	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER); \
+	   --tmpfs $(PG_DATA_DIR):size=$(ENGINE_PG_DATA) \
+	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER) & \
 	up $(ENGINE_PREFIX)-mysql $(ENGINE_MYSQL_IMAGE) 127.0.0.1:$(ENGINE_MYSQL_PORT):3306 \
-	   $(MY_TEST_DATA) -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
+	   --tmpfs $(MY_DATA_DIR):size=$(ENGINE_MYSQL_DATA) \
+	   -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER) & \
 	up $(ENGINE_PREFIX)-mariadb $(ENGINE_MARIADB_IMAGE) 127.0.0.1:$(ENGINE_MARIADB_PORT):3306 \
-	   $(MY_TEST_DATA) -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
+	   --tmpfs $(MY_DATA_DIR):size=$(ENGINE_MARIADB_DATA) \
+	   -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER) & \
 	up $(ENGINE_PREFIX)-floor $(ENGINE_FLOOR_IMAGE) 127.0.0.1:$(ENGINE_FLOOR_PORT):5432 \
-	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER)
+	   --tmpfs $(PG_DATA_DIR):size=$(ENGINE_FLOOR_DATA) \
+	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER) & \
+	failed=0; for job in $$(jobs -p); do wait "$$job" || failed=1; done; exit $$failed
 	@# A container reported "Up" is not one that answers. Each server is asked
 	@# with its own client, inside its own container, so nothing here depends on
 	@# a client being installed on this machine. MariaDB renamed mysqladmin to
@@ -236,9 +251,18 @@ engines-down:
 engines-clean:
 	$(GO) run ./internal/tools/dbclean
 
+# Each server's state, and for a running one its memory and how full its data
+# directory is, which CI prints at the end of every run.
 engines-status:
 	@$(DOCKER) ps -a --filter "name=^$(ENGINE_PREFIX)-" \
 	  --format '{{.Names}}: {{.Image}}, {{.Status}}' | sed 's/^/  /' || true
+	@for name in $(ENGINE_PREFIX)-pg16 $(ENGINE_PREFIX)-mysql $(ENGINE_PREFIX)-mariadb $(ENGINE_PREFIX)-floor; do \
+	  [ -n "$$($(DOCKER) ps -q -f name="^$$name$$" 2>/dev/null)" ] || continue; \
+	  memory=$$($(DOCKER) stats --no-stream --format '{{.MemUsage}}' "$$name" 2>/dev/null || true); \
+	  data=$$($(DOCKER) exec "$$name" df -h $(PG_DATA_DIR) $(MY_DATA_DIR) 2>/dev/null \
+	    | awk 'NR > 1 { print $$3 " of " $$2 }' || true); \
+	  echo "  $$name: memory $$memory; data $$data"; \
+	done
 ifeq ($(ENGINES_MISSING),)
 	@echo "  configured: postgres, mysql, mariadb"
 else
@@ -248,21 +272,3 @@ endif
 ifeq ($(strip $(OPENPSIRT_TEST_TOO_OLD_URL)),)
 	@echo "  NOT configured: the below-floor server, so the version refusal is skipped."
 endif
-
-# That the engines started here are the engines CI runs. Two pinned lists in
-# two files drift, and the drift is invisible exactly when it matters: a suite
-# green against MariaDB 11.4 says nothing about the 11.8 CI moved to. Checked
-# in both directions, so an engine CI adds and this does not start is caught
-# as well as the reverse.
-engines-check:
-	@ours="$(ENGINE_PG_IMAGE) $(ENGINE_MYSQL_IMAGE) $(ENGINE_MARIADB_IMAGE) $(ENGINE_FLOOR_IMAGE)"; \
-	theirs=$$(grep -oE '^[[:space:]]+image: [^[:space:]]+' .github/workflows/ci.yml \
-	  | awk '{print $$2}' | sort -u); \
-	for image in $$ours; do \
-	  echo "$$theirs" | grep -qxF "$$image" \
-	    || { echo "$$image is pinned here, and CI runs no such server."; exit 1; }; \
-	done; \
-	for image in $$theirs; do \
-	  printf '%s\n' $$ours | grep -qxF "$$image" \
-	    || { echo "CI runs $$image, and nothing here starts one."; exit 1; }; \
-	done

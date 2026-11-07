@@ -255,9 +255,10 @@ analysis, `design-docs/build-tests.md` § The race pass and
 
 ## Gate work outside the tests
 
-Rules in `design-docs/build.md` § Static analysis and
-`design-docs/build-interface.md` § Interface tools. Four cores of a
-workstation, Go 1.27.3.
+Rules in `design-docs/build.md` § CI jobs, `design-docs/build.md` § CI caches,
+`design-docs/build.md` § Static analysis, `design-docs/build-tests.md`
+§ Database engines and `design-docs/build-interface.md` § Interface tools.
+Four cores of a workstation, Go 1.27.3, unless a row says CI.
 
 | `make vet-other-os` | Every package on macOS, the upload client on Windows | The packages whose files differ, per system |
 |---|---|---|
@@ -276,3 +277,17 @@ settings package and the migration runner on Windows.
 | Prettier | 3.9 to 4.6 s | 0.6 s |
 
 The three caches are 115 kB, 194 kB and 113 kB.
+
+| Database servers | Measured |
+|---|---|
+| CI's four service containers, started before the checkout, six runs on `main` | 29 to 51 s |
+| `make engines-up`, images present, four at once, to all answering | 6 s |
+| A fresh data directory: PostgreSQL, MySQL, MariaDB, the floor server | 46 MB, 190 MB, 162 MB, 47 MB |
+| The same servers' memory | 100 MB, 641 MB, 290 MB, 86 MB |
+| A workstation's after two weeks of runs | 349 MB, 1.6 GB, 1.6 GB, 47 MB of data; 472 MB, 2.8 GB, 2.5 GB, 16 MB of memory |
+| A write past a 128 MB cap on PostgreSQL | Refused: no space left on device |
+
+A module cache filled by every target of `make check` but the tests, and a
+build of every test binary, held 1,839 MB, 453 MB of it downloaded archives.
+With the archives deleted and the module proxy off, every target passed again
+and no archive was fetched.

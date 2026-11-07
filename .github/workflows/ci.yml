@@ -53,64 +53,39 @@ jobs:
     # All four supported engines run the same suite. SQLite alone would catch
     # none of the portability traps the design is written around, so a green
     # run here is the only thing that makes "runs on four engines" a fact.
-    services:
-      postgres:
-        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
-        env:
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: openpsirt
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-      mysql:
-        image: mysql:8.4@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70
-        env:
-          MYSQL_ROOT_PASSWORD: test
-          MYSQL_DATABASE: openpsirt
-        ports: ["3306:3306"]
-        options: >-
-          --health-cmd "mysqladmin ping -ptest --silent" --health-interval 5s
-          --health-timeout 5s --health-retries 20
-      # Deliberately below the floor, so the refusal is exercised. Without it
-      # that test skips in every run, and the design claims it is proved.
-      postgres-old:
-        image: postgres:13-alpine@sha256:fb9065b6e3e213bdc07edd372a5b2a26245840b7fb65d1fd8b6700106d51805c
-        env:
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: openpsirt
-        ports: ["5433:5432"]
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-      mariadb:
-        image: mariadb:11.4@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6
-        env:
-          MARIADB_ROOT_PASSWORD: test
-          MARIADB_DATABASE: openpsirt
-        ports: ["3307:3306"]
-        options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
-          --health-interval 5s --health-timeout 5s --health-retries 20
+    #
+    # The servers are the ones "make engines-up" starts, from the one list in
+    # mk/engines.mk, so a developer's pass and this one run the same servers.
+    # A job's service containers start one after another before the checkout,
+    # 29 to 51 s; started by a step, they pull and start while the toolchains
+    # and caches are restored.
 
     env:
-      # Whether this run writes the Go build and linter caches. One spelling,
-      # read by the steps that mark, prune and save them.
+      # Whether this run writes the Go build, linter and interface caches.
+      # One spelling, read by the steps that mark, prune and save them.
       SAVES_CACHES: ${{ github.ref == 'refs/heads/main' }}
       OPENPSIRT_TEST_POSTGRES_URL: postgres://postgres:test@127.0.0.1:5432/openpsirt?sslmode=disable
       OPENPSIRT_TEST_MYSQL_URL: mysql://root:test@127.0.0.1:3306/openpsirt
       OPENPSIRT_TEST_MARIADB_URL: mariadb://root:test@127.0.0.1:3307/openpsirt
       OPENPSIRT_TEST_TOO_OLD_URL: postgres://postgres:test@127.0.0.1:5433/openpsirt?sslmode=disable
-      # The service containers are throwaways, so the harness may turn off
-      # their commit durability, which is global on MySQL and MariaDB.
+      # The servers are throwaways, so the harness may turn off their commit
+      # durability, which is global on MySQL and MariaDB.
       OPENPSIRT_TEST_RELAX_DURABILITY: "1"
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # The whole history, so the vulnerability gates can find where this
-          # change left main and fail only what it introduced.
+          # change left main and fail only what it introduced. Commits and
+          # trees alone: the few files read from the base are fetched as read.
           fetch-depth: 0
+          filter: blob:none
+      # In the background, so the pulls and the servers' start overlap the
+      # steps below; the step before "make check" waits for it.
+      - name: Start the database servers
+        run: |
+          ( status=0; make engines-up > "$RUNNER_TEMP/engines.log" 2>&1 || status=$?
+            echo "$status" > "$RUNNER_TEMP/engines.status" ) > /dev/null 2>&1 &
       # The Go release is the one the image builds with. The Dockerfile's
       # golang tag is the one pin of the patch, and go.mod's go line is only
       # the oldest release the module accepts.
@@ -129,10 +104,14 @@ jobs:
           # of the two below, and grows to hold the merged copy.
           cache: false
       # The modules, keyed on what decides their content: the module's own and
-      # each tool's under tools/, which the same directory holds.
+      # each tool's under tools/, which the same directory holds. The
+      # downloaded archives are left out: every module is also kept extracted,
+      # and nothing in the job reads an archive again.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
-          path: ~/go/pkg/mod
+          path: |
+            ~/go/pkg/mod
+            !~/go/pkg/mod/cache/download/**/*.zip
           key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'tools/*/go.sum') }}
           restore-keys: go-mod-${{ runner.os }}-
       # The build cache, kept current.
@@ -176,15 +155,25 @@ jobs:
           node-version: ${{ steps.node.outputs.version }}
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # The interface checks' own caches: the type checker's build information,
+      # and the formatter's and linter's results per file by content. Kept as
+      # the build cache is, and keyed on the lockfile and the tools'
+      # configuration as well, so a change to either starts them empty.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: web/.cache
+          key: web-checks-${{ runner.os }}-${{ hashFiles('web/package-lock.json', 'web/tsconfig.json', 'web/eslint.config.js', 'web/.prettierrc.json', 'web/.prettierignore') }}-${{ github.run_id }}
+          restore-keys: web-checks-${{ runner.os }}-${{ hashFiles('web/package-lock.json', 'web/tsconfig.json', 'web/eslint.config.js', 'web/.prettierrc.json', 'web/.prettierignore') }}-
 
-      - name: Confirm a developer's engines are the engines run here
-        # The servers above are declared in this file and started locally by
-        # "make engines-up", which pins the same versions. Two pinned lists
-        # drift, and the drift is invisible exactly when it matters: a suite
-        # green locally against an engine this job no longer runs proves
-        # nothing about the one it does. The target compares the two lists in
-        # both directions, so an engine added here and nowhere else is caught.
-        run: make engines-check
+      - name: Wait for the database servers
+        run: |
+          for _ in $(seq 300); do
+            [ -e "$RUNNER_TEMP/engines.status" ] && break
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/engines.log"
+          [ "$(cat "$RUNNER_TEMP/engines.status" 2>/dev/null)" = 0 ] \
+            || { echo "::error::the database servers did not start"; exit 1; }
 
       - name: Mark every restored cache entry as unused
         # Both caches record a use by moving an entry's modification time to
@@ -241,6 +230,11 @@ jobs:
         with:
           path: ~/.cache/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ github.run_id }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        if: env.SAVES_CACHES == 'true'
+        with:
+          path: web/.cache
+          key: web-checks-${{ runner.os }}-${{ hashFiles('web/package-lock.json', 'web/tsconfig.json', 'web/eslint.config.js', 'web/.prettierrc.json', 'web/.prettierignore') }}-${{ github.run_id }}
 
       - name: Confirm every engine ran, and that each was the engine it claimed
         # A skipped engine passes silently, which would make the matrix
@@ -266,6 +260,14 @@ jobs:
           name: openpsirt-sbom
           path: bin/openpsirt.cdx.json
           if-no-files-found: error
+
+      # Whatever happened above, so a run that ran out of memory or filled a
+      # server's data directory says which.
+      - name: Report the runner's memory and each server's
+        if: always()
+        run: |
+          free -m
+          make engines-status
 
   # The two below are not steps of the job above, and each for a reason of
   # its own rather than for tidiness.

@@ -155,7 +155,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make release-freeze VERSION=vX.Y.Z` | The release migration record and its check, on a branch from `main` with four engines up. See `design-docs/database-migrations.md` § Release records |
 | `make release-check VERSION=vX.Y.Z` | The tagged release was frozen and the tree still matches. The release workflow runs it first |
 | `make docs-site` | The documentation site, strict. Needs mkdocs |
-| `make engines-up` / `-down` / `-status` | The four database servers |
+| `make engines-up` / `-down` / `-status` | The four database servers; `-status` adds each running one's memory and data directory use |
 | `make engines-clean` | Drops unheld test databases. See `design-docs/build-tests.md` § Test databases |
 | `make measure` | Measurements behind a build tag. See `design-docs/build-tests.md` § Measurement databases |
 | `make sbom-shape` | The reader over a full-size committed inventory. Inside `check` |
@@ -199,7 +199,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 
 | Job | Holds | Separate because |
 |---|---|---|
-| Build, test and check | `engines-check`, `make check`, `check-engines`, the bill of materials as an artifact | — |
+| Build, test and check | `make engines-up` beside the setup, `make check`, `check-engines`, the bill of materials as an artifact, then the runner's and each server's memory | — |
 | Container image and chart | The image, then `check-packaging` | buildx, helm and a build cache |
 | Documentation builds | The site | Python |
 | Upload client on macOS and Windows | `client-test` per system, after a Linux step compares the change with `client-sources` | Only there are the client's paths and line endings seen as a build host sees them |
@@ -208,6 +208,9 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 |---|---|
 | The first job runs `make check`, never a target list | A target added to `check` runs in CI |
 | Jobs needing only a checkout and Go are one job | |
+| The database servers are started by `make engines-up` in a step after the checkout, never as service containers, and waited for before `make check` | Service containers start one after another before the checkout, 29 to 51 s; a step overlaps the setup, and CI and a developer run one list of servers (`design-docs/build-tests.md` § Database engines) |
+| The runner's free memory, and each server's memory and data directory use, are printed at the end of every run, whatever failed | A run out of memory or a full data directory names its cause |
+| The checking job fetches every commit and tree and no file contents beyond its checkout | The vulnerability gates' few reads of the base fetch their files as read |
 | No composite action or reusable workflow | One Go setup remains, and a reusable workflow re-clones |
 | The macOS and Windows jobs run only when a client source moved | Those runners cost several Linux ones |
 | `client-sources` is what reaches the client, held by a test in `internal/build` | It includes fixtures the client's tests read and the Dockerfile, whose `golang` tag sets the runners' Go |
@@ -224,16 +227,18 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 
 | Cache | Holds | Keyed on | Saved |
 |---|---|---|---|
-| Go modules | Modules for the tree and pinned tools | `go.sum` and each tool's | When the key is new |
+| Go modules | Modules for the tree and pinned tools, extracted, without their downloaded archives | `go.sum` and each tool's | When the key is new |
 | Go build | Plain and race builds, test objects, tools built from source | The run, restored by prefix | On `main` |
 | Linter results | Per-package analysis by content | The run, restored by prefix | On `main` |
+| Interface checks | The type checker's build information; the formatter's and ESLint's per-file results by content | The lockfile and the three tools' configuration, then the run, restored by that prefix | On `main` |
 | Image layers | Every stage's layers | The buildkit scope | On `main` |
 
 | Rule | Reason |
 |---|---|
-| A pull request restores all four and saves none | Its saves are keyed to a commit nothing rebuilds, and the 10 GB store evicts least recently used |
+| A pull request restores each and saves none | Its saves are keyed to a commit nothing rebuilds, and the 10 GB store evicts least recently used |
 | The build and linter caches keep only what the run read: entries are moved two hours back first, and unmoved ones deleted after | Both tools refresh an entry's time once it is an hour old. Saved whole, the build cache is 2.87 GB against 683 MB |
 | Linter results are keyed by package content | One changed file costs 9 to 12 s against 42 s with none, on four local cores |
+| A module's downloaded archive is not saved | Every module is kept extracted beside it, and nothing in the job reads the archive again |
 | The image's Go steps mount the build cache, never write it into a layer | A layer after the source copy is per commit: 441 MB and 499 MB became 39 MB and 131 kB |
 | The bill-of-materials tool is fetched beside `go mod download`, before the source copy | Its layer is reused |
 

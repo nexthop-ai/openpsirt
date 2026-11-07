@@ -306,8 +306,10 @@ node-version:
 # declares, or a workflow could install a Node of its own — each silently, and
 # each producing an artifact built with something other than what was tested.
 #
-# Named rather than folded into engines-check, because that one is about what
-# the tests run against and this is about what the release is built from.
+# The test database servers are one list, in mk/engines.mk, which CI starts
+# with "engines-up" as a developer does. Each is named by digest, and a
+# workflow declaring a server of its own is refused: it would be a second list,
+# and a pass against one says nothing about the other.
 #
 # A base image is the first word after FROM that is not a flag, unless it names
 # an earlier stage, scratch, or a build argument, whose default is read from its
@@ -403,14 +405,20 @@ pins-check:
 	       echo "Name it by digest as well: $$base@sha256:..."; fail=1 ;; \
 	  esac; \
 	done; \
-	services=$$(awk '/^[[:space:]]+image:/ { print $$2 }' .github/workflows/*.yml); \
-	[ -n "$$services" ] || { echo "no workflow names a service image, so no pin was compared."; fail=1; }; \
-	for service in $$services; do \
-	  case "$$service" in \
+	engines=$$(awk '/^ENGINE_[A-Z]+_IMAGE[[:space:]]*\?=/ { print $$3 }' mk/engines.mk); \
+	[ -n "$$engines" ] || { echo "mk/engines.mk names no server image, so no pin was compared."; fail=1; }; \
+	for engine in $$engines; do \
+	  case "$$engine" in \
 	    *@sha256:*) ;; \
-	    *) echo "the service image $$service is named by a tag alone, which its owner can move under a rebuild."; \
-	       echo "Name it by digest as well: $$service@sha256:..."; fail=1 ;; \
+	    *) echo "the server image $$engine is named by a tag alone, which its owner can move under a rebuild."; \
+	       echo "Name it by digest as well: $$engine@sha256:..."; fail=1 ;; \
 	  esac; \
+	done; \
+	for flow in .github/workflows/*.yml; do \
+	  ! grep -qE '^[[:space:]]+(services|container):' "$$flow" || { \
+	    echo "$$flow declares a container of its own. The test servers are the ones"; \
+	    echo "make engines-up starts from mk/engines.mk, so CI and a developer run one list."; \
+	    fail=1; }; \
 	done; \
 	quota=$$(sed -n 's/^const DefaultQuota = \([0-9]*\) << \([0-9]*\)$$/\1 \2/p' internal/patchbranch/copies.go); \
 	chart=$$(sed -n 's/.*patchBranches\.quota | default \([0-9]*\).*/\1/p' $(CHART_DIR)/templates/deployment.yaml); \
