@@ -53,16 +53,13 @@ govulncheck:
 # product that would have caught them turned out to be a paid add-on on a
 # private repository. The allowlist is this variable, passed to both, because
 # a policy written in two files is a policy that differs in one of them.
-licenses:
+#
+# The npm half parses the interface's source with the TypeScript compiler to
+# find what it imports, so it needs the install, which "web-check" shares.
+licenses: web-deps
 	$(call tool,go-licenses) check $(PACKAGES) \
 		--allowed_licenses=$(ALLOWED_LICENSES) \
 		$(foreach m,$(LICENSE_EXCEPTIONS),--ignore=$(m))
-	@command -v $(NPM) >/dev/null 2>&1 \
-	  || { echo "npm not found, so the interface's licenses are unchecked here"; exit 1; }
-	@# The npm half parses the interface's source with the TypeScript compiler
-	@# to find what it imports, so it needs an install. One already there is
-	@# used: the licenses are read from the lockfile, and the compiler only reads.
-	@[ -d web/node_modules/typescript ] || $(MAKE) --no-print-directory web-deps
 	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) LICENSE_EXCEPTIONS=$(WEB_LICENSE_EXCEPTIONS) \
 	  $(NPM) --prefix web run --silent licenses
 

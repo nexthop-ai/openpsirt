@@ -331,9 +331,14 @@ web: web-deps
 
 # Reproducible, like every other dependency here: npm ci installs exactly what
 # the lockfile pins rather than re-resolving ranges at build time.
+#
+# A prerequisite of every target needing the install, never a recursive make,
+# so one make run installs once: "licenses" and "web-check" in one "check" are
+# one npm ci.
 web-deps:
-	@command -v $(NPM) >/dev/null 2>&1 \
-	  || { echo "$(NPM) is needed to build the interface"; exit 1; }
+	@command -v $(NPM) >/dev/null 2>&1 || { \
+	  echo "npm not found, so the interface cannot be installed or checked here."; \
+	  echo "Install node, or run this on a machine that has it."; exit 1; }
 	$(NPM) --prefix web ci
 
 # The client is generated from the committed document, so a drifted
@@ -345,8 +350,8 @@ web-api: openapi
 
 # What CI runs for the interface.
 #
-# It refuses without node rather than skipping, like "licenses" and
-# "web-audit" on the identical condition. A skip here is indistinguishable
+# It refuses without node rather than skipping, through "web-deps", like
+# "licenses" and "web-audit" on the identical condition. A skip here is indistinguishable
 # from a pass, and what it covers is the whole tier: the typecheck, the lint,
 # the stylelint, the tests and their coverage, the class collisions, the
 # tokens and the severity ladder. "make gate" routes a change touching only
@@ -356,11 +361,7 @@ web-api: openapi
 # A machine without node can still gate a Go-only change: that change lands in
 # the code tier, which does not reach here. What needs node is "make check",
 # which is everything CI checks and is meant to.
-web-check:
-	@command -v $(NPM) >/dev/null 2>&1 || { \
-	  echo "npm not found, so the interface cannot be checked here."; \
-	  echo "Install node, or run this on a machine that has it."; exit 1; }
-	$(MAKE) web-deps
+web-check: web-deps
 	$(NPM) --prefix web run typecheck
 	$(NPM) --prefix web run format
 	$(NPM) --prefix web run lint

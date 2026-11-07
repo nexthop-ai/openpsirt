@@ -106,6 +106,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | Rule | Reason |
 |---|---|
 | `check` and the gate never run `make build` | Its `-trimpath` compiles every package a second time: 23.5 s and 461 MB of build cache beside the test builds, which link every package and the program. The image job builds the binary as a release does (`design-docs/build-measurements.md` § Gate build work) |
+| One make run installs the interface once: `licenses` and `web-check` share `web-deps` as a prerequisite | Each `npm ci` is 4 s locally and 7 to 8 s on a CI runner |
 
 | Target | Runs |
 |---|---|

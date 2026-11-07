@@ -140,3 +140,4 @@ Rules in `design-docs/build.md` § Make targets and `design-docs/build-tests.md`
 | Work | Before | After |
 |---|---|---|
 | `make build` over a build cache holding the plain build | 23.5 s wall, 97 s processor, 461 MB more cache | Not run; 13 s on a CI runner |
+| `npm ci` in one `make check` | Twice, 4 s each; 7 to 8 s each on a CI runner | Once |
