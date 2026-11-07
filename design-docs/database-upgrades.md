@@ -191,7 +191,7 @@ times on each engine.
 | A v0.10.0 database holding a role grant | The grant keeps its role, and every table holding a role takes the longest role name |
 | Every check above that does not stop, at once | One v0.10.0 database per engine holds all their seeds and is upgraded once; each check reads its own seed's rows or counts every seed's, so no seed changes what another's check expects, and the checks that write run last |
 | The stops each engine takes of the renames and stored words | Every one on MySQL and MariaDB, where each builds on what the last left; the first two and the last of each list on PostgreSQL and SQLite, where every stop starts from the database v0.10.0 left |
-| Every check above that stops, at once | One v0.10.0 database per engine holds their seeds, takes its stops in the order the upgrade reaches them, the renames of both lists merged, and is upgraded once, each built declaration describing the built table. A stop at a step an earlier start on MySQL or MariaDB already made would find nothing to stop at. The issue kind stop has a database of its own: its stand-in column carries a default v0.11.0 does not declare |
+| Every check above that stops, at once | One v0.10.0 database per engine holds their seeds, takes its stops in the order the upgrade reaches them, the renames of both lists merged, and is upgraded once, each built declaration describing the built table. A stop at a step an earlier start on MySQL or MariaDB already made would find nothing to stop at. Two stops have databases of their own: what a stop leaves unmade, because the shared database resumes over a complete report step, and the issue kind, because its stand-in column carries a default v0.11.0 does not declare |
 
 ## The v0.12.0 upgrade
 
@@ -212,7 +212,7 @@ stepped over where a stopped upgrade made it already.
 | Check, on each engine | What it holds |
 |---|---|
 | A v0.11.0 database, on the way up the release records (`design-docs/database-migrations.md` § Release records) | Upgraded, each changed table's declaration describing the built table |
-| A v0.11.0 database already holding one or all of the issue date columns | Upgraded the same, the run column and its index made |
+| A v0.11.0 database already holding one or all of the issue date columns | Upgraded the same, the missing date columns made |
 | A v0.11.0 database already holding the run column, or the run column, its key and its index; the column alone on the servers | Upgraded the same, nothing already made replaced |
 | A v0.11.0 database holding a replaced and a current inventory, and the same already holding the column marking it | The replaced one marked, the current one and any later one not |
 | Every check above that stops, at once | Two v0.11.0 databases per engine, each holding the inventories: one takes one date column, the run column and the marking column, the other every date column and the run's index, in the order the upgrade reaches them; each is upgraded once and checked as above. The stops of one check are alternatives, so no one database takes both |

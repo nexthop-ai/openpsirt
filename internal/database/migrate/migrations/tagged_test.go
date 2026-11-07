@@ -26,7 +26,9 @@ import (
 // whose finding table carries the indexes v0.10.0 declares, and v0.11.0's to
 // v0.12.0, whose tables are as v0.12.0 declares them. Each is a subtest
 // under the name of the test it was. A rung after one holds the whole schema
-// to its record, which a scratch table a declaration is built under fails.
+// to its record, which a scratch table a declaration is built under fails;
+// the v0.12.0 check follows the last rung, and its own clean-up is all that
+// holds it.
 func TestEachReleaseBuildsTheSchemaItTagged(t *testing.T) {
 	tagged, err := released.All(records)
 	if err != nil {
@@ -38,10 +40,14 @@ func TestEachReleaseBuildsTheSchemaItTagged(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
+		// Several releases end at one migration, and the upgrade is checked
+		// at the first.
+		upgradedToV0100 := false
 		for _, r := range tagged {
 			dbtest.MigrateTo(t, db, r.Last)
 			taggedSchema(t, r.Version, db.Server.Engine, describe(t, ctx, db))
-			if r.Last == v0100 {
+			if r.Last == v0100 && !upgradedToV0100 {
+				upgradedToV0100 = true
 				t.Run("AV090DatabaseUpgradesToV0100", func(t *testing.T) {
 					declarationsAreBuilt(t, ctx, db, migrations.StatementsV0100(db.Server.Engine))
 				})

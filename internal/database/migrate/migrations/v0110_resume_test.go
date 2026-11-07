@@ -16,12 +16,11 @@ import (
 // The former tests a stopped start of the v0.11.0 upgrade is checked by, each
 // a subtest of the one below under its own name.
 const (
-	renamesResume       = "AnUpgradeStoppedPartWayThroughItsRenamesResumes"
-	ruleRenamesResume   = "AnUpgradeStoppedPartWayThroughTheRuleRenamesResumes"
-	storedWordsResume   = "AnUpgradeStoppedPartWayThroughItsStoredWordsResumes"
-	acknowledgedOnce    = "AStoppedUpgradeWritesNoAcknowledgementTwice"
-	pastTheReportStep   = "TheV0110UpgradeCarriesOnPastItsReportStep"
-	whatAStopLeftUnmade = "TheV0110UpgradeMakesWhatAStopLeftUnmade"
+	renamesResume     = "AnUpgradeStoppedPartWayThroughItsRenamesResumes"
+	ruleRenamesResume = "AnUpgradeStoppedPartWayThroughTheRuleRenamesResumes"
+	storedWordsResume = "AnUpgradeStoppedPartWayThroughItsStoredWordsResumes"
+	acknowledgedOnce  = "AStoppedUpgradeWritesNoAcknowledgementTwice"
+	pastTheReportStep = "TheV0110UpgradeCarriesOnPastItsReportStep"
 )
 
 // triageRenameStops is where the renames of the triage records and incidents
@@ -102,10 +101,11 @@ type ownedStop struct {
 // Each stopped subtest makes one former test's stops, and the resumed subtest
 // of the same name checks what that test pinned.
 //
-// The stop after adding the issue kind has a database of its own: its stand-in
-// column carries a default v0.11.0 does not declare, which the upgrade steps
-// over, so the schema it resumes to is not the one the others compare with
-// v0.11.0's declaration.
+// Two stops have databases of their own. What a stop leaves unmade is dropped
+// from a complete report step, which the shared database resumes over. The
+// stand-in column of the issue kind stop carries a default v0.11.0 does not
+// declare, which the upgrade steps over, so the schema it resumes to is not
+// the one the others compare with v0.11.0's declaration.
 func TestAV0100DatabaseResumesTheV0110UpgradeFromEveryStop(t *testing.T) {
 	triage := inRenameOrder(t, slices.Clone(triageRenameStops))
 	if triage[0].after != "decision" || triage[1].after != "claim" {
@@ -207,24 +207,13 @@ func TestAV0100DatabaseResumesTheV0110UpgradeFromEveryStop(t *testing.T) {
 				t.Fatalf("make what a stopped upgrade left: %v", err)
 			}
 		})
-		// A stopped upgrade can leave the report step's tables made without
-		// the indexes made after them, and its columns changed without the
-		// holder's foreign key.
-		stopped(whatAStopLeftUnmade, func(t *testing.T) {
-			for _, stmt := range unmadeByAStop(db.Server.Engine) {
-				if _, err := db.ExecContext(ctx, stmt); err != nil {
-					t.Fatalf("%s: %v", stmt, err)
-				}
-			}
-		})
-
 		dbtest.MigrateTo(t, db, v0110)
 
 		// Every former test that compared the schema with v0.11.0's
-		// declaration compared the one this upgrade built. MySQL and MariaDB
-		// adopt the holder index for the holder's foreign key and refuse to
-		// drop it, so the index is made once and never replaced; what a stop
-		// left unmade is made.
+		// declaration compared the one this upgrade built. The upgrade starts
+		// over a complete report step: MySQL and MariaDB adopt the holder
+		// index for the holder's foreign key and refuse to drop it, so the
+		// index is made once and never replaced.
 		t.Run("resumed/TheV0110DeclarationsAreBuiltAfterEveryStop", func(t *testing.T) {
 			declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 		})
@@ -243,6 +232,28 @@ func TestAV0100DatabaseResumesTheV0110UpgradeFromEveryStop(t *testing.T) {
 		t.Run("resumed/"+acknowledgedOnce, func(t *testing.T) {
 			sentOnce(t, ctx, db, acknowledgedBy)
 		})
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// A stopped upgrade can leave the report step's tables made without the
+// indexes made after them, and its columns changed without the holder's
+// foreign key. Starting again makes what is missing.
+func TestTheV0110UpgradeMakesWhatAStopLeftUnmade(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		if err := migrations.RunV0110ReportStep(ctx, db); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
+		}
+		for _, stmt := range unmadeByAStop(db.Server.Engine) {
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				t.Fatalf("%s: %v", stmt, err)
+			}
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 		leaveAtLatest(t, ctx, db)
 	})
 }
