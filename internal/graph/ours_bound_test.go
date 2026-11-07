@@ -27,10 +27,13 @@ func holdEverything(t *testing.T, f *fixture, party int64) {
 	}
 }
 
-// The tree seen upward assembles over at most graph.Ours components, says it
-// is incomplete past that, and draws a component nothing pulls in directly
-// under the root, where the tree draws it.
+// The tree seen upward assembles over at most its bound of components, says it
+// is incomplete past that and complete at it, and draws a component nothing
+// pulls in directly under the root, where the tree draws it.
 func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
+	// The bound a store is given here, far below the default, so the test
+	// writes tens of findings and not thousands.
+	const bound = 50
 	each(t, func(t *testing.T, f *fixture) {
 		orphan := at("orphan", "1")
 		snap := graph.Snapshot{Root: root, Components: []graph.Described{orphan}}
@@ -45,7 +48,7 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 		hit("CVE-2026-0001", orphan)
 		hit("CVE-2026-0002", orphan)
 		// One more component than the bound, each holding one issue.
-		for i := range graph.Ours {
+		for i := range bound {
 			lib := at(fmt.Sprintf("lib%04d", i), "1")
 			snap.Components = append(snap.Components, lib)
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: lib})
@@ -70,7 +73,7 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 		holder := access.NewPerson(2, "holder", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead}}, party)
 
-		rows, complete, err := f.store.Ours(t.Context(), holder, f.buildID)
+		rows, complete, err := f.store.AssemblingAtMost(bound).Ours(t.Context(), holder, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,8 +81,8 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 			t.Error("a tree over more components than it assembles read as complete")
 		}
 		// The root, the components it kept below it, and the orphan.
-		if len(rows) != graph.Ours+1 {
-			t.Fatalf("the tree drew %d nodes, want the root and %d components", len(rows), graph.Ours)
+		if len(rows) != bound+1 {
+			t.Fatalf("the tree drew %d nodes, want the root and %d components", len(rows), bound)
 		}
 		var held *graph.Upward
 		for i := range rows {
@@ -92,6 +95,21 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 		}
 		if held.Findings != 2 || held.Beneath != 2 {
 			t.Errorf("the orphan reads %d on itself and %d beneath, want 2 and 2", held.Findings, held.Beneath)
+		}
+
+		// Holding exactly as many components as the bound, and holding fewer
+		// than the default's, are both a complete tree.
+		for name, store := range map[string]*graph.Store{
+			"at the bound": f.store.AssemblingAtMost(bound + 1), "the default": f.store,
+		} {
+			rows, complete, err := store.Ours(t.Context(), holder, f.buildID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !complete || len(rows) != bound+2 {
+				t.Errorf("%s, the tree over every component held reads complete %v with %d nodes, want true and %d",
+					name, complete, len(rows), bound+2)
+			}
 		}
 	})
 }

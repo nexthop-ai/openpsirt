@@ -276,10 +276,11 @@ func TestInterningARunOfReportsWritesWhatInterningEachAloneWrites(t *testing.T) 
 			// Each sequence names issues of its own.
 			mine, theirs := 3001+2*sequence, 3002+2*sequence
 			steady, steadyToo := steadily(mine), steadily(theirs)
-			// Twenty random rounds after the steady ones. Measured up to
-			// sixty, five reach every statement any count reaches, and three
-			// do not.
-			for round := range 20 + len(steady) {
+			// Twelve random rounds after the steady ones. On every engine
+			// they reach every block twenty reach, from these seeds and from
+			// four other sets; eight miss one block from one of those sets,
+			// and three miss ten from these.
+			for round := range 12 + len(steady) {
 				seed := r.Int63()
 				ours := reportsIn(seeded(seed), mine)
 				others := reportsIn(seeded(seed), theirs)

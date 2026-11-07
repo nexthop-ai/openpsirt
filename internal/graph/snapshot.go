@@ -112,6 +112,10 @@ type Store struct {
 	// code counts the open code findings on components, where the reader
 	// asked for them beside the issues. Nil, none are counted.
 	code CodeCounter
+	// ours is the most components the tree seen upward assembles over. A
+	// field, so a test sets a small one on its own store beside parallel
+	// tests on the default.
+	ours int
 }
 
 // CodeCounter reads the open code findings one build places on each of these
@@ -130,7 +134,7 @@ func (s *Store) CountingCode(counter CodeCounter) *Store {
 
 // NewStore returns a graph store over db.
 func NewStore(db bun.IDB) *Store {
-	return &Store{db: db, components: NewComponents(db)}
+	return &Store{db: db, components: NewComponents(db), ours: ours}
 }
 
 // ApplyWithin records a scan's graph against a variant, inside a transaction

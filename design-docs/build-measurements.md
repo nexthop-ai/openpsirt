@@ -10,6 +10,7 @@ durability and gate build rules.
 - [The race pass](#the-race-pass)
 - [Measurement databases](#measurement-databases)
 - [Commit durability](#commit-durability)
+- [Test bodies](#test-bodies)
 - [Suite totals](#suite-totals)
 - [Gate build work](#gate-build-work)
 
@@ -125,6 +126,51 @@ where two runs of one tree vary by 5 to 10 s on each large package.
 The server pass over every package, six at once, went from 516 s to 246 s of
 package time with the shared pool and the data in memory, where the 516 s reused
 databases an earlier run migrated and the 246 s migrated every one.
+
+## Test bodies
+
+Rules in `design-docs/build-tests.md` § Test bodies. One test alone on a
+workstation, before and after, except where a package is named.
+
+| Test, engine | Before | After |
+|---|---|---|
+| The upward tree's bound, SQLite | 0.54 to 0.59 s | 0.04 s |
+| The same, under the race detector | 2.12 to 2.27 s | 0.12 to 0.13 s |
+| The graph package, PostgreSQL | 10.1 s | 4.2 s |
+| The graph package, MySQL | 5.8 s | 1.8 s |
+| The graph package, MariaDB | 3.3 s | 1.6 s |
+| The queue ordered by the tool's rating, SQLite | 0.21 s | 0.09 s |
+| The same, under the race detector | 0.90 s | 0.38 s |
+| The same, PostgreSQL | 1.60 to 2.75 s | 0.44 to 0.46 s |
+| The same, MySQL | 0.57 s | 0.15 s |
+| The same, MariaDB | 0.56 s | 0.17 s |
+| A stale database's refused drop, PostgreSQL | 5.99 s | 0.94 s |
+| Interning a run against each report alone, twenty rounds and twelve, SQLite | 0.24 s | 0.18 to 0.19 s |
+| The same, under the race detector | 1.01 to 1.02 s | 0.78 to 0.84 s |
+| The same, PostgreSQL | 1.75 to 2.01 s | 1.33 to 1.54 s |
+| The same, MySQL | 0.89 to 1.23 s | 0.62 to 0.89 s |
+| The same, MariaDB | 0.96 to 1.19 s | 0.64 to 0.94 s |
+
+The interning comparison's coverage counts the blocks of every package in the
+module except the harness and the migrations, which only a run building its
+database reaches.
+
+| The test's seeds, five runs of each count | Blocks at twenty rounds | At twelve |
+|---|---|---|
+| SQLite | 831 | The same blocks |
+| PostgreSQL | 837 | The same blocks |
+| MySQL | 865 | The same blocks |
+| MariaDB | 857 | The same blocks |
+
+From four other sets of seeds, one run each, twelve rounds reach the blocks
+twenty do on every engine, and eight miss one block from one set on every
+engine. Three miss ten blocks from the test's seeds. One PostgreSQL run of
+twelve rounds in nineteen missed one block, the second line of the comparison
+with the newest rating, which every run of twenty reached.
+
+Turning off the check for a rating the issue holds lower fails the comparison
+at twelve rounds and at eight, in the fifth random round; with no random rounds
+it passes.
 
 ## Suite totals
 
