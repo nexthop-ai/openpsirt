@@ -57,7 +57,15 @@ func signIn(t *testing.T, r *httpapitest.Reach, identity string) *access.Issued 
 func TestABrowserIsRecognizedByItsSessionAlone(t *testing.T) {
 	// No header, no key. The cookie is the whole credential, which is what a
 	// deployment with a real identity provider looks like.
+	//
+	// Nothing is echoed either. The guard is against a request being made,
+	// not against one being read, and requiring it on reads would break every
+	// ordinary page load for nothing.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// GET alone, because it is the only safe method this API routes.
+		// HEAD and OPTIONS are treated as safe by the guard regardless, so
+		// that adding a route for either does not make it one that has to
+		// echo a value to be read.
 		issued := signIn(t, r, "reader")
 		if got := asBrowser(t, r, issued, http.MethodGet, "/v1/products", "").Code; got != http.StatusOK {
 			t.Errorf("a signed-in browser reading products answered %d, want 200", got)
@@ -87,21 +95,6 @@ func TestAWriteFromABrowserHasToProveItCameFromOurOwnPage(t *testing.T) {
 			if got != c.want {
 				t.Errorf("declaring a product with %s answered %d, want %d", c.what, got, c.want)
 			}
-		}
-	})
-}
-
-func TestReadingFromABrowserNeedsNothingEchoed(t *testing.T) {
-	// The guard is against a request being made, not against one being read.
-	// Requiring it on reads would break every ordinary page load for nothing.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		// GET alone, because it is the only safe method this API routes.
-		// HEAD and OPTIONS are treated as safe by the guard regardless, so
-		// that adding a route for either later does not quietly make it one
-		// that has to echo a value to be read.
-		issued := signIn(t, r, "reader")
-		if got := asBrowser(t, r, issued, http.MethodGet, "/v1/products", "").Code; got != http.StatusOK {
-			t.Errorf("GET with nothing echoed answered %d, want 200", got)
 		}
 	})
 }
