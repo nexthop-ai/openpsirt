@@ -144,6 +144,9 @@ read answers from a snapshot and a write lands on whatever the row holds.
 | A product, a release and a variant | Recording that a VEX document went out, matching the name each had when it was generated |
 | Every response window in force | Declaring a window counting from another, changing one, retiring one |
 | An incident | Naming or withdrawing a fix release, while the record stands |
+| A series | Applying one of its runs |
+| A person's turn row | Saving a filter, before counting what they hold under the limit |
+| The uploads lock row | An upload, before summing what is held |
 
 ## Absence and failure
 
