@@ -134,6 +134,7 @@ scenario once per engine: a server, its seeded cast and the rows the checks read
 | A subtest is named for the check it holds and keeps that check's failure messages | A failure names the check, as a test of its own did |
 | A subtest that writes runs after every subtest that reads | Each subtest reads what it read as a test of its own |
 | Two checks that each write are two tests | The second would read the first's rows |
+| Checks making one identical write share it, each reading before it and after | Neither reads a row the other made |
 | A merged test covers the statements its checks covered as tests of their own | Merging moves where a check runs and never what it reaches |
 
 ## Server database slots
