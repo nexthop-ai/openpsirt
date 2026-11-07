@@ -84,7 +84,8 @@ func TestTwoRefusalsOfASeriesRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 			second <- series.NewStore(db.DB).Refused(ctx, series.Refusal{BuildID: build, Kind: kind.Analysis,
 				Series: "nightly", Reason: "second"})
 		}()
-		time.Sleep(500 * time.Millisecond)
+		// Until the second waits on the first's row.
+		dbtest.UntilLockWait(ctx, db, nil, 500*time.Millisecond)
 		if err := first.Commit(); err != nil {
 			t.Fatal(err)
 		}
