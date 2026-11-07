@@ -349,7 +349,10 @@ func locksOn(t *testing.T, engine database.Engine, base string) string {
 // A stale database that will not drop leaves the database a lease just built
 // usable. Dropping another schema's databases is housekeeping the lease does
 // not need, and a session still open on one, which a binary exiting a moment
-// ago leaves on PostgreSQL, refuses the drop.
+// ago leaves on PostgreSQL, refuses the drop. PostgreSQL refuses that drop
+// only after waiting five seconds for the session to leave, and refuses a
+// template database at once, so the refusal here is a template. MySQL and
+// MariaDB drop a database a session is open on.
 func TestAStaleDatabaseThatWillNotDropLeavesTheLeaseStanding(t *testing.T) {
 	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
 		ctx := t.Context()
@@ -365,13 +368,22 @@ func TestAStaleDatabaseThatWillNotDropLeavesTheLeaseStanding(t *testing.T) {
 		if err := stale.release(ctx); err != nil {
 			t.Fatal(err)
 		}
-		inside, err := databaseURL(base, engine, stale.key)
-		if err != nil {
-			t.Fatal(err)
-		}
-		session := Open(t, inside)
-		if err := session.PingContext(ctx); err != nil {
-			t.Fatal(err)
+		if engine == database.Postgres {
+			template := `ALTER DATABASE "` + stale.key + `" IS_TEMPLATE `
+			if _, err := admin.ExecContext(ctx, template+"true"); err != nil {
+				t.Fatal(err)
+			}
+			// Before the drop that cleans up, which is registered earlier.
+			t.Cleanup(func() { _, _ = admin.ExecContext(context.Background(), template+"false") })
+		} else {
+			inside, err := databaseURL(base, engine, stale.key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			session := Open(t, inside)
+			if err := session.PingContext(ctx); err != nil {
+				t.Fatal(err)
+			}
 		}
 
 		held, own, err := leaseDatabase(ctx, engine, base, namespace, schemaOne)
@@ -382,6 +394,14 @@ func TestAStaleDatabaseThatWillNotDropLeavesTheLeaseStanding(t *testing.T) {
 		if own == "" {
 			t.Error("the lease answered no database")
 		}
-		_ = session.Close()
+		if engine == database.Postgres {
+			left, err := databasesFor(ctx, admin, engine, namespace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Contains(left, stale.key) {
+				t.Errorf("the stale database was dropped, so no drop was refused: %v", left)
+			}
+		}
 	})
 }
