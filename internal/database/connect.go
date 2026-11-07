@@ -415,14 +415,28 @@ func alwaysEncrypted(config *pgconn.Config) bool {
 	return true
 }
 
+// The PostgreSQL and SQLite dialects are one value each for the process. A
+// dialect holds the cache of every model's reflected table, which is built
+// under its own lock and never changed after, and their initialization reads
+// nothing from the connection. A dialect per handle reflected every model again
+// for every handle: a test opens one, and under the race detector the
+// reflection and its pluralizing were 9% of a package's samples.
+var (
+	postgresDialect = pgdialect.New()
+	sqliteDialect   = sqlitedialect.New()
+)
+
+// driverFor names the driver and the dialect for an engine. A MySQL dialect is
+// made per handle, because its initialization asks the server its version and
+// turns on what MariaDB and each MySQL release accept in that dialect alone.
 func driverFor(e Engine) (driver string, dialect func() schema.Dialect, err error) {
 	switch e {
 	case Postgres:
-		return "pgx", func() schema.Dialect { return pgdialect.New() }, nil
+		return "pgx", func() schema.Dialect { return postgresDialect }, nil
 	case MySQL, MariaDB:
 		return "mysql", func() schema.Dialect { return mysqldialect.New() }, nil
 	case SQLite:
-		return "sqlite", func() schema.Dialect { return sqlitedialect.New() }, nil
+		return "sqlite", func() schema.Dialect { return sqliteDialect }, nil
 	}
 	return "", nil, fmt.Errorf("unsupported database %q", e)
 }

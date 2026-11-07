@@ -133,7 +133,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 
 | Document | Covers | Terms |
 |---|---|---|
-| [database](design-docs/database.md) | Supported engines, where engine-specific code lives, connections, and the test harness | version floors, engine-specific code, make confined, engine detection, connection encryption, connection pool, statement preparation, SQLite settings, test harness, failing commit, partitioning |
+| [database](design-docs/database.md) | Supported engines, where engine-specific code lives, connections, and the test harness | version floors, engine-specific code, make confined, engine detection, connection encryption, connection pool, statement preparation, query builder dialects, SQLite settings, test harness, failing commit, partitioning |
 | [database-migrations](design-docs/database-migrations.md) | Creating and moving the schema forward | migrate up, schema version, baseline, forward only, migrations that stop half way, release records, release freeze, upgrade rehearsal, migration lock |
 | [database-upgrades](design-docs/database-upgrades.md) | What each release's upgrade migration does | release upgrades, v0.10.0, v0.11.0 renames, stored values, SQLite rebuild |
 | [database-queries](design-docs/database-queries.md) | Query rules the four engines impose | identifier quoting, reserved words, make reserved, silently wrong query shapes, LIKE escaping, case folding, affected-row counts, recursion bound, collation, text truncation, bulk inserts |
