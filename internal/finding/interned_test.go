@@ -309,9 +309,11 @@ func TestInterningARunOfReportsWritesWhatInterningEachAloneWrites(t *testing.T) 
 			// Each sequence names issues of its own.
 			mine, theirs := 3001+2*sequence, 3002+2*sequence
 			steady, steadyToo := steadily(mine), steadily(theirs)
-			// Twelve random rounds after the steady ones, which on every
-			// engine reach every block twenty reach, from these seeds and
-			// from four other sets.
+			// Twelve random rounds after the steady ones. Over repeated runs
+			// on every engine they reach every block twenty reach, from these
+			// seeds and from four other sets. They differ run to run, and one
+			// PostgreSQL run of twelve in nineteen has missed a block every
+			// run of twenty reached, so a check is guarded by a steady round.
 			for round := range 12 + len(steady) {
 				seed := r.Int63()
 				ours := reportsIn(seeded(seed), mine)
