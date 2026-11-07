@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -32,6 +33,26 @@ type streamSlots chan struct{}
 
 // exportStreams is the number of slots where the pool states no size.
 const exportStreams = 5
+
+// streams holds each database's slots for the life of the process. The slots
+// are a share of one pool, so they belong to the pool rather than to a server
+// built over it.
+var streams = struct {
+	sync.Mutex
+	of map[*database.DB]streamSlots
+}{of: map[*database.DB]streamSlots{}}
+
+// streamSlotsFor is the slots of db's pool.
+func streamSlotsFor(db *database.DB) streamSlots {
+	streams.Lock()
+	defer streams.Unlock()
+	slots, ok := streams.of[db]
+	if !ok {
+		slots = newStreamSlots(db)
+		streams.of[db] = slots
+	}
+	return slots
+}
 
 func newStreamSlots(db *database.DB) streamSlots {
 	n := exportStreams
@@ -101,6 +122,7 @@ func registerExport(api huma.API, in core.Deps) {
 		core.AtOneBuild
 		core.Narrowing
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "the minimum severity could not be read")
@@ -175,6 +197,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 		Format string `path:"format" enum:"csv,json"`
 		core.Narrowing
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -293,6 +316,7 @@ func withCodeFindings(by core.Narrowing, at core.AtOneBuild) core.Stated {
 // no row.
 func codeFindingRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
 	return func(ctx context.Context, limit, offset int) ([][]string, error) {
+		in := core.Of(ctx, in)
 		open, err := analysis.OpenCodeFindingsOf(ctx, in.DB.DB, subject, scope, limit, offset)
 		if errors.Is(err, access.ErrDenied) {
 			return nil, nil

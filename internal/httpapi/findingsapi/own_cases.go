@@ -53,6 +53,7 @@ func registerOwnCases(api huma.API, in core.Deps) {
 			"grant is not listed. A pipeline key is refused with 403.",
 		Tags: []string{"Access"},
 	}, core.OwnSubject, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body OwnCasesBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

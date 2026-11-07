@@ -58,6 +58,8 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			"destination is told apart by its name and kind.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[OutboundBody], error) {
+		a := a.In(ctx)
+		in := core.Of(ctx, in)
 		if _, _, err := core.Administerable(ctx, a, a.Handle()); err != nil {
 			return nil, err
 		}
@@ -130,6 +132,8 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		Status int
 		Body   OutboundBody
 	}, error) {
+		a := a.In(ctx)
+		in := core.Of(ctx, in)
 		by, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -223,6 +227,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		Name string `path:"name"`
 		Kind string `path:"kind"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		by, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

@@ -15,66 +15,100 @@ import (
 
 const twoNamespacesAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 
-func TestAPackageUnderTwoNamespacesIsReachedByNamingOne(t *testing.T) {
+func TestAPackageUnderOneOfTwoNamespacesIsReachedByName(t *testing.T) {
+	// One package shipped under two namespaces, with the issue open at one of
+	// them. Every subtest reads and none writes.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ShipsUnderTwoNamespaces(t, httpapitest.SeededLib)
-		around := twoNamespacesAt + "/components/libnl-3-200/around?version=3.7.0&ecosystem=deb"
+		t.Run("APackageUnderTwoNamespacesIsReachedByNamingOne", func(t *testing.T) {
+			around := twoNamespacesAt + "/components/libnl-3-200/around?version=3.7.0&ecosystem=deb"
 
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, around, "")
-		if got.Code != http.StatusConflict {
-			t.Fatalf("a name, version and ecosystem held twice answered %d, want 409: %s",
-				got.Code, got.Body.String())
-		}
-		for _, namespace := range []string{`"namespace":"debian"`, `"namespace":"sonic"`} {
-			if !strings.Contains(got.Body.String(), namespace) {
-				t.Errorf("the refusal does not offer %s, so it offers no way out: %s",
-					namespace, got.Body.String())
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, around, "")
+			if got.Code != http.StatusConflict {
+				t.Fatalf("a name, version and ecosystem held twice answered %d, want 409: %s",
+					got.Code, got.Body.String())
 			}
-		}
+			for _, namespace := range []string{`"namespace":"debian"`, `"namespace":"sonic"`} {
+				if !strings.Contains(got.Body.String(), namespace) {
+					t.Errorf("the refusal does not offer %s, so it offers no way out: %s",
+						namespace, got.Body.String())
+				}
+			}
 
-		for _, namespace := range []string{"debian", "sonic"} {
-			got = httpapitest.AsPerson(t, r, "triager", http.MethodGet, around+"&namespace="+namespace, "")
+			for _, namespace := range []string{"debian", "sonic"} {
+				got = httpapitest.AsPerson(t, r, "triager", http.MethodGet, around+"&namespace="+namespace, "")
+				if got.Code != http.StatusOK {
+					t.Errorf("naming the %s namespace answered %d: %s",
+						namespace, got.Code, got.Body.String())
+				}
+			}
+		})
+		t.Run("AFindingOpenUnderOneOfTwoNamespacesNeedsNoChoice", func(t *testing.T) {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, twoNamespacesAt+
+				"/findings/CVE-2026-9999/components/libnl-3-200?version=3.7.0", "")
 			if got.Code != http.StatusOK {
-				t.Errorf("naming the %s namespace answered %d: %s",
-					namespace, got.Code, got.Body.String())
+				t.Errorf("a finding open at one of the two answered %d, want 200: %s",
+					got.Code, got.Body.String())
 			}
-		}
+		})
 	})
 }
 
-func TestAFindingOpenUnderOneOfTwoNamespacesNeedsNoChoice(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ShipsUnderTwoNamespaces(t, httpapitest.SeededLib)
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, twoNamespacesAt+
-			"/findings/CVE-2026-9999/components/libnl-3-200?version=3.7.0", "")
-		if got.Code != http.StatusOK {
-			t.Errorf("a finding open at one of the two answered %d, want 200: %s",
-				got.Code, got.Body.String())
-		}
-	})
-}
-
-func TestAFindingOpenUnderBothNamespacesOffersBoth(t *testing.T) {
+func TestAFindingOpenUnderBothNamespacesIsReachedByName(t *testing.T) {
+	// One package shipped under two namespaces, with the issue open at both.
+	// Only the last writes: it records a decision, after the others have read.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ShipsUnderTwoNamespaces(t, httpapitest.SeededLib, httpapitest.SeededTwin)
-		at := twoNamespacesAt + "/findings/CVE-2026-9999/components/libnl-3-200?version=3.7.0"
+		t.Run("AFindingOpenUnderBothNamespacesOffersBoth", func(t *testing.T) {
+			at := twoNamespacesAt + "/findings/CVE-2026-9999/components/libnl-3-200?version=3.7.0"
 
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
-		if got.Code != http.StatusConflict {
-			t.Fatalf("a finding open at both answered %d, want 409: %s",
-				got.Code, got.Body.String())
-		}
-		body := got.Body.String()
-		if !strings.Contains(body, `"carrying"`) ||
-			!strings.Contains(body, `"namespace":"debian"`) ||
-			!strings.Contains(body, `"namespace":"sonic"`) {
-			t.Errorf("the refusal does not offer both carrying components: %s", body)
-		}
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
+			if got.Code != http.StatusConflict {
+				t.Fatalf("a finding open at both answered %d, want 409: %s",
+					got.Code, got.Body.String())
+			}
+			body := got.Body.String()
+			if !strings.Contains(body, `"carrying"`) ||
+				!strings.Contains(body, `"namespace":"debian"`) ||
+				!strings.Contains(body, `"namespace":"sonic"`) {
+				t.Errorf("the refusal does not offer both carrying components: %s", body)
+			}
 
-		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"&ecosystem=deb&namespace=sonic", "")
-		if got.Code != http.StatusOK {
-			t.Errorf("naming the namespace answered %d: %s", got.Code, got.Body.String())
-		}
+			got = httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"&ecosystem=deb&namespace=sonic", "")
+			if got.Code != http.StatusOK {
+				t.Errorf("naming the namespace answered %d: %s", got.Code, got.Body.String())
+			}
+		})
+		t.Run("AListNarrowedBeneathAComponentTakesTheNamespace", func(t *testing.T) {
+			at := "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom" +
+				"&beneath=libnl-3-200&beneath_version=3.7.0"
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
+			if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), `"namespace":"sonic"`) {
+				t.Errorf("a name held twice answered %d, want 409 offering both: %s",
+					got.Code, got.Body.String())
+			}
+			got = httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+				at+"&beneath_ecosystem=deb&beneath_namespace=sonic", "")
+			if got.Code != http.StatusOK {
+				t.Errorf("naming the namespace answered %d: %s", got.Code, got.Body.String())
+			}
+		})
+		t.Run("ADecisionReachesABuildThatNamesThePackageUnderAnotherNamespace", func(t *testing.T) {
+			// Only the distribution's namespace in the other build.
+			r.ScannedAlso(t, "mellanox", "3.8.0")
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, twoNamespacesAt+
+				"/findings/CVE-2026-9999/components/libnl-3-200/decision"+
+				"?version=3.7.0&ecosystem=deb&namespace=sonic",
+				`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
+					`"also":[{"branch_or_tag":"master","variant":"mellanox","version":"3.8.0"}]}`)
+			if got.Code != http.StatusCreated {
+				t.Fatalf("deciding across a build naming it under another namespace answered %d: %s",
+					got.Code, got.Body.String())
+			}
+			if !strings.Contains(got.Body.String(), `"variant":"mellanox"`) {
+				t.Errorf("the other build is missing from what was recorded: %s", got.Body.String())
+			}
+		})
 	})
 }
 
@@ -143,44 +177,6 @@ func TestARouteNamingAFindingOpenAtOneOfTwoNeedsNoNamespace(t *testing.T) {
 			})
 		})
 	}
-}
-
-func TestADecisionReachesABuildThatNamesThePackageUnderAnotherNamespace(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ShipsUnderTwoNamespaces(t, httpapitest.SeededLib, httpapitest.SeededTwin)
-		// Only the distribution's namespace in the other build.
-		r.ScannedAlso(t, "mellanox", "3.8.0")
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, twoNamespacesAt+
-			"/findings/CVE-2026-9999/components/libnl-3-200/decision"+
-			"?version=3.7.0&ecosystem=deb&namespace=sonic",
-			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
-				`"also":[{"branch_or_tag":"master","variant":"mellanox","version":"3.8.0"}]}`)
-		if got.Code != http.StatusCreated {
-			t.Fatalf("deciding across a build naming it under another namespace answered %d: %s",
-				got.Code, got.Body.String())
-		}
-		if !strings.Contains(got.Body.String(), `"variant":"mellanox"`) {
-			t.Errorf("the other build is missing from what was recorded: %s", got.Body.String())
-		}
-	})
-}
-
-func TestAListNarrowedBeneathAComponentTakesTheNamespace(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ShipsUnderTwoNamespaces(t, httpapitest.SeededLib, httpapitest.SeededTwin)
-		at := "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom" +
-			"&beneath=libnl-3-200&beneath_version=3.7.0"
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
-		if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), `"namespace":"sonic"`) {
-			t.Errorf("a name held twice answered %d, want 409 offering both: %s",
-				got.Code, got.Body.String())
-		}
-		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			at+"&beneath_ecosystem=deb&beneath_namespace=sonic", "")
-		if got.Code != http.StatusOK {
-			t.Errorf("naming the namespace answered %d: %s", got.Code, got.Body.String())
-		}
-	})
 }
 
 func TestTheListsLinkingToAFindingSayWhichComponentItIs(t *testing.T) {

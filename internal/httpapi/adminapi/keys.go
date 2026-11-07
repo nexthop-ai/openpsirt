@@ -31,6 +31,7 @@ func registerKeys(api huma.API, a core.Administering) {
 			"whether it still works. The secrets are not here and cannot be: what is stored is a digest.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[KeyBody], error) {
+		a := a.In(ctx)
 		store, names, err := core.Administerable(ctx, a, a.Handle())
 		if err != nil {
 			return nil, err
@@ -124,6 +125,7 @@ func registerKeys(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Body KeyBody
 	}) (*core.DeclaredOutput[KeyBody], error) {
+		a := a.In(ctx)
 		var name, secret string
 		var resolved KeyBody
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
@@ -202,6 +204,7 @@ func registerKeys(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Name string `path:"name"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {

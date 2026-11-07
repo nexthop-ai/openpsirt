@@ -91,6 +91,7 @@ func registerIssue(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Limit         int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
 	}) (*IssueOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

@@ -81,6 +81,7 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		Within int `query:"within" minimum:"0" maximum:"3650" doc:"Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone"`
 	}) (*retiredOutput, error) {
+		in := core.Of(ctx, in)
 		rows, err := outOfSupport(ctx, in, input.ScopeQuery, input.Within)
 		if err != nil {
 			return nil, err
@@ -122,6 +123,7 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		Within int `query:"within" minimum:"0" maximum:"3650" doc:"Also write out releases whose date falls inside this many days ahead, marked as not yet ended"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		rows, err := outOfSupport(ctx, in, input.ScopeQuery, input.Within)
 		if err != nil {
 			return nil, err

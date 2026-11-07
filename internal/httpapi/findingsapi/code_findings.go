@@ -158,6 +158,7 @@ func registerCodeFindings(api huma.API, in core.Deps) {
 		Variant     string `path:"variant"`
 		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 	}) (*struct{ Body CodeFindingEvidenceBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

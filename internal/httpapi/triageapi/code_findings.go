@@ -56,6 +56,7 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 		Body        CodeFindingDecisionBody
 	}) (*struct{ Body core.DecisionOccurrenceBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -153,6 +154,7 @@ func registerCodeFindingFixed(api huma.API, in core.Deps) {
 			FixedIn int64  `json:"fixed_in" minimum:"1" doc:"The run whose build fixed it"`
 		}
 	}) (*struct{ Body CodeFindingFixedBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

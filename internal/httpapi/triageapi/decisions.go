@@ -53,6 +53,7 @@ func registerDecisions(api huma.API, in core.Deps) {
 		ID   int64 `path:"id"`
 		Body DecisionApprovalBody
 	}) (*struct{ Body DecisionApprovedBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -116,6 +117,7 @@ func registerDecisions(api huma.API, in core.Deps) {
 			Because string `json:"because" minLength:"1" doc:"The change being asked for, in markdown"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -194,6 +196,7 @@ func registerDecisionLink(api huma.API, in core.Deps) {
 			Elsewhere string `json:"elsewhere" maxLength:"1000" doc:"The place the work is happening. Empty clears it"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -259,6 +262,7 @@ func registerReaffirmDecision(api huma.API, in core.Deps) {
 			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason every one of them still holds, in markdown"`
 		}
 	}) (*struct{ Body ReaffirmedBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

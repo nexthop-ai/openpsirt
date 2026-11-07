@@ -119,6 +119,7 @@ func registerScrutiny(api huma.API, in core.Deps) {
 		core.Period
 		Limit int `query:"limit" default:"100" minimum:"1" maximum:"500" doc:"The number of rows each section carries at most. capped says a section reached it"`
 	}) (*scrutinyOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

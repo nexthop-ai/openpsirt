@@ -129,6 +129,7 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 			"the server's rule and stays there.",
 		Tags: []string{"Access"},
 	}, core.OwnSubject, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body WhoBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

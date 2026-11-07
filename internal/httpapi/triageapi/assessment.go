@@ -92,6 +92,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Body          AssessmentBody
 	}) (*struct{ Body AssessmentBody }, error) {
+		in := core.Of(ctx, in)
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -142,6 +143,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		"not one in the path.", core.ApproveRights()...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{ Body AssessmentBody }, error) {
+		in := core.Of(ctx, in)
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -175,6 +177,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -216,6 +219,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		State   core.AssessmentState `query:"state" doc:"Limit to one state"`
 		core.Paging
 	}) (*core.ListOutput[AssessmentBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

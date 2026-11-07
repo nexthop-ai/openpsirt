@@ -113,6 +113,8 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 		Identity string `path:"identity" maxLength:"191"`
 		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of each list returned"`
 	}) (*struct{ Body AboutPersonBody }, error) {
+		a := a.In(ctx)
+		in := core.Of(ctx, in)
 		store, _, err := readable(ctx, a, a.Handle())
 		if err != nil {
 			return nil, err
@@ -244,6 +246,7 @@ func registerDeactivation(api huma.API, a core.Administering) {
 			Since    string `json:"since" doc:"The date they left"`
 		}
 	}, error) {
+		a := a.In(ctx)
 		out := &struct {
 			Body struct {
 				Released int64  `json:"released" doc:"Findings, code findings and vulnerability reports handed back: theirs, and what their teams' queues held that no remaining member reads"`
@@ -343,6 +346,7 @@ func registerDeactivation(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Identity string `path:"identity" maxLength:"191"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			rights, _, person, err := aboutPerson(ctx, a, tx, input.Identity)
 			if err != nil {

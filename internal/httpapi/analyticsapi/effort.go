@@ -56,6 +56,7 @@ func registerEffort(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most rows to return"`
 		Offset  int    `query:"offset" minimum:"0" doc:"How many rows to skip, in the order the report is sorted"`
 	}) (*core.OverPeriod[SpentBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

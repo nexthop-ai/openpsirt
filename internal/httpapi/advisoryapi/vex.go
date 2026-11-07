@@ -48,6 +48,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			Undisclosed bool         `query:"undisclosed" doc:"Include findings nobody has announced. A preview, not a document to publish"`
 			Kind        documentKind `query:"kind" doc:"Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours"`
 		}) (*struct{ Body *vex.Statements }, error) {
+			in := core.Of(ctx, in)
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
@@ -85,6 +86,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			Variant     string       `path:"variant"`
 			Kind        documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
 		}) (*publishedVEXList, error) {
+			in := core.Of(ctx, in)
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
@@ -149,6 +151,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			Status int
 			Body   VEXRecordedBody
 		}, error) {
+			in := core.Of(ctx, in)
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
@@ -190,6 +193,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			Version     int          `path:"version" minimum:"1" doc:"Which revision, counting from one"`
 			Kind        documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
 		}) (*struct{ Body json.RawMessage }, error) {
+			in := core.Of(ctx, in)
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err

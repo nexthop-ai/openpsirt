@@ -50,6 +50,7 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*core.ListOutput[SupplierAdvisoryFeedBody], error) {
+		in := core.Of(ctx, in)
 		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
 		if err != nil {
 			return nil, err
@@ -111,6 +112,7 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 		Status int
 		Body   SupplierAdvisoryFeedBody
 	}, error) {
+		in := core.Of(ctx, in)
 		// Normalized here so the stored value is the address as it parses. The
 		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
@@ -169,6 +171,7 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Name    string `path:"name"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename committing
 			// between the two is what a retry reads.

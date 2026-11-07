@@ -58,6 +58,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			Product       string `path:"product"`
 			Vulnerability string `path:"issue"`
 		}) (*core.ListOutput[CollaboratorBody], error) {
+			in := core.Of(ctx, in)
 			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
@@ -97,6 +98,8 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			Vulnerability string `path:"issue"`
 			Identity      string `path:"identity"`
 		}) (*struct{}, error) {
+			a := a.In(ctx)
+			in := core.Of(ctx, in)
 			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
@@ -173,6 +176,8 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			Vulnerability string `path:"issue"`
 			Identity      string `path:"identity"`
 		}) (*struct{}, error) {
+			a := a.In(ctx)
+			in := core.Of(ctx, in)
 			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err

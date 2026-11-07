@@ -82,6 +82,7 @@ func registerMeasures(api huma.API, in core.Deps) {
 		Product string `query:"product" doc:"Limit to decisions made in one product, by name"`
 		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows"`
 	}) (*struct{ Body MeasuresBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

@@ -62,6 +62,7 @@ func registerDue(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*core.ListOutput[LateBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

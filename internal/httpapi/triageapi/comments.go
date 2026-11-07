@@ -28,6 +28,7 @@ func registerComments(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*core.ListOutput[core.WrittenBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -63,6 +64,7 @@ func registerComments(api huma.API, in core.Deps) {
 			Body string `json:"body" minLength:"1"`
 		}
 	}) (*struct{ Body core.MentionsBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -87,6 +89,7 @@ func registerComments(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*core.ListOutput[core.WasSaidBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

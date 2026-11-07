@@ -51,6 +51,7 @@ func registerTeams(api huma.API, a core.Administering) {
 		Tags: []string{"Administration"},
 	}, core.AnyPerson, "Membership is listed for an administrator; anybody else sees the names."),
 		func(ctx context.Context, _ *struct{}) (*core.ListOutput[TeamBody], error) {
+			a := a.In(ctx)
 			if _, err := core.Reading(ctx); err != nil {
 				return nil, err
 			}
@@ -100,6 +101,7 @@ func registerTeams(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Body TeamRecordBody
 	}) (*core.DeclaredOutput[TeamBody], error) {
+		a := a.In(ctx)
 		by, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -184,6 +186,7 @@ func registerTeams(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Team string `path:"team"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
@@ -225,6 +228,7 @@ func registerTeams(api huma.API, a core.Administering) {
 		Team     string `path:"team"`
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		by, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -275,6 +279,7 @@ func registerTeams(api huma.API, a core.Administering) {
 		Team     string `path:"team"`
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {

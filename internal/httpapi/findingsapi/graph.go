@@ -100,6 +100,7 @@ func registerGraph(api huma.API, in core.Deps) {
 		Limit       int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of matches returned. Only read when searching"`
 		Code        bool   `query:"code_findings" doc:"Count the open code findings on each component and beneath it as well. Requires security-testing-read on the product"`
 	}) (*rootsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, product, build, err := core.BrowsingIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -185,6 +186,7 @@ func registerGraph(api huma.API, in core.Deps) {
 		Namespace   string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components"`
 		Code        bool   `query:"code_findings" doc:"Count the open code findings on each component and beneath it as well. Requires security-testing-read on the product"`
 	}) (*struct{ Body AroundBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, build, err := core.BrowsingIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -218,6 +220,7 @@ func countingCode(in core.Deps, subject access.Subject, productID int64, asked b
 		return nil, core.Refused(in.Logger, err, "code finding counts need security-testing-read on the product")
 	}
 	return store.CountingCode(func(ctx context.Context, buildID int64, components []int64) (map[int64][]string, error) {
+		in := core.Of(ctx, in)
 		return analysis.OpenOn(ctx, in.DB.DB, subject, productID, buildID, components)
 	}), nil
 }

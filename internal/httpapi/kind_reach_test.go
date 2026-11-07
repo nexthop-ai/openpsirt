@@ -144,12 +144,14 @@ func TestTheDeadlinePassRewritesNoCodeFinding(t *testing.T) {
 	})
 }
 
-// The screens about what a build contains count the vulnerability findings at
-// a component and no code finding there.
-func TestTheInventoryScreensCountNoCodeFinding(t *testing.T) {
+// The screens about what a build contains, and the figures about findings,
+// count the vulnerability findings and no code finding. Both read the same
+// build before and after its one finding becomes a code finding, so the kind
+// is rewritten once between the two reads.
+func TestTheInventoryScreensAndFiguresCountNoCodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		counted := func() int {
+		counted := func(t *testing.T) int {
 			t.Helper()
 			var top struct {
 				Items []struct {
@@ -164,22 +166,7 @@ func TestTheInventoryScreensCountNoCodeFinding(t *testing.T) {
 			}
 			return total
 		}
-		if counted() == 0 {
-			t.Fatal("the tree counts nothing at the scanned component, so this checks nothing")
-		}
-		asKind(t, r, "CVE-2026-9999", "analysis", "public")
-		if got := counted(); got != 0 {
-			t.Errorf("the tree counts %d findings where the one finding is a code finding", got)
-		}
-	})
-}
-
-// The figures about findings — the trend and a product's overview — count
-// the vulnerability and no code finding.
-func TestTheFiguresCountNoCodeFinding(t *testing.T) {
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.Scanned(t)
-		figures := func() (trend, overview int) {
+		figures := func(t *testing.T) (trend, overview int) {
 			t.Helper()
 			var points struct {
 				Items []struct {
@@ -196,13 +183,30 @@ func TestTheFiguresCountNoCodeFinding(t *testing.T) {
 			httpapitest.Read(t, r, "reader", "/v1/products/mine/overview", &shown)
 			return points.Items[len(points.Items)-1].Open, shown.Open
 		}
-		if trend, overview := figures(); trend == 0 || overview == 0 {
-			t.Fatalf("the figures count %d and %d open, so this checks nothing", trend, overview)
-		}
+		tree := counted(t)
+		trend, overview := figures(t)
 		asKind(t, r, "CVE-2026-9999", "analysis", "public")
-		if trend, overview := figures(); trend != 0 || overview != 0 {
-			t.Errorf("the trend counts %d open and the overview %d where the one finding is a code finding", trend, overview)
-		}
+
+		// The screens about what a build contains count the vulnerability
+		// findings at a component and no code finding there.
+		t.Run("TheInventoryScreensCountNoCodeFinding", func(t *testing.T) {
+			if tree == 0 {
+				t.Fatal("the tree counts nothing at the scanned component, so this checks nothing")
+			}
+			if got := counted(t); got != 0 {
+				t.Errorf("the tree counts %d findings where the one finding is a code finding", got)
+			}
+		})
+		// The figures about findings — the trend and a product's overview —
+		// count the vulnerability and no code finding.
+		t.Run("TheFiguresCountNoCodeFinding", func(t *testing.T) {
+			if trend == 0 || overview == 0 {
+				t.Fatalf("the figures count %d and %d open, so this checks nothing", trend, overview)
+			}
+			if trend, overview := figures(t); trend != 0 || overview != 0 {
+				t.Errorf("the trend counts %d open and the overview %d where the one finding is a code finding", trend, overview)
+			}
+		})
 	})
 }
 

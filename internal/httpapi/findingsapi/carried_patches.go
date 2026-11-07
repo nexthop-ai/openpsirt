@@ -73,6 +73,7 @@ func registerCarried(api huma.API, in core.Deps) {
 		Component   string `query:"component" doc:"Narrow to what one package was claimed about"`
 		core.Paging
 	}) (*core.CountedListOutput[CarriedDecisionBody], error) {
+		in := core.Of(ctx, in)
 		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err

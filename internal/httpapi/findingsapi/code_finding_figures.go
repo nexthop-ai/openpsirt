@@ -138,6 +138,7 @@ type CodeFindingFixingBody struct {
 
 func registerCodeFindingTiming(api huma.API, in core.Deps) {
 	judged := func(ctx context.Context, input *CodeFindingWindowAsked) (*analysis.Judging, time.Time, time.Time, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := figuresScoped(ctx, in, input.Product, input.CodeFindingNarrowing,
 			"time the judging of code findings")
 		if err != nil {
@@ -192,6 +193,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 	})
 
 	fixed := func(ctx context.Context, input *CodeFindingWindowAsked) (*analysis.Fixing, time.Time, time.Time, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := figuresScoped(ctx, in, input.Product, input.CodeFindingNarrowing,
 			"time the fixing of code findings")
 		if err != nil {

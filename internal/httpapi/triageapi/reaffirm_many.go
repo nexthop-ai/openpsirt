@@ -62,6 +62,7 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset  int    `query:"offset" minimum:"0"`
 	}) (*ToReaffirmOutput, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -138,6 +139,7 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 			Decisions []ReaffirmedBody `json:"decisions" doc:"One entry per decision re-made"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

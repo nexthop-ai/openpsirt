@@ -42,6 +42,7 @@ func registerLabels(api huma.API, in core.Deps) {
 			core.ComponentQuery
 			Label string `path:"label" maxLength:"191" doc:"The word, matched without regard to capitals"`
 		}) (*struct{}, error) {
+			in := core.Of(ctx, in)
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
@@ -107,6 +108,7 @@ func registerLabels(api huma.API, in core.Deps) {
 		core.ReadRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*core.ListOutput[string], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

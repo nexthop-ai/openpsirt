@@ -50,6 +50,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

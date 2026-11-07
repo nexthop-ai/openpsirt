@@ -607,52 +607,48 @@ func TestASearchHitCarriesWhatIsBeneathItAsTheTreeDoes(t *testing.T) {
 	})
 }
 
-func TestASearchMatchingNothingReadsNoCodeFinding(t *testing.T) {
-	// The code finding read takes no components as the whole build, so a
-	// search that reaches nothing asks it for nothing.
+func TestASearchOverOneAppliedTree(t *testing.T) {
+	// One applied tree, searched by every subtest and changed by none.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
-		var asked [][]int64
-		store := f.store.CountingCode(func(_ context.Context, _ int64, components []int64) (map[int64][]string, error) {
-			asked = append(asked, components)
-			return map[int64][]string{}, nil
+		// The code finding read takes no components as the whole build, so a
+		// search that reaches nothing asks it for nothing.
+		t.Run("ASearchMatchingNothingReadsNoCodeFinding", func(t *testing.T) {
+			var asked [][]int64
+			store := f.store.CountingCode(func(_ context.Context, _ int64, components []int64) (map[int64][]string, error) {
+				asked = append(asked, components)
+				return map[int64][]string{}, nil
+			})
+			found, err := store.Search(ctx, everyone(f), f.buildID, "nosuch", 10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(found) != 0 || len(asked) != 0 {
+				t.Errorf("a search matching nothing found %+v and read code findings for %v; want neither", found, asked)
+			}
+			// A search matching something reads them, so the count above is of
+			// a read that happens.
+			if _, err := store.Search(ctx, everyone(f), f.buildID, "curl", 10); err != nil {
+				t.Fatal(err)
+			}
+			if len(asked) != 1 || len(asked[0]) == 0 {
+				t.Errorf("a search finding curl read code findings for %v; want one read of what it reaches", asked)
+			}
 		})
-		found, err := store.Search(ctx, everyone(f), f.buildID, "nosuch", 10)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(found) != 0 || len(asked) != 0 {
-			t.Errorf("a search matching nothing found %+v and read code findings for %v; want neither", found, asked)
-		}
-		// A search matching something reads them, so the count above is of
-		// a read that happens.
-		if _, err := store.Search(ctx, everyone(f), f.buildID, "curl", 10); err != nil {
-			t.Fatal(err)
-		}
-		if len(asked) != 1 || len(asked[0]) == 0 {
-			t.Errorf("a search finding curl read code findings for %v; want one read of what it reaches", asked)
-		}
-	})
-}
-
-func TestASearchDoesNotFindTheBuildItself(t *testing.T) {
-	// The root is the build rather than one of its components, which is what
-	// every other read of a build's contents says.
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), tree()); err != nil {
-			t.Fatal(err)
-		}
-		found, err := f.store.Search(ctx, everyone(f), f.buildID, root.Name, 10)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(found) != 0 {
-			t.Errorf("searching for the build's own name found %+v", found)
-		}
+		// The root is the build rather than one of its components, which is what
+		// every other read of a build's contents says.
+		t.Run("ASearchDoesNotFindTheBuildItself", func(t *testing.T) {
+			found, err := f.store.Search(ctx, everyone(f), f.buildID, root.Name, 10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(found) != 0 {
+				t.Errorf("searching for the build's own name found %+v", found)
+			}
+		})
 	})
 }
 

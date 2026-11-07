@@ -119,6 +119,7 @@ func registerReadiness(api huma.API, in core.Deps) {
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`
 	}) (*struct{ Body ReadinessBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

@@ -48,6 +48,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		CountsQuery
 	}) (*core.ListOutput[core.ProductBody], error) {
+		d := d.In(ctx)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -127,6 +128,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		Retired bool   `query:"retired" doc:"Include branches and tags that have been retired. They say so, and no scan may be filed against one"`
 		CountsQuery
 	}) (*core.ListOutput[core.BranchOrTagBody], error) {
+		d := d.In(ctx)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -227,6 +229,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		CountsQuery
 	}) (*core.ListOutput[core.VariantBody], error) {
+		d := d.In(ctx)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -269,6 +272,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		BranchOrTag string `path:"branch_or_tag"`
 		CountsQuery
 	}) (*core.ListOutput[core.VariantBody], error) {
+		d := d.In(ctx)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

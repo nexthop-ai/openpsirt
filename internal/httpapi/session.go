@@ -37,6 +37,7 @@ func registerSession(api huma.API, in core.Deps) {
 		Tags:          []string{"Access"},
 		DefaultStatus: http.StatusNoContent,
 	}, core.OwnSubject, ""), func(ctx context.Context, _ *struct{}) (*SignOutOutput, error) {
+		in := core.Of(ctx, in)
 		// Signing out is not something a pipeline's key can do: there is no
 		// session behind it to end, and answering as though there were would
 		// suggest one existed.

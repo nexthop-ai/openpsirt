@@ -94,6 +94,7 @@ func registerRemediation(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		core.Period
 	}) (*RemediationOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -154,6 +155,7 @@ func registerRemediation(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset  int    `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*core.ListOutput[RepeatBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -198,6 +200,7 @@ func registerRemediation(api huma.API, in core.Deps) {
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
 		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"The number of deferrals that makes something worth listing. One is an ordinary decision"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

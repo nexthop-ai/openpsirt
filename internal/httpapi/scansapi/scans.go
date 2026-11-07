@@ -101,6 +101,7 @@ func registerScans(api huma.API, in core.Deps) {
 		MaxBodyBytes: core.MaxUpload(in.Limits),
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
+				in := core.Of(hc.Context(), in)
 				_, _, err := admitted(hc.Context(), in, hc.Param("product"), hc.Param("branch_or_tag"), hc.Param("variant"))
 				return err
 			},
@@ -110,6 +111,7 @@ func registerScans(api huma.API, in core.Deps) {
 		DefaultStatus: http.StatusAccepted,
 	}, core.PerProduct, "A pipeline key covering this product, branch and variant sends without any "+
 		"of these, and is how a build sends.", core.TriageRights()...), func(ctx context.Context, input *UploadInput) (*UploadOutput, error) {
+		in := core.Of(ctx, in)
 		return upload(ctx, in, input)
 	}, core.FormerUpload)
 }
@@ -248,6 +250,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		outcome ingest.Outcome
 	)
 	err = database.InTransaction(ctx, in.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		in := core.Of(ctx, in)
 		scan, taken, err := ingest.NewStore(tx).Record(ctx, arriving)
 		// Recorded before the error is checked: a refusal carries the reason
 		// in the outcome, and that is what decides which answer the producer
@@ -354,6 +357,7 @@ func refusedAt(ctx context.Context, in core.Deps, subject access.Subject, refusa
 // sender has been admitted to that build.
 func refusedBeforeReading(in core.Deps) func(huma.Context, int, string) {
 	return func(hctx huma.Context, _ int, reason string) {
+		in := core.Of(hctx.Context(), in)
 		ctx := hctx.Context()
 		subject, named, err := admitted(ctx, in, hctx.Param("product"), hctx.Param("branch_or_tag"),
 			hctx.Param("variant"))

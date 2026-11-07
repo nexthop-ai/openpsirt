@@ -98,49 +98,68 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 	})
 }
 
-func TestAVEXDocumentCarriesNothingNobodyHasAnnounced(t *testing.T) {
-	// Every statement names an issue and a component in something we ship, so
-	// a document built from undisclosed work would announce the undisclosed
-	// work.
+func TestAVEXDocumentLeavesOutAnUndisclosedDismissal(t *testing.T) {
+	// One undisclosed issue dismissed and agreed to. The generated document is
+	// read first; only the last subtest writes, recording the document that
+	// goes out.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		hidden := r.Embargoed(t)
 		decision, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
 		r.AgreedBy(t, "private-dispatcher", decision)
-
-		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
-		var doc struct {
-			Statements []struct {
-				Vulnerability struct {
-					Name string `json:"name"`
-				} `json:"vulnerability"`
-			} `json:"statements"`
-		}
-		// Even to somebody who may read it, the document is public by default:
-		// it is a thing to publish.
-		httpapitest.Read(t, r, "private-triage", at, &doc)
-		for _, one := range doc.Statements {
-			if one.Vulnerability.Name == hidden {
-				t.Fatalf("an undisclosed flaw is in a document meant for customers: %+v", doc)
+		// Every statement names an issue and a component in something we ship, so
+		// a document built from undisclosed work would announce the undisclosed
+		// work.
+		t.Run("AVEXDocumentCarriesNothingNobodyHasAnnounced", func(t *testing.T) {
+			const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
+			var doc struct {
+				Statements []struct {
+					Vulnerability struct {
+						Name string `json:"name"`
+					} `json:"vulnerability"`
+				} `json:"statements"`
 			}
-		}
+			// Even to somebody who may read it, the document is public by default:
+			// it is a thing to publish.
+			httpapitest.Read(t, r, "private-triage", at, &doc)
+			for _, one := range doc.Statements {
+				if one.Vulnerability.Name == hidden {
+					t.Fatalf("an undisclosed flaw is in a document meant for customers: %+v", doc)
+				}
+			}
 
-		// Asked for as a preview, somebody who may read it sees it.
-		httpapitest.Read(t, r, "private-triage", at+"?undisclosed=true", &doc)
-		var found bool
-		for _, one := range doc.Statements {
-			found = found || one.Vulnerability.Name == hidden
-		}
-		if !found {
-			t.Errorf("the preview leaves out what it is for: %+v", doc.Statements)
-		}
+			// Asked for as a preview, somebody who may read it sees it.
+			httpapitest.Read(t, r, "private-triage", at+"?undisclosed=true", &doc)
+			var found bool
+			for _, one := range doc.Statements {
+				found = found || one.Vulnerability.Name == hidden
+			}
+			if !found {
+				t.Errorf("the preview leaves out what it is for: %+v", doc.Statements)
+			}
 
-		// And somebody who may not read undisclosed work cannot ask for it.
-		// Answered as a product nobody declared rather than as a refusal, on
-		// purpose: 403 here would say "there is undisclosed work in this
-		// product and you may not see it", which is the fact being withheld.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"?undisclosed=true", ""),
-			http.StatusNotFound)
+			// And somebody who may not read undisclosed work cannot ask for it.
+			// Answered as a product nobody declared rather than as a refusal, on
+			// purpose: 403 here would say "there is undisclosed work in this
+			// product and you may not see it", which is the fact being withheld.
+			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"?undisclosed=true", ""),
+				http.StatusNotFound)
+		})
+		// Kept bytes are read by anybody who may read the product, so what is
+		// recorded has to be the public document whoever recorded it.
+		t.Run("AVEXDocumentThatWentOutHoldsNothingNobodyHasAnnounced", func(t *testing.T) {
+			if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, httpapitest.ABuild+"/issuance",
+				""); got.Code != http.StatusCreated {
+				t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+			}
+			got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, httpapitest.ABuild+"/issuance/1", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("reading what went out answered %d: %s", got.Code, got.Body.String())
+			}
+			if strings.Contains(got.Body.String(), hidden) {
+				t.Errorf("a document that went out names %s, which nobody has announced", hidden)
+			}
+		})
 	})
 }
 

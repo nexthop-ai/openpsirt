@@ -140,6 +140,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -301,6 +302,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 			Moved int64 `json:"moved"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -372,6 +374,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Limit  int         `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int         `query:"offset" minimum:"0"`
 	}) (*UnassignedPage, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -411,6 +414,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Limit  int         `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int         `query:"offset" minimum:"0"`
 	}) (*UnassignedPage, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -501,6 +505,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Limit  int         `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int         `query:"offset" minimum:"0"`
 	}) (*UnassignedPage, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -559,6 +564,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 	}) (*core.ListOutput[HoldingBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

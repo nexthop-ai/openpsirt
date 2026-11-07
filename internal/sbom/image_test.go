@@ -71,17 +71,20 @@ func TestARebuiltSwitchImageMovesOnlyWhatItsImagesAreStampedWith(t *testing.T) {
 	if !bytes.Contains(first, []byte(stamp)) {
 		t.Fatalf("the fixture carries no %s, so nothing is rebuilt", stamp)
 	}
-	rebuilt := bytes.ReplaceAll(first, []byte(stamp), []byte("sbom-consumer-metadata.1-0ddba11"))
+	// Read once for every engine: storing a document does not change it, and
+	// reading twenty megabytes is most of what this test costs.
+	original := readFullSize(t)
+	rebuilt, err := sbom.Read(bytes.NewReader(
+		bytes.ReplaceAll(first, []byte(stamp), []byte("sbom-consumer-metadata.1-0ddba11"))), sbom.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	world.Each(t, func(t *testing.T, w *world.World) {
 		ctx := t.Context()
 		scans := ingest.NewStore(w.DB.DB)
 		built := time.Now().UTC().Add(-24 * time.Hour)
-		apply := func(body []byte, hash string, at time.Time) graph.Applied {
+		apply := func(doc *sbom.Document, hash string, at time.Time) graph.Applied {
 			t.Helper()
-			doc, err := sbom.Read(bytes.NewReader(body), sbom.Limits{})
-			if err != nil {
-				t.Fatal(err)
-			}
 			rec, outcome, err := scans.Record(ctx, ingest.Arriving{
 				BuildID: w.Build.ID, ContentHash: hash, BuiltAt: at, ParserVersion: "test",
 			})
@@ -94,7 +97,7 @@ func TestARebuiltSwitchImageMovesOnlyWhatItsImagesAreStampedWith(t *testing.T) {
 			}
 			return applied
 		}
-		if opened := apply(first, "first", built); opened.VersionsOpened != 34 {
+		if opened := apply(original, "first", built); opened.VersionsOpened != 34 {
 			t.Errorf("the first build recorded %d image versions, want 34", opened.VersionsOpened)
 		}
 		got := apply(rebuilt, "second", built.Add(time.Hour))

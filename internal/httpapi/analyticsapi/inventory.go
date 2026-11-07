@@ -64,6 +64,7 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 		Limit       int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
 		Offset      int             `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ListedInventoryChanges, error) {
+		in := core.Of(ctx, in)
 		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -163,6 +164,7 @@ func registerInventoryComparison(api huma.API, in core.Deps) {
 		Limit  int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
 		Offset int             `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ListedInventoryDifferences, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -203,6 +205,7 @@ func registerInventoryComparisonExport(api huma.API, in core.Deps) {
 		TwoBuilds
 		Change core.ChangeKind `query:"change" doc:"One kind of change alone"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

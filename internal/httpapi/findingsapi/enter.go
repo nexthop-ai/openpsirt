@@ -142,6 +142,7 @@ func registerEntry(api huma.API, in core.Deps) {
 		Status int
 		Body   EnteredBody
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -280,6 +281,7 @@ func registerResolution(api huma.API, in core.Deps) {
 			Because string `json:"because" minLength:"1" doc:"The fix"`
 		}
 	}) (*struct{ Body ResolvedBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -342,6 +344,7 @@ func registerDisclosure(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset int `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*core.ListOutput[EmbargoedBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -464,6 +467,7 @@ func registerMovements(api huma.API, in core.Deps) {
 	}
 	moving := func(act finding.Act) func(context.Context, *movingInput) (*movingOutput, error) {
 		return func(ctx context.Context, input *movingInput) (*movingOutput, error) {
+			in := core.Of(ctx, in)
 			subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
@@ -554,6 +558,7 @@ func registerMovements(api huma.API, in core.Deps) {
 			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"The reason the issue is being disclosed"`
 		}
 	}) (*movingOutput, error) {
+		in := core.Of(ctx, in)
 		subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
@@ -593,6 +598,7 @@ func registerMovements(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue"`
 	}) (*core.ListOutput[MovementBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
@@ -624,6 +630,7 @@ func registerMovements(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*core.ListOutput[PendingMovementBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -685,6 +692,7 @@ func registerMovements(api huma.API, in core.Deps) {
 	}, core.PerProduct, "Not the person who asked for it.", []access.Role{access.PrivateTriage}...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -879,6 +887,7 @@ func registerAffects(api huma.API, in core.Deps) {
 			Reason string `json:"reason,omitempty" doc:"The reason any build is being taken out. Required whenever one is"`
 		}
 	}) (*struct{ Body AffectsBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

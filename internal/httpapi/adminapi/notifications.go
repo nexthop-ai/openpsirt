@@ -57,6 +57,7 @@ func registerNotifications(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
 		Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*notificationsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -92,6 +93,7 @@ func registerNotifications(api huma.API, in core.Deps) {
 	}, core.OwnSubject, ""), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -120,6 +122,7 @@ func registerNotifications(api huma.API, in core.Deps) {
 			Acknowledged int `json:"acknowledged" doc:"The number that were waiting"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -159,6 +162,7 @@ func registerDigest(api huma.API, in core.Deps) {
 			Unassigned bool `json:"unassigned,omitempty" doc:"Include findings nobody owns"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -198,6 +202,7 @@ func registerChatChoices(api huma.API, in core.Deps) {
 			Shared bool `json:"shared,omitempty" doc:"Whether what a channel carries is sent to you directly as well"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

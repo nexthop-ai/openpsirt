@@ -113,6 +113,7 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
 		Package   string `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
 	}) (*core.ListOutput[PointBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -163,6 +164,7 @@ func registerAnalytics(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*core.ListOutput[ReleaseBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -221,6 +223,7 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		TwoBuilds
 		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
 	}) (*struct{ Body ComparisonBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -301,6 +304,7 @@ func registerReleaseTrend(api huma.API, in core.Deps) {
 			Items []ReleasePointBody `json:"items"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -368,6 +372,7 @@ func registerNotes(api huma.API, in core.Deps) {
 		TwoBuilds
 		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -510,6 +515,7 @@ func registerCarry(api huma.API, in core.Deps) {
 		From        string `query:"from" required:"true" doc:"The branch or tag to inherit from"`
 		FromVariant string `query:"from_variant" required:"true" doc:"That branch or tag's variant"`
 	}) (*struct{ Body CarriedBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -574,6 +580,7 @@ func registerCarrying(api huma.API, in core.Deps) {
 			Carried int `json:"carried" doc:"The number of decisions written, each waiting for a second person"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err

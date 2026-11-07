@@ -107,59 +107,351 @@ func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
 	})
 }
 
-func TestAnExportAnswersAsJSONToo(t *testing.T) {
+func TestAnExportReadsTheFixturesTwoIssues(t *testing.T) {
+	// The fixture's two issues on one build, read by every subtest. Only the
+	// last writes: it declares a second variant, after the others have read.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/findings.json", "")
-		if got.Code != http.StatusOK {
-			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
-		}
-		var out struct {
-			Above string `json:"triaged_at_or_above"`
-			Items []struct {
-				Issue     string `json:"issue"`
-				Component string `json:"component"`
-			} `json:"items"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
-			t.Fatalf("the export is not JSON: %v (%s)", err, got.Body.String())
-		}
-		if out.Above == "" {
-			t.Error("the export does not state the line it was taken above")
-		}
-		if len(out.Items) != 2 {
-			t.Fatalf("the export holds %d rows, want the fixture's two", len(out.Items))
-		}
-		if out.Items[0].Component == "" || out.Items[0].Issue == "" {
-			t.Errorf("a row came out empty: %+v", out.Items[0])
-		}
-
-		// One document, one convention. The stated fact's key was written
-		// with underscores and every column name kept the spaces it is read
-		// with on paper, so the same file named its fields two ways.
-		var raw struct {
-			Items []map[string]string `json:"items"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &raw); err != nil {
-			t.Fatal(err)
-		}
-		if len(raw.Items) == 0 {
-			t.Fatal("no rows to read the keys of")
-		}
-		var spaced []string
-		for key := range raw.Items[0] {
-			if strings.Contains(key, " ") {
-				spaced = append(spaced, key)
+		t.Run("AnExportAnswersAsJSONToo", func(t *testing.T) {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+				"/v1/products/mine/findings.json", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
 			}
-		}
-		if len(spaced) != 0 {
-			t.Errorf("these keys are written as they are read on paper: %v", spaced)
-		}
-		if _, held := raw.Items[0]["upstream_fix"]; !held {
-			t.Errorf("a multi-word column is not keyed the way the stated fact is: %v",
-				raw.Items[0])
-		}
+			var out struct {
+				Above string `json:"triaged_at_or_above"`
+				Items []struct {
+					Issue     string `json:"issue"`
+					Component string `json:"component"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
+				t.Fatalf("the export is not JSON: %v (%s)", err, got.Body.String())
+			}
+			if out.Above == "" {
+				t.Error("the export does not state the line it was taken above")
+			}
+			if len(out.Items) != 2 {
+				t.Fatalf("the export holds %d rows, want the fixture's two", len(out.Items))
+			}
+			if out.Items[0].Component == "" || out.Items[0].Issue == "" {
+				t.Errorf("a row came out empty: %+v", out.Items[0])
+			}
+
+			// One document, one convention. The stated fact's key was written
+			// with underscores and every column name kept the spaces it is read
+			// with on paper, so the same file named its fields two ways.
+			var raw struct {
+				Items []map[string]string `json:"items"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &raw); err != nil {
+				t.Fatal(err)
+			}
+			if len(raw.Items) == 0 {
+				t.Fatal("no rows to read the keys of")
+			}
+			var spaced []string
+			for key := range raw.Items[0] {
+				if strings.Contains(key, " ") {
+					spaced = append(spaced, key)
+				}
+			}
+			if len(spaced) != 0 {
+				t.Errorf("these keys are written as they are read on paper: %v", spaced)
+			}
+			if _, held := raw.Items[0]["upstream_fix"]; !held {
+				t.Errorf("a multi-word column is not keyed the way the stated fact is: %v",
+					raw.Items[0])
+			}
+		})
+		// An export declaring its query parameters by hand rather than taking the
+		// list's own is how nineteen of them went missing: a parameter the
+		// endpoint does not declare is dropped before the handler runs, with no
+		// error, so the screen's Export link produced a file about a different
+		// population than the screen. Asserted as a comparison, because every
+		// single-filter assertion passed throughout — the one filter that was
+		// tested was one of the few the export still parsed.
+		t.Run("AnExportAnswersTheSameQuestionAsTheListItCameFrom", func(t *testing.T) {
+			counted := func(t *testing.T, at, query string) int {
+				t.Helper()
+				var page struct {
+					Total int `json:"total"`
+				}
+				httpapitest.Read(t, r, "triager", at+"?"+query, &page)
+				return page.Total
+			}
+			exported := func(t *testing.T, at, query string) int {
+				t.Helper()
+				got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"?"+query, "")
+				if got.Code != http.StatusOK {
+					t.Fatalf("exporting %q answered %d: %s", query, got.Code, got.Body.String())
+				}
+				reader := csv.NewReader(strings.NewReader(got.Body.String()))
+				read, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("the export is not readable as CSV: %v", err)
+				}
+				// Every export writes a comment line and a header before its rows.
+				rows := 0
+				for _, line := range read {
+					if len(line) > 0 && strings.HasPrefix(line[0], "#") {
+						continue
+					}
+					rows++
+				}
+				return rows - 1
+			}
+
+			// One filter of each kind the hand-written list left out: a plain
+			// narrowing, one that reads a date, one that walks the tree, one
+			// behind the minimum severity, and one that changes the population
+			// entirely — asking for what has closed, which this list is not about
+			// and which the export could never have produced a row of.
+			for _, each := range []struct{ list, file, query string }{
+				{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", ""},
+				{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "label=nothing-is-marked-this"},
+				{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "weakness=CWE-125"},
+				{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "epss_at_least=0.9"},
+				{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "under_build=true"},
+				{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "opened_after=2099-01-01"},
+				{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "origin=manual"},
+				{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", ""},
+				{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "label=nothing-is-marked-this"},
+				{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "assigned=nobody"},
+			} {
+				want := counted(t, each.list, each.query)
+				if got := exported(t, each.file, each.query); got != want {
+					t.Errorf("%s?%s lists %d and exports %d", each.list, each.query, want, got)
+				}
+			}
+		})
+		// A true/false column whose threshold is not in the file is a column
+		// nobody can check later, and coverage is the report read longest after
+		// the fact: what it says is that a build stopped being scanned, which
+		// only means something against a number.
+		t.Run("TheLastUploadsFileStatesTheThresholdItsQuietColumnWasComputedAgainst", func(t *testing.T) {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/last-uploads.csv", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("exporting coverage answered %d: %s", got.Code, got.Body.String())
+			}
+			reader := csv.NewReader(strings.NewReader(got.Body.String()))
+			lines, err := reader.ReadAll()
+			if err != nil {
+				t.Fatalf("coverage came back as something that is not a spreadsheet: %v", err)
+			}
+			if len(lines) < 3 {
+				t.Fatalf("coverage exported %d lines, want the statement, the header and a build",
+					len(lines))
+			}
+			if states(lines)["quiet after days"] == "" {
+				t.Errorf("coverage does not state its threshold: %v", states(lines))
+			}
+			columns := httpapitest.RowsUnder(lines)[0]
+			// Named rather than counted from, because an index moves silently when
+			// a column is added and the assertion goes on passing about the wrong
+			// one. The two that matter here are the first and the quiet flag the
+			// statement above was computed for.
+			if columns[0] != "product" || httpapitest.IndexOf(columns, "quiet") < 0 {
+				t.Errorf("coverage's columns moved: %v", columns)
+			}
+			// The pair that tells a build nobody uploads to apart from one whose
+			// uploads are refused. Both read as quiet and they are different
+			// faults.
+			if httpapitest.IndexOf(columns, "last_refused_at") < 0 || httpapitest.IndexOf(columns, "refused_because") < 0 {
+				t.Errorf("coverage does not say whether anybody is trying: %v", columns)
+			}
+
+			// Narrowed the way the screen is. An export that built the list first
+			// and narrowed it afterwards is the leak, and coverage names every
+			// build there is.
+			if strings.Contains(got.Body.String(), "theirs") {
+				t.Error("a product the reader holds nothing on is in their coverage file")
+			}
+		})
+		// EveryExportSaysWhatItIsAndWhenItWasTaken walks the API document rather
+		// than a list somebody maintains.
+		//
+		// A file that cannot say what it is and when it was taken is not
+		// evidence, and the way that fails is one export added later that states
+		// nothing — which no test of the other nine would notice.
+		t.Run("EveryExportSaysWhatItIsAndWhenItWasTaken", func(t *testing.T) {
+			// A value for every path and required query parameter an export takes.
+			// Unfilled, the request is refused and the file is never looked at, so an
+			// unknown name fails the test rather than skipping the route.
+			filled := map[string]string{
+				"product": "mine", "branch_or_tag": "master", "variant": "broadcom", "format": "csv",
+				"from": "master", "from_variant": "broadcom",
+				"to": "master", "to_variant": "broadcom",
+			}
+			examined := 0
+			for path, item := range r.API.OpenAPI().Paths {
+				if item.Get == nil || !strings.HasSuffix(path, ".{format}") {
+					continue
+				}
+				at := path
+				query := ""
+				for _, param := range item.Get.Parameters {
+					value, known := filled[param.Name]
+					switch {
+					case param.In == "path" && !known:
+						t.Errorf("GET %s takes a path parameter %q this does not know how to fill",
+							path, param.Name)
+					case param.In == "path":
+						at = strings.ReplaceAll(at, "{"+param.Name+"}", value)
+					case param.Required && !known:
+						t.Errorf("GET %s requires %q and this does not know what to send",
+							path, param.Name)
+					case param.Required:
+						query += "&" + param.Name + "=" + value
+					}
+				}
+				if strings.Contains(at, "{") {
+					continue
+				}
+				if query != "" {
+					query = "?" + strings.TrimPrefix(query, "&")
+				}
+				// Asked as somebody the operation's own declaration says may
+				// ask. A file over the deployment's own records is not a file
+				// about findings, and driving every export as one persona would
+				// make the walk skip whichever kind that persona cannot reach —
+				// which is the export this test exists to catch.
+				// Asked as the narrowest persona the declaration admits.
+				// Administration is a superset of reading the deployment's own
+				// records, so asking as an administrator leaves a file that
+				// narrowed back to administration green — which is the change
+				// this walk exists to catch.
+				who := "private-triage"
+				if asks, stated := item.Get.Extensions["x-openpsirt-requires"]; stated {
+					switch httpapitest.DeclaredScope(t, asks) {
+					case "deployment":
+						who = "admin"
+					case "records":
+						who = "auditor"
+					}
+					// A figure about security testing material is refused to
+					// everybody who reads none, so it is asked as somebody who
+					// reads that alone.
+					if strings.Contains(fmt.Sprint(asks), "security-testing-read") {
+						who = "security-testing-reader"
+					}
+				}
+				got := httpapitest.AsPerson(t, r, who, http.MethodGet, at+query, "")
+				if got.Code != http.StatusOK {
+					t.Errorf("GET %s%s answered %d: %s", at, query, got.Code, got.Body.String())
+					continue
+				}
+				reader := csv.NewReader(strings.NewReader(got.Body.String()))
+				rows, err := reader.ReadAll()
+				if err != nil {
+					t.Errorf("%s is not a spreadsheet: %v", at, err)
+					continue
+				}
+				examined++
+				if states(rows)["export"] == "" {
+					t.Errorf("%s does not say what it is: %v", at, states(rows))
+				}
+				if states(rows)["taken on"] == "" {
+					t.Errorf("%s does not say when it was taken: %v", at, states(rows))
+				}
+			}
+			if examined == 0 {
+				t.Fatal("no exports were read, so this checked nothing")
+			}
+		})
+		// The demo's seeders read the findings export by name (Makefile.demo,
+		// which nothing else runs): its issue, component, version and upstream
+		// fix columns. A name changed here leaves the demo seeding nothing, and
+		// saying so only as "no findings yet".
+		t.Run("WhatTheDemoSeedsFromIsStillThere", func(t *testing.T) {
+			got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, "/v1/products/mine/findings.csv", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
+			}
+			lines, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var header []string
+			for _, line := range lines {
+				if len(line) > 0 && line[0] == "issue" {
+					header = line
+					break
+				}
+			}
+			if header == nil {
+				t.Fatal("the export has no header row opening with the issue")
+			}
+			for _, want := range []string{"issue", "component", "version", "upstream fix"} {
+				found := false
+				for _, column := range header {
+					found = found || column == want
+				}
+				if !found {
+					t.Errorf("the export has no %q column: %v", want, header)
+				}
+			}
+		})
+		// The deadline report is what somebody takes to a meeting about dates
+		// and the comparison is what a release note is written from, and
+		// neither could leave the screen — so both answers were retyped, and a
+		// retyped list is wrong by the meeting after next.
+		t.Run("TheTwoListsThatCouldNotLeaveTheScreenNowCan", func(t *testing.T) {
+			lines := func(t *testing.T, at string) [][]string {
+				t.Helper()
+				got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
+				if got.Code != http.StatusOK {
+					t.Fatalf("exporting %s answered %d: %s", at, got.Code, got.Body.String())
+				}
+				reader := csv.NewReader(strings.NewReader(got.Body.String()))
+				read, err := reader.ReadAll()
+				if err != nil {
+					t.Fatalf("the export is not readable as CSV: %v", err)
+				}
+				rows := make([][]string, 0, len(read))
+				for _, line := range read {
+					if len(line) > 0 && strings.HasPrefix(line[0], "#") {
+						continue
+					}
+					rows = append(rows, line)
+				}
+				return rows
+			}
+
+			// The file holds what the screen holds. Asked as a comparison rather
+			// than as a number, because every export that quietly answers a
+			// narrower question passes a count assertion written against itself.
+			var screen struct {
+				Items []struct {
+					Vulnerability string `json:"vulnerability"`
+				} `json:"items"`
+			}
+			httpapitest.Read(t, r, "triager", "/v1/running-out?days=365", &screen)
+			if len(screen.Items) == 0 {
+				t.Fatal("nothing is running out in the fixture, so the export proves nothing")
+			}
+			file := lines(t, "/v1/running-out.csv?days=365")
+			if len(file)-1 != len(screen.Items) {
+				t.Errorf("the screen lists %d and the file holds %d", len(screen.Items), len(file)-1)
+			}
+
+			// And the comparison, which is one file with a column saying which of
+			// its parts a row belongs to: four files are four chances to send
+			// somebody three of them.
+			r.AlsoIn(t, "vs")
+			changed := lines(t, "/v1/products/mine/comparison.csv"+
+				"?from=master&from_variant=broadcom&to=master&to_variant=vs")
+			if len(changed) == 0 || changed[0][0] != "change" {
+				t.Fatalf("the comparison exports %v", changed)
+			}
+			for _, row := range changed[1:] {
+				switch row[0] {
+				case "fixed", "closed, not fixed", "newly present", "still present":
+				default:
+					t.Errorf("a row says it changed by %q", row[0])
+				}
+			}
+		})
 	})
 }
 
@@ -350,72 +642,6 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 	})
 }
 
-func TestAnExportAnswersTheSameQuestionAsTheListItCameFrom(t *testing.T) {
-	// An export declaring its query parameters by hand rather than taking the
-	// list's own is how nineteen of them went missing: a parameter the
-	// endpoint does not declare is dropped before the handler runs, with no
-	// error, so the screen's Export link produced a file about a different
-	// population than the screen. Asserted as a comparison, because every
-	// single-filter assertion passed throughout — the one filter that was
-	// tested was one of the few the export still parsed.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedTwoIssues(t)
-
-		counted := func(t *testing.T, at, query string) int {
-			t.Helper()
-			var page struct {
-				Total int `json:"total"`
-			}
-			httpapitest.Read(t, r, "triager", at+"?"+query, &page)
-			return page.Total
-		}
-		exported := func(t *testing.T, at, query string) int {
-			t.Helper()
-			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"?"+query, "")
-			if got.Code != http.StatusOK {
-				t.Fatalf("exporting %q answered %d: %s", query, got.Code, got.Body.String())
-			}
-			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			read, err := reader.ReadAll()
-			if err != nil {
-				t.Fatalf("the export is not readable as CSV: %v", err)
-			}
-			// Every export writes a comment line and a header before its rows.
-			rows := 0
-			for _, line := range read {
-				if len(line) > 0 && strings.HasPrefix(line[0], "#") {
-					continue
-				}
-				rows++
-			}
-			return rows - 1
-		}
-
-		// One filter of each kind the hand-written list left out: a plain
-		// narrowing, one that reads a date, one that walks the tree, one
-		// behind the minimum severity, and one that changes the population
-		// entirely — asking for what has closed, which this list is not about
-		// and which the export could never have produced a row of.
-		for _, each := range []struct{ list, file, query string }{
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", ""},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "label=nothing-is-marked-this"},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "weakness=CWE-125"},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "epss_at_least=0.9"},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "under_build=true"},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "opened_after=2099-01-01"},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "origin=manual"},
-			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", ""},
-			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "label=nothing-is-marked-this"},
-			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "assigned=nobody"},
-		} {
-			want := counted(t, each.list, each.query)
-			if got := exported(t, each.file, each.query); got != want {
-				t.Errorf("%s?%s lists %d and exports %d", each.list, each.query, want, got)
-			}
-		}
-	})
-}
-
 func TestAnExportedNameCannotBeAFormula(t *testing.T) {
 	// Component names arrive in somebody else's SBOM and these files are
 	// opened by the people holding the most access in the deployment. A cell
@@ -584,119 +810,6 @@ func TestTheCrossProductExportCarriesTheProductAndTheVisibility(t *testing.T) {
 	})
 }
 
-func TestTheTwoListsThatCouldNotLeaveTheScreenNowCan(t *testing.T) {
-	// The deadline report is what somebody takes to a meeting about dates
-	// and the comparison is what a release note is written from, and
-	// neither could leave the screen — so both answers were retyped, and a
-	// retyped list is wrong by the meeting after next.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedTwoIssues(t)
-
-		lines := func(t *testing.T, at string) [][]string {
-			t.Helper()
-			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
-			if got.Code != http.StatusOK {
-				t.Fatalf("exporting %s answered %d: %s", at, got.Code, got.Body.String())
-			}
-			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			read, err := reader.ReadAll()
-			if err != nil {
-				t.Fatalf("the export is not readable as CSV: %v", err)
-			}
-			rows := make([][]string, 0, len(read))
-			for _, line := range read {
-				if len(line) > 0 && strings.HasPrefix(line[0], "#") {
-					continue
-				}
-				rows = append(rows, line)
-			}
-			return rows
-		}
-
-		// The file holds what the screen holds. Asked as a comparison rather
-		// than as a number, because every export that quietly answers a
-		// narrower question passes a count assertion written against itself.
-		var screen struct {
-			Items []struct {
-				Vulnerability string `json:"vulnerability"`
-			} `json:"items"`
-		}
-		httpapitest.Read(t, r, "triager", "/v1/running-out?days=365", &screen)
-		if len(screen.Items) == 0 {
-			t.Fatal("nothing is running out in the fixture, so the export proves nothing")
-		}
-		file := lines(t, "/v1/running-out.csv?days=365")
-		if len(file)-1 != len(screen.Items) {
-			t.Errorf("the screen lists %d and the file holds %d", len(screen.Items), len(file)-1)
-		}
-
-		// And the comparison, which is one file with a column saying which of
-		// its parts a row belongs to: four files are four chances to send
-		// somebody three of them.
-		r.AlsoIn(t, "vs")
-		changed := lines(t, "/v1/products/mine/comparison.csv"+
-			"?from=master&from_variant=broadcom&to=master&to_variant=vs")
-		if len(changed) == 0 || changed[0][0] != "change" {
-			t.Fatalf("the comparison exports %v", changed)
-		}
-		for _, row := range changed[1:] {
-			switch row[0] {
-			case "fixed", "closed, not fixed", "newly present", "still present":
-			default:
-				t.Errorf("a row says it changed by %q", row[0])
-			}
-		}
-	})
-}
-
-func TestTheLastUploadsFileStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T) {
-	// A true/false column whose threshold is not in the file is a column
-	// nobody can check later, and coverage is the report read longest after
-	// the fact: what it says is that a build stopped being scanned, which
-	// only means something against a number.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedTwoIssues(t)
-
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/last-uploads.csv", "")
-		if got.Code != http.StatusOK {
-			t.Fatalf("exporting coverage answered %d: %s", got.Code, got.Body.String())
-		}
-		reader := csv.NewReader(strings.NewReader(got.Body.String()))
-		lines, err := reader.ReadAll()
-		if err != nil {
-			t.Fatalf("coverage came back as something that is not a spreadsheet: %v", err)
-		}
-		if len(lines) < 3 {
-			t.Fatalf("coverage exported %d lines, want the statement, the header and a build",
-				len(lines))
-		}
-		if states(lines)["quiet after days"] == "" {
-			t.Errorf("coverage does not state its threshold: %v", states(lines))
-		}
-		columns := httpapitest.RowsUnder(lines)[0]
-		// Named rather than counted from, because an index moves silently when
-		// a column is added and the assertion goes on passing about the wrong
-		// one. The two that matter here are the first and the quiet flag the
-		// statement above was computed for.
-		if columns[0] != "product" || httpapitest.IndexOf(columns, "quiet") < 0 {
-			t.Errorf("coverage's columns moved: %v", columns)
-		}
-		// The pair that tells a build nobody uploads to apart from one whose
-		// uploads are refused. Both read as quiet and they are different
-		// faults.
-		if httpapitest.IndexOf(columns, "last_refused_at") < 0 || httpapitest.IndexOf(columns, "refused_because") < 0 {
-			t.Errorf("coverage does not say whether anybody is trying: %v", columns)
-		}
-
-		// Narrowed the way the screen is. An export that built the list first
-		// and narrowed it afterwards is the leak, and coverage names every
-		// build there is.
-		if strings.Contains(got.Body.String(), "theirs") {
-			t.Error("a product the reader holds nothing on is in their coverage file")
-		}
-	})
-}
-
 func TestAFileWithNothingToStateStatesNothing(t *testing.T) {
 	// The record has no severity line. An empty "triaged_at_or_above" is a key
 	// about findings on a file about decisions — worse than silence, because
@@ -733,136 +846,4 @@ func states(rows [][]string) map[string]string {
 		out[strings.TrimPrefix(row[0], "# ")] = row[1]
 	}
 	return out
-}
-
-// TestEveryExportSaysWhatItIsAndWhenItWasTaken walks the API document rather
-// than a list somebody maintains.
-//
-// A file that cannot say what it is and when it was taken is not evidence, and
-// the way that fails is one export added later that states nothing — which no
-// test of the other nine would notice.
-func TestEveryExportSaysWhatItIsAndWhenItWasTaken(t *testing.T) {
-	// A value for every path and required query parameter an export takes.
-	// Unfilled, the request is refused and the file is never looked at, so an
-	// unknown name fails the test rather than skipping the route.
-	filled := map[string]string{
-		"product": "mine", "branch_or_tag": "master", "variant": "broadcom", "format": "csv",
-		"from": "master", "from_variant": "broadcom",
-		"to": "master", "to_variant": "broadcom",
-	}
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedTwoIssues(t)
-		examined := 0
-		for path, item := range r.API.OpenAPI().Paths {
-			if item.Get == nil || !strings.HasSuffix(path, ".{format}") {
-				continue
-			}
-			at := path
-			query := ""
-			for _, param := range item.Get.Parameters {
-				value, known := filled[param.Name]
-				switch {
-				case param.In == "path" && !known:
-					t.Errorf("GET %s takes a path parameter %q this does not know how to fill",
-						path, param.Name)
-				case param.In == "path":
-					at = strings.ReplaceAll(at, "{"+param.Name+"}", value)
-				case param.Required && !known:
-					t.Errorf("GET %s requires %q and this does not know what to send",
-						path, param.Name)
-				case param.Required:
-					query += "&" + param.Name + "=" + value
-				}
-			}
-			if strings.Contains(at, "{") {
-				continue
-			}
-			if query != "" {
-				query = "?" + strings.TrimPrefix(query, "&")
-			}
-			// Asked as somebody the operation's own declaration says may
-			// ask. A file over the deployment's own records is not a file
-			// about findings, and driving every export as one persona would
-			// make the walk skip whichever kind that persona cannot reach —
-			// which is the export this test exists to catch.
-			// Asked as the narrowest persona the declaration admits.
-			// Administration is a superset of reading the deployment's own
-			// records, so asking as an administrator leaves a file that
-			// narrowed back to administration green — which is the change
-			// this walk exists to catch.
-			who := "private-triage"
-			if asks, stated := item.Get.Extensions["x-openpsirt-requires"]; stated {
-				switch httpapitest.DeclaredScope(t, asks) {
-				case "deployment":
-					who = "admin"
-				case "records":
-					who = "auditor"
-				}
-				// A figure about security testing material is refused to
-				// everybody who reads none, so it is asked as somebody who
-				// reads that alone.
-				if strings.Contains(fmt.Sprint(asks), "security-testing-read") {
-					who = "security-testing-reader"
-				}
-			}
-			got := httpapitest.AsPerson(t, r, who, http.MethodGet, at+query, "")
-			if got.Code != http.StatusOK {
-				t.Errorf("GET %s%s answered %d: %s", at, query, got.Code, got.Body.String())
-				continue
-			}
-			reader := csv.NewReader(strings.NewReader(got.Body.String()))
-			rows, err := reader.ReadAll()
-			if err != nil {
-				t.Errorf("%s is not a spreadsheet: %v", at, err)
-				continue
-			}
-			examined++
-			if states(rows)["export"] == "" {
-				t.Errorf("%s does not say what it is: %v", at, states(rows))
-			}
-			if states(rows)["taken on"] == "" {
-				t.Errorf("%s does not say when it was taken: %v", at, states(rows))
-			}
-		}
-		if examined == 0 {
-			t.Fatal("no exports were read, so this checked nothing")
-		}
-	})
-}
-
-// The demo's seeders read the findings export by name (Makefile.demo, which
-// nothing else runs): its issue, component, version and upstream fix columns.
-// A name changed here leaves the demo seeding nothing, and saying so only as
-// "no findings yet".
-func TestWhatTheDemoSeedsFromIsStillThere(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedTwoIssues(t)
-		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, "/v1/products/mine/findings.csv", "")
-		if got.Code != http.StatusOK {
-			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
-		}
-		lines, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
-		if err != nil {
-			t.Fatal(err)
-		}
-		var header []string
-		for _, line := range lines {
-			if len(line) > 0 && line[0] == "issue" {
-				header = line
-				break
-			}
-		}
-		if header == nil {
-			t.Fatal("the export has no header row opening with the issue")
-		}
-		for _, want := range []string{"issue", "component", "version", "upstream fix"} {
-			found := false
-			for _, column := range header {
-				found = found || column == want
-			}
-			if !found {
-				t.Errorf("the export has no %q column: %v", want, header)
-			}
-		}
-	})
 }

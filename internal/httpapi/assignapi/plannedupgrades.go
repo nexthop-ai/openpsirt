@@ -111,6 +111,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		PlannedUpgradeQuery
 		core.CountedPaging
 	}) (*core.CountedListOutput[PlannedUpgradeItemBody], error) {
+		in := core.Of(ctx, in)
 		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
 			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, "the minimum severity could not be read")
@@ -155,6 +156,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		Format  string `path:"format" enum:"csv,json"`
 		PlannedUpgradeQuery
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
 			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, "the minimum severity could not be read")
@@ -302,6 +304,7 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`
 	}) (*core.ListOutput[PlannedBody], error) {
+		in := core.Of(ctx, in)
 		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -331,6 +334,7 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 		Variant     string `path:"variant"`
 		Format      string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err

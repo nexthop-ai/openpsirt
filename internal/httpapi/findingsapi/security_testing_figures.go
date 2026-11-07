@@ -141,6 +141,7 @@ type CodeFindingReleaseBody struct {
 
 func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 	precise := func(ctx context.Context, input *CodeFindingStandingAsked) (*analysis.Precision, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := figuresScoped(ctx, in, input.Product, input.CodeFindingNarrowing,
 			"measure the precision of the analyzers")
 		if err != nil {
@@ -235,6 +236,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 	})
 
 	covered := func(ctx context.Context, input *AnalysisCoverageAsked) ([]analysis.Analyzed, time.Time, time.Time, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := (CodeFindingNarrowing{BranchOrTag: input.BranchOrTag, Variant: input.Variant}).
 			selected(ctx, in, input.Product)
 		if err != nil {
@@ -295,6 +297,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 	})
 
 	released := func(ctx context.Context, input *CodeFindingsByReleaseAsked) ([]analysis.Release, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := figuresScoped(ctx, in, input.Product, CodeFindingNarrowing{
 			Variant: input.Variant, Series: input.Series, Method: input.Method,
 			Component: input.Component, ComponentVersion: input.ComponentVersion,

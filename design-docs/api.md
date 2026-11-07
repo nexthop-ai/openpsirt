@@ -20,6 +20,7 @@ filtering and cross-product reads are `design-docs/api-lists.md`.
 - [Representation](#representation)
 - [Addresses and labels](#addresses-and-labels)
 - [File organization](#file-organization)
+- [Registration and dependencies](#registration-and-dependencies)
 - [Limits](#limits)
 
 ## No private half
@@ -170,6 +171,21 @@ One description, registered from one area per thing somebody works on.
 | Each area checks its own refusal mappers, and a check at the top fails an area declaring a mapper with no such check | A mapper is private to its area |
 | Within an area, one file per subject, a subject being a noun somebody acts on, never a count of lines | |
 | The authorization primitives sit beside the declarations they enforce | |
+
+## Registration and dependencies
+
+Registering every operation is most of what building a server costs. A
+registration answers each request with the dependencies the request carries,
+so one registration serves any number of deployments over different databases.
+
+| Rule | Reason |
+|---|---|
+| A handler reads its dependencies from its request, never from what its route was registered with | One registration serves a test binary's tests, each over its own database |
+| Registering reads only what shapes a route: the limits an upload is bounded by, the interface served, the sign-in providers and the documents published | Each is fixed for the life of a process |
+| The process serves with the dependencies it registered with | A route reading either answers alike |
+| A served handler holds its own count of the uploads it reads at once | The count bounds one server's spooling |
+| The slots a streamed export holds are a share of one database's pool, held for the process | Two servers over one pool share it |
+| The test registration holds no database, queue or caller resolver | A route reading what it was registered with rather than its request fails its tests |
 
 ## Limits
 

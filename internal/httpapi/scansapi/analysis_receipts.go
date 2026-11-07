@@ -76,6 +76,7 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 		Limit       int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
 		Offset      int    `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*AnalysisReceiptsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err

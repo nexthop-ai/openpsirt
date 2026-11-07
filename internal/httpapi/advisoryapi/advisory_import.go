@@ -76,6 +76,7 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		RawBody huma.MultipartFormFiles[advisoryParts]
 	}) (*struct{ Body AdvisoryTakenBody }, error) {
+		in := core.Of(ctx, in)
 		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
 		if err != nil {
 			return nil, err

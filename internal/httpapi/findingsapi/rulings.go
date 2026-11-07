@@ -82,6 +82,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Body    RulingProposedBody
 	}) (*struct{ Body RulingBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -132,6 +133,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Limit      int      `query:"limit" minimum:"1" maximum:"500" default:"50"`
 		Offset     int      `query:"offset" minimum:"0" default:"0"`
 	}) (*core.ListOutput[RulingBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -176,6 +178,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 		Offset  int    `query:"offset" minimum:"0" default:"0"`
 	}) (*core.ListOutput[RulingBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -204,6 +207,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Ruling  int64  `path:"ruling"`
 	}) (*struct{ Body RulingBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -227,6 +231,7 @@ func registerRulings(api huma.API, in core.Deps) {
 			Product string `path:"product"`
 			Ruling  int64  `path:"ruling"`
 		}) (*struct{ Body RulingBody }, error) {
+			in := core.Of(ctx, in)
 			subject, product, err := productForReports(ctx, in, input.Product)
 			if err != nil {
 				return nil, err
@@ -252,6 +257,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Ruling  int64  `path:"ruling"`
 	}) (*struct{ Body RulingBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -277,6 +283,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue"`
 	}) (*core.ListOutput[ReportBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -322,6 +329,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Vulnerability string   `path:"issue"`
 		Report        []string `query:"report,explode" minItems:"1" maxItems:"10000" maxLength:"191" doc:"The references of the reports the ruling would cover. Repeatable"`
 	}) (*struct{ Body DuplicateDisclosureBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err

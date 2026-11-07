@@ -40,6 +40,7 @@ func registerComponentChooser(api huma.API, in core.Deps) {
 		Term  string `query:"q" minLength:"1" maxLength:"200" required:"true" doc:"Part of a name"`
 		Limit int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of entries returned"`
 	}) (*core.ListOutput[ComponentMatchBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

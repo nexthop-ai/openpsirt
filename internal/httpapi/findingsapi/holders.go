@@ -75,6 +75,7 @@ func registerHolders(api huma.API, in core.Deps) {
 		Term       string          `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals"`
 		Limit      int             `query:"limit" default:"25" minimum:"1" maximum:"100"`
 	}) (*core.ListOutput[HolderBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, wanted, err := readersHere(ctx, in, input.Product, string(input.Visibility))
 		if err != nil {
 			return nil, err

@@ -55,6 +55,21 @@ func (d Declaring) Handle() bun.IDB {
 	return d.DB.DB
 }
 
+// In is d over the database and logger ctx's request is answered with, where
+// it carries them.
+func (d Declaring) In(ctx context.Context) Declaring {
+	in := Of(ctx, Deps{DB: d.DB, Logger: d.Logger})
+	d.DB, d.Logger = in.DB, in.Logger
+	db := in.DB
+	if d.Findings != nil {
+		d.Findings = func() *finding.Store { return finding.NewStore(db.DB) }
+	}
+	if d.Scans != nil {
+		d.Scans = func() *ingest.Store { return ingest.NewStore(db.DB) }
+	}
+	return d
+}
+
 // ProductBody is a product as the API states it.
 type ProductBody struct {
 	Name        string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this product"`

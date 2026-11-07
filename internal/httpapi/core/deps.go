@@ -116,6 +116,29 @@ type Deps struct {
 	Published http.Handler
 }
 
+// serving is the context key the dependencies a request is answered with are
+// carried under.
+type serving struct{}
+
+// Serving returns ctx carrying the dependencies its request is answered with.
+//
+// A handler reads them from its request, never from what its route was
+// registered with, so one registered API answers each request with the
+// dependencies it was handed: registering every operation is most of what
+// building a server costs.
+func Serving(ctx context.Context, in Deps) context.Context {
+	return context.WithValue(ctx, serving{}, &in)
+}
+
+// Of is the dependencies ctx's request is answered with, or held where it
+// carries none.
+func Of(ctx context.Context, held Deps) Deps {
+	if in, ok := ctx.Value(serving{}).(*Deps); ok {
+		return *in
+	}
+	return held
+}
+
 // Attachments returns a store over the files this deployment holds. A nil
 // Storage inside it is the deployment that configured none, and every path
 // through it refuses in the same words.

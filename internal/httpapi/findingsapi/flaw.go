@@ -164,6 +164,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 		Variant     string `path:"variant"`
 		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 	}) (*struct{ Body FlawOfferBody }, error) {
+		in := core.Of(ctx, in)
 		at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -222,6 +223,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 		Status int
 		Body   RecordedAsFlawBody
 	}, error) {
+		in := core.Of(ctx, in)
 		at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -283,6 +285,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 			Variant     string `path:"variant"`
 			Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 		}) (*struct{}, error) {
+			in := core.Of(ctx, in)
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err
@@ -389,6 +392,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 	// reads security testing work in the product: who is on a code finding is managed by its
 	// security testing readers, whether or not it is included in disclosure.
 	recorded := func(ctx context.Context, db bun.IDB, at *codeFindingAt, occurrence string) (*finding.CodeFindingFlaw, error) {
+		in := core.Of(ctx, in)
 		if _, err := finding.NewStore(db).CodeFindingAt(ctx, at.subject, at.build, occurrence); err != nil {
 			return nil, core.Absent(in.Logger, err, "that code finding could not be looked up", core.NoSuchFinding)
 		}
@@ -407,6 +411,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 	// changing is recorded asked inside the transaction granting or withdrawing,
 	// where a disclosed flaw ends the grants.
 	changing := func(ctx context.Context, tx bun.IDB, at *codeFindingAt, occurrence string) (*finding.CodeFindingFlaw, string, error) {
+		in := core.Of(ctx, in)
 		h, err := recorded(ctx, tx, at, occurrence)
 		if err != nil {
 			return nil, "", err
@@ -430,6 +435,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Where you read security testing work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *codeFindingInput) (*core.ListOutput[CodeFindingCollaboratorBody], error) {
+			in := core.Of(ctx, in)
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err
@@ -463,6 +469,8 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Where you read security testing work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
+			a := a.In(ctx)
+			in := core.Of(ctx, in)
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err
@@ -527,6 +535,8 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Where you read security testing work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
+			a := a.In(ctx)
+			in := core.Of(ctx, in)
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err

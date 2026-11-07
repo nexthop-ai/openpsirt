@@ -98,6 +98,7 @@ func registerAnalyses(api huma.API, in core.Deps) {
 		MaxBodyBytes: analysisLimits(in).MaxCompressed + core.Envelope,
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
+				in := core.Of(hc.Context(), in)
 				_, _, err := admittedAnalysis(hc.Context(), in, hc.Param("product"), hc.Param("branch_or_tag"), hc.Param("variant"))
 				return err
 			},
@@ -107,6 +108,7 @@ func registerAnalyses(api huma.API, in core.Deps) {
 		DefaultStatus: http.StatusAccepted,
 	}, core.PerProduct, "A pipeline key covering this product, branch and variant sends without it, "+
 		"and is how a build sends.", access.SecurityTestingTriage), func(ctx context.Context, input *AnalysisInput) (*AnalysisOutput, error) {
+		in := core.Of(ctx, in)
 		return uploadAnalysis(ctx, in, input)
 	})
 }
@@ -220,6 +222,7 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 		repeat bool
 	)
 	err = database.InTransaction(ctx, in.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		in := core.Of(ctx, in)
 		store := series.NewStore(tx)
 		var err error
 		run, repeat, err = store.Receive(ctx, series.Arriving{
@@ -366,6 +369,7 @@ func analysisRefused(ctx context.Context, in core.Deps, subject access.Subject, 
 // sender has been admitted to the build.
 func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, int, string) {
 	return func(hctx huma.Context, _ int, reason string) {
+		in := core.Of(hctx.Context(), in)
 		ctx := hctx.Context()
 		subject, named, err := admittedAnalysis(ctx, in, hctx.Param("product"), hctx.Param("branch_or_tag"),
 			hctx.Param("variant"))

@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -137,6 +138,9 @@ type Reach struct {
 	// Deps is what the handler was built from, so a test that needs one more
 	// thing wired builds a second handler from the same deployment.
 	Deps core.Deps
+	// built is the registration the handler serves, which a handler wired
+	// with one more thing serves too.
+	built *httpapi.Built
 }
 
 // Response is what came back, for the tests that compare answers rather than
@@ -522,7 +526,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 // differently — the one that has not been told who it publishes as.
 func ReachAs(t *testing.T, on withCast, as publisher.Named, fn func(t *testing.T, r *Reach)) {
 	t.Helper()
-	reach(t, on, as, func(*core.Deps) {}, fn)
+	reach(t, on, as, nil, fn)
 }
 
 // ReachAdjusted is ReachOn for a test that needs a bound brought down to
@@ -573,11 +577,40 @@ func reach(t *testing.T, on withCast, as publisher.Named, adjust func(*core.Deps
 			// settings answer rather than saying the deployment offers none.
 			Chats: []string{notify.Slack},
 		}
-		adjust(&deps)
-		handler, api := httpapi.New(quiet, nil, deps)
-		fn(t, &Reach{Handler: handler, Key: made.key, Revoked: made.revoked,
-			Rights: rights, DB: db, API: api, Deps: deps})
+		deps.Logger = quiet
+		reached := &Reach{Key: made.key, Revoked: made.revoked, Rights: rights, DB: db, Deps: deps}
+		if adjust == nil {
+			// Every operation registered once per binary, each test's
+			// dependencies handed to it per request.
+			reached.built = registered()
+		} else {
+			// An adjustment may change what registering reads, such as the
+			// limits an upload is bounded by, so it is registered afresh.
+			adjust(&reached.Deps)
+			reached.built = httpapi.Build(nil, reached.Deps)
+		}
+		reached.Handler = reached.built.Serving(reached.Deps)
+		reached.API = reached.built.API
+		fn(t, reached)
 	})
+}
+
+// shared is every operation registered once for the binary, over dependencies
+// holding none of what a request reads: a route reading what it was
+// registered with rather than its request's finds no database and fails.
+var shared struct {
+	once  sync.Once
+	built *httpapi.Built
+}
+
+// registered is the binary's one registration of every operation, with the
+// shape the reach's dependencies give it: no upload limits, interface,
+// sign-in provider or published document.
+func registered() *httpapi.Built {
+	shared.once.Do(func() {
+		shared.built = httpapi.Build(nil, core.Deps{Logger: slog.New(slog.DiscardHandler)})
+	})
+	return shared.built
 }
 
 // DeclaredScope reads the scope off an operation's declaration, whichever
@@ -626,9 +659,8 @@ func Deriving(t *testing.T, r *Reach, groups bool) *Reach {
 		}
 		return access.AsMode(stored)
 	}
-	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, deps)
 	with := *r
-	with.Handler = handler
+	with.Handler = r.built.Serving(deps)
 	with.Deps = deps
 	return &with
 }

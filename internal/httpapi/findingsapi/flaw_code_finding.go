@@ -79,6 +79,7 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue" doc:"The flaw, by any name it is known under"`
 	}) (*struct{ Body FlawCodeFindingBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -151,6 +152,7 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 			Because string `json:"because" minLength:"1" doc:"Why the flaw record is undone, in markdown"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
