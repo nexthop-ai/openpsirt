@@ -247,6 +247,7 @@ Resolution is computed from scans (REQ-35), and a duration is a subtraction.
 | A fix at or before its publication date counts as no time from publication | At disclosure nothing was left to fix; left out, the earliest fixes raise the average |
 | A merged issue is timed from the date it holds, which a merge carries from the absorbed issue where the kept one has none (`design-docs/findings-issues.md` § Merged issues) | Every finding moves to the issue kept |
 | Both figures and the undated count are over the same fixed issues, narrowed for the reader as the fix count is (REQ-43) | The date is public; which issues were fixed is not |
+| Both figures and the undated count come from the one statement averaging the fixes | No slower at 102,645 findings: 98 ms on PostgreSQL either way (`design-docs/findings-measurements.md` § Time to fix from publication) |
 | A code finding's figures have one clock | A rule has no publication date |
 | The Program overview shows the two side by side per severity, "Since we saw it" and "Since published"; a severity with no dated fix shows a dash | |
 | A publication figure leaving fixes out is underlined, and its hover counts them | The count stays beside the figure it changes |

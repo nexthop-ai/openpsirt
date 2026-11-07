@@ -13,6 +13,7 @@ justifies. `make measure` re-runs the harness-driven ones.
 - [A year of nightly scans](#a-year-of-nightly-scans)
 - [Replaced inventory check](#replaced-inventory-check)
 - [Remediation beside a check](#remediation-beside-a-check)
+- [Time to fix from publication](#time-to-fix-from-publication)
 
 ## Fan-out cost
 
@@ -203,3 +204,22 @@ findings. Median of five reads of one product's figures over all time.
 | Asked of each row | Two correlated EXISTS per row raise PostgreSQL's estimate past its default `jit_above_cost`, and each statement spends over a second compiling |
 | One set | An uncorrelated lookup prices each statement under the threshold |
 | MySQL and MariaDB | Measured on the set alone |
+
+## Time to fix from publication
+
+Justifies working out the publication figure and the undated count in the
+statement averaging the first-sighting figure (`design-docs/analytics-program.md`
+§ Remediation metrics). Model: the full-size image, fifteen issues at every
+component, ten of them fixed everywhere and five open, every other issue
+dated: 102,645 findings. Median of five reads of one product's figures over
+all time, two runs each.
+
+| Engine | First sighting alone | With the publication figure |
+|---|---:|---:|
+| SQLite | 229 ms, 239 ms | 243 ms, 224 ms |
+| PostgreSQL | 100 ms, 98 ms | 113 ms, 98 ms |
+
+| Reading | Detail |
+|---|---|
+| The difference | Inside run-to-run noise: the date is one column of the issue row the statement already joins |
+| MySQL and MariaDB | Not measured; SQLite and PostgreSQL show no cost |
