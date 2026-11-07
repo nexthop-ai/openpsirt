@@ -10,6 +10,7 @@ durability and gate build rules.
 - [The race pass](#the-race-pass)
 - [Measurement databases](#measurement-databases)
 - [Commit durability](#commit-durability)
+- [Test bodies](#test-bodies)
 - [Suite totals](#suite-totals)
 - [Gate build work](#gate-build-work)
 
@@ -125,6 +126,19 @@ where two runs of one tree vary by 5 to 10 s on each large package.
 The server pass over every package, six at once, went from 516 s to 246 s of
 package time with the shared pool and the data in memory, where the 516 s reused
 databases an earlier run migrated and the 246 s migrated every one.
+
+## Test bodies
+
+Rules in `design-docs/build-tests.md` § Test bodies. One test alone on a
+workstation, before and after, except where a package is named.
+
+| Test, engine | Before | After |
+|---|---|---|
+| The upward tree's bound, SQLite | 0.54 to 0.59 s | 0.04 s |
+| The same, under the race detector | 2.12 to 2.27 s | 0.12 to 0.13 s |
+| The graph package, PostgreSQL | 10.1 s | 4.2 s |
+| The graph package, MySQL | 5.8 s | 1.8 s |
+| The graph package, MariaDB | 3.3 s | 1.6 s |
 
 ## Suite totals
 

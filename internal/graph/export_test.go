@@ -30,5 +30,11 @@ func (s *Store) Climbed(ctx context.Context, buildID int64, componentIDs []int64
 	return len(r.at), edges, nil
 }
 
-// Ours is the most components the upward tree assembles over.
-const Ours = ours
+// AssemblingAtMost is the store with the tree seen upward bounded at n
+// components, so a test reaches the bound without writing the default's
+// worth of findings.
+func (s *Store) AssemblingAtMost(n int) *Store {
+	bounded := *s
+	bounded.ours = n
+	return &bounded
+}
