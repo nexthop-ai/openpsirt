@@ -87,9 +87,19 @@ type correlation struct {
 // correlationsSpelledOut is every comparison in Go source that correlates a
 // decision with a finding by hand, or compares two rows by occurrence, with where
 // it is as "file:line".
+//
+// Each pattern names a column, so a line holding neither column is passed over
+// before either pattern runs: 0.16 s against 14.7 s matching every line, under
+// the race detector.
 func correlationsSpelledOut(name, source string) []correlation {
+	if !strings.Contains(source, "occurrence_identity") && !strings.Contains(source, "issue_id") {
+		return nil
+	}
 	var found []correlation
 	for i, line := range strings.Split(source, "\n") {
+		if !strings.Contains(line, "occurrence_identity") && !strings.Contains(line, "issue_id") {
+			continue
+		}
 		at := name + ":" + strconv.Itoa(i+1)
 		for _, match := range sameOccurrence.FindAllStringSubmatch(line, -1) {
 			found = append(found, correlation{at: at, pair: pairOf(match[1], match[2])})
