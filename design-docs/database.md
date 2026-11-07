@@ -167,7 +167,7 @@ model's reflected table.
 
 | Engine | Dialect | Reason |
 |---|---|---|
-| PostgreSQL, SQLite | One for the process, shared by every handle | Its cache is built under its own lock and never changed after, and it reads nothing from the connection. One per handle reflected every model again per test: under the race detector the finding package took 57 to 59 s of processor time against 42 to 45 s shared |
+| PostgreSQL, SQLite | One for the process, shared by every handle the database package opens or wraps | Its cache is built under its own lock and never changed after, and it reads nothing from the connection. One per handle reflects every model again for each handle, and a SQLite test opens a handle of its own: under the race detector the finding package takes 57 to 59 s of processor time with one per handle against 42 to 45 s shared |
 | MySQL, MariaDB | One per handle | Its initialization asks the server its version and turns on what MariaDB and each MySQL release accept, in that dialect alone |
 
 ## SQLite settings

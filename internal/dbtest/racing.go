@@ -11,8 +11,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 	_ "modernc.org/sqlite"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -154,10 +152,11 @@ func Racing(t *testing.T, between func()) (*database.DB, *Race) {
 		t.Fatal(err)
 	}
 	owner := &Race{Connector: base, between: between}
-	handle := &database.DB{
-		DB:     bun.NewDB(sql.OpenDB(owner), sqlitedialect.New()),
-		Server: database.Server{Engine: database.SQLite},
+	query, err := database.Query(sql.OpenDB(owner), database.SQLite)
+	if err != nil {
+		t.Fatal(err)
 	}
+	handle := &database.DB{DB: query, Server: database.Server{Engine: database.SQLite}}
 	t.Cleanup(func() { _ = handle.Close() })
 	return handle, owner
 }

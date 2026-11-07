@@ -418,9 +418,10 @@ func alwaysEncrypted(config *pgconn.Config) bool {
 // The PostgreSQL and SQLite dialects are one value each for the process. A
 // dialect holds the cache of every model's reflected table, which is built
 // under its own lock and never changed after, and their initialization reads
-// nothing from the connection. A dialect per handle reflected every model again
-// for every handle: a test opens one, and under the race detector the
-// reflection and its pluralizing were 9% of a package's samples.
+// nothing from the connection. A dialect per handle reflects every model again
+// for each handle, and a SQLite test opens a handle of its own: under the race
+// detector the reflection and its pluralizing are 9% of a package's samples
+// with a dialect per handle.
 var (
 	postgresDialect = pgdialect.New()
 	sqliteDialect   = sqlitedialect.New()
