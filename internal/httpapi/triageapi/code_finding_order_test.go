@@ -95,6 +95,10 @@ func TestTheQueueIsOrderedByTheToolsOwnRating(t *testing.T) {
 			}
 			return paths
 		}
+		// Every rule is on record unrated before a run rates it, as the
+		// seeded code finding's rules are, so the rating arrives as a change
+		// to a rule held.
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-90*time.Minute), casesRun(cases, false))
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), casesRun(cases, true))
 		rated := queue()
 		// A run of the tool that rates nothing and tags nothing leaves the
