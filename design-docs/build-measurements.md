@@ -144,3 +144,5 @@ Rules in `design-docs/build.md` § Make targets and `design-docs/build-tests.md`
 | The vet `go test` runs, per pass, after an exported change in a package most others import | 1.8 s wall, 11 s processor | None |
 | Linking every test binary, one at a time | 55 s; 1.8 GB of binaries | 42 to 47 s; 1.4 GB |
 | Linking the largest API test binary | 1.25 s wall, 1.65 s processor; 52 MB | 0.93 s, 1.10 s; 41 MB |
+| The server pass over the packages reaching no database, cold build cache | 3.2 s wall, 10.8 s processor | Not run |
+| The same, warm | 2.3 to 3.1 s wall, 7.4 s processor | Not run |

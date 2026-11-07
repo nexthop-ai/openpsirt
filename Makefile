@@ -201,11 +201,18 @@ SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -vet=off
 # The label goes through a pipe, and the shell here runs with pipefail, so a
 # failing pass is still a failing pipeline. Watched going red one pass at a
 # time.
+#
+# The race pass runs every package, the server pass only those whose test
+# binaries reach a database. A binary holding no SQL connects to no engine, so
+# the server pass would run it as the race pass does, without the detector.
+# internal/tools/lanes reads the division from the dependency graph, and its
+# tests hold this recipe to it.
 test-all:
-	@( $(RACE_PASS) -p $(TEST_HALF) \
+	@servers=$$($(GO) run ./internal/tools/lanes $(PACKAGES)) || exit 1; \
+	( $(RACE_PASS) -p $(TEST_HALF) \
 	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$0; fflush() }' ) & detector=$$!; \
 	( $(SERVERS_PASS) -p $(TEST_HALF) \
-	    $(PACKAGES) 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' ) & portability=$$!; \
+	    $$servers 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' ) & portability=$$!; \
 	failed=0; \
 	wait $$detector || failed=1; \
 	wait $$portability || failed=1; \
@@ -220,7 +227,8 @@ test-race:
 # socket, which is not where a race is found: 16.9 s against 12.0 s for the API
 # package on MariaDB, where the same package on SQLite is 73.6 s against 10.1 s.
 test-engines:
-	$(SERVERS_PASS) $(PACKAGES)
+	@servers=$$($(GO) run ./internal/tools/lanes $(PACKAGES)) || exit 1; \
+	  $(SERVERS_PASS) $$servers
 
 # The checks this change has to pass, chosen from what it touches.
 #

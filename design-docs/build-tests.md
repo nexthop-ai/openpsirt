@@ -177,6 +177,8 @@ the detector's cost is in-process work. The detector is per binary, so
 
 | Rule | Reason |
 |---|---|
+| The server run takes only the packages whose test binaries reach `database/sql`; the race run takes every package | A binary holding no SQL connects to no engine, so the server run repeats it without the detector: 3.2 s and 10.8 s of processor time on a cold build cache |
+| A program reads the division from `go list -test`, never a list | Its tests report a package importing a database package that the server run lacks, a listed package outside the module, a recipe handing either run the other's list, and a listing that examined nothing or picked nothing |
 | The two runs go at once on half the cores each | One is in-process, the other waits on sockets: 100 s and 1.5 GB against 119 s and 3.4 GB in sequence |
 | Each run labels its lines as it prints | Held, a slow run looks stopped; unlabeled, nobody knows which failed |
 | A failure in either fails the target | Checked by breaking each |

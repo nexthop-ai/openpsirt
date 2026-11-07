@@ -77,7 +77,7 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | `internal/refusal/` | A caller-readable sentence, apart from a withheld fault. See `design-docs/api-refusals.md` |
 | `internal/webui/` | The embedded interface. See `design-docs/interface.md` |
 | `internal/weakness/` | Weakness catalog names. See `design-docs/findings-severity.md` |
-| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gate, release, rehearsal and image-inventory programs |
+| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gate, release, rehearsal, image-inventory and test-lane programs |
 | `web/` | The interface source. See `design-docs/interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `design-docs/packaging-chart.md` |
 | `docs/` | The documentation site |
@@ -116,7 +116,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make test` | SQLite only, parallel, cached |
 | `make test-all` | Every configured engine, uncached: the two runs below, at once |
 | `make test-race` | SQLite with the race detector |
-| `make test-engines` | The three server engines, without the detector |
+| `make test-engines` | The three server engines, without the detector, over the packages reaching a database |
 | `make docs-check` | What a documents-only change can break |
 | `make lint` | Static analysis |
 | `make vet-other-os` | Type-checks for macOS, and the upload client for Windows |
