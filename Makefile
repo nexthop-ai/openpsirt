@@ -162,8 +162,8 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/
 # The SQLite engine is C translated to Go, and instrumenting it is most of what
 # the detector costs: an empty test under the detector spends 48% of its time in
 # the engine parsing the schema, and the pointer checks the detector turns on
-# another 16 to 22%. The translated engine and the C library it runs on are
-# compiled without either. The engine's Go driver stays instrumented: an error
+# another 16 to 22%. The translated engine, the C library it runs on and the
+# allocator under that library are compiled without either. The engine's Go driver stays instrumented: an error
 # it fills in uninstrumented leaves no record of that write, so our code reading
 # it is checked against whatever last used the memory and reported as a race.
 # Our code, the query builder and the standard library stay instrumented and
@@ -171,7 +171,8 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/
 # The compiler flags are not documented for this use; a Go release that
 # rejects one fails the build.
 RACE_UNWATCHED = -gcflags='modernc.org/sqlite/lib=-race=false -d=checkptr=0' \
-	-gcflags='modernc.org/libc/...=-race=false -d=checkptr=0'
+	-gcflags='modernc.org/libc/...=-race=false -d=checkptr=0' \
+	-gcflags='modernc.org/memory=-race=false -d=checkptr=0'
 #
 # Both passes skip the vet "go test" runs first. The linter's govet runs every
 # analyzer go vet does over the test files, a superset of the ones "go test"

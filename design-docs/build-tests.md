@@ -209,9 +209,9 @@ the detector's cost is in-process work. The detector is per binary, so
 | Each run labels its lines as it prints | Held, a slow run looks stopped; unlabeled, nobody knows which failed |
 | A failure in either fails the target | Checked by breaking each |
 | The race binary sleeps 100 ms before exiting | The default second is paid per binary, the better part of a minute across the tree where the pass runs one package at a time |
-| The SQLite engine's translated C and its C library are built without the detector and its pointer checks, and nothing else is | They are most of the cost: an empty test takes 57 ms against 4.4 ms |
+| The SQLite engine's translated C, its C library and the allocator under the library are built without the detector and its pointer checks, and nothing else is | They are most of the cost: an empty test takes 57 ms against 4.4 ms |
 | The engine's Go driver stays instrumented | Uninstrumented, an error it fills reports a false race |
-| A race inside the translated C or its C library is not reported | |
+| A race inside the translated C, its C library or the allocator is not reported | |
 | A test races this tree against the standard database layer and expects the report | Excluding more silences it |
 | The per-package compiler flags are undocumented | A Go release rejecting one fails the build loudly |
 | Neither run vets; `make test` keeps the vet `go test` runs | The linter's `govet` runs every analyzer `go vet` does over the test files (`design-docs/build.md` § Static analysis), and the subset `go test` picks cost each run 1.8 s and 11 s of processor time after a change low in the tree |

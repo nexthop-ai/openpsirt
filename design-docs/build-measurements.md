@@ -79,6 +79,14 @@ in the engine parsing the schema and 16 to 22% in the pointer checks.
 | The translated engine and its C library left out | 186 s | 49 s | None |
 | Every package of the engine left out, its Go driver included | 180 s | 57 s | False, in 3 of 10 runs of one package |
 
+The allocator under the C library is the same kind of translated support, and
+leaving it out too was measured on a later tree:
+
+| The race pass, every package, four cores, two packages at once | Processor time | Wall time | Races reported |
+|---|---|---|---|
+| The translated engine and its C library left out | 367 s | 146 s | None |
+| The same and the library's allocator | 349 s | 137 s | None |
+
 Run with the server pass on twelve cores, everything warm: 119 s and 3.4 GB peak
 one after another, 100 s and 1.5 GB together.
 
