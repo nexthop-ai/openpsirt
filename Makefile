@@ -357,8 +357,8 @@ web: web-deps
 # the lockfile pins rather than re-resolving ranges at build time.
 #
 # A prerequisite of every target needing the install, never a recursive make,
-# so one make run installs once: "licenses" and "web-check" in one "check" are
-# one npm ci.
+# so one make run installs once: "licenses", "web-api" and "web-check" in one
+# "check" are one npm ci.
 web-deps:
 	@command -v $(NPM) >/dev/null 2>&1 || { \
 	  echo "npm not found, so the interface cannot be installed or checked here."; \
@@ -367,7 +367,7 @@ web-deps:
 
 # The client is generated from the committed document, so a drifted
 # document is a compile error in the interface rather than a runtime surprise.
-web-api: openapi
+web-api: web-deps openapi
 	$(NPM) --prefix web run api
 	@git diff --exit-code -- web/src/api/schema.d.ts \
 	  || { echo "web/src/api/schema.d.ts is stale: run make web-api and commit it"; exit 1; }
@@ -385,7 +385,10 @@ web-api: openapi
 # A machine without node can still gate a Go-only change: that change lands in
 # the code tier, which does not reach here. What needs node is "make check",
 # which is everything CI checks and is meant to.
-web-check: web-deps
+#
+# The client is regenerated first, as a prerequisite, so the typecheck reads
+# it and the install is shared.
+web-check: web-deps web-api
 	$(NPM) --prefix web run typecheck
 	$(NPM) --prefix web run format
 	$(NPM) --prefix web run lint
@@ -396,7 +399,6 @@ web-check: web-deps
 	$(NPM) --prefix web run ladder
 	$(NPM) --prefix web run copy
 	$(MAKE) web-audit
-	$(MAKE) web-api
 
 # Measurements, not gates.
 #

@@ -150,7 +150,7 @@ func targets(reached map[tier]bool) []string {
 	if wanted["test-all"] {
 		delete(wanted, "test")
 	}
-	// So does the interface check, which ends by regenerating the client.
+	// So does the interface check, which regenerates the client first.
 	if wanted["web-check"] {
 		delete(wanted, "web-api")
 	}
