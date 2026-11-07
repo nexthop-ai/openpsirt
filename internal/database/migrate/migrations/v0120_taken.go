@@ -48,7 +48,7 @@ func takenV0120(t *columnTypes, table string) []string {
 			// Before the first constraint, which follows the last column.
 			at := strings.Index(stmt, "CONSTRAINT")
 			if at < 0 {
-				panic("the declaration of " + table + " holds no constraint to place a column before")
+				panic("the declaration of " + table + " holds no constraint")
 			}
 			at = strings.LastIndex(stmt[:at], "\n") + 1
 			statements[i] = stmt[:at] + `			-- A fresh value written by a transaction taking the row to wait
