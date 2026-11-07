@@ -205,6 +205,10 @@ stepped over where a stopped upgrade made it already.
 | `scan_run` | The replaced inventory a run checked, empty, with a foreign key to `scan` and an index (`design-docs/findings-closure.md` § Replaced inventories) |
 | `scan` | Whether an inventory was replaced before the upgrade: true on every accepted, applied scan with a later one of its build, false on the rest and on every scan after |
 
+| Table | Loses |
+|---|---|
+| `vulnerability` | The default its kind was filled with, where present. v0.11.0 adds the kind with a default and drops the default in the next statement; on MySQL and MariaDB a start stopped between the two is resumed past the column, and the default stays. PostgreSQL and SQLite make the change in one transaction and never hold it, and SQLite is not asked |
+
 | Upgrade note | Detail |
 |---|---|
 | Replaced inventories | An inventory replaced before the upgrade is never checked; one replaced after it is, once |
@@ -216,6 +220,7 @@ stepped over where a stopped upgrade made it already.
 | A v0.11.0 database already holding the run column, or the run column, its key and its index; the column alone on the servers | Upgraded the same, nothing already made replaced |
 | A v0.11.0 database holding a replaced and a current inventory, and the same already holding the column marking it | The replaced one marked, the current one and any later one not |
 | Every check above that stops, at once | Two v0.11.0 databases per engine, each holding the inventories: one takes one date column, the run column and the marking column, the other every date column and the run's index, in the order the upgrade reaches them; each is upgraded once and checked as above. The stops of one check are alternatives, so no one database takes both |
+| A v0.10.0 database stopped after the v0.11.0 upgrade added the issue kind, on MySQL and MariaDB | Upgraded through v0.12.0, the kind declared with no default |
 
 `design-docs/build-measurements.md` § Migration tests has what sharing the
 databases saves.
