@@ -1,7 +1,7 @@
 # Build measurements
 
 Benchmark runs behind the CI cache, test database, race pass, commit
-durability and gate build rules.
+durability, seeded start, migration test and gate build rules.
 
 ## Contents
 
@@ -10,6 +10,8 @@ durability and gate build rules.
 - [The race pass](#the-race-pass)
 - [Measurement databases](#measurement-databases)
 - [Commit durability](#commit-durability)
+- [Seeded test starts](#seeded-test-starts)
+- [Migration tests](#migration-tests)
 - [Suite totals](#suite-totals)
 - [Gate build work](#gate-build-work)
 
@@ -133,6 +135,43 @@ where two runs of one tree vary by 5 to 10 s on each large package.
 The server pass over every package, six at once, went from 516 s to 246 s of
 package time with the shared pool and the data in memory, where the 516 s reused
 databases an earlier run migrated and the 246 s migrated every one.
+
+## Seeded test starts
+
+Rules in `design-docs/build-tests.md` § Undoing a test. The triage API, finding,
+API and findings API packages, one engine at a time, a workstation shared with
+other work, each binary's first test included:
+
+| A test's start | Emptied and written back | Undone |
+|---|---|---|
+| PostgreSQL, mean | 28 to 34 ms | 6.9 to 7.6 ms |
+| PostgreSQL, 90th percentile | 60 to 66 ms | 9.5 to 11 ms |
+| PostgreSQL, the four packages' starts together | 33 to 41 s | 8.1 to 9.0 s |
+| PostgreSQL, the four packages' wall time | 115 to 136 s | 88 to 90 s |
+| MySQL, mean | 5.0 ms | 3.4 ms |
+| MariaDB, mean | 4.9 ms | 4.1 ms |
+
+Deleting from `person` alone was about 31 ms of a PostgreSQL start. In an
+earlier run of the same packages, emptying with the foreign key triggers off
+averaged 9.3 ms against 23 to 28 ms with them on; that setting needs a
+superuser.
+
+## Migration tests
+
+Rules in `design-docs/database-upgrades.md`. The migrations package, one engine
+at a time, the same workstation; two runs of the earlier tree:
+
+| The migrations package | A build per test | One build per starting release | And fewer stops where a stop rolls back |
+|---|---|---|---|
+| SQLite | 10.5 to 15.9 s | 8.9 s | 5.5 s |
+| SQLite under the race detector | 56 to 68 s | 37 s | 16 s, the allocator also uninstrumented |
+| PostgreSQL | 37 to 51 s | 24 s | 22 s |
+| MySQL | 68 to 92 s | 38 s | 39 s |
+| MariaDB | 17 to 27 s | 12 s | 12 s |
+
+Covered statements were the same on every engine with one build per starting
+release. Fewer stops leaves three statements uncovered on PostgreSQL and SQLite,
+each returning from a stop, all covered on MySQL and MariaDB.
 
 ## Suite totals
 

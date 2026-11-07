@@ -217,6 +217,9 @@ stepped over where a stopped upgrade made it already.
 | A v0.11.0 database holding a replaced and a current inventory, and the same already holding the column marking it | The replaced one marked, the current one and any later one not |
 | Every check above that stops, at once | Two v0.11.0 databases per engine, each holding the inventories: one takes one date column, the run column and the marking column, the other every date column and the run's index, in the order the upgrade reaches them; each is upgraded once and checked as above. The stops of one check are alternatives, so no one database takes both |
 
+`design-docs/build-measurements.md` § Migration tests has what sharing the
+databases saves.
+
 ## Limits
 
 | Limit | Detail |
