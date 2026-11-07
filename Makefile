@@ -379,6 +379,12 @@ web-deps:
 	  echo "npm not found, so the interface cannot be installed or checked here."; \
 	  echo "Install node, or run this on a machine that has it."; exit 1; }
 	$(NPM) --prefix web ci
+	@# The interface checks' caches belong to one install. The linter's results
+	@# outlive a plugin moving under an unchanged configuration, so they are
+	@# emptied whenever the lockfile differs from the one they were made under.
+	@cmp -s web/package-lock.json web/.cache/package-lock.json || { \
+	  rm -rf web/.cache; mkdir -p web/.cache; \
+	  cp web/package-lock.json web/.cache/package-lock.json; }
 
 # The client is generated from the committed document, so a drifted
 # document is a compile error in the interface rather than a runtime surprise.

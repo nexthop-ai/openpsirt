@@ -255,8 +255,9 @@ analysis, `design-docs/build-tests.md` § The race pass and
 
 ## Gate work outside the tests
 
-Rules in `design-docs/build.md` § Static analysis. Four cores of a workstation,
-Go 1.27.3, each run from an empty build cache.
+Rules in `design-docs/build.md` § Static analysis and
+`design-docs/build-interface.md` § Interface tools. Four cores of a
+workstation, Go 1.27.3.
 
 | `make vet-other-os` | Every package on macOS, the upload client on Windows | The packages whose files differ, per system |
 |---|---|---|
@@ -267,3 +268,11 @@ Go 1.27.3, each run from an empty build cache.
 
 The packages picked are the background-pass package on macOS, and that, the
 settings package and the migration runner on Windows.
+
+| Interface check, every source file's time moved | No cache | Cached by content |
+|---|---|---|
+| `tsc` | 10.7 to 11.3 s, `tsc -b` with its build information present included | 1.2 s |
+| ESLint | 13.7 to 14.6 s | 0.7 s |
+| Prettier | 3.9 to 4.6 s | 0.6 s |
+
+The three caches are 115 kB, 194 kB and 113 kB.

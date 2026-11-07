@@ -7,3 +7,6 @@ dist/
 
 # Incremental build state for the type-checker.
 tsconfig.tsbuildinfo
+
+# The type checker's, formatter's and linter's caches for "make web-check".
+.cache/
