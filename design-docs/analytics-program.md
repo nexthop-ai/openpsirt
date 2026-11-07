@@ -250,7 +250,7 @@ Resolution is computed from scans (REQ-35), and a duration is a subtraction.
 | Both figures and the undated count come from the one statement averaging the fixes | No slower at 102,645 findings: 98 ms on PostgreSQL either way (`design-docs/findings-measurements.md` § Time to fix from publication) |
 | A code finding's figures have one clock | A rule has no publication date |
 | The Program overview shows the two side by side per severity, "Since we saw it" and "Since published"; a severity with no dated fix shows a dash | |
-| A publication figure leaving fixes out is underlined, and its hover counts them | The count stays beside the figure it changes |
+| A publication figure leaving fixes out is underlined, and its hover counts them; the printed sheet writes the count beside it | The count stays beside the figure it changes, and a hover does not print |
 | An occurrence one run recorded already closed is neither opened nor fixed | It was never open |
 | A replaced inventory's check match on an issue with a known publication date is opened and fixed, timed from its opening to the replacement (`design-docs/findings-closure.md` § Replaced inventories) | It was open over that stretch |
 | A check match marked publication date unknown is in no remediation figure | Its opening is the widest stretch it could have, so its duration is a guess |

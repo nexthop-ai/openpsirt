@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { BANDS } from "../../ui/severities";
 import { UNNARROWED } from "../../app/scope";
-import { fixTimes, openFor, undatedNote } from "./Overview";
+import { fixTimes, openFor, undatedCount, undatedNote } from "./Overview";
 import { byProduct } from "./catalog";
 
 // The parameters an address carries, one list per name.
@@ -106,5 +106,11 @@ describe("the undated hover", () => {
 
   it("says nothing where none is left out", () => {
     expect(undatedNote(0)).toBeUndefined();
+  });
+});
+
+describe("the undated count on paper", () => {
+  it("names how many fixes the figure leaves out", () => {
+    expect(undatedCount(3)).toBe("(3 undated)");
   });
 });

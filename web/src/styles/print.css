@@ -90,6 +90,13 @@
     text-decoration: none;
     color: inherit;
   }
+  /* The count a hover gives on screen. */
+  .undated {
+    text-decoration: none;
+  }
+  .undatedcount {
+    display: inline;
+  }
   .state,
   .decided {
     border: 1px solid #bbb;

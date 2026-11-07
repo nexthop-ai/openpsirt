@@ -364,9 +364,12 @@ tr.occurrences td {
 }
 
 /* A time to fix leaving out fixes with no publication date, which its hover
-   counts. */
+   counts on screen and its count beside it on paper. */
 .undated {
   text-decoration: underline dotted;
   text-underline-offset: 3px;
   cursor: help;
+}
+.undatedcount {
+  display: none;
 }

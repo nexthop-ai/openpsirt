@@ -112,6 +112,12 @@ export function undatedNote(undated: number): string | undefined {
     : `${undated.toLocaleString()} fixes have no publication date and aren't counted here`;
 }
 
+// The count a publication figure leaves out, written beside it on paper, where
+// a hover reaches nobody.
+export function undatedCount(undated: number): string {
+  return `(${undated.toLocaleString()} undated)`;
+}
+
 // Hours as whole days, the unit people quote a time to fix in.
 function inDays(hours: number): string {
   const days = Math.round(hours / 24);
@@ -294,6 +300,9 @@ export function Overview() {
                             >
                               {row.published === undefined ? "—" : inDays(row.published)}
                             </span>
+                            {row.undated > 0 && (
+                              <span className="undatedcount"> {undatedCount(row.undated)}</span>
+                            )}
                           </td>
                         </tr>
                       ))}
