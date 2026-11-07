@@ -362,3 +362,11 @@ tr.occurrences td {
 .occurrencelist .note {
   color: var(--faint);
 }
+
+/* A time to fix leaving out fixes with no publication date, which its hover
+   counts. */
+.undated {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}

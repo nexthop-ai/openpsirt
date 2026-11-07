@@ -72,6 +72,52 @@ export function openFor(
   return findingsPath(at, true, asked);
 }
 
+// One row of the time to fix table: a severity's average in hours from first
+// sighting and from publication, and how many of its fixes have no
+// publication date. Published is absent where none of them has one.
+interface FixTime {
+  band: string;
+  seen: number;
+  published?: number;
+  undated: number;
+}
+
+// The time to fix rows, worst first, the way every other list here orders
+// them. A bare sort is alphabetical and prints low above medium.
+export function fixTimes(
+  figures:
+    | {
+        time_to_fix?: Record<string, number>;
+        time_to_fix_from_publication?: Record<string, number>;
+        time_to_fix_undated?: Record<string, number>;
+      }
+    | undefined,
+): FixTime[] {
+  return Object.entries(figures?.time_to_fix ?? {})
+    .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
+    .map(([band, seen]) => ({
+      band,
+      seen,
+      published: figures?.time_to_fix_from_publication?.[band],
+      undated: figures?.time_to_fix_undated?.[band] ?? 0,
+    }));
+}
+
+// The hover on a publication figure: how many fixes it leaves out for want of
+// a date, and nothing where it leaves none out.
+export function undatedNote(undated: number): string | undefined {
+  if (undated <= 0) return undefined;
+  return undated === 1
+    ? "1 fix has no publication date and isn't counted here"
+    : `${undated.toLocaleString()} fixes have no publication date and aren't counted here`;
+}
+
+// Hours as whole days, the unit people quote a time to fix in.
+function inDays(hours: number): string {
+  const days = Math.round(hours / 24);
+  return days === 1 ? "1 day" : `${days.toLocaleString()} days`;
+}
+
 // The state of the work, rather than the work itself: how fast things are
 // fixed, what is aging, how long a decision waits for a second person, what
 // keeps being put off, and what has been argued away.
@@ -222,22 +268,38 @@ export function Overview() {
               </div>
 
               <h4 style={{ marginTop: 14 }}>Average time to fix</h4>
-              {Object.keys(pace.data?.time_to_fix ?? {}).length === 0 ? (
+              {fixTimes(pace.data).length === 0 ? (
                 <p className="hint">Nothing closed in this window.</p>
               ) : (
-                <ul className="files">
-                  {Object.entries(pace.data?.time_to_fix ?? {})
-                    // Worst first, the way every other list here orders them.
-                    // A bare sort is alphabetical, which printed low above
-                    // medium under a heading the aging table forty lines down
-                    // orders correctly.
-                    .sort(([a], [b]) => bandOrder(a) - bandOrder(b))
-                    .map(([band, hours]) => (
-                      <li key={band}>
-                        <Severity word={band} /> <b>{Math.round((hours as number) / 24)}</b> days
-                      </li>
-                    ))}
-                </ul>
+                <Wide>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Severity</th>
+                        <th className="num">Since we saw it</th>
+                        <th className="num">Since published</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fixTimes(pace.data).map((row) => (
+                        <tr key={row.band}>
+                          <td>
+                            <Severity word={row.band} />
+                          </td>
+                          <td className="num">{inDays(row.seen)}</td>
+                          <td className="num">
+                            <span
+                              className={row.undated > 0 ? "undated" : undefined}
+                              title={undatedNote(row.undated)}
+                            >
+                              {row.published === undefined ? "—" : inDays(row.published)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Wide>
               )}
 
               <h4 style={{ marginTop: 14 }}>Aging work</h4>

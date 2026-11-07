@@ -248,6 +248,8 @@ Resolution is computed from scans (REQ-35), and a duration is a subtraction.
 | A merged issue is timed from the date it holds, which a merge carries from the absorbed issue where the kept one has none (`design-docs/findings-issues.md` § Merged issues) | Every finding moves to the issue kept |
 | Both figures and the undated count are over the same fixed issues, narrowed for the reader as the fix count is (REQ-43) | The date is public; which issues were fixed is not |
 | A code finding's figures have one clock | A rule has no publication date |
+| The Program overview shows the two side by side per severity, "Since we saw it" and "Since published"; a severity with no dated fix shows a dash | |
+| A publication figure leaving fixes out is underlined, and its hover counts them | The count stays beside the figure it changes |
 | An occurrence one run recorded already closed is neither opened nor fixed | It was never open |
 | A replaced inventory's check match on an issue with a known publication date is opened and fixed, timed from its opening to the replacement (`design-docs/findings-closure.md` § Replaced inventories) | It was open over that stretch |
 | A check match marked publication date unknown is in no remediation figure | Its opening is the widest stretch it could have, so its duration is a guess |
