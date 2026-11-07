@@ -260,6 +260,9 @@ type seeder interface {
 	sqlite() ([]byte, any, error)
 	// server seeds an emptied server database for one test.
 	server(ctx context.Context, db *database.DB) (any, error)
+	// again brings a server database an earlier test left back to the seed's
+	// rows without emptying it, and reports false where it did not.
+	again(ctx context.Context, db *database.DB) (any, bool)
 }
 
 func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, seed seeder) {
@@ -322,20 +325,28 @@ func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, see
 			// The package's one database on this server holds whatever the
 			// previous test, or the previous run, left: the per-test copy
 			// SQLite takes has no counterpart on a server. So it is emptied
-			// before every test, and seeded where there is a seed. A
-			// measurement empties it to the layout a fresh load leaves,
-			// because the plan it times depends on that layout.
-			empty := clear
-			if measuring {
-				empty = fresh
-			}
-			if err := empty(t.Context(), db); err != nil {
-				t.Fatalf("empty the %s database for this test: %v", c.name, err)
-			}
+			// before every test, and seeded where there is a seed; once a
+			// seed's rows are kept, undoing what the previous test changed
+			// stands in for both where it can. A measurement empties it to
+			// the layout a fresh load leaves, because the plan it times
+			// depends on that layout.
 			var made any
+			undone := false
 			if seed != nil {
-				if made, err = seed.server(t.Context(), db); err != nil {
-					t.Fatalf("seed the %s database: %v", c.name, err)
+				made, undone = seed.again(t.Context(), db)
+			}
+			if !undone {
+				empty := clear
+				if measuring {
+					empty = fresh
+				}
+				if err := empty(t.Context(), db); err != nil {
+					t.Fatalf("empty the %s database for this test: %v", c.name, err)
+				}
+				if seed != nil {
+					if made, err = seed.server(t.Context(), db); err != nil {
+						t.Fatalf("seed the %s database: %v", c.name, err)
+					}
 				}
 			}
 			fn(t, db, made)
@@ -1134,37 +1145,16 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 	// emptying tables that are already empty. Which ones hold anything is one
 	// more statement, asked before the deletes and inside the same transaction.
 	return database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
-		occupied, err := occupied(ctx, tx, tables)
+		occupied, err := occupied(ctx, db, tx, tables)
 		if err != nil {
 			return err
-		}
-		// A tag points at the branch it was cut from. MySQL and MariaDB
-		// enforce that self-reference during a bulk delete even though every
-		// row is going; PostgreSQL and SQLite happen not to.
-		if occupied["branch_or_tag"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "branch_or_tag" SET "parent_id" = NULL`); err != nil {
-				return fmt.Errorf("detach branch or tag parents: %w", err)
-			}
-		}
-		// A decision points at the decision it was derived from, which is the
-		// same shape and the same two engines.
-		if occupied["decision"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "decision" SET "derived_from" = NULL`); err != nil {
-				return fmt.Errorf("detach derived decisions: %w", err)
-			}
-		}
-		// A window points at the window it counts from, the same shape again.
-		if occupied["response_window"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "response_window" SET "from_window_id" = NULL`); err != nil {
-				return fmt.Errorf("detach windows counting from others: %w", err)
-			}
 		}
 		for _, table := range tables {
 			if !occupied[table] {
 				continue
 			}
-			if _, err := tx.ExecContext(ctx, `DELETE FROM "`+table+`"`); err != nil {
-				return fmt.Errorf("clear %s: %w", table, err)
+			if err := deleteRows(ctx, tx, table, nil); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -1177,23 +1167,42 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 // exists to avoid, so it is one row of one column per table: a scalar subquery
 // answering 1 where the table has anything and NULL where it has not. LIMIT 1
 // rather than COUNT, because the question is whether a delete has anything to
-// do and a table under test can hold a quarter of a million rows.
-func occupied(ctx context.Context, tx bun.Tx, tables []string) (map[string]bool, error) {
-	columns := make([]string, len(tables))
-	for i, table := range tables {
-		columns[i] = fmt.Sprintf(`(SELECT 1 FROM "%s" LIMIT 1) AS "held_%d"`, table, i)
-	}
-	held := make([]sql.NullInt64, len(tables))
-	into := make([]any, len(tables))
+// do and a table under test can hold a quarter of a million rows. On a harness
+// pool the question about every table is a statement prepared once.
+func occupied(ctx context.Context, db *database.DB, tx bun.Tx, list []string) (map[string]bool, error) {
+	held := make([]sql.NullInt64, len(list))
+	into := make([]any, len(list))
 	for i := range held {
 		into[i] = &held[i]
 	}
-	if err := tx.QueryRowContext(ctx, "SELECT "+strings.Join(columns, ", ")).Scan(into...); err != nil {
+	var row *sql.Row
+	var stmt *sql.Stmt
+	if slices.Equal(list, tables) {
+		var err error
+		if stmt, err = occupancyFor(ctx, db); err != nil {
+			return nil, err
+		}
+	}
+	if stmt != nil {
+		row = tx.StmtContext(ctx, stmt).QueryRowContext(ctx)
+	} else {
+		row = tx.QueryRowContext(ctx, occupancyQuery(list))
+	}
+	if err := row.Scan(into...); err != nil {
 		return nil, fmt.Errorf("ask which tables hold rows: %w", err)
 	}
-	occupied := make(map[string]bool, len(tables))
-	for i, table := range tables {
+	occupied := make(map[string]bool, len(list))
+	for i, table := range list {
 		occupied[table] = held[i].Valid
 	}
 	return occupied, nil
+}
+
+// occupancyQuery asks which of the tables hold a row.
+func occupancyQuery(list []string) string {
+	columns := make([]string, len(list))
+	for i, table := range list {
+		columns[i] = fmt.Sprintf(`(SELECT 1 FROM "%s" LIMIT 1) AS "held_%d"`, table, i)
+	}
+	return "SELECT " + strings.Join(columns, ", ")
 }

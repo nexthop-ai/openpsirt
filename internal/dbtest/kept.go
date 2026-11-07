@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -37,7 +36,7 @@ func keep(ctx context.Context, db *database.DB) ([]keptTable, error) {
 	var kept []keptTable
 	err := database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
 		kept = nil
-		held, err := occupied(ctx, tx, tables)
+		held, err := occupied(ctx, db, tx, tables)
 		if err != nil {
 			return err
 		}
@@ -58,7 +57,18 @@ func keep(ctx context.Context, db *database.DB) ([]keptTable, error) {
 
 // readTable reads every row of one table.
 func readTable(ctx context.Context, tx bun.Tx, table string) (keptTable, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT * FROM "`+table+`"`)
+	return readTableUpTo(ctx, tx, table, 0)
+}
+
+// readTableUpTo reads at most limit rows of one table, or every row where
+// limit is zero. Which rows a limit leaves out is the engine's choice, so a
+// read reaching it is a table too large to compare, not a part of one.
+func readTableUpTo(ctx context.Context, tx bun.Tx, table string, limit int) (keptTable, error) {
+	query := `SELECT * FROM "` + table + `"`
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return keptTable{}, fmt.Errorf("read %s: %w", table, err)
 	}
@@ -106,26 +116,6 @@ func readTable(ctx context.Context, tx bun.Tx, table string) (keptTable, error) 
 // moved it, so a row a test adds takes an identifier no kept row holds.
 func restore(ctx context.Context, db *database.DB, kept []keptTable) error {
 	return database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
-		for _, table := range kept {
-			quoted := make([]string, len(table.columns))
-			for i, column := range table.columns {
-				quoted[i] = `"` + column + `"`
-			}
-			row := "(" + strings.TrimSuffix(strings.Repeat("?, ", len(table.columns)), ", ") + ")"
-			for start := 0; start < len(table.rows); start += keptBatch {
-				batch := table.rows[start:min(start+keptBatch, len(table.rows))]
-				values := make([]string, len(batch))
-				args := make([]any, 0, len(batch)*len(table.columns))
-				for i, r := range batch {
-					values[i] = row
-					args = append(args, r...)
-				}
-				if _, err := tx.ExecContext(ctx, `INSERT INTO "`+table.name+`" (`+strings.Join(quoted, ", ")+
-					`) VALUES `+strings.Join(values, ", "), args...); err != nil {
-					return fmt.Errorf("write back the seeded rows of %s: %w", table.name, err)
-				}
-			}
-		}
-		return nil
+		return insertKept(ctx, tx, kept)
 	})
 }

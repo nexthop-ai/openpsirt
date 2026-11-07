@@ -148,6 +148,22 @@ func (s *Seeded[T]) sqlite() ([]byte, any, error) {
 	return s.bytes, s.made, s.err
 }
 
+// again undoes what the previous test changed in the seed's rows on a
+// server, where the seed has run there and is kept. It reports false where it
+// did not, and the caller empties the database and calls server.
+func (s *Seeded[T]) again(ctx context.Context, db *database.DB) (any, bool) {
+	if measuring {
+		return nil, false
+	}
+	s.keptMu.Lock()
+	defer s.keptMu.Unlock()
+	kept := s.kept[db.Server.Engine]
+	if kept == nil || reconcile(ctx, db, kept.rows) != nil {
+		return nil, false
+	}
+	return kept.made, true
+}
+
 // server seeds a server database for one test. The caller has emptied it.
 //
 // The first test on an engine runs the seed and reads back what it wrote;

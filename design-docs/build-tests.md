@@ -65,7 +65,7 @@ need, such as an identifier or a secret shown once.
 | Engine | The seed runs | A later test gets |
 |---|---|---|
 | SQLite | Once per binary, into the template | A copy of the template |
-| The three servers | Once per binary, in its first test, after emptying | The rows the seed wrote, read back after it ran and written again after emptying, in one transaction |
+| The three servers | Once per binary, in its first test, after emptying | The rows the seed wrote, read back after it ran. What the test before changed is undone, in one transaction (§ Undoing a test) |
 
 | Rule | Reason |
 |---|---|
@@ -95,6 +95,31 @@ other test.
 | The catalog and access packages, the API package's catalog tests, the schema width tests | The declarations are what they test |
 | The API authorization tests | Their products and people are the matrix |
 | A migration test | It seeds the older schema it migrates from |
+
+### Undoing a test
+
+A later test on a server starts by undoing what the test before it did to the
+kept rows, in one transaction. Emptying the seeded tables costs most of a start
+on PostgreSQL, which checks every foreign key referencing a deleted row once
+per row, and most tables reference a person.
+
+| Table | At a test's start |
+|---|---|
+| Holding no kept row | Emptied |
+| Holding kept rows, with an identifier | Rows the test added deleted; kept rows it changed written back in the columns that differ; kept rows it deleted written again with their identifiers |
+| Holding kept rows, with no identifier | Emptied and written back whole where it differs |
+
+| Rule | Reason |
+|---|---|
+| Kept rows are written again, parents first, and written back before anything is deleted; the deletes run children first | Every kept row then points only at kept rows, so no delete, nor a foreign key's action on one, reaches a kept row |
+| A column referencing its own table with no action on a delete is emptied on the rows going first | MySQL and MariaDB enforce it during a bulk delete even where every row is going |
+| No foreign key references a table without an identifier | Writing it back whole would delete what references it. A test holds this and the list of self-references against the schema |
+| A table holding more than 200 rows past its kept ones, a changed column list, or a write back refused, ends the undoing: the transaction rolls back, and the database is emptied and the rows written again | Reading a large table to compare costs more than emptying it; a refusal is usually a unique value an added row holds |
+| A test changes kept rows in each way above and holds what reads back to what the seed wrote, on every engine | |
+| The question of which tables hold rows is prepared once per harness pool | Planning it costs 37 ms on a PostgreSQL connection that has not seen it and about 3 ms after |
+| A measurement never undoes | It truncates, for the layout a fresh load leaves (§ Measurement databases) |
+
+`design-docs/build-measurements.md` § Seeded test starts has the timings.
 
 ## Server database slots
 
@@ -245,6 +270,7 @@ findings package between them.
 | Limit | Detail |
 |---|---|
 | A test database is named for schema and slot alone | A checkout in the name outlives it: one workstation reached about 750 databases and 55,000 tables per MySQL and MariaDB server |
+| Foreign key checks stay on while a test starts | Suspending them is engine-specific, and on PostgreSQL needs a privilege a test server may not grant |
 | A test killed while changing the schema leaves it changed | The version still matches, so the next binary fails on the missing table until `make engines-clean` |
 | Checkouts of two schemas running at once drop each other's free databases | Each drop costs the other one build |
 | The clean trusts the slot lock alone | A database used without its lock is dropped in use |
