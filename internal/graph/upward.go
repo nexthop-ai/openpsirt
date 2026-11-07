@@ -57,8 +57,9 @@ type Upward struct {
 }
 
 // ours is the most components of somebody's own this will assemble a tree
-// over. Past it the tree is incomplete and says so, rather than being drawn
-// with counts that are quietly wrong.
+// over, the bound a store takes unless a test sets its own. Past it the tree
+// is incomplete and says so, rather than being drawn with counts that are
+// quietly wrong.
 const ours = 2000
 
 // Ours is the tree of what this subject holds in one build, seen upward.
@@ -108,7 +109,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, buildID int64)
 		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."component_id"`).
 		OrderExpr(`issues DESC, "name"`).
-		Limit(ours + 1)
+		Limit(int64(s.ours) + 1)
 	// An assignment carries a row that is not disclosed only to somebody who
 	// reads its visibility here — the rule the work list applies, for the same
 	// reason.
@@ -125,9 +126,9 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, buildID int64)
 	if len(rows) == 0 {
 		return nil, true, nil
 	}
-	complete := len(rows) <= ours
+	complete := len(rows) <= s.ours
 	if !complete {
-		rows = rows[:ours]
+		rows = rows[:s.ours]
 	}
 
 	ids := make([]int64, 0, len(rows))

@@ -12,6 +12,7 @@ durability, seeded start, migration test and gate build rules.
 - [Commit durability](#commit-durability)
 - [Seeded test starts](#seeded-test-starts)
 - [Migration tests](#migration-tests)
+- [Test bodies](#test-bodies)
 - [Suite totals](#suite-totals)
 - [Gate build work](#gate-build-work)
 
@@ -172,6 +173,18 @@ at a time, the same workstation; two runs of the earlier tree:
 Covered statements were the same on every engine with one build per starting
 release. Fewer stops leaves three statements uncovered on PostgreSQL and SQLite,
 each returning from a stop, all covered on MySQL and MariaDB.
+## Test bodies
+
+Rules in `design-docs/build-tests.md` § Test bodies. One test alone on a
+workstation, before and after, except where a package is named.
+
+| Test, engine | Before | After |
+|---|---|---|
+| The upward tree's bound, SQLite | 0.54 to 0.59 s | 0.04 s |
+| The same, under the race detector | 2.12 to 2.27 s | 0.12 to 0.13 s |
+| The graph package, PostgreSQL | 10.1 s | 4.2 s |
+| The graph package, MySQL | 5.8 s | 1.8 s |
+| The graph package, MariaDB | 3.3 s | 1.6 s |
 
 ## Suite totals
 

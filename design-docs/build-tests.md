@@ -16,6 +16,7 @@ Satisfies REQ-75.
 - [Engine selection](#engine-selection)
 - [Commit durability](#commit-durability)
 - [In-package test files](#in-package-test-files)
+- [Test bodies](#test-bodies)
 - [Limits](#limits)
 
 ## Database engines
@@ -264,6 +265,16 @@ findings package between them.
 |---|---|
 | A package the harness or the seeded world imports tests through its exported surface where it can | The trail's tests build in 0.67 s against 2.4 to 3.1 s after a change to the findings package |
 | A test needing a moment the store stamps writes the row, then moves its timestamp in the database | The store's clock is unexported, and exporting it for a test is exported code with no caller |
+
+## Test bodies
+
+Work a test repeats in its own body, past what the harness sets up.
+
+| Rule | Reason |
+|---|---|
+| A test reaching a bound sets a small one on its own store | The default's worth of rows took 3.6 to 3.8 s on PostgreSQL and MySQL, and the next test on PostgreSQL 3 s more emptying them. A package variable races with the package's parallel SQLite tests |
+
+`design-docs/build-measurements.md` § Test bodies has the timings.
 
 ## Limits
 
