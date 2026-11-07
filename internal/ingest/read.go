@@ -5,6 +5,7 @@ package ingest
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -358,9 +359,11 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			// before a parse that can take minutes, and a newer scan applied
 			// meanwhile is replaced by this one if nothing asks. The build's
 			// row is taken first, as the graph's apply takes it, so a newer
-			// scan being applied has committed before this reads.
+			// scan being applied has committed before this reads. A fresh
+			// value, because MySQL and MariaDB skip a write that changes
+			// nothing and a cluster never certifies a row nothing changed.
 			if _, err := tx.NewUpdate().Table("build").
-				Set(`"last_scan_id" = "last_scan_id"`).
+				Set(`"taken_by" = ?`, rand.Text()).
 				Where(`"id" = ?`, scan.BuildID).Exec(ctx); err != nil {
 				return fmt.Errorf("take the build: %w", err)
 			}

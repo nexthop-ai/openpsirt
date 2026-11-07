@@ -27,6 +27,7 @@ and the one in-memory lock stops a process migrating twice.
 | Two replicas migrating at start | A database-level lock (`design-docs/database-migrations.md` § Migration locks) |
 | Two scans of one build | The apply takes the build's row first, so the second waits rather than interleaving, and a scan applies whole (REQ-06) |
 | A scan and a replaced-inventory check of one build | The check writes a fresh value into the build's row before reading, since a check is never the build's last run, so each waits for the other and a cluster conflicts the two (`design-docs/findings-closure.md` § Replaced inventories) |
+| Two scans merging overlapping issues | Each takes every issue it names by writing a fresh value into its row, and goes again where one is no longer its own issue, so the second waits and a cluster conflicts the two (`design-docs/findings-issues.md` § Merged issues) |
 | Two uploads checking the room left | The upload's transaction writes a fresh value into one fixed lock row before summing what is held, so the second waits and a cluster conflicts the two at certification. A write of the value already held is not written on MySQL and MariaDB, so never certified |
 | An administrator changing a setting | Read per request, so it applies on every replica at once |
 
@@ -134,6 +135,15 @@ read answers from a snapshot and a write lands on whatever the row holds.
 | A revision's number is read before the row whose text it keeps | An edit committing between them takes the number, and the attempt goes again |
 | A bound counted before an insert takes turns on a row of the owner's first, an ordinary update writing a new value every time | Otherwise two transactions each count one under a person's saved-filter limit and both add. A new value, because MySQL and MariaDB skip an unchanged row and a cluster certifies only written rows |
 | That row is one per person in the lease table, made before the transaction opens, and nothing takes it as a lease | |
+| A write taking a row so another writer waits writes a fresh value into the row's taking column, never the value a column holds | MySQL and MariaDB skip a write that changes nothing, and a cluster certifies only written rows, so two takes on two nodes both commit |
+
+| Taken with a fresh value | By |
+|---|---|
+| An issue | A merge, for every issue it names; a replaced inventory's check, for every issue it read as undated |
+| A build | A replaced inventory's check; a read asking whether a newer scan overtook it |
+| A product, a release and a variant | Recording that a VEX document went out, matching the name each had when it was generated |
+| Every response window in force | Declaring a window counting from another, changing one, retiring one |
+| An incident | Naming or withdrawing a fix release, while the record stands |
 
 ## Absence and failure
 

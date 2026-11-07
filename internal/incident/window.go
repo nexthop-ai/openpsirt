@@ -14,6 +14,7 @@ package incident
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"strconv"
@@ -172,15 +173,16 @@ var ErrCountedFrom = refusal.New("another window in force counts from this one")
 // retiring it. Each write here checks those by reading rows it does not
 // write, and a transaction is not a lock (`design-docs/database-transactions.md` § Reads a
 // write depends on). So every declaration counting from another window, every
-// change and every retirement first writes every window in force, unchanged.
-// Two of them wait for each other, and the second reads what the first
-// committed: MySQL and MariaDB fix the snapshot at the first plain read, which
+// change and every retirement first writes a fresh value into every window in
+// force, since MySQL and MariaDB skip a write that changes nothing and a
+// cluster never certifies a row nothing changed. Two of them wait for each
+// other, and the second reads what the first committed: MySQL and MariaDB fix the snapshot at the first plain read, which
 // comes after this. The windows in force are a handful, so the whole set is
 // held rather than the rows one act happens to walk: a loop closed by two
 // changes can pass through no row either one names.
 func holdWindows(ctx context.Context, tx bun.IDB) error {
 	if _, err := tx.NewUpdate().Model((*Window)(nil)).
-		Set(`"live_name" = "live_name"`).
+		Set(`"taken_by" = ?`, rand.Text()).
 		Where(`"retired_at" IS NULL`).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("hold the windows in force: %w", err)

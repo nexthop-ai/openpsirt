@@ -195,7 +195,8 @@ stepped over where a stopped upgrade made it already.
 
 | Table | Gains |
 |---|---|
-| `vulnerability` | When the issue was published and last modified, and when that was last asked, all empty (`design-docs/findings-issues.md` § Issue dates) |
+| `vulnerability` | When the issue was published and last modified, and when that was last asked, all empty (`design-docs/findings-issues.md` § Issue dates); a value a transaction writes to take the row, empty |
+| `build`, `product`, `branch_or_tag`, `variant`, `incident`, `response_window` | A value a transaction writes to take the row, empty (`design-docs/database-transactions.md` § Reads a write depends on) |
 | `scan_run` | The replaced inventory a run checked, empty, with a foreign key to `scan` and an index (`design-docs/findings-closure.md` § Replaced inventories) |
 | `scan` | Whether an inventory was replaced before the upgrade: true on every accepted, applied scan with a later one of its build, false on the rest and on every scan after |
 

@@ -91,7 +91,7 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 	}
 	err := s.db.NewSelect().
 		Model((*triage.Incident)(nil)).
-		ColumnExpr("eh.*").
+		ColumnExpr("?TableColumns").
 		ColumnExpr(`"v"."identifier" AS "issue"`).
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).

@@ -189,3 +189,48 @@ func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
 		})
 	}
 }
+
+// A confirmation writing the value a row already holds is skipped on MySQL
+// and MariaDB, and a cluster never certifies it, so a rename on another node
+// would not conflict with a document recorded under the old name.
+func TestEveryDocumentRecordedTakesEachPartOfTheBuildWithAFreshValue(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(false), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		subject := access.NewPerson(who.ID, who.Email, false,
+			map[int64][]access.Role{w.Product.ID: {access.PublicTriage}}, 0)
+		named := publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}
+		levels := []struct {
+			table string
+			id    int64
+		}{{"product", w.Product.ID}, {"branch_or_tag", w.Branch.ID}, {"variant", w.Customer.ID}}
+		seen := map[string][]string{}
+		for range 2 {
+			if _, err := vex.NewStore(db.DB).Issued(ctx, subject, named,
+				"sonic", "master", "broadcom", vex.Ours); err != nil {
+				t.Fatal(err)
+			}
+			for _, level := range levels {
+				var by *string
+				if err := db.DB.NewSelect().Table(level.table).Column("taken_by").
+					Where(`"id" = ?`, level.id).Scan(ctx, &by); err != nil {
+					t.Fatal(err)
+				}
+				value := ""
+				if by != nil {
+					value = *by
+				}
+				seen[level.table] = append(seen[level.table], value)
+			}
+		}
+		for table, values := range seen {
+			if values[0] == "" || values[0] == values[1] {
+				t.Errorf("the %s was taken with %q then %q, want a fresh value each time", table, values[0], values[1])
+			}
+		}
+	})
+}

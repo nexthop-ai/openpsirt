@@ -216,10 +216,14 @@ func SavedQueryV0110(query string) string { return savedQueryV0110(query) }
 // StatementsV0120 is v0.12.0's declaration of each table it changes.
 func StatementsV0120(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
-	return map[string][]string{
+	statements := map[string][]string{
 		"vulnerability": vulnerabilityV0120(t),
 		"scan_run":      scanRunV0120(t),
 		"scan":          scanV0120(t),
 		"build":         buildV0120(t),
 	}
+	for _, each := range takenTablesV0120 {
+		statements[each.table] = takenV0120(t, each.table)
+	}
+	return statements
 }

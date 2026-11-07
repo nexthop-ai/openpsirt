@@ -5,6 +5,7 @@ package vex
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -427,7 +428,10 @@ func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, wha
 var ErrRenamed = refusal.New("the build was renamed while its document was being written; ask again")
 
 // stillNamed confirms each part of a build is still called what it was when
-// its document was generated.
+// its document was generated. Each confirmation writes a fresh value, because
+// MySQL and MariaDB skip a write that changes nothing and a cluster never
+// certifies a row nothing changed, so a rename on another node would not
+// conflict with it.
 func stillNamed(ctx context.Context, tx bun.IDB, named *catalog.Named) error {
 	for _, level := range []struct {
 		model any
@@ -439,7 +443,7 @@ func stillNamed(ctx context.Context, tx bun.IDB, named *catalog.Named) error {
 		{(*catalog.Variant)(nil), named.VariantID, named.Variant},
 	} {
 		result, err := tx.NewUpdate().Model(level.model).
-			Set(`"name" = "name"`).
+			Set(`"taken_by" = ?`, rand.Text()).
 			Where(`"id" = ?`, level.id).Where(`"name" = ?`, level.name).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("confirm what the build is called: %w", err)

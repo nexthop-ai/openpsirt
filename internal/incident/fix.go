@@ -5,6 +5,7 @@ package incident
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"strings"
 	"time"
@@ -211,17 +212,19 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 // standingFor reads a record this subject may act on, inside the write that
 // acts on it, and refuses one that is cleared.
 //
-// The record is written first, unchanged, while it stands, before anything
-// is read. Clearing writes the same row, so a clearing and a naming wait for
-// each other, and the one that goes second reads what the first committed: a
-// naming never lands on a record cleared after it was read
-// (`design-docs/database-transactions.md` § Reads a write depends on). The write changes
-// nothing, so it says nothing to a subject the reads below then refuse.
+// The record is taken first, while it stands, before anything is read, by a
+// write of a fresh value: MySQL and MariaDB skip a write that changes nothing
+// and a cluster never certifies a row nothing changed. Clearing writes the
+// same row, so a clearing and a naming wait for each other, and the one that
+// goes second reads what the first committed: a naming never lands on a
+// record cleared after it was read (`design-docs/database-transactions.md` §
+// Reads a write depends on). The value means nothing, so the write says
+// nothing to a subject the reads below then refuse.
 func standingFor(ctx context.Context, tx bun.IDB, subject access.Subject,
 	recordID int64) (*triage.Incident, error) {
 
 	if _, err := tx.NewUpdate().Model((*triage.Incident)(nil)).
-		Set(`"cleared_at" = "cleared_at"`).
+		Set(`"taken_by" = ?`, rand.Text()).
 		Where(`"id" = ?`, recordID).Where(`"cleared_at" IS NULL`).
 		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("hold the incident: %w", err)

@@ -5,6 +5,7 @@ package finding
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -190,9 +191,12 @@ func (v *Vulnerabilities) merging(ctx context.Context, rows []int64, names []str
 	// the first is moving and leaves an issue two steps from the one that
 	// stands. An ordinary row update is a lock every engine honors, so the
 	// second waits, finds a row that is no longer its own issue, and goes
-	// again against what the first committed.
+	// again against what the first committed. It writes a fresh value,
+	// because MySQL and MariaDB skip a write that changes nothing and a
+	// cluster never certifies a row nothing changed, so two merges on two
+	// nodes would both commit.
 	res, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
-		Set(`"issue_id" = "vu"."issue_id"`).
+		Set(`"taken_by" = ?`, rand.Text()).
 		Where(`"vu"."id" IN (?)`, bun.List(rows)).
 		Where(`"vu"."issue_id" = "vu"."id"`).Exec(ctx)
 	if err != nil {
