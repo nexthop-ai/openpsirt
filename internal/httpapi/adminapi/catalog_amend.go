@@ -56,6 +56,7 @@ func registerVariantEdits(api huma.API, d core.Declaring) {
 			CustomerFacing *bool `json:"customer_facing,omitempty" doc:"Whether it reaches customers. Omitted leaves it alone"`
 		}
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -128,6 +129,7 @@ func registerVariantEdits(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Variant string `path:"variant"`
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -189,6 +191,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			DisplayName string `json:"display_name,omitempty" maxLength:"191" doc:"What screens and documents should show instead. Omitted leaves it alone"`
 		}
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -271,6 +274,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -317,6 +321,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			Name string `json:"name" minLength:"1" maxLength:"191" doc:"What to call it instead"`
 		}
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -365,6 +370,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}

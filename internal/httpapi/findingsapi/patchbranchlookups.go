@@ -66,6 +66,7 @@ func registerPatchBranchLookups(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		core.Paging
 	}) (*PatchBranchLookupsOutput, error) {
+		in := core.Of(ctx, in)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}

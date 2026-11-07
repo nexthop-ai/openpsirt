@@ -98,6 +98,7 @@ func registerUnmatchedComponents(api huma.API, in core.Deps) {
 		Limit       int              `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
 		Offset      int              `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*unmatchedComponentsOutput, error) {
+		in := core.Of(ctx, in)
 		listed, held, err := unmatchedIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -143,6 +144,7 @@ func registerUnmatchedComponentsExport(api huma.API, in core.Deps) {
 		Format      string           `path:"format" enum:"csv,json"`
 		Reason      core.Unmatchable `query:"reason" doc:"One reason alone"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		// Worked out whole before the response starts, so a build out of reach
 		// is refused with a status rather than a file cut short. It is bounded
 		// by what one build holds now.

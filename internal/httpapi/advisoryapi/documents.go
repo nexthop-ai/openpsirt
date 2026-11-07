@@ -83,6 +83,7 @@ func registerDocuments(api huma.API, in core.Deps) {
 // product.
 func documentsOf(in core.Deps, source string) func(context.Context, *documentsInput) (*DocumentsOutput, error) {
 	return func(ctx context.Context, input *documentsInput) (*DocumentsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

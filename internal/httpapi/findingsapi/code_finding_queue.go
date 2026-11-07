@@ -272,6 +272,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 		CodeFindingsAsked
 		core.Paging
 	}) (*CodeFindingsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in)
 		if err != nil {
 			return nil, err
@@ -298,6 +299,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 		CodeFindingsAsked
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		// Refused before the first byte, so a refusal is a status rather
 		// than a line in a file that answered 200.
 		subject, scope, err := input.scoped(ctx, in)
@@ -390,6 +392,7 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 		CodeFindingsAcrossAsked
 		core.Paging
 	}) (*CodeFindingsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in)
 		if err != nil {
 			return nil, err
@@ -415,6 +418,7 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 		CodeFindingsAcrossAsked
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in)
 		if err != nil {
 			return nil, err

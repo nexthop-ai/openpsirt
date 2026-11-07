@@ -49,6 +49,7 @@ func registerRetained(api huma.API, in core.Deps) {
 		Scan        int64  `path:"sbom" doc:"The upload, as the receipt names it"`
 		Document    int64  `path:"document" doc:"The document, as the receipt names it"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		// Resolved the way the receipts list resolves the build: somebody
 		// brought into a case is answered as a stranger is, and a branch or
 		// a variant the product does not declare is named as the part that

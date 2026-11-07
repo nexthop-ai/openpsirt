@@ -64,6 +64,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*core.ListOutput[RuleBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -124,6 +125,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 		Beneath  string `query:"beneath" maxLength:"191" doc:"A component name, with * for any run of characters"`
 		Reports  bool   `query:"reports" doc:"Preview a rule placing vulnerability reports"`
 	}) (*CatchesOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -207,6 +209,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 			Reports  bool   `json:"reports,omitempty" doc:"Whether it places vulnerability reports rather than findings. Refused with either key"`
 		}
 	}) (*struct{ Body RuleBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := ruleWriter(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -264,6 +267,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 			Product string `path:"product"`
 			ID      int64  `path:"id"`
 		}) (*struct{}, error) {
+			in := core.Of(ctx, in)
 			subject, product, err := ruleWriter(ctx, in, input.Product)
 			if err != nil {
 				return nil, err

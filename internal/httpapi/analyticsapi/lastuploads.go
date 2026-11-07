@@ -111,6 +111,7 @@ func registerLastUploads(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand"`
 		Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*lastUploadsOutput, error) {
+		in := core.Of(ctx, in)
 		rows, quietAfter, err := lastUploadRows(ctx, in, input.ScopeQuery)
 		if err != nil {
 			return nil, err
@@ -209,6 +210,7 @@ func registerLastUploadsExport(api huma.API, in core.Deps) {
 		Format string `path:"format" enum:"csv,json"`
 		core.ScopeQuery
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		// Read once and paged out of the slice, because the reader answers
 		// whole: asking it again per page would re-run the same statement and
 		// re-sort the same estate for every two hundred rows.

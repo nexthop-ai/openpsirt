@@ -96,6 +96,7 @@ func registerIncidents(api huma.API, in core.Deps) {
 		Tags: []string{"Incidents"},
 	}, core.PerProduct, "A product you may not read contributes nothing, not even a count.",
 		core.ReadRights()...), func(ctx context.Context, _ *struct{}) (*struct{ Body IncidentsBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -163,6 +164,7 @@ func registerIncidents(api huma.API, in core.Deps) {
 			"products a window names are narrowed to those you may.",
 		Tags: []string{"Incidents"},
 	}, core.AnyPerson, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body WindowsBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -196,6 +198,7 @@ func registerIncidents(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Body WindowSaid
 	}) (*struct{ Body WindowBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -229,6 +232,7 @@ func registerIncidents(api huma.API, in core.Deps) {
 		ID   int64 `path:"id"`
 		Body WindowSaid
 	}) (*struct{ Body WindowBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -255,6 +259,7 @@ func registerIncidents(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -284,6 +289,7 @@ func registerIncidents(api huma.API, in core.Deps) {
 		ID   int64 `path:"id"`
 		Body NoticeSaid
 	}) (*struct{ Body core.NoticeBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

@@ -56,6 +56,7 @@ func registerCatalogRepositories(api huma.API, d core.Declaring) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 	}) (*struct{ Body RepositoriesBody }, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -86,6 +87,7 @@ func registerCatalogRepositories(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Body    RepositoriesBody
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}

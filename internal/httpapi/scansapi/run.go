@@ -71,6 +71,7 @@ func registerRun(api huma.API, in core.Deps) {
 		Variant     string `path:"variant"`
 		Run         int64  `path:"run" doc:"The run, as a receipt or a finding names it"`
 	}) (*struct{ Body RunBody }, error) {
+		in := core.Of(ctx, in)
 		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err

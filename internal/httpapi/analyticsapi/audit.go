@@ -248,6 +248,7 @@ func registerAudit(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset int `query:"offset" minimum:"0"`
 	}) (*core.CountedListOutput[AuditedBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -348,6 +349,7 @@ func registerAuditDecisions(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
 	}) (*core.CountedListOutput[AuditedDecisionBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

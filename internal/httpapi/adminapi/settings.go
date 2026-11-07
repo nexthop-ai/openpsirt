@@ -358,6 +358,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			"ignores.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[SettingBody], error) {
+		in := core.Of(ctx, in)
 		if err := core.ReadingTheDeployment(ctx); err != nil {
 			return nil, err
 		}
@@ -398,6 +399,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			Value string `json:"value" minLength:"1"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -534,6 +536,7 @@ func registerSettings(api huma.API, in core.Deps) {
 // the goroutine.
 func deadlinesRewritten(in core.Deps) func(context.Context, string, string) {
 	return func(ctx context.Context, what, value string) {
+		in := core.Of(ctx, in)
 		logger, db, replica := in.Logger, in.DB, in.Replica
 		rewriterFor(db).ask(ctx, what, value, func(ctx context.Context, what, value string) {
 			rewrite(ctx, db, replica, logger, what, value)

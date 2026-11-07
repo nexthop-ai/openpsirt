@@ -180,6 +180,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		core.ComponentQuery
 		Body FindingDecisionBody
 	}) (*struct{ Body DecidedBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

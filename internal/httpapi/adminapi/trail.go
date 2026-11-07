@@ -103,6 +103,7 @@ func registerTrail(api huma.API, in core.Deps) {
 			To   string `json:"to,omitempty"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Requester(ctx)
 		if err != nil {
 			return nil, err

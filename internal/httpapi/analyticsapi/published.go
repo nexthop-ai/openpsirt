@@ -64,6 +64,7 @@ func registerPublished(api huma.API, in core.Deps) {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		core.Period
 	}) (*core.OverPeriod[WentBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

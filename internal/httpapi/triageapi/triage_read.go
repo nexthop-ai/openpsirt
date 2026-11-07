@@ -148,6 +148,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		Limit   int                `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset  int                `query:"offset" minimum:"0"`
 	}) (*DecisionOccurrencesOutput, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -202,6 +203,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{ Body core.DecisionOccurrenceDetail }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -238,6 +240,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only decisions you may read in full."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{ Body DecisionDetail }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -307,6 +310,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*core.ListOutput[RevisionBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -358,6 +362,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*core.ListOutput[ApprovalBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -430,6 +435,7 @@ func registerOccurrenceDecisions(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		OccurrencePath
 	}) (*struct{ Body StandingBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -507,6 +513,7 @@ func registerOccurrenceDecisions(api huma.API, in core.Deps) {
 			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason it still holds, in markdown"`
 		}
 	}) (*struct{ Body core.DecisionOccurrenceBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

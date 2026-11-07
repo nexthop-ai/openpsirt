@@ -68,6 +68,7 @@ func registerReleases(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory" doc:"The identifier the advisory is tracked by"`
 	}) (*core.ListOutput[AdvisoryReleaseBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -124,6 +125,7 @@ func registerReleases(api huma.API, in core.Deps) {
 			Affected      bool   `json:"affected" doc:"True marks the release affected, false clears the mark"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

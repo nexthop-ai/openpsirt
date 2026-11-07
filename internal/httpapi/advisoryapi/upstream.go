@@ -84,6 +84,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*struct{ Body UpstreamBody }, error) {
+		in := core.Of(ctx, in)
 		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
 		if err != nil {
 			return nil, err
@@ -114,6 +115,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			URL string `json:"url" minLength:"1" maxLength:"1000" doc:"The address of the upstream's CSAF provider description"`
 		}
 	}) (*struct{ Body InspectedBody }, error) {
+		in := core.Of(ctx, in)
 		if _, _, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product); err != nil {
 			return nil, err
 		}
@@ -156,6 +158,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			Fingerprint string `json:"fingerprint,omitempty" maxLength:"191" doc:"The fingerprint of the key its documents are signed with, as inspecting it answered. Empty for an upstream that signs nothing"`
 		}
 	}) (*struct{ Body UpstreamBody }, error) {
+		in := core.Of(ctx, in)
 		if _, _, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product); err != nil {
 			return nil, err
 		}
@@ -220,6 +223,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
 			if err != nil {
@@ -256,6 +260,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 	}) (*core.ListOutput[OfferBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Requester(ctx)
 		if err != nil {
 			return nil, err
@@ -305,6 +310,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 		Product   string `path:"product"`
 		Component string `path:"component"`
 	}) (*core.ListOutput[UpstreamSaidBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Requester(ctx)
 		if err != nil {
 			return nil, err
@@ -362,6 +368,7 @@ func declineHandler(in core.Deps, decline bool) func(context.Context, *struct {
 	return func(ctx context.Context, input *struct {
 		Statement int64 `path:"statement"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			subject, err := core.Requester(ctx)
 			if err != nil {

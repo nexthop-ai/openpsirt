@@ -172,6 +172,7 @@ func registerBurndown(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *BurndownQuery) (*struct {
 		Body BurndownBody
 	}, error) {
+		in := core.Of(ctx, in)
 		asked, err := input.read(ctx, in)
 		if err != nil {
 			return nil, err
@@ -197,6 +198,7 @@ func registerBurndown(api huma.API, in core.Deps) {
 		Format string `path:"format" enum:"csv,json"`
 		BurndownQuery
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		// Read, and the burndown worked out, before the file is begun, so a
 		// refusal or a failure is a status rather than a file cut short, and
 		// the file states the day 0 that was used.

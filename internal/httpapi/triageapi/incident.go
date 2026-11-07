@@ -60,6 +60,7 @@ func registerIncident(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Body          IncidentKept
 	}) (*struct{ Body core.IncidentBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -132,6 +133,7 @@ func registerIncident(api huma.API, in core.Deps) {
 			Because string `json:"because" minLength:"1" maxLength:"65536" doc:"Why the record is being cleared"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

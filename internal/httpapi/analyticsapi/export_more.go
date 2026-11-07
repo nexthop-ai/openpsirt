@@ -69,6 +69,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		Days int `query:"days" default:"14" minimum:"0" maximum:"365" doc:"The distance ahead to look"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -152,6 +153,7 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 		TwoBuilds
 		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -270,6 +272,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 		Auditing
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -368,6 +371,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 		Product string `query:"product" doc:"Limit to decisions made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 		core.QueueNarrowing
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -465,6 +469,7 @@ func registerComponentExport(api huma.API, in core.Deps) {
 		core.AtOneBuild
 		core.Narrowing
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "the minimum severity could not be read")
@@ -527,6 +532,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 		Kind   core.TrailKind `query:"kind" doc:"Keep only changes of one kind"`
 		core.Period
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Requester(ctx)
 		if err != nil {
 			return nil, err
@@ -607,6 +613,7 @@ func registerTrendExport(api huma.API, in core.Deps) {
 		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
 		Package   string `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

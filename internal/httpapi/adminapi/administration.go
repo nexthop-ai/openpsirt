@@ -292,6 +292,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Product string    `query:"product" doc:"Keep only people holding something on this product, by the name that addresses it"`
 		Role    core.Role `query:"role" doc:"Keep only people holding this role"`
 	}) (*core.ListOutput[PersonBody], error) {
+		a := a.In(ctx)
 		store, names, err := readable(ctx, a, a.Handle())
 		if err != nil {
 			return nil, err
@@ -353,6 +354,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Body RecordBody
 	}) (*core.DeclaredOutput[PersonBody], error) {
+		a := a.In(ctx)
 		store, _, err := mintable(ctx, a, a.Handle())
 		if err != nil {
 			return nil, err
@@ -570,6 +572,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 			Released int64 `json:"released" doc:"Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
 		}
 	}, error) {
+		a := a.In(ctx)
 		if _, err := core.Requester(ctx); err != nil {
 			return nil, err
 		}
@@ -656,6 +659,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			// A credential-shaped act: whoever next arrives under the username
 			// is taken to be its holder, so a token may not do it.
@@ -713,6 +717,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 			Released int64 `json:"released" doc:"Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
 		}
 	}, error) {
+		a := a.In(ctx)
 		if _, err := core.Requester(ctx); err != nil {
 			return nil, err
 		}

@@ -205,6 +205,7 @@ func registerTriage(api huma.API, in core.Deps) {
 		core.QueueNarrowing
 		core.CountedPaging
 	}) (*QueueOutput, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -292,6 +293,7 @@ func registerTriage(api huma.API, in core.Deps) {
 			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason the promise is changing, in markdown"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -337,6 +339,7 @@ func registerTriage(api huma.API, in core.Deps) {
 			DecisionID int64 `json:"decision_id" doc:"The decision the occurrences were moved into"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -370,6 +373,7 @@ func registerTriage(api huma.API, in core.Deps) {
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
 	}) (*BecameOutput, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -446,6 +450,7 @@ func registerTriage(api huma.API, in core.Deps) {
 			Reasoning string `json:"reasoning" minLength:"1"`
 		}
 	}) (*struct{ Body core.MentionsBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -472,6 +477,7 @@ func registerTriage(api huma.API, in core.Deps) {
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -508,6 +514,7 @@ func registerTriage(api huma.API, in core.Deps) {
 				Undone int64 `json:"undone"`
 			}
 		}, error) {
+			in := core.Of(ctx, in)
 			subject, store, err := core.Triaging(ctx, in)
 			if err != nil {
 				return nil, err
@@ -551,6 +558,7 @@ func registerTriage(api huma.API, in core.Deps) {
 			NotNotified []string `json:"not_notified,omitempty" doc:"Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the text is about — deliberately not said which"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -629,6 +637,7 @@ func registerProposing(api huma.API, in core.Deps) {
 		OccurrencePath
 		Body core.DecisionOccurrenceBody
 	}) (*struct{ Body core.DecisionOccurrenceBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

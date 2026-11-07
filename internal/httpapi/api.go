@@ -154,13 +154,64 @@ func changesSomething(method string) bool {
 func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API) {
 	in.Logger = logger
 	in.Uploads = &core.Uploads{}
+	built := Build(ready, in)
+	return built.Serving(in), built.API
+}
+
+// Built is a router with every operation registered, answering each request
+// with the dependencies the handler Serving returns hands it.
+type Built struct {
+	router *chi.Mux
+	// API is the description the router was built from.
+	API huma.API
+}
+
+// Serving is the handler answering every request with in, holding a count of
+// the uploads it reads at once of its own where in holds none.
+func (b *Built) Serving(in core.Deps) http.Handler {
+	if in.Uploads == nil {
+		in.Uploads = &core.Uploads{}
+	}
+	return served{router: b.router, in: in}
+}
+
+// served is one router answering with one set of dependencies. It answers what
+// its routes are as the router does, so a route can be asked of it.
+type served struct {
+	router *chi.Mux
+	in     core.Deps
+}
+
+var _ chi.Routes = served{}
+
+func (s served) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.router.ServeHTTP(w, r.WithContext(core.Serving(r.Context(), s.in)))
+}
+
+func (s served) Routes() []chi.Route { return s.router.Routes() }
+
+func (s served) Middlewares() chi.Middlewares { return s.router.Middlewares() }
+
+func (s served) Match(rctx *chi.Context, method, path string) bool {
+	return s.router.Match(rctx, method, path)
+}
+
+func (s served) Find(rctx *chi.Context, method, path string) string {
+	return s.router.Find(rctx, method, path)
+}
+
+// Build registers every operation into one router.
+//
+// A handler reads its dependencies from its request. What registering reads
+// of in holds for every request the router answers: the limits an upload is
+// bounded by, the interface served, the sign-in providers and the documents
+// published.
+func Build(ready Ready, in core.Deps) *Built {
 	router := chi.NewMux()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(browserHeaders(policyFor(in.Interface.Files)))
-	if in.DB == nil || in.Queue == nil {
-		router.Use(unconfigured(in.Log()))
-	}
+	router.Use(unconfigured)
 	// One resolution step, before any handler. Doing it here rather than in
 	// each handler is the whole point: a handler that forgets is a handler
 	// answering for everybody, and the forgetting is invisible until somebody
@@ -171,6 +222,7 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	// added later cannot be less careful than the one beside it.
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			in := core.Of(r.Context(), in)
 			// Named exceptions rather than a guarded prefix. Guarding one
 			// prefix leaves everything else open by default, and the
 			// framework registers routes of its own: the API document and
@@ -317,7 +369,7 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	router.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if ready != nil {
 			if err := ready(r.Context()); err != nil {
-				logger.Warn("not ready", "error", err)
+				core.Of(r.Context(), in).Log().Warn("not ready", "error", err)
 				http.Error(w, "not ready\n", http.StatusServiceUnavailable)
 				return
 			}
@@ -387,7 +439,7 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	// Last, so it claims only what nothing above it did.
 	mountInterface(router, in.Interface)
 
-	return router, api
+	return &Built{router: router, API: api}
 }
 
 // open is every path served without a credential. It is a list rather than a
@@ -428,25 +480,24 @@ func publishing(path string) bool {
 	return false
 }
 
-// unconfigured answers every request but the probes for a process built
+// unconfigured answers every request but the probes for a process served
 // without a database or a queue, before a caller is resolved.
 //
 // No handler is reached without both, so no handler guards against either.
 // The one sentence says nothing about the request, because the caller did not
 // cause it and cannot fix it. Logged, because otherwise the only trace of a
 // deployment wired up wrong is a 500 with a sentence in it.
-func unconfigured(logger *slog.Logger) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
-				next.ServeHTTP(w, r)
-				return
-			}
-			logger.Error("this process has no database or queue behind it, so it can answer nothing",
-				"path", r.URL.Path)
-			Problem(w, http.StatusInternalServerError, "this deployment is not fully configured")
-		})
-	}
+func unconfigured(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		in := core.Of(r.Context(), core.Deps{})
+		if (in.DB != nil && in.Queue != nil) || r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		in.Log().Error("this process has no database or queue behind it, so it can answer nothing",
+			"path", r.URL.Path)
+		Problem(w, http.StatusInternalServerError, "this deployment is not fully configured")
+	})
 }
 
 // refuse answers somebody unrecognized.

@@ -30,7 +30,8 @@ func registerProviders(api huma.API, in core.Deps) {
 			"operator configured and nothing else — no account exists or does not exist as far " +
 			"as this is concerned, which is the disclosure that would matter.",
 		Tags: []string{"Access"},
-	}, core.NoCredential, ""), func(_ context.Context, _ *struct{}) (*core.ListOutput[ProviderBody], error) {
+	}, core.NoCredential, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[ProviderBody], error) {
+		in := core.Of(ctx, in)
 		out := &core.ListOutput[ProviderBody]{}
 		out.Body.Items = make([]ProviderBody, 0, len(in.Providers))
 		for name := range in.Providers {

@@ -141,6 +141,7 @@ func registerComponent(api huma.API, in core.Deps) {
 		Component string `path:"component"`
 		core.ScopeQuery
 	}) (*core.ListOutput[PerBuildBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -273,6 +274,7 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		Component string `path:"component"`
 		Body      PlanUpgradeBody
 	}) (*struct{ Body PlannedUpgradeBody }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

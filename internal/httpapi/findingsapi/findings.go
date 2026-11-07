@@ -221,6 +221,7 @@ func registerFindings(api huma.API, in core.Deps) {
 		core.Narrowing
 		core.Paging
 	}) (*FindingsOutput, error) {
+		in := core.Of(ctx, in)
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
@@ -340,6 +341,7 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 		core.Narrowing
 		core.CountedPaging
 	}) (*ComponentFindingsOutput, error) {
+		in := core.Of(ctx, in)
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
@@ -664,6 +666,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		Component     string `path:"component" doc:"The component's name, as the findings list gives it"`
 		core.ComponentQuery
 	}) (*struct{ Body EvidenceBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

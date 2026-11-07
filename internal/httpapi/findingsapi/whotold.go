@@ -84,6 +84,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue"`
 	}) (*struct{ Body ReportBody }, error) {
+		in := core.Of(ctx, in)
 		// Read with the right every read of a report asks, which the store
 		// checks against the product it was reported in.
 		subject, _, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
@@ -132,6 +133,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The other identifier, as it is written"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
@@ -197,6 +199,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The name to remove, as it is written"`
 	}) (*struct{ Body AliasRemovedBody }, error) {
+		in := core.Of(ctx, in)
 		subject, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err

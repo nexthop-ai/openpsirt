@@ -58,6 +58,7 @@ func registerTokens(api huma.API, in core.Deps) {
 			"was made, so what one reaches shrinks the moment your roles do.",
 		Tags: []string{"Access"},
 	}, core.OwnSubject, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[TokenBody], error) {
+		in := core.Of(ctx, in)
 		subject, rights, names, err := mine(ctx, in)
 		if err != nil {
 			return nil, err
@@ -83,6 +84,7 @@ func registerTokens(api huma.API, in core.Deps) {
 			"found when somebody leaves and nobody knows what breaks if it is turned off.",
 		Tags: []string{"Access"}, DefaultStatus: http.StatusCreated,
 	}, core.OwnSubject, "Signed in, not through a token: a token cannot mint another."), func(ctx context.Context, input *struct{ Body TokenBody }) (*struct{ Body TokenBody }, error) {
+		in := core.Of(ctx, in)
 		subject, _, _, err := mine(ctx, in)
 		if err != nil {
 			return nil, err
@@ -195,6 +197,7 @@ func registerTokens(api huma.API, in core.Deps) {
 	}, core.OwnSubject, "Signed in, not through a token: a token cannot withdraw another."), func(ctx context.Context, input *struct {
 		Name string `path:"name"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, _, _, err := mine(ctx, in)
 		if err != nil {
 			return nil, err

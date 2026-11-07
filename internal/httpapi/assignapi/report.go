@@ -59,6 +59,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -134,6 +135,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset  int    `query:"offset" minimum:"0"`
 	}) (*HeldReportsPage, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -156,6 +158,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset   int    `query:"offset" minimum:"0"`
 	}) (*HeldReportsPage, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -200,6 +203,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset  int    `query:"offset" minimum:"0"`
 	}) (*HeldReportsPage, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

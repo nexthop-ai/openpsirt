@@ -37,6 +37,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Body core.ProductBody
 	}) (*core.DeclaredOutput[core.ProductBody], error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -71,6 +72,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Body    core.BranchOrTagBody
 	}) (*core.DeclaredOutput[core.BranchOrTagBody], error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -131,6 +133,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Body    core.VariantBody
 	}) (*core.DeclaredOutput[core.VariantBody], error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}

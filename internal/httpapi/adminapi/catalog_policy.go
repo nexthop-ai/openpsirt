@@ -43,6 +43,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Body    core.PairThresholdsBody
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -91,6 +92,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Body    core.PublicationBody
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -144,6 +146,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Body    core.MinimumSeverityBody
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -209,6 +212,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Body    core.EndOfLifeBody
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -272,6 +276,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			CutFrom    string `json:"cut_from,omitempty" doc:"The branch it was cut from, by name. Fills in where nothing has been said; naming a different one is refused, and empty leaves whatever stands alone"`
 		}
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
@@ -335,6 +340,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		BranchOrTag string `path:"branch_or_tag"`
 		Body        core.EndOfLifeBody
 	}) (*struct{}, error) {
+		d := d.In(ctx)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}

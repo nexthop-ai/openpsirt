@@ -46,6 +46,18 @@ func (a Administering) Handle() bun.IDB {
 	return a.DB.DB
 }
 
+// In is a over the database and logger ctx's request is answered with, where
+// it carries them.
+func (a Administering) In(ctx context.Context) Administering {
+	in := Of(ctx, Deps{DB: a.DB, Logger: a.Logger})
+	a.DB, a.Logger = in.DB, in.Logger
+	if a.Findings != nil {
+		db := in.DB
+		a.Findings = func() *finding.Store { return finding.NewStore(db.DB) }
+	}
+	return a
+}
+
 // Administerable refuses anybody who is not an administrator, and hands back
 // what the endpoint needs.
 //

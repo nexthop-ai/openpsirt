@@ -38,6 +38,7 @@ func registerFixes(api huma.API, in core.Deps) {
 		ID   int64 `path:"id"`
 		Body FixNamed
 	}) (*struct{ Body core.FixBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -87,6 +88,7 @@ func registerFixes(api huma.API, in core.Deps) {
 		ID  int64 `path:"id"`
 		Fix int64 `path:"fix"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

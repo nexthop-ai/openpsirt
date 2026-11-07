@@ -40,6 +40,7 @@ func registerCodeFindingSeries(api huma.API, in core.Deps) {
 			Items []CodeFindingSeriesBody `json:"items"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -106,6 +107,7 @@ func registerComponentCodeFindings(api huma.API, in core.Deps) {
 		Product   string `path:"product"`
 		Component string `path:"component" maxLength:"200"`
 	}) (*struct{ Body ComponentCodeFindingsBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

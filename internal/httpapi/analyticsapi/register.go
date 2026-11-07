@@ -206,6 +206,7 @@ func registerRegister(api huma.API, in core.Deps) {
 			Measured *core.MeasuredBody `json:"measured,omitempty" doc:"The tools the register was measured with. Absent where nothing has been uploaded to the build"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -237,7 +238,6 @@ func registerRegister(api huma.API, in core.Deps) {
 
 	// And as a file, because a register is the report most likely to be
 	// wanted whole.
-	streams := newStreamSlots(in.DB)
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-disposition-register", Method: http.MethodGet,
 		Path:    path + ".{format}",
@@ -252,6 +252,7 @@ func registerRegister(api huma.API, in core.Deps) {
 		Format      string `path:"format" enum:"csv,json"`
 		Registering
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
@@ -316,7 +317,7 @@ func registerRegister(api huma.API, in core.Deps) {
 			},
 		}
 		name := "register-" + strings.ToLower(input.Product+"-"+input.BranchOrTag+"-"+input.Variant)
-		release, err := streams.take()
+		release, err := streamSlotsFor(in.DB).take()
 		if err != nil {
 			return nil, err
 		}
@@ -452,6 +453,7 @@ func registerCompliance(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		core.Period
 	}) (*core.OverPeriod[RateBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

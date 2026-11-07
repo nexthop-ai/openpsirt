@@ -45,6 +45,7 @@ func turnedAway(ctx context.Context, in core.Deps, by access.Subject, productID 
 // 503, which is the deployment and not the document, and is not recorded.
 func turnedAwayBeforeReading(in core.Deps, source string) func(huma.Context, int, string) {
 	return func(hctx huma.Context, status int, reason string) {
+		in := core.Of(hctx.Context(), in)
 		if status >= http.StatusInternalServerError {
 			return
 		}

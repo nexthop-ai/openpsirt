@@ -32,6 +32,7 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

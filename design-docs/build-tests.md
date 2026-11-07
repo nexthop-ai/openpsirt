@@ -77,6 +77,8 @@ need, such as an identifier or a secret shown once.
 | A test holds every column of a written-back row to what the seed wrote: a moment to the microsecond, a date, both booleans, an absent value, text outside ASCII | A value the driver reads in one form and writes in another changes a seeded row on one engine only |
 | The API package's seed is written back, never run, after its first test | About a hundred transactions: 157 ms a test on PostgreSQL and 71 ms on MySQL |
 | The API package's fixture is a seeded template | Two products, eighteen people, their decisions and grants: per test it was 27% of the package's processor time under the detector |
+| The API's operations are registered once per test binary, and each test's server answers with that test's dependencies | Registering takes 13 ms, and 44 ms under the detector; answering with a test's dependencies takes 6 µs |
+| A test adjusting its dependencies registers afresh | An adjustment may change what registering reads, such as the limits an upload is bounded by |
 
 A test needing a product, its branches and tags, its variants and a build takes
 them from one shared default world, a seeded template of its own or part of a

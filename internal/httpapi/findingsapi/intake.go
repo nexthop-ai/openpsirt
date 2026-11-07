@@ -69,6 +69,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		Status int
 		Body   ReportBody
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -107,6 +108,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 		Offset  int    `query:"offset" minimum:"0" default:"0"`
 	}) (*core.ListOutput[ReportBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -137,6 +139,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593" doc:"The reference this deployment minted"`
 	}) (*struct{ Body ReportBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -173,6 +176,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593"`
 		Body      ReportIssueBody
 	}) (*struct{ Body ReportBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -223,6 +227,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
+				in := core.Of(hc.Context(), in)
 				_, _, err := reportAttaching(hc.Context(), in, hc.Param("product"), hc.Param("reference"))
 				return err
 			},
@@ -233,6 +238,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593"`
 		RawBody   huma.MultipartFormFiles[arrivedParts]
 	}) (*attachmentUploaded, error) {
+		in := core.Of(ctx, in)
 		subject, at, err := reportAttaching(ctx, in, input.Product, input.Reference)
 		if err != nil {
 			return nil, err
@@ -268,6 +274,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*attachmentsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err

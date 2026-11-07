@@ -61,6 +61,7 @@ func registerUploads(api huma.API, in core.Deps) {
 		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`
 	}) (*UploadsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err

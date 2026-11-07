@@ -48,6 +48,7 @@ func registerKinds(api huma.API, in core.Deps) {
 		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
 		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 	}) (*PackageKindsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -74,6 +75,7 @@ func registerKinds(api huma.API, in core.Deps) {
 			"counts in each, as it is two rows on the findings list across products.\n\n" + kindsSaid,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, _ *struct{}) (*PackageKindsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

@@ -90,6 +90,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 			Items []SuppressionRuleBody `json:"items"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -134,6 +135,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 			Reasoning string                 `json:"reasoning" minLength:"1" doc:"The reasoning, in markdown"`
 		}
 	}) (*struct{ Body SuppressionRuleBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := suppressionRulesProduct(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -172,6 +174,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		ID      int64  `path:"id"`
 	}) (*struct{ Body SuppressionRuleBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := suppressionRulesProduct(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -209,6 +212,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		ID      int64  `path:"id"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := suppressionRulesProduct(ctx, in, input.Product)
 		if err != nil {
 			return nil, err

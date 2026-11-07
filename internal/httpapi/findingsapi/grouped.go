@@ -59,6 +59,7 @@ func registerGrouped(api huma.API, in core.Deps) {
 		By          core.GroupBy `query:"by" required:"true" doc:"repository or ecosystem"`
 		Ecosystem   string       `query:"ecosystem" maxLength:"64" doc:"With by=ecosystem, list the packages of this ecosystem instead of the ecosystems"`
 	}) (*core.ListOutput[GroupBody], error) {
+		in := core.Of(ctx, in)
 		subject, _, build, err := core.BrowsingIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err

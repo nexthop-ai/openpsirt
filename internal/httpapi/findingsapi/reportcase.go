@@ -127,6 +127,7 @@ func registerReportCase(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593"`
 		Body      ReportEditBody
 	}) (*struct{ Body ReportBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -158,6 +159,7 @@ func registerReportCase(api huma.API, in core.Deps) {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[ReportRevisionBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -204,6 +206,7 @@ func registerReportCase(api huma.API, in core.Deps) {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[ReportEventBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -279,6 +282,7 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[MessageBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -327,6 +331,7 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 		Reference string `path:"reference" maxLength:"593"`
 		Body      MessageLogBody
 	}) (*struct{ Body MessageBody }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -375,6 +380,7 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[core.WrittenBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -417,6 +423,7 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 			Body string `json:"body" minLength:"1" doc:"The text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -456,6 +463,7 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 			Body string `json:"body" minLength:"1" doc:"The replacement text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
@@ -483,6 +491,7 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 		Reference string `path:"reference" maxLength:"593"`
 		Note      int64  `path:"note"`
 	}) (*core.ListOutput[core.WasSaidBody], error) {
+		in := core.Of(ctx, in)
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err

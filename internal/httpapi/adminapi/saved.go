@@ -68,6 +68,7 @@ func registerSaved(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers your own and nobody else's."),
 		func(ctx context.Context, _ *struct{}) (*core.ListOutput[SavedBody], error) {
+			in := core.Of(ctx, in)
 			who, store, err := keeping(ctx, in)
 			if err != nil {
 				return nil, err
@@ -121,6 +122,7 @@ func registerSaved(api huma.API, in core.Deps) {
 			Prepares *PreparedBody `json:"prepares,omitempty" doc:"The decision this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		who, store, err := keeping(ctx, in)
 		if err != nil {
 			return nil, err
@@ -157,6 +159,7 @@ func registerSaved(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Yours alone."), func(ctx context.Context, input *struct {
 		Name string `path:"name" maxLength:"120"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		who, store, err := keeping(ctx, in)
 		if err != nil {
 			return nil, err

@@ -49,6 +49,7 @@ func registerAnywhere(api huma.API, in core.Deps) {
 		core.Narrowing
 		core.Paging
 	}) (*AnywhereOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err

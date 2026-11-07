@@ -46,6 +46,7 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 			"`OPENPSIRT_GROUP_ROLES` maps a group, and changes only when that setting does.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ModeBody }, error) {
+		a := a.In(ctx)
 		if _, _, err := readable(ctx, a, a.Handle()); err != nil {
 			return nil, err
 		}
@@ -67,6 +68,7 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 			"admitted, and somebody in none is refused.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[BindingBody], error) {
+		a := a.In(ctx)
 		rights, _, err := readable(ctx, a, a.Handle())
 		if err != nil {
 			return nil, err
@@ -163,6 +165,7 @@ func registerRevocation(api huma.API, a core.Administering) {
 			"breaks if it is turned off.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[TokenBody], error) {
+		a := a.In(ctx)
 		rights, _, err := core.Administerable(ctx, a, a.Handle())
 		if err != nil {
 			return nil, err
@@ -201,6 +204,7 @@ func registerRevocation(api huma.API, a core.Administering) {
 		Identity string `path:"identity"`
 		Name     string `path:"name"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			rights, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
@@ -244,6 +248,7 @@ func registerRevocation(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
+		a := a.In(ctx)
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 			rights, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {

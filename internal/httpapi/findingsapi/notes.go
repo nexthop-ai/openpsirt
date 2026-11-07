@@ -48,6 +48,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 	}) (*core.ListOutput[core.WrittenBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -88,6 +89,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 			Body string `json:"body" minLength:"1" doc:"The text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -125,6 +127,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 			Body string `json:"body" minLength:"1" doc:"The replacement text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -162,6 +165,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 		"note's own product and issue rather than anything in the path."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*core.ListOutput[core.WasSaidBody], error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

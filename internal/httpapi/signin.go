@@ -61,9 +61,11 @@ func registerSignIn(router chi.Router, in core.Deps) {
 		return
 	}
 	router.Get("/v1/sign-in/{provider}", func(w http.ResponseWriter, r *http.Request) {
+		in := core.Of(r.Context(), in)
 		begin(w, r, in)
 	})
 	router.Get("/v1/sign-in/{provider}/callback", func(w http.ResponseWriter, r *http.Request) {
+		in := core.Of(r.Context(), in)
 		complete(w, r, in)
 	})
 }

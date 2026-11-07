@@ -126,6 +126,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			Only   []PieceBody `json:"only,omitempty" minItems:"1" maxItems:"2000" doc:"The rows picked from the list. Left out, every row the filter matches; an empty list is refused"`
 		}
 	}) (*struct{ Body AssignedMatchingBody }, error) {
+		in := core.Of(ctx, in)
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")

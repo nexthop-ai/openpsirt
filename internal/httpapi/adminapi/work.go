@@ -109,6 +109,7 @@ func registerWork(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct {
 		Body VulnerabilityDataBody
 	}, error) {
+		in := core.Of(ctx, in)
 		type answer = struct{ Body VulnerabilityDataBody }
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
@@ -155,6 +156,7 @@ func registerWork(api huma.API, in core.Deps) {
 			Waiting []QueuedBody    `json:"waiting"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		type answer = struct {
 			Body struct {
 				Items   []FailedJobBody `json:"items"`
@@ -209,6 +211,7 @@ func registerWork(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in2 *struct {
 		ID int64 `path:"id" doc:"The job to put back"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}

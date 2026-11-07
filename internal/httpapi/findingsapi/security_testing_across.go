@@ -114,6 +114,7 @@ func fileAcross(f figureFile) huma.Operation {
 func registerCountsAcross(api huma.API, in core.Deps) {
 	const what = "count the code findings"
 	counted := func(ctx context.Context, input *CodeFindingAcrossAsked) (*analysis.Queue, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in, what)
 		if err != nil {
 			return nil, err
@@ -176,6 +177,7 @@ func countsBody(got *analysis.Queue) CodeFindingCountsBody {
 func registerTrendAcross(api huma.API, in core.Deps) {
 	const what = "trend the code findings"
 	trended := func(ctx context.Context, input *CodeFindingAcrossTrendAsked) (*analysis.Trended, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in, what)
 		if err != nil {
 			return nil, err
@@ -226,6 +228,7 @@ func registerTrendAcross(api huma.API, in core.Deps) {
 func registerJudgingAcross(api huma.API, in core.Deps) {
 	const what = "time the judging of code findings"
 	judged := func(ctx context.Context, input *CodeFindingAcrossWindowAsked) (*analysis.Judging, time.Time, time.Time, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in, what)
 		if err != nil {
 			return nil, time.Time{}, time.Time{}, err
@@ -272,6 +275,7 @@ func registerJudgingAcross(api huma.API, in core.Deps) {
 func registerCoverageAcross(api huma.API, in core.Deps) {
 	const what = "read the analysis coverage"
 	covered := func(ctx context.Context, input *CodeFindingAcrossWindowAsked) ([]analysis.Analyzed, time.Time, time.Time, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in, what)
 		if err != nil {
 			return nil, time.Time{}, time.Time{}, err

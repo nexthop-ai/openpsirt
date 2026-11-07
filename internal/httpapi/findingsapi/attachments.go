@@ -154,6 +154,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		// outside.
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
+				in := core.Of(hc.Context(), in)
 				_, _, err := issueAttaching(hc.Context(), in, hc.Param("product"), hc.Param("issue"))
 				return err
 			},
@@ -165,6 +166,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue" doc:"The issue, under any identifier it goes by"`
 		RawBody       huma.MultipartFormFiles[attachmentParts]
 	}) (*attachmentUploaded, error) {
+		in := core.Of(ctx, in)
 		subject, at, err := issueAttaching(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
@@ -200,6 +202,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue"`
 	}) (*attachmentsOutput, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -233,6 +236,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Token string `path:"token" doc:"The identifier text refers to, without the attachment: prefix"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -287,6 +291,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 			Reason string `json:"reason" minLength:"1" maxLength:"1000" doc:"The reason the file is being removed. Recorded and shown wherever the text referred to it"`
 		}
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -363,6 +368,7 @@ func issueAttaching(ctx context.Context, in core.Deps, product, vulnerability st
 // the size this deployment accepts, and the form around it.
 func attachmentRequest(in core.Deps) func(context.Context) (int64, error) {
 	return func(ctx context.Context) (int64, error) {
+		in := core.Of(ctx, in)
 		maxSize, _, _, err := attachmentLimits(ctx, in)
 		if err != nil {
 			return 0, err

@@ -39,6 +39,7 @@ func registerScoring(api huma.API, in core.Deps) {
 			Severity core.ScoreBand `json:"severity" doc:"The band the score falls in"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		if _, err := core.Reading(ctx); err != nil {
 			return nil, err
 		}

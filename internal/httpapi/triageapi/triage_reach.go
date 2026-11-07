@@ -86,6 +86,7 @@ func registerElsewhere(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		OccurrencePath
 	}) (*struct{ Body ReachBody }, error) {
+		in := core.Of(ctx, in)
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -133,6 +134,7 @@ func registerReachAcross(api huma.API, in core.Deps) {
 		Component     string `path:"component"`
 		core.ComponentQuery
 	}) (*struct{ Body ReachBody }, error) {
+		in := core.Of(ctx, in)
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

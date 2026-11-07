@@ -73,6 +73,7 @@ func registerBulk(api huma.API, in core.Deps) {
 			OccurrenceLimit int `json:"occurrence_limit" doc:"The number of findings one answer here may write"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -209,6 +210,7 @@ func registerBulk(api huma.API, in core.Deps) {
 			Skipped    []SkippedBody `json:"skipped,omitempty" doc:"The occurrences left out because a live decision already covers them, where skip_decided was sent"`
 		}
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err

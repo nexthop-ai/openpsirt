@@ -112,6 +112,7 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 			"looked up.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Requires security-testing-read on the product."), func(ctx context.Context, input *CodeFindingTrendAsked) (*struct{ Body CodeFindingTrendBody }, error) {
+		in := core.Of(ctx, in)
 		subject, scope, err := input.scoped(ctx, in)
 		if err != nil {
 			return nil, err
@@ -139,6 +140,7 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 		CodeFindingTrendAsked
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
+		in := core.Of(ctx, in)
 		// Refused before the first byte, so a refusal is a status rather
 		// than a line in a file that answered 200.
 		subject, scope, err := input.scoped(ctx, in)

@@ -97,6 +97,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Status int
 		Body   AdvisoryBody
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -136,6 +137,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Limit         int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 		Offset        int    `query:"offset" minimum:"0" default:"0"`
 	}) (*core.ListOutput[AdvisoryListedBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -174,6 +176,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory" doc:"The identifier the advisory is tracked by"`
 	}) (*struct{ Body AdvisoryBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -218,6 +221,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 		}) (*core.ListOutput[NameableBody], error) {
+			in := core.Of(ctx, in)
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
@@ -262,6 +266,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Status int
 		Body   CoveredBody
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -295,6 +300,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -333,6 +339,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 	}) (*struct{ Body *advisory.Document }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -363,6 +370,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 	}) (*core.ListOutput[IssuanceBody], error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -400,6 +408,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			Title string `json:"title" maxLength:"191" doc:"What to call it. Empty, the document names the issues it covers"`
 		}
 	}) (*struct{ Body AdvisoryBody }, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -432,6 +441,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Status int
 		Body   AgreementBody
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -460,6 +470,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 	}) (*struct{}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -500,6 +511,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Status int
 		Body   IssuanceBody
 	}, error) {
+		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
