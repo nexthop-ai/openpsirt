@@ -261,6 +261,7 @@ directory and reads the interface.
 | `.golangci.yml` alone selects rules, each gating or advisory | No scope grandfathers a backlog (REQ-75) |
 | Documentation rules are off; error checking excludes conventional cleanup calls | |
 | The linter's `govet` is the vet, over test files and the `measure`-tagged file | Running `go vet` too cost 50 s of a two-core runner |
+| `test-all` passes `-vet=off`; `make test` keeps the vet of `go test` | That vet is a subset of the linter's |
 | A test holds that configuration: `govet` on and unnarrowed, test and generated files included, no exclusion naming either, the `measure` tag passed | The linter skips generated files by default |
 | The linter reports one issue per line | |
 | The linter's Go release is at least the code's | Otherwise it cannot read export data (`design-docs/build-dependencies.md` § Pinned pairs) |

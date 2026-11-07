@@ -141,3 +141,6 @@ Rules in `design-docs/build.md` § Make targets and `design-docs/build-tests.md`
 |---|---|---|
 | `make build` over a build cache holding the plain build | 23.5 s wall, 97 s processor, 461 MB more cache | Not run; 13 s on a CI runner |
 | `npm ci` in one `make check` | Twice, 4 s each; 7 to 8 s each on a CI runner | Once |
+| The vet `go test` runs, per pass, after an exported change in a package most others import | 1.8 s wall, 11 s processor | None |
+| Linking every test binary, one at a time | 55 s; 1.8 GB of binaries | 42 to 47 s; 1.4 GB |
+| Linking the largest API test binary | 1.25 s wall, 1.65 s processor; 52 MB | 0.93 s, 1.10 s; 41 MB |

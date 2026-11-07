@@ -186,6 +186,8 @@ the detector's cost is in-process work. The detector is per binary, so
 | A race inside the translated C or its C library is not reported | |
 | A test races this tree against the standard database layer and expects the report | Excluding more silences it |
 | The per-package compiler flags are undocumented | A Go release rejecting one fails the build loudly |
+| Neither run vets; `make test` keeps the vet `go test` runs | The linter's `govet` runs every analyzer `go vet` does over the test files (`design-docs/build.md` § Static analysis), and the subset `go test` picks cost each run 1.8 s and 11 s of processor time after a change low in the tree |
+| Test binaries, `make test`'s included, link without DWARF | Nothing in a test reads it: a caller's file and line and a race report's frames come from the runtime's own tables. A relink of every test binary is 42 to 47 s against 55 s in sequence |
 
 `design-docs/build-measurements.md` § The race pass has every configuration.
 

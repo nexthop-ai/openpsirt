@@ -114,8 +114,15 @@ build:
 # The quick loop: SQLite only, packages in parallel, the build cache on, no
 # race detector. Seconds, so it is run after every change. The four-engine,
 # race-detected, uncached run is test-all, and the gate uses that.
+#
+# Test binaries are linked without DWARF, which nothing in a test reads: a
+# caller's file and line, a panic's trace and a race report come from the
+# symbol table the runtime carries. It cuts a relink of every test binary from
+# 55 s to 42 to 47 s in sequence, and the binaries from 1.8 GB to 1.4 GB.
+TEST_LINK := -ldflags=-w
+
 test:
-	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test $(PACKAGES)
+	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test $(TEST_LINK) $(PACKAGES)
 
 # Every configured engine, the race detector once, nothing cached. Packages run
 # in parallel: each test binary gets a database of its own on every engine
@@ -161,8 +168,13 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/
 # rejects one fails the build.
 RACE_UNWATCHED = -gcflags='modernc.org/sqlite/lib=-race=false -d=checkptr=0' \
 	-gcflags='modernc.org/libc/...=-race=false -d=checkptr=0'
-RACE_PASS    = GORACE=atexit_sleep_ms=100 OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race $(RACE_UNWATCHED) -count=1
-SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1
+#
+# Both passes skip the vet "go test" runs first. The linter's govet runs every
+# analyzer go vet does over the test files, a superset of the ones "go test"
+# picks, and "make test" keeps them for the quick loop: 1.8 s and 11 s of
+# processor time per pass after a change low in the tree.
+RACE_PASS    = GORACE=atexit_sleep_ms=100 OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race $(RACE_UNWATCHED) -vet=off $(TEST_LINK) -count=1
+SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -vet=off $(TEST_LINK) -count=1
 
 # Both passes at once. They share no engine — the detector runs on SQLite and
 # the portability pass on the three servers — so neither can see the other's
