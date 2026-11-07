@@ -60,7 +60,11 @@ PYTHON ?= python3
 #
 # Computed rather than written as "./cmd/... ./internal/...", so a new
 # directory of ours is included without anybody remembering to add it.
-PACKAGES = $(shell $(GO) list ./... | grep -v '/node_modules/')
+#
+# Listed on first use and kept: an ordinary "=" runs go list at every
+# expansion, several in one "check" at 0.35 to 0.45 s each, and ":=" runs it
+# in every make, those that never read it included.
+PACKAGES = $(eval PACKAGES := $(shell $(GO) list ./... | grep -v '/node_modules/'))$(PACKAGES)
 
 BIN          := bin/openpsirt
 VERSION      ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)

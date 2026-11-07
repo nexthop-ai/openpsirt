@@ -149,3 +149,4 @@ analysis, `design-docs/build-tests.md` § The race pass and
 | The server pass over the packages reaching no database, cold build cache | 3.2 s wall, 10.8 s processor | Not run |
 | The same, warm | 2.3 to 3.1 s wall, 7.4 s processor | Not run |
 | Building the trail's test binary after an exported change in the findings package | 2.4 to 3.1 s wall, 5.8 s processor | 0.67 s, 0.85 s |
+| `go list` of the module's packages in one `make check` | At every expansion, 0.35 to 0.45 s each | Once per make run |
