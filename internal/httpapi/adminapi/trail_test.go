@@ -921,7 +921,9 @@ func TestADeactivationIsRecordedEvenWhenTheRestOfTheActFails(t *testing.T) {
 }
 
 func TestTheTrailIsAnAdministratorsToRead(t *testing.T) {
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	// Which role reaches the endpoint, refused on the role alone, so two
+	// engines.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		for _, who := range []string{"triager", "private-triage", "approver"} {
 			got := httpapitest.AsPerson(t, r, who, http.MethodGet, "/v1/administration/changes", "")
 			if got.Code != http.StatusForbidden && got.Code != http.StatusNotFound {

@@ -166,7 +166,10 @@ func TestTheAssignerRightAloneHandsNobodyAnything(t *testing.T) {
 	// store — so this assertion only moves when both go. The store's own
 	// half is broken and watched in internal/finding, and the endpoint's in
 	// TestSomebodyWhoMayNotTriageIsToldNothingAboutWhoHasAnAccount.
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	//
+	// Both answers are decided from the rights the caller holds, after the
+	// finding is located as every assignment locates it, so two engines.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
