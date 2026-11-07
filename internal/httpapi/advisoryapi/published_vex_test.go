@@ -369,25 +369,3 @@ func TestAVEXDocumentThatWentOutIsHandedBackAsItsKeptBytes(t *testing.T) {
 		}
 	})
 }
-
-func TestAVEXDocumentThatWentOutHoldsNothingNobodyHasAnnounced(t *testing.T) {
-	// Kept bytes are read by anybody who may read the product, so what is
-	// recorded has to be the public document whoever recorded it.
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedWithEvidence(t)
-		hidden := r.Embargoed(t)
-		decision, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
-		r.AgreedBy(t, "private-dispatcher", decision)
-		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, httpapitest.ABuild+"/issuance",
-			""); got.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
-		}
-		got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, httpapitest.ABuild+"/issuance/1", "")
-		if got.Code != http.StatusOK {
-			t.Fatalf("reading what went out answered %d: %s", got.Code, got.Body.String())
-		}
-		if strings.Contains(got.Body.String(), hidden) {
-			t.Errorf("a document that went out names %s, which nobody has announced", hidden)
-		}
-	})
-}

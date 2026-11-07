@@ -10,6 +10,7 @@ Satisfies REQ-75.
 - [Database engines](#database-engines)
 - [Test databases](#test-databases)
 - [Seeded templates](#seeded-templates)
+- [Shared scenarios](#shared-scenarios)
 - [Server database slots](#server-database-slots)
 - [Measurement databases](#measurement-databases)
 - [The race pass](#the-race-pass)
@@ -120,6 +121,18 @@ per row, and most tables reference a person.
 | A measurement never undoes | It truncates, for the layout a fresh load leaves (§ Measurement databases) |
 
 `design-docs/build-measurements.md` § Seeded test starts has the timings.
+
+## Shared scenarios
+
+Checks that read one scenario are subtests of one test, which builds the
+scenario once per engine: a server, its seeded cast and the rows the checks read.
+
+| Rule | Reason |
+|---|---|
+| A subtest is named for the check it holds and keeps that check's failure messages | A failure names the check, as a test of its own did |
+| A subtest that writes runs after every subtest that reads | Each subtest reads what it read as a test of its own |
+| Two checks that each write are two tests | The second would read the first's rows |
+| A merged test covers the statements its checks covered as tests of their own | Merging moves where a check runs and never what it reaches |
 
 ## Server database slots
 
