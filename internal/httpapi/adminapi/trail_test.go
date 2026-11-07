@@ -1050,17 +1050,32 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 			}
 		}
 
-		// And no product, and nothing that is not one of those records. What a
-		// worker reported quotes what its job was about, and a destination's
-		// address is the credential for two of the services it names — so
-		// neither is read by the grant that reads the records.
-		for _, path := range []string{
-			"/v1/products/mine/findings", "/v1/products/mine/builds",
-			"/v1/failed-jobs", "/v1/outbound",
-		} {
-			got := httpapitest.AsPerson(t, r, "auditor", http.MethodGet, path, "")
-			if got.Code != http.StatusForbidden && got.Code != http.StatusNotFound {
-				t.Errorf("an auditor reading %s answered %d, want a refusal: %s",
+		// And no product: one the auditor holds nothing on answers as a name
+		// nobody declared. A reader reads each path, so a refusal there is the
+		// grant's and not the router's.
+		for _, path := range []string{"/findings", "/branches-and-tags"} {
+			held := "/v1/products/mine" + path
+			if got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, held, ""); got.Code != http.StatusOK {
+				t.Fatalf("a reader reading %s answered %d, so it asks the auditor nothing: %s",
+					held, got.Code, got.Body.String())
+			}
+			got := httpapitest.AsPerson(t, r, "auditor", http.MethodGet, held, "")
+			undeclared := httpapitest.AsPerson(t, r, "auditor", http.MethodGet,
+				"/v1/products/nobody-declared"+path, "")
+			if got.Code != http.StatusNotFound ||
+				strings.ReplaceAll(got.Body.String(), `\"mine\"`, `\"nobody-declared\"`) != undeclared.Body.String() {
+				t.Errorf("an auditor reading %s answered %d, want the answer a name nobody "+
+					"declared gets (%d): %s", held, got.Code, undeclared.Code, got.Body.String())
+			}
+		}
+
+		// Nor anything that is not one of those records. What a worker
+		// reported quotes what its job was about, and a destination's address
+		// is the credential for two of the services it names — so neither is
+		// read by the grant that reads the records.
+		for _, path := range []string{"/v1/failed-jobs", "/v1/outbound"} {
+			if got := httpapitest.AsPerson(t, r, "auditor", http.MethodGet, path, ""); got.Code != http.StatusForbidden {
+				t.Errorf("an auditor reading %s answered %d, want 403: %s",
 					path, got.Code, got.Body.String())
 			}
 		}
@@ -1153,21 +1168,65 @@ func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		seen := &seeded{issue: r.Embargoed(t)}
-
-		restore := dbtest.Hide(t, r.DB, "admin_change")
-		examined := 0
-		for _, act := range administrativeActs {
+		drive := func(act trailedAct) *httptest.ResponseRecorder {
+			if act.drive != nil {
+				return act.drive(t, r, seen)
+			}
 			who := act.who
 			if who == "" {
 				who = "admin"
 			}
-			var got *httptest.ResponseRecorder
-			if act.drive != nil {
-				got = act.drive(t, r, seen)
-			} else {
-				got = httpapitest.AsPerson(t, r, who, act.method, seen.fill(act.path), seen.fill(act.body))
+			return httpapitest.AsPerson(t, r, who, act.method, seen.fill(act.path), seen.fill(act.body))
+		}
+
+		// What an act names is made with the trail present. With it taken
+		// away the act making a rule, an incident or a window is refused, and
+		// every act after it names an empty identifier no route answers. Each
+		// is made apart from what the walk makes, so the walk's own act meets
+		// no conflict before it reaches its record.
+		for _, act := range administrativeActs {
+			if act.keep == nil {
+				continue
 			}
+			act.drive = nil
+			act.body = strings.NewReplacer("kernel", "seeded", "Early warning", "Seeded",
+				`"prefix":"tests"`, `"prefix":"seeded"`).Replace(act.body)
+			switch act.id {
+			case "add-assignment-rule":
+				if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+					`{"name":"seeded"}`); got.Code >= 300 {
+					t.Fatalf("seeding a team answered %d: %s", got.Code, got.Body.String())
+				}
+			case "record-incident":
+				act.path = strings.ReplaceAll(act.path, "CVE-2026-9999", "{issue}")
+			case "name-fix-release":
+				names := catalog.NewStore(r.DB.DB)
+				product, err := names.ProductByName(t.Context(), "mine")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := names.DeclareBranchOrTag(t.Context(), product.ID, "v9.0.0", catalog.Tag, nil); err != nil {
+					t.Fatal(err)
+				}
+				act.path, act.body = "/v1/incidents/{record}/fixes", `{"release":"v9.0.0"}`
+			}
+			answered := drive(act)
+			if answered.Code >= 300 {
+				t.Fatalf("seeding %s (%s) answered %d: %s",
+					act.what, act.id, answered.Code, answered.Body.String())
+			}
+			act.keep(t, seen, answered.Body.Bytes())
+		}
+
+		restore := dbtest.Hide(t, r.DB, "admin_change")
+		examined := 0
+		for _, act := range administrativeActs {
+			got := drive(act)
 			examined++
+			if strings.HasPrefix(got.Body.String(), "404 page not found") {
+				t.Errorf("%s (%s) answers as no route, so it reached no recorder",
+					act.what, act.id)
+			}
 
 			// Whatever the act would otherwise have answered, what it must
 			// not answer is anything a driver wrote. Checked by what a
