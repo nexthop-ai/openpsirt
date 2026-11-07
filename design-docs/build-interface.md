@@ -38,6 +38,7 @@ Satisfies REQ-75.
 | Each test file runs in its own VM context and DOM, inside a child process running file after file | A process per file was 29 s against 9 s on four cores |
 | Processes, never threads | Node applies a time zone change only on a main thread, and a zone test passes vacuously under UTC; such a test asserts the zone took effect |
 | Whole-interface tests, addresses, query keys, screen copy and control names, share one file and one parse | 0.66 s against 1.19 s |
+| A test scheduling an animation frame waits for it, and a screen cancels its pending frames as it goes | A frame outliving its test fires inside a later one: jsdom has no `scrollIntoView`, and a findings-list frame failed 2 runs of 8 on four cores |
 
 ## Class-name checks
 

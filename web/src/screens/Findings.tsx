@@ -516,6 +516,9 @@ export function Findings() {
     };
   });
   useEffect(() => {
+    // The frame bringing the cursor's row into view, canceled with the screen
+    // so it never reaches a row another screen draws.
+    let frame = 0;
     function key(event: KeyboardEvent) {
       // A key a control on the page has already answered is that control's: an
       // arrow opening a filter's list does not also move the cursor.
@@ -536,7 +539,8 @@ export function Findings() {
         setCursor(to);
         // The row brought into view, because a cursor below the fold is a
         // cursor nobody can see moving.
-        requestAnimationFrame(() =>
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() =>
           document
             .querySelector(`#findingRows tr[data-i="${to}"]`)
             ?.scrollIntoView({ block: "nearest" }),
@@ -558,7 +562,10 @@ export function Findings() {
       setPeeking(peeking === at ? null : at);
     }
     document.addEventListener("keydown", key);
-    return () => document.removeEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("keydown", key);
+      cancelAnimationFrame(frame);
+    };
     // Bound once. Everything it reads that changes is read off the ref above,
     // which the effect before this one keeps in step.
   }, [navigate]);

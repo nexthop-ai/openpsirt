@@ -122,10 +122,46 @@ describe("the findings list's keys", () => {
       on.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
     });
 
+  // The row the cursor lands on is brought into view a frame later, and jsdom
+  // draws no layout to scroll, so each test records the scrolls and waits for
+  // that frame.
+  async function scrolledRows(during: () => void): Promise<(string | null)[]> {
+    const kept = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+    const scrolled: Element[] = [];
+    HTMLElement.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    try {
+      during();
+      await new Promise((frame) => requestAnimationFrame(frame));
+      return scrolled.map((each) => each.getAttribute("data-i"));
+    } finally {
+      if (kept) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", kept);
+      else delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+    }
+  }
+
   it("moves the cursor on an arrow nothing else answers", async () => {
     await drawRows();
-    press(document, "ArrowDown");
-    expect(at()).toBe("0");
+    const scrolled = await scrolledRows(() => {
+      press(document, "ArrowDown");
+      expect(at()).toBe("0");
+    });
+    expect(scrolled).toEqual(["0"]);
+  });
+
+  // Verified by leaving the frame running after the screen goes: the row a
+  // later screen draws under the same address is scrolled and the test fails.
+  it("drops the scroll to the cursor's row when the screen goes", async () => {
+    await drawRows();
+    const scrolled = await scrolledRows(() => {
+      press(document, "ArrowDown");
+      const rows = mount.host().querySelector("#findingRows");
+      mount.render(<></>);
+      if (rows) document.body.append(rows);
+    });
+    document.querySelector("body > #findingRows")?.remove();
+    expect(scrolled).toEqual([]);
   });
 
   // Verified by dropping the handler's check of a key already answered: the
