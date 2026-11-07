@@ -13,6 +13,7 @@ Satisfies REQ-03, REQ-71, REQ-73.
 - [Connection encryption](#connection-encryption)
 - [Connection pool](#connection-pool)
 - [Statement preparation](#statement-preparation)
+- [Query builder dialects](#query-builder-dialects)
 - [SQLite settings](#sqlite-settings)
 - [Test harness](#test-harness)
 - [Not built](#not-built)
@@ -158,6 +159,16 @@ A test asks each server how many statements it holds prepared for one
 connection before and after a query and an insert. Another stores a moment and
 reads it back on sessions set fourteen hours east and to a month-first date
 style.
+
+## Query builder dialects
+
+The query builder speaks to each engine through a dialect, which caches every
+model's reflected table.
+
+| Engine | Dialect | Reason |
+|---|---|---|
+| PostgreSQL, SQLite | One for the process, shared by every handle | Its cache is built under its own lock and never changed after, and it reads nothing from the connection. One per handle reflected every model again per test: under the race detector the finding package took 57 to 59 s of processor time against 42 to 45 s shared |
+| MySQL, MariaDB | One per handle | Its initialization asks the server its version and turns on what MariaDB and each MySQL release accept, in that dialect alone |
 
 ## SQLite settings
 
