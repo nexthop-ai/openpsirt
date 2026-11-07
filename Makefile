@@ -304,7 +304,12 @@ openapi:
 
 # Everything CI runs, reachable from one command, except the container and the
 # chart: those need docker and helm, and check-packaging holds them.
-check: build lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed subjected attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+#
+# The release binary is not built here. -trimpath makes it a second compilation
+# of every package, 23.5 s and 461 MB of build cache beside the test builds,
+# which already link every package and the program; the image job builds the
+# binary the way a release does.
+check: lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed subjected attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"

@@ -1,7 +1,7 @@
 # Build measurements
 
-Benchmark runs behind the CI cache, test database, race pass and commit
-durability rules.
+Benchmark runs behind the CI cache, test database, race pass, commit
+durability and gate build rules.
 
 ## Contents
 
@@ -11,6 +11,7 @@ durability rules.
 - [Measurement databases](#measurement-databases)
 - [Commit durability](#commit-durability)
 - [Suite totals](#suite-totals)
+- [Gate build work](#gate-build-work)
 
 ## CI caches
 
@@ -130,3 +131,12 @@ databases an earlier run migrated and the 246 s migrated every one.
 The rules in `design-docs/build-tests.md` together bring the suite to one minute
 fifteen against warm servers and two minutes forty-five against cold ones, from
 four minutes four seconds.
+
+## Gate build work
+
+Rules in `design-docs/build.md` § Make targets and `design-docs/build-tests.md`
+§ The race pass. Twelve local cores, Go 1.27.3.
+
+| Work | Before | After |
+|---|---|---|
+| `make build` over a build cache holding the plain build | 23.5 s wall, 97 s processor, 461 MB more cache | Not run; 13 s on a CI runner |

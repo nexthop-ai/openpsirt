@@ -103,6 +103,10 @@ Every CI check is a `make` target, reproducible locally with the same pinned
 tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 `./...`, which would compile and scan a Go package an npm dependency ships.
 
+| Rule | Reason |
+|---|---|
+| `check` and the gate never run `make build` | Its `-trimpath` compiles every package a second time: 23.5 s and 461 MB of build cache beside the test builds, which link every package and the program. The image job builds the binary as a release does (`design-docs/build-measurements.md` § Gate build work) |
+
 | Target | Runs |
 |---|---|
 | `make build` | The binary, with version information |
@@ -137,7 +141,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make spdx` | License headers; `make spdx-fix` writes missing ones. See `design-docs/build-dependencies.md` § License headers |
 | `make pins-check` | Versions pinned in two files agree |
 | `make go-version` | The image's Go release, which every workflow installs |
-| `make check` | Everything above. Needs npm |
+| `make check` | Everything above except `make build`. Needs npm |
 | `make check-engines` | All four engines ran as claimed, and the reserved-word list matches them |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the engines |
 | `make weakness-names` | Rewrites weakness names and primary parents from the catalog. In no gate, since the catalog is unpinned |
@@ -165,7 +169,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | `web/**` alone | `web-check`, `spdx`, `readable`, `secrets` |
 | the interface's manifest, lockfile or source | `licenses` too |
 | the interface's route table | the Go tier too, since a Go test holds server links to it |
-| Go reaching no SQL | `build`, `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `subjected`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
+| Go reaching no SQL | `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `subjected`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
 | a query, the schema, a migration, or the shared test harness | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: the registering package, or a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |

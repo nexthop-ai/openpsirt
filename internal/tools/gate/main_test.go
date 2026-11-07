@@ -288,8 +288,8 @@ func TestEveryTargetCheckRunsIsChosenBySomeTier(t *testing.T) {
 }
 
 func TestATargetNoTierChoosesIsReported(t *testing.T) {
-	tiers := map[tier][]string{code: {"build"}, everything: {"check"}}
-	got := unchosenBy(checkPrerequisites("check: build lint\n\tdo\n"), tiers)
+	tiers := map[tier][]string{code: {"unreachable"}, everything: {"check"}}
+	got := unchosenBy(checkPrerequisites("check: unreachable lint\n\tdo\n"), tiers)
 	if !slices.Equal(got, []string{"lint"}) {
 		t.Errorf("unchosen: %v, want [lint]", got)
 	}
