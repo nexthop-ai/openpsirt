@@ -139,6 +139,11 @@ workstation, before and after, except where a package is named.
 | The graph package, PostgreSQL | 10.1 s | 4.2 s |
 | The graph package, MySQL | 5.8 s | 1.8 s |
 | The graph package, MariaDB | 3.3 s | 1.6 s |
+| The queue ordered by the tool's rating, SQLite | 0.21 s | 0.09 s |
+| The same, under the race detector | 0.90 s | 0.38 s |
+| The same, PostgreSQL | 1.60 to 2.75 s | 0.44 to 0.46 s |
+| The same, MySQL | 0.57 s | 0.15 s |
+| The same, MariaDB | 0.56 s | 0.17 s |
 
 ## Suite totals
 

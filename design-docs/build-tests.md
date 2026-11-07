@@ -248,6 +248,7 @@ Work a test repeats in its own body, past what the harness sets up.
 | Rule | Reason |
 |---|---|
 | A test reaching a bound sets a small one on its own store | The default's worth of rows took 3.6 to 3.8 s on PostgreSQL and MySQL, and the next test on PostgreSQL 3 s more emptying them. A package variable races with the package's parallel SQLite tests |
+| Cases ordering rows by each row's own values are pairs of rows in one world, each case a named subtest | A world per case is an API, a seeded code finding and two runs |
 
 `design-docs/build-measurements.md` § Test bodies has the timings.
 
