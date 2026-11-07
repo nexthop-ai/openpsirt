@@ -163,9 +163,10 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/
 # the detector costs: an empty test under the detector spends 48% of its time in
 # the engine parsing the schema, and the pointer checks the detector turns on
 # another 16 to 22%. The translated engine, the C library it runs on and the
-# allocator under that library are compiled without either. The engine's Go driver stays instrumented: an error
-# it fills in uninstrumented leaves no record of that write, so our code reading
-# it is checked against whatever last used the memory and reported as a race.
+# allocator under that library are compiled without either. The engine's Go
+# driver stays instrumented: an error it fills in uninstrumented leaves no
+# record of that write, so our code reading it is checked against whatever last
+# used the memory and reported as a race.
 # Our code, the query builder and the standard library stay instrumented and
 # checked, and a race inside the translated C is the one thing no longer seen.
 # The compiler flags are not documented for this use; a Go release that
