@@ -269,7 +269,7 @@ full:
 # that tier is "unclaimed", which is a check of its own.
 DOCS_PACKAGES := ./internal/docs/ ./internal/build/ ./internal/config/
 docs-check:
-	$(GO) test $(DOCS_PACKAGES)
+	$(GO) test $(TEST_LINK) $(DOCS_PACKAGES)
 
 # The upload client's own tests, which are what the macOS and Windows runners
 # take: it is the one program here that runs on a build host rather than in a
@@ -283,7 +283,7 @@ docs-check:
 CLIENT_PACKAGES := ./cmd/openpsirt-upload/ ./internal/uploadclient/
 CLIENT_SOURCES  := $(CLIENT_PACKAGES) ./internal/version/ ./internal/markdown/ ./internal/refusal/ ./internal/sarif/testdata/ Dockerfile go.mod go.sum .github/workflows/ci.yml
 client-test:
-	$(GO) test -count=1 $(CLIENT_PACKAGES)
+	$(GO) test $(TEST_LINK) -count=1 $(CLIENT_PACKAGES)
 
 # The two lists, printed for the workflow, which reads them rather than
 # keeping copies.
