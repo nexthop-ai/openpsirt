@@ -191,6 +191,32 @@ workstation, before and after, except where a package is named.
 | The same, MySQL | 0.57 s | 0.15 s |
 | The same, MariaDB | 0.56 s | 0.17 s |
 | A stale database's refused drop, PostgreSQL | 5.99 s | 0.94 s |
+| Interning a run against each report alone, twenty rounds and twelve, SQLite | 0.24 s | 0.18 to 0.19 s |
+| The same, under the race detector | 1.01 to 1.02 s | 0.78 to 0.84 s |
+| The same, PostgreSQL | 1.75 to 2.01 s | 1.33 to 1.54 s |
+| The same, MySQL | 0.89 to 1.23 s | 0.62 to 0.89 s |
+| The same, MariaDB | 0.96 to 1.19 s | 0.64 to 0.94 s |
+
+The interning comparison's coverage counts the blocks of every package in the
+module except the harness and the migrations, which only a run building its
+database reaches.
+
+| The test's seeds, five runs of each count | Blocks at twenty rounds | At twelve |
+|---|---|---|
+| SQLite | 831 | The same blocks |
+| PostgreSQL | 837 | The same blocks |
+| MySQL | 865 | The same blocks |
+| MariaDB | 857 | The same blocks |
+
+From four other sets of seeds, one run each, twelve rounds reach the blocks
+twenty do on every engine, and eight miss one block from one set on every
+engine. Three miss ten blocks from the test's seeds. One PostgreSQL run of
+twelve rounds in nineteen missed one block, the second line of the comparison
+with the newest rating, which every run of twenty reached.
+
+Turning off the check for a rating the issue holds lower fails the comparison
+at twelve rounds and at eight, in the fifth random round; with no random rounds
+it passes.
 
 ## Suite totals
 
