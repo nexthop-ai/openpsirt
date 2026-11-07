@@ -5,6 +5,7 @@ package graph_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -40,6 +41,72 @@ func TestAPackageIdentifierStartsAtEveryLiveComponentOfThatPackageAlone(t *testi
 		slices.Sort(want)
 		if !slices.Equal(got, want) {
 			t.Errorf("started at %v, want the two commits %v", got, want)
+		}
+
+		// A rescan moves the first commit and drops the longer name: the
+		// closed commit is no start, and a package only closed nodes hold has
+		// none, which the API answers as a package the build does not hold.
+		third := graph.Described{Purl: "pkg:github/sonic-net/sonic-repo@7a8b", Name: "repo", Version: "3.0"}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{third, second, elsewhere, odd},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: third}, {Parent: root, Child: second},
+				{Parent: root, Child: elsewhere}, {Parent: root, Child: odd},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		got, err = f.store.ComponentsOf(ctx, f.buildID, graph.ParsePurlPrefix("pkg:github/sonic-net/sonic-repo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want = []int64{f.componentWithPurl(t, second.Purl), f.componentWithPurl(t, third.Purl)}
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			t.Errorf("after the rescan started at %v, want the live commits %v", got, want)
+		}
+		gone, err := f.store.ComponentsOf(ctx, f.buildID, graph.ParsePurlPrefix("pkg:github/sonic-net/sonic-repo-common"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(gone) != 0 {
+			t.Errorf("a package only closed nodes hold started at %v, want none", gone)
+		}
+	})
+}
+
+// A walk starts from what nothing pulls in only where the build's root is
+// among its starts: the branch is priced at every node on MySQL and MariaDB,
+// so a walk from below the root is written without it.
+func TestAWalkFromBelowTheRootStartsAtItsStartsAlone(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
+			Root: root, Components: []graph.Described{curl},
+			Dependencies: []graph.Dependency{{Parent: root, Child: curl}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		top, below := f.componentNamed(t, root.Name), f.componentNamed(t, curl.Name)
+		for _, c := range []struct {
+			starts []int64
+			root   bool
+		}{{[]int64{below}, false}, {[]int64{below, top}, true}, {nil, false}} {
+			got, err := graph.RootAmong(ctx, f.db.DB, f.buildID, c.starts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != c.root {
+				t.Errorf("starts %v hold the root: %v, want %v", c.starts, got, c.root)
+			}
+		}
+		for fromRoot, seeds := range map[bool]bool{false: false, true: true} {
+			written := graph.WithinAny(f.db.DB, f.buildID, []int64{below}, fromRoot).String()
+			if strings.Contains(written, `"rn"`) != seeds {
+				t.Errorf("from the root %v wrote the seeds of what nothing pulls in: %v, want %v",
+					fromRoot, !seeds, seeds)
+			}
 		}
 	})
 }

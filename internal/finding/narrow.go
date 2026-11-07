@@ -137,8 +137,8 @@ type Filter struct {
 	Purl graph.PurlPrefix
 	// purlComponents is the components Purl chooses, set by the store: the
 	// type narrows the statement reading them and the package is tested on
-	// each identifier read, since no stored column holds it reduced. Nil asks
-	// nothing, and empty answers nothing.
+	// each identifier read, since no stored column holds it reduced. Read only
+	// where Purl is set; unset or empty, the list keeps nothing.
 	purlComponents []int64
 	// Under keeps what sits inside one container, by its name. UnderTheBuild
 	// asks for the other case: what the build holds directly, which has no
@@ -171,6 +171,10 @@ type Filter struct {
 	// replaced is the components the build no longer holds whose name sits
 	// beneath, read by the store with the build.
 	replaced []int64
+	// belowRoot is that the build's root is none of Beneath, read by the
+	// store with the build; a walk from elsewhere then leaves out what
+	// nothing pulls in (graph.WithinAny). Unread, the walk keeps it.
+	belowRoot bool
 	// State keeps groups by how far they have been decided. A group is an issue
 	// in a component across every occurrence it sits at, and its occurrences
 	// can be in different states, so what a group's state *is* had to be
@@ -796,7 +800,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// bound back in: under a build's root that list is the whole build.
 		// A finding on a version a rescan replaced is beneath wherever the
 		// present version of its name is.
-		q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), f.BuildID, f.Beneath, f.replaced))
+		q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), f.BuildID, f.Beneath, f.replaced, !f.belowRoot))
 	}
 	q = f.byState(q)
 	if !f.BelowMinimumSeverity {

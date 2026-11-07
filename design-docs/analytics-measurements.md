@@ -287,10 +287,36 @@ The findings list's package filter, one page and its total, in a third run:
 
 | Reading | Detail |
 |---|---|
-| Choosing every component of a type costs no more than one package | The chosen set is read once and held to by the occurrences' component |
+| On SQLite and PostgreSQL a whole type costs about what one package costs | The chosen set is read once and held to by the occurrences' component |
+| On MySQL and MariaDB a whole type costs about twice one package | The type is matched on the lowercased identifier, which no index answers: at 52 weekly rescans `pkg:deb/` reads a page in 888 ms against 479 for the kernel's package on MySQL 8.4, and 297 against 165 on MariaDB |
 
 | Caveat | Detail |
 |---|---|
 | One build | The image's repositories reach every top-level component, the widest walk a repository row takes |
-| Thirteen weeks | A year of weekly rescans holds four times the closed rows; the replaced components a narrowing reads grow with it |
+| Thirteen weeks | § Fifty-two weekly rescans has a year's figures on MySQL 8.4 and MariaDB; SQLite and PostgreSQL were not read at a year |
 | Seeding took 6 minutes on SQLite and 16 to 39 on the servers | The history is built by applying each scan in turn |
+
+### Fifty-two weekly rescans
+
+The same image at 52 weekly rescans, read on MySQL 8.4 and MariaDB in the
+review of this work, each engine run alone.
+
+| Read | MySQL 8.4 | MariaDB |
+|---|--:|--:|
+| Burndown, the product | 2,691 ms | |
+| Burndown, the kernel by its name | 4,439 ms | |
+| Burndown, beneath the root | 3,869 ms | |
+| The three reads above | 2.7 to 4.4 s | 3.8 to 4.8 s |
+
+| Beneath, on MySQL 8.4 | Seeds of what nothing pulls in | Without them |
+|---|--:|--:|
+| Burndown beneath a leaf package | 1,034 ms | 22 ms |
+| Trend beneath a leaf package | 290 ms | 19 ms |
+| List beneath a leaf package | 217 ms | 20 ms |
+| Burndown from a repository's two commits | 1,064 ms | 183 ms |
+
+| Reading | Detail |
+|---|---|
+| A year of history costs the burndown its reads over the closed rows | The product alone takes 2.7 s on MySQL 8.4, so the time is outside the dismissals and the replaced components |
+| A day 0 left empty pays the whole history | It is the first scan, so a year-old product reads a year each time the page opens |
+| A walk from below the root is written without the seeds of what nothing pulls in | The planner prices them at every node of the build (`design-docs/data-model-graph.md` § Path traversal) |

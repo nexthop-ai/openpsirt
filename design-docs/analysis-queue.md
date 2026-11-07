@@ -60,7 +60,7 @@ its code findings out.
 | A name also reaches the folds of every component of the name, or built from a source of the name, holding a finding in the builds in scope, whatever version a rescan has since replaced | A code finding keeps the component it opened on (`design-docs/analysis-source.md` § Placement); the finding's component index answers which hold one, and the node history has no index by component |
 | A name naming a build's root reaches every component that was ever that build's root | A code finding keeps the component it opened on, and a root a rescan replaced is still the build (`design-docs/analysis-source.md` § Placement) |
 | Beneath a component narrows to one build and the code findings placed at the component or anywhere under it, by the tree's walk, and every count follows (REQ-56) | A tree count opens the list it counts |
-| Beneath the build's root is every code finding of the build | The root adopts what hangs from nothing, which no edge from it reaches, and a former root is no node the walk reaches; walking 16,000 children of the root took 2.48 s on PostgreSQL, against 143 ms reading the build |
+| Beneath the build's root is every code finding of the build | A former root is no node the walk reaches; walking 16,000 children of the root took 2.48 s on PostgreSQL, against 143 ms reading the build |
 | Beneath is refused without one build; a name the build does not hold answers not found, after the reader is authorized (REQ-42) | An empty list is a clean subtree, and a refusal after resolving a name is a directory |
 | A rule's rating is the newest naming run's, held until rated again | |
 | A rule's tier is the highest of every weakness recorded for it, re-ranked each run naming it | |

@@ -324,7 +324,7 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 				args  []any
 			}{
 				{"united with the walk", `"f"."component_id" IN (?)`,
-					[]any{graph.WithinAnd(db.DB, w.Build.ID, []int64{beneath}, under)}},
+					[]any{graph.WithinAnd(db.DB, w.Build.ID, []int64{beneath}, under, false)}},
 				{"named as a second start of the walk", `"f"."component_id" IN (?)`,
 					[]any{db.NewRaw(`WITH RECURSIVE "down" AS (
 		SELECT "n"."id" AS "node" FROM "graph_node" AS "n"

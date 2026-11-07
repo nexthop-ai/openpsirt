@@ -45,7 +45,7 @@ const depth = 64
 // is unbounded by construction; the two callers that pass it into a subquery
 // never hold it.
 func Within(db *bun.DB, buildID, componentID int64) *bun.RawQuery {
-	return WithinAny(db, buildID, []int64{componentID})
+	return WithinAny(db, buildID, []int64{componentID}, true)
 }
 
 // WithinAny is the same for a set of components, in one statement.
@@ -54,22 +54,30 @@ func Within(db *bun.DB, buildID, componentID int64) *bun.RawQuery {
 // over every build of the product — so a rule naming a pattern that matches
 // broadly issued tens of thousands of them inside one request. The engine
 // walks from every anchor at once instead.
-func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
+//
+// FromRoot says the starts may hold the build's root (RootAmong), and only
+// then does the walk also start from every component nothing pulls in, the
+// tree's placement of them (§ unplacedSeeds). The branch is left out
+// otherwise, since MySQL and MariaDB price it at every node of the build: on
+// MySQL 8.4, beneath a leaf package after 52 weekly rescans, a burndown read
+// in 1,034 ms with it and 22 ms without.
+func WithinAny(db bun.IDB, buildID int64, componentIDs []int64, fromRoot bool) *bun.RawQuery {
 	// No depth in the rows, for the reason the count beneath carries none:
 	// 167,785 rows for 10,045 components under one real product, 0.81 s
 	// against 0.10 s, and the union ends a cycle on its own.
-	//
-	// The root's walk also starts from every component nothing pulls in, the
-	// tree's placement of them (§ unplacedSeeds).
-	return db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT "seed"."node" FROM (
-			SELECT "n"."id" AS "node"
+	seeds := `SELECT "n"."id" AS "node"
 			FROM "graph_node" AS "n"
-			WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
+			WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
+	args := []any{buildID, bun.List(componentIDs)}
+	if fromRoot {
+		seeds += `
 			UNION ALL
 			SELECT "fn"."id" FROM "graph_node" AS "rn" CROSS JOIN "graph_node" AS "fn"
-			WHERE `+unplacedSeeds+`
-		) AS "seed"
+			WHERE ` + unplacedSeeds
+		args = append(args, buildID, true, bun.List(componentIDs), false)
+	}
+	return db.NewRaw(`WITH RECURSIVE "down" AS (
+		SELECT "seed"."node" FROM (`+seeds+`) AS "seed"
 		UNION
 		SELECT "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
@@ -77,7 +85,25 @@ func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 		  AND "e"."parent_id" <> "e"."child_id"
 	)
 	SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`,
-		buildID, bun.List(componentIDs), buildID, true, bun.List(componentIDs), false, buildID)
+		append(args, buildID)...)
+}
+
+// RootAmong says whether one of these components is the live root of a build:
+// whether a walk from them starts from what nothing pulls in as well.
+func RootAmong(ctx context.Context, db bun.IDB, buildID int64, componentIDs []int64) (bool, error) {
+	if len(componentIDs) == 0 {
+		return false, nil
+	}
+	found, err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, true).
+		Where(`"n"."component_id" IN (?)`, bun.List(componentIDs)).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("ask whether build %d's root is among components %v: %w", buildID, componentIDs, err)
+	}
+	return found, nil
 }
 
 // unplacedSeeds joins a build's root, where it is among the components a walk
@@ -159,14 +185,14 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 // semi-join and answer by reading every finding of the build; the components
 // named beside the walk in its last step; and the components named as a second
 // start of the walk.
-func WithinAnd(db bun.IDB, buildID int64, starts, also []int64) *bun.RawQuery {
+func WithinAnd(db bun.IDB, buildID int64, starts, also []int64, fromRoot bool) *bun.RawQuery {
 	if len(also) == 0 {
-		return WithinAny(db, buildID, starts)
+		return WithinAny(db, buildID, starts, fromRoot)
 	}
 	return db.NewRaw(`SELECT "u"."component_id" FROM (?
 	UNION
 	SELECT "c"."id" FROM "component" AS "c" WHERE "c"."id" IN (?)) AS "u"`,
-		WithinAny(db, buildID, starts), bun.List(also))
+		WithinAny(db, buildID, starts, fromRoot), bun.List(also))
 }
 
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
@@ -193,14 +219,24 @@ func (s *Store) reach(ctx context.Context, buildID int64, of []int64) ([]reachin
 	}
 	// Every start is walked from itself, and the root from every component
 	// nothing pulls in as well (§ unplacedSeeds), so the root's count is the
-	// whole build's in the same walk as everything else being counted.
+	// whole build's in the same walk as everything else being counted. The
+	// branch is written only where the root is a start, as in WithinAny.
+	fromRoot, err := RootAmong(ctx, s.db, buildID, of)
+	if err != nil {
+		return nil, err
+	}
 	seeds := `SELECT "n"."id" AS "start", "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
+		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
+	walkArgs := []any{buildID, bun.List(of)}
+	if fromRoot {
+		seeds += `
 		UNION ALL
 		SELECT "rn"."id", "fn"."id" FROM "graph_node" AS "rn" CROSS JOIN "graph_node" AS "fn"
 		WHERE ` + unplacedSeeds
-	walkArgs := []any{buildID, bun.List(of), buildID, true, bun.List(of), false, buildID}
+		walkArgs = append(walkArgs, buildID, true, bun.List(of), false)
+	}
+	walkArgs = append(walkArgs, buildID)
 	// No depth in the rows. With one, the union keeps a node once per depth
 	// it is reached at, and a node reached along many paths is walked again
 	// from each: 1,612,405 rows for 43,904 pairs under one real product's
@@ -217,7 +253,7 @@ func (s *Store) reach(ctx context.Context, buildID int64, of []int64) ([]reachin
 	`
 
 	var reached []reaching
-	err := s.db.NewRaw(walk+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
+	err = s.db.NewRaw(walk+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
 	FROM "down" AS "d"
 	JOIN "graph_node" AS "sn" ON "sn"."id" = "d"."start"
 	JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`, walkArgs...).
@@ -591,8 +627,9 @@ func (s *Store) Above(ctx context.Context, subject access.Subject, buildID,
 // With a component reached several ways, the shortest way down is the one
 // returned. A path is being shown to explain a position rather than to
 // enumerate the graph, and the shortest is the one somebody can hold in mind.
-// A component the inventory placed nowhere, or one whose every way up runs
-// past the bound, has no chain, which is the honest answer.
+// A component nothing pulls in hangs from the root, so its chain is the root
+// and itself (§ unplacedSeeds). One whose every way up runs past the bound
+// has no chain, which is the honest answer.
 func (s *Store) Chains(ctx context.Context, subject access.Subject, buildID int64,
 	componentIDs []int64) (map[int64][]Step, error) {
 
@@ -830,8 +867,12 @@ func ReplacedWithin(ctx context.Context, db bun.IDB, buildID int64, starts []int
 			}
 		}
 	}
+	fromRoot, err := RootAmong(ctx, db, buildID, starts)
+	if err != nil {
+		return nil, err
+	}
 	var reached []int64
-	if err := db.NewSelect().TableExpr(`(?) AS "w"`, WithinAny(db, buildID, starts)).
+	if err := db.NewSelect().TableExpr(`(?) AS "w"`, WithinAny(db, buildID, starts, fromRoot)).
 		ColumnExpr(`"w"."component_id"`).
 		Where(`"w"."component_id" IN (?)`, bun.List(namesakes)).
 		Scan(ctx, &reached); err != nil {

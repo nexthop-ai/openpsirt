@@ -28,7 +28,7 @@ const MostTrendSteps = 730
 // Within narrows a trend to part of one build's tree.
 //
 // A team that owns the kernel reads the same series for the part of the tree
-// it owns. These are the findings list's own two narrowings, so a chart and a
+// it owns. These are the findings list's own narrowings, so a chart and a
 // list cannot disagree about what a subtree is.
 type Within struct {
 	// Component keeps what is open against components of this name, at any
@@ -334,6 +334,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 
 	var buildID int64
 	var under []int64
+	var fromRoot bool
 	if len(within.Beneath) > 0 {
 		buildIDs, err := s.Builds(ctx, scope)
 		if err != nil {
@@ -354,6 +355,9 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 			return nil, err
 		}
 		if under, err = graph.ReplacedWithin(ctx, s.db, buildID, within.Beneath, replaced); err != nil {
+			return nil, err
+		}
+		if fromRoot, err = graph.RootAmong(ctx, s.db, buildID, within.Beneath); err != nil {
 			return nil, err
 		}
 	}
@@ -386,7 +390,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 				}
 				heldFor[asked] = held
 			}
-			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), buildID, within.Beneath, held))
+			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), buildID, within.Beneath, held, fromRoot))
 		}
 		return q, nil
 	}, nil

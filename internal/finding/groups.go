@@ -327,6 +327,11 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 			if err != nil {
 				return 0, nil, nil, err
 			}
+			fromRoot, err := graph.RootAmong(ctx, s.db, filter.BuildID, filter.Beneath)
+			if err != nil {
+				return 0, nil, nil, err
+			}
+			filter.belowRoot = !fromRoot
 			// Over the rows the read lists: open now, or on the day asked.
 			held, heldArgs := openOn("f", filter.OpenOn)
 			if filter.replaced, err = holding(ctx, s.db, filter.BuildID, under,

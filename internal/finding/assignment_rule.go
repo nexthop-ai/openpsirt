@@ -654,8 +654,12 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 		// component, inside a loop over every build of the product, is tens of
 		// thousands of recursive round trips in one request for a pattern
 		// matching broadly.
+		fromRoot, err := graph.RootAmong(ctx, s.db, build, roots)
+		if err != nil {
+			return nil, err
+		}
 		var found []int64
-		if err := graph.WithinAny(s.db, build, roots).Scan(ctx, &found); err != nil {
+		if err := graph.WithinAny(s.db, build, roots, fromRoot).Scan(ctx, &found); err != nil {
 			return nil, fmt.Errorf("walk what sits under it: %w", err)
 		}
 		// A finding on a version a rescan replaced is under wherever the

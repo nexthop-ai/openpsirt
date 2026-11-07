@@ -91,6 +91,7 @@ every binary built from it.
 | A rule matches without regard to capitals, its keys folded and cut as component names are; a longer key is refused when written | It could never match |
 | A pattern naming most of a build is refused, when written and at the preview, as a rule matching nothing is | The subtree is one recursive walk per build |
 | A place in the tree also holds every component a rescan replaced whose name a component there carries, as the tree counts it (`design-docs/data-model-graph.md` § Path traversal) | A flaw recorded on a version a rescan replaced stays open on it, and a rule and the count beside a node agree |
+| A place that is the build's root, named or matched by a pattern, also holds every component nothing pulls in and what it pulls in (`design-docs/data-model-graph.md` § Path traversal) | The tree draws them under the root. Such a rule, at an upgrade from a release that walked edges alone, takes at its first sweep the unheld work beneath them that a later rule placing beneath one of them used to take |
 | The preview records nothing and answers which components the rule names, how many pieces of work sit there, and how many nobody holds | Only the last would be placed; it ignores rules already there, so it reports what the rule matches |
 | The preview shares the sweep's predicate | |
 | The preview names a sample of components and counts all of them | A rule beneath a kernel matches hundreds |

@@ -54,6 +54,9 @@ func replacedIn(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int
 
 // beneathOrAdopted is the condition keeping a finding, as "f", at the
 // component beneath or anywhere under it, or on a component adopted there.
+// The queue never walks from the build's root, whose subtree is the whole
+// build and is asked as no narrowing, so the walk starts at the component
+// alone.
 func beneathOrAdopted(db bun.IDB, buildID, beneath int64, adopted []int64) (string, []any) {
-	return `"f"."component_id" IN (?)`, []any{graph.WithinAnd(db, buildID, []int64{beneath}, adopted)}
+	return `"f"."component_id" IN (?)`, []any{graph.WithinAnd(db, buildID, []int64{beneath}, adopted, false)}
 }

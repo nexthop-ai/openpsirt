@@ -904,16 +904,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, buildID int64
 
 // IsRoot is whether a component is a build's root now.
 func IsRoot(ctx context.Context, db bun.IDB, buildID, componentID int64) (bool, error) {
-	root, err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
-		Where(`"n"."build_id" = ?`, buildID).
-		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`"n"."component_id" = ?`, componentID).
-		Where(`"n"."is_root" = ?`, true).
-		Exists(ctx)
-	if err != nil {
-		return false, fmt.Errorf("ask whether component %d is the root of build %d: %w", componentID, buildID, err)
-	}
-	return root, nil
+	return RootAmong(ctx, db, buildID, []int64{componentID})
 }
 
 // Root is a component that was ever a build's root.
