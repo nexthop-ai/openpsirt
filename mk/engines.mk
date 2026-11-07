@@ -44,6 +44,10 @@ ENGINE_WAIT          ?= 120
 # nothing reports the same "OK" as a grep that found nothing wrong. The empty
 # check below is for the same reason: an enumeration that came back empty would
 # make every loop vacuous.
+#
+# Its test binaries are built with test-all's flags: no vet, which the linter
+# has run, and linked without debugging information.
+ENGINES_TEST = -vet=off $(TEST_LINK)
 check-engines:
 ifneq ($(ENGINES_MISSING),)
 	@echo "Not configured: $(ENGINES_MISSING). SQLite alone tests none of the"
@@ -55,25 +59,25 @@ endif
 	  [ -n "$$every" ] && [ -n "$$servers" ] \
 	    || { echo "the engine list came back empty, so these greps check nothing"; exit 1; }; \
 	  out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
-	  $(GO) test ./internal/schema/ -count=1 -v -run TestMigrationsApplyOnEveryEngine \
+	  $(GO) test $(ENGINES_TEST) ./internal/schema/ -count=1 -v -run TestMigrationsApplyOnEveryEngine \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
 	  for engine in $$every; do \
 	    grep -q "PASS: TestMigrationsApplyOnEveryEngine/$$engine" "$$out" \
 	      || { echo "$$engine did not run"; exit 1; }; \
 	  done; \
-	  $(GO) test ./internal/database/migrate/ -count=1 -v -run TestLockExcludes \
+	  $(GO) test $(ENGINES_TEST) ./internal/database/migrate/ -count=1 -v -run TestLockExcludes \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
 	  for engine in $$servers; do \
 	    grep -q "PASS: TestLockExcludesAnotherConnection/$$engine" "$$out" \
 	      || { echo "the migration lock was not exercised on $$engine"; exit 1; }; \
 	  done; \
-	  $(GO) test ./internal/dbtest/ -count=1 -v -run TestEachEngineIsTheEngineItSaysItIs \
+	  $(GO) test $(ENGINES_TEST) ./internal/dbtest/ -count=1 -v -run TestEachEngineIsTheEngineItSaysItIs \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
 	  for engine in $$every; do \
 	    grep -q "PASS: TestEachEngineIsTheEngineItSaysItIs/$$engine" "$$out" \
 	      || { echo "$$engine was not checked for being itself"; exit 1; }; \
 	  done; \
-	  $(GO) test ./internal/database/migrate/migrations/ -count=1 -v \
+	  $(GO) test $(ENGINES_TEST) ./internal/database/migrate/migrations/ -count=1 -v \
 	    -run TestAMigrationThatFailedPartWayThroughCanBeRunAgain \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
 	  for engine in mysql mariadb; do \
@@ -83,7 +87,7 @@ endif
 	$(MAKE) reserved-current
 ifneq ($(strip $(OPENPSIRT_TEST_TOO_OLD_URL)),)
 	@out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
-	  $(GO) test ./internal/database/ -count=1 -v -run TestOpenRefuses \
+	  $(GO) test $(ENGINES_TEST) ./internal/database/ -count=1 -v -run TestOpenRefuses \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
 	  grep -q "PASS: TestOpenRefusesAServerBelowTheFloor" "$$out" \
 	    || { echo "the version floor test did not run"; exit 1; }

@@ -77,7 +77,7 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | `internal/refusal/` | A caller-readable sentence, apart from a withheld fault. See `design-docs/api-refusals.md` |
 | `internal/webui/` | The embedded interface. See `design-docs/interface.md` |
 | `internal/weakness/` | Weakness catalog names. See `design-docs/findings-severity.md` |
-| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gate, release, rehearsal, image-inventory and test-lane programs |
+| `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gate, release, rehearsal, image-inventory, test-lane and other-system programs |
 | `web/` | The interface source. See `design-docs/interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `design-docs/packaging-chart.md` |
 | `docs/` | The documentation site |
@@ -120,7 +120,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make test-engines` | The three server engines, without the detector, over the packages reaching a database |
 | `make docs-check` | What a documents-only change can break |
 | `make lint` | Static analysis |
-| `make vet-other-os` | Type-checks for macOS, and the upload client for Windows |
+| `make vet-other-os` | Type-checks, for macOS and Windows, the packages compiling other files there than on Linux, and the upload client for Windows |
 | `make client-test` | The upload client's tests, uncached; `make client-packages` and `make client-sources` print the lists the macOS and Windows jobs read |
 | `make govulncheck` | Go vulnerabilities the change introduces |
 | `make licenses` | Shipped Go and npm licenses against the allowlist |
@@ -262,7 +262,11 @@ directory and reads the interface.
 | `.golangci.yml` alone selects rules, each gating or advisory | No scope grandfathers a backlog (REQ-75) |
 | Documentation rules are off; error checking excludes conventional cleanup calls | |
 | The linter's `govet` is the vet, over test files and the `measure`-tagged file | Running `go vet` too cost 50 s of a two-core runner |
-| `test-all` passes `-vet=off`; `make test` keeps the vet of `go test` | That vet is a subset of the linter's |
+| `test-all` and `check-engines` pass `-vet=off`; `make test` keeps the vet of `go test` | That vet is a subset of the linter's |
+| `vet-other-os` vets, per other system, the packages whose compiled files there differ from Linux's, read from `go list` by a program, never a list; Windows adds the upload client | A package compiling the same files type-checks the same: 36.4 s against 63.9 s on an empty build cache, 5.5 s against 24.8 s after an exported change low in the tree (`design-docs/build-measurements.md` § Gate work outside the tests) |
+| A file one system compiles and the other does not declaring an exported name is refused, test files aside | Its importers are vetted on Linux alone |
+| A test holds every file on disk some system compiles and Linux does not to a system `vet-other-os` names; the program lists each system's packages itself, so a package Linux compiles nothing of is found | A `!unix` file and a file kept off Linux, macOS and the BSDs were compiled by nothing |
+| The program refuses a listing holding no package, or a system where no package differs | Either is a vet of nothing |
 | A test holds that configuration: `govet` on and unnarrowed, test and generated files included, no exclusion naming either, the `measure` tag passed | The linter skips generated files by default |
 | The linter reports one issue per line | |
 | The linter's Go release is at least the code's | Otherwise it cannot read export data (`design-docs/build-dependencies.md` § Pinned pairs) |

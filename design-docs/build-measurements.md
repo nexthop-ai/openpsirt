@@ -1,7 +1,8 @@
 # Build measurements
 
 Benchmark runs behind the CI cache, test database, race pass, commit
-durability, seeded start, migration test and gate build rules.
+durability, seeded start, migration test, gate build and other gate work
+rules.
 
 ## Contents
 
@@ -15,6 +16,7 @@ durability, seeded start, migration test and gate build rules.
 - [Test bodies](#test-bodies)
 - [Suite totals](#suite-totals)
 - [Gate build work](#gate-build-work)
+- [Gate work outside the tests](#gate-work-outside-the-tests)
 
 ## CI caches
 
@@ -250,3 +252,18 @@ analysis, `design-docs/build-tests.md` § The race pass and
 | The same, warm | 2.3 to 3.1 s wall, 7.4 s processor | Not run |
 | Building the trail's test binary after an exported change in the findings package | 2.4 to 3.1 s wall, 5.8 s processor | 0.67 s, 0.85 s |
 | `go list` of the module's packages in one `make check` | At every expansion, 0.35 to 0.45 s each | Once per make run |
+
+## Gate work outside the tests
+
+Rules in `design-docs/build.md` § Static analysis. Four cores of a workstation,
+Go 1.27.3, each run from an empty build cache.
+
+| `make vet-other-os` | Every package on macOS, the upload client on Windows | The packages whose files differ, per system |
+|---|---|---|
+| Empty build cache | 63.9 s | 36.4 s |
+| Nothing changed | 0.5 s | 1.2 s |
+| After an exported change to a package most others import | 24.8 s | 5.5 s |
+| Build cache it leaves | 1,428 MB | 529 MB |
+
+The packages picked are the background-pass package on macOS, and that, the
+settings package and the migration runner on Windows.
