@@ -190,6 +190,7 @@ workstation, before and after, except where a package is named.
 | The same, PostgreSQL | 1.60 to 2.75 s | 0.44 to 0.46 s |
 | The same, MySQL | 0.57 s | 0.15 s |
 | The same, MariaDB | 0.56 s | 0.17 s |
+| A stale database's refused drop, PostgreSQL | 5.99 s | 0.94 s |
 
 ## Suite totals
 

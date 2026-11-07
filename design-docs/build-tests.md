@@ -274,6 +274,7 @@ Work a test repeats in its own body, past what the harness sets up.
 |---|---|
 | A test reaching a bound sets a small one on its own store | The default's worth of rows took 3.6 to 3.8 s on PostgreSQL and MySQL, and the next test on PostgreSQL 3 s more emptying them. A package variable races with the package's parallel SQLite tests |
 | Cases ordering rows by each row's own values are pairs of rows in one world, each case a named subtest | A world per case is an API, a seeded code finding and two runs |
+| A test needing PostgreSQL to refuse a drop marks the database a template | A drop beside another open session is refused only after the server waits five seconds for it to leave |
 
 `design-docs/build-measurements.md` § Test bodies has the timings.
 
@@ -288,3 +289,4 @@ Work a test repeats in its own body, past what the harness sets up.
 | The clean trusts the slot lock alone | A database used without its lock is dropped in use |
 | A check needing a running server refuses, never skips | A skip passes |
 | The graph, inventory reader, currency and access packages keep in-package test files | Each exposes an unexported value, bound or clock to its tests, and exporting one would be for a test alone; their test binaries still compile the packages between them and the harness twice |
+| MySQL and MariaDB drop a database another session is open on | The test of a refused stale drop refuses nothing there |
