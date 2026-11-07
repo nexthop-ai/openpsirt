@@ -541,3 +541,27 @@ func (u *upgrader) hasColumn(table, column string) (bool, error) {
 	}
 	return true, nil
 }
+
+// dropDefault drops a column's default on the three servers where it holds
+// one, and changes nothing where it holds none, so a start that stopped after
+// it runs it again safely. A column declared NOT NULL with no default reports
+// a null default on each. SQLite cannot drop a default where a table stands,
+// and fills a column in a rebuild declaring none, so there it is never asked.
+func (u *upgrader) dropDefault(table, column string) error {
+	if u.engine == database.SQLite {
+		return nil
+	}
+	query := `SELECT 1 FROM "information_schema"."columns"
+		WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?
+		AND "column_default" IS NOT NULL`
+	if u.engine != database.Postgres {
+		query = `SELECT 1 FROM "information_schema"."COLUMNS"
+			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?
+			AND "COLUMN_DEFAULT" IS NOT NULL LIMIT 1`
+	}
+	held, err := exists(u.ctx, u.tx, fmt.Sprintf("%s.%s has a default", table, column), query, table, column)
+	if err != nil || !held {
+		return err
+	}
+	return u.run([]string{`ALTER TABLE "` + table + `" ALTER COLUMN "` + column + `" DROP DEFAULT`})
+}

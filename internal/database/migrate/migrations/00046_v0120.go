@@ -29,6 +29,8 @@ func upV0120(ctx context.Context, sqldb *sql.DB) error {
 //
 //   - An issue records when it was published and last modified, as a public
 //     vulnerability database answers, and when that database was last asked.
+//   - An issue's kind holds no default, where a stopped v0.11.0 upgrade left
+//     the one that filled it.
 //   - A scan run records the replaced inventory it checked, where it is the
 //     check a replaced branch inventory owes.
 //   - A scan records that it was replaced before the upgrade, and so owes no
@@ -37,8 +39,8 @@ func upV0120(ctx context.Context, sqldb *sql.DB) error {
 //     and a response window each hold a value a transaction writes to take
 //     the row.
 func upgradeV0120(ctx context.Context, tx bun.Tx) error {
-	for _, step := range []func(context.Context, bun.Tx) error{issueDatesV0120, checkedScanV0120, uncheckedV0120,
-		buildTakenV0120, takenByV0120} {
+	for _, step := range []func(context.Context, bun.Tx) error{issueDatesV0120, issueKindDefaultV0120,
+		checkedScanV0120, uncheckedV0120, buildTakenV0120, takenByV0120} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

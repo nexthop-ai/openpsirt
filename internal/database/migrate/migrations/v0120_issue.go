@@ -78,6 +78,21 @@ func issueDatesV0120(ctx context.Context, tx bun.Tx) error {
 	return u.change(vulnerabilityV0120(u.t), c)
 }
 
+// issueKindDefaultV0120 drops the default an issue's kind was filled with,
+// where a v0.11.0 upgrade left it. That upgrade adds the column with a
+// default and drops the default in the next statement. MySQL and MariaDB
+// commit each statement as it runs, and a start that stopped between the two
+// is resumed by one stepping over the column, so the default stays. v0.11.0
+// declares none. PostgreSQL and SQLite never hold it, since each makes the
+// change in one transaction.
+func issueKindDefaultV0120(ctx context.Context, tx bun.Tx) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	return u.dropDefault("vulnerability", "kind")
+}
+
 // buildV0120 is v0.12.0's declaration of the build table.
 //
 // v0.11.0's, with a value written by a replaced inventory's check to take the
