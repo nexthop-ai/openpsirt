@@ -250,6 +250,7 @@ Work a test repeats in its own body, past what the harness sets up.
 | A test reaching a bound sets a small one on its own store | The default's worth of rows took 3.6 to 3.8 s on PostgreSQL and MySQL, and the next test on PostgreSQL 3 s more emptying them. A package variable races with the package's parallel SQLite tests |
 | Cases ordering rows by each row's own values are pairs of rows in one world, each case a named subtest | A world per case is an API, a seeded code finding and two runs |
 | A test needing PostgreSQL to refuse a drop marks the database a template | A drop beside another open session is refused only after the server waits five seconds for it to leave |
+| A randomized comparison runs the fewest rounds reaching every block a larger count reaches, on every engine, from several sets of seeds | A round past that reaches nothing new |
 
 `design-docs/build-measurements.md` § Test bodies has the timings.
 
