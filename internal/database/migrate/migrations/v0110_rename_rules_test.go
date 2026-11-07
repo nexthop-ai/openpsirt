@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
 // rulesV0100 is, in a v0.10.0 database, a standing rule handing work to a
@@ -98,48 +96,4 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 			t.Errorf("%s reads %d rows after the upgrade, want 1", c.what, n)
 		}
 	}
-}
-
-// An upgrade stopped after each of these renames in turn, every start resuming
-// the one before it, is started again, and leaves what one that did not stop
-// leaves. One database per engine runs every stop, in the order the upgrade
-// renames, as TestAnUpgradeStoppedPartWayThroughItsRenamesResumes says.
-func TestAnUpgradeStoppedPartWayThroughTheRuleRenamesResumes(t *testing.T) {
-	stops := inRenameOrder(t, []renameStop{
-		{after: "routing_rule"},
-		{after: "routed_by"},
-		{after: "routing_rule_team_fk", servers: true},
-		{after: "routing_rule_order_idx"},
-		{after: "advisory_source"},
-		{after: "advisory_source_named_once", servers: true},
-		{after: "advisory_source_due_idx"},
-		{after: "finding_tag"},
-		{after: "tag"},
-		{after: "finding_tag_once", servers: true},
-		{after: "finding_tag_named_idx"},
-		{after: "vex_statement"},
-		{after: "vex_statement_by_fk", servers: true},
-		{after: "vex_statement_from_idx"},
-		{after: "vex_issuance"},
-		{after: "vex_issuance_once_per_kind", servers: true},
-		{after: "vex_issuance_by_fk", servers: true},
-	})
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
-		seeded := seedRulesV0100(t, ctx, db)
-		for _, stop := range stops {
-			if stop.servers && db.Server.Engine == database.SQLite {
-				continue // SQLite keeps the constraint names v0.10.0 wrote.
-			}
-			stopAt(t, stop.after, func() (bool, error) {
-				return migrations.StopV0110RenamingAfter(ctx, db, stop.after)
-			})
-		}
-		dbtest.MigrateTo(t, db, v0110)
-		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
-		seeded.renamedAs(t, ctx, db)
-		leaveAtLatest(t, ctx, db)
-	})
 }

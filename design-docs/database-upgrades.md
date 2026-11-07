@@ -54,7 +54,7 @@ over where a stopped upgrade made it already.
 
 | Check, on each engine | What it holds |
 |---|---|
-| A v0.9.0 database | Upgraded, each changed or new table's declaration describing the built table |
+| A v0.9.0 database, on the way up the release records (`design-docs/database-migrations.md` § Release records) | Upgraded, each changed or new table's declaration describing the built table |
 | A v0.9.0 database holding a new index in another shape | Upgraded the same, the index in the release's shape |
 
 Each index builds in 0.7 s on PostgreSQL over 1,159,943 findings, at 21 to
@@ -177,16 +177,20 @@ times on each engine.
 | A v0.10.0 database holding an acknowledged report | The acknowledgement reads back as the first message sent, on its day, by its recorder |
 | A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Each row reads back under its v0.11.0 name pointing where it did, each renamed declaration describing the built table |
 | A v0.10.0 database holding an incident, a release carrying its fix, a notice outside, a window counted from another and limited to a product, and a finding the incident ranks first | The same, and a window declared after it numbered after the existing rows |
-| The same two, stopped after each rename in turn, each start resuming the last: tables, columns, indexes, and on the servers unique constraints and foreign keys | On MySQL and MariaDB what was renamed stays renamed; on PostgreSQL and SQLite nothing does. Started again, it leaves what an unstopped upgrade leaves. One database per engine takes every stop in rename order, because migrating a fresh database to v0.10.0 is most of each run |
+| The same two, stopped after each rename in turn, each start resuming the last: tables, columns, indexes, and on the servers unique constraints and foreign keys | On MySQL and MariaDB what was renamed stays renamed; on PostgreSQL and SQLite nothing does. Started again, it leaves what an unstopped upgrade leaves |
 | A v0.10.0 database holding a finding on a branch's build | The finding reads back through `build` and `branch_or_tag` on its branch |
 | A routing rule and a supplier, upgraded whole and stopped after each of their renames | An assignment rule placing findings and a supplier advisory feed, each declaration describing the built table |
 | A rename whose table another session holds, on the servers | It waits, logs the holding session, and runs once released |
 | A bulk decision, a notification and a destination of each renamed kind, a link to a decision's row and one to a claim, a failed job, a kept filter naming renamed words, the bulk action limit, a trail change of the renamed kind | Each value in its v0.11.0 spelling, every value beside it unchanged |
 | The same, stopped after each value-rewriting step in turn | Started again, it leaves what an unstopped upgrade leaves |
+| An acknowledged report, stopped after its acknowledgement is written as a message and before the stamp is dropped, then after the report step | Started again, the acknowledgement is one message |
+| The report step's tables made without their indexes, and its columns changed without the holder's foreign key | Started again, it makes what is missing; on MySQL and MariaDB the holder index a foreign key adopted is made once and never replaced |
+| A v0.10.0 database already holding the issue kind column | Started again, every issue says what sort of issue it is |
 | A v0.10.0 database holding components stated with spaces, a non-breaking one among them, and one with none | Each text reads trimmed, a column stating nothing still stating nothing |
 | The trimming alone over four components two at a time, twice | Every batch is read, the last included, and the second run leaves what the first did |
 | A v0.10.0 database holding a role grant | The grant keeps its role, and every table holding a role takes the longest role name |
 | Every check above that does not stop, at once | One v0.10.0 database per engine holds all their seeds and is upgraded once; each check reads its own seed's rows or counts every seed's, so no seed changes what another's check expects, and the checks that write run last |
+| Every check above that stops, at once | One v0.10.0 database per engine holds their seeds, takes every stop in the order the upgrade reaches it, the renames of both lists merged, and is upgraded once, each built declaration describing the built table. A stop at a step an earlier start on MySQL or MariaDB already made would find nothing to stop at. The issue kind stop has a database of its own: its stand-in column carries a default v0.11.0 does not declare |
 
 ## The v0.12.0 upgrade
 
@@ -206,9 +210,11 @@ stepped over where a stopped upgrade made it already.
 
 | Check, on each engine | What it holds |
 |---|---|
-| A v0.11.0 database | Upgraded, each changed table's declaration describing the built table |
-| A v0.11.0 database already holding the issue date columns | Upgraded the same, the run column and its index made |
-| A v0.11.0 database holding a replaced and a current inventory | The replaced one marked, the current one and any later one not |
+| A v0.11.0 database, on the way up the release records (`design-docs/database-migrations.md` § Release records) | Upgraded, each changed table's declaration describing the built table |
+| A v0.11.0 database already holding one or all of the issue date columns | Upgraded the same, the run column and its index made |
+| A v0.11.0 database already holding the run column, or the run column, its key and its index; the column alone on the servers | Upgraded the same, nothing already made replaced |
+| A v0.11.0 database holding a replaced and a current inventory, and the same already holding the column marking it | The replaced one marked, the current one and any later one not |
+| Every check above that stops, at once | Two v0.11.0 databases per engine, each holding the inventories: one takes one date column, the run column and the marking column, the other every date column and the run's index, in the order the upgrade reaches them; each is upgraded once and checked as above. The stops of one check are alternatives, so no one database takes both |
 
 ## Limits
 

@@ -145,6 +145,7 @@ schema they build on each of the four engines, captured from the tag.
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files read column spellings and widths from helpers a later change may edit. On SQLite the description includes whether each key is `AUTOINCREMENT` and each index partial, which its listings omit |
 | The migration library's bookkeeping table is left out of the compared schema, and a record listing it is compared without it | The library chooses its column types, and its releases change them |
 | A release the baseline replaced lists no file | Its files are gone. v0.9.0's schema on each engine holds the baseline |
+| One database per engine climbs the releases, checked at each; it also holds the unstopped v0.9.0 to v0.10.0 and v0.11.0 to v0.12.0 upgrades to their declarations | It reaches both schemas on its way; a rung after a declaration check fails on a scratch table one leaves behind |
 
 A file a release owns is a migration numbered after the previous release's last
 up to its own, or a declaration named for it. A release changing no schema owns

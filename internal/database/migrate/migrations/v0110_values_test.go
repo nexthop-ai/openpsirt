@@ -10,7 +10,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
 // savedV0100 is a kept filter's address as v0.10.0 wrote it, naming every
@@ -209,33 +208,6 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB, seeded wor
 			t.Errorf("the kept filter %q opens %q after the upgrade, want %q", name, query, want)
 		}
 	}
-}
-
-// An upgrade stopped after each step rewriting stored words in turn, every
-// start resuming the one before it, is started again, and leaves what one that
-// did not stop leaves. One database per engine runs every stop, as
-// TestAnUpgradeStoppedPartWayThroughItsRenamesResumes says.
-func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
-	steps := []string{
-		"decision.bulk", "notification.decision-lapsed", "outbound.decision-waiting",
-		"notification.link", "notification.response-window-near", "outbound.response-window-passed",
-		"admin_change.incident", "job.failed", "admin_change.assignment-rule", "job.assignment.sweep",
-		"saved_filter", "application_setting",
-	}
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
-		seeded := seedWordsV0100(t, ctx, db)
-		for _, step := range steps {
-			stopAt(t, step, func() (bool, error) {
-				return migrations.StopV0110RewritingAfter(ctx, db, step)
-			})
-		}
-		dbtest.MigrateTo(t, db, v0110)
-		wordsRenamed(t, ctx, db, seeded)
-		leaveAtLatest(t, ctx, db)
-	})
 }
 
 // A kept filter's address takes v0.11.0's words for a word of the address and
