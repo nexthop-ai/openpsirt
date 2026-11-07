@@ -190,7 +190,8 @@ times on each engine.
 | The trimming alone over four components two at a time, twice | Every batch is read, the last included, and the second run leaves what the first did |
 | A v0.10.0 database holding a role grant | The grant keeps its role, and every table holding a role takes the longest role name |
 | Every check above that does not stop, at once | One v0.10.0 database per engine holds all their seeds and is upgraded once; each check reads its own seed's rows or counts every seed's, so no seed changes what another's check expects, and the checks that write run last |
-| Every check above that stops, at once | One v0.10.0 database per engine holds their seeds, takes every stop in the order the upgrade reaches it, the renames of both lists merged, and is upgraded once, each built declaration describing the built table. A stop at a step an earlier start on MySQL or MariaDB already made would find nothing to stop at. The issue kind stop has a database of its own: its stand-in column carries a default v0.11.0 does not declare |
+| The stops each engine takes of the renames and stored words | Every one on MySQL and MariaDB, where each builds on what the last left; the first two and the last of each list on PostgreSQL and SQLite, where every stop starts from the database v0.10.0 left |
+| Every check above that stops, at once | One v0.10.0 database per engine holds their seeds, takes its stops in the order the upgrade reaches them, the renames of both lists merged, and is upgraded once, each built declaration describing the built table. A stop at a step an earlier start on MySQL or MariaDB already made would find nothing to stop at. The issue kind stop has a database of its own: its stand-in column carries a default v0.11.0 does not declare |
 
 ## The v0.12.0 upgrade
 

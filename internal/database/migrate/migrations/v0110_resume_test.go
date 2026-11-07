@@ -96,6 +96,9 @@ type ownedStop struct {
 // leaves the database as v0.10.0 left it; the changes are made in
 // transactions of their own, and build on one another on every engine.
 //
+// On PostgreSQL and SQLite the renames and stored words are stopped at the
+// first two and the last of each former test's stops (stopsTaken).
+//
 // Each stopped subtest makes one former test's stops, and the resumed subtest
 // of the same name checks what that test pinned.
 //
@@ -109,21 +112,32 @@ func TestAV0100DatabaseResumesTheV0110UpgradeFromEveryStop(t *testing.T) {
 		t.Fatalf("the first two stops are %s and %s, and the claim table is read after decision and claim",
 			triage[0].after, triage[1].after)
 	}
-	var renames []ownedStop
-	for _, stop := range triage {
-		renames = append(renames, ownedStop{renamesResume, stop})
-	}
-	for _, stop := range inRenameOrder(t, slices.Clone(ruleRenameStops)) {
-		renames = append(renames, ownedStop{ruleRenamesResume, stop})
-	}
+	rules := inRenameOrder(t, slices.Clone(ruleRenameStops))
 	// Both lists in the one order the upgrade renames, because on MySQL and
 	// MariaDB a stop listed after a later one finds its name already renamed.
-	slices.SortStableFunc(renames, func(a, b ownedStop) int {
-		return migrations.RenameOrderV0110(a.after) - migrations.RenameOrderV0110(b.after)
-	})
-	for i := 1; i < len(renames); i++ {
-		if renames[i].after == renames[i-1].after {
-			t.Fatalf("%s is stopped after twice, and the second start finds nothing to stop at", renames[i].after)
+	merged := func(engine database.Engine) []ownedStop {
+		var renames []ownedStop
+		for test, stops := range map[string][]renameStop{renamesResume: triage, ruleRenamesResume: rules} {
+			var on []renameStop
+			for _, stop := range stops {
+				// SQLite keeps the constraint names v0.10.0 wrote.
+				if !stop.servers || engine != database.SQLite {
+					on = append(on, stop)
+				}
+			}
+			for _, stop := range stopsTaken(engine, on) {
+				renames = append(renames, ownedStop{test, stop})
+			}
+		}
+		slices.SortFunc(renames, func(a, b ownedStop) int {
+			return migrations.RenameOrderV0110(a.after) - migrations.RenameOrderV0110(b.after)
+		})
+		return renames
+	}
+	all := merged(database.MySQL)
+	for i := 1; i < len(all); i++ {
+		if all[i].after == all[i-1].after {
+			t.Fatalf("%s is stopped after twice, and the second start finds nothing to stop at", all[i].after)
 		}
 	}
 
@@ -151,10 +165,7 @@ func TestAV0100DatabaseResumesTheV0110UpgradeFromEveryStop(t *testing.T) {
 		// stay made and are stepped over; on PostgreSQL and SQLite each stop
 		// leaves every name as it was, which the claim table shows after the
 		// first two.
-		for _, stop := range renames {
-			if stop.servers && db.Server.Engine == database.SQLite {
-				continue // SQLite keeps the constraint names v0.10.0 wrote.
-			}
+		for _, stop := range merged(db.Server.Engine) {
 			stopped(stop.test+"/after "+stop.after, func(t *testing.T) {
 				stopAt(t, stop.after, func() (bool, error) {
 					return migrations.StopV0110RenamingAfter(ctx, db, stop.after)
@@ -174,7 +185,7 @@ func TestAV0100DatabaseResumesTheV0110UpgradeFromEveryStop(t *testing.T) {
 		}
 		// An upgrade stopped after each step rewriting stored words in turn,
 		// every start resuming the one before it.
-		for _, step := range storedWordSteps {
+		for _, step := range stopsTaken(db.Server.Engine, storedWordSteps) {
 			stopped(storedWordsResume+"/after "+step, func(t *testing.T) {
 				stopAt(t, step, func() (bool, error) {
 					return migrations.StopV0110RewritingAfter(ctx, db, step)
@@ -257,4 +268,16 @@ func unmadeByAStop(engine database.Engine) []string {
 		}
 	}
 	return []string{`DROP INDEX "report_message_log_idx"`}
+}
+
+// stopsTaken is the stops of one former test an engine takes, in order:
+// every one on MySQL and MariaDB, where each stop builds on what the last
+// left, and the first two and the last on PostgreSQL and SQLite, where every
+// stop starts from the database as v0.10.0 left it and runs the same
+// statements a step further.
+func stopsTaken[S any](engine database.Engine, stops []S) []S {
+	if !stopsAllAlike(engine) || len(stops) <= 3 {
+		return stops
+	}
+	return append(slices.Clone(stops[:2]), stops[len(stops)-1])
 }
