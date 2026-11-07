@@ -5,6 +5,7 @@ package analyticsapi
 
 import (
 	"context"
+	"maps"
 	"math"
 	"net/http"
 	"strconv"
@@ -42,7 +43,11 @@ type RemediationOutput struct {
 		// TimeToFix is by the severity a thing was rated, in hours. Absent for
 		// a rating nothing closed at, because a zero would read as instant.
 		TimeToFix map[string]float64 `json:"time_to_fix,omitempty" doc:"Average hours an issue fixed in the window was open for, from its first occurrence opening to its last occurrence closing, by severity. A severity nothing was fixed at is absent rather than zero"`
-		Aging     []BucketBody       `json:"aging" doc:"Everything open now, by how long it has been. About now whatever period was asked for"`
+		// TimeToFixFromPublication is the same average from each issue's
+		// publication date, and Undated what it leaves out for want of one.
+		TimeToFixFromPublication map[string]float64 `json:"time_to_fix_from_publication,omitempty" doc:"Average hours an issue fixed in the window took from its publication date to its last occurrence closing, by severity, over the fixed issues with a publication date. An issue fixed before its publication date counts as zero hours. A severity with no dated fix is absent"`
+		Undated                  map[string]int     `json:"time_to_fix_undated,omitempty" doc:"The number of issues fixed in the window with no publication date, by severity: counted in time_to_fix and left out of time_to_fix_from_publication. A severity with none is absent"`
+		Aging                    []BucketBody       `json:"aging" doc:"Everything open now, by how long it has been. About now whatever period was asked for"`
 		// The period these cover, said back, so a figure is never read apart
 		// from the window it was worked out over.
 		From string `json:"from,omitempty" doc:"The first day of the period. Absent where it runs from the beginning"`
@@ -80,6 +85,9 @@ func registerRemediation(api huma.API, in core.Deps) {
 			"not counted.\n\n" +
 			"Counted in issues, not in occurrences. An issue is fixed in the period its last " +
 			"occurrence closed by a fix, and not while any occurrence of it you may see is open.\n\n" +
+			"Time to fix is given twice: from the issue's first occurrence opening here, and from " +
+			"its publication date as a public vulnerability database states it. An issue with no " +
+			"publication date is in the first and counted apart from the second.\n\n" +
 			"Asked for neither a period nor a window, this is the last 30 days.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
@@ -107,6 +115,8 @@ func registerRemediation(api huma.API, in core.Deps) {
 		out.Body.From, out.Body.To = core.Stating(since, until)
 		out.Body.Aging = []BucketBody{}
 		out.Body.TimeToFix = map[string]float64{}
+		out.Body.TimeToFixFromPublication = map[string]float64{}
+		out.Body.Undated = map[string]int{}
 		if got == nil {
 			return out, nil
 		}
@@ -114,6 +124,10 @@ func registerRemediation(api huma.API, in core.Deps) {
 		for band, took := range got.TimeToFix {
 			out.Body.TimeToFix[band] = took.Hours()
 		}
+		for band, took := range got.FromPublication {
+			out.Body.TimeToFixFromPublication[band] = took.Hours()
+		}
+		maps.Copy(out.Body.Undated, got.Undated)
 		for _, bucket := range got.Aging {
 			out.Body.Aging = append(out.Body.Aging, BucketBody{
 				Label: bucket.Label, Days: bucket.Days, Until: bucket.Until, Open: bucket.Open,

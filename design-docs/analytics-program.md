@@ -3,7 +3,7 @@
 How a program is doing over time: trends, deadlines and compliance, remediation,
 who holds what, where the effort went, and how long triage takes.
 
-Satisfies REQ-33, REQ-35, REQ-53, REQ-54.
+Satisfies REQ-33, REQ-35, REQ-53, REQ-54, REQ-82.
 
 ## Contents
 
@@ -242,6 +242,12 @@ Resolution is computed from scans (REQ-35), and a duration is a subtraction.
 | A fix is counted in issues, fixed in the period its last occurrence the reader may see, in any product, closed by a fix | Fixed at one occurrence and open at another is not gone |
 | An issue with any occurrence open is fixed in no period; an occurrence closed for a reason that is no fix is left out | |
 | A fix is timed from the earliest occurrence opening to the last closing | |
+| Time to fix is given twice per severity: from that opening, and from the issue's publication date (REQ-82), each to the last closing | The first measures this deployment's work; the second is what a customer or an auditor asks for |
+| An issue with no publication date is in the first figure, out of the second, and counted per severity beside it | Timed from its first sighting instead, a sighting reads as a disclosure |
+| A fix at or before its publication date counts as no time from publication | At disclosure nothing was left to fix; left out, the earliest fixes raise the average |
+| A merged issue is timed from the date it holds, which a merge carries from the absorbed issue where the kept one has none (`design-docs/findings-issues.md` § Merged issues) | Every finding moves to the issue kept |
+| Both figures and the undated count are over the same fixed issues, narrowed for the reader as the fix count is (REQ-43) | The date is public; which issues were fixed is not |
+| A code finding's figures have one clock | A rule has no publication date |
 | An occurrence one run recorded already closed is neither opened nor fixed | It was never open |
 | A replaced inventory's check match on an issue with a known publication date is opened and fixed, timed from its opening to the replacement (`design-docs/findings-closure.md` § Replaced inventories) | It was open over that stretch |
 | A check match marked publication date unknown is in no remediation figure | Its opening is the widest stretch it could have, so its duration is a guess |

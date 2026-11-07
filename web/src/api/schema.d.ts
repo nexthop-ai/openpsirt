@@ -6669,6 +6669,8 @@ export interface paths {
          *
          *     Counted in issues, not in occurrences. An issue is fixed in the period its last occurrence closed by a fix, and not while any occurrence of it you may see is open.
          *
+         *     Time to fix is given twice: from the issue's first occurrence opening here, and from its publication date as a public vulnerability database states it. An issue with no publication date is in the first and counted apart from the second.
+         *
          *     Asked for neither a period nor a window, this is the last 30 days.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
@@ -14700,6 +14702,14 @@ export interface components {
             opened: number;
             /** @description Average hours an issue fixed in the window was open for, from its first occurrence opening to its last occurrence closing, by severity. A severity nothing was fixed at is absent rather than zero */
             time_to_fix?: {
+                [key: string]: number;
+            };
+            /** @description Average hours an issue fixed in the window took from its publication date to its last occurrence closing, by severity, over the fixed issues with a publication date. An issue fixed before its publication date counts as zero hours. A severity with no dated fix is absent */
+            time_to_fix_from_publication?: {
+                [key: string]: number;
+            };
+            /** @description The number of issues fixed in the window with no publication date, by severity: counted in time_to_fix and left out of time_to_fix_from_publication. A severity with none is absent */
+            time_to_fix_undated?: {
                 [key: string]: number;
             };
             /** @description The day it ends, which is not itself in it */

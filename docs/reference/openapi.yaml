@@ -12011,6 +12011,18 @@ components:
             type: number
           description: Average hours an issue fixed in the window was open for, from its first occurrence opening to its last occurrence closing, by severity. A severity nothing was fixed at is absent rather than zero
           type: object
+        time_to_fix_from_publication:
+          additionalProperties:
+            format: double
+            type: number
+          description: Average hours an issue fixed in the window took from its publication date to its last occurrence closing, by severity, over the fixed issues with a publication date. An issue fixed before its publication date counts as zero hours. A severity with no dated fix is absent
+          type: object
+        time_to_fix_undated:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: "The number of issues fixed in the window with no publication date, by severity: counted in time_to_fix and left out of time_to_fix_from_publication. A severity with none is absent"
+          type: object
         to:
           description: The day it ends, which is not itself in it
           type: string
@@ -35626,6 +35638,8 @@ paths:
         A closure counts as a fix only where the issue went away. An upgrade that carried the issue into the next version, and a finding a scanner stopped reporting, are not counted.
 
         Counted in issues, not in occurrences. An issue is fixed in the period its last occurrence closed by a fix, and not while any occurrence of it you may see is open.
+
+        Time to fix is given twice: from the issue's first occurrence opening here, and from its publication date as a public vulnerability database states it. An issue with no publication date is in the first and counted apart from the second.
 
         Asked for neither a period nor a window, this is the last 30 days.
 

@@ -147,6 +147,7 @@ background, because no scanner report carries either (REQ-82).
 | OSV not answering ends the pass and leaves the issue due: a failed connection, a refusal by the outbound guard, a status other than success, not found or a bad request | A proxy or a resolver inside the network says nothing about the issue |
 | The client reaches `api.osv.dev` alone, follows no redirect and connects nowhere inside this network (REQ-69) | |
 | The issue page states both dates and whether they are stated, unknown or not yet asked | |
+| Time to fix is given from the published date beside the first sighting, and an issue with no date is counted apart (`design-docs/analytics-program.md` § Remediation metrics) | |
 
 ## Limits
 
@@ -154,4 +155,4 @@ background, because no scanner report carries either (REQ-82).
 |---|---|
 | A merge is not undone | Nothing a report says unmerges, and unmerging divides findings and decisions made since |
 | An absorbed issue's filed name is not taken by the kept issue | Where the best-known name is the absorbed row's, the kept issue stays filed where it is |
-| Time to fix is measured from a finding's opening, never from publication, except that a replaced inventory's dated check match opens at the later of its publication and the inventory's arrival | The issue page shows the dates |
+| A deployment not asking OSV has no time to fix from publication; every fix is counted undated | The first-sighting figure stands alone |

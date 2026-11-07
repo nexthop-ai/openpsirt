@@ -35,6 +35,15 @@ type Remediation struct {
 	// for, by the severity it was rated. Absent where nothing of that rating
 	// closed — a zero would read as "fixed instantly".
 	TimeToFix map[string]time.Duration
+	// FromPublication is the same average measured from each issue's
+	// publication date to its last occurrence closing, over the fixed issues
+	// with a date. An issue fixed before it was published took no time from
+	// publication. Absent where no fixed issue of that rating has a date.
+	FromPublication map[string]time.Duration
+	// Undated is how many fixed issues of each rating have no publication
+	// date and so are in TimeToFix and not in FromPublication. Absent where
+	// none.
+	Undated map[string]int
 	// Aging is what is open now, by how long it has been open. The buckets are
 	// the ones people ask in, and the last one is open-ended because "older
 	// than ninety days" is the answer that matters and its shape does not.
@@ -164,7 +173,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// a default here, a caller asking for an end alone got a window it never
 	// asked for under a response saying the period ran from the beginning.
 
-	out := &Remediation{TimeToFix: map[string]time.Duration{}}
+	out := &Remediation{TimeToFix: map[string]time.Duration{},
+		FromPublication: map[string]time.Duration{}, Undated: map[string]int{}}
 
 	// spans is how long each issue took, averaged per severity band. Averaged
 	// over the issue rather than over its rows, because the occurrences are
@@ -172,10 +182,16 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// closed by a fix, and only where none of its occurrences is still open. It
 	// took from the first of its occurrences to open to the last of them to
 	// close.
+	//
+	// A merge moves every finding to the issue kept and carries the absorbed
+	// issue's date where the kept one has none, so a merged issue is timed
+	// from the date it holds.
 	var spans []struct {
-		Rank    int     `bun:"band_rank"`
-		Seconds float64 `bun:"seconds"`
-		Issues  int     `bun:"issues"`
+		Rank      int             `bun:"band_rank"`
+		Seconds   float64         `bun:"seconds"`
+		Published sql.NullFloat64 `bun:"published_seconds"`
+		Issues    int             `bun:"issues"`
+		Undated   int             `bun:"undated"`
 	}
 	// The issues with an occurrence closed by a fix in the window, whoever may
 	// read it. Every issue counted is among these, so the occurrences of the
@@ -234,6 +250,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MAX(` + rankCase(rating.BandExpr, 0) + `) AS "band_rank"`).
 		ColumnExpr(`MAX("grouped"."closed_at") AS "closed_at"`).
 		ColumnExpr(`MIN("grouped"."opened_at") AS "opened_at"`).
+		ColumnExpr(`MAX("v"."published_at") AS "published_at"`).
 		GroupExpr(`"grouped"."vulnerability_id"`).
 		Having(`SUM("grouped"."open_places") = 0`)
 	perIssue = perIssue.Having(`MAX("grouped"."closed_at") < ?`, until)
@@ -248,6 +265,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`"per_issue"."band_rank" AS "band_rank"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
 		ColumnExpr(secondsBetween(s.db)+` AS "seconds"`).
+		ColumnExpr(secondsSincePublished(s.db)+` AS "published_seconds"`).
+		ColumnExpr(`SUM(CASE WHEN "per_issue"."published_at" IS NULL THEN 1 ELSE 0 END) AS "undated"`).
 		GroupExpr(`"per_issue"."band_rank"`).
 		Scan(ctx, &spans); err != nil {
 		return nil, fmt.Errorf("read how long fixes took: %w", err)
@@ -256,6 +275,12 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		out.Fixed += row.Issues
 		if row.Issues > 0 {
 			out.TimeToFix[wordAt(row.Rank)] = time.Duration(row.Seconds) * time.Second
+		}
+		if row.Published.Valid {
+			out.FromPublication[wordAt(row.Rank)] = time.Duration(row.Published.Float64) * time.Second
+		}
+		if row.Undated > 0 {
+			out.Undated[wordAt(row.Rank)] = row.Undated
 		}
 	}
 
@@ -451,4 +476,16 @@ func secondsBetween(db bun.IDB) string {
 	return "AVG(" + database.SecondsBetween(db,
 		database.Column(db, "per_issue.opened_at"),
 		database.Column(db, "per_issue.closed_at")) + ")"
+}
+
+// secondsSincePublished averages how long a fixed issue took from its
+// publication date to its last occurrence closing, over the issues with a
+// date: the average skips the null an undated issue gives. A closing at or
+// before publication is no time, because at disclosure nothing was left to fix.
+func secondsSincePublished(db bun.IDB) string {
+	published := database.Column(db, "per_issue.published_at")
+	closed := database.Column(db, "per_issue.closed_at")
+	return "AVG(CASE WHEN " + string(published) + " IS NULL THEN NULL WHEN " +
+		string(published) + " >= " + string(closed) + " THEN 0 ELSE " +
+		database.SecondsBetween(db, published, closed) + " END)"
 }
