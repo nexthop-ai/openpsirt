@@ -206,6 +206,20 @@ func TestStartingAtAPackageIsRefusedWhatItCannotAnswer(t *testing.T) {
 
 func TestAPackageHeldAsTooManyComponentsIsRefusedNamingOneStart(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// Exactly the most a walk starts at is answered.
+		most := graph.Snapshot{Root: httpapitest.SeededRoot}
+		for i := range graph.MostStarts {
+			c := graph.Described{Purl: fmt.Sprintf("%s-most@%06x", repository, i), Name: "repo-most", Version: fmt.Sprint(i)}
+			most.Components = append(most.Components, c)
+			most.Dependencies = append(most.Dependencies, graph.Dependency{Parent: httpapitest.SeededRoot, Child: c})
+		}
+		r.Shipped(t, httpapitest.SeededBuild, "most-commits", most)
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/findings?branch_or_tag=master&variant=broadcom&beneath_purl="+repository+"-most", "")
+		if got.Code != http.StatusOK {
+			t.Errorf("%d components answered %d, want 200: %s", graph.MostStarts, got.Code, got.Body.String())
+		}
+
 		snap := graph.Snapshot{Root: httpapitest.SeededRoot}
 		for i := range graph.MostStarts + 1 {
 			c := graph.Described{Purl: fmt.Sprintf("%s@%06x", repository, i), Name: "repo", Version: fmt.Sprint(i)}
@@ -213,7 +227,7 @@ func TestAPackageHeldAsTooManyComponentsIsRefusedNamingOneStart(t *testing.T) {
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: httpapitest.SeededRoot, Child: c})
 		}
 		r.Shipped(t, httpapitest.SeededBuild, "many-commits", snap)
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet,
 			"/v1/products/mine/findings?branch_or_tag=master&variant=broadcom&beneath_purl="+repository, "")
 		if got.Code != http.StatusUnprocessableEntity || !strings.Contains(got.Body.String(), "beneath_version") {
 			t.Errorf("%d components answered %d, want 422 naming beneath_version: %s",

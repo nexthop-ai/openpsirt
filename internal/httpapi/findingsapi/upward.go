@@ -24,7 +24,7 @@ type UpwardBody struct {
 	Depth     int    `json:"depth" doc:"The depth below the build's root, so the tree is drawn by indenting"`
 	Findings  int    `json:"findings" doc:"Your own open issues on this component itself"`
 	Beneath   int    `json:"beneath" doc:"Your own open issues at or under it along these chains. Never how much the build holds there"`
-	Placed    bool   `json:"placed" doc:"False for a component the inventory put nowhere. Those sit at the end with no chain"`
+	Placed    bool   `json:"placed" doc:"False for a component whose every way up is longer than the tree is drawn. Those sit at the end with no chain. A component nothing pulls in is placed directly under the root"`
 }
 
 // OursOutput is the tree, seen upward.

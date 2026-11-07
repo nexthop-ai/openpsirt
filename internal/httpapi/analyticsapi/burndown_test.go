@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
@@ -163,20 +164,30 @@ func TestABurndownIsRefusedWhatItCannotAnswer(t *testing.T) {
 func TestABurndownFileStatesTheDayZeroItUsedAndWhatWasLeftThen(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
+		// Opened ten days back, so a day 0 three days back starts with both
+		// left and the file's start line pins a count.
+		if _, err := r.DB.DB.NewUpdate().Table("finding").
+			Set(`"opened_at" = ?`, time.Now().UTC().AddDate(0, 0, -10)).
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 		var body struct {
 			Since string `json:"since"`
 			Start int    `json:"start"`
 		}
 		httpapitest.Read(t, r, "private", "/v1/burndown?product=mine&since=2020-01-01", &body)
 		got := httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/burndown.csv?product=mine&since=2020-01-01", "")
-		file := got.Body.String()
-		for _, says := range []string{
-			body.Since + ", moved from 2020-01-01",
-			"left at day 0's start," + strconv.Itoa(body.Start),
-		} {
-			if !strings.Contains(file, says) {
-				t.Errorf("the file does not say %q:\n%s", says, file)
-			}
+		if !strings.Contains(got.Body.String(), body.Since+", moved from 2020-01-01") {
+			t.Errorf("the file does not say its day 0 moved:\n%s", got.Body.String())
+		}
+		since := time.Now().UTC().AddDate(0, 0, -3).Format(time.DateOnly)
+		httpapitest.Read(t, r, "private", "/v1/burndown?product=mine&since="+since, &body)
+		if body.Start == 0 {
+			t.Fatal("nothing was left at day 0's start, so the line pins nothing")
+		}
+		got = httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/burndown.csv?product=mine&since="+since, "")
+		if says := "left at day 0's start," + strconv.Itoa(body.Start); !strings.Contains(got.Body.String(), says) {
+			t.Errorf("the file does not say %q:\n%s", says, got.Body.String())
 		}
 		got = httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/burndown.csv?product=mine", "")
 		if !strings.Contains(got.Body.String(), ", the day the earliest finding opened") {

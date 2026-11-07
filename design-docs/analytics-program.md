@@ -95,7 +95,7 @@ The same series for an area: a team owns a kernel or a runtime, not an image.
 
 | Rule | Reason |
 |---|---|
-| It takes the findings list's two narrowings: a component at any version, or a component and everything under it, or every component of one package identifier and everything under them (`design-docs/data-model-graph.md` § Path traversal) | |
+| It takes the findings list's narrowings: a component at any version, or a component and everything under it, or every component of one package identifier and everything under them (`design-docs/data-model-graph.md` § Path traversal) | |
 | Under a component, a finding on a version a rescan replaced counts where the build's present version of its name sits, for every series alike (`design-docs/data-model-graph.md` § Path traversal) | A bump closes what it fixed on the version it replaced |
 | Whether an issue was present before the window is asked under the same narrowing | An issue that sat elsewhere in the build is new to the area; by a component's name it costs 722 ms on MySQL 8.4 and 471 ms on MariaDB against 45 ms on PostgreSQL, accepted until a deployment shows it as a problem (`design-docs/analytics-measurements.md` § Daily trend) |
 | Across several builds it refuses | A subtree is one build's walk |
@@ -166,7 +166,7 @@ at it (REQ-54).
 
 | Rule | Reason |
 |---|---|
-| It takes the subtree trend's two narrowings, with the same refusals (§ Subtree trends) | One meaning of a subtree |
+| It takes the subtree trend's narrowings, with the same refusals (§ Subtree trends) | One meaning of a subtree |
 | A component is chosen by name, or by a package identifier prefix (`design-docs/data-model-components.md` § Package identifier prefixes) | A repository is named by its identifier, never by the name its producer gave it |
 | The answer names the packages a name or a prefix chose before the severity floor, with each one's ecosystem, at most 20, and whether it chose more | A name two ecosystems share reads as one otherwise, and a name with nothing at the floor still names its package |
 | A severity names the least severe band kept; an unrated issue reads as medium | As every band filter reads it |

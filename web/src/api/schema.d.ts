@@ -11150,7 +11150,7 @@ export interface components {
             occurrences: number;
             /** @description The earliest of these occurrences opening here, as a date. The age a deadline relates to */
             opened?: string;
-            /** @description The part of the product this belongs to. Absent where the inventory placed the component nowhere */
+            /** @description The part of the product this belongs to; a component nothing pulls in is its own. Absent where every way up from it is longer than the tree is drawn */
             owner?: string;
             /**
              * Format: int64
@@ -15566,7 +15566,7 @@ export interface components {
             answered_by?: string;
             /** @description The supplier's product those routes run through */
             answered_in?: string;
-            /** @description The way down to here, the build first and this component last. Empty where the inventory left the component unplaced */
+            /** @description The way down to here, the build first and this component last; for a component nothing pulls in, the build and itself. Empty where every way up from it is longer than the tree is drawn */
             chain?: components["schemas"]["StepBody"][] | null;
             /** @description The package of the source package this occurrence is */
             component: string;
@@ -16441,7 +16441,7 @@ export interface components {
             findings: number;
             /** @description The namespace its package identifier names, where it names one */
             namespace?: string;
-            /** @description False for a component the inventory put nowhere. Those sit at the end with no chain */
+            /** @description False for a component whose every way up is longer than the tree is drawn. Those sit at the end with no chain. A component nothing pulls in is placed directly under the root */
             placed: boolean;
             version: string;
         };

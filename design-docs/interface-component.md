@@ -46,7 +46,7 @@ carries) and the act hangs off it.
 | Furthest along first where versions order; unranked where any comparison refuses, the two counts then equal and the screen saying so | An ordering is per ecosystem |
 | The second count is consumers; occurrences are the row's title | The ceiling on one action is in occurrences |
 | It carries where the component sits: what pulls it in, what it pulls in, and the trend of what opened and closed under it, thirty days or twelve weeks | Arriving from the tree is a question about the graph |
-| The trend's card links to the findings burndown twice: at or under the component on the graph's build, and the component's name at any version across the product | The two narrowings a burndown takes (`design-docs/analytics-program.md` § Narrowing) |
+| The trend's card links to the findings burndown twice: at or under the component on the graph's build, and the component's name at any version across the product | Two of the narrowings a burndown takes (`design-docs/analytics-program.md` § Narrowing) |
 | The trend follows the component by name on the graph's build: a finding on a version a rescan replaced counts at the present version, so the steps before a bump keep what was open and the bump's closures count as corrected (`design-docs/analytics-program.md` § Subtree trends) | A finding keeps the component it opened on |
 | The graph answers for one build, picked from the rows; a link naming a build arrives on it | An edge is a fact about one build |
 | Releases are picked inside the promise form, ticked to those shipping this version | One bump moves every release at that version |
@@ -163,8 +163,8 @@ by ecosystem. The list is in the address, so a link carries it. The counts are
 | An ecosystem row is the type, its component count, open and fixed; its name opens the ecosystem's packages, each a row like a repository's with versions in place of commits | Ecosystems then packages |
 | A repository row opens the findings list and the burndown at or under it on this build: its one component, or every component of its identifier where it ships several commits | What the row counts |
 | A package or an ecosystem row opens the burndown chosen by its identifier, a prefix ending in a slash for an ecosystem, on the build's branch and variant | A package at any version; an ecosystem as every package of it |
-| An ecosystem row opens the findings list narrowed to its kind; a package row of one component opens it narrowed to its name and its kind | The list's name filter spans every ecosystem, so the kind keeps it to the row |
-| A package row of several components opens the findings list narrowed to its package identifier, at every version | The row names no one component; the identifier chooses as the burndown does |
+| An ecosystem row opens the findings list narrowed to its kind; a package row opens it narrowed to its package identifier, at every version | The identifier chooses as the burndown does; a name and a kind span namespaces the row keeps apart |
+| A row of components with no identifier opens no findings list | Nothing names them |
 | Components with no identifier are an ecosystem row with no burndown and no findings list | No prefix or kind chooses them |
 | A note under the list says what a row counts: beneath for a repository, at its own components otherwise | The two read differently |
 

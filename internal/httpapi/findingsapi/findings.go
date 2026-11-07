@@ -61,7 +61,7 @@ type FindingBody struct {
 	// ends of the way down, with the middle collapsed. Those two are what
 	// differ between sibling rows; the steps between them rarely
 	// distinguish anything, so they are counted rather than named.
-	Owner  string `json:"owner,omitempty" doc:"The part of the product this belongs to. Absent where the inventory placed the component nowhere"`
+	Owner  string `json:"owner,omitempty" doc:"The part of the product this belongs to; a component nothing pulls in is its own. Absent where every way up from it is longer than the tree is drawn"`
 	Parent string `json:"parent,omitempty" doc:"The component that directly pulls it in, which is what a decision is about"`
 	Middle int    `json:"middle,omitempty" doc:"The number of steps between those two"`
 	Chains int    `json:"chains,omitempty" doc:"The number of distinct ways down. More than one means the pair above is one of them"`
@@ -455,7 +455,7 @@ type SittingBody struct {
 	// Chain is display rather than identity. A decision occurrence is keyed on the
 	// direct consumer and nothing else, which is what keeps one decision from
 	// multiplying by every route through the graph.
-	Chain []StepBody `json:"chain,omitempty" doc:"The way down to here, the build first and this component last. Empty where the inventory left the component unplaced"`
+	Chain []StepBody `json:"chain,omitempty" doc:"The way down to here, the build first and this component last; for a component nothing pulls in, the build and itself. Empty where every way up from it is longer than the tree is drawn"`
 }
 
 // RatingBody is one published rating of an issue.

@@ -79,81 +79,97 @@ async function drawn(reach: object[], at = AT) {
               },
             };
     if (path === `${BUILD}/component-groups`)
-      return query.ecosystem
+      return query.ecosystem === "none"
         ? {
             data: {
               items: [
                 {
-                  key: "pkg:cargo/addr2line",
-                  versions: ["0.25.1"],
+                  key: "loose-tool",
+                  versions: ["1.0"],
                   components: 1,
-                  open: 1,
+                  open: 2,
                   fixed: 0,
-                  open_by_severity: { high: 1 },
-                  component: { name: "addr2line", version: "0.25.1", ecosystem: "cargo" },
-                },
-                {
-                  key: "pkg:cargo/gimli",
-                  versions: ["0.31.1", "0.32.0"],
-                  components: 2,
-                  open: 3,
-                  fixed: 0,
-                  open_by_severity: { high: 3 },
+                  open_by_severity: { high: 2 },
+                  component: { name: "loose-tool", version: "1.0", ecosystem: "" },
                 },
               ],
             },
           }
-        : query.by === "ecosystem"
+        : query.ecosystem
           ? {
               data: {
                 items: [
                   {
-                    key: "cargo",
-                    versions: [],
-                    components: 3,
-                    open: 2,
-                    fixed: 1,
-                    open_by_severity: {},
+                    key: "pkg:cargo/addr2line",
+                    versions: ["0.25.1"],
+                    components: 1,
+                    open: 1,
+                    fixed: 0,
+                    open_by_severity: { high: 1 },
+                    component: { name: "addr2line", version: "0.25.1", ecosystem: "cargo" },
                   },
                   {
-                    key: "none",
-                    versions: [],
-                    components: 1,
-                    open: 0,
+                    key: "pkg:cargo/gimli",
+                    versions: ["0.31.1", "0.32.0"],
+                    components: 2,
+                    open: 3,
                     fixed: 0,
-                    open_by_severity: {},
+                    open_by_severity: { high: 3 },
                   },
                 ],
               },
             }
-          : {
-              data: {
-                items: [
-                  {
-                    key: "pkg:github/sonic-net/sonic-swss",
-                    versions: ["2126d2752826"],
-                    components: 1,
-                    open: 4,
-                    fixed: 2,
-                    open_by_severity: { critical: 4 },
-                    component: {
-                      name: "swss",
-                      version: "1.0.0",
-                      ecosystem: "github",
-                      namespace: "sonic-net",
+          : query.by === "ecosystem"
+            ? {
+                data: {
+                  items: [
+                    {
+                      key: "cargo",
+                      versions: [],
+                      components: 3,
+                      open: 2,
+                      fixed: 1,
+                      open_by_severity: {},
                     },
-                  },
-                  {
-                    key: "pkg:github/sonic-net/saibcm-modules",
-                    versions: ["1a2b", "3c4d"],
-                    components: 2,
-                    open: 50,
-                    fixed: 0,
-                    open_by_severity: { high: 50 },
-                  },
-                ],
-              },
-            };
+                    {
+                      key: "none",
+                      versions: [],
+                      components: 1,
+                      open: 0,
+                      fixed: 0,
+                      open_by_severity: {},
+                    },
+                  ],
+                },
+              }
+            : {
+                data: {
+                  items: [
+                    {
+                      key: "pkg:github/sonic-net/sonic-swss",
+                      versions: ["2126d2752826"],
+                      components: 1,
+                      open: 4,
+                      fixed: 2,
+                      open_by_severity: { critical: 4 },
+                      component: {
+                        name: "swss",
+                        version: "1.0.0",
+                        ecosystem: "github",
+                        namespace: "sonic-net",
+                      },
+                    },
+                    {
+                      key: "pkg:github/sonic-net/saibcm-modules",
+                      versions: ["1a2b", "3c4d"],
+                      components: 2,
+                      open: 50,
+                      fixed: 0,
+                      open_by_severity: { high: 50 },
+                    },
+                  ],
+                },
+              };
     if (path === `${BUILD}/components/{component}/around`)
       return { data: { below: [node("libnl"), node("zlib")] } };
     return undefined;
@@ -275,13 +291,19 @@ describe("the components listed by repository and by ecosystem", () => {
     );
     await settle();
     expect(text()).toContain("pkg:cargo/addr2line");
-    // The name within its ecosystem: the list's name filter spans every one.
-    // A package at several versions is chosen by its identifier at every one.
+    // A package is chosen by its identifier at every version, as its
+    // burndown is, whether one component or several.
     expect(link("Findings")).toEqual([
-      "/products/sonic/branches-and-tags/master/variants/arm/findings?component=addr2line&ecosystem=cargo",
+      "/products/sonic/branches-and-tags/master/variants/arm/findings?purl=pkg%3Acargo%2Faddr2line",
       "/products/sonic/branches-and-tags/master/variants/arm/findings?purl=pkg%3Acargo%2Fgimli",
     ]);
     expect(link("Burndown")[0]).toContain("purl=pkg%3Acargo%2Faddr2line");
+  });
+
+  it("opens no findings list for a component with no identifier", async () => {
+    await drawn(REACH, `${AT}?list=ecosystem&ecosystem=none`);
+    expect(text()).toContain("loose-tool");
+    expect(link("Findings")).toEqual([]);
   });
 
   it("switches back to the tree from a list", async () => {

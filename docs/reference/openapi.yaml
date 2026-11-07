@@ -5688,7 +5688,7 @@ components:
           description: The earliest of these occurrences opening here, as a date. The age a deadline relates to
           type: string
         owner:
-          description: The part of the product this belongs to. Absent where the inventory placed the component nowhere
+          description: The part of the product this belongs to; a component nothing pulls in is its own. Absent where every way up from it is longer than the tree is drawn
           type: string
         packages:
           description: The number of binaries of the source package here. More than one means deciding on this row decides about all of them
@@ -13504,7 +13504,7 @@ components:
           description: The supplier's product those routes run through
           type: string
         chain:
-          description: The way down to here, the build first and this component last. Empty where the inventory left the component unplaced
+          description: The way down to here, the build first and this component last; for a component nothing pulls in, the build and itself. Empty where every way up from it is longer than the tree is drawn
           items:
             $ref: "#/components/schemas/StepBody"
           type:
@@ -15050,7 +15050,7 @@ components:
           description: The namespace its package identifier names, where it names one
           type: string
         placed:
-          description: False for a component the inventory put nowhere. Those sit at the end with no chain
+          description: False for a component whose every way up is longer than the tree is drawn. Those sit at the end with no chain. A component nothing pulls in is placed directly under the root
           type: boolean
         version:
           type: string
