@@ -201,18 +201,26 @@ The interning comparison's coverage counts the blocks of every package in the
 module except the harness and the migrations, which only a run building its
 database reaches.
 
-| The test's seeds, five runs of each count | Blocks at twenty rounds | At twelve |
+| The test's seeds, three runs of each count | Blocks at twenty rounds | At twelve |
 |---|---|---|
-| SQLite | 831 | The same blocks |
-| PostgreSQL | 837 | The same blocks |
-| MySQL | 865 | The same blocks |
-| MariaDB | 857 | The same blocks |
+| SQLite | 838 | The same blocks |
+| PostgreSQL | 844 | The same blocks |
+| MySQL | 872 | The same blocks |
+| MariaDB | 864 | The same blocks |
 
-From four other sets of seeds, one run each, twelve rounds reach the blocks
-twenty do on every engine, and eight miss one block from one set on every
-engine. Three miss ten blocks from the test's seeds. One PostgreSQL run of
-twelve rounds in nineteen missed one block, the second line of the comparison
-with the newest rating, which every run of twenty reached.
+From four other sets of seeds, one run of each count, twelve rounds reach the
+blocks twenty do on every engine, and no set reaches a block the test's seeds
+do not.
+
+Each check below, turned off, fails the comparison on every engine in a steady
+round, so at any count of random rounds:
+
+| Check | Steady round |
+|---|---|
+| A severity filling an issue's gap | An issue held with no severity, reported with one |
+| An earlier day an issue was exploited | Exploited on a day, then reported exploited the day before |
+| A held weakness newly named the root cause | A root cause named after the last one was unmarked |
+| A marked root cause another report moves away | A root cause the issue holds no weakness for |
 
 Turning off the check for a rating the issue holds lower fails the comparison
 at twelve rounds and at eight, in the fifth random round; with no random rounds

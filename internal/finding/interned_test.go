@@ -151,7 +151,40 @@ func steadily(year int) [][]finding.Named {
 			{Identifier: fmt.Sprintf("CVE-%d-3000", year), Aliases: []string{fmt.Sprintf("GHSA-%d-3000", year)}},
 			{Identifier: fmt.Sprintf("CVE-%d-3001", year), Aliases: []string{fmt.Sprintf("GHSA-%d-3000", year)}},
 		},
+		// A new issue exploited on a day, then reported exploited a day
+		// earlier: the earlier day is kept.
+		{{Identifier: fmt.Sprintf("CVE-%d-2002", year), Exploited: true, ExploitedOn: &second}},
+		{{Identifier: fmt.Sprintf("CVE-%d-2002", year), Exploited: true, ExploitedOn: &first}},
+		// Two weaknesses with one the root cause, then the other, then a
+		// root cause the issue does not hold as a weakness, which unmarks the
+		// one marked, then a root cause marked where none is.
+		weakened(year, "CWE-79", "CWE-79", "CWE-89"),
+		weakened(year, "CWE-89", "CWE-79", "CWE-89"),
+		weakened(year, "CWE-416", "CWE-79"),
+		weakened(year, "CWE-79", "CWE-79", "CWE-89"),
+		// An issue held with no severity, then reported with one, which
+		// moves its deadlines.
+		{{Identifier: fmt.Sprintf("CVE-%d-2004", year)}},
+		{{Identifier: fmt.Sprintf("CVE-%d-2004", year), Severity: "high"}},
+		// An issue seen under its advisory name, another under a CVE, then
+		// a report naming both, which merges the one seen first away.
+		{{Identifier: fmt.Sprintf("GHSA-%d-5000", year)}},
+		{{Identifier: fmt.Sprintf("CVE-%d-5000", year)}},
+		{{Identifier: fmt.Sprintf("CVE-%d-5000", year), Aliases: []string{fmt.Sprintf("GHSA-%d-5000", year)}}},
+		// An issue held under its advisory name, then reported with a CVE
+		// beside it, which it is filed under instead.
+		{{Identifier: fmt.Sprintf("GHSA-%d-4000", year)}},
+		{{Identifier: fmt.Sprintf("GHSA-%d-4000", year), Aliases: []string{fmt.Sprintf("CVE-%d-4000", year)}}},
 	}
+}
+
+// weakened is a report of one issue with the weaknesses given, primary the
+// root cause.
+func weakened(year int, primary string, weaknesses ...string) []finding.Named {
+	return []finding.Named{{
+		Identifier: fmt.Sprintf("CVE-%d-2003", year),
+		Weaknesses: weaknesses, PrimaryWeakness: primary,
+	}}
 }
 
 // issueState is everything interning wrote about the issues named in one
@@ -276,10 +309,9 @@ func TestInterningARunOfReportsWritesWhatInterningEachAloneWrites(t *testing.T) 
 			// Each sequence names issues of its own.
 			mine, theirs := 3001+2*sequence, 3002+2*sequence
 			steady, steadyToo := steadily(mine), steadily(theirs)
-			// Twelve random rounds after the steady ones. On every engine
-			// they reach every block twenty reach, from these seeds and from
-			// four other sets; eight miss one block from one of those sets,
-			// and three miss ten from these.
+			// Twelve random rounds after the steady ones, which on every
+			// engine reach every block twenty reach, from these seeds and
+			// from four other sets.
 			for round := range 12 + len(steady) {
 				seed := r.Int63()
 				ours := reportsIn(seeded(seed), mine)
