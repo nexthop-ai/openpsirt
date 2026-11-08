@@ -146,11 +146,13 @@ func TestALoopbackEngineIsReachedOrRefusedInWords(t *testing.T) {
 		t.Errorf("reached %q through %q, %v", host, attached, err)
 	}
 	for what, d := range map[string]docker{
-		"docker ps failing":            fakeDocker(engine, "ps --filter"),
-		"two containers on the port":   fakeDocker(map[string]string{"ps --filter": "a\nb\n"}),
-		"the network not made":         fakeDocker(engine, "network create", "network inspect"),
-		"the engine never joining":     fakeDocker(map[string]string{"ps --filter": "openpsirt-pg\n", "port openpsirt-pg": engine["port openpsirt-pg"]}, "network connect"),
-		"the port not published there": fakeDocker(map[string]string{"ps --filter": "openpsirt-pg\n"}),
+		"docker ps failing":             fakeDocker(engine, "ps --filter"),
+		"two containers on the port":    fakeDocker(map[string]string{"ps --filter": "a\nb\n"}),
+		"the network not made":          fakeDocker(engine, "network create", "network inspect"),
+		"the engine never joining":      fakeDocker(map[string]string{"ps --filter": "openpsirt-pg\n", "port openpsirt-pg": engine["port openpsirt-pg"]}, "network connect"),
+		"the port not published there":  fakeDocker(map[string]string{"ps --filter": "openpsirt-pg\n"}),
+		"an engine on the host network": fakeDocker(map[string]string{"ps --format": "openpsirt-pg16\n"}),
+		"the host network unreadable":   fakeDocker(map[string]string{}, "ps --format"),
 	} {
 		if host, _, err := reachEngine(context.Background(), u, d); err == nil {
 			t.Errorf("%s: reached as %q", what, host)

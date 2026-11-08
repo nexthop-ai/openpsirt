@@ -40,7 +40,8 @@ func runDocker(ctx context.Context, args ...string) (string, error) {
 //
 // A URL naming another host, or a loopback port no container publishes, is
 // reached through host.docker.internal: a server listening on a real interface
-// answers there on every setup that maps the name. Any docker command failing
+// answers there on every setup that maps the name. Where a container runs on
+// the host network instead, the port is refused. Any docker command failing
 // on the way to a container that does publish the port is an error, with what
 // docker said, because the fallback cannot reach a port published on loopback
 // alone and would fail minutes later with nothing to say why.
@@ -59,7 +60,7 @@ func reachEngine(ctx context.Context, u *url.URL, run docker) (host, attached st
 	names := strings.Fields(out)
 	switch len(names) {
 	case 0:
-		return fallback, "", nil
+		return hostNetworked(ctx, u.Port(), fallback, run)
 	case 1:
 	default:
 		return "", "", fmt.Errorf("%d containers publish port %s (%s), so which is the engine is unknown",
@@ -85,6 +86,25 @@ func reachEngine(ctx context.Context, u *url.URL, run docker) (host, attached st
 		return "", "", err
 	}
 	return net.JoinHostPort(names[0], inside), names[0], nil
+}
+
+// hostNetworked answers the fallback for a loopback port no container
+// publishes, or refuses where a container runs on the host network. `make
+// engines-up` with ENGINE_NETWORK=host starts its servers there, listening on
+// loopback alone, which neither the rehearsal's network nor
+// host.docker.internal reaches, so the rehearsal would fail minutes in on a
+// refused connection.
+func hostNetworked(ctx context.Context, port, fallback string, run docker) (host, attached string, err error) {
+	out, err := run(ctx, "ps", "--format", "{{.Names}}", "--filter", "network=host")
+	if err != nil {
+		return "", "", err
+	}
+	if names := strings.Fields(out); len(names) > 0 {
+		return "", "", fmt.Errorf("no container publishes port %s, and %s run on the host network, "+
+			"where a server on loopback is out of a container's reach; start the engines with ENGINE_NETWORK=ports",
+			port, strings.Join(names, ", "))
+	}
+	return fallback, "", nil
 }
 
 // loopback reports whether a host names this machine's loopback.

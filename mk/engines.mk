@@ -24,6 +24,14 @@ ENGINE_MYSQL_PORT    ?= 3306
 ENGINE_MARIADB_PORT  ?= 3307
 ENGINE_FLOOR_PORT    ?= 5433
 ENGINE_PREFIX        ?= openpsirt
+# How a server is reached: "ports" publishes each on the loopback address, and
+# "host" puts each on the host's own network, listening on its port above and
+# on loopback alone. A published port's traffic passes through a proxy
+# process, 9% of a CI run's processor time; on the host network there is none.
+# Ports is the default because the host network of rootless Docker and of a
+# desktop virtual machine is not the machine's, so a server there is
+# unreachable at 127.0.0.1. CI sets "host".
+ENGINE_NETWORK       ?= ports
 # Seconds to wait for a server to start accepting connections. A container
 # reported "Up" is not one that answers yet, and MySQL takes the longest.
 ENGINE_WAIT          ?= 120
@@ -131,9 +139,50 @@ endif
 # lists say "lose my writes if you crash", which is the right answer for a
 # database that exists for ninety seconds and the wrong one everywhere else;
 # the packaging chart sets none of them.
-PG_AS_A_TEST_SERVER := -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+#
+# PostgreSQL also runs without its query compiler. Compiling changes no result,
+# and whether a query is compiled turns on the planner's estimates, which move
+# with what earlier tests left in the statistics: one package's server time
+# was 169 s with compiling forced on against 13 s off, and unforced it added 0
+# to 70 s a run at random. MySQL runs without its performance schema, which
+# nothing a test asserts reads: 3% of the server's processor time and 7% of the
+# wall time of the packages heaviest on MySQL. MariaDB's is off by default.
+PG_AS_A_TEST_SERVER := -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c jit=off
 MY_AS_A_TEST_SERVER := --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=0 \
 	--sync-binlog=0 --skip-log-bin
+
+# The docker option reaching each server, and the port it listens on inside
+# its container. Published, a server listens on its image's own port, so a
+# container created before ENGINE_NETWORK existed still answers the check
+# below. On the host network each listens on its own port, and on loopback
+# alone, because the servers carry the password "test". MySQL's X protocol
+# listener is off everywhere: nothing here speaks it, and on the host network it
+# would listen on every address.
+ifeq ($(ENGINE_NETWORK),host)
+PG_INSIDE      := $(ENGINE_PG_PORT)
+MYSQL_INSIDE   := $(ENGINE_MYSQL_PORT)
+MARIADB_INSIDE := $(ENGINE_MARIADB_PORT)
+FLOOR_INSIDE   := $(ENGINE_FLOOR_PORT)
+PG_REACH      := --network=host
+MYSQL_REACH   := --network=host
+MARIADB_REACH := --network=host
+FLOOR_REACH   := --network=host
+PG_LISTEN = -c port=$(1) -c listen_addresses=127.0.0.1
+MY_LISTEN = --port=$(1) --bind-address=127.0.0.1
+else ifeq ($(ENGINE_NETWORK),ports)
+PG_INSIDE      := 5432
+MYSQL_INSIDE   := 3306
+MARIADB_INSIDE := 3306
+FLOOR_INSIDE   := 5432
+PG_REACH      := --publish=127.0.0.1:$(ENGINE_PG_PORT):$(PG_INSIDE)
+MYSQL_REACH   := --publish=127.0.0.1:$(ENGINE_MYSQL_PORT):$(MYSQL_INSIDE)
+MARIADB_REACH := --publish=127.0.0.1:$(ENGINE_MARIADB_PORT):$(MARIADB_INSIDE)
+FLOOR_REACH   := --publish=127.0.0.1:$(ENGINE_FLOOR_PORT):$(FLOOR_INSIDE)
+PG_LISTEN =
+MY_LISTEN =
+else
+$(error ENGINE_NETWORK is "$(ENGINE_NETWORK)"; it takes "ports" or "host")
+endif
 
 # The data directories are in memory, each under its cap above. The settings
 # above govern commits, and a schema change syncs the files it creates whatever
@@ -151,7 +200,7 @@ engines-up:
 	@# target.
 	@set -u; \
 	up() { \
-	  name="$$1"; image="$$2"; ports="$$3"; shift 3; \
+	  name="$$1"; image="$$2"; reach="$$3"; shift 3; \
 	  if [ -n "$$($(DOCKER) ps -q -f name="^$$name$$")" ]; then \
 	    echo "  $$name: already running"; return 0; \
 	  fi; \
@@ -161,26 +210,33 @@ engines-up:
 	  opts=""; \
 	  while [ $$# -gt 0 ] && [ "$$1" != "--" ]; do opts="$$opts $$1"; shift; done; \
 	  if [ $$# -gt 0 ]; then shift; fi; \
-	  $(DOCKER) run -d --name "$$name" -p "$$ports" $$opts "$$image" "$$@" >/dev/null; \
+	  $(DOCKER) run -d --name "$$name" "$$reach" $$opts "$$image" "$$@" >/dev/null; \
 	  echo "  $$name: created from $$image"; \
 	}; \
-	up $(ENGINE_PREFIX)-pg16 $(ENGINE_PG_IMAGE) 127.0.0.1:$(ENGINE_PG_PORT):5432 \
+	up $(ENGINE_PREFIX)-pg16 $(ENGINE_PG_IMAGE) $(PG_REACH) \
 	   --tmpfs $(PG_DATA_DIR):size=$(ENGINE_PG_DATA) \
-	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER) & \
-	up $(ENGINE_PREFIX)-mysql $(ENGINE_MYSQL_IMAGE) 127.0.0.1:$(ENGINE_MYSQL_PORT):3306 \
+	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER) \
+	   $(call PG_LISTEN,$(PG_INSIDE)) & \
+	up $(ENGINE_PREFIX)-mysql $(ENGINE_MYSQL_IMAGE) $(MYSQL_REACH) \
 	   --tmpfs $(MY_DATA_DIR):size=$(ENGINE_MYSQL_DATA) \
-	   -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER) & \
-	up $(ENGINE_PREFIX)-mariadb $(ENGINE_MARIADB_IMAGE) 127.0.0.1:$(ENGINE_MARIADB_PORT):3306 \
+	   -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER) \
+	   --mysqlx=OFF --performance-schema=OFF $(call MY_LISTEN,$(MYSQL_INSIDE)) & \
+	up $(ENGINE_PREFIX)-mariadb $(ENGINE_MARIADB_IMAGE) $(MARIADB_REACH) \
 	   --tmpfs $(MY_DATA_DIR):size=$(ENGINE_MARIADB_DATA) \
-	   -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER) & \
-	up $(ENGINE_PREFIX)-floor $(ENGINE_FLOOR_IMAGE) 127.0.0.1:$(ENGINE_FLOOR_PORT):5432 \
+	   -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER) \
+	   $(call MY_LISTEN,$(MARIADB_INSIDE)) & \
+	up $(ENGINE_PREFIX)-floor $(ENGINE_FLOOR_IMAGE) $(FLOOR_REACH) \
 	   --tmpfs $(PG_DATA_DIR):size=$(ENGINE_FLOOR_DATA) \
-	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER) & \
+	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER) \
+	   $(call PG_LISTEN,$(FLOOR_INSIDE)) & \
 	failed=0; for job in $$(jobs -p); do wait "$$job" || failed=1; done; exit $$failed
 	@# A container reported "Up" is not one that answers. Each server is asked
 	@# with its own client, inside its own container, so nothing here depends on
 	@# a client being installed on this machine. MariaDB renamed mysqladmin to
 	@# mariadb-admin, so the two lines differ by more than the server they name.
+	@# Each is asked over TCP on loopback, at the port it listens on: the
+	@# images first start a temporary server on a socket alone to initialize,
+	@# and a socket answer from that one is not the server the tests reach.
 	@set -u; \
 	ready() { \
 	  name="$$1"; shift; waited=0; \
@@ -193,10 +249,10 @@ engines-up:
 	  echo "  $$name: no answer in $(ENGINE_WAIT)s. '$(DOCKER) logs $$name' says why."; \
 	  return 1; \
 	}; \
-	ready $(ENGINE_PREFIX)-pg16 pg_isready -U postgres -d openpsirt; \
-	ready $(ENGINE_PREFIX)-floor pg_isready -U postgres -d openpsirt; \
-	ready $(ENGINE_PREFIX)-mysql mysqladmin ping -uroot -ptest --silent; \
-	ready $(ENGINE_PREFIX)-mariadb mariadb-admin ping -uroot -ptest --silent
+	ready $(ENGINE_PREFIX)-pg16 pg_isready -h 127.0.0.1 -p $(PG_INSIDE) -U postgres -d openpsirt; \
+	ready $(ENGINE_PREFIX)-floor pg_isready -h 127.0.0.1 -p $(FLOOR_INSIDE) -U postgres -d openpsirt; \
+	ready $(ENGINE_PREFIX)-mysql mysqladmin ping -h127.0.0.1 -P$(MYSQL_INSIDE) -uroot -ptest --silent; \
+	ready $(ENGINE_PREFIX)-mariadb mariadb-admin ping -h127.0.0.1 -P$(MARIADB_INSIDE) -uroot -ptest --silent
 	@# Never overwritten. The file is machine-local and somebody may be pointing
 	@# at servers of their own; silently replacing that is how a run tests
 	@# something other than what its author thinks it is testing.

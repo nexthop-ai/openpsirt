@@ -208,8 +208,9 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 |---|---|
 | The first job runs `make check`, never a target list | A target added to `check` runs in CI |
 | Jobs needing only a checkout and Go are one job | |
-| The database servers are started by `make engines-up` in a step after the checkout, never as service containers, and waited for before `make check` | Service containers start one after another before the checkout, 29 to 51 s; a step overlaps the setup, and CI and a developer run one list of servers (`design-docs/build-tests.md` § Database engines) |
+| The database servers are started by `make engines-up` on the runner's network in a step after the checkout, never as service containers, and waited for before `make check` | Service containers start one after another before the checkout, 29 to 51 s; a step overlaps the setup, and CI and a developer run one list of servers (`design-docs/build-tests.md` § Database engines) |
 | The runner's free memory, and each server's memory and data directory use, are printed at the end of every run, whatever failed | A run out of memory or a full data directory names its cause |
+| The processors are sampled every five seconds from the checkout on, and the last step prints their idle share for the job, for both test passes together and for the one left running alone | The cores one pass leaves idle are the room to start other checks in |
 | The checking job fetches every commit and tree and no file contents beyond its checkout | The vulnerability gates' few reads of the base fetch their files as read |
 | No composite action or reusable workflow | One Go setup remains, and a reusable workflow re-clones |
 | The macOS and Windows jobs run only when a client source moved | Those runners cost several Linux ones |
@@ -227,6 +228,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 
 | Cache | Holds | Keyed on | Saved |
 |---|---|---|---|
+| Go toolchain | The Go release, installed where setup-go looks for it | The release, the runner's system and architecture | On `main`, when the key is new |
 | Go modules | Modules for the tree and pinned tools, extracted, without their downloaded archives | `go.sum` and each tool's | When the key is new |
 | Go build | Plain and race builds, test objects, tools built from source | The run, restored by prefix | On `main` |
 | Linter results | Per-package analysis by content | The run, restored by prefix | On `main` |
@@ -238,6 +240,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | A pull request restores each and saves none | Its saves are keyed to a commit nothing rebuilds, and the 10 GB store evicts least recently used |
 | The build and linter caches keep only what the run read: entries are moved two hours back first, and unmoved ones deleted after | Both tools refresh an entry's time once it is an hour old. Saved whole, the build cache is 2.87 GB against 683 MB |
 | Linter results are keyed by package content | One changed file costs 9 to 12 s against 42 s with none, on four local cores |
+| The toolchain is restored before setup-go, which then finds it installed | setup-go downloads a release in under a second and copies it into the tool cache file by file in 20 s more |
 | A module's downloaded archive is not saved | Every module is kept extracted beside it, and nothing in the job reads the archive again |
 | The image's Go steps mount the build cache, never write it into a layer | A layer after the source copy is per commit: 441 MB and 499 MB became 39 MB and 131 kB |
 | The bill-of-materials tool is fetched beside `go mod download`, before the source copy | Its layer is reused |

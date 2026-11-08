@@ -213,12 +213,20 @@ SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -vet=off
 # the server pass would run it as the race pass does, without the detector.
 # internal/tools/lanes reads the division from the dependency graph, and its
 # tests hold this recipe to it.
+#
+# Each pass ends on a line saying when it finished and how long after the
+# start, with the pass's own status kept: while one pass runs alone, the
+# other's cores are idle, and CI measures how idle from those lines.
 test-all:
 	@servers=$$($(GO) run ./internal/tools/lanes $(PACKAGES)) || exit 1; \
-	( $(RACE_PASS) -p $(TEST_HALF) \
-	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$0; fflush() }' ) & detector=$$!; \
-	( $(SERVERS_PASS) -p $(TEST_HALF) \
-	    $$servers 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' ) & portability=$$!; \
+	started=$$(date +%s); \
+	finished() { echo "$$1 finished at $$(date -u +%Y-%m-%dT%H:%M:%SZ), $$(( $$(date +%s) - started )) s after the start"; }; \
+	( status=0; $(RACE_PASS) -p $(TEST_HALF) \
+	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$0; fflush() }' || status=$$?; \
+	  finished "[sqlite -race]"; exit $$status ) & detector=$$!; \
+	( status=0; $(SERVERS_PASS) -p $(TEST_HALF) \
+	    $$servers 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' || status=$$?; \
+	  finished "[servers]     "; exit $$status ) & portability=$$!; \
 	failed=0; \
 	wait $$detector || failed=1; \
 	wait $$portability || failed=1; \
@@ -436,6 +444,13 @@ web-check: web-deps web-api
 # which -run already refuses for the whole invocation.
 MEASURED := ./internal/finding/ ./internal/notify/ ./internal/triage/ ./internal/httpapi/triageapi/ ./internal/database/migrate/migrations/ ./internal/publish/ ./internal/upstream/
 
+# The PostgreSQL test servers run without the query compiler, and a deployment
+# keeps PostgreSQL's default of compiling a query the planner estimates is
+# costly, which a measurement has caught costing 1,685 ms against 170 ms. So a
+# measurement asks for it back on its own sessions: the driver sends a URL
+# parameter it does not know to the server as a setting.
+MEASURE_POSTGRES_URL = $(OPENPSIRT_TEST_POSTGRES_URL)$(if $(findstring ?,$(OPENPSIRT_TEST_POSTGRES_URL)),&,?)jit=on
+
 measure:
 ifneq ($(ENGINES_MISSING),)
 	@echo "Not configured: $(ENGINES_MISSING). A measurement taken on SQLite alone"
@@ -451,6 +466,7 @@ endif
 	@# check is per package rather than over the combined run.
 	@for pkg in $(MEASURED); do \
 	  out=$$(mktemp); \
+	  OPENPSIRT_TEST_POSTGRES_URL='$(MEASURE_POSTGRES_URL)' \
 	  $(GO) test -tags measure -count=1 -v -timeout 60m \
 	    -run 'TestMeasure' "$$pkg" 2>&1 | tee "$$out"; \
 	  grep -q "^=== RUN   TestMeasure" "$$out" \

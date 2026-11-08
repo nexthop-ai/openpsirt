@@ -71,6 +71,9 @@ jobs:
       # The servers are throwaways, so the harness may turn off their commit
       # durability, which is global on MySQL and MariaDB.
       OPENPSIRT_TEST_RELAX_DURABILITY: "1"
+      # The servers on the runner's own network, each on its port above, so no
+      # proxy process carries the suite's traffic to them.
+      ENGINE_NETWORK: host
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -80,6 +83,12 @@ jobs:
           # trees alone: the few files read from the base are fetched as read.
           fetch-depth: 0
           filter: blob:none
+      # Every processor's time, every five seconds until the job ends, which
+      # the last step reads against the times test-all prints.
+      - name: Sample the processors
+        run: |
+          ( while :; do echo "$(date +%s) $(head -1 /proc/stat)"; sleep 5; done \
+              > "$RUNNER_TEMP/cpu.log" ) > /dev/null 2>&1 &
       # In the background, so the pulls and the servers' start overlap the
       # steps below; the step before "make check" waits for it.
       - name: Start the database servers
@@ -95,6 +104,15 @@ jobs:
           version=$(make -s --no-print-directory go-version)
           [ -n "$version" ] || { echo "::error::the Dockerfile names no golang release"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      # The toolchain itself, where setup-go looks for one already installed.
+      # Downloading it takes setup-go under a second; copying it into the tool
+      # cache file by file takes 20 s more, and a restored one is found there.
+      # One release never changes, so the key is the release.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        id: go-toolchain
+        with:
+          path: ${{ runner.tool_cache }}/go/${{ steps.go.outputs.version }}
+          key: go-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version: ${{ steps.go.outputs.version }}
@@ -103,6 +121,11 @@ jobs:
           # on, the entry holding both is downloaded and extracted over the top
           # of the two below, and grows to hold the merged copy.
           cache: false
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        if: env.SAVES_CACHES == 'true' && steps.go-toolchain.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.tool_cache }}/go/${{ steps.go.outputs.version }}
+          key: go-toolchain-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}
       # The modules, keyed on what decides their content: the module's own and
       # each tool's under tools/, which the same directory holds. The
       # downloaded archives are left out: every module is also kept extracted,
@@ -203,7 +226,8 @@ jobs:
         # race-detected suite,
         # known vulnerabilities, dependency licenses, the OpenAPI document
         # being current, the bill of materials, and the interface.
-        run: make check
+        # Its output is kept for the processor report at the end.
+        run: make check 2>&1 | tee "$RUNNER_TEMP/check.log"
 
       - name: Drop the cache entries this run did not read
         # An entry is a file or, for a built program, a directory, two levels
@@ -262,12 +286,42 @@ jobs:
           if-no-files-found: error
 
       # Whatever happened above, so a run that ran out of memory or filled a
-      # server's data directory says which.
-      - name: Report the runner's memory and each server's
+      # server's data directory says which. The processors' idle share is
+      # given while both test passes ran and while one ran alone, from the
+      # samples and the line each pass printed as it finished.
+      - name: Report the runner's memory and processors, and each server's
         if: always()
         run: |
           free -m
           make engines-status
+          idle() {
+            awk -v from="$1" -v to="$2" '$1 >= from && $1 <= to {
+                total = 0; for (i = 3; i <= 10; i++) total += $i
+                if (!n++) { t0 = total; i0 = $6 + $7 }
+                t1 = total; i1 = $6 + $7
+              }
+              END { if (n > 1 && t1 > t0) printf "%.0f%% idle", 100 * (i1 - i0) / (t1 - t0); else printf "too short to sample" }' \
+              "$RUNNER_TEMP/cpu.log"
+          }
+          ends() {
+            sed -n "s/^\[$1\] *finished at \([^,]*\), \([0-9]*\) s after the start$/\1 \2/p" \
+              "$RUNNER_TEMP/check.log" 2>/dev/null | tail -1
+          }
+          echo "processors: $(nproc); whole job $(idle 0 9999999999)"
+          read -r race_at race_s <<< "$(ends 'sqlite -race')" || true
+          read -r servers_at servers_s <<< "$(ends servers)" || true
+          if [ -z "${race_at:-}" ] || [ -z "${servers_at:-}" ]; then
+            echo "test-all did not finish both passes, so its idle share is not reported"
+            exit 0
+          fi
+          race_end=$(date -d "$race_at" +%s); servers_end=$(date -d "$servers_at" +%s)
+          start=$((race_end - race_s))
+          first=$((race_end < servers_end ? race_end : servers_end))
+          last=$((race_end < servers_end ? servers_end : race_end))
+          alone=$([ "$race_end" -lt "$servers_end" ] && echo "the server pass" || echo "the race pass")
+          echo "test-all: race pass ${race_s} s, server pass ${servers_s} s"
+          echo "  both passes, $((first - start)) s: $(idle "$start" "$first")"
+          echo "  $alone alone, $((last - first)) s: $(idle "$first" "$last")"
 
   # The two below are not steps of the job above, and each for a reason of
   # its own rather than for tidiness.

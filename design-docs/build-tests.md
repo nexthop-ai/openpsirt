@@ -29,7 +29,15 @@ writes their URLs to the git-ignored `local.mk`, which the makefile includes.
 | Rule | Reason |
 |---|---|
 | Each server is asked with its own client, in its own container | "Up" is not answering, and no host client is assumed |
-| Each listens on loopback alone | They carry the password `test` |
+| Each listens on loopback alone: published on it by default, or bound to it on the host network where `ENGINE_NETWORK` is `host` | They carry the password `test` |
+| CI runs them on the host network | A published port's traffic passes through a proxy process: 77 of 871 processor-seconds of `test-all` on four cores |
+| Published ports stay the default | The host network of rootless Docker or a desktop virtual machine is not the machine's |
+| A published server listens on its image's port inside its container; on the host network each listens on its own | A container created before the choice existed still answers |
+| The PostgreSQL servers run without the query compiler (JIT), the floor server included | Compiling changes no result, and whether a query compiles turns on the planner's estimates, so its cost moves at random from run to run |
+| `make measure` turns the query compiler back on for its own sessions, through a setting on its PostgreSQL URL | A deployment keeps the compiler on, and a measurement has caught it costing 1,685 ms against 170 ms |
+| The MySQL server runs without its performance schema | Nothing a test asserts reads it, and it costs the server 3% of its processor time |
+| MySQL's X protocol listener is off | Nothing speaks it, and on the host network it would listen on every address |
+| A server is ready when it answers over TCP on loopback | Each image first initializes on a temporary server listening on a socket alone |
 | `local.mk` is never overwritten | It may point at an operator's own servers |
 | Starting is idempotent: a running engine is left, a stopped container started | |
 | CI starts its servers with `make engines-up`, from the same one list | A local pass means CI's only on the same servers |
@@ -38,6 +46,8 @@ writes their URLs to the git-ignored `local.mk`, which the makefile includes.
 | Each data directory is in memory under a cap: 1 GB PostgreSQL, 3 GB MySQL and MariaDB, 256 MB the floor server | Past it a write fails as a full disk on that server; unbounded, the four grow into the memory the tests run in. Two weeks of a workstation's runs left 349 MB, 1.6 GB, 1.6 GB and 47 MB, and the caps leave a 16 GB runner over 8 GB |
 | One server is below the supported version floor | The old-server refusal is exercised |
 | The URLs are read when make starts | The run writing `local.mk` is not the run using it |
+
+`design-docs/build-measurements.md` § Server processor time has the timings.
 
 ## Test databases
 
@@ -228,6 +238,7 @@ the detector's cost is in-process work. The detector is per binary, so
 | A program reads the division from `go list -test`, never a list | Its tests report a package importing a database package that the server run lacks, a listed package outside the module, a recipe handing either run the other's list, and a listing that examined nothing or picked nothing |
 | The two runs go at once on half the cores each | One is in-process, the other waits on sockets: 100 s and 1.5 GB against 119 s and 3.4 GB in sequence |
 | Each run labels its lines as it prints | Held, a slow run looks stopped; unlabeled, nobody knows which failed |
+| Each run ends on a line giving when it finished and how long after the start | CI reads it to measure the cores one run leaves idle |
 | A failure in either fails the target | Checked by breaking each |
 | The race binary sleeps 100 ms before exiting | The default second is paid per binary, the better part of a minute across the tree where the pass runs one package at a time |
 | The SQLite engine's translated C, its C library and the allocator under the library are built without the detector and its pointer checks, and nothing else is | They are most of the cost: an empty test takes 57 ms against 4.4 ms |
@@ -310,4 +321,5 @@ Work a test repeats in its own body, past what the harness sets up.
 | The clean trusts the slot lock alone | A database used without its lock is dropped in use |
 | A check needing a running server refuses, never skips | A skip passes |
 | The graph, inventory reader, currency and access packages keep in-package test files | Each exposes an unexported value, bound or clock to its tests, and exporting one would be for a test alone; their test binaries still compile the packages between them and the harness twice |
+| A MySQL lock wait in an upgrade test reports the holders from the process list | The metadata locks it names elsewhere are in the performance schema, which the test server lacks |
 | MySQL and MariaDB drop a database another session is open on | The test of a refused stale drop refuses nothing there |
