@@ -14,6 +14,7 @@ Satisfies REQ-75.
 - [Server database slots](#server-database-slots)
 - [Measurement databases](#measurement-databases)
 - [The race pass](#the-race-pass)
+- [Checks beside the tests](#checks-beside-the-tests)
 - [Engine selection](#engine-selection)
 - [Commit durability](#commit-durability)
 - [In-package test files](#in-package-test-files)
@@ -251,6 +252,28 @@ the detector's cost is in-process work. The detector is per binary, so
 
 `design-docs/build-measurements.md` § The race pass has every configuration.
 
+## Checks beside the tests
+
+`make check` runs its checks reading no database inside `test-all`, in the
+cores the first run to end leaves idle: the interface install, the API
+document, the full-size inventory read, the Go vulnerability scan, the
+licenses, the secret scan, the API document's currency, this project's
+inventory and the interface checks.
+
+| Rule | Reason |
+|---|---|
+| They start when the first run ends | Both runs together leave 3% of a four-core runner idle; the server run alone leaves 39% |
+| They run one after another, at the lowest scheduling priority | A run still going takes every core it can use, and the checks take what it leaves |
+| Each check, and every program it starts, uses at most as many cores as one run had: Go's thread count and the interface tests' workers | The cores a finished run frees are the room, and more workers than that contend for nothing idle |
+| Each check's output is held in a file and printed whole, labeled, when it ends, followed by a line naming it, its result and its time | Threaded through the running pass's lines, it reads as neither |
+| The checks end on a line giving when they finished and how long after the start | CI reports the cores idle beside them and after them from it |
+| Every check runs, and any one failing fails `test-all` and `check` | Checked by breaking one |
+| A check that passed is not made again by a later one | The interface is installed and the API document generated once |
+| They also start if both runs end without printing their last line | A run killed by a signal leaves nothing to wait for |
+| `test-all` on its own runs the tests alone | `make gate` runs the checks a change reaches as targets of their own |
+
+`design-docs/build-measurements.md` § Checks beside the tests has the times.
+
 ## Engine selection
 
 `OPENPSIRT_TEST_ENGINES` narrows the engines a run touches; `test` and
@@ -320,6 +343,8 @@ Work a test repeats in its own body, past what the harness sets up.
 | Checkouts of two schemas running at once drop each other's free databases | Each drop costs the other one build |
 | The clean trusts the slot lock alone | A database used without its lock is dropped in use |
 | A check needing a running server refuses, never skips | A skip passes |
+| The checks beside the tests outlast the server run where it leaves too little idle | They keep the lowest priority and the cores one run had |
+| The lowest priority ranks the checks below the test binaries alone | The servers run in containers the scheduler shares time between first, so the checks still take some from them: on four cores of a workstation the server run ended 9 to 20 s later |
 | The graph, inventory reader, currency and access packages keep in-package test files | Each exposes an unexported value, bound or clock to its tests, and exporting one would be for a test alone; their test binaries still compile the packages between them and the harness twice |
 | A MySQL lock wait in an upgrade test reports the holders from the process list | The metadata locks it names elsewhere are in the performance schema, which the test server lacks |
 | MySQL and MariaDB drop a database another session is open on | The test of a refused stale drop refuses nothing there |
