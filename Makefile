@@ -228,6 +228,9 @@ SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -vet=off
 # passed is not made again by a later one, so the interface is installed and
 # the API document generated once. Any one failing fails test-all, and every
 # one still runs. "check" sets it; on its own, test-all runs the tests alone.
+# The command reaches the recipe through the environment, because a recipe
+# naming $(MAKE) is run even by "make -n", which would run the suite.
+test-all: export BESIDE_MAKE = $(MAKE)
 test-all:
 	@servers=$$($(GO) run ./internal/tools/lanes $(PACKAGES)) || exit 1; \
 	started=$$(date +%s); \
@@ -243,7 +246,7 @@ test-all:
 	  for target in $(BESIDE_TESTS); do \
 	    until [ -e "$$held/ended" ] || ! kill -0 $$detector $$portability 2>/dev/null; do sleep 1; done; \
 	    begun=$$(date +%s); \
-	    if GOMAXPROCS=$(TEST_HALF) nice -n 19 $(MAKE) --no-print-directory $$made $$target \
+	    if GOMAXPROCS=$(TEST_HALF) nice -n 19 "$$BESIDE_MAKE" --no-print-directory $$made $$target \
 	        WEB_WORKERS=$(TEST_HALF) > "$$held/$$target.log" 2>&1; then \
 	      result=passed; made="$$made -o $$target"; \
 	    else result=failed; status=1; fi; \
@@ -387,9 +390,10 @@ openapi:
 # The checks reading no database run inside test-all, in the cores the first
 # test pass to end leaves idle (BESIDE_TESTS there). The interface install and
 # the API document lead as steps of their own, so the later checks needing
-# them find them made.
-check: lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed subjected attached readable negatives pins-check test-all
+# them find them made. The variable is set before the rule, because the
+# recipe below follows the rule line.
 check: BESIDE_TESTS := web-deps openapi sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed subjected attached readable negatives pins-check test-all
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"

@@ -271,6 +271,8 @@ inventory and the interface checks.
 | A check that passed is not made again by a later one | The interface is installed and the API document generated once |
 | They also start if both runs end without printing their last line | A run killed by a signal leaves nothing to wait for |
 | `test-all` on its own runs the tests alone | `make gate` runs the checks a change reaches as targets of their own |
+| `test-all` names the make command it runs the checks with through the environment | A recipe naming it is run even by `make -n`, which would run the suite |
+| The variable listing the checks is set before the `check` rule line | Set after it, the recipe lines printed where an engine is unconfigured follow a variable line, and make refuses the file |
 
 `design-docs/build-measurements.md` § Checks beside the tests has the times.
 

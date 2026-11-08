@@ -4,6 +4,7 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -274,9 +275,20 @@ func TestEveryTargetCheckRunsIsChosenBySomeTier(t *testing.T) {
 	// A target check runs and no tier chooses is one a commit can fail in CI
 	// with the local gate green, which is the narrowing the gate promises
 	// never to do.
-	makefile, err := os.ReadFile(filepath.Join("..", "..", "..", "Makefile"))
+	// The included makefiles as well, which hold the rules of the targets
+	// check names.
+	root := os.DirFS(filepath.Join("..", "..", ".."))
+	paths, err := fs.Glob(root, "mk/*.mk")
 	if err != nil {
 		t.Fatal(err)
+	}
+	var makefile []byte
+	for _, path := range append([]string{"Makefile"}, paths...) {
+		text, err := fs.ReadFile(root, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		makefile = append(append(makefile, text...), '\n')
 	}
 	prerequisites := checkPrerequisites(string(makefile))
 	if len(prerequisites) == 0 {
@@ -295,14 +307,53 @@ func TestATargetNoTierChoosesIsReported(t *testing.T) {
 	}
 }
 
-// checkPrerequisites is what the makefile's check target depends on.
+// The targets run beside the tests are what check runs too, and one that
+// another of them depends on is made inside it.
+func TestATargetRunBesideTheTestsIsHeldToTheTiers(t *testing.T) {
+	tiers := map[tier][]string{code: {"unreachable", "web-check"}, everything: {"check"}}
+	makefile := "check: BESIDE_TESTS := web-deps web-check sbom\ncheck: unreachable test-all\n\tdo\nweb-check: web-deps web-api\n"
+	if got := unchosenBy(checkPrerequisites(makefile), tiers); !slices.Equal(got, []string{"sbom", "test-all"}) {
+		t.Errorf("unchosen: %v, want [sbom test-all]", got)
+	}
+}
+
+// checkPrerequisites is what the makefile's check target runs: its
+// prerequisites and the targets it hands test-all to run beside the tests.
+// A target another of those depends on is left out, since it is made inside
+// that one wherever a tier chooses it.
 func checkPrerequisites(makefile string) []string {
+	var runs []string
+	needs := map[string][]string{}
 	for _, line := range strings.Split(makefile, "\n") {
-		if rest, ok := strings.CutPrefix(line, "check:"); ok {
-			return strings.Fields(rest)
+		name, rest, ok := strings.Cut(line, ":")
+		if !ok || strings.ContainsAny(name, " \t$#") || strings.HasPrefix(rest, "=") {
+			continue
+		}
+		if beside, ok := strings.CutPrefix(strings.TrimSpace(rest), "BESIDE_TESTS :="); ok && name == "check" {
+			runs = append(runs, strings.Fields(beside)...)
+			continue
+		}
+		if strings.Contains(rest, "=") {
+			continue
+		}
+		needs[name] = append(needs[name], strings.Fields(rest)...)
+		if name == "check" {
+			runs = append(runs, strings.Fields(rest)...)
 		}
 	}
-	return nil
+	var out []string
+	for _, target := range runs {
+		inside := false
+		for _, other := range runs {
+			if other != target && slices.Contains(needs[other], target) {
+				inside = true
+			}
+		}
+		if !inside {
+			out = append(out, target)
+		}
+	}
+	return out
 }
 
 // unchosenBy is each prerequisite no tier but everything runs.

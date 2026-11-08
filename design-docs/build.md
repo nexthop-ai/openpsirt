@@ -186,7 +186,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | A Go file is classified by its whole content | An edit anywhere in a file of queries can move a query |
 | A file takes every tier it lands in | |
 | Every tier reachable alone scans for secrets | A pushed credential is in the remote's history |
-| Every target `check` runs is in some narrow tier, held by a test | |
+| Every target `check` runs is in some narrow tier, held by a test, the checks it runs beside the tests included; a target one of them depends on is made inside it | |
 | `docs-check` tests every package whose tests read a `.md` file, held by a test | |
 | A clean tree takes the whole gate | It is about to push committed work |
 | `test-all` replaces `test` | |
