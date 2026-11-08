@@ -7,8 +7,13 @@
 //
 // Every runner and every other target builds for Linux, so a file a build
 // constraint keeps off Linux is compiled by nothing else. A package compiling
-// the same files on both systems type-checks the same on both, so vetting it
-// again for the other system finds nothing Linux did not.
+// the same files on both systems is not vetted for the other one, so a
+// Linux-only standard library or dependency API in a file with no constraint,
+// such as a parent-death signal on a child process, is caught only by a build
+// on that system. Vetting those too was measured: the packages importing
+// syscall bring in the program and nearly the whole tree, 57 s on macOS and
+// 66 s on Windows from an empty build cache, against 63.9 s for every package
+// on macOS.
 //
 // The packages and their files are read from "go list" under each system, so a
 // file gaining a constraint is covered without anybody editing a list, and a

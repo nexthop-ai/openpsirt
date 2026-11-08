@@ -316,8 +316,9 @@ lint:
 # under it with every check green. Vet type-checks without linking.
 #
 # Per system, only the packages compiling other files there than on Linux,
-# read by internal/tools/otheros: a package with the same files type-checks the
-# same, so vetting it again finds nothing. The program refuses a file it picks
+# read by internal/tools/otheros. A package compiling the same files on both is
+# not vetted for the other system, so a Linux-only API in a file with no
+# constraint is caught only by a build there. The program refuses a file it picks
 # declaring an exported name, which would reach importers vetted on Linux
 # alone, and a test there holds every file kept off Linux to a system named
 # here. Windows also vets the upload client, the one program shipped for it.

@@ -270,6 +270,11 @@ Four cores of a workstation, Go 1.27.3, unless a row says CI.
 The packages picked are the background-pass package on macOS, and that, the
 settings package and the migration runner on Windows.
 
+Vetting also every package importing `syscall` or `golang.org/x/sys`, to catch
+a Linux-only call in a file with no constraint, took 57 s on macOS and 66 s on
+Windows from an empty build cache: the program is among them, and vetting it
+compiles nearly the whole tree for that system.
+
 | Interface check, every source file's time moved | No cache | Cached by content |
 |---|---|---|
 | `tsc` | 10.7 to 11.3 s, `tsc -b` with its build information present included | 1.2 s |
