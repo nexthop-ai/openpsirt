@@ -10,10 +10,10 @@ import { afterAll, afterEach, beforeEach } from "vitest";
 // answers through console.warn. Each is a defect the test's assertions do not
 // see, and a passing run prints it where nobody reads.
 //
-// A test expecting such output spies on the method itself and asserts on the
-// spy: the spy takes the method's place, so what it receives is never recorded
-// here. Each test starts with the recorder back in place, so a spy left behind
-// silences nothing in the next test.
+// A test expecting such output replaces the method with a spy that prints
+// nothing, and asserts on the spy. A bare spy calls through to the recorder
+// and fails the test. Each test starts with the recorder back in place, so a
+// spy left behind silences nothing in the next test.
 
 type Method = "error" | "warn";
 
