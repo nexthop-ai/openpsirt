@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Shell } from "./Shell";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Who } from "./session";
@@ -20,6 +20,8 @@ const who = {
 
 // Where the top search lands for a term, given how the issue route answers.
 async function searched(term: string, issue: Answer): Promise<string> {
+  // A search that lands somewhere scrolls to the top, and jsdom has no scroll.
+  vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   serve((path) => (path === "/v1/issues/{issue}" ? issue : { data: { items: [], total: 0 } }));
   mount.render(screen(<Shell who={who}>{null}</Shell>, "/start"));
   await settle();

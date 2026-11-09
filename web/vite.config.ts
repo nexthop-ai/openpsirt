@@ -37,6 +37,10 @@ export default defineConfig({
     // are `.mjs` with their detection exported, so the test beside them is an
     // ordinary `.test.ts`.
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
+    // A test writing to console.error or console.warn fails: React's act and
+    // key warnings and a render that threw arrive there, and a passing run
+    // prints them where nobody reads.
+    setupFiles: ["src/test/console.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text-summary"],

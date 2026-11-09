@@ -59,7 +59,16 @@ describe("a printed sheet's header", () => {
             },
           }
         : path === "/v1/effort"
-          ? { data: { items: Array.from({ length: 50 }, () => row), total: 80 } }
+          ? {
+              // The server answers one row per product and component.
+              data: {
+                items: Array.from({ length: 50 }, (_, i) => ({
+                  ...row,
+                  component: `openssl-${i}`,
+                })),
+                total: 80,
+              },
+            }
           : { data: { items: [], total: 0 } },
     );
     mount.render(screen(<Effort />, "/analytics/effort-by-component"));

@@ -103,13 +103,19 @@ describe("the findings list's keys", () => {
     vulnerability: "CVE-2026-1",
     component: "openssl",
     version: "3.0.0",
+    fold: "openssl@3.0.0",
   };
 
   async function drawRows() {
     serve((path) => {
       if (path === "/v1/session/me") return { data: me };
       if (path === "/v1/findings")
-        return { data: { items: [row, { ...row, version: "3.0.1" }], total: 2 } };
+        return {
+          data: {
+            items: [row, { ...row, version: "3.0.1", fold: "openssl@3.0.1" }],
+            total: 2,
+          },
+        };
       return { data: { items: [], total: 0 } };
     });
     mount.render(screen(<Findings />, "/findings", "/findings"));

@@ -256,8 +256,10 @@ export function AutoAssignment() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((rule) => (
-                    <tr key={rule.id} className="row">
+                  {items.map((rule, row) => (
+                    // A rule the server did not identify is keyed on its row,
+                    // since nothing stops two rules sharing an order.
+                    <tr key={rule.id ?? `row ${row}`} className="row">
                       <td className="num">{rule.order}</td>
                       <td>{rule.name}</td>
                       <td className="hint">
