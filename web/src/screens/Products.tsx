@@ -168,9 +168,8 @@ export function Products({ who }: { who: Who }) {
   // because a memo's body still runs during render. There is no pure source
   // for it: the answer this asks for is what the time is, and the alternatives
   // are state written from an effect, which is the pattern this same ruleset
-  // argues against, or a field the server does not send. So the rule is
-  // switched off for this line and stays on everywhere else.
-  // eslint-disable-next-line react-hooks/purity
+  // argues against, or a field the server does not send.
+  // eslint-disable-next-line react-hooks/purity -- The answer asked for is the time, which no pure source holds.
   const asOf = Date.now();
 
   return (

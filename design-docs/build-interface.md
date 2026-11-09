@@ -18,7 +18,7 @@ Satisfies REQ-75.
 | Tool | Covers |
 |---|---|
 | `tsc` | Strict, with unused locals and parameters, unchecked indexed access, verbatim module syntax |
-| ESLint | The rules of hooks, and little else `tsc` misses |
+| ESLint | The rules of hooks, a reason on every disable directive, and little else `tsc` misses |
 | Prettier | TypeScript and CSS formatting |
 | Stylelint | CSS correctness: unknown properties, duplicate selectors, notation; no whitespace rules |
 | `npm run classes` | The class-name checks |
@@ -29,7 +29,9 @@ Satisfies REQ-75.
 |---|---|
 | Prettier alone formats | |
 | ESLint carries the hook rules: an impure read in render, an effect running every time, a value assigned and unused | A style rule firing on working code teaches people to ignore output |
-| Writing state from an effect is reported, never refused | Its fix, remounting with a key, must be checked in a browser |
+| ESLint fails on a warning as on an error, writing state from an effect included | A warning a run passes is read by nobody, and the next one hides among those before it |
+| A disable directive gives its reason after `--`, on the directive itself | It marks a line a rule would otherwise catch, so the exception is deliberate or a defect |
+| A disable directive switching off nothing is an error | The rule it named moved or was fixed, and the directive would silence the next real report |
 | The type check is `tsc -p` with `--incremental`, never `tsc -b` | One project with no references; build mode with `--noEmit` reused nothing, 10.7 s each run, against 1.2 s with the build information |
 | ESLint and Prettier cache per file by content | ESLint here is not type-aware, so a file's result depends on that file and the configuration alone: 14.6 s against 0.7 s, and 4.6 s against 0.6 s |
 | The three caches live in `web/.cache`, outside `node_modules`, and are emptied whenever the lockfile differs from the one they were made under | `npm ci` deletes `node_modules` every run; ESLint's results outlive a plugin moving under an unchanged configuration |
@@ -70,3 +72,4 @@ Satisfies REQ-75.
 | Only literal class names are read | A class built wholly from an interpolation is unseen |
 | A name that is also a Tailwind utility passes the collision and unstyled checks | Both ask the same compiler |
 | The unused-export check matches names, never imports | A name that is an ordinary word elsewhere passes |
+| A bare `eslint-disable` switches off the reason rule with the rest | A disable naming no rule switches every rule off, and the reason rule is one of them |

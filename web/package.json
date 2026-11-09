@@ -14,7 +14,7 @@
     "ladder": "node scripts/one-ladder.mjs",
     "copy": "node scripts/screen-copy.mjs",
     "licenses": "node scripts/licenses.mjs",
-    "lint": "eslint --cache --cache-strategy content --cache-location .cache/eslint . && node scripts/silent-reads.mjs",
+    "lint": "eslint --max-warnings 0 --cache --cache-strategy content --cache-location .cache/eslint . && node scripts/silent-reads.mjs",
     "stylelint": "stylelint \"src/**/*.css\"",
     "format": "prettier --check --cache --cache-strategy content --cache-location .cache/prettier \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.{mjs,ts}\""
   },

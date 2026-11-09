@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useEffectEvent, type RefObject } from "react";
 
 // Closing something open when the reader's attention leaves it.
 //
@@ -21,13 +21,18 @@ export function useClickAway(
   close: () => void,
   onEscape = true,
 ) {
+  // The listener calls the close of the latest render without being
+  // re-attached for it, so a close holding state never acts on a stale copy,
+  // and a caller passing a fresh arrow each render costs nothing.
+  const dismiss = useEffectEvent(close);
+
   useEffect(() => {
     if (!open) return;
     function away(event: MouseEvent) {
-      if (box.current && !box.current.contains(event.target as Node)) close();
+      if (box.current && !box.current.contains(event.target as Node)) dismiss();
     }
     function key(event: KeyboardEvent) {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") dismiss();
     }
     document.addEventListener("mousedown", away);
     if (onEscape) document.addEventListener("keydown", key);
@@ -35,9 +40,5 @@ export function useClickAway(
       document.removeEventListener("mousedown", away);
       if (onEscape) document.removeEventListener("keydown", key);
     };
-    // close is a setter or a stable callback at every call site; listing it
-    // would re-attach the listener on every render of the component that
-    // draws the box.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, onEscape]);
+  }, [box, open, onEscape]);
 }
