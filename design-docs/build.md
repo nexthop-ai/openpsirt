@@ -115,7 +115,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make gate` | The checks this change must pass, chosen from what it touches |
 | `make gate full` | Every check |
 | `make test` | SQLite only, parallel, cached |
-| `make test-all` | Every configured engine, uncached: the two runs below, at once |
+| `make test-all` | Every configured engine, uncached: the two runs below, at once. Inside `make check`, also the checks reading no database, once the first run ends (`design-docs/build-tests.md` § Checks beside the tests) |
 | `make test-race` | SQLite with the race detector |
 | `make test-engines` | The three server engines, without the detector, over the packages reaching a database |
 | `make docs-check` | What a documents-only change can break |
@@ -186,7 +186,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | A Go file is classified by its whole content | An edit anywhere in a file of queries can move a query |
 | A file takes every tier it lands in | |
 | Every tier reachable alone scans for secrets | A pushed credential is in the remote's history |
-| Every target `check` runs is in some narrow tier, held by a test | |
+| Every target `check` runs is in some narrow tier, held by a test, the checks it runs beside the tests included; a target one of them depends on is made inside it | |
 | `docs-check` tests every package whose tests read a `.md` file, held by a test | |
 | A clean tree takes the whole gate | It is about to push committed work |
 | `test-all` replaces `test` | |
@@ -210,7 +210,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | Jobs needing only a checkout and Go are one job | |
 | The database servers are started by `make engines-up` on the runner's network in a step after the checkout, never as service containers, and waited for before `make check` | Service containers start one after another before the checkout, 29 to 51 s; a step overlaps the setup, and CI and a developer run one list of servers (`design-docs/build-tests.md` § Database engines) |
 | The runner's free memory, and each server's memory and data directory use, are printed at the end of every run, whatever failed | A run out of memory or a full data directory names its cause |
-| The processors are sampled every five seconds from the checkout on, and the last step prints their idle share for the job, for both test passes together and for the one left running alone | The cores one pass leaves idle are the room to start other checks in |
+| The processors are sampled every five seconds from the checkout on, and the last step prints their idle share for the job, for both test passes together, for the one left running with the other checks beside it, and for whichever runs alone after | The cores one pass leaves idle are where the other checks run |
 | The checking job fetches every commit and tree and no file contents beyond its checkout | The vulnerability gates' few reads of the base fetch their files as read |
 | No composite action or reusable workflow | One Go setup remains, and a reusable workflow re-clones |
 | The macOS and Windows jobs run only when a client source moved | Those runners cost several Linux ones |

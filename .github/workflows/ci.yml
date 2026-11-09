@@ -287,8 +287,9 @@ jobs:
 
       # Whatever happened above, so a run that ran out of memory or filled a
       # server's data directory says which. The processors' idle share is
-      # given while both test passes ran and while one ran alone, from the
-      # samples and the line each pass printed as it finished.
+      # given while both test passes ran, while one ran with the other checks
+      # beside it, and while either ran alone, from the samples and the line
+      # each printed as it finished.
       - name: Report the runner's memory and processors, and each server's
         if: always()
         run: |
@@ -321,7 +322,20 @@ jobs:
           alone=$([ "$race_end" -lt "$servers_end" ] && echo "the server pass" || echo "the race pass")
           echo "test-all: race pass ${race_s} s, server pass ${servers_s} s"
           echo "  both passes, $((first - start)) s: $(idle "$start" "$first")"
-          echo "  $alone alone, $((last - first)) s: $(idle "$first" "$last")"
+          read -r checks_at checks_s <<< "$(ends checks)" || true
+          if [ -z "${checks_at:-}" ]; then
+            echo "  $alone alone, $((last - first)) s: $(idle "$first" "$last")"
+            exit 0
+          fi
+          checks_end=$(date -d "$checks_at" +%s)
+          echo "  the other checks ended ${checks_s} s after the start"
+          if [ "$checks_end" -le "$last" ]; then
+            echo "  $alone with the checks, $((checks_end - first)) s: $(idle "$first" "$checks_end")"
+            echo "  $alone alone, $((last - checks_end)) s: $(idle "$checks_end" "$last")"
+          else
+            echo "  $alone with the checks, $((last - first)) s: $(idle "$first" "$last")"
+            echo "  the checks alone, $((checks_end - last)) s: $(idle "$last" "$checks_end")"
+          fi
 
   # The two below are not steps of the job above, and each for a reason of
   # its own rather than for tidiness.

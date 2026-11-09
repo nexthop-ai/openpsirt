@@ -217,19 +217,48 @@ SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -vet=off
 # Each pass ends on a line saying when it finished and how long after the
 # start, with the pass's own status kept: while one pass runs alone, the
 # other's cores are idle, and CI measures how idle from those lines.
+#
+# BESIDE_TESTS names targets run in those idle cores: one after another, from
+# the moment the first pass ends, at the lowest priority, so a pass still
+# running takes every core it can use and they take what it leaves. Each
+# target and every program it starts may use as many cores as one pass had:
+# Go's own thread count, and the interface tests' workers. Each target's
+# output is held in a file and printed, labeled, when it ends, so it is read
+# whole rather than threaded through the running pass's lines. A target that
+# passed is not made again by a later one, so the interface is installed and
+# the API document generated once. Any one failing fails test-all, and every
+# one still runs. "check" sets it; on its own, test-all runs the tests alone.
+# The command reaches the recipe through the environment, because a recipe
+# naming $(MAKE) is run even by "make -n", which would run the suite.
+test-all: export BESIDE_MAKE = $(MAKE)
 test-all:
 	@servers=$$($(GO) run ./internal/tools/lanes $(PACKAGES)) || exit 1; \
 	started=$$(date +%s); \
 	finished() { echo "$$1 finished at $$(date -u +%Y-%m-%dT%H:%M:%SZ), $$(( $$(date +%s) - started )) s after the start"; }; \
+	held=$$(mktemp -d) || exit 1; trap 'rm -rf "$$held"' EXIT; \
 	( status=0; $(RACE_PASS) -p $(TEST_HALF) \
 	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$0; fflush() }' || status=$$?; \
-	  finished "[sqlite -race]"; exit $$status ) & detector=$$!; \
+	  finished "[sqlite -race]"; : > "$$held/ended"; exit $$status ) & detector=$$!; \
 	( status=0; $(SERVERS_PASS) -p $(TEST_HALF) \
 	    $$servers 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' || status=$$?; \
-	  finished "[servers]     "; exit $$status ) & portability=$$!; \
+	  finished "[servers]     "; : > "$$held/ended"; exit $$status ) & portability=$$!; \
+	( status=0; made=; last=; \
+	  for target in $(BESIDE_TESTS); do \
+	    until [ -e "$$held/ended" ] || ! kill -0 $$detector $$portability 2>/dev/null; do sleep 1; done; \
+	    begun=$$(date +%s); \
+	    if GOMAXPROCS=$(TEST_HALF) nice -n 19 "$$BESIDE_MAKE" --no-print-directory $$made $$target \
+	        WEB_WORKERS=$(TEST_HALF) > "$$held/$$target.log" 2>&1; then \
+	      result=passed; made="$$made -o $$target"; \
+	    else result=failed; status=1; fi; \
+	    awk -v label="[$$target] " '{ print label $$0; fflush() }' "$$held/$$target.log"; \
+	    echo "[checks]       make $$target $$result in $$(( $$(date +%s) - begun )) s"; \
+	    last=$$target; \
+	  done; \
+	  if [ -n "$$last" ]; then finished "[checks]      "; fi; exit $$status ) & beside=$$!; \
 	failed=0; \
 	wait $$detector || failed=1; \
 	wait $$portability || failed=1; \
+	wait $$beside || failed=1; \
 	exit $$failed
 
 # The detector, on the engine every checkout has. Its own target, for running
@@ -357,7 +386,14 @@ openapi:
 # of every package, 23.5 s and 461 MB of build cache beside the test builds,
 # which already link every package and the program; the image job builds the
 # binary the way a release does.
-check: lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed subjected attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+#
+# The checks reading no database run inside test-all, in the cores the first
+# test pass to end leaves idle (BESIDE_TESTS there). The interface install and
+# the API document lead as steps of their own, so the later checks needing
+# them find them made. The variable is set before the rule, because the
+# recipe below follows the rule line.
+check: BESIDE_TESTS := web-deps openapi sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed subjected attached readable negatives pins-check test-all
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -418,12 +454,15 @@ web-api: web-deps openapi
 #
 # The client is regenerated first, as a prerequisite, so the typecheck reads
 # it and the install is shared.
+#
+# WEB_WORKERS, where set, is the most workers the interface tests run in;
+# unset, the test runner chooses from the machine's cores.
 web-check: web-deps web-api
 	$(NPM) --prefix web run typecheck
 	$(NPM) --prefix web run format
 	$(NPM) --prefix web run lint
 	$(NPM) --prefix web run stylelint
-	$(NPM) --prefix web run coverage
+	$(NPM) --prefix web run coverage $(if $(WEB_WORKERS),-- --maxWorkers=$(WEB_WORKERS))
 	$(NPM) --prefix web run classes
 	$(NPM) --prefix web run tokens
 	$(NPM) --prefix web run ladder

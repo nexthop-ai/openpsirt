@@ -2,7 +2,7 @@
 
 Benchmark runs behind the CI cache, test database, race pass, commit
 durability, seeded start, migration test, gate build, other gate work and
-server setting rules.
+server setting rules, and the checks run beside the tests.
 
 ## Contents
 
@@ -18,6 +18,7 @@ server setting rules.
 - [Gate build work](#gate-build-work)
 - [Gate work outside the tests](#gate-work-outside-the-tests)
 - [Server processor time](#server-processor-time)
+- [Checks beside the tests](#checks-beside-the-tests)
 
 ## CI caches
 
@@ -322,3 +323,20 @@ pinned to the same four cores of a workstation, servers started fresh.
 |---|---|---|
 | MySQL's processor time | 84.1 s | 81.3 s |
 | Wall time | 76.6 s | 71.1 s |
+
+## Checks beside the tests
+
+Rules in `design-docs/build-tests.md` § Checks beside the tests. `make check`
+with every cache warm, test binaries, checks and the four servers pinned to
+the same four cores of a workstation, servers started fresh.
+
+| `make check`, four cores, three runs each | The checks after `test-all` | Beside it |
+|---|---|---|
+| Wall time | 330, 341, 343 s | 289, 299, 296 s |
+| The race pass ends, after `test-all` starts | 120, 115, 118 s | 120, 117, 120 s |
+| The server pass ends, after `test-all` starts | 262, 268, 276 s | 277, 287, 285 s |
+| The checks end, after `test-all` starts | 56 to 58 s after the server pass ends | 210 to 217 s |
+| Idle while the server pass runs alone | 40 to 42% | 6 to 11% with the checks, 43 to 44% after them |
+
+The workstation runs other work beside these, so a difference of ten or
+fifteen seconds in where the server pass ends is within its variance.
