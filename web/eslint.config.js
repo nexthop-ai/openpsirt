@@ -16,6 +16,45 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
 
+// An ESLint rule refusing a disable directive that gives no reason.
+//
+// A disable switches a rule off where it would otherwise have caught a
+// defect, so the line says why the exception is deliberate, after ESLint's
+// own `--` separator: `eslint-disable-next-line rule -- reason`. Enabling a
+// rule again needs no reason. It lives in this file because cached lint
+// results are kept while this file is unchanged, so a rule in a file of its
+// own could change under results cached for the old one.
+
+const DISABLE = /^\s*eslint-disable(?:-line|-next-line)?(?=\s|$)/;
+const REASON = /\s--\s*\S/;
+
+// Whether a comment's text is a disable directive with no reason after it.
+function unreasoned(text) {
+  return DISABLE.test(text) && !REASON.test(text);
+}
+
+export const reasonedDisables = {
+  meta: {
+    type: "problem",
+    docs: { description: "Require a reason on every eslint-disable directive" },
+    schema: [],
+    messages: {
+      unreasoned: "Say why this exception is deliberate, after ' -- ' on the directive itself.",
+    },
+  },
+  create(context) {
+    return {
+      Program() {
+        for (const comment of context.sourceCode.getAllComments()) {
+          if (unreasoned(comment.value)) {
+            context.report({ loc: comment.loc, messageId: "unreasoned" });
+          }
+        }
+      },
+    };
+  },
+};
+
 export default tseslint.config(
   { ignores: ["dist", "src/api/schema.d.ts"] },
   js.configs.recommended,
@@ -27,6 +66,13 @@ export default tseslint.config(
       ecmaVersion: 2022,
       globals: globals.browser,
     },
+  },
+  // A rule switched off says why, on the directive, and a directive that
+  // switches off nothing is an error rather than a warning.
+  {
+    linterOptions: { reportUnusedDisableDirectives: "error" },
+    plugins: { local: { rules: { "reasoned-disables": reasonedDisables } } },
+    rules: { "local/reasoned-disables": "error" },
   },
   // A label table over a word the server sends is keyed on the generated
   // union, so a word the server adds is a compile error rather than a raw
