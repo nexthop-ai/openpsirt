@@ -19,12 +19,31 @@ const WHO = {
   outcomes: [],
 };
 
+// The reads a forward lands on that answer one object rather than a list,
+// each in the shape the server gives.
+const ONE: Record<string, unknown> = {
+  "/v1/decisions/{id}": {
+    decision: { id: 12, proposed_by: "bo" },
+    occurrence: { product: "sonic", vulnerability: "CVE-2026-1" },
+    argument: { outcome: "not-applicable" },
+    happened: "waiting",
+    undisclosed: false,
+    security_testing: false,
+    issues: 1,
+    occurrences: 1,
+    age_days: 1,
+  },
+  "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components":
+    { unmatched: 0, components: 0, total: 0, reasons: [], items: [] },
+};
+
 // Draws the application at an address, with the identity read answered as
 // given and every other read answered empty.
 async function drawn(who: () => Answer, at = "/nowhere/at/all") {
   const asked = serve((path) => {
     if (path === "/v1/session/me") return who();
     if (path === "/v1/sign-in") return { data: { items: [] } };
+    if (path in ONE) return { data: ONE[path] };
     return { data: { items: [], total: 0 } };
   });
   mount.render(screen(<App />, at));

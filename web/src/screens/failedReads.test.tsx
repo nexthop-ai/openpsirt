@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { act } from "react";
 import type { Who } from "../app/session";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Uploads } from "./Uploads";
@@ -236,7 +237,7 @@ describe("a secondary read that fails", () => {
     await settle();
     const bell = mount.host().querySelector<HTMLButtonElement>("button.bell");
     expect(bell?.getAttribute("aria-label")).toBe("Notices could not be read");
-    bell?.click();
+    await act(async () => bell?.click());
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("Notices could not be read.");

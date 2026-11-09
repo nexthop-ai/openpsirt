@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodeFinding } from "./CodeFinding";
 import { accept, answer, mounted, screen, serve, settle } from "../test/mount";
@@ -76,7 +77,7 @@ async function drawn(triages: boolean, evidence: object = EVIDENCE, hides = fals
 async function holderBox() {
   const box = mount.host().querySelector<HTMLInputElement>('input[role="combobox"]');
   if (!box) throw new Error("no holder box");
-  box.focus();
+  await act(async () => box.focus());
   await settle();
   return box;
 }

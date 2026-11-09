@@ -13,11 +13,8 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 describe("a screen whose chunk failed to arrive", () => {
-  beforeEach(() => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-  });
-
-  it("is asked for again when Try again is pressed", async () => {
+  it("is asked for again when Try again is pressed, and is logged", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     let calls = 0;
     const Screen = retrying(async () => {
       calls++;
@@ -35,6 +32,11 @@ describe("a screen whose chunk failed to arrive", () => {
     );
     await settle();
     expect(mount.host().textContent).toContain("This screen could not be drawn.");
+    expect(logged).toHaveBeenCalledWith(
+      "the interface threw while rendering",
+      expect.objectContaining({ message: "the chunk did not arrive" }),
+      expect.anything(),
+    );
     const again = Array.from(mount.host().querySelectorAll("button")).find(
       (each) => each.textContent === "Try again",
     );

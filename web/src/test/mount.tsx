@@ -122,6 +122,8 @@ export function watchInvalidations(queries: QueryClient): () => string[] {
 //
 // A fresh client per draw, so nothing one test cached is read by the next. A
 // test that watches what a screen invalidates passes the client it watches.
+// Every other address draws nothing, so a forward away from the screen lands
+// on a route.
 export function screen(
   node: ReactNode,
   at = "/",
@@ -134,6 +136,7 @@ export function screen(
         <Here />
         <Routes>
           <Route path={pattern} element={node} />
+          {pattern !== "*" && <Route path="*" element={null} />}
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>

@@ -41,6 +41,9 @@ Satisfies REQ-75.
 | Each test file runs in its own VM context and DOM, inside a child process running file after file | A process per file was 29 s against 9 s on four cores |
 | Processes, never threads | Node applies a time zone change only on a main thread, and a zone test passes vacuously under UTC; such a test asserts the zone took effect |
 | Whole-interface tests, addresses, query keys, screen copy and control names, share one file and one parse | 0.66 s against 1.19 s |
+| A test writing to `console.error` or `console.warn`, or meeting something jsdom does not implement, fails | React reports an update outside `act`, a repeated key and a render that threw there, and a passing run prints them where nobody reads |
+| A test expecting such output replaces the method with a spy that prints nothing, and asserts on the spy | A bare spy calls through to the recorder; each test starts with the recorder back |
+| The fake server answers a read in the shape the API document gives it, unless the test is about an answer missing a field, and a screen drawn alone sits beside a route answering every other address | A list body for a one-object read crashes the screen landed on, and a forward to an unrouted address warns |
 | A test scheduling an animation frame waits for it, and a screen cancels its pending frames as it goes | A frame outliving its test fires inside a later one: jsdom has no `scrollIntoView`, and a findings-list frame failed 2 runs of 8 on four cores |
 
 ## Class-name checks
