@@ -1,0 +1,1620 @@
+column admin_change.about VARCHAR(593) notnull=1 default=- pk=0
+column admin_change.actor TEXT notnull=1 default=- pk=0
+column admin_change.at DATETIME notnull=1 default=- pk=0
+column admin_change.became TEXT notnull=0 default=- pk=0
+column admin_change.by INTEGER notnull=0 default=- pk=0
+column admin_change.id INTEGER notnull=0 default=- pk=1
+column admin_change.kind TEXT notnull=1 default=- pk=0
+column admin_change.was TEXT notnull=0 default=- pk=0
+column advisory.edition_id INTEGER notnull=0 default=- pk=0
+column advisory.id INTEGER notnull=0 default=- pk=1
+column advisory.identifier TEXT notnull=1 default=- pk=0
+column advisory.identifier_folded TEXT notnull=1 default=- pk=0
+column advisory.mint_number INTEGER notnull=1 default=- pk=0
+column advisory.minted_at DATETIME notnull=1 default=- pk=0
+column advisory.minted_by INTEGER notnull=1 default=- pk=0
+column advisory.minted_year INTEGER notnull=1 default=- pk=0
+column advisory.released_from DATETIME notnull=0 default=- pk=0
+column advisory_agreed_status.approval_id INTEGER notnull=1 default=- pk=0
+column advisory_agreed_status.branch_or_tag_id INTEGER notnull=1 default=- pk=0
+column advisory_agreed_status.id INTEGER notnull=0 default=- pk=1
+column advisory_agreed_status.product_id INTEGER notnull=1 default=- pk=0
+column advisory_agreed_status.status TEXT notnull=1 default=- pk=0
+column advisory_agreed_status.variant_id INTEGER notnull=1 default=- pk=0
+column advisory_agreed_status.vulnerability_id INTEGER notnull=1 default=- pk=0
+column advisory_approval.advisory_id INTEGER notnull=1 default=- pk=0
+column advisory_approval.approved_at DATETIME notnull=1 default=- pk=0
+column advisory_approval.approved_by INTEGER notnull=1 default=- pk=0
+column advisory_approval.edition_id INTEGER notnull=1 default=- pk=0
+column advisory_approval.id INTEGER notnull=0 default=- pk=1
+column advisory_approval.withdrawn_at DATETIME notnull=0 default=- pk=0
+column advisory_approval.withdrawn_by INTEGER notnull=0 default=- pk=0
+column advisory_edition.advisory_id INTEGER notnull=1 default=- pk=0
+column advisory_edition.id INTEGER notnull=0 default=- pk=1
+column advisory_edition.ordinal INTEGER notnull=1 default=- pk=0
+column advisory_edition.title TEXT notnull=0 default=- pk=0
+column advisory_edition.written_at DATETIME notnull=1 default=- pk=0
+column advisory_edition.written_by INTEGER notnull=1 default=- pk=0
+column advisory_issuance.advisory_id INTEGER notnull=1 default=- pk=0
+column advisory_issuance.digest TEXT notnull=1 default=- pk=0
+column advisory_issuance.document TEXT notnull=0 default=- pk=0
+column advisory_issuance.edition_id INTEGER notnull=1 default=- pk=0
+column advisory_issuance.id INTEGER notnull=0 default=- pk=1
+column advisory_issuance.issued_at DATETIME notnull=1 default=- pk=0
+column advisory_issuance.issued_by INTEGER notnull=1 default=- pk=0
+column advisory_issuance.ordinal INTEGER notnull=1 default=- pk=0
+column advisory_issuance.summary TEXT notnull=0 default=- pk=0
+column advisory_issue.added_at DATETIME notnull=1 default=- pk=0
+column advisory_issue.added_by INTEGER notnull=1 default=- pk=0
+column advisory_issue.advisory_id INTEGER notnull=1 default=- pk=0
+column advisory_issue.id INTEGER notnull=0 default=- pk=1
+column advisory_issue.product_id INTEGER notnull=1 default=- pk=0
+column advisory_issue.removed_at DATETIME notnull=0 default=- pk=0
+column advisory_issue.removed_by INTEGER notnull=0 default=- pk=0
+column advisory_issue.vulnerability_id INTEGER notnull=1 default=- pk=0
+column advisory_override.advisory_id INTEGER notnull=1 default=- pk=0
+column advisory_override.branch_or_tag_id INTEGER notnull=1 default=- pk=0
+column advisory_override.id INTEGER notnull=0 default=- pk=1
+column advisory_override.product_id INTEGER notnull=1 default=- pk=0
+column advisory_override.removed_at DATETIME notnull=0 default=- pk=0
+column advisory_override.removed_by INTEGER notnull=0 default=- pk=0
+column advisory_override.set_at DATETIME notnull=1 default=- pk=0
+column advisory_override.set_by INTEGER notnull=1 default=- pk=0
+column advisory_override.variant_id INTEGER notnull=1 default=- pk=0
+column advisory_override.vulnerability_id INTEGER notnull=1 default=- pk=0
+column analysis_location.depth INTEGER notnull=0 default=- pk=0
+column analysis_location.end_column INTEGER notnull=0 default=- pk=0
+column analysis_location.end_line INTEGER notnull=0 default=- pk=0
+column analysis_location.finding_id INTEGER notnull=1 default=- pk=0
+column analysis_location.id INTEGER notnull=0 default=- pk=1
+column analysis_location.message_text TEXT notnull=0 default=- pk=0
+column analysis_location.ordinal INTEGER notnull=1 default=- pk=0
+column analysis_location.part TEXT notnull=1 default=- pk=0
+column analysis_location.path TEXT notnull=0 default=- pk=0
+column analysis_location.snippet TEXT notnull=0 default=- pk=0
+column analysis_location.snippet_line INTEGER notnull=0 default=- pk=0
+column analysis_location.start_column INTEGER notnull=0 default=- pk=0
+column analysis_location.start_line INTEGER notnull=0 default=- pk=0
+column analysis_result.call_chain TEXT notnull=0 default=- pk=0
+column analysis_result.enclosing TEXT notnull=0 default=- pk=0
+column analysis_result.end_column INTEGER notnull=0 default=- pk=0
+column analysis_result.end_line INTEGER notnull=0 default=- pk=0
+column analysis_result.finding_id INTEGER notnull=1 default=- pk=0
+column analysis_result.fingerprint TEXT notnull=0 default=- pk=0
+column analysis_result.fingerprint_scheme TEXT notnull=0 default=- pk=0
+column analysis_result.function_key TEXT notnull=0 default=- pk=0
+column analysis_result.id INTEGER notnull=0 default=- pk=1
+column analysis_result.last_line INTEGER notnull=0 default=- pk=0
+column analysis_result.last_path TEXT notnull=1 default=- pk=0
+column analysis_result.last_path_identity TEXT notnull=1 default=- pk=0
+column analysis_result.level TEXT notnull=0 default=- pk=0
+column analysis_result.line_key TEXT notnull=1 default=- pk=0
+column analysis_result.match_key TEXT notnull=1 default=- pk=0
+column analysis_result.matched_on TEXT notnull=0 default=- pk=0
+column analysis_result.message_text TEXT notnull=1 default=- pk=0
+column analysis_result.path TEXT notnull=1 default=- pk=0
+column analysis_result.snippet TEXT notnull=0 default=- pk=0
+column analysis_result.snippet_line INTEGER notnull=0 default=- pk=0
+column analysis_result.start_column INTEGER notnull=0 default=- pk=0
+column analysis_result.start_line INTEGER notnull=0 default=- pk=0
+column analysis_result.unprinted_key TEXT notnull=1 default=- pk=0
+column api_key.branch_or_tag_id INTEGER notnull=0 default=- pk=0
+column api_key.created_at DATETIME notnull=1 default=- pk=0
+column api_key.id INTEGER notnull=0 default=- pk=1
+column api_key.last_used_at DATETIME notnull=0 default=- pk=0
+column api_key.live_name TEXT notnull=0 default=- pk=0
+column api_key.name TEXT notnull=1 default=- pk=0
+column api_key.product_id INTEGER notnull=1 default=- pk=0
+column api_key.revoked_at DATETIME notnull=0 default=- pk=0
+column api_key.secret_hash TEXT notnull=1 default=- pk=0
+column api_key.variant_id INTEGER notnull=0 default=- pk=0
+column application_setting.name TEXT notnull=1 default=- pk=1
+column application_setting.updated_at DATETIME notnull=1 default=- pk=0
+column application_setting.value TEXT notnull=1 default=- pk=0
+column assessment.decided_at DATETIME notnull=0 default=- pk=0
+column assessment.decided_by INTEGER notnull=0 default=- pk=0
+column assessment.id INTEGER notnull=0 default=- pk=1
+column assessment.live_vulnerability_id INTEGER notnull=0 default=- pk=0
+column assessment.needs_approval BOOLEAN notnull=1 default=- pk=0
+column assessment.product_id INTEGER notnull=1 default=- pk=0
+column assessment.proposed_at DATETIME notnull=1 default=- pk=0
+column assessment.proposed_by INTEGER notnull=1 default=- pk=0
+column assessment.published TEXT notnull=0 default=- pk=0
+column assessment.reasoning TEXT notnull=1 default=- pk=0
+column assessment.severity TEXT notnull=1 default=- pk=0
+column assessment.state TEXT notnull=1 default=- pk=0
+column assessment.vulnerability_id INTEGER notnull=1 default=- pk=0
+column assessment.withdrawn_because TEXT notnull=0 default=- pk=0
+column assignment_rule.beneath TEXT notnull=0 default=- pk=0
+column assignment_rule.created_at DATETIME notnull=1 default=- pk=0
+column assignment_rule.created_by INTEGER notnull=1 default=- pk=0
+column assignment_rule.id INTEGER notnull=0 default=- pk=1
+column assignment_rule.name TEXT notnull=1 default=- pk=0
+column assignment_rule.ordinal INTEGER notnull=1 default=- pk=0
+column assignment_rule.product_id INTEGER notnull=1 default=- pk=0
+column assignment_rule.reports BOOLEAN notnull=1 default=FALSE pk=0
+column assignment_rule.retired_at DATETIME notnull=0 default=- pk=0
+column assignment_rule.team_id INTEGER notnull=1 default=- pk=0
+column assignment_rule.upstream TEXT notnull=0 default=- pk=0
+column attachment.attached_at DATETIME notnull=0 default=- pk=0
+column attachment.content_type TEXT notnull=1 default=- pk=0
+column attachment.digest TEXT notnull=1 default=- pk=0
+column attachment.filename TEXT notnull=1 default=- pk=0
+column attachment.flaw_report_id INTEGER notnull=0 default=- pk=0
+column attachment.id INTEGER notnull=0 default=- pk=1
+column attachment.object_key TEXT notnull=1 default=- pk=0
+column attachment.product_id INTEGER notnull=1 default=- pk=0
+column attachment.redacted_at DATETIME notnull=0 default=- pk=0
+column attachment.redacted_by INTEGER notnull=0 default=- pk=0
+column attachment.redacted_reason TEXT notnull=0 default=- pk=0
+column attachment.size_bytes BIGINT notnull=1 default=- pk=0
+column attachment.token TEXT notnull=1 default=- pk=0
+column attachment.uploaded_at DATETIME notnull=1 default=- pk=0
+column attachment.uploaded_by INTEGER notnull=1 default=- pk=0
+column attachment.vulnerability_id INTEGER notnull=0 default=- pk=0
+column branch_or_tag.created_at DATETIME notnull=1 default=- pk=0
+column branch_or_tag.display_name TEXT notnull=1 default=- pk=0
+column branch_or_tag.eol_on DATE notnull=0 default=- pk=0
+column branch_or_tag.id INTEGER notnull=0 default=- pk=1
+column branch_or_tag.kind TEXT notnull=1 default=- pk=0
+column branch_or_tag.name TEXT notnull=1 default=- pk=0
+column branch_or_tag.parent_id INTEGER notnull=0 default=- pk=0
+column branch_or_tag.product_id INTEGER notnull=1 default=- pk=0
+column branch_or_tag.released_on DATE notnull=0 default=- pk=0
+column branch_or_tag.retired_at DATETIME notnull=0 default=- pk=0
+column branch_or_tag.taken_by TEXT notnull=0 default=- pk=0
+column build.branch_or_tag_id INTEGER notnull=1 default=- pk=0
+column build.created_at DATETIME notnull=1 default=- pk=0
+column build.id INTEGER notnull=0 default=- pk=1
+column build.last_run_id INTEGER notnull=0 default=- pk=0
+column build.last_scan_id INTEGER notnull=0 default=- pk=0
+column build.taken_by TEXT notnull=0 default=- pk=0
+column build.variant_id INTEGER notnull=1 default=- pk=0
+column case_collaborator.added_at DATETIME notnull=1 default=- pk=0
+column case_collaborator.added_by INTEGER notnull=1 default=- pk=0
+column case_collaborator.id INTEGER notnull=0 default=- pk=1
+column case_collaborator.live_person_id INTEGER notnull=0 default=- pk=0
+column case_collaborator.person_id INTEGER notnull=1 default=- pk=0
+column case_collaborator.product_id INTEGER notnull=1 default=- pk=0
+column case_collaborator.removed_at DATETIME notnull=0 default=- pk=0
+column case_collaborator.removed_by INTEGER notnull=0 default=- pk=0
+column case_collaborator.vulnerability_id INTEGER notnull=1 default=- pk=0
+column chat_delivery.attempts INTEGER notnull=1 default=- pk=0
+column chat_delivery.failed TEXT notnull=0 default=- pk=0
+column chat_delivery.first_seen DATETIME notnull=1 default=- pk=0
+column chat_delivery.id INTEGER notnull=0 default=- pk=1
+column chat_delivery.notification_id INTEGER notnull=1 default=- pk=0
+column chat_delivery.platform TEXT notnull=1 default=- pk=0
+column chat_delivery.sent_at DATETIME notnull=0 default=- pk=0
+column chat_preference.direct BOOLEAN notnull=1 default=- pk=0
+column chat_preference.id INTEGER notnull=0 default=- pk=1
+column chat_preference.person_id INTEGER notnull=1 default=- pk=0
+column chat_preference.shared BOOLEAN notnull=1 default=- pk=0
+column chat_preference.updated_at DATETIME notnull=1 default=- pk=0
+column code_finding_collaborator.added_at DATETIME notnull=1 default=- pk=0
+column code_finding_collaborator.added_by INTEGER notnull=1 default=- pk=0
+column code_finding_collaborator.id INTEGER notnull=0 default=- pk=1
+column code_finding_collaborator.live_person_id INTEGER notnull=0 default=- pk=0
+column code_finding_collaborator.occurrence_identity TEXT notnull=1 default=- pk=0
+column code_finding_collaborator.person_id INTEGER notnull=1 default=- pk=0
+column code_finding_collaborator.product_id INTEGER notnull=1 default=- pk=0
+column code_finding_collaborator.removed_at DATETIME notnull=0 default=- pk=0
+column code_finding_collaborator.removed_by INTEGER notnull=0 default=- pk=0
+column code_finding_component.component TEXT notnull=1 default=- pk=0
+column code_finding_component.confirmed_at DATETIME notnull=1 default=- pk=0
+column code_finding_component.confirmed_by INTEGER notnull=1 default=- pk=0
+column code_finding_component.ecosystem TEXT notnull=0 default=- pk=0
+column code_finding_component.id INTEGER notnull=0 default=- pk=1
+column code_finding_component.namespace TEXT notnull=0 default=- pk=0
+column code_finding_component.prefix TEXT notnull=1 default=- pk=0
+column code_finding_component.prefix_identity TEXT notnull=1 default=- pk=0
+column code_finding_component.product_id INTEGER notnull=1 default=- pk=0
+column code_finding_component.under TEXT notnull=1 default=- pk=0
+column code_finding_component.under_length INTEGER notnull=1 default=- pk=0
+column code_finding_flaw.disclosed_at DATETIME notnull=0 default=- pk=0
+column code_finding_flaw.id INTEGER notnull=0 default=- pk=1
+column code_finding_flaw.included_at DATETIME notnull=0 default=- pk=0
+column code_finding_flaw.included_by INTEGER notnull=0 default=- pk=0
+column code_finding_flaw.last_run_id INTEGER notnull=0 default=- pk=0
+column code_finding_flaw.occurrence_identity TEXT notnull=1 default=- pk=0
+column code_finding_flaw.product_id INTEGER notnull=1 default=- pk=0
+column code_finding_flaw.recorded_at DATETIME notnull=1 default=- pk=0
+column code_finding_flaw.recorded_by INTEGER notnull=1 default=- pk=0
+column code_finding_flaw.visibility TEXT notnull=1 default=- pk=0
+column code_finding_flaw.vulnerability_id INTEGER notnull=1 default=- pk=0
+column component.cpe TEXT notnull=0 default=- pk=0
+column component.first_seen_at DATETIME notnull=1 default=- pk=0
+column component.fold_key TEXT notnull=1 default=- pk=0
+column component.id INTEGER notnull=0 default=- pk=1
+column component.identity TEXT notnull=1 default=- pk=0
+column component.latest_checked_at DATETIME notnull=0 default=- pk=0
+column component.latest_released_at DATETIME notnull=0 default=- pk=0
+column component.latest_version TEXT notnull=0 default=- pk=0
+column component.license TEXT notnull=0 default=- pk=0
+column component.name TEXT notnull=1 default=- pk=0
+column component.name_folded TEXT notnull=0 default=- pk=0
+column component.project_url TEXT notnull=0 default=- pk=0
+column component.purl TEXT notnull=0 default=- pk=0
+column component.summary TEXT notnull=0 default=- pk=0
+column component.supplier TEXT notnull=0 default=- pk=0
+column component.upstream_folded TEXT notnull=0 default=- pk=0
+column component.upstream_name TEXT notnull=0 default=- pk=0
+column component.upstream_version TEXT notnull=0 default=- pk=0
+column component.version TEXT notnull=1 default=- pk=0
+column decision.committed_to DATE notnull=0 default=- pk=0
+column decision.deferred_until DATE notnull=0 default=- pk=0
+column decision.derived_from INTEGER notnull=0 default=- pk=0
+column decision.elsewhere TEXT notnull=0 default=- pk=0
+column decision.fixed_version TEXT notnull=0 default=- pk=0
+column decision.id INTEGER notnull=0 default=- pk=1
+column decision.justification TEXT notnull=0 default=- pk=0
+column decision.kind TEXT notnull=1 default=- pk=0
+column decision.mitigation TEXT notnull=0 default=- pk=0
+column decision.outcome TEXT notnull=1 default=- pk=0
+column decision.proposed_at DATETIME notnull=1 default=- pk=0
+column decision.proposed_by INTEGER notnull=1 default=- pk=0
+column decision.revision_id INTEGER notnull=0 default=- pk=0
+column decision.scope TEXT notnull=0 default=- pk=0
+column decision.selected_by TEXT notnull=0 default=- pk=0
+column decision.selected_matched INTEGER notnull=0 default=- pk=0
+column decision.selected_named INTEGER notnull=0 default=- pk=0
+column decision.selected_where TEXT notnull=0 default=- pk=0
+column decision.upgrade_to TEXT notnull=0 default=- pk=0
+column decision_approval.approved_at DATETIME notnull=1 default=- pk=0
+column decision_approval.approved_by INTEGER notnull=1 default=- pk=0
+column decision_approval.batch TEXT notnull=0 default=- pk=0
+column decision_approval.carried_from INTEGER notnull=0 default=- pk=0
+column decision_approval.covered INTEGER notnull=0 default=- pk=0
+column decision_approval.decision_id INTEGER notnull=1 default=- pk=0
+column decision_approval.id INTEGER notnull=0 default=- pk=1
+column decision_approval.revision_id INTEGER notnull=1 default=- pk=0
+column decision_approval.withdrawn_at DATETIME notnull=0 default=- pk=0
+column decision_approval.withdrawn_by INTEGER notnull=0 default=- pk=0
+column decision_build.build_id INTEGER notnull=1 default=- pk=0
+column decision_build.decision_id INTEGER notnull=1 default=- pk=0
+column decision_build.id INTEGER notnull=0 default=- pk=1
+column decision_comment.body TEXT notnull=1 default=- pk=0
+column decision_comment.decision_id INTEGER notnull=1 default=- pk=0
+column decision_comment.edited_at DATETIME notnull=0 default=- pk=0
+column decision_comment.id INTEGER notnull=0 default=- pk=1
+column decision_comment.written_at DATETIME notnull=1 default=- pk=0
+column decision_comment.written_by INTEGER notnull=1 default=- pk=0
+column decision_comment_revision.body TEXT notnull=1 default=- pk=0
+column decision_comment_revision.comment_id INTEGER notnull=1 default=- pk=0
+column decision_comment_revision.id INTEGER notnull=0 default=- pk=1
+column decision_comment_revision.ordinal INTEGER notnull=1 default=- pk=0
+column decision_comment_revision.replaced_at DATETIME notnull=1 default=- pk=0
+column decision_occurrence.component_upstream_version TEXT notnull=0 default=- pk=0
+column decision_occurrence.consumer_upstream_version TEXT notnull=0 default=- pk=0
+column decision_occurrence.decision_id INTEGER notnull=1 default=- pk=0
+column decision_occurrence.ended_at DATETIME notnull=0 default=- pk=0
+column decision_occurrence.from_statement_id INTEGER notnull=0 default=- pk=0
+column decision_occurrence.id INTEGER notnull=0 default=- pk=1
+column decision_occurrence.live_key TEXT notnull=0 default=- pk=0
+column decision_occurrence.needs_approval BOOLEAN notnull=1 default=- pk=0
+column decision_occurrence.occurrence_identity TEXT notnull=1 default=- pk=0
+column decision_occurrence.product_id INTEGER notnull=1 default=- pk=0
+column decision_occurrence.proposed_at DATETIME notnull=1 default=- pk=0
+column decision_occurrence.proposed_by INTEGER notnull=1 default=- pk=0
+column decision_occurrence.selected_by TEXT notnull=0 default=- pk=0
+column decision_occurrence.sent_back_at DATETIME notnull=0 default=- pk=0
+column decision_occurrence.severity_centi INTEGER notnull=0 default=- pk=0
+column decision_occurrence.state TEXT notnull=1 default=- pk=0
+column decision_occurrence.visibility TEXT notnull=1 default=- pk=0
+column decision_occurrence.vulnerability_id INTEGER notnull=1 default=- pk=0
+column decision_occurrence_superseded.decision_occurrence_id INTEGER notnull=1 default=- pk=0
+column decision_occurrence_superseded.disagreed BOOLEAN notnull=1 default=- pk=0
+column decision_occurrence_superseded.id INTEGER notnull=0 default=- pk=1
+column decision_occurrence_superseded.merge_id INTEGER notnull=1 default=- pk=0
+column decision_occurrence_superseded.standing_id INTEGER notnull=1 default=- pk=0
+column decision_revision.body TEXT notnull=1 default=- pk=0
+column decision_revision.decision_id INTEGER notnull=1 default=- pk=0
+column decision_revision.id INTEGER notnull=0 default=- pk=1
+column decision_revision.ordinal INTEGER notnull=1 default=- pk=0
+column decision_revision.written_at DATETIME notnull=1 default=- pk=0
+column decision_revision.written_by INTEGER notnull=1 default=- pk=0
+column decision_stamp.decision_id INTEGER notnull=1 default=- pk=1
+column decision_stamp.stamp INTEGER notnull=1 default=- pk=0
+column disclosure_movement.act TEXT notnull=1 default=- pk=0
+column disclosure_movement.approved_at DATETIME notnull=0 default=- pk=0
+column disclosure_movement.approved_by INTEGER notnull=0 default=- pk=0
+column disclosure_movement.asked_at DATETIME notnull=1 default=- pk=0
+column disclosure_movement.asked_by INTEGER notnull=1 default=- pk=0
+column disclosure_movement.flaw_report_id INTEGER notnull=0 default=- pk=0
+column disclosure_movement.id INTEGER notnull=0 default=- pk=1
+column disclosure_movement.needs_approval BOOLEAN notnull=1 default=- pk=0
+column disclosure_movement.product_id INTEGER notnull=1 default=- pk=0
+column disclosure_movement.reason TEXT notnull=1 default=- pk=0
+column disclosure_movement.ruling_id INTEGER notnull=0 default=- pk=0
+column disclosure_movement.until DATETIME notnull=0 default=- pk=0
+column disclosure_movement.vulnerability_id INTEGER notnull=1 default=- pk=0
+column disclosure_movement.was DATETIME notnull=0 default=- pk=0
+column document_upload.credential TEXT notnull=0 default=- pk=0
+column document_upload.digest TEXT notnull=0 default=- pk=0
+column document_upload.document TEXT notnull=1 default=- pk=0
+column document_upload.document_id TEXT notnull=1 default=- pk=0
+column document_upload.id INTEGER notnull=0 default=- pk=1
+column document_upload.product_id INTEGER notnull=1 default=- pk=0
+column document_upload.publisher TEXT notnull=1 default=- pk=0
+column document_upload.reason TEXT notnull=0 default=- pk=0
+column document_upload.received_at DATETIME notnull=1 default=- pk=0
+column document_upload.recorded INTEGER notnull=1 default=- pk=0
+column document_upload.source TEXT notnull=1 default=- pk=0
+column document_upload.status TEXT notnull=1 default=- pk=0
+column document_upload.superseded INTEGER notnull=1 default=- pk=0
+column document_upload.supplier_advisory_feed_id INTEGER notnull=0 default=- pk=0
+column finding.arrived_from TEXT notnull=0 default=- pk=0
+column finding.assigned_at DATETIME notnull=0 default=- pk=0
+column finding.assigned_by_rule INTEGER notnull=0 default=- pk=0
+column finding.assigned_to INTEGER notnull=0 default=- pk=0
+column finding.build_id INTEGER notnull=1 default=- pk=0
+column finding.claimed_by INTEGER notnull=0 default=- pk=0
+column finding.closed_at DATETIME notnull=0 default=- pk=0
+column finding.closed_because TEXT notnull=0 default=- pk=0
+column finding.closed_by INTEGER notnull=0 default=- pk=0
+column finding.closed_note TEXT notnull=0 default=- pk=0
+column finding.closed_run_id INTEGER notnull=0 default=- pk=0
+column finding.component_id INTEGER notnull=1 default=- pk=0
+column finding.consumer_id INTEGER notnull=0 default=- pk=0
+column finding.disclose_at DATETIME notnull=0 default=- pk=0
+column finding.due_at DATETIME notnull=0 default=- pk=0
+column finding.exploited_learned_at DATETIME notnull=0 default=- pk=0
+column finding.fix_state TEXT notnull=0 default=- pk=0
+column finding.fixed_at DATE notnull=0 default=- pk=0
+column finding.fixed_in TEXT notnull=0 default=- pk=0
+column finding.id INTEGER notnull=0 default=- pk=1
+column finding.kind TEXT notnull=1 default=- pk=0
+column finding.matched TEXT notnull=0 default=- pk=0
+column finding.matched_from TEXT notnull=0 default=- pk=0
+column finding.matched_in TEXT notnull=0 default=- pk=0
+column finding.matched_range TEXT notnull=0 default=- pk=0
+column finding.moved_to TEXT notnull=0 default=- pk=0
+column finding.occurrence_identity TEXT notnull=1 default=- pk=0
+column finding.opened_at DATETIME notnull=1 default=- pk=0
+column finding.opened_run_id INTEGER notnull=0 default=- pk=0
+column finding.rated_at DATETIME notnull=0 default=- pk=0
+column finding.stated_by INTEGER notnull=0 default=- pk=0
+column finding.suppressed_by INTEGER notnull=0 default=- pk=0
+column finding.unaffected_by TEXT notnull=0 default=- pk=0
+column finding.urgency INTEGER notnull=1 default=- pk=0
+column finding.urgency_exploited BOOLEAN notnull=1 default=- pk=0
+column finding.urgency_incident BOOLEAN notnull=1 default=- pk=0
+column finding.urgency_shipped BOOLEAN notnull=1 default=- pk=0
+column finding.visibility TEXT notnull=1 default=- pk=0
+column finding.vulnerability_id INTEGER notnull=1 default=- pk=0
+column finding_label.added_at DATETIME notnull=1 default=- pk=0
+column finding_label.added_by INTEGER notnull=1 default=- pk=0
+column finding_label.component_id INTEGER notnull=1 default=- pk=0
+column finding_label.id INTEGER notnull=0 default=- pk=1
+column finding_label.label TEXT notnull=1 default=- pk=0
+column finding_label.product_id INTEGER notnull=1 default=- pk=0
+column finding_label.typed TEXT notnull=1 default=- pk=0
+column finding_label.vulnerability_id INTEGER notnull=1 default=- pk=0
+column flaw_code_finding.id INTEGER notnull=0 default=- pk=1
+column flaw_code_finding.occurrence_identity TEXT notnull=1 default=- pk=0
+column flaw_code_finding.product_id INTEGER notnull=1 default=- pk=0
+column flaw_code_finding.recorded_at DATETIME notnull=1 default=- pk=0
+column flaw_code_finding.recorded_by INTEGER notnull=1 default=- pk=0
+column flaw_code_finding.suggested_component TEXT notnull=0 default=- pk=0
+column flaw_code_finding.suggested_ecosystem TEXT notnull=0 default=- pk=0
+column flaw_code_finding.suggested_from TEXT notnull=1 default=- pk=0
+column flaw_code_finding.suggested_namespace TEXT notnull=0 default=- pk=0
+column flaw_code_finding.undone_at DATETIME notnull=0 default=- pk=0
+column flaw_code_finding.undone_by INTEGER notnull=0 default=- pk=0
+column flaw_code_finding.undone_note TEXT notnull=0 default=- pk=0
+column flaw_code_finding.vulnerability_id INTEGER notnull=1 default=- pk=0
+column flaw_code_finding_build.build_id INTEGER notnull=1 default=- pk=0
+column flaw_code_finding_build.flaw_code_finding_id INTEGER notnull=1 default=- pk=0
+column flaw_code_finding_build.id INTEGER notnull=0 default=- pk=1
+column flaw_code_finding_build.seen BOOLEAN notnull=1 default=- pk=0
+column flaw_report.assigned_at DATETIME notnull=0 default=- pk=0
+column flaw_report.assigned_to INTEGER notnull=0 default=- pk=0
+column flaw_report.contact TEXT notnull=0 default=- pk=0
+column flaw_report.credit TEXT notnull=0 default=- pk=0
+column flaw_report.evaluated_at DATETIME notnull=0 default=- pk=0
+column flaw_report.evaluated_by INTEGER notnull=0 default=- pk=0
+column flaw_report.found_here BOOLEAN notnull=1 default=FALSE pk=0
+column flaw_report.id INTEGER notnull=0 default=- pk=1
+column flaw_report.product_id INTEGER notnull=1 default=- pk=0
+column flaw_report.received_on DATE notnull=0 default=- pk=0
+column flaw_report.recorded_at DATETIME notnull=1 default=- pk=0
+column flaw_report.recorded_by INTEGER notnull=1 default=- pk=0
+column flaw_report.reference VARCHAR(593) notnull=1 default=- pk=0
+column flaw_report.reported_by TEXT notnull=0 default=- pk=0
+column flaw_report.reported_problem TEXT notnull=0 default=- pk=0
+column flaw_report.ruling_id INTEGER notnull=0 default=- pk=0
+column flaw_report.title TEXT notnull=0 default=- pk=0
+column flaw_report.vulnerability_id INTEGER notnull=0 default=- pk=0
+column flaw_report_revision.contact TEXT notnull=0 default=- pk=0
+column flaw_report_revision.credit TEXT notnull=0 default=- pk=0
+column flaw_report_revision.flaw_report_id INTEGER notnull=1 default=- pk=0
+column flaw_report_revision.id INTEGER notnull=0 default=- pk=1
+column flaw_report_revision.ordinal INTEGER notnull=1 default=- pk=0
+column flaw_report_revision.received_on DATE notnull=0 default=- pk=0
+column flaw_report_revision.replaced_at DATETIME notnull=1 default=- pk=0
+column flaw_report_revision.replaced_by INTEGER notnull=1 default=- pk=0
+column flaw_report_revision.reported_by TEXT notnull=0 default=- pk=0
+column flaw_report_revision.reported_problem TEXT notnull=0 default=- pk=0
+column flaw_report_revision.title TEXT notnull=0 default=- pk=0
+column graph_edge.build_id INTEGER notnull=1 default=- pk=0
+column graph_edge.child_id INTEGER notnull=1 default=- pk=0
+column graph_edge.closed_scan_id INTEGER notnull=0 default=- pk=0
+column graph_edge.id INTEGER notnull=0 default=- pk=1
+column graph_edge.kind TEXT notnull=1 default=- pk=0
+column graph_edge.opened_scan_id INTEGER notnull=1 default=- pk=0
+column graph_edge.parent_id INTEGER notnull=1 default=- pk=0
+column graph_node.build_id INTEGER notnull=1 default=- pk=0
+column graph_node.closed_scan_id INTEGER notnull=0 default=- pk=0
+column graph_node.component_id INTEGER notnull=1 default=- pk=0
+column graph_node.cpe TEXT notnull=0 default=- pk=0
+column graph_node.id INTEGER notnull=0 default=- pk=1
+column graph_node.is_root BOOLEAN notnull=1 default=- pk=0
+column graph_node.opened_scan_id INTEGER notnull=1 default=- pk=0
+column graph_node.purl TEXT notnull=0 default=- pk=0
+column graph_node.repository TEXT notnull=0 default=- pk=0
+column graph_node.upstream_name TEXT notnull=0 default=- pk=0
+column graph_node.upstream_version TEXT notnull=0 default=- pk=0
+column group_admin.created_at DATETIME notnull=1 default=- pk=0
+column group_admin.grants TEXT notnull=1 default=- pk=0
+column group_admin.group_name TEXT notnull=1 default=- pk=0
+column group_admin.id INTEGER notnull=0 default=- pk=1
+column group_role.created_at DATETIME notnull=1 default=- pk=0
+column group_role.group_name TEXT notnull=1 default=- pk=0
+column group_role.id INTEGER notnull=0 default=- pk=1
+column group_role.product_name TEXT notnull=1 default=- pk=0
+column group_role.role TEXT notnull=1 default=- pk=0
+column group_role_all.created_at DATETIME notnull=1 default=- pk=0
+column group_role_all.group_name TEXT notnull=1 default=- pk=0
+column group_role_all.id INTEGER notnull=0 default=- pk=1
+column group_role_all.role TEXT notnull=1 default=- pk=0
+column image_version.closed_scan_id INTEGER notnull=0 default=- pk=0
+column image_version.id INTEGER notnull=0 default=- pk=1
+column image_version.node_id INTEGER notnull=1 default=- pk=0
+column image_version.opened_scan_id INTEGER notnull=1 default=- pk=0
+column image_version.purl TEXT notnull=0 default=- pk=0
+column image_version.version TEXT notnull=1 default=- pk=0
+column incident.cleared_at DATETIME notnull=0 default=- pk=0
+column incident.cleared_because TEXT notnull=0 default=- pk=0
+column incident.cleared_by INTEGER notnull=0 default=- pk=0
+column incident.grounds TEXT notnull=1 default=- pk=0
+column incident.id INTEGER notnull=0 default=- pk=1
+column incident.known_at DATETIME notnull=1 default=- pk=0
+column incident.live_vulnerability_id INTEGER notnull=0 default=- pk=0
+column incident.product_id INTEGER notnull=1 default=- pk=0
+column incident.recorded_at DATETIME notnull=1 default=- pk=0
+column incident.recorded_by INTEGER notnull=1 default=- pk=0
+column incident.taken_by TEXT notnull=0 default=- pk=0
+column incident.vulnerability_id INTEGER notnull=1 default=- pk=0
+column incident_fix.branch_or_tag_id INTEGER notnull=1 default=- pk=0
+column incident_fix.id INTEGER notnull=0 default=- pk=1
+column incident_fix.incident_id INTEGER notnull=1 default=- pk=0
+column incident_fix.live_branch_or_tag_id INTEGER notnull=0 default=- pk=0
+column incident_fix.named_at DATETIME notnull=1 default=- pk=0
+column incident_fix.named_by INTEGER notnull=1 default=- pk=0
+column incident_fix.withdrawn_at DATETIME notnull=0 default=- pk=0
+column incident_fix.withdrawn_by INTEGER notnull=0 default=- pk=0
+column issue_note.body TEXT notnull=1 default=- pk=0
+column issue_note.edited_at DATETIME notnull=0 default=- pk=0
+column issue_note.id INTEGER notnull=0 default=- pk=1
+column issue_note.product_id INTEGER notnull=1 default=- pk=0
+column issue_note.vulnerability_id INTEGER notnull=1 default=- pk=0
+column issue_note.written_at DATETIME notnull=1 default=- pk=0
+column issue_note.written_by INTEGER notnull=1 default=- pk=0
+column issue_note_revision.body TEXT notnull=1 default=- pk=0
+column issue_note_revision.id INTEGER notnull=0 default=- pk=1
+column issue_note_revision.note_id INTEGER notnull=1 default=- pk=0
+column issue_note_revision.ordinal INTEGER notnull=1 default=- pk=0
+column issue_note_revision.replaced_at DATETIME notnull=1 default=- pk=0
+column issue_rating.id INTEGER notnull=0 default=- pk=1
+column issue_rating.product_id INTEGER notnull=1 default=- pk=0
+column issue_rating.severity TEXT notnull=1 default=- pk=0
+column issue_rating.vulnerability_id INTEGER notnull=1 default=- pk=0
+column job.attempts INTEGER notnull=1 default=- pk=0
+column job.claimed_at DATETIME notnull=0 default=- pk=0
+column job.claimed_by TEXT notnull=0 default=- pk=0
+column job.created_at DATETIME notnull=1 default=- pk=0
+column job.id INTEGER notnull=0 default=- pk=1
+column job.kind TEXT notnull=1 default=- pk=0
+column job.last_error TEXT notnull=0 default=- pk=0
+column job.max_attempts INTEGER notnull=1 default=- pk=0
+column job.reference TEXT notnull=1 default=- pk=0
+column job.run_after DATETIME notnull=1 default=- pk=0
+column job.state TEXT notnull=1 default=- pk=0
+column job.updated_at DATETIME notnull=1 default=- pk=0
+column lease.held_by TEXT notnull=0 default=- pk=0
+column lease.held_until DATETIME notnull=0 default=- pk=0
+column lease.name TEXT notnull=1 default=- pk=1
+column notification.about TEXT notnull=1 default=- pk=0
+column notification.about_open TEXT notnull=0 default=- pk=0
+column notification.attempts INTEGER notnull=1 default=- pk=0
+column notification.body TEXT notnull=1 default=- pk=0
+column notification.cleared_at DATETIME notnull=0 default=- pk=0
+column notification.concerns TEXT notnull=0 default=- pk=0
+column notification.created_at DATETIME notnull=1 default=- pk=0
+column notification.id INTEGER notnull=0 default=- pk=1
+column notification.kind TEXT notnull=1 default=- pk=0
+column notification.lifetime TEXT notnull=1 default=- pk=0
+column notification.link TEXT notnull=1 default=- pk=0
+column notification.person_id INTEGER notnull=1 default=- pk=0
+column notification.private BOOLEAN notnull=1 default=- pk=0
+column notification.product_id INTEGER notnull=0 default=- pk=0
+column notification.read_at DATETIME notnull=0 default=- pk=0
+column notification.security_testing BOOLEAN notnull=1 default=FALSE pk=0
+column notification.sent_at DATETIME notnull=0 default=- pk=0
+column notification.team_id INTEGER notnull=0 default=- pk=0
+column notification.together TEXT notnull=1 default=- pk=0
+column notification.vulnerability_id INTEGER notnull=0 default=- pk=0
+column outbound.channel TEXT notnull=0 default=- pk=0
+column outbound.created_at DATETIME notnull=1 default=- pk=0
+column outbound.created_by INTEGER notnull=1 default=- pk=0
+column outbound.display_name TEXT notnull=1 default=- pk=0
+column outbound.id INTEGER notnull=0 default=- pk=1
+column outbound.kind TEXT notnull=1 default=- pk=0
+column outbound.name TEXT notnull=1 default=- pk=0
+column outbound.platform TEXT notnull=1 default=- pk=0
+column outbound.product_id INTEGER notnull=0 default=- pk=0
+column outbound.retired_at DATETIME notnull=0 default=- pk=0
+column outbound.secret TEXT notnull=1 default=- pk=0
+column outbound.team_id INTEGER notnull=0 default=- pk=0
+column outbound.topic TEXT notnull=0 default=- pk=0
+column outbound.url TEXT notnull=1 default=- pk=0
+column outbound_delivery.about TEXT notnull=1 default=- pk=0
+column outbound_delivery.attempted_at DATETIME notnull=0 default=- pk=0
+column outbound_delivery.attempts INTEGER notnull=1 default=- pk=0
+column outbound_delivery.failed TEXT notnull=0 default=- pk=0
+column outbound_delivery.first_seen DATETIME notnull=1 default=- pk=0
+column outbound_delivery.id INTEGER notnull=0 default=- pk=1
+column outbound_delivery.notification_id INTEGER notnull=1 default=- pk=0
+column outbound_delivery.outbound_id INTEGER notnull=1 default=- pk=0
+column outbound_delivery.sent_at DATETIME notnull=0 default=- pk=0
+column party.id INTEGER notnull=0 default=- pk=1
+column party.kind TEXT notnull=1 default=- pk=0
+column patch_commit.branch_count INTEGER notnull=1 default=- pk=0
+column patch_commit.commit_hash TEXT notnull=1 default=- pk=0
+column patch_commit.created_at DATETIME notnull=1 default=- pk=0
+column patch_commit.found BOOLEAN notnull=1 default=- pk=0
+column patch_commit.id INTEGER notnull=0 default=- pk=1
+column patch_commit.looked_at DATETIME notnull=0 default=- pk=0
+column patch_commit.repository_id INTEGER notnull=1 default=- pk=0
+column patch_commit_branch.branch TEXT notnull=1 default=- pk=0
+column patch_commit_branch.commit_id INTEGER notnull=1 default=- pk=0
+column patch_commit_branch.id INTEGER notnull=0 default=- pk=1
+column patch_repository.created_at DATETIME notnull=1 default=- pk=0
+column patch_repository.ended_at DATETIME notnull=0 default=- pk=0
+column patch_repository.failed TEXT notnull=0 default=- pk=0
+column patch_repository.fetched_at DATETIME notnull=0 default=- pk=0
+column patch_repository.held_bytes INTEGER notnull=0 default=- pk=0
+column patch_repository.host TEXT notnull=1 default=- pk=0
+column patch_repository.id INTEGER notnull=0 default=- pk=1
+column patch_repository.reached_at DATETIME notnull=0 default=- pk=0
+column patch_repository.url TEXT notnull=1 default=- pk=0
+column patch_repository.url_identity TEXT notnull=1 default=- pk=0
+column person.admin_derived BOOLEAN notnull=1 default=- pk=0
+column person.admin_derived_at DATETIME notnull=0 default=- pk=0
+column person.audits BOOLEAN notnull=1 default=- pk=0
+column person.audits_derived BOOLEAN notnull=1 default=- pk=0
+column person.audits_derived_at DATETIME notnull=0 default=- pk=0
+column person.created_at DATETIME notnull=1 default=- pk=0
+column person.deactivated_at DATETIME notnull=0 default=- pk=0
+column person.digest BOOLEAN notnull=1 default=- pk=0
+column person.digest_sent_at DATETIME notnull=0 default=- pk=0
+column person.digest_unassigned BOOLEAN notnull=1 default=- pk=0
+column person.display_name TEXT notnull=0 default=- pk=0
+column person.email TEXT notnull=0 default=- pk=0
+column person.email_source TEXT notnull=1 default=- pk=0
+column person.id INTEGER notnull=0 default=- pk=1
+column person.identity TEXT notnull=1 default=- pk=0
+column person.is_admin BOOLEAN notnull=1 default=- pk=0
+column person.is_bootstrap BOOLEAN notnull=1 default=- pk=0
+column person.last_seen_at DATETIME notnull=0 default=- pk=0
+column person.party_id INTEGER notnull=1 default=- pk=0
+column person_identity.bound_at DATETIME notnull=0 default=- pk=0
+column person_identity.claimable_until DATETIME notnull=0 default=- pk=0
+column person_identity.created_at DATETIME notnull=1 default=- pk=0
+column person_identity.id INTEGER notnull=0 default=- pk=1
+column person_identity.person_id INTEGER notnull=1 default=- pk=0
+column person_identity.provider TEXT notnull=0 default=- pk=0
+column person_identity.subject TEXT notnull=0 default=- pk=0
+column person_identity.username TEXT notnull=1 default=- pk=0
+column personal_token.created_at DATETIME notnull=1 default=- pk=0
+column personal_token.expires_at DATETIME notnull=1 default=- pk=0
+column personal_token.holds TEXT notnull=0 default=- pk=0
+column personal_token.id INTEGER notnull=0 default=- pk=1
+column personal_token.last_used_at DATETIME notnull=0 default=- pk=0
+column personal_token.live_name TEXT notnull=0 default=- pk=0
+column personal_token.name TEXT notnull=1 default=- pk=0
+column personal_token.person_id INTEGER notnull=1 default=- pk=0
+column personal_token.product_id INTEGER notnull=0 default=- pk=0
+column personal_token.revoked_at DATETIME notnull=0 default=- pk=0
+column personal_token.secret_hash TEXT notnull=1 default=- pk=0
+column product.created_at DATETIME notnull=1 default=- pk=0
+column product.display_name TEXT notnull=1 default=- pk=0
+column product.eol_on DATE notnull=0 default=- pk=0
+column product.id INTEGER notnull=0 default=- pk=1
+column product.minimum_severity TEXT notnull=0 default=- pk=0
+column product.name TEXT notnull=1 default=- pk=0
+column product.pair_approvers INTEGER notnull=0 default=- pk=0
+column product.pair_share INTEGER notnull=0 default=- pk=0
+column product.publishes BOOLEAN notnull=1 default=FALSE pk=0
+column product.retired_at DATETIME notnull=0 default=- pk=0
+column product.taken_by TEXT notnull=0 default=- pk=0
+column published_document.current_at DATETIME notnull=1 default=- pk=0
+column published_document.document TEXT notnull=1 default=- pk=0
+column published_document.first_at DATETIME notnull=1 default=- pk=0
+column published_document.id INTEGER notnull=0 default=- pk=1
+column published_document.kind TEXT notnull=1 default=- pk=0
+column published_document.path TEXT notnull=1 default=- pk=0
+column published_document.path_digest TEXT notnull=1 default=- pk=0
+column published_document.product_id INTEGER notnull=1 default=- pk=0
+column published_document.settled TEXT notnull=1 default=- pk=0
+column published_document.statuses TEXT notnull=1 default=- pk=0
+column published_document.subject TEXT notnull=1 default=- pk=0
+column published_document.title TEXT notnull=1 default=- pk=0
+column published_document.tracking_id TEXT notnull=1 default=- pk=0
+column published_document.version INTEGER notnull=1 default=- pk=0
+column published_document.withdrawn_at DATETIME notnull=0 default=- pk=0
+column published_vex.build_id INTEGER notnull=1 default=- pk=0
+column published_vex.digest TEXT notnull=1 default=- pk=0
+column published_vex.document TEXT notnull=1 default=- pk=0
+column published_vex.id INTEGER notnull=0 default=- pk=1
+column published_vex.issued_at DATETIME notnull=1 default=- pk=0
+column published_vex.issued_by INTEGER notnull=1 default=- pk=0
+column published_vex.kind TEXT notnull=1 default=- pk=0
+column published_vex.ordinal INTEGER notnull=1 default=- pk=0
+column received_vex_statement.about TEXT notnull=1 default=- pk=0
+column received_vex_statement.component TEXT notnull=1 default=- pk=0
+column received_vex_statement.declined_at DATETIME notnull=0 default=- pk=0
+column received_vex_statement.declined_by INTEGER notnull=0 default=- pk=0
+column received_vex_statement.digest TEXT notnull=1 default=- pk=0
+column received_vex_statement.document TEXT notnull=1 default=- pk=0
+column received_vex_statement.document_id TEXT notnull=1 default=- pk=0
+column received_vex_statement.id INTEGER notnull=0 default=- pk=1
+column received_vex_statement.justification TEXT notnull=0 default=- pk=0
+column received_vex_statement.placement TEXT notnull=0 default=- pk=0
+column received_vex_statement.product_id INTEGER notnull=1 default=- pk=0
+column received_vex_statement.publisher TEXT notnull=1 default=- pk=0
+column received_vex_statement.purl TEXT notnull=0 default=- pk=0
+column received_vex_statement.restated_at DATETIME notnull=0 default=- pk=0
+column received_vex_statement.source TEXT notnull=1 default=- pk=0
+column received_vex_statement.statement_id INTEGER notnull=0 default=- pk=0
+column received_vex_statement.status TEXT notnull=1 default=- pk=0
+column received_vex_statement.superseded_at DATETIME notnull=0 default=- pk=0
+column received_vex_statement.uploaded_at DATETIME notnull=1 default=- pk=0
+column received_vex_statement.uploaded_by INTEGER notnull=1 default=- pk=0
+column received_vex_statement.vulnerability TEXT notnull=1 default=- pk=0
+column received_vex_statement.within TEXT notnull=0 default=- pk=0
+column received_vex_statement.within_about TEXT notnull=0 default=- pk=0
+column received_vex_statement.within_purl TEXT notnull=0 default=- pk=0
+column recorded_rating.id INTEGER notnull=0 default=- pk=1
+column recorded_rating.product_id INTEGER notnull=1 default=- pk=0
+column recorded_rating.score_centi INTEGER notnull=0 default=- pk=0
+column recorded_rating.score_version TEXT notnull=0 default=- pk=0
+column recorded_rating.severity TEXT notnull=0 default=- pk=0
+column recorded_rating.vector TEXT notnull=0 default=- pk=0
+column recorded_rating.vulnerability_id INTEGER notnull=1 default=- pk=0
+column report_assignment.assigned_at DATETIME notnull=1 default=- pk=0
+column report_assignment.assigned_by INTEGER notnull=0 default=- pk=0
+column report_assignment.assigned_by_rule INTEGER notnull=0 default=- pk=0
+column report_assignment.assigned_to INTEGER notnull=0 default=- pk=0
+column report_assignment.flaw_report_id INTEGER notnull=1 default=- pk=0
+column report_assignment.id INTEGER notnull=0 default=- pk=1
+column report_message.body TEXT notnull=0 default=- pk=0
+column report_message.dated DATE notnull=1 default=- pk=0
+column report_message.direction TEXT notnull=1 default=- pk=0
+column report_message.flaw_report_id INTEGER notnull=1 default=- pk=0
+column report_message.id INTEGER notnull=0 default=- pk=1
+column report_message.logged_at DATETIME notnull=1 default=- pk=0
+column report_message.logged_by INTEGER notnull=1 default=- pk=0
+column report_note.body TEXT notnull=1 default=- pk=0
+column report_note.edited_at DATETIME notnull=0 default=- pk=0
+column report_note.flaw_report_id INTEGER notnull=1 default=- pk=0
+column report_note.id INTEGER notnull=0 default=- pk=1
+column report_note.written_at DATETIME notnull=1 default=- pk=0
+column report_note.written_by INTEGER notnull=1 default=- pk=0
+column report_note_revision.body TEXT notnull=1 default=- pk=0
+column report_note_revision.id INTEGER notnull=0 default=- pk=1
+column report_note_revision.note_id INTEGER notnull=1 default=- pk=0
+column report_note_revision.ordinal INTEGER notnull=1 default=- pk=0
+column report_note_revision.replaced_at DATETIME notnull=1 default=- pk=0
+column report_ruled.flaw_report_id INTEGER notnull=1 default=- pk=2
+column report_ruled.ruling_id INTEGER notnull=1 default=- pk=1
+column report_ruling.approved_at DATETIME notnull=0 default=- pk=0
+column report_ruling.approved_by INTEGER notnull=0 default=- pk=0
+column report_ruling.disposition TEXT notnull=1 default=- pk=0
+column report_ruling.duplicate_of INTEGER notnull=0 default=- pk=0
+column report_ruling.id INTEGER notnull=0 default=- pk=1
+column report_ruling.product_id INTEGER notnull=1 default=- pk=0
+column report_ruling.proposed_at DATETIME notnull=1 default=- pk=0
+column report_ruling.proposed_by INTEGER notnull=1 default=- pk=0
+column report_ruling.reasoning TEXT notnull=0 default=- pk=0
+column report_ruling.settled_at DATETIME notnull=0 default=- pk=0
+column report_ruling.withdrawn_at DATETIME notnull=0 default=- pk=0
+column report_ruling.withdrawn_by INTEGER notnull=0 default=- pk=0
+column repository_host.compare_template TEXT notnull=0 default=- pk=0
+column repository_host.file_template TEXT notnull=0 default=- pk=0
+column repository_host.id INTEGER notnull=0 default=- pk=1
+column repository_host.product_id INTEGER notnull=1 default=- pk=0
+column repository_host.remote TEXT notnull=1 default=- pk=0
+column repository_host.remote_identity TEXT notnull=1 default=- pk=0
+column repository_host.style TEXT notnull=1 default=- pk=0
+column repository_host.web TEXT notnull=1 default=- pk=0
+column repository_path.branch TEXT notnull=0 default=- pk=0
+column repository_path.disclosed_snippets BOOLEAN notnull=0 default=- pk=0
+column repository_path.id INTEGER notnull=0 default=- pk=1
+column repository_path.prefix TEXT notnull=1 default=- pk=0
+column repository_path.prefix_identity TEXT notnull=1 default=- pk=0
+column repository_path.product_id INTEGER notnull=1 default=- pk=0
+column repository_path.remote TEXT notnull=0 default=- pk=0
+column repository_path.snippets BOOLEAN notnull=0 default=- pk=0
+column response_window.declared_at DATETIME notnull=1 default=- pk=0
+column response_window.declared_by INTEGER notnull=1 default=- pk=0
+column response_window.from_fix BOOLEAN notnull=1 default=- pk=0
+column response_window.from_window_id INTEGER notnull=0 default=- pk=0
+column response_window.id INTEGER notnull=0 default=- pk=1
+column response_window.lead_hours INTEGER notnull=0 default=- pk=0
+column response_window.length_hours INTEGER notnull=1 default=- pk=0
+column response_window.live_name TEXT notnull=0 default=- pk=0
+column response_window.name TEXT notnull=1 default=- pk=0
+column response_window.retired_at DATETIME notnull=0 default=- pk=0
+column response_window.taken_by TEXT notnull=0 default=- pk=0
+column response_window_product.product_id INTEGER notnull=1 default=- pk=2
+column response_window_product.window_id INTEGER notnull=1 default=- pk=1
+column role_grant.active BOOLEAN notnull=1 default=- pk=0
+column role_grant.created_at DATETIME notnull=1 default=- pk=0
+column role_grant.id INTEGER notnull=0 default=- pk=1
+column role_grant.person_id INTEGER notnull=1 default=- pk=0
+column role_grant.product_id INTEGER notnull=1 default=- pk=0
+column role_grant.role TEXT notnull=1 default=- pk=0
+column role_grant.source TEXT notnull=1 default=- pk=0
+column role_grant_all.active BOOLEAN notnull=1 default=- pk=0
+column role_grant_all.created_at DATETIME notnull=1 default=- pk=0
+column role_grant_all.id INTEGER notnull=0 default=- pk=1
+column role_grant_all.person_id INTEGER notnull=1 default=- pk=0
+column role_grant_all.role TEXT notnull=1 default=- pk=0
+column role_grant_all.source TEXT notnull=1 default=- pk=0
+column rule_family.family TEXT notnull=1 default=- pk=0
+column rule_family.id INTEGER notnull=0 default=- pk=1
+column rule_family.tool TEXT notnull=1 default=- pk=0
+column rule_family.vulnerability_id INTEGER notnull=1 default=- pk=0
+column rule_rating.id INTEGER notnull=0 default=- pk=1
+column rule_rating.precision TEXT notnull=0 default=- pk=0
+column rule_rating.severity_tenths INTEGER notnull=0 default=- pk=0
+column rule_rating.vulnerability_id INTEGER notnull=1 default=- pk=0
+column rule_rating.weakness_tier INTEGER notnull=1 default=- pk=0
+column saved_filter.created_at DATETIME notnull=1 default=- pk=0
+column saved_filter.defer_days INTEGER notnull=0 default=- pk=0
+column saved_filter.display_name TEXT notnull=0 default=- pk=0
+column saved_filter.id INTEGER notnull=0 default=- pk=1
+column saved_filter.justification TEXT notnull=0 default=- pk=0
+column saved_filter.name TEXT notnull=1 default=- pk=0
+column saved_filter.outcome TEXT notnull=0 default=- pk=0
+column saved_filter.person_id INTEGER notnull=1 default=- pk=0
+column saved_filter.query TEXT notnull=1 default=- pk=0
+column saved_filter.reasoning TEXT notnull=0 default=- pk=0
+column scan.build_id INTEGER notnull=1 default=- pk=0
+column scan.built_at DATETIME notnull=1 default=- pk=0
+column scan.components INTEGER notnull=0 default=- pk=0
+column scan.content_hash TEXT notnull=1 default=- pk=0
+column scan.credential TEXT notnull=0 default=- pk=0
+column scan.failure TEXT notnull=0 default=- pk=0
+column scan.id INTEGER notnull=0 default=- pk=1
+column scan.parser_version TEXT notnull=1 default=- pk=0
+column scan.placed INTEGER notnull=0 default=- pk=0
+column scan.received_at DATETIME notnull=1 default=- pk=0
+column scan.replaced_unchecked BOOLEAN notnull=1 default=FALSE pk=0
+column scan.root_identifier TEXT notnull=0 default=- pk=0
+column scan.serial TEXT notnull=0 default=- pk=0
+column scan.status TEXT notnull=1 default=- pk=0
+column scan_document.content_hash TEXT notnull=1 default=- pk=0
+column scan_document.created_at DATETIME notnull=1 default=- pk=0
+column scan_document.discarded_at DATETIME notnull=0 default=- pk=0
+column scan_document.id INTEGER notnull=0 default=- pk=1
+column scan_document.kind TEXT notnull=1 default=- pk=0
+column scan_document.ordinal INTEGER notnull=1 default=- pk=0
+column scan_document.scan_id INTEGER notnull=1 default=- pk=0
+column scan_document.size_bytes BIGINT notnull=1 default=- pk=0
+column scan_document_chunk.body BLOB notnull=1 default=- pk=0
+column scan_document_chunk.document_id INTEGER notnull=1 default=- pk=0
+column scan_document_chunk.id INTEGER notnull=0 default=- pk=1
+column scan_document_chunk.seq INTEGER notnull=1 default=- pk=0
+column scan_refusal.at DATETIME notnull=1 default=- pk=0
+column scan_refusal.build_id INTEGER notnull=1 default=- pk=0
+column scan_refusal.built_at DATETIME notnull=0 default=- pk=0
+column scan_refusal.content_hash TEXT notnull=0 default=- pk=0
+column scan_refusal.credential TEXT notnull=0 default=- pk=0
+column scan_refusal.id INTEGER notnull=0 default=- pk=1
+column scan_refusal.reason TEXT notnull=1 default=- pk=0
+column scan_run.build_id INTEGER notnull=1 default=- pk=0
+column scan_run.caution TEXT notnull=0 default=- pk=0
+column scan_run.checked_scan_id INTEGER notnull=0 default=- pk=0
+column scan_run.database_version TEXT notnull=0 default=- pk=0
+column scan_run.failure TEXT notnull=0 default=- pk=0
+column scan_run.finished_at DATETIME notnull=0 default=- pk=0
+column scan_run.id INTEGER notnull=0 default=- pk=1
+column scan_run.ran_here BOOLEAN notnull=1 default=- pk=0
+column scan_run.records_version TEXT notnull=0 default=- pk=0
+column scan_run.scanner TEXT notnull=1 default=- pk=0
+column scan_run.scanner_version TEXT notnull=0 default=- pk=0
+column scan_run.started_at DATETIME notnull=1 default=- pk=0
+column series.created_at DATETIME notnull=1 default=- pk=0
+column series.id INTEGER notnull=0 default=- pk=1
+column series.kind TEXT notnull=1 default=- pk=0
+column series.name TEXT notnull=1 default=- pk=0
+column series.name_folded TEXT notnull=1 default=- pk=0
+column series.product_id INTEGER notnull=1 default=- pk=0
+column series.taken_by TEXT notnull=0 default=- pk=0
+column series_document.content_hash TEXT notnull=1 default=- pk=0
+column series_document.created_at DATETIME notnull=1 default=- pk=0
+column series_document.discarded_at DATETIME notnull=0 default=- pk=0
+column series_document.id INTEGER notnull=0 default=- pk=1
+column series_document.ordinal INTEGER notnull=1 default=- pk=0
+column series_document.run_id INTEGER notnull=1 default=- pk=0
+column series_document.size_bytes BIGINT notnull=1 default=- pk=0
+column series_document_chunk.body BLOB notnull=1 default=- pk=0
+column series_document_chunk.document_id INTEGER notnull=1 default=- pk=0
+column series_document_chunk.id INTEGER notnull=0 default=- pk=1
+column series_document_chunk.seq INTEGER notnull=1 default=- pk=0
+column series_module.changed BOOLEAN notnull=1 default=FALSE pk=0
+column series_module.id INTEGER notnull=0 default=- pk=1
+column series_module.path TEXT notnull=1 default=- pk=0
+column series_module.remote TEXT notnull=0 default=- pk=0
+column series_module.revision TEXT notnull=0 default=- pk=0
+column series_module.run_id INTEGER notnull=1 default=- pk=0
+column series_refusal.at DATETIME notnull=1 default=- pk=0
+column series_refusal.build_id INTEGER notnull=1 default=- pk=0
+column series_refusal.credential TEXT notnull=0 default=- pk=0
+column series_refusal.id INTEGER notnull=0 default=- pk=1
+column series_refusal.kind TEXT notnull=1 default=- pk=0
+column series_refusal.reason TEXT notnull=1 default=- pk=0
+column series_refusal.series TEXT notnull=1 default=- pk=0
+column series_refusal.series_folded TEXT notnull=1 default=- pk=0
+column series_run.applied_at DATETIME notnull=0 default=- pk=0
+column series_run.build_id INTEGER notnull=1 default=- pk=0
+column series_run.built_at DATETIME notnull=1 default=- pk=0
+column series_run.client_version TEXT notnull=0 default=- pk=0
+column series_run.comparable BOOLEAN notnull=0 default=- pk=0
+column series_run.completed BOOLEAN notnull=0 default=- pk=0
+column series_run.content_hash TEXT notnull=1 default=- pk=0
+column series_run.credential TEXT notnull=0 default=- pk=0
+column series_run.exit_status INTEGER notnull=0 default=- pk=0
+column series_run.failure TEXT notnull=0 default=- pk=0
+column series_run.fingerprints TEXT notnull=0 default=- pk=0
+column series_run.fingerprints_changed BOOLEAN notnull=1 default=FALSE pk=0
+column series_run.id INTEGER notnull=0 default=- pk=1
+column series_run.not_comparable TEXT notnull=0 default=- pk=0
+column series_run.receipt TEXT notnull=0 default=- pk=0
+column series_run.received_at DATETIME notnull=1 default=- pk=0
+column series_run.rules_count INTEGER notnull=0 default=- pk=0
+column series_run.rules_digest TEXT notnull=0 default=- pk=0
+column series_run.scan_id INTEGER notnull=0 default=- pk=0
+column series_run.series_id INTEGER notnull=1 default=- pk=0
+column series_run.source_commit TEXT notnull=0 default=- pk=0
+column series_run.status TEXT notnull=1 default=- pk=0
+column series_run.third_party TEXT notnull=0 default=- pk=0
+column series_run.tool_name TEXT notnull=0 default=- pk=0
+column series_run.tool_version TEXT notnull=0 default=- pk=0
+column series_run.units_analyzed INTEGER notnull=0 default=- pk=0
+column series_run.units_expected INTEGER notnull=0 default=- pk=0
+column session.created_at DATETIME notnull=1 default=- pk=0
+column session.csrf_token TEXT notnull=1 default=- pk=0
+column session.expires_at DATETIME notnull=1 default=- pk=0
+column session.id INTEGER notnull=0 default=- pk=1
+column session.last_used_at DATETIME notnull=0 default=- pk=0
+column session.person_id INTEGER notnull=1 default=- pk=0
+column session.token_hash TEXT notnull=1 default=- pk=0
+column sighting.absent_run_id INTEGER notnull=0 default=- pk=0
+column sighting.finding_id INTEGER notnull=1 default=- pk=0
+column sighting.first_run_id INTEGER notnull=1 default=- pk=0
+column sighting.fixed_run_id INTEGER notnull=0 default=- pk=0
+column sighting.id INTEGER notnull=0 default=- pk=1
+column sighting.last_run_id INTEGER notnull=1 default=- pk=0
+column sighting.series_id INTEGER notnull=1 default=- pk=0
+column statement_text.id INTEGER notnull=0 default=- pk=1
+column statement_text.words TEXT notnull=1 default=- pk=0
+column statement_text.words_digest TEXT notnull=1 default=- pk=0
+column supplier_advisory_feed.caught_up_mark TEXT notnull=0 default=- pk=0
+column supplier_advisory_feed.caught_up_to DATETIME notnull=0 default=- pk=0
+column supplier_advisory_feed.created_at DATETIME notnull=1 default=- pk=0
+column supplier_advisory_feed.created_by INTEGER notnull=1 default=- pk=0
+column supplier_advisory_feed.display_name TEXT notnull=1 default=- pk=0
+column supplier_advisory_feed.failed TEXT notnull=0 default=- pk=0
+column supplier_advisory_feed.fetched_at DATETIME notnull=0 default=- pk=0
+column supplier_advisory_feed.id INTEGER notnull=0 default=- pk=1
+column supplier_advisory_feed.name TEXT notnull=1 default=- pk=0
+column supplier_advisory_feed.product_id INTEGER notnull=1 default=- pk=0
+column supplier_advisory_feed.reached_at DATETIME notnull=0 default=- pk=0
+column supplier_advisory_feed.retired_at DATETIME notnull=0 default=- pk=0
+column supplier_advisory_feed.url TEXT notnull=1 default=- pk=0
+column suppression.build_id INTEGER notnull=1 default=- pk=0
+column suppression.closed_scan_id INTEGER notnull=0 default=- pk=0
+column suppression.id INTEGER notnull=0 default=- pk=1
+column suppression.identity TEXT notnull=1 default=- pk=0
+column suppression.justification TEXT notnull=0 default=- pk=0
+column suppression.opened_scan_id INTEGER notnull=1 default=- pk=0
+column suppression.origin TEXT notnull=1 default=- pk=0
+column suppression.stated_by INTEGER notnull=0 default=- pk=0
+column suppression.statement_id INTEGER notnull=0 default=- pk=0
+column suppression.status TEXT notnull=1 default=- pk=0
+column suppression.subject_folded TEXT notnull=0 default=- pk=0
+column suppression.subject_name TEXT notnull=0 default=- pk=0
+column suppression.subject_purl TEXT notnull=0 default=- pk=0
+column suppression.subject_version TEXT notnull=0 default=- pk=0
+column suppression.vulnerability TEXT notnull=1 default=- pk=0
+column suppression.within_name TEXT notnull=0 default=- pk=0
+column suppression.within_purl TEXT notnull=0 default=- pk=0
+column suppression.within_version TEXT notnull=0 default=- pk=0
+column suppression_rule.approved_at DATETIME notnull=0 default=- pk=0
+column suppression_rule.approved_by INTEGER notnull=0 default=- pk=0
+column suppression_rule.approved_covering INTEGER notnull=0 default=- pk=0
+column suppression_rule.id INTEGER notnull=0 default=- pk=1
+column suppression_rule.prefix TEXT notnull=0 default=- pk=0
+column suppression_rule.product_id INTEGER notnull=1 default=- pk=0
+column suppression_rule.proposed_at DATETIME notnull=1 default=- pk=0
+column suppression_rule.proposed_by INTEGER notnull=1 default=- pk=0
+column suppression_rule.reason TEXT notnull=1 default=- pk=0
+column suppression_rule.reasoning TEXT notnull=1 default=- pk=0
+column suppression_rule.retired_at DATETIME notnull=0 default=- pk=0
+column suppression_rule.retired_by INTEGER notnull=0 default=- pk=0
+column suppression_rule.rule TEXT notnull=0 default=- pk=0
+column suppression_rule.rule_folded TEXT notnull=0 default=- pk=0
+column suppression_rule.under TEXT notnull=0 default=- pk=0
+column suppression_rule.under_length INTEGER notnull=0 default=- pk=0
+column team.created_at DATETIME notnull=1 default=- pk=0
+column team.display_name TEXT notnull=0 default=- pk=0
+column team.id INTEGER notnull=0 default=- pk=1
+column team.name TEXT notnull=1 default=- pk=0
+column team.party_id INTEGER notnull=1 default=- pk=0
+column team.retired_at DATETIME notnull=0 default=- pk=0
+column team_member.added_at DATETIME notnull=1 default=- pk=0
+column team_member.added_by INTEGER notnull=1 default=- pk=0
+column team_member.person_id INTEGER notnull=1 default=- pk=2
+column team_member.team_id INTEGER notnull=1 default=- pk=1
+column told_outside.id INTEGER notnull=0 default=- pk=1
+column told_outside.incident_id INTEGER notnull=1 default=- pk=0
+column told_outside.recipient TEXT notnull=1 default=- pk=0
+column told_outside.recorded_at DATETIME notnull=1 default=- pk=0
+column told_outside.recorded_by INTEGER notnull=1 default=- pk=0
+column told_outside.reference TEXT notnull=0 default=- pk=0
+column told_outside.said TEXT notnull=1 default=- pk=0
+column told_outside.suspected_malicious TEXT notnull=0 default=- pk=0
+column told_outside.told_at DATETIME notnull=1 default=- pk=0
+column told_outside.window_id INTEGER notnull=0 default=- pk=0
+column told_place.place TEXT notnull=1 default=- pk=0
+column told_place.position INTEGER notnull=1 default=- pk=2
+column told_place.told_id INTEGER notnull=1 default=- pk=1
+column upgrade.build_id INTEGER notnull=1 default=- pk=0
+column upgrade.committed_to DATE notnull=0 default=- pk=0
+column upgrade.decision_id INTEGER notnull=0 default=- pk=0
+column upgrade.declared_at DATETIME notnull=1 default=- pk=0
+column upgrade.declared_by INTEGER notnull=1 default=- pk=0
+column upgrade.fold_key TEXT notnull=1 default=- pk=0
+column upgrade.from_version TEXT notnull=1 default=- pk=0
+column upgrade.id INTEGER notnull=0 default=- pk=1
+column upgrade.to_version TEXT notnull=1 default=- pk=0
+column upstream.failed TEXT notnull=0 default=- pk=0
+column upstream.fetched_at DATETIME notnull=0 default=- pk=0
+column upstream.fingerprint TEXT notnull=0 default=- pk=0
+column upstream.id INTEGER notnull=0 default=- pk=1
+column upstream.key_offered TEXT notnull=0 default=- pk=0
+column upstream.listings TEXT notnull=0 default=- pk=0
+column upstream.product_id INTEGER notnull=1 default=- pk=0
+column upstream.public_key TEXT notnull=0 default=- pk=0
+column upstream.publisher TEXT notnull=1 default=- pk=0
+column upstream.reached_at DATETIME notnull=0 default=- pk=0
+column upstream.trusted_at DATETIME notnull=1 default=- pk=0
+column upstream.trusted_by INTEGER notnull=1 default=- pk=0
+column upstream.url TEXT notnull=1 default=- pk=0
+column upstream_document.digest TEXT notnull=1 default=- pk=0
+column upstream_document.id INTEGER notnull=0 default=- pk=1
+column upstream_document.listed_at TEXT notnull=1 default=- pk=0
+column upstream_document.recorded_at DATETIME notnull=1 default=- pk=0
+column upstream_document.tracking_id TEXT notnull=1 default=- pk=0
+column upstream_document.upstream_id INTEGER notnull=1 default=- pk=0
+column upstream_document.url TEXT notnull=1 default=- pk=0
+column upstream_document.url_digest TEXT notnull=1 default=- pk=0
+column variant.created_at DATETIME notnull=1 default=- pk=0
+column variant.customer_facing BOOLEAN notnull=1 default=- pk=0
+column variant.display_name TEXT notnull=1 default=- pk=0
+column variant.id INTEGER notnull=0 default=- pk=1
+column variant.name TEXT notnull=1 default=- pk=0
+column variant.product_id INTEGER notnull=1 default=- pk=0
+column variant.retired_at DATETIME notnull=0 default=- pk=0
+column variant.taken_by TEXT notnull=0 default=- pk=0
+column vulnerability.advisory TEXT notnull=0 default=- pk=0
+column vulnerability.dates_asked_at DATETIME notnull=0 default=- pk=0
+column vulnerability.description TEXT notnull=0 default=- pk=0
+column vulnerability.exploited BOOLEAN notnull=1 default=- pk=0
+column vulnerability.exploited_on DATE notnull=0 default=- pk=0
+column vulnerability.first_seen_at DATETIME notnull=1 default=- pk=0
+column vulnerability.id INTEGER notnull=0 default=- pk=1
+column vulnerability.identifier TEXT notnull=1 default=- pk=0
+column vulnerability.identifier_folded TEXT notnull=1 default=- pk=0
+column vulnerability.issue_id INTEGER notnull=1 default=- pk=0
+column vulnerability.kind TEXT notnull=1 default=- pk=0
+column vulnerability.likelihood_on DATE notnull=0 default=- pk=0
+column vulnerability.likelihood_percentile_ppm INTEGER notnull=0 default=- pk=0
+column vulnerability.likelihood_ppm INTEGER notnull=0 default=- pk=0
+column vulnerability.modified_at DATETIME notnull=0 default=- pk=0
+column vulnerability.published_at DATETIME notnull=0 default=- pk=0
+column vulnerability.score_centi INTEGER notnull=0 default=- pk=0
+column vulnerability.score_kind TEXT notnull=0 default=- pk=0
+column vulnerability.score_source TEXT notnull=0 default=- pk=0
+column vulnerability.score_version TEXT notnull=0 default=- pk=0
+column vulnerability.severity TEXT notnull=0 default=- pk=0
+column vulnerability.taken_by TEXT notnull=0 default=- pk=0
+column vulnerability.vector TEXT notnull=0 default=- pk=0
+column vulnerability_alias.by_hand BOOLEAN notnull=1 default=FALSE pk=0
+column vulnerability_alias.id INTEGER notnull=0 default=- pk=1
+column vulnerability_alias.identifier TEXT notnull=1 default=- pk=0
+column vulnerability_alias.identifier_folded TEXT notnull=1 default=- pk=0
+column vulnerability_alias.vulnerability_id INTEGER notnull=1 default=- pk=0
+column vulnerability_merge.absorbed_id INTEGER notnull=1 default=- pk=0
+column vulnerability_merge.id INTEGER notnull=0 default=- pk=1
+column vulnerability_merge.kept_id INTEGER notnull=1 default=- pk=0
+column vulnerability_merge.merged_at DATETIME notnull=1 default=- pk=0
+column vulnerability_merge.named TEXT notnull=1 default=- pk=0
+column vulnerability_merge.run_id INTEGER notnull=0 default=- pk=0
+column vulnerability_rating.generation INTEGER notnull=1 default=- pk=0
+column vulnerability_rating.id INTEGER notnull=0 default=- pk=1
+column vulnerability_rating.score_centi INTEGER notnull=1 default=- pk=0
+column vulnerability_rating.score_kind TEXT notnull=0 default=- pk=0
+column vulnerability_rating.score_source TEXT notnull=0 default=- pk=0
+column vulnerability_rating.score_version TEXT notnull=0 default=- pk=0
+column vulnerability_rating.vector TEXT notnull=1 default=- pk=0
+column vulnerability_rating.vulnerability_id INTEGER notnull=1 default=- pk=0
+column vulnerability_reference.id INTEGER notnull=0 default=- pk=1
+column vulnerability_reference.kind TEXT notnull=1 default=- pk=0
+column vulnerability_reference.url TEXT notnull=1 default=- pk=0
+column vulnerability_reference.url_identity TEXT notnull=1 default=- pk=0
+column vulnerability_reference.vulnerability_id INTEGER notnull=1 default=- pk=0
+column vulnerability_weakness.cwe TEXT notnull=1 default=- pk=0
+column vulnerability_weakness.id INTEGER notnull=0 default=- pk=1
+column vulnerability_weakness.is_primary BOOLEAN notnull=1 default=- pk=0
+column vulnerability_weakness.vulnerability_id INTEGER notnull=1 default=- pk=0
+foreign key admin_change (by) -> person (id) NO ACTION
+foreign key advisory (minted_by) -> person (id) NO ACTION
+foreign key advisory_agreed_status (approval_id) -> advisory_approval (id) NO ACTION
+foreign key advisory_agreed_status (branch_or_tag_id) -> branch_or_tag (id) NO ACTION
+foreign key advisory_agreed_status (product_id) -> product (id) NO ACTION
+foreign key advisory_agreed_status (variant_id) -> variant (id) NO ACTION
+foreign key advisory_agreed_status (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key advisory_approval (advisory_id) -> advisory (id) NO ACTION
+foreign key advisory_approval (approved_by) -> person (id) NO ACTION
+foreign key advisory_approval (edition_id) -> advisory_edition (id) NO ACTION
+foreign key advisory_approval (withdrawn_by) -> person (id) NO ACTION
+foreign key advisory_edition (advisory_id) -> advisory (id) NO ACTION
+foreign key advisory_edition (written_by) -> person (id) NO ACTION
+foreign key advisory_issuance (advisory_id) -> advisory (id) NO ACTION
+foreign key advisory_issuance (edition_id) -> advisory_edition (id) NO ACTION
+foreign key advisory_issuance (issued_by) -> person (id) NO ACTION
+foreign key advisory_issue (added_by) -> person (id) NO ACTION
+foreign key advisory_issue (advisory_id) -> advisory (id) NO ACTION
+foreign key advisory_issue (product_id) -> product (id) NO ACTION
+foreign key advisory_issue (removed_by) -> person (id) NO ACTION
+foreign key advisory_issue (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key advisory_override (advisory_id) -> advisory (id) NO ACTION
+foreign key advisory_override (branch_or_tag_id) -> branch_or_tag (id) NO ACTION
+foreign key advisory_override (product_id) -> product (id) NO ACTION
+foreign key advisory_override (removed_by) -> person (id) NO ACTION
+foreign key advisory_override (set_by) -> person (id) NO ACTION
+foreign key advisory_override (variant_id) -> variant (id) NO ACTION
+foreign key advisory_override (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key analysis_location (finding_id) -> finding (id) NO ACTION
+foreign key analysis_result (finding_id) -> finding (id) NO ACTION
+foreign key api_key (branch_or_tag_id) -> branch_or_tag (id) NO ACTION
+foreign key api_key (product_id) -> product (id) NO ACTION
+foreign key api_key (variant_id) -> variant (id) NO ACTION
+foreign key assessment (decided_by) -> person (id) NO ACTION
+foreign key assessment (product_id) -> product (id) NO ACTION
+foreign key assessment (proposed_by) -> person (id) NO ACTION
+foreign key assessment (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key assignment_rule (created_by) -> person (id) NO ACTION
+foreign key assignment_rule (product_id) -> product (id) NO ACTION
+foreign key assignment_rule (team_id) -> team (id) NO ACTION
+foreign key attachment (flaw_report_id) -> flaw_report (id) NO ACTION
+foreign key attachment (product_id) -> product (id) NO ACTION
+foreign key attachment (redacted_by) -> person (id) NO ACTION
+foreign key attachment (uploaded_by) -> person (id) NO ACTION
+foreign key attachment (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key branch_or_tag (parent_id) -> branch_or_tag (id) NO ACTION
+foreign key branch_or_tag (product_id) -> product (id) NO ACTION
+foreign key build (branch_or_tag_id) -> branch_or_tag (id) NO ACTION
+foreign key build (variant_id) -> variant (id) NO ACTION
+foreign key case_collaborator (added_by) -> person (id) NO ACTION
+foreign key case_collaborator (person_id) -> person (id) NO ACTION
+foreign key case_collaborator (product_id) -> product (id) NO ACTION
+foreign key case_collaborator (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key chat_delivery (notification_id) -> notification (id) CASCADE
+foreign key chat_preference (person_id) -> person (id) NO ACTION
+foreign key code_finding_collaborator (added_by) -> person (id) NO ACTION
+foreign key code_finding_collaborator (person_id) -> person (id) NO ACTION
+foreign key code_finding_collaborator (product_id) -> product (id) NO ACTION
+foreign key code_finding_collaborator (removed_by) -> person (id) NO ACTION
+foreign key code_finding_component (confirmed_by) -> person (id) NO ACTION
+foreign key code_finding_component (product_id) -> product (id) NO ACTION
+foreign key code_finding_flaw (included_by) -> person (id) NO ACTION
+foreign key code_finding_flaw (product_id) -> product (id) NO ACTION
+foreign key code_finding_flaw (recorded_by) -> person (id) NO ACTION
+foreign key code_finding_flaw (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key decision (derived_from) -> decision (id) NO ACTION
+foreign key decision (proposed_by) -> person (id) NO ACTION
+foreign key decision_approval (approved_by) -> person (id) NO ACTION
+foreign key decision_approval (carried_from) -> decision_approval (id) SET NULL
+foreign key decision_approval (decision_id) -> decision (id) NO ACTION
+foreign key decision_approval (revision_id) -> decision_revision (id) NO ACTION
+foreign key decision_approval (withdrawn_by) -> person (id) NO ACTION
+foreign key decision_build (build_id) -> build (id) NO ACTION
+foreign key decision_build (decision_id) -> decision (id) NO ACTION
+foreign key decision_comment (decision_id) -> decision (id) NO ACTION
+foreign key decision_comment (written_by) -> person (id) NO ACTION
+foreign key decision_comment_revision (comment_id) -> decision_comment (id) NO ACTION
+foreign key decision_occurrence (decision_id) -> decision (id) NO ACTION
+foreign key decision_occurrence (product_id) -> product (id) NO ACTION
+foreign key decision_occurrence (proposed_by) -> person (id) NO ACTION
+foreign key decision_occurrence (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key decision_occurrence_superseded (decision_occurrence_id) -> decision_occurrence (id) NO ACTION
+foreign key decision_occurrence_superseded (merge_id) -> vulnerability_merge (id) NO ACTION
+foreign key decision_occurrence_superseded (standing_id) -> decision_occurrence (id) NO ACTION
+foreign key decision_revision (decision_id) -> decision (id) NO ACTION
+foreign key decision_revision (written_by) -> person (id) NO ACTION
+foreign key decision_stamp (decision_id) -> decision (id) NO ACTION
+foreign key disclosure_movement (approved_by) -> person (id) NO ACTION
+foreign key disclosure_movement (asked_by) -> person (id) NO ACTION
+foreign key disclosure_movement (flaw_report_id) -> flaw_report (id) NO ACTION
+foreign key disclosure_movement (product_id) -> product (id) NO ACTION
+foreign key disclosure_movement (ruling_id) -> report_ruling (id) NO ACTION
+foreign key disclosure_movement (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key document_upload (product_id) -> product (id) NO ACTION
+foreign key document_upload (supplier_advisory_feed_id) -> supplier_advisory_feed (id) NO ACTION
+foreign key finding (build_id) -> build (id) NO ACTION
+foreign key finding (closed_run_id) -> scan_run (id) NO ACTION
+foreign key finding (component_id) -> component (id) NO ACTION
+foreign key finding (consumer_id) -> component (id) NO ACTION
+foreign key finding (opened_run_id) -> scan_run (id) NO ACTION
+foreign key finding (suppressed_by) -> suppression (id) NO ACTION
+foreign key finding (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key finding_label (added_by) -> person (id) NO ACTION
+foreign key finding_label (component_id) -> component (id) NO ACTION
+foreign key finding_label (product_id) -> product (id) NO ACTION
+foreign key finding_label (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key flaw_code_finding (product_id) -> product (id) NO ACTION
+foreign key flaw_code_finding (recorded_by) -> person (id) NO ACTION
+foreign key flaw_code_finding (undone_by) -> person (id) NO ACTION
+foreign key flaw_code_finding (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key flaw_code_finding_build (build_id) -> build (id) NO ACTION
+foreign key flaw_code_finding_build (flaw_code_finding_id) -> flaw_code_finding (id) NO ACTION
+foreign key flaw_report (assigned_to) -> party (id) NO ACTION
+foreign key flaw_report (evaluated_by) -> person (id) NO ACTION
+foreign key flaw_report (product_id) -> product (id) NO ACTION
+foreign key flaw_report (recorded_by) -> person (id) NO ACTION
+foreign key flaw_report (ruling_id) -> report_ruling (id) NO ACTION
+foreign key flaw_report (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key flaw_report_revision (flaw_report_id) -> flaw_report (id) NO ACTION
+foreign key flaw_report_revision (replaced_by) -> person (id) NO ACTION
+foreign key graph_edge (build_id) -> build (id) NO ACTION
+foreign key graph_edge (child_id) -> graph_node (id) NO ACTION
+foreign key graph_edge (closed_scan_id) -> scan (id) NO ACTION
+foreign key graph_edge (opened_scan_id) -> scan (id) NO ACTION
+foreign key graph_edge (parent_id) -> graph_node (id) NO ACTION
+foreign key graph_node (build_id) -> build (id) NO ACTION
+foreign key graph_node (closed_scan_id) -> scan (id) NO ACTION
+foreign key graph_node (component_id) -> component (id) NO ACTION
+foreign key graph_node (opened_scan_id) -> scan (id) NO ACTION
+foreign key image_version (closed_scan_id) -> scan (id) NO ACTION
+foreign key image_version (node_id) -> graph_node (id) NO ACTION
+foreign key image_version (opened_scan_id) -> scan (id) NO ACTION
+foreign key incident (cleared_by) -> person (id) NO ACTION
+foreign key incident (product_id) -> product (id) NO ACTION
+foreign key incident (recorded_by) -> person (id) NO ACTION
+foreign key incident (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key incident_fix (branch_or_tag_id) -> branch_or_tag (id) NO ACTION
+foreign key incident_fix (incident_id) -> incident (id) NO ACTION
+foreign key incident_fix (named_by) -> person (id) NO ACTION
+foreign key incident_fix (withdrawn_by) -> person (id) NO ACTION
+foreign key issue_note (product_id) -> product (id) NO ACTION
+foreign key issue_note (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key issue_note (written_by) -> person (id) NO ACTION
+foreign key issue_note_revision (note_id) -> issue_note (id) NO ACTION
+foreign key issue_rating (product_id) -> product (id) NO ACTION
+foreign key issue_rating (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key notification (person_id) -> person (id) NO ACTION
+foreign key notification (product_id) -> product (id) NO ACTION
+foreign key notification (team_id) -> team (id) NO ACTION
+foreign key notification (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key outbound (created_by) -> person (id) NO ACTION
+foreign key outbound (product_id) -> product (id) NO ACTION
+foreign key outbound (team_id) -> team (id) NO ACTION
+foreign key outbound_delivery (notification_id) -> notification (id) CASCADE
+foreign key outbound_delivery (outbound_id) -> outbound (id) NO ACTION
+foreign key patch_commit (repository_id) -> patch_repository (id) NO ACTION
+foreign key patch_commit_branch (commit_id) -> patch_commit (id) NO ACTION
+foreign key person (party_id) -> party (id) NO ACTION
+foreign key person_identity (person_id) -> person (id) NO ACTION
+foreign key personal_token (person_id) -> person (id) NO ACTION
+foreign key personal_token (product_id) -> product (id) NO ACTION
+foreign key published_document (product_id) -> product (id) NO ACTION
+foreign key published_vex (build_id) -> build (id) NO ACTION
+foreign key published_vex (issued_by) -> person (id) NO ACTION
+foreign key received_vex_statement (product_id) -> product (id) NO ACTION
+foreign key received_vex_statement (uploaded_by) -> person (id) NO ACTION
+foreign key recorded_rating (product_id) -> product (id) NO ACTION
+foreign key recorded_rating (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key report_assignment (assigned_by) -> person (id) NO ACTION
+foreign key report_assignment (assigned_by_rule) -> assignment_rule (id) NO ACTION
+foreign key report_assignment (assigned_to) -> party (id) NO ACTION
+foreign key report_assignment (flaw_report_id) -> flaw_report (id) NO ACTION
+foreign key report_message (flaw_report_id) -> flaw_report (id) NO ACTION
+foreign key report_message (logged_by) -> person (id) NO ACTION
+foreign key report_note (flaw_report_id) -> flaw_report (id) NO ACTION
+foreign key report_note (written_by) -> person (id) NO ACTION
+foreign key report_note_revision (note_id) -> report_note (id) NO ACTION
+foreign key report_ruled (flaw_report_id) -> flaw_report (id) NO ACTION
+foreign key report_ruled (ruling_id) -> report_ruling (id) NO ACTION
+foreign key report_ruling (approved_by) -> person (id) NO ACTION
+foreign key report_ruling (duplicate_of) -> vulnerability (id) NO ACTION
+foreign key report_ruling (product_id) -> product (id) NO ACTION
+foreign key report_ruling (proposed_by) -> person (id) NO ACTION
+foreign key report_ruling (withdrawn_by) -> person (id) NO ACTION
+foreign key repository_host (product_id) -> product (id) NO ACTION
+foreign key repository_path (product_id) -> product (id) NO ACTION
+foreign key response_window (declared_by) -> person (id) NO ACTION
+foreign key response_window (from_window_id) -> response_window (id) NO ACTION
+foreign key response_window_product (product_id) -> product (id) NO ACTION
+foreign key response_window_product (window_id) -> response_window (id) NO ACTION
+foreign key role_grant (person_id) -> person (id) NO ACTION
+foreign key role_grant (product_id) -> product (id) NO ACTION
+foreign key role_grant_all (person_id) -> person (id) NO ACTION
+foreign key rule_family (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key rule_rating (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key saved_filter (person_id) -> person (id) NO ACTION
+foreign key scan (build_id) -> build (id) NO ACTION
+foreign key scan_document (scan_id) -> scan (id) NO ACTION
+foreign key scan_document_chunk (document_id) -> scan_document (id) NO ACTION
+foreign key scan_refusal (build_id) -> build (id) NO ACTION
+foreign key scan_run (build_id) -> build (id) NO ACTION
+foreign key scan_run (checked_scan_id) -> scan (id) NO ACTION
+foreign key series (product_id) -> product (id) NO ACTION
+foreign key series_document (run_id) -> series_run (id) NO ACTION
+foreign key series_document_chunk (document_id) -> series_document (id) NO ACTION
+foreign key series_module (run_id) -> series_run (id) NO ACTION
+foreign key series_refusal (build_id) -> build (id) NO ACTION
+foreign key series_run (build_id) -> build (id) NO ACTION
+foreign key series_run (scan_id) -> scan (id) NO ACTION
+foreign key series_run (series_id) -> series (id) NO ACTION
+foreign key session (person_id) -> person (id) NO ACTION
+foreign key sighting (absent_run_id) -> series_run (id) NO ACTION
+foreign key sighting (finding_id) -> finding (id) NO ACTION
+foreign key sighting (first_run_id) -> series_run (id) NO ACTION
+foreign key sighting (fixed_run_id) -> series_run (id) NO ACTION
+foreign key sighting (last_run_id) -> series_run (id) NO ACTION
+foreign key sighting (series_id) -> series (id) NO ACTION
+foreign key supplier_advisory_feed (created_by) -> person (id) NO ACTION
+foreign key supplier_advisory_feed (product_id) -> product (id) NO ACTION
+foreign key suppression (build_id) -> build (id) NO ACTION
+foreign key suppression (closed_scan_id) -> scan (id) NO ACTION
+foreign key suppression (opened_scan_id) -> scan (id) NO ACTION
+foreign key suppression_rule (approved_by) -> person (id) NO ACTION
+foreign key suppression_rule (product_id) -> product (id) NO ACTION
+foreign key suppression_rule (proposed_by) -> person (id) NO ACTION
+foreign key suppression_rule (retired_by) -> person (id) NO ACTION
+foreign key team (party_id) -> party (id) NO ACTION
+foreign key team_member (added_by) -> person (id) NO ACTION
+foreign key team_member (person_id) -> person (id) NO ACTION
+foreign key team_member (team_id) -> team (id) NO ACTION
+foreign key told_outside (incident_id) -> incident (id) NO ACTION
+foreign key told_outside (recorded_by) -> person (id) NO ACTION
+foreign key told_outside (window_id) -> response_window (id) NO ACTION
+foreign key told_place (told_id) -> told_outside (id) NO ACTION
+foreign key upgrade (build_id) -> build (id) NO ACTION
+foreign key upgrade (declared_by) -> person (id) NO ACTION
+foreign key upstream (product_id) -> product (id) NO ACTION
+foreign key upstream (trusted_by) -> person (id) NO ACTION
+foreign key upstream_document (upstream_id) -> upstream (id) NO ACTION
+foreign key variant (product_id) -> product (id) NO ACTION
+foreign key vulnerability_alias (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key vulnerability_merge (absorbed_id) -> vulnerability (id) NO ACTION
+foreign key vulnerability_merge (kept_id) -> vulnerability (id) NO ACTION
+foreign key vulnerability_merge (run_id) -> scan_run (id) NO ACTION
+foreign key vulnerability_rating (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key vulnerability_reference (vulnerability_id) -> vulnerability (id) NO ACTION
+foreign key vulnerability_weakness (vulnerability_id) -> vulnerability (id) NO ACTION
+index admin_change admin_change_about_idx unique=0 partial=0 (about, at)
+index admin_change admin_change_kind_idx unique=0 partial=0 (kind, at)
+index admin_change admin_change_recent_idx unique=0 partial=0 (at)
+index advisory u unique=1 partial=0 (identifier_folded)
+index advisory u unique=1 partial=0 (minted_year, mint_number)
+index advisory_agreed_status advisory_agreed_status_approval_idx unique=0 partial=0 (approval_id)
+index advisory_approval advisory_approval_edition_idx unique=0 partial=0 (edition_id)
+index advisory_edition u unique=1 partial=0 (advisory_id, ordinal)
+index advisory_issuance u unique=1 partial=0 (advisory_id, ordinal)
+index advisory_issue u unique=1 partial=0 (advisory_id, product_id, vulnerability_id)
+index advisory_override u unique=1 partial=0 (advisory_id, product_id, vulnerability_id, branch_or_tag_id, variant_id)
+index analysis_location u unique=1 partial=0 (finding_id, ordinal)
+index analysis_result analysis_result_key_idx unique=0 partial=0 (match_key)
+index analysis_result analysis_result_last_idx unique=0 partial=0 (last_path_identity, last_line)
+index analysis_result u unique=1 partial=0 (finding_id)
+index api_key api_key_product_idx unique=0 partial=0 (product_id)
+index api_key u unique=1 partial=0 (live_name)
+index api_key u unique=1 partial=0 (secret_hash)
+index application_setting pk unique=1 partial=0 (name)
+index assessment assessment_issue_idx unique=0 partial=0 (vulnerability_id, product_id, state)
+index assessment assessment_waiting_idx unique=0 partial=0 (state, needs_approval)
+index assessment u unique=1 partial=0 (live_vulnerability_id, product_id)
+index assignment_rule assignment_rule_order_idx unique=0 partial=0 (product_id, retired_at, ordinal)
+index attachment attachment_issue_idx unique=0 partial=0 (product_id, vulnerability_id)
+index attachment attachment_report_idx unique=0 partial=0 (flaw_report_id)
+index attachment attachment_unattached_idx unique=0 partial=0 (attached_at, uploaded_at)
+index attachment u unique=1 partial=0 (token)
+index branch_or_tag u unique=1 partial=0 (product_id, name)
+index build build_variant_idx unique=0 partial=0 (variant_id)
+index build u unique=1 partial=0 (branch_or_tag_id, variant_id)
+index case_collaborator case_collaborator_live_idx unique=1 partial=0 (product_id, vulnerability_id, live_person_id)
+index case_collaborator case_collaborator_person_idx unique=0 partial=0 (person_id, live_person_id)
+index chat_delivery u unique=1 partial=0 (notification_id, platform)
+index chat_preference u unique=1 partial=0 (person_id)
+index code_finding_collaborator code_finding_collaborator_person_idx unique=0 partial=0 (person_id)
+index code_finding_collaborator u unique=1 partial=0 (product_id, occurrence_identity, live_person_id)
+index code_finding_component u unique=1 partial=0 (product_id, prefix_identity)
+index code_finding_flaw code_finding_flaw_flaw_idx unique=0 partial=0 (vulnerability_id)
+index code_finding_flaw u unique=1 partial=0 (product_id, occurrence_identity)
+index component component_fold_idx unique=0 partial=0 (fold_key)
+index component component_folded_idx unique=0 partial=0 (name_folded)
+index component component_upstream_folded_idx unique=0 partial=0 (upstream_folded)
+index component u unique=1 partial=0 (identity)
+index decision decision_derived_idx unique=0 partial=0 (derived_from)
+index decision_approval decision_approval_batch_idx unique=0 partial=0 (batch)
+index decision_approval decision_approval_decision_idx unique=0 partial=0 (decision_id)
+index decision_build u unique=1 partial=0 (decision_id, build_id)
+index decision_comment decision_comment_decision_idx unique=0 partial=0 (decision_id)
+index decision_comment_revision u unique=1 partial=0 (comment_id, ordinal)
+index decision_occurrence decision_occurrence_applies_idx unique=0 partial=0 (product_id, vulnerability_id, occurrence_identity, component_upstream_version, consumer_upstream_version)
+index decision_occurrence decision_occurrence_decision_idx unique=0 partial=0 (decision_id)
+index decision_occurrence decision_occurrence_state_decision_idx unique=0 partial=0 (state, decision_id)
+index decision_occurrence u unique=1 partial=0 (live_key)
+index decision_occurrence_superseded u unique=1 partial=0 (decision_occurrence_id)
+index decision_revision u unique=1 partial=0 (decision_id, ordinal)
+index disclosure_movement disclosure_movement_place_idx unique=0 partial=0 (vulnerability_id, product_id)
+index document_upload document_upload_feed_idx unique=0 partial=0 (supplier_advisory_feed_id)
+index document_upload document_upload_list_idx unique=0 partial=0 (product_id, source, received_at)
+index finding finding_assigned_idx unique=0 partial=0 (assigned_to, closed_at)
+index finding finding_closed_run_idx unique=0 partial=0 (build_id, closed_run_id, vulnerability_id, component_id, visibility, kind, opened_run_id)
+index finding finding_component_idx unique=0 partial=0 (build_id, component_id, closed_at)
+index finding finding_due_idx unique=0 partial=0 (closed_at, suppressed_by, due_at)
+index finding finding_group_idx unique=0 partial=0 (build_id, closed_at, visibility, kind, vulnerability_id, component_id, urgency, urgency_exploited, urgency_incident, opened_at, closed_because, assigned_to)
+index finding finding_kind_idx unique=0 partial=0 (kind, vulnerability_id)
+index finding finding_occurrence_idx unique=0 partial=0 (occurrence_identity, vulnerability_id, build_id, kind, id)
+index finding finding_open_idx unique=0 partial=0 (build_id, closed_at, due_at)
+index finding finding_opened_run_idx unique=0 partial=0 (build_id, opened_run_id, vulnerability_id, component_id, visibility, kind, closed_run_id)
+index finding finding_vulnerability_idx unique=0 partial=0 (vulnerability_id, closed_at)
+index finding_label finding_label_named_idx unique=0 partial=0 (product_id, label)
+index finding_label u unique=1 partial=0 (product_id, vulnerability_id, component_id, label)
+index flaw_code_finding flaw_code_finding_occurrence_idx unique=0 partial=0 (product_id, occurrence_identity)
+index flaw_code_finding u unique=1 partial=0 (vulnerability_id)
+index flaw_code_finding_build u unique=1 partial=0 (flaw_code_finding_id, build_id)
+index flaw_report flaw_report_holder_idx unique=0 partial=0 (assigned_to, product_id)
+index flaw_report flaw_report_product_idx unique=0 partial=0 (product_id, recorded_at)
+index flaw_report flaw_report_ruling_idx unique=0 partial=0 (ruling_id)
+index flaw_report u unique=1 partial=0 (reference)
+index flaw_report u unique=1 partial=0 (vulnerability_id)
+index flaw_report_revision u unique=1 partial=0 (flaw_report_id, ordinal)
+index graph_edge graph_edge_child_idx unique=0 partial=0 (child_id, closed_scan_id)
+index graph_edge graph_edge_current_idx unique=0 partial=0 (build_id, closed_scan_id, parent_id, child_id)
+index graph_node graph_node_current_idx unique=0 partial=0 (build_id, closed_scan_id, component_id)
+index graph_node graph_node_root_idx unique=0 partial=0 (build_id, is_root, component_id, closed_scan_id)
+index group_admin u unique=1 partial=0 (group_name, grants)
+index group_role u unique=1 partial=0 (group_name, product_name, role)
+index group_role_all u unique=1 partial=0 (group_name, role)
+index image_version image_version_node_idx unique=0 partial=0 (node_id, closed_scan_id)
+index incident incident_issue_idx unique=0 partial=0 (vulnerability_id, product_id)
+index incident incident_product_idx unique=0 partial=0 (product_id, recorded_at)
+index incident u unique=1 partial=0 (live_vulnerability_id, product_id)
+index incident_fix u unique=1 partial=0 (incident_id, live_branch_or_tag_id)
+index issue_note issue_note_thread_idx unique=0 partial=0 (vulnerability_id, product_id, id)
+index issue_note_revision u unique=1 partial=0 (note_id, ordinal)
+index issue_rating u unique=1 partial=0 (vulnerability_id, product_id)
+index job job_failed_idx unique=0 partial=0 (state, updated_at, id)
+index job job_runnable_idx unique=0 partial=0 (kind, state, run_after, id)
+index lease pk unique=1 partial=0 (name)
+index notification notification_condition_idx unique=1 partial=0 (person_id, kind, about_open)
+index notification notification_kind_open_idx unique=0 partial=0 (kind, cleared_at, person_id)
+index notification notification_unread_idx unique=0 partial=0 (person_id, read_at, cleared_at)
+index outbound outbound_kind_idx unique=0 partial=0 (kind, retired_at)
+index outbound u unique=1 partial=0 (name, kind)
+index outbound_delivery outbound_delivery_settled_idx unique=0 partial=0 (outbound_id, notification_id)
+index outbound_delivery u unique=1 partial=0 (outbound_id, about)
+index patch_commit patch_commit_due_idx unique=0 partial=0 (repository_id, looked_at)
+index patch_commit u unique=1 partial=0 (repository_id, commit_hash)
+index patch_commit_branch u unique=1 partial=0 (commit_id, branch)
+index patch_repository u unique=1 partial=0 (url_identity)
+index person u unique=1 partial=0 (identity)
+index person u unique=1 partial=0 (party_id)
+index person_identity person_identity_person_idx unique=0 partial=0 (person_id)
+index person_identity u unique=1 partial=0 (subject)
+index person_identity u unique=1 partial=0 (username)
+index personal_token u unique=1 partial=0 (person_id, live_name)
+index personal_token u unique=1 partial=0 (secret_hash)
+index product u unique=1 partial=0 (name)
+index published_document u unique=1 partial=0 (path_digest)
+index published_document u unique=1 partial=0 (product_id, kind, subject)
+index published_vex u unique=1 partial=0 (build_id, kind, ordinal)
+index received_vex_statement received_vex_statement_about_idx unique=0 partial=0 (product_id, vulnerability, component, superseded_at)
+index received_vex_statement received_vex_statement_from_idx unique=0 partial=0 (product_id, publisher, source, document_id, superseded_at)
+index recorded_rating u unique=1 partial=0 (vulnerability_id, product_id)
+index report_assignment report_assignment_report_idx unique=0 partial=0 (flaw_report_id, assigned_at)
+index report_message report_message_log_idx unique=0 partial=0 (flaw_report_id, direction, dated)
+index report_note report_note_thread_idx unique=0 partial=0 (flaw_report_id, id)
+index report_note_revision u unique=1 partial=0 (note_id, ordinal)
+index report_ruled pk unique=1 partial=0 (ruling_id, flaw_report_id)
+index report_ruled report_ruled_report_idx unique=0 partial=0 (flaw_report_id)
+index report_ruling report_ruling_duplicate_idx unique=0 partial=0 (duplicate_of)
+index report_ruling report_ruling_waiting_idx unique=0 partial=0 (product_id, settled_at, withdrawn_at)
+index repository_host u unique=1 partial=0 (product_id, remote_identity)
+index repository_path u unique=1 partial=0 (product_id, prefix_identity)
+index response_window u unique=1 partial=0 (live_name)
+index response_window_product pk unique=1 partial=0 (window_id, product_id)
+index role_grant u unique=1 partial=0 (person_id, product_id, role, source)
+index role_grant_all u unique=1 partial=0 (person_id, role, source)
+index rule_family u unique=1 partial=0 (vulnerability_id, family)
+index rule_rating u unique=1 partial=0 (vulnerability_id)
+index saved_filter u unique=1 partial=0 (person_id, name)
+index scan scan_newest_idx unique=0 partial=0 (build_id, status, built_at)
+index scan scan_recency_idx unique=0 partial=0 (build_id, received_at)
+index scan u unique=1 partial=0 (build_id, content_hash)
+index scan_document u unique=1 partial=0 (scan_id, kind, ordinal)
+index scan_document_chunk u unique=1 partial=0 (document_id, seq)
+index scan_refusal u unique=1 partial=0 (build_id)
+index scan_run scan_run_checked_idx unique=0 partial=0 (checked_scan_id)
+index series u unique=1 partial=0 (product_id, kind, name_folded)
+index series_document u unique=1 partial=0 (run_id, ordinal)
+index series_document_chunk u unique=1 partial=0 (document_id, seq)
+index series_module series_module_run_idx unique=0 partial=0 (run_id)
+index series_refusal u unique=1 partial=0 (build_id, kind, series_folded)
+index series_run series_run_build_idx unique=0 partial=0 (build_id, received_at)
+index series_run series_run_newest_idx unique=0 partial=0 (series_id, build_id, status, built_at)
+index series_run u unique=1 partial=0 (series_id, build_id, content_hash)
+index session session_expires_idx unique=0 partial=0 (expires_at)
+index session session_person_idx unique=0 partial=0 (person_id)
+index session u unique=1 partial=0 (token_hash)
+index sighting sighting_absent_idx unique=0 partial=0 (absent_run_id)
+index sighting sighting_last_idx unique=0 partial=0 (last_run_id)
+index sighting u unique=1 partial=0 (finding_id)
+index statement_text u unique=1 partial=0 (words_digest)
+index supplier_advisory_feed supplier_advisory_feed_due_idx unique=0 partial=0 (retired_at, fetched_at)
+index supplier_advisory_feed u unique=1 partial=0 (product_id, name)
+index suppression suppression_open_idx unique=0 partial=0 (build_id, closed_scan_id)
+index suppression_rule suppression_rule_product_idx unique=0 partial=0 (product_id)
+index team u unique=1 partial=0 (name)
+index team u unique=1 partial=0 (party_id)
+index team_member pk unique=1 partial=0 (team_id, person_id)
+index team_member team_member_person_idx unique=0 partial=0 (person_id)
+index told_outside told_outside_incident_idx unique=0 partial=0 (incident_id, told_at)
+index told_place pk unique=1 partial=0 (told_id, position)
+index upgrade u unique=1 partial=0 (build_id, fold_key)
+index upstream u unique=1 partial=0 (product_id)
+index upstream_document u unique=1 partial=0 (upstream_id, url_digest)
+index variant u unique=1 partial=0 (product_id, name)
+index vulnerability u unique=1 partial=0 (identifier_folded)
+index vulnerability vulnerability_issue_idx unique=0 partial=0 (issue_id, id)
+index vulnerability_alias u unique=1 partial=0 (identifier)
+index vulnerability_alias vulnerability_alias_folded_idx unique=0 partial=0 (identifier_folded, vulnerability_id)
+index vulnerability_merge u unique=1 partial=0 (absorbed_id)
+index vulnerability_merge vulnerability_merge_kept_idx unique=0 partial=0 (kept_id)
+index vulnerability_rating u unique=1 partial=0 (vulnerability_id, generation)
+index vulnerability_reference u unique=1 partial=0 (vulnerability_id, url_identity)
+index vulnerability_weakness u unique=1 partial=0 (vulnerability_id, cwe)
+index vulnerability_weakness vulnerability_weakness_cwe_idx unique=0 partial=0 (cwe)
+table admin_change autoincrement=1
+table advisory autoincrement=1
+table advisory_agreed_status autoincrement=1
+table advisory_approval autoincrement=1
+table advisory_edition autoincrement=1
+table advisory_issuance autoincrement=1
+table advisory_issue autoincrement=1
+table advisory_override autoincrement=1
+table analysis_location autoincrement=1
+table analysis_result autoincrement=1
+table api_key autoincrement=1
+table application_setting autoincrement=0
+table assessment autoincrement=1
+table assignment_rule autoincrement=1
+table attachment autoincrement=1
+table branch_or_tag autoincrement=1
+table build autoincrement=1
+table case_collaborator autoincrement=1
+table chat_delivery autoincrement=1
+table chat_preference autoincrement=1
+table code_finding_collaborator autoincrement=1
+table code_finding_component autoincrement=1
+table code_finding_flaw autoincrement=1
+table component autoincrement=1
+table decision autoincrement=1
+table decision_approval autoincrement=1
+table decision_build autoincrement=1
+table decision_comment autoincrement=1
+table decision_comment_revision autoincrement=1
+table decision_occurrence autoincrement=1
+table decision_occurrence_superseded autoincrement=1
+table decision_revision autoincrement=1
+table decision_stamp autoincrement=0
+table disclosure_movement autoincrement=1
+table document_upload autoincrement=1
+table finding autoincrement=1
+table finding_label autoincrement=1
+table flaw_code_finding autoincrement=1
+table flaw_code_finding_build autoincrement=1
+table flaw_report autoincrement=1
+table flaw_report_revision autoincrement=1
+table graph_edge autoincrement=1
+table graph_node autoincrement=1
+table group_admin autoincrement=1
+table group_role autoincrement=1
+table group_role_all autoincrement=1
+table image_version autoincrement=1
+table incident autoincrement=1
+table incident_fix autoincrement=1
+table issue_note autoincrement=1
+table issue_note_revision autoincrement=1
+table issue_rating autoincrement=1
+table job autoincrement=1
+table lease autoincrement=0
+table notification autoincrement=1
+table outbound autoincrement=1
+table outbound_delivery autoincrement=1
+table party autoincrement=1
+table patch_commit autoincrement=1
+table patch_commit_branch autoincrement=1
+table patch_repository autoincrement=1
+table person autoincrement=1
+table person_identity autoincrement=1
+table personal_token autoincrement=1
+table product autoincrement=1
+table published_document autoincrement=1
+table published_vex autoincrement=1
+table received_vex_statement autoincrement=1
+table recorded_rating autoincrement=1
+table report_assignment autoincrement=1
+table report_message autoincrement=1
+table report_note autoincrement=1
+table report_note_revision autoincrement=1
+table report_ruled autoincrement=0
+table report_ruling autoincrement=1
+table repository_host autoincrement=1
+table repository_path autoincrement=1
+table response_window autoincrement=1
+table response_window_product autoincrement=0
+table role_grant autoincrement=1
+table role_grant_all autoincrement=1
+table rule_family autoincrement=1
+table rule_rating autoincrement=1
+table saved_filter autoincrement=1
+table scan autoincrement=1
+table scan_document autoincrement=1
+table scan_document_chunk autoincrement=1
+table scan_refusal autoincrement=1
+table scan_run autoincrement=1
+table series autoincrement=1
+table series_document autoincrement=1
+table series_document_chunk autoincrement=1
+table series_module autoincrement=1
+table series_refusal autoincrement=1
+table series_run autoincrement=1
+table session autoincrement=1
+table sighting autoincrement=1
+table statement_text autoincrement=1
+table supplier_advisory_feed autoincrement=1
+table suppression autoincrement=1
+table suppression_rule autoincrement=1
+table team autoincrement=1
+table team_member autoincrement=0
+table told_outside autoincrement=1
+table told_place autoincrement=0
+table upgrade autoincrement=1
+table upstream autoincrement=1
+table upstream_document autoincrement=1
+table variant autoincrement=1
+table vulnerability autoincrement=1
+table vulnerability_alias autoincrement=1
+table vulnerability_merge autoincrement=1
+table vulnerability_rating autoincrement=1
+table vulnerability_reference autoincrement=1
+table vulnerability_weakness autoincrement=1

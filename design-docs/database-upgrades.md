@@ -195,7 +195,7 @@ times on each engine.
 
 ## The v0.12.0 upgrade
 
-Migration 46, untagged. No row moves; one column is filled. Each addition is
+Migration 46. No row moves; one column is filled. Each addition is
 stepped over where a stopped upgrade made it already.
 
 | Table | Gains |
