@@ -377,6 +377,41 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 		around("refreshed")
 		plan("refreshed", "package-1")
 		plan("refreshed", "kernel")
+
+		// The kernel build's list under each decision filter, with the kernel
+		// planned: every one of its issues is decided, so each issue list a
+		// filter reads first holds thousands of identifiers.
+		dbtest.SettleStatistics(t, db)
+		for _, one := range []struct {
+			name   string
+			filter finding.Filter
+		}{
+			{"undecided", finding.Filter{States: []finding.DecisionStanding{finding.StandingUndecided}}},
+			{"unplanned", finding.Filter{Planned: finding.NotPlanned}},
+			{"the defaults", finding.Filter{
+				Workable: finding.Working([]string{finding.OnBranch}, []string{finding.InSupport}),
+				Planned:  finding.NotPlanned,
+			}},
+			{"agreed", finding.Filter{States: []finding.DecisionStanding{finding.StandingAgreed}}},
+			{"upgrade needed", finding.Filter{Outcomes: []string{string(triage.UpgradeNeeded)}}},
+			{"planned", finding.Filter{Planned: finding.PlannedOnly}},
+		} {
+			bounded, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			at := time.Now()
+			_, n, err := store.Groups(bounded, triager, finding.Scope{
+				ProductID: &product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Internal.ID,
+			}, 50, 0, one.filter)
+			took := time.Since(at)
+			switch {
+			case bounded.Err() != nil:
+				t.Logf("the kernel build's list, %-14s unfinished after %s", one.name, took.Round(time.Second))
+			case err != nil:
+				t.Fatalf("the kernel build's list, %s: %v", one.name, err)
+			default:
+				t.Logf("the kernel build's list, %-14s %9s (%d)", one.name, took.Round(time.Millisecond), n)
+			}
+			cancel()
+		}
 	})
 }
 

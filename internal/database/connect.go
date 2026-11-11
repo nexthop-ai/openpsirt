@@ -382,6 +382,14 @@ func Query(sqldb *sql.DB, e Engine) (*bun.DB, error) {
 // string is the last word on it. The driver merges the environment and a
 // service file under the URL, and a mode from either can leave a fallback to
 // cleartext that nothing in the URL shows.
+//
+// A PostgreSQL session starts with its per-key cache of a parameterized
+// lookup (enable_memoize) off, unless the URL sets it. The planner sizes the
+// cache from the average rows per key, and a kernel's occurrence identity
+// holds thousands of issues where the average is six: with an upgrade planned
+// over a kernel's 6,000 issues at 204,000 occurrences, the findings list
+// under any decision filter did not finish in two minutes, and finishes in
+// under a second without the cache.
 func openPool(e Engine, driver, dsn string, encrypted bool) (*sql.DB, error) {
 	if e != Postgres {
 		return sql.Open(driver, dsn)
@@ -394,7 +402,45 @@ func openPool(e Engine, driver, dsn string, encrypted bool) (*sql.DB, error) {
 		return nil, errMayGoInCleartext
 	}
 	config.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
-	return stdlib.OpenDB(*config), nil
+	if _, set := config.RuntimeParams[memoize]; set {
+		return stdlib.OpenDB(*config), nil
+	}
+	return stdlib.OpenDB(*config, stdlib.OptionAfterConnect(withoutLookupCache)), nil
+}
+
+// memoize is the PostgreSQL setting naming the per-key cache of a
+// parameterized lookup.
+const memoize = "enable_memoize"
+
+// withoutLookupCache turns the per-key lookup cache off on a new connection to
+// a server that has one.
+//
+// A statement after the connection opens, never a startup parameter: a server
+// without the setting refuses a startup parameter naming it before the version
+// floor is read, and so does a connection pooler that passes only the
+// parameters it knows.
+func withoutLookupCache(ctx context.Context, conn *pgx.Conn) error {
+	if major(conn.PgConn().ParameterStatus("server_version")) < memoizeSince {
+		return nil
+	}
+	_, err := conn.Exec(ctx, "SET "+memoize+" = off")
+	return err
+}
+
+// memoizeSince is the first PostgreSQL release with the lookup cache.
+const memoizeSince = 14
+
+// major is the release series a PostgreSQL version string opens with, such as
+// 16 from "16.4 (Debian 16.4-1)", or zero where it opens with no number.
+func major(version string) int {
+	n := 0
+	for _, r := range version {
+		if r < '0' || r > '9' {
+			break
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n
 }
 
 // errMayGoInCleartext is a PostgreSQL configuration with an attempt the

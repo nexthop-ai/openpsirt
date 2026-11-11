@@ -262,3 +262,143 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 		}
 	})
 }
+
+// Under a filter a group can pass with no decision, the decided side of the
+// list reaches each occurrence by its occurrence identity, the key the match
+// holds it to. The issue list it is narrowed by is a filter there: read as an
+// index key, SQLite probes the occurrences once per listed issue for every
+// decision occurrence, which is seconds once a product has decided a few
+// thousand issues and invisible on a fixture this size, so the plan is what is
+// asserted.
+//
+// SQLite alone, for the reason the test above gives.
+func TestTheDecidedSideReachesEachOccurrenceByItsIdentity(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		w, err := world.Declare(ctx, db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f := &fixture{
+			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
+			build: w.Build.ID, productID: w.Product.ID, tag: w.Tag.ID, variant: w.Customer.ID,
+			scans: ingest.NewStore(db.DB),
+			scope: finding.Scope{
+				ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID,
+			},
+			built: time.Now().UTC().Add(-72 * time.Hour),
+		}
+		two := f.acrossProducts(t)
+		who := f.holdingIn(t, []int64{two.first, two.second}, access.PublicRead, access.PrivateRead)
+
+		seen := &statements{}
+		f.hook(seen)
+		if _, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{
+			States: []finding.DecisionStanding{finding.StandingUndecided},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		seen.mu.Lock()
+		sent := append([]string{}, seen.sent...)
+		seen.mu.Unlock()
+
+		checked := 0
+		decisions := regexp.MustCompile(`^SEARCH de USING `)
+		occurrence := regexp.MustCompile(`^SEARCH f USING `)
+		byIdentity := regexp.MustCompile(`^SEARCH f USING (COVERING )?INDEX finding_occurrence_idx \(occurrence_identity=\?`)
+		for _, statement := range sent {
+			if !strings.Contains(statement, `"decision_occurrence" AS "de"`) || !strings.Contains(statement, `AS "f2"`) {
+				continue
+			}
+			var plan []struct {
+				ID     int    `bun:"id"`
+				Parent int    `bun:"parent"`
+				Unused int    `bun:"notused"`
+				Detail string `bun:"detail"`
+			}
+			if err := f.db.DB.NewRaw("EXPLAIN QUERY PLAN "+statement).Scan(ctx, &plan); err != nil {
+				t.Fatalf("explain a statement: %v", err)
+			}
+			var lines []string
+			after, reached := false, 0
+			for _, step := range plan {
+				lines = append(lines, step.Detail)
+				if decisions.MatchString(step.Detail) {
+					after = true
+					continue
+				}
+				if after && occurrence.MatchString(step.Detail) {
+					reached++
+					if !byIdentity.MatchString(step.Detail) {
+						t.Errorf("the decided side reaches an occurrence other than by its identity:\n  %s",
+							strings.Join(lines, "\n  "))
+					}
+				}
+			}
+			if reached == 0 {
+				t.Errorf("the decided side reaches no occurrence after the decision occurrences:\n  %s",
+					strings.Join(lines, "\n  "))
+			}
+			checked++
+		}
+		if checked == 0 {
+			t.Fatal("no statement matched decision occurrences to occurrences, so this checked nothing")
+		}
+	})
+}
+
+// Under a filter needing a decision, every issue list on the decided side is
+// stated on the column behind a unary plus. SQLite otherwise takes the list
+// as the issue index's key and probes it once per listed issue for each
+// decision occurrence, which shows in a plan only once statistics hold a few
+// thousand decided issues, so the statements are what is asserted.
+//
+// SQLite alone: the text is the same on every engine.
+func TestAnIssueListOnTheDecidedSideIsStatedUnindexed(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		w, err := world.Declare(ctx, db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f := &fixture{
+			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
+			build: w.Build.ID, productID: w.Product.ID, tag: w.Tag.ID, variant: w.Customer.ID,
+			scans: ingest.NewStore(db.DB),
+			scope: finding.Scope{
+				ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID,
+			},
+			built: time.Now().UTC().Add(-72 * time.Hour),
+		}
+		two := f.acrossProducts(t)
+		who := f.holdingIn(t, []int64{two.first, two.second}, access.PublicRead, access.PrivateRead)
+
+		seen := &statements{}
+		f.hook(seen)
+		if _, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{
+			States: []finding.DecisionStanding{finding.StandingAgreed},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		seen.mu.Lock()
+		sent := append([]string{}, seen.sent...)
+		seen.mu.Unlock()
+
+		listed := regexp.MustCompile(`(\+?)"dv"\."issue_id" IN \(`)
+		checked := 0
+		for _, statement := range sent {
+			if !strings.Contains(statement, `"decision_occurrence" AS "de"`) {
+				continue
+			}
+			for _, m := range listed.FindAllStringSubmatch(statement, -1) {
+				checked++
+				if m[1] != "+" {
+					t.Errorf("an issue list on the decided side is stated on the indexed column:\n%s", statement)
+				}
+			}
+		}
+		if checked == 0 {
+			t.Fatal("no statement listed issues on the decided side, so this checked nothing")
+		}
+	})
+}

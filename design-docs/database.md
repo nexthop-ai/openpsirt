@@ -13,6 +13,7 @@ Satisfies REQ-03, REQ-71, REQ-73.
 - [Connection encryption](#connection-encryption)
 - [Connection pool](#connection-pool)
 - [Statement preparation](#statement-preparation)
+- [PostgreSQL session settings](#postgresql-session-settings)
 - [Query builder dialects](#query-builder-dialects)
 - [SQLite settings](#sqlite-settings)
 - [Test harness](#test-harness)
@@ -64,7 +65,7 @@ every engine. Engine-specific code lives in these places and no others.
 |---|---|
 | Schema migrations | Data-definition language differs |
 | The migration lock | Each engine spells advisory locking differently |
-| Connection setup | Driver-specific settings, including how PostgreSQL's statements are sent (§ Statement preparation) |
+| Connection setup | Driver-specific settings, including how PostgreSQL's statements are sent (§ Statement preparation) and the settings its sessions start with (§ PostgreSQL session settings) |
 | Recognizing what an engine reports | Each driver has its own error type. Three questions, each silent when wrong: a lost race worth retrying (REQ-71), a unique constraint refusing a duplicate, a failure from the engine rather than an impossible request |
 | Subtracting two moments | No portable expression yields seconds: one engine returns an interval, one a number of days |
 | Inserting a row another writer may already have written | `ON CONFLICT DO NOTHING` on two engines, `ON DUPLICATE KEY UPDATE` setting the key to itself on two. Never `INSERT IGNORE`, which also stores a value cut to fit, a dangling reference or a missing value as a warning. Only for a table of facts, where two writers agree |
@@ -159,6 +160,21 @@ A test asks each server how many statements it holds prepared for one
 connection before and after a query and an insert. Another stores a moment and
 reads it back on sessions set fourteen hours east and to a month-first date
 style.
+
+## PostgreSQL session settings
+
+| Setting | Value | Reason |
+|---|---|---|
+| `enable_memoize` | `off`, set as each connection opens, unless the database URL names it | The planner sizes its per-key lookup cache from the average rows a key holds. A kernel's occurrence identity holds thousands of issues where the average is six: with an upgrade planned over a kernel's 6,000 issues, the findings list under any decision filter gave no answer in two minutes, and answers in under a second without the cache. A burndown costs about a sixth more without it (`design-docs/findings-measurements.md` § A planned kernel) |
+
+| Rule | Reason |
+|---|---|
+| Set by a statement after the connection opens, never as a startup parameter | A server without the setting refuses a startup parameter naming it before the version floor is read, and so does a pooler passing only parameters it knows |
+| Skipped on a server below release 14 | The setting does not exist there; the floor then refuses the server by its version |
+| Under transaction or statement pooling, the database carries it | The statement lands on whichever server connection ran it |
+
+A test reads the setting back on a fresh session and on one whose URL turns it
+on.
 
 ## Query builder dialects
 
@@ -259,5 +275,5 @@ on partitions.
 | Queries are not bounded | No statement timeout and no driver read timeout. A bound kills legitimate slow work, a large report or an ingest over tens of thousands of components, and would cut a migration part way |
 | Connections are not validated on checkout | There is no hook. A validation helper with a short deadline serves callers that would block on a dead connection, readiness among them; it costs a round trip and says only that a connection was alive a moment ago |
 | A SQLite write waiting on the write lock ignores its request's context | A write given 300 ms waited out 55 s, holding its goroutine and connection. The driver offers no busy handler, and queuing writes in the process would miss every write outside a transaction |
-| PostgreSQL compiles a plan priced past its default `jit_above_cost` of 100,000 | Server settings are left at their defaults, so a 30 ms statement can spend 150 ms compiling. A group condition in `HAVING` is the known case, asked over the grouped statement instead (`design-docs/triage-decisions.md` § Act placement) |
+| PostgreSQL compiles a plan priced past its default `jit_above_cost` of 100,000 | Server settings are left at their defaults but for § PostgreSQL session settings, so a 30 ms statement can spend 150 ms compiling. A group condition in `HAVING` is the known case, asked over the grouped statement instead (`design-docs/triage-decisions.md` § Act placement) |
 | Timestamp semantics differ between engines | Moments are stored in UTC with explicit types |

@@ -211,6 +211,18 @@ read.
 | The server will not say which | Refused. What this asks for is certainty, and "we could not find out" is not it |
 | The database is SQLite | Refused. A file opened directly has no connection to encrypt, and quietly doing nothing is what a setting that changes nothing looks like |
 
+### PostgreSQL session settings
+
+Each PostgreSQL connection turns `enable_memoize` off as it opens, because with
+it on a findings list over a large kernel with planned upgrades can take
+minutes. Naming `enable_memoize` in the URL sends that value instead, as a
+startup parameter, which a pooler passing only the parameters it knows refuses.
+
+| Connection pooler | What to do |
+|---|---|
+| None, or session pooling | Nothing |
+| Transaction or statement pooling, as PgBouncer offers | Set it on the database: `ALTER DATABASE name SET enable_memoize = off` |
+
 ## Sign-in
 
 The process refuses to start until somebody can administer it, and naming

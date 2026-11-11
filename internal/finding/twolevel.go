@@ -183,8 +183,12 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	// the undecided page's grouping takes 479 ms against 543 ms over every
 	// occurrence, and the blocking list on a build's readiness 403 ms against
 	// 523 ms.
+	//
+	// The match is the join that holds an occurrence's issue, so the list is
+	// stated unindexed.
 	whole := apart
 	whole.decidedIssues = f.placedIssues
+	whole.issuesJoined = true
 	population := whole.narrowRows(rows).
 		ColumnExpr(`"f"."id" AS "id"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
@@ -207,7 +211,7 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 		occurrences = occurrences.GroupExpr(`"f2"."id"`)
 	}
 	if f.decidedIssues != nil {
-		occurrences = f.amongDecidedIssues(occurrences, `"dv"."issue_id"`)
+		occurrences = f.amongDecidedIssues(occurrences, unindexed(`"dv"."issue_id"`))
 	}
 	if f.Across {
 		// Across products each occurrence carries its own product, and the

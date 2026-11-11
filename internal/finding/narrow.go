@@ -116,6 +116,9 @@ type Filter struct {
 	// decided occurrences are read among them alone. Nil asks nothing, and
 	// empty answers nothing.
 	placedIssues []int64
+	// issuesJoined says the occurrences read here are reached through a join
+	// that already holds their issue, so decidedIssues is stated unindexed.
+	issuesJoined bool
 	// decidedApart says the occurrences are read without the decision table
 	// joined: the first level counts the decided occurrences beside itself, and
 	// a page's rows belong to groups the conditions over a group already chose.
@@ -568,7 +571,11 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// A condition on the issue, which every occurrence of a group shares:
 		// it drops whole groups, and only groups the conditions over a group
 		// drop anyway.
-		q = f.amongDecidedIssues(q, `"f"."vulnerability_id"`)
+		column := `"f"."vulnerability_id"`
+		if f.issuesJoined {
+			column = unindexed(column)
+		}
+		q = f.amongDecidedIssues(q, column)
 	}
 	if words := f.severities(); len(words) > 0 {
 		// The rating in force here, not the published one. Being able to say

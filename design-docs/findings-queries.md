@@ -43,6 +43,8 @@ second pass, because aggregating text is spelled differently per engine.
 | A filter needing a decision reads those decisions' issues first, narrowing occurrences and decisions both | Every state but undecided needs a decision in that state, and an outcome or a promised upgrade one in force. The set is a superset; the group conditions decide |
 | Under such a filter, issues are stated on the decisions and the list's occurrences, never on the decided side's occurrences | Otherwise PostgreSQL probes the occurrence index per decision: 2,726 ms against 419 ms |
 | A filter that can pass with no decision narrows the decided side to the issues of every decision that can mark one | Undecided: 479 ms against 543 ms over every occurrence |
+| On the decided side an issue list is a condition on rows the match already reached, stated on the column behind a unary plus, which SQLite never takes as an index key | SQLite otherwise probes the issue index once per listed issue for each decision occurrence: the demo's undecided list 2.5 s against 0.26 s, and agreed 2.6 s against 0.46 s (`design-docs/findings-measurements.md` § A planned kernel) |
+| PostgreSQL plans these reads without its per-key lookup cache | `design-docs/database.md` § PostgreSQL session settings |
 | A live decision's versions are compared in an EXISTS on the component's key, never a joined component | Joined, PostgreSQL scanned every component per decided occurrence: 290 ms of 433 ms |
 | An occurrence with no consumer holds the empty version | Nothing to look up |
 | Conditions over decision counts are ranges: "none" is below one, "every" is at least the occurrences | A planner estimates a range at a third of groups and an equality at a two-hundredth |

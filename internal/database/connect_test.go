@@ -418,6 +418,32 @@ func TestAServiceFileModeIsJudgedWhenEncryptionIsRequired(t *testing.T) {
 	}
 }
 
+// A PostgreSQL session starts with the per-key lookup cache off, and a URL
+// naming the setting keeps its own value.
+func TestPostgreSQLStartsWithoutTheLookupCacheAndAURLMayOverrideIt(t *testing.T) {
+	read := func(t *testing.T, db *database.DB) string {
+		t.Helper()
+		var value string
+		if err := db.QueryRowContext(t.Context(), "SHOW enable_memoize").Scan(&value); err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+	dbtest.Only(t, database.Postgres, func(t *testing.T, db *database.DB) {
+		if got := read(t, db); got != "off" {
+			t.Errorf("enable_memoize = %q, wanted off", got)
+		}
+		url := os.Getenv(dbtest.PostgresURLEnv)
+		joined := "?"
+		if strings.Contains(url, "?") {
+			joined = "&"
+		}
+		if got := read(t, dbtest.Open(t, url+joined+"enable_memoize=on")); got != "on" {
+			t.Errorf("enable_memoize with the URL's own setting = %q, wanted on", got)
+		}
+	})
+}
+
 // A statement leaves nothing prepared on the server behind the connection that
 // ran it. The query builder writes every value into the statement text, so a
 // statement kept prepared is one nothing runs again, held by the server for as

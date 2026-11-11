@@ -387,6 +387,18 @@ func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products [
 	return nil
 }
 
+// unindexed is a column read through a unary plus, which every engine reads as
+// the column's value and SQLite never reads through an index.
+//
+// It is for an issue list stated where a join already holds the column to a
+// row it has reached. SQLite takes an IN list over an indexed column as that
+// index's key, and where the join is the better key it probes the index once
+// per listed issue for every row the join reaches. With 3,105 decision
+// occurrences over 2,990 issues the undecided page took 2.5 s against 0.26 s,
+// and the agreed page 2.6 s against 0.46 s; the other engines read the same
+// either way.
+func unindexed(column string) string { return "+" + column }
+
 // amongDecidedIssues holds a column naming an issue to decidedIssues.
 func (f Filter) amongDecidedIssues(q *bun.SelectQuery, column string) *bun.SelectQuery {
 	if len(f.decidedIssues) == 0 {
