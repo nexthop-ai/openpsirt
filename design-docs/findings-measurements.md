@@ -11,6 +11,7 @@ justifies. `make measure` re-runs the harness-driven ones.
 - [Two-level grouping](#two-level-grouping)
 - [Across products](#across-products)
 - [A planned kernel](#a-planned-kernel)
+- [Component and upgrade views](#component-and-upgrade-views)
 - [A year of nightly scans](#a-year-of-nightly-scans)
 - [Replaced inventory check](#replaced-inventory-check)
 - [Remediation beside a check](#remediation-beside-a-check)
@@ -150,6 +151,39 @@ occurrences' alone leaves undecided at 2.4 s.
 | The decided side's population behind DISTINCT | PostgreSQL answered; MariaDB took 4 s to 6.8 s |
 | No issue lists on the decided side | SQLite across products 0.47 s to 2.5 s; MySQL and MariaDB about 2 s |
 | PostgreSQL's cache off over every measured read | A product's burndown 0.42 s against 0.36 s, and the kernel's by its name 0.59 s against 0.48 s; every other read the same within the host's variation, or faster: the across-products list, the component view and the review queue by about a third |
+
+## Component and upgrade views
+
+Justifies `design-docs/findings-queries.md` § Two-level grouping, the rows on
+reading about a page's rows. The across-products fixture, a page of fifty from
+each view in one product, after planner statistics are refreshed. Each range
+is two runs, alternated; "before" joins every view statement to the kept
+groups and reads a components page's upgrades and ratings apart.
+
+| Components page | SQLite | PostgreSQL | MySQL | MariaDB |
+|---|---|---|---|---|
+| Undecided, before | 1.8 s | 33.5 s to 34.1 s | 4.0 s | 3.2 s to 3.3 s |
+| Undecided | 1.2 s to 1.4 s | 0.95 s to 1.04 s | 2.9 s | 2.8 s |
+| The list's defaults, before | 1.8 s to 1.9 s | 31.5 s to 33.6 s | 3.7 s to 4.0 s | 3.0 s to 3.1 s |
+| The list's defaults | 1.2 s | 0.94 s to 1.04 s | 2.8 s | 2.7 s to 2.8 s |
+| A fix known, before | 3.7 s | 1.1 s to 2.0 s | 4.0 s to 4.4 s | 1.9 s to 2.2 s |
+| A fix known | 2.4 s to 2.5 s | 0.87 s to 0.99 s | 3.0 s | 2.1 s |
+
+| Planned upgrades | SQLite | PostgreSQL | MySQL | MariaDB |
+|---|---|---|---|---|
+| Undecided, before | 1.6 s | 16.5 s to 17.8 s | 2.3 s to 2.6 s | 2.1 s to 2.3 s |
+| Undecided | 1.2 s to 1.3 s | 1.06 s to 1.15 s | 2.2 s | 2.0 s |
+| A fix known, before | 2.9 s to 3.0 s | 0.85 s to 1.0 s | 2.9 s to 3.5 s | 1.7 s to 2.2 s |
+| A fix known | 2.9 s to 3.0 s | 0.93 s to 1.1 s | 3.0 s | 2.0 s to 2.3 s |
+
+Every filter needing a decision answers in under 50 ms on every engine either way.
+
+| Further readings | |
+|---|---|
+| PostgreSQL, before | The page itself 0.6 s; each read about its rows 15.3 s to 17.0 s, a kernel component's 103,069 rows walked for each of 11,891 kept groups |
+| One-level kept groups keyed fold first | SQLite's components page under a fix known 2.2 s against 3.6 s; PostgreSQL's planned upgrades 1.27 s to 1.42 s against 0.93 s to 1.10 s |
+| The demo's planned-upgrade page under undecided, SQLite through the server's driver | 1.37 s joined with the kept groups read first, 1.04 s with the page's rows outermost; 11,766 groups and 3,105 decision occurrences |
+| The demo's broadcom components page, SQLite through the server's driver | Under the list's defaults 2.17 s against 1.84 s with the upgrades and ratings read once; the same rows and totals in both, under every filter |
 
 ## A year of nightly scans
 

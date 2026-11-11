@@ -213,13 +213,20 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			{"agreed", finding.Filter{States: []finding.DecisionStanding{finding.StandingAgreed}}},
 			{"upgrade needed", finding.Filter{Outcomes: []string{string(triage.UpgradeNeeded)}}},
 			{"planned", finding.Filter{Planned: finding.PlannedOnly}},
+			{"has a fix", finding.Filter{HasFix: true}},
+			{"the list's defaults", finding.Filter{
+				Workable: finding.Working([]string{finding.OnBranch}, []string{finding.InSupport}),
+				Planned:  finding.NotPlanned,
+			}},
 		} {
+			// A page of fifty, as the views ask, so what each reads about the
+			// rows on its page is read too.
 			components := bounded(func(ctx context.Context) (int, error) {
-				_, n, err := store.ComponentGroups(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
+				_, n, err := store.ComponentGroups(ctx, reader, finding.Scope{ProductID: &product.ID}, 50, 0, one.filter)
 				return n, err
 			})
 			upgrades := bounded(func(ctx context.Context) (int, error) {
-				_, n, err := store.PlannedUpgrades(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
+				_, n, err := store.PlannedUpgrades(ctx, reader, finding.Scope{ProductID: &product.ID}, 50, 0, one.filter)
 				return n, err
 			})
 			t.Logf("%-20s components %s · planned upgrades %s", one.name, components, upgrades)
