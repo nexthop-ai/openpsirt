@@ -459,6 +459,11 @@ func (f Filter) ofRows() Filter {
 // rows on that guess it read the kernel's 271,000 rows once per kept group, and
 // did not finish in two minutes where the one-level form hashes the join in 2
 // s.
+//
+// The kept groups are joined through CROSS JOIN ... WHERE, an inner join on
+// every engine that on SQLite also keeps q's finding rows outermost. Left to
+// choose, SQLite walks every kept group and probes the findings once for each:
+// the demo's planned-upgrade page under undecided took 1.37 s against 1.04 s.
 func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
@@ -473,8 +478,9 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return f.ofRows().narrow(q.
 		Join(`JOIN "component" AS "ck" ON "ck"."id" = "f"."component_id"`).
-		Join(`JOIN (?) AS "kept" ON "kept"."vulnerability_id" = "f"."vulnerability_id"`+
-			` AND "kept"."fold" = "ck"."fold_key"`, kept))
+		Join(`CROSS JOIN (?) AS "kept"`, kept).
+		Where(`"kept"."vulnerability_id" = "f"."vulnerability_id"`).
+		Where(`"kept"."fold" = "ck"."fold_key"`))
 }
 
 // keepsAfterGrouping is whether asListed restricts its query's groups rather
@@ -482,6 +488,35 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 // a query is grouped on the component and the issue among its keys.
 func (f Filter) keepsAfterGrouping() bool {
 	return f.asksOfGroups() && f.decidedIssues != nil
+}
+
+// aboutPage is asListed for a read about the rows of a page another statement
+// chose, such as what a page's components could move to. Under a filter that
+// reads the decision occurrences, q is grouped on the component and the issue
+// among its keys, and its groups are restricted to the kept groups after it has
+// grouped (see amongKept), whether the filter needs a decision or can pass with
+// none.
+//
+// PostgreSQL estimates the list's two-level groups at a twenty-fifth of what
+// they hold, 473 where 11,891 are kept, and joined to a page's finding rows it
+// walked a kernel component's 103,069 rows once per kept group: 15.8 s for the
+// components page's upgrades under undecided. The page's own statement keeps
+// the join under a filter that can pass with no decision, where most of the
+// list is kept.
+func (f Filter) aboutPage(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
+	visible []access.Visibility) *bun.SelectQuery {
+
+	if f.keepsAboutPageAfterGrouping() {
+		return f.amongKept(db, f.ofRows().narrow(q), buildIDs, visible)
+	}
+	return f.asListed(db, q, buildIDs, visible)
+}
+
+// keepsAboutPageAfterGrouping is whether aboutPage restricts its query's groups
+// rather than its finding rows. Such a query is grouped on the component and
+// the issue among its keys.
+func (f Filter) keepsAboutPageAfterGrouping() bool {
+	return f.asksOfGroups() && f.asksDecided()
 }
 
 // amongKept restricts a statement grouped on the component and the issue

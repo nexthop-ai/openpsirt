@@ -72,6 +72,9 @@ component and grouped again by fold.
 | Another view's groups under a decision condition are the list's two-level statement | One level: MariaDB gave no answer in 985 s |
 | Under a filter needing a decision, the view's own first level is restricted by membership in the kept groups | Joined, PostgreSQL took 185 s for lapsed planned upgrades |
 | Under a filter that can pass with no decision, the kept groups are joined to the view's rows | Most of the list is kept: 2.6 s on MariaDB |
+| The kept groups are joined through CROSS JOIN ... WHERE, the view's rows outermost | Left to choose, SQLite walks every kept group and probes the findings for each: the demo's planned-upgrade page under undecided 1.37 s against 1.04 s |
+| A read about a page's rows restricts its groups by membership under any filter reading a decision | PostgreSQL estimates the two-level kept groups at 473 where 11,891 are kept and walks a kernel component's rows once per group: 15.8 s against under 0.4 s (`design-docs/findings-measurements.md` § Component and upgrade views) |
+| The components page reads its rows' upgrades and ratings in one statement | Each statement keeping the list's groups builds them again over the build; a rating is per issue, so an issue counts once in its component's band |
 | A planned upgrade's names are grouped over the page's components, named as a list | 166 ms against 287 ms joined |
 | By component, the first level is one row per issue; by upgrade, it keys on component, issue, build and fixed version | |
 

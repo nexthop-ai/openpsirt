@@ -302,7 +302,7 @@ func (s *Store) namesIn(ctx context.Context, buildIDs []int64, visible []access.
 		return fmt.Errorf("read which components a bump moves: %w", err)
 	}
 	inFolds, args := database.InAnyOf(`"f"."component_id"`, components)
-	under := filter.asListed(s.db, rowsOn(s.db, buildIDs, visible, filter.OpenOn).
+	under := filter.aboutPage(s.db, rowsOn(s.db, buildIDs, visible, filter.OpenOn).
 		Where(inFolds, args...).
 		Where(`"f"."fixed_in" IN (?)`, bun.List(distinct(versions))).
 		ColumnExpr(`"f"."fixed_in"`).
@@ -311,7 +311,7 @@ func (s *Store) namesIn(ctx context.Context, buildIDs []int64, visible []access.
 		// The issue as well where the groups are restricted after grouping,
 		// which asks it of each group.
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
-			if filter.keepsAfterGrouping() {
+			if filter.keepsAboutPageAfterGrouping() {
 				return q.ColumnExpr(`"f"."vulnerability_id"`).GroupExpr(`"f"."vulnerability_id"`)
 			}
 			return q
@@ -426,11 +426,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		return nil, 0, err
 	}
 
-	upgrades, err := s.upgradesFor(ctx, shipped, buildIDs, visible, filter)
-	if err != nil {
-		return nil, 0, err
-	}
-	bands, err := s.bandsFor(ctx, ids, buildIDs, visible, filter)
+	upgrades, bands, err := s.readAboutPage(ctx, shipped, ids, buildIDs, visible, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -612,115 +608,92 @@ func componentOrder(filter Filter) string {
 	return orderedBy(filter, ByUrgency) + ", " + byWeight
 }
 
-// bandsFor is how the issues open against each component were rated.
+// readAboutPage is where each component on a page could go and how the issues
+// open against it were rated, read in one statement.
 //
-// Ranking by count alone is the wrong answer to the question this view
-// asks. A package with forty-four issues outranks one with three criticals,
-// and somebody reading it to decide what to look at next is told the opposite
-// of what they need. The count is still the order — where the weight is is the
-// question — but the row says what the weight is made of.
+// One read for both, because each asks the list's kept groups of the same
+// occurrences, and the kept groups are the list's whole grouping over the
+// build: the components page under undecided spent 0.47 s of 1.73 s reading
+// the ratings again. One read for the page rather than one per row: a page of
+// fifty components on a real image is fifty round trips otherwise, for a
+// column. The components are the page's, already read, which is where the
+// ecosystem a version is ordered in comes from.
 //
-// Distinct issues, like the count beside it, so the parts sum to the whole
-// rather than to the number of occurrences.
-func (s *Store) bandsFor(ctx context.Context, ids []int64, buildIDs []int64,
-	visible []access.Visibility, filter Filter) (map[int64]map[string]int, error) {
-
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	var rows []struct {
-		ComponentID int64  `bun:"component_id"`
-		Band        string `bun:"band"`
-		Issues      int    `bun:"issues"`
-	}
-	// The issues open against each component, once each, and only then the
-	// rating: a rating is per issue, so reading it for every occurrence would
-	// read it again for every occurrence the issue sits at.
-	pairs := rowsOn(s.db, buildIDs, visible, filter.OpenOn).
-		ColumnExpr(`"f"."component_id"`).
-		ColumnExpr(`"f"."vulnerability_id"`).
-		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
-		GroupExpr(`"f"."component_id", "f"."vulnerability_id"`)
-	query := s.db.NewSelect().
-		TableExpr(`(?) AS "f"`, filter.asListed(s.db, pairs, buildIDs, visible)).
-		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
-		// This product's rating where it has stated one, which is what every
-		// other surface judges a finding by. Read without it, the strip on
-		// each row drew the published rating and a product that had re-rated
-		// an issue saw its own decision in the list and the world's in the
-		// bars over it.
-		Join(rating.Here, filter.ProductID).
-		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(rating.EffectiveExpr + ` AS "band"`).
-		ColumnExpr(`COUNT(*) AS "issues"`).
-		GroupExpr(`"f"."component_id", ` + rating.EffectiveExpr)
-	if err := query.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read how what is open here was rated: %w", err)
-	}
-	out := make(map[int64]map[string]int, len(ids))
-	for _, row := range rows {
-		// Folded through the one place that says which words are real: a
-		// scanner's "unknown" and no rating at all are the same state, and
-		// two rows for it is two names for one nothing.
-		band := BandOf(row.Band)
-		if out[row.ComponentID] == nil {
-			out[row.ComponentID] = map[string]int{}
-		}
-		out[row.ComponentID][band] += row.Issues
-	}
-	return out, nil
-}
-
-// upgradesFor is where each component on a page could go, and how much each
-// move would close.
+// The rating is per issue, so the issues are grouped first and only then
+// joined to it, and an issue counts once in its component's band however many
+// fixes its occurrences name. This product's rating where it has stated one,
+// which is what every other surface judges a finding by. Read without it, the
+// strip on each row drew the published rating and a product that had re-rated
+// an issue saw its own decision in the list and the world's in the bars over
+// it.
 //
-// One read for the page rather than one per row: a page of fifty components on
-// a real image is fifty round trips otherwise, for a column. The components are
-// the page's, already read, which is where the ecosystem a version is ordered
-// in comes from.
+// Ranking by count alone is the wrong answer to the question this view asks.
+// A package with forty-four issues outranks one with three criticals, and
+// somebody reading it to decide what to look at next is told the opposite of
+// what they need. The count is still the order, but the row says what the
+// weight is made of, in distinct issues like the count beside it, so the parts
+// sum to the whole rather than to the number of occurrences.
 //
-// Ordered by how much it closes, never by version. Comparing two versions
-// needs an ordering per ecosystem this does not have, so the question
+// Upgrades are ordered by how much they close, never by version. Comparing two
+// versions needs an ordering per ecosystem this does not have, so the question
 // "which of these is nearest" is one this cannot answer and does not pretend
 // to. What it answers is which one closes the most, which is the question
 // somebody choosing between them is actually asking.
-func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Component, buildIDs []int64,
-	visible []access.Visibility, filter Filter) (map[int64][]Candidate, error) {
+func (s *Store) readAboutPage(ctx context.Context, shipped map[int64]graph.Component, ids []int64,
+	buildIDs []int64, visible []access.Visibility, filter Filter) (map[int64][]Candidate,
+	map[int64]map[string]int, error) {
 
-	if len(shipped) == 0 {
-		return nil, nil
+	if len(ids) == 0 {
+		return nil, nil, nil
 	}
-	ids := make([]int64, 0, len(shipped))
-	for id := range shipped {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
 		Issue       int64  `bun:"vulnerability_id"`
 		FixedIn     string `bun:"fixed_in"`
+		Band        string `bun:"band"`
 	}
-	query := rowsOn(s.db, buildIDs, visible, filter.OpenOn).
+	// Grouped to one row per issue and fix rather than per occurrence, because
+	// a version has to be read out of that string before it can be counted, and
+	// grouped rather than plain because the narrowing asks questions of the
+	// occurrences under an issue, which are aggregates.
+	pairs := rowsOn(s.db, buildIDs, visible, filter.OpenOn).
+		ColumnExpr(`"f"."component_id"`).
+		ColumnExpr(`"f"."vulnerability_id"`).
+		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
+		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"f"."component_id", "f"."vulnerability_id", COALESCE("f"."fixed_in", '')`)
+	query := s.db.NewSelect().
+		TableExpr(`(?) AS "f"`, filter.aboutPage(s.db, pairs, buildIDs, visible)).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		Join(rating.Here, filter.ProductID).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
-		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
-		// A finding with nothing to move to contributes no upgrade. It is not
-		// absent from the view — it is a row with an empty column, which is
-		// the population that needs a decision rather than a bump.
-		Where(`"f"."fixed_in" IS NOT NULL`).
-		Where(`"f"."fixed_in" <> ?`, "").
-		// Grouped to one row per issue rather than per version string, because
-		// a version has to be read out of that string before it can be counted
-		// — and grouped rather than plain because the narrowing asks questions
-		// of the occurrences under an issue, which are aggregates.
-		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."fixed_in"`)
-	if err := filter.asListed(s.db, query, buildIDs, visible).Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read where each component could go: %w", err)
+		ColumnExpr(rating.EffectiveExpr + ` AS "band"`).
+		// In one order on every read, so an unorderable set of upgrades comes
+		// back the same way twice.
+		OrderExpr(`"f"."component_id", "f"."vulnerability_id", "f"."fixed_in"`)
+	if err := query.Scan(ctx, &rows); err != nil {
+		return nil, nil, fmt.Errorf("read where each component could go and how it was rated: %w", err)
 	}
+	bands := make(map[int64]map[string]int, len(ids))
+	rated := map[[2]int64]bool{}
 	per := map[int64][]namedFix{}
 	scheme := map[int64]vercmp.Scheme{}
 	for _, row := range rows {
+		if at := [2]int64{row.ComponentID, row.Issue}; !rated[at] {
+			rated[at] = true
+			// Folded through the one place that says which words are real: a
+			// scanner's "unknown" and no rating at all are the same state, and
+			// two rows for it is two names for one nothing.
+			if bands[row.ComponentID] == nil {
+				bands[row.ComponentID] = map[string]int{}
+			}
+			bands[row.ComponentID][BandOf(row.Band)]++
+		}
+		// A finding with nothing to move to contributes no upgrade. It is not
+		// absent from the view: it is a row with an empty column, which is the
+		// population that needs a decision rather than a bump.
 		versions := versionsIn(row.FixedIn)
 		if len(versions) == 0 {
 			continue
@@ -729,11 +702,11 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 			namedFix{issue: row.Issue, versions: versions})
 		scheme[row.ComponentID] = vercmp.SchemeOf(graph.EcosystemOf(shipped[row.ComponentID].Purl))
 	}
-	out := make(map[int64][]Candidate, len(per))
+	upgrades := make(map[int64][]Candidate, len(per))
 	for component, found := range per {
-		out[component] = candidatesFrom(found, scheme[component])
+		upgrades[component] = candidatesFrom(found, scheme[component])
 	}
-	return out, nil
+	return upgrades, bands, nil
 }
 
 // namedFix is one issue and every version its fix names, or a set of issues
