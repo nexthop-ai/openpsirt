@@ -3,6 +3,11 @@
 bin
 site
 docs
+# The demo's and the upgrade rehearsal's state: the scanner's database, copies
+# of upstream repositories and the demo's own database, tens of gigabytes the
+# image never reads. Sent as build context, they are copied whole before the
+# build starts.
+.demo
 # Not excluded, unlike the documentation it was collected for: the interface's
 # brand files are symlinks into it, so an excluded assets/ leaves them dangling
 # and the web build fails.
