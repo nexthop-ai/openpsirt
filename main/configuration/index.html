@@ -569,6 +569,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#postgresql-session-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PostgreSQL session settings
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1366,6 +1377,17 @@
     <span class="md-ellipsis">
       
         Database connection encryption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgresql-session-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PostgreSQL session settings
       
     </span>
   </a>
@@ -2468,6 +2490,29 @@ read.</p>
 <tr>
 <td>The database is SQLite</td>
 <td>Refused. A file opened directly has no connection to encrypt, and quietly doing nothing is what a setting that changes nothing looks like</td>
+</tr>
+</tbody>
+</table>
+<h3 id="postgresql-session-settings">PostgreSQL session settings<a class="headerlink" href="#postgresql-session-settings" title="Permanent link">&para;</a></h3>
+<p>Each PostgreSQL connection turns <code>enable_memoize</code> off as it opens, because with
+it on a findings list over a large kernel with planned upgrades can take
+minutes. Naming <code>enable_memoize</code> in the URL sends that value instead, as a
+startup parameter, which a pooler passing only the parameters it knows refuses.</p>
+<table>
+<thead>
+<tr>
+<th>Connection pooler</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>None, or session pooling</td>
+<td>Nothing</td>
+</tr>
+<tr>
+<td>Transaction or statement pooling, as PgBouncer offers</td>
+<td>Set it on the database: <code>ALTER DATABASE name SET enable_memoize = off</code></td>
 </tr>
 </tbody>
 </table>
