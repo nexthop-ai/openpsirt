@@ -10,6 +10,7 @@ justifies. `make measure` re-runs the harness-driven ones.
 - [Decision state reads](#decision-state-reads)
 - [Two-level grouping](#two-level-grouping)
 - [Across products](#across-products)
+- [A planned kernel](#a-planned-kernel)
 - [A year of nightly scans](#a-year-of-nightly-scans)
 - [Replaced inventory check](#replaced-inventory-check)
 - [Remediation beside a check](#remediation-beside-a-check)
@@ -113,6 +114,42 @@ findings-outermost without them).
 
 Before a statistics refresh, servers plan fresh tables from one-row estimates,
 and MySQL takes minutes however the statement is written.
+
+## A planned kernel
+
+Justifies `design-docs/findings-queries.md` § Decision state filters and
+`design-docs/database.md` § PostgreSQL session settings. The across-products
+fixture with an upgrade planned over the kernel's 6,000 issues: 204,000 decision
+occurrences, the kernel build's list over 6,260 groups, after planner
+statistics are refreshed. Each range is two runs, alternated.
+
+| The kernel build's list | SQLite | PostgreSQL | MySQL | MariaDB |
+|---|---|---|---|---|
+| No filter | 0.13 s to 0.15 s | 0.23 s to 0.25 s | 0.31 s to 0.34 s | 0.13 s |
+| Undecided | 1.3 s to 1.5 s | 0.51 s to 0.75 s | 2.7 s to 2.9 s | 1.0 s to 1.2 s |
+| Agreed | 1.9 s to 2.1 s | 0.73 s to 0.90 s | 3.2 s to 3.5 s | 1.5 s to 2.1 s |
+| Planned | 1.7 s to 1.9 s | 0.61 s to 0.77 s | 2.9 s to 3.1 s | 1.1 s to 1.6 s |
+| Any decision filter, PostgreSQL's lookup cache on | — | none in 2 minutes | — | — |
+
+The issue lists stated unindexed and stated on the column read the same within
+these ranges on every engine, each list alone and both together.
+
+| The demo's broadcom list, SQLite | Issue lists through the index | Unindexed |
+|---|---|---|
+| Undecided | 2.4 s to 2.5 s | 0.26 s to 0.29 s |
+| Unplanned | 2.4 s to 2.5 s | 0.26 s to 0.29 s |
+| Agreed | 2.6 s | 0.46 s to 0.47 s |
+
+The demo holds 11,766 groups and 3,105 decision occurrences over 2,990 issues.
+The population's list unindexed alone leaves agreed at 2.5 s; the decision
+occurrences' alone leaves undecided at 2.4 s.
+
+| Further readings | |
+|---|---|
+| PostgreSQL's cache | Keyed on the occurrence identity and sized for six rows a key, where the kernel's identity holds 6,000 issues |
+| The decided side's population behind DISTINCT | PostgreSQL answered; MariaDB took 4 s to 6.8 s |
+| No issue lists on the decided side | SQLite across products 0.47 s to 2.5 s; MySQL and MariaDB about 2 s |
+| PostgreSQL's cache off over every measured read | A product's burndown 0.42 s against 0.36 s, and the kernel's by its name 0.59 s against 0.48 s; every other read the same within the host's variation, or faster: the across-products list, the component view and the review queue by about a third |
 
 ## A year of nightly scans
 
