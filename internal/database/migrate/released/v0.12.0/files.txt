@@ -1,0 +1,5 @@
+# The migrations v0.12.0 tagged, and the digest of each file below its license header.
+last 46
+6ef121d048127585093fa56e15d2341f93b9f8d53458d6da0c99ed9ea664e251  00046_v0120.go
+2dcd702e6595b6e478a4f0af308a44ed144208ef2dfa98b4a94e56ff8abe172d  v0120_issue.go
+3dd6c88f65428cd4d1026d7eee897de922a11d651a5f5e25a8c0d84ba06cc6cf  v0120_taken.go
