@@ -215,7 +215,8 @@ read.
 
 Each PostgreSQL connection turns `enable_memoize` off as it opens, because with
 it on a findings list over a large kernel with planned upgrades can take
-minutes. `?enable_memoize=on` in the URL keeps the server's own value.
+minutes. Naming `enable_memoize` in the URL sends that value instead, as a
+startup parameter, which a pooler passing only the parameters it knows refuses.
 
 | Connection pooler | What to do |
 |---|---|
