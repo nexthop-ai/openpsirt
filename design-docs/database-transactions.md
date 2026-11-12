@@ -45,6 +45,7 @@ back.
 | Any other failure is reported, never retried | A constraint violation retried hammers the database and hangs |
 | Nothing a transaction depends on is read outside it | A retry re-runs the closure against a moved database |
 | A read made before the transaction as an early refusal is repeated inside it, and the inside one decides | |
+| An attempt never changes what the closure was handed; what it works out, such as the issue a proposal is filed under, it works out on a copy | The next attempt would authorize what the first produced, not what was asked |
 | A statement whose refusal is an ordinary answer stands on its own savepoint, rolled back on refusal | PostgreSQL aborts the whole transaction after a failed statement, such as an insert a primary key refuses. The other three carry on, so SQLite never shows it |
 | An act is one transaction, and an act is what a person asked for | Recording a person with their roles, a team with its members, a tag's parent with when it went out, a graph with what the build argued about its patches. Split, a refusal partway leaves half a write, and the resent request lands it twice |
 | The record of an administrative act is inside it | A failure to record fails the act |

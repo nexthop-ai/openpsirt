@@ -1135,3 +1135,37 @@ func TestAWithdrawalIsReportedAsTheWithdrawersAct(t *testing.T) {
 		}
 	})
 }
+
+func TestProposingUnderAMergedNameLeavesTheRequestAsGivenAndNamesWhatStands(t *testing.T) {
+	// A proposal naming an issue that merged into another is written under
+	// the issue that stands. The rewrite is the write's own: the proposals a
+	// caller handed over, which a retried attempt authorizes again, still
+	// name the issue asked about, and a refusal finds the decision standing
+	// under the issue it was keyed under.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		merged := f.secondIssue(t)
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
+			Where(`"id" = ?`, merged).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		standing := f.decisions(t, f.at())
+
+		at := f.at()
+		at.VulnerabilityID = merged
+		proposals := []triage.Proposal{{
+			Occurrence: at, Outcome: triage.WontFix,
+			Reasoning: "Not worth the churn.", By: f.proposer,
+		}}
+		_, err := f.store.ProposeMany(ctx, f.triager, proposals)
+		if !errors.Is(err, triage.ErrAlreadyDecided) ||
+			!strings.Contains(err.Error(), fmt.Sprintf("decision occurrence %d", standing.ID)) {
+			t.Errorf("proposing under the merged name answered %v; want it refused naming decision occurrence %d",
+				err, standing.ID)
+		}
+		if proposals[0].Occurrence.VulnerabilityID != merged {
+			t.Errorf("the proposal handed over now names issue %d; want the issue it asked about, %d",
+				proposals[0].Occurrence.VulnerabilityID, merged)
+		}
+	})
+}
