@@ -71,6 +71,7 @@ tested against it (`design-docs/notifications.md` § Links).
 | A build's screen moved to another build keeps the address's own segments, cutting the tail from the address as it stands | The router hands the tail back with escaped slashes restored |
 | An address written out whole is matched against the table, path and query | An unknown address lands on not-found; an unread parameter opens the screen on its default |
 | Every listed parameter is read by its route's screen, found by reading the router and searching every module the screen reaches | A promised parameter nothing reads is a dead link |
+| A read is a `get`, `getAll` or `has` asked of query parameters: the router's, a new `URLSearchParams`, a name typed as one, or a property or function result the interface hands them out through | The same call on a map, a set or headers reads no address |
 | A screen whose address changed keeps its former address, forwarding with query and fragment; an address another screen now holds forwards nowhere | An unread notice keeps the link it was sent with |
 | An API address, under `/v1` or joined onto the API's build prefix, is not an address into the page | The API document describes it |
 

@@ -2,8 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
+import {
+  addressesIn,
+  handedThrough,
+  readsIn,
+  screensOf,
+  table,
+  unread,
+  unrouted,
+  // @ts-expect-error - a gate script, which is plain ESM with no types of its own
+} from "./addresses.mjs";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { addressesIn, readsIn, screensOf, table, unread, unrouted } from "./addresses.mjs";
+import { parse } from "./parsed.mjs";
 
 // Both directions per shape — one input that must be reported and one that
 // must not — because the failure that matters here is the check going quiet.
@@ -84,13 +94,46 @@ describe("a parameter the route table lists", () => {
   });
 
   it("is reported where the screen reads no such parameter", () => {
-    const reads = () => readsIn(`const mine = params.get("mine");`);
+    const reads = () =>
+      readsIn(`const [params] = useSearchParams(); const mine = params.get("mine");`);
     expect(
       unread({ reviewQueue: { path: "/review-queue", query: ["tab"] } }, screens, reads),
     ).toEqual([{ route: "reviewQueue", key: "tab", why: "unread" }]);
     expect(
       unread({ reviewQueue: { path: "/review-queue", query: ["mine"] } }, screens, reads),
     ).toEqual([]);
+  });
+
+  it("is not read by a get on a map or a set", () => {
+    const text = `const seen = new Map(); seen.get("tab"); shut.has("mine");`;
+    expect([...readsIn(text)]).toEqual([]);
+  });
+
+  it("is read from the router's parameters, a new URLSearchParams or a typed one", () => {
+    const text =
+      `const [params] = useSearchParams(); params.get("a");\n` +
+      `new URLSearchParams(search).has("b");\n` +
+      `const list = useMemo(() => new URLSearchParams(from), [from]); list.get("c");\n` +
+      `function f(asked: URLSearchParams) { return asked.getAll("d"); }`;
+    expect([...readsIn(text)].sort()).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("is read through what a hook in another file hands out", () => {
+    const hook = parse(
+      `export function usePair() { const [params] = useSearchParams(); return { params }; }\n` +
+        `export function asAsked(p: string): URLSearchParams { return new URLSearchParams(p); }`,
+      "hook.ts",
+    );
+    const screen = parse(
+      `const pair = usePair(); pair.params.get("a"); pair.other.get("x");`,
+      "a.tsx",
+    );
+    const destructured = parse(`const { params } = usePair(); params.get("b");`, "b.tsx");
+    const returned = parse(`const asked = asAsked(x); asked.get("c"); other.get("d");`, "c.tsx");
+    const handed = handedThrough([hook, screen, destructured, returned]);
+    expect([...readsIn("", "a.tsx", screen, handed)]).toEqual(["a"]);
+    expect([...readsIn("", "b.tsx", destructured, handed)]).toEqual(["b"]);
+    expect([...readsIn("", "c.tsx", returned, handed)]).toEqual(["c"]);
   });
 
   it("is reported where the route renders no screen to read it", () => {
