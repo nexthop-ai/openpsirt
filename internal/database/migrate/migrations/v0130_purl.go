@@ -140,7 +140,7 @@ func purlWithoutCredentialV0130(purl string) string {
 			parsed.Fragment, parsed.RawFragment = "", ""
 			kept = append(kept, key+"="+qualifierEscapedV0130(parsed.String()))
 		}
-		if strings.Contains(value, "?") || (queried && strings.Contains(value, "=")) {
+		if queryUnescapedV0130(value) {
 			break
 		}
 	}
@@ -152,6 +152,17 @@ func purlWithoutCredentialV0130(purl string) string {
 		purl += "#" + subpath
 	}
 	return purl
+}
+
+// queryUnescapedV0130 says whether a qualifier's value holds an address whose
+// query is written in part unescaped: a question mark written as it is, or an
+// escaped one followed by an equals sign written as it is.
+func queryUnescapedV0130(value string) bool {
+	if strings.Contains(value, "?") {
+		return true
+	}
+	at := strings.Index(strings.ToLower(value), "%3f")
+	return at >= 0 && strings.Contains(value[at:], "=")
 }
 
 // withoutPasswordV0130 is an address written without a scheme with the user

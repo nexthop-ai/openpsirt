@@ -40,7 +40,7 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //     publisher's statements about one subject stands.
 //   - A decision occurrence records who withdrew it, where somebody did.
 //   - A package identifier holds no credential in a qualifier's address, on a
-//     component, a build's node or an image version.
+//     component, a build's node, an image version or a scan's root identifier.
 func upgradeV0130(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{advisoryCoverLiveV0130,
 		advisoryOverrideLiveV0130, graphNodeStatedV0130, receivedStatementTimedV0130,

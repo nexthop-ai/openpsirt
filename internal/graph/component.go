@@ -306,7 +306,7 @@ func StoredPurl(purl string) string {
 			parsed.Fragment, parsed.RawFragment = "", ""
 			kept = append(kept, key+"="+qualifierEscaped(parsed.String()))
 		}
-		if strings.Contains(value, "?") || (queried && strings.Contains(value, "=")) {
+		if queryUnescaped(value) {
 			// An address whose query is written in part unescaped carries
 			// the pairs after it as that query, so they are not kept.
 			break
@@ -322,6 +322,18 @@ func StoredPurl(purl string) string {
 		purl += "#" + subpath
 	}
 	return purl
+}
+
+// queryUnescaped says whether a qualifier's value holds an address whose query
+// is written in part unescaped: a question mark written as it is, or an
+// escaped one followed by an equals sign written as it is. An equals sign in
+// the address's path is no query.
+func queryUnescaped(value string) bool {
+	if strings.Contains(value, "?") {
+		return true
+	}
+	at := strings.Index(strings.ToLower(value), "%3f")
+	return at >= 0 && strings.Contains(value[at:], "=")
 }
 
 // withoutPassword is an address written without a scheme, such as a
