@@ -115,25 +115,15 @@ func registerTeams(api huma.API, a core.Administering) {
 		var body TeamBody
 		var declared bool
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-			// Every attempt decides afresh: a retry runs against a team
-			// another request has just declared.
-			declared = false
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
 			}
-			// Read inside, because the record at the foot of it states
-			// whether this declared the team, and so does the status.
-			_, missing := store.TeamByName(ctx, in.Body.Name)
-			switch {
-			case missing == nil:
-			case errors.Is(missing, access.ErrNoSuchTeam):
-				declared = true
-			default:
-				return core.WentWrong(a.Logger, "that team could not be looked up", missing)
-			}
-
-			if team, err = store.DeclareTeam(ctx, in.Body.Name, in.Body.DisplayName); err != nil {
+			// Whether this declared the team comes from the write that
+			// declared it, and decides the trail row and the status. Set on
+			// every attempt: a retry runs against a team another request has
+			// just declared.
+			if team, declared, err = store.DeclareTeam(ctx, in.Body.Name, in.Body.DisplayName); err != nil {
 				return core.Asked(a.Logger, err)
 			}
 			if declared {

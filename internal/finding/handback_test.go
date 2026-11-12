@@ -171,7 +171,7 @@ func TestATeamHandsBackWhatNoMemberStillReads(t *testing.T) {
 			each(t, func(t *testing.T, f *fixture) {
 				ctx := t.Context()
 				rights := access.NewStore(f.db.DB)
-				team, err := rights.DeclareTeam(ctx, "desk", "Desk")
+				team, _, err := rights.DeclareTeam(ctx, "desk", "Desk")
 				if err != nil {
 					t.Fatal(err)
 				}

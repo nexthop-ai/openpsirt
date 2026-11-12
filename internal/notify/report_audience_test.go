@@ -53,7 +53,7 @@ func newAudienceWorld(t *testing.T, w *fixture.World) audienceWorld {
 	if _, err := rights.Deactivate(ctx, out.departed.ID); err != nil {
 		t.Fatal(err)
 	}
-	team, err := rights.DeclareTeam(ctx, "intake", "Intake")
+	team, _, err := rights.DeclareTeam(ctx, "intake", "Intake")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func newAudienceWorld(t *testing.T, w *fixture.World) audienceWorld {
 		}
 	}
 	out.team = team
-	unread, err := rights.DeclareTeam(ctx, "bystanders", "Bystanders")
+	unread, _, err := rights.DeclareTeam(ctx, "bystanders", "Bystanders")
 	if err != nil {
 		t.Fatal(err)
 	}

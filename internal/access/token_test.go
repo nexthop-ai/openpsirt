@@ -429,7 +429,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		if err := f.store.GrantRole(ctx, person.ID, elsewhere, access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		team, err := f.store.DeclareTeam(ctx, "kernel", "Kernel")
+		team, _, err := f.store.DeclareTeam(ctx, "kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}

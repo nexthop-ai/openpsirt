@@ -23,7 +23,7 @@ func TestAScanOpeningWorkUnderARuleQueuesItsSweep(t *testing.T) {
 			t.Fatal(err)
 		}
 		rights := access.NewStore(f.db.DB)
-		team, err := rights.DeclareTeam(ctx, "platform", "platform")
+		team, _, err := rights.DeclareTeam(ctx, "platform", "platform")
 		if err != nil {
 			t.Fatal(err)
 		}

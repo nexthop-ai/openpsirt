@@ -452,10 +452,20 @@ func TestAnActThatCouldNotFinishLeavesNothingBehind(t *testing.T) {
 
 // Declared from two requests at once, a team is declared by one of them: the
 // request losing the race runs again, finds the team, and says it made nothing.
+// The same holds for a retired team declared again, which one request
+// reinstates.
 func TestDeclaringOneTeamTwiceAtOnceIsOneDeclaration(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		for round := range 4 {
-			name := "kernel-" + string(rune('a'+round))
+		trailRows := func(name string) int {
+			rows, err := r.DB.DB.NewSelect().TableExpr(`"admin_change"`).
+				Where(`"about" = ?`, name).Count(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return int(rows)
+		}
+		declareAtOnce := func(name string) {
+			before := trailRows(name)
 			codes := make([]int, 4)
 			var wait sync.WaitGroup
 			for i := range codes {
@@ -478,14 +488,23 @@ func TestDeclaringOneTeamTwiceAtOnceIsOneDeclaration(t *testing.T) {
 			if created != 1 {
 				t.Errorf("declaring %s at once answered created %d times, want once", name, created)
 			}
-			rows, err := r.DB.DB.NewSelect().TableExpr(`"admin_change"`).
-				Where(`"about" = ?`, name).Count(t.Context())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if rows != 1 {
+			if rows := trailRows(name) - before; rows != 1 {
 				t.Errorf("declaring %s at once left %d trail rows, want one", name, rows)
 			}
+		}
+		for round := range 4 {
+			declareAtOnce("kernel-" + string(rune('a'+round)))
+		}
+		for round := range 4 {
+			name := "retired-" + string(rune('a'+round))
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+				`{"name":"`+name+`"}`); got.Code != http.StatusCreated {
+				t.Fatalf("declaring %s answered %d: %s", name, got.Code, got.Body.String())
+			}
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete, "/v1/teams/"+name, ""); got.Code >= 300 {
+				t.Fatalf("retiring %s answered %d: %s", name, got.Code, got.Body.String())
+			}
+			declareAtOnce(name)
 		}
 	})
 }

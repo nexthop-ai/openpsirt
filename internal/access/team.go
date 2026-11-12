@@ -68,25 +68,30 @@ const MostTeamMembers = 500
 var ErrNoSuchTeam = refusal.New("no team is known by that name")
 
 // DeclareTeam records a team, or returns the one already declared under that
-// name.
+// name, and reports whether this call declared it: inserted it, or reinstated
+// it from retirement.
 //
 // Declaring rather than creating, the way a product is: the same name arriving
 // twice is one team, and a second call is how a deployment script stays
-// runnable.
-func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Team, error) {
+// runnable. The report comes from the write that declared the team, because a
+// separate lookup before it reads a different moment on an engine that reads
+// committed rows per statement, and two callers at once would each be told
+// they declared it.
+func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Team, bool, error) {
 	matched := typedname.Matching(name)
 	if matched == "" {
-		return nil, refusal.Errorf("a team needs a name")
+		return nil, false, refusal.Errorf("a team needs a name")
 	}
 	shown := strings.TrimSpace(displayName)
 	// A longer name is refused. Cut, the name stored and the name typed
 	// would differ, and declaring the typed one again would make a second
 	// team.
 	if utf8.RuneCountInString(matched) > database.NameWidth || utf8.RuneCountInString(shown) > database.NameWidth {
-		return nil, refusal.Errorf("a team's name is at most %d characters", database.NameWidth)
+		return nil, false, refusal.Errorf("a team's name is at most %d characters", database.NameWidth)
 	}
 
 	team := new(Team)
+	declared := false
 	// Both statements or neither, for the reason a person and their party
 	// are written together: a team nothing can be assigned to is not a team.
 	// And the lookup is inside, because a retry runs against a database
@@ -96,7 +101,7 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 	// refused: declaring a team and putting people on it is one act, and what
 	// this asks for is met by the caller's transaction.
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		*team = Team{}
+		*team, declared = Team{}, false
 		found := new(Team)
 		err := tx.NewSelect().Model(found).
 			Where(`"name" = ?`, matched).Limit(1).Scan(ctx)
@@ -112,14 +117,27 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			// refused by the index with a message about a team that is not
 			// there as far as anybody can see. Reinstating is also what
 			// somebody typing a name they retired last week means.
-			if _, err := tx.NewUpdate().Model((*Team)(nil)).
+			//
+			// Conditional on the team still being retired, so of two callers
+			// reinstating it at once only the one whose write matched it
+			// declared it; the other runs again and finds it in use.
+			res, err := tx.NewUpdate().Model((*Team)(nil)).
 				Set(`"retired_at" = ?`, nil).
 				Set(`"display_name" = ?`, shown).
-				Where(`"id" = ?`, found.ID).Exec(ctx); err != nil {
+				Where(`"id" = ?`, found.ID).
+				Where(`"retired_at" IS NOT NULL`).Exec(ctx)
+			if err != nil {
 				return err
 			}
+			reinstated, err := database.Changed(res, "reinstate the team")
+			if err != nil {
+				return err
+			}
+			if !reinstated {
+				return fmt.Errorf("reinstate the team %q: %w", matched, database.ErrGoAgain)
+			}
 			found.RetiredAt, found.DisplayName = nil, shown
-			*team = *found
+			*team, declared = *found, true
 			return nil
 		case !database.IsNoRows(err):
 			// A read that could not be made says nothing about whether the
@@ -143,13 +161,13 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			}
 			return err
 		}
-		*team = *fresh
+		*team, declared = *fresh, true
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("record the team %q: %w", name, err)
+		return nil, false, fmt.Errorf("record the team %q: %w", name, err)
 	}
-	return team, nil
+	return team, declared, nil
 }
 
 // TeamByName reads a team by the name people type. A retired one is not found:

@@ -151,7 +151,7 @@ func TestWorkCanBeHandedToSomebodyElse(t *testing.T) {
 			t.Error("work was handed to the person who already had it")
 		}
 		// A party no person holds holds nothing, disclosed work included.
-		team, err := access.NewStore(f.db.DB).DeclareTeam(t.Context(), "kernel", "Kernel")
+		team, _, err := access.NewStore(f.db.DB).DeclareTeam(t.Context(), "kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}
