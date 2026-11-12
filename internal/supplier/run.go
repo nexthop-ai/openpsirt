@@ -215,12 +215,13 @@ func (p *Pass) from(ctx context.Context, feed Feed) (Taken, error) {
 	}
 	// A failure of this deployment says nothing about the publisher: the mark
 	// moves as far as the pass read and the supplier stays due. It is recorded
-	// as this deployment's, so one that repeats at the same document shows on
-	// the supplier rather than in the log alone.
-	if errors.As(err, new(local)) {
-		ours := refusal.Errorf("this deployment failed, not the publisher: %v", err)
+	// as this deployment's in fixed words, since a database's own text is never
+	// shown, so one that repeats at the same document shows on the supplier
+	// rather than in the log alone. A pass cut short by shutdown records none.
+	if errors.As(err, new(local)) && !cut {
+		ours := errFailedHere
 		if barred != nil {
-			ours = refusal.Errorf("%v; %v", ours, barred)
+			ours = refusal.Errorf("%v; %v", errFailedHere, barred)
 		}
 		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark, ours); marked != nil {
 			p.logger.Error("recording how far a supplier was read",
@@ -245,6 +246,10 @@ func (p *Pass) from(ctx context.Context, feed Feed) (Taken, error) {
 	}
 	return took, err
 }
+
+// errFailedHere is what a supplier records where this deployment, not the
+// publisher, stopped the pass.
+var errFailedHere = refusal.New("this deployment failed, not the publisher; its log says why")
 
 // recordedAs is who a fetched claim is recorded as having been brought in by.
 //

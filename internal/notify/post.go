@@ -195,7 +195,7 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 			// message's fault: nothing is counted against them.
 			p.logger.Error("mail is refused until the server offers STARTTLS or plain mail is accepted",
 				"channel", p.channel.Name(), "error", sendErr)
-			return sent, failed + 1, nil
+			return sent, failed, nil
 		}
 		if sendErr != nil {
 			failed++
