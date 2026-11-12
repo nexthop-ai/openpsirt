@@ -706,6 +706,8 @@ describe("analytics", () => {
           {
             product: "sonic",
             branch_or_tag: "v1",
+            product_name: "sonic",
+            branch_or_tag_name: "v1",
             kind: "tag",
             ended_on: "2026-01-01",
             ended_days: 10,
