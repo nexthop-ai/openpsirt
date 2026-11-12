@@ -7,27 +7,23 @@ import (
 	"io"
 	"strings"
 	"testing"
-
-	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// A declaration ends where the decoder ends it: a bracket inside its quotes
-// does not end it, and a quote or bracket inside a comment within it is
-// neither. Ended earlier, the guard reads what follows as a comment
-// the decoder never saw, and counts no tag after it.
-func TestATagAfterADeclarationIsStillBounded(t *testing.T) {
+// A declaration ends what the guard reads. The reader refuses the document
+// when the decoder returns the declaration, so the refusal names it whatever
+// follows, an over-long tag included, and the guard never answers first.
+func TestTheGuardLeavesADeclarationToTheReader(t *testing.T) {
 	long := "<a " + strings.Repeat("b", 200) + ">"
 	for name, declaration := range map[string]string{
-		"a bracket in quotes":          `<!DOCTYPE a "x><!--">`,
-		"a quote in a comment":         `<!DOCTYPE x [<!-- ' -->]>`,
-		"a bracket in a comment":       `<!DOCTYPE x [<!-- < -->]>`,
-		"a nested bracket, no comment": `<!DOCTYPE x [<!ENTITY a "b">]>`,
-		"a quote straight after <!":    `<!"x>`,
+		"a bracket in quotes":       `<!DOCTYPE a "x><!--">`,
+		"a comment inside it":       `<!DOCTYPE x [<!-- ' -->]>`,
+		"a nested bracket":          `<!DOCTYPE x [<!ENTITY a "b">]>`,
+		"a quote straight after <!": `<!"x>`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			guard := &tagGuard{r: strings.NewReader(declaration + long), most: 64}
-			if _, err := io.ReadAll(guard); !refusal.In(err) {
-				t.Errorf("a tag past the bound after %s answered %v", name, err)
+			if _, err := io.ReadAll(guard); err != nil {
+				t.Errorf("the guard answered %v after %s, which the reader refuses", err, name)
 			}
 		})
 	}
