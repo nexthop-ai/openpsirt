@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -106,6 +107,43 @@ func TestAnUploadNamesItsBuild(t *testing.T) {
 	} {
 		if _, err := analysesURL(to); err == nil {
 			t.Errorf("%+v was accepted", to)
+		}
+	}
+}
+
+// A plain http address is refused unless it is this machine or plain http is
+// allowed, because the key would cross the network unencrypted.
+func TestAPlainHTTPAddressIsRefusedUnlessItIsThisMachineOrAllowed(t *testing.T) {
+	for _, address := range []string{"http://192.0.2.1", "http://psirt.example.com:8080/", "HTTP://psirt.example.com"} {
+		_, err := analysesURL(Target{URL: address, Product: "p", BranchOrTag: "b", Variant: "v"})
+		if err == nil || !strings.Contains(err.Error(), "--allow-http") {
+			t.Errorf("%s answered %v, want a refusal naming --allow-http", address, err)
+		}
+	}
+	for _, to := range []Target{
+		{URL: "http://127.0.0.1:8080"},
+		{URL: "http://localhost:8080"},
+		{URL: "http://[::1]:8080"},
+		{URL: "http://192.0.2.1", AllowHTTP: true},
+		{URL: "https://psirt.example.com"},
+	} {
+		to.Product, to.BranchOrTag, to.Variant = "p", "b", "v"
+		if _, err := analysesURL(to); err != nil {
+			t.Errorf("%+v was refused: %v", to, err)
+		}
+	}
+}
+
+// An address that is not a deployment's is refused without its password,
+// which a CI log would otherwise keep.
+func TestARefusedAddressHidesItsPassword(t *testing.T) {
+	for _, address := range []string{"psirt.example.com:hunter2@x", "ftp://u:hunter2@psirt.example.com",
+		"https://bot:12/hunter2@psirt.example.com"} {
+		_, err := analysesURL(Target{URL: address, Product: "p", BranchOrTag: "b", Variant: "v"})
+		if err == nil || !strings.Contains(err.Error(), "not the address of a deployment") {
+			t.Errorf("%s answered %v, want a refusal", address, err)
+		} else if strings.Contains(err.Error(), "hunter2") {
+			t.Errorf("%s: the refusal shows the password: %v", address, err)
 		}
 	}
 }

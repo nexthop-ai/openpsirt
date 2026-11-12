@@ -295,3 +295,17 @@ func TestAConfiguredAddressIsReachedWhereverItIs(t *testing.T) {
 		}
 	}
 }
+
+// A host is this machine where it is localhost in any spelling or a loopback
+// address in any form, and nowhere else.
+func TestOnlyThisMachineIsLoopback(t *testing.T) {
+	for host, want := range map[string]bool{
+		"localhost": true, "LOCALHOST.": true, "127.0.0.1": true, "127.8.9.10": true,
+		"::1": true, "[::1]": true, "::ffff:127.0.0.1": true,
+		"localhost.example.com": false, "10.0.0.1": false, "::2": false, "": false,
+	} {
+		if got := Loopback(host); got != want {
+			t.Errorf("%q read as loopback %v, want %v", host, got, want)
+		}
+	}
+}

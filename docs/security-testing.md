@@ -131,7 +131,8 @@ Run it inside the checkout, or name the checkout with `--source-root`.
 | `--tool-version` | The analyzer's version, where its output does not state one |
 | `--snippets` | Send the source lines of each location, which is the default. With `--snippets=false`, no source leaves the pipeline |
 | `--salt-file` | A file holding a secret that keys each result's fingerprint. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt changes every fingerprint, and the next run is matched as a fingerprint change |
-| `--url` | The deployment's address, where `OPENPSIRT_URL` is not set |
+| `--url` | The deployment's address, where `OPENPSIRT_URL` is not set. A plain `http` address is refused unless it is this machine, because the key would cross the network unencrypted |
+| `--allow-http` | Send to a plain `http` address that is not this machine, inside a network you trust. The client says so each time |
 | `--output` | Where `write` stores the document |
 
 `--exit-status`, `--units-analyzed`, `--tool-version`, `--rule` and

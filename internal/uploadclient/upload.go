@@ -17,12 +17,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 )
 
 // Target is where a run is sent, and the key it is sent with.
+//
+// AllowHTTP permits a plain http address that is not this machine, over
+// which the key crosses the network unencrypted.
 type Target struct {
 	URL, Key                      string
 	Product, BranchOrTag, Variant string
+	AllowHTTP                     bool
 }
 
 // Fields is what is sent beside the document: the values the deployment
@@ -97,8 +104,14 @@ func Send(ctx context.Context, client *http.Client, to Target, doc []byte, field
 // analysesURL is the operation a build's analyzer runs are sent to.
 func analysesURL(to Target) (string, error) {
 	base, err := url.Parse(strings.TrimSuffix(to.URL, "/"))
-	if err != nil || base.Host == "" || (base.Scheme != "https" && base.Scheme != "http") {
-		return "", fmt.Errorf("%q is not the address of a deployment", to.URL)
+	// A password holding an unescaped "/", "?" or "#" parses with its start
+	// as the host, which the key would be sent to.
+	if err != nil || base.Host == "" || (base.Scheme != "https" && base.Scheme != "http") || redact.Stray(base) {
+		return "", fmt.Errorf("%q is not the address of a deployment", redact.URL(to.URL))
+	}
+	if base.Scheme == "http" && !to.AllowHTTP && !outward.Loopback(base.Hostname()) {
+		return "", fmt.Errorf("%q is plain http, and the key would cross the network unencrypted: "+
+			"use https, or --allow-http inside a network you trust", redact.URL(to.URL))
 	}
 	for _, part := range []struct{ name, value string }{
 		{"product", to.Product}, {"branch_or_tag", to.BranchOrTag}, {"variant", to.Variant},

@@ -191,6 +191,19 @@ func Pinned(within time.Duration, host string, roots *x509.CertPool) *http.Clien
 	return c
 }
 
+// Loopback reports whether a host is this machine: localhost, in any case
+// and with or without its trailing dot, or a loopback address, bracketed or
+// not. Loopback is the whole of 127.0.0.0/8 and ::1 in every spelling, the
+// IPv4-mapped forms included, so it is asked of the parsed address rather than
+// matched against a list of spellings.
+func Loopback(host string) bool {
+	if strings.EqualFold(strings.TrimSuffix(host, "."), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
 // anywhere is the address check of a client whose address an administrator
 // configured: none.
 func anywhere(string) error { return nil }

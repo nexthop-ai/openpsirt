@@ -15,6 +15,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -24,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 	"github.com/nexthop-ai/openpsirt/internal/uploadclient"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
@@ -37,7 +40,9 @@ const usage = `openpsirt-upload sends an analyzer's run to OpenPSIRT.
 Each OUTPUT is clang plist-multi-file, cppcheck XML version 2, or any tool's
 SARIF 2.1.0, compressed with gzip or not. The address is --url, or
 OPENPSIRT_URL where the flag is not given. The key is read from OPENPSIRT_KEY
-alone, so it is never on a command line a process listing shows.
+alone, so it is never on a command line a process listing shows. A plain
+http address is refused unless it is this machine or --allow-http is given,
+because the key would cross the network unencrypted.
 
 Output of several analyzers is sent as one upload per analyzer, each with its
 own series, named --series TOOL=NAME once per analyzer. write puts each in a
@@ -108,6 +113,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		expected, analyzed, exitStatus   count
 	)
 	fs.StringVar(&to.URL, "url", os.Getenv("OPENPSIRT_URL"), "the deployment's address")
+	fs.BoolVar(&to.AllowHTTP, "allow-http", false, "send to a plain http address that is not this machine, the key unencrypted")
 	fs.StringVar(&to.Product, "product", "", "the declared product the build is of")
 	fs.StringVar(&to.BranchOrTag, "branch-or-tag", "", "the declared branch or tag")
 	fs.StringVar(&to.Variant, "variant", "", "the declared way the branch or tag is built")
@@ -256,6 +262,14 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	to.Key = os.Getenv("OPENPSIRT_KEY")
 	if to.Key == "" {
 		return errors.New("OPENPSIRT_KEY holds no key")
+	}
+	if to.AllowHTTP {
+		if base, err := url.Parse(to.URL); err == nil && base.Scheme == "http" && !outward.Loopback(base.Hostname()) {
+			if _, err := fmt.Fprintf(stderr, "%s is plain http: the key crosses the network unencrypted\n",
+				redact.URL(to.URL)); err != nil {
+				return err
+			}
+		}
 	}
 	// Each analyzer's run is its own upload, and one refused does not keep
 	// the others from being sent.

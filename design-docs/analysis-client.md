@@ -116,6 +116,7 @@ Each result carries `openpsirt/context/v1`, a content fingerprint of its line
 | Address from `--url` or `OPENPSIRT_URL`; key from `OPENPSIRT_KEY` only | A command-line key shows in process listings |
 | A 503 retries after `Retry-After`; a request reaching nothing retries with doubling pauses, five attempts, pauses at most two minutes | |
 | A redirect is not followed, failing the step with its target | It would carry the token |
+| A plain `http` address is refused unless its host is `localhost` or a loopback address, or `--allow-http` is given, which writes a warning naming the address to standard error | The key would cross the network unencrypted |
 | The receipt is printed as returned; a refusal fails the step with its words | 202 means queued |
 
 ## Distribution
