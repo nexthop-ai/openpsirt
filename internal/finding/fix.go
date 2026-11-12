@@ -355,9 +355,9 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 // toldOf keeps the commitments a reader may be told of, visible being what
 // they read in the build's product. The commitment row carries no visibility,
 // so it is read through what it is about. One made by a decision is shown
-// where the reader reads every occurrence the decision covers, each in its own
-// product and issue, a case they were brought into included: the test reading
-// the decision itself makes. One without a decision is shown where some
+// where the reader reads every occurrence the decision covers, each at what
+// they read of its product: a case they were brought into counts for nothing,
+// as it widens no read of a build. One without a decision is shown where some
 // finding at its fold in this build, open or closed, is visible: a commitment
 // whose findings have all closed has landed, and stays readable to whoever
 // could read them.
@@ -382,17 +382,16 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 	withheld := map[int64]bool{}
 	if len(decisions) > 0 {
 		type cover struct {
-			DecisionID      int64             `bun:"decision_id"`
-			ProductID       int64             `bun:"product_id"`
-			VulnerabilityID int64             `bun:"vulnerability_id"`
-			Visibility      access.Visibility `bun:"visibility"`
+			DecisionID int64             `bun:"decision_id"`
+			ProductID  int64             `bun:"product_id"`
+			Visibility access.Visibility `bun:"visibility"`
 		}
 		var covered []cover
 		if err := database.IDsInBatches(ctx, decisions, func(ctx context.Context, batch []int64) error {
 			var some []cover
 			if err := s.db.NewSelect().
 				TableExpr(`"decision_occurrence" AS "de"`).
-				ColumnExpr(`DISTINCT "de"."decision_id", "de"."product_id", "de"."vulnerability_id", "de"."visibility"`).
+				ColumnExpr(`DISTINCT "de"."decision_id", "de"."product_id", "de"."visibility"`).
 				Where(`"de"."decision_id" IN (?)`, bun.List(batch)).
 				Scan(ctx, &some); err != nil {
 				return err
@@ -414,7 +413,7 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 		// of the product, so a case-only reach would show a commitment with
 		// nothing under it.
 		for _, row := range covered {
-			if !slices.Contains(access.Visible(subject, row.ProductID), row.Visibility) {
+			if !subject.Reads(row.Visibility, row.ProductID) {
 				withheld[row.DecisionID] = true
 			}
 		}
