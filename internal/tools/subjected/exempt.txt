@@ -265,6 +265,7 @@ publish.AnyPublishedForBranchOrTag Not varying by reader: whether any served doc
 publish.AnyPublishedForProduct Not varying by reader: whether any served document names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.AnyPublishedForVariant Not varying by reader: whether any served document names a variant. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.Store.TurnOff Who is asking: an administrator turning publishing off for a product records it and withdraws its documents, on a route only an administrator reaches.
+queue.EnsureTurn Not varying by reader: it makes the row a turn is taken on, for a write its caller already authorized.
 queue.Held Not varying by reader: whether a replica holds a lease, for the patch branch progress on a screen only an administrator reaches.
 queue.Leases.Await A background pass: a replica waits its turn to rewrite deadlines after a policy change.
 queue.Leases.Handback A background pass: a replica hands back a lease as a pass ends.
@@ -284,6 +285,7 @@ queue.Queue.Postpone A background pass: a worker puts a job back to wait.
 queue.Queue.Renew A background pass: a worker renews its hold on a job.
 queue.Queue.Settle A background pass: a worker records how a job ended.
 queue.Queue.Succeed A background pass: a worker records a job done.
+queue.TakeTurn Not varying by reader: it makes other writers taking one turn wait, inside a transaction its caller already authorized.
 saved.Store.ForgetFilter A person's own record: it removes a filter the signed-in person saved, keyed by their id.
 saved.Store.SaveFilterPreparing A person's own record: it saves a filter for the signed-in person, keyed by their id.
 saved.Store.SavedFilters A person's own record: the filters the signed-in person saved, keyed by their id.
