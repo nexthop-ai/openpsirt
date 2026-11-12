@@ -79,7 +79,7 @@ func TestEveryTierNamesAWeaknessTheCatalogHolds(t *testing.T) {
 	}
 	for id := range tiers {
 		if _, ok := names[id]; !ok {
-			t.Errorf("%s is named by a tier and not held by catalog %s", id, Version)
+			t.Errorf("%s is named by a tier and not held by the catalog", id)
 		}
 	}
 }
