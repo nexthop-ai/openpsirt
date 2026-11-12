@@ -92,7 +92,12 @@ An object store through the S3-compatible API, never the database.
 |---|---|
 | Configured credentials win over the environment's | |
 | A key without its secret, a secret without its key, and a session token with no key and no name in the endpoint are refused at startup | Dropped, the process runs as whatever the environment offers, silently |
-| The published directory is never the attachment store: refused at startup for one bucket on one endpoint (both unset is the provider default), one folder, or folders nested either way | The directory is public; an attachment is served only after its check (REQ-70) |
+| The published directory is never the attachment store: refused at startup for one bucket on one service, one folder, or folders nested either way | The directory is public; an attachment is served only after its check (REQ-70) |
+| Two endpoints are one service where host, port and path match, ignoring capitals in the host, slashes around the path, credentials and the scheme's default port | A store routed by path keeps its path as a prefix, and the store takes credentials out of its endpoint before using it |
+| Every Amazon S3 address in one partition is one service: China, GovCloud, and the rest | Amazon's bucket names are unique within a partition |
+| An unset endpoint is the same as every other | The SDK resolves it from the environment, a profile or the region |
+| An endpoint that does not parse is the same as every other | |
+| Folders are compared with every symbolic link followed, through the nearest existing folder above one not made yet | A link makes two names for one folder |
 | A refusal names the settings of the store it is about | The two stores share setting names under two prefixes |
 
 ### The filesystem store

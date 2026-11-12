@@ -5,6 +5,8 @@ package config
 
 import (
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -458,6 +460,20 @@ func TestAZulipServerIsReachedOverHTTPSAlone(t *testing.T) {
 // store, a folder holding it, or a folder inside it.
 func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 	root := t.TempDir()
+	// served/attachments, written as linked, and private/csaf, written
+	// through link-to-private. Neither link's own name shares a folder with
+	// what it points at.
+	for _, dir := range []string{"served/attachments", "private"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join(root, "served"), filepath.Join(root, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "private"), filepath.Join(root, "link-to-private")); err != nil {
+		t.Fatal(err)
+	}
 	for _, c := range []struct {
 		what    string
 		set     map[string]string
@@ -468,7 +484,64 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio.example.test/",
 			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://MINIO.example.test",
 		}, "DIRECTORY_BUCKET"},
+		// Amazon's bucket names are global, so its default endpoint and
+		// every regional one reach one bucket of a name.
+		{"one bucket on the default and a regional endpoint", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.eu-west-1.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on one path of one host", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.example.test/tenant-a/",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://S3.example.test/tenant-a",
+		}, "DIRECTORY_BUCKET"},
+		// An unset endpoint is the same as any endpoint.
+		{"one bucket on the default endpoint and one in GovCloud", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_REGION": "us-gov-west-1",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_REGION": "us-gov-west-1",
+			"ATTACHMENT_ENDPOINT": "https://s3.us-gov-west-1.amazonaws.com",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on the default endpoint and one in China", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.cn-north-1.amazonaws.com.cn",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_REGION": "cn-north-1",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on two endpoints in GovCloud", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.us-gov-west-1.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3-fips.us-gov-east-1.amazonaws.com",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on two endpoints in China", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.cn-north-1.amazonaws.com.cn",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.cn-northwest-1.amazonaws.com.cn",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on two regional endpoints", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.us-east-1.amazonaws.com",
+		}, "DIRECTORY_BUCKET"},
+		// The store takes credentials out of its endpoint before using it.
+		{"one bucket on one endpoint, one with credentials", map[string]string{ //nolint:gosec // G101: a made-up credential the store strips
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio.example.test:9000",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://key:secret@minio.example.test:9000",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on one endpoint, one naming its default port", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio.example.test:443/",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://minio.example.test",
+		}, "DIRECTORY_BUCKET"},
+		// An unset endpoint is whatever the SDK resolves, and
+		// AWS_ENDPOINT_URL_S3 can point it anywhere.
+		{"one bucket on the default endpoint and another store", map[string]string{
+			"DIRECTORY_BUCKET":  "psirt",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://minio.example.test:9000",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on an endpoint that does not parse", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio.example.test:x/",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://two.example.test",
+		}, "DIRECTORY_BUCKET"},
 		{"one folder", map[string]string{"DIRECTORY_DIR": root + "/a", "ATTACHMENT_DIR": root + "/a/"}, "DIRECTORY_DIR"},
+		{"the attachments inside the directory through a link", map[string]string{
+			"DIRECTORY_DIR": root + "/linked", "ATTACHMENT_DIR": root + "/served/attachments",
+		}, "DIRECTORY_DIR"},
+		{"the directory inside the attachments through a link", map[string]string{
+			"DIRECTORY_DIR": root + "/link-to-private/csaf", "ATTACHMENT_DIR": root + "/private",
+		}, "DIRECTORY_DIR"},
 		{"the attachments inside the directory", map[string]string{
 			"DIRECTORY_DIR": root, "ATTACHMENT_DIR": root + "/attachments",
 		}, "DIRECTORY_DIR"},
@@ -480,6 +553,23 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 		{"one name on two stores", map[string]string{
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://one.example.test",
 			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://two.example.test",
+		}, ""},
+		{"one name on two ports of one host", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio.example.test:9000",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://minio.example.test:9001",
+		}, ""},
+		{"one name on two paths of one host", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.example.test/tenant-a",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.example.test/tenant-b/",
+		}, ""},
+		// The China partition is a namespace of its own.
+		{"one name on Amazon and on Amazon GovCloud", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.us-gov-west-1.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.us-east-1.amazonaws.com",
+		}, ""},
+		{"one name on Amazon and on Amazon in China", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.cn-north-1.amazonaws.com.cn",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.amazonaws.com",
 		}, ""},
 		{"sibling folders", map[string]string{"DIRECTORY_DIR": root + "/csaf", "ATTACHMENT_DIR": root + "/csaf-private"}, ""},
 		{"a bucket beside a folder", map[string]string{"DIRECTORY_DIR": root, "ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_DIR": root}, ""},
