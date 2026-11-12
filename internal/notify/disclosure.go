@@ -110,6 +110,10 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 			WHERE "sn"."product_id" = "ss"."product_id" AND "sn"."publisher" = "ss"."publisher"
 			  AND "sn"."source" = "ss"."source" AND "sn"."vulnerability" = "ss"."vulnerability"
 			  AND "sn"."component" = "ss"."component" AND "sn"."about" = "ss"."about"
+			  AND COALESCE("sn"."purl", '') = COALESCE("ss"."purl", '')
+			  AND COALESCE("sn"."within_purl", '') = COALESCE("ss"."within_purl", '')
+			  AND COALESCE("sn"."within", '') = COALESCE("ss"."within", '')
+			  AND COALESCE("sn"."within_about", '') = COALESCE("ss"."within_about", '')
 			  AND "sn"."status" = "ss"."status"
 			  AND COALESCE("sn"."justification", '') = COALESCE("ss"."justification", '')
 			  AND "sn"."superseded_at" IS NULL)`).

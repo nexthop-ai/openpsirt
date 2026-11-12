@@ -628,8 +628,8 @@ func TestStoppingTrustingAnUpstreamIsSaidAsThatToADecisionCitingIt(t *testing.T)
 }
 
 // A supplier saying a cited statement again, word for word, in another of its
-// documents leaves the decision citing it untold, and saying something else
-// tells it.
+// documents leaves the decision citing it untold, and withdrawing it tells
+// the decision, though the same words stand about another product.
 func TestASupplierRepeatingACitedStatementElsewhereTellsNobody(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
@@ -640,17 +640,25 @@ func TestASupplierRepeatingACitedStatementElsewhereTellsNobody(t *testing.T) {
 		if err := w.Access.GrantRole(ctx, w.proposer.ID, w.fork.ID, access.PublicTriage); err != nil {
 			t.Fatal(err)
 		}
-		record := func(name string, month time.Month, status string) {
+		recordWithin := func(name string, month time.Month, status, within string) {
 			t.Helper()
 			at := time.Date(2026, month, 1, 0, 0, 0, 0, time.UTC)
 			said := claim
-			said.Status = status
+			said.Status, said.Within = status, within
+			var claims []finding.Statement
+			if status != "" {
+				claims = append(claims, said)
+			}
 			if _, _, err := w.findings.RecordStatements(ctx, w.admin, w.fork.ID, finding.Supplied{
 				Source: finding.FromVex, Identifier: "https://supplier.test/vex/" + name,
-				Publisher: "Supplier", Document: name + ".json", Digest: name, SaidAt: &at,
-			}, []finding.Statement{said}); err != nil {
+				Publisher: "Supplier", Document: name + ".json", Digest: name + month.String(), SaidAt: &at,
+			}, claims); err != nil {
 				t.Fatal(err)
 			}
+		}
+		record := func(name string, month time.Month, status string) {
+			t.Helper()
+			recordWithin(name, month, status, claim.Within)
 		}
 		told := func() int {
 			t.Helper()
@@ -683,9 +691,14 @@ func TestASupplierRepeatingACitedStatementElsewhereTellsNobody(t *testing.T) {
 		if got := told(); got != 0 {
 			t.Errorf("the supplier repeating the statement in another document told the decision %d times", got)
 		}
-		record("july", time.July, "affected")
+		// The same words about the component inside another product leave
+		// the statement the decision cited withdrawn.
+		recordWithin("elsewhere", time.July, claim.Status, "another-product")
+		record("june", time.August, "")
+		record("march", time.September, "")
 		if got := told(); got != 1 {
-			t.Errorf("the supplier saying something else told the decision %d times, want once", got)
+			t.Errorf("the statement withdrawn while the same words stand inside another product told the "+
+				"decision %d times, want once", got)
 		}
 	})
 }

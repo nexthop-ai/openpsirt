@@ -114,6 +114,7 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		advisory.Publisher = strings.TrimSpace(attach.Visible(advisory.Publisher))
 		advisory.Identifier = strings.TrimSpace(attach.Visible(advisory.Identifier))
 		from.Publisher, from.Identifier = advisory.Publisher, advisory.Identifier
+		from.SaidAt = advisory.SaidAt
 		if utf8.RuneCountInString(advisory.Publisher) > finding.MostPublisher {
 			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records",

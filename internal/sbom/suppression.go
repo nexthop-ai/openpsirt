@@ -83,7 +83,7 @@ type Suppression struct {
 	Targets []Target
 	Origin  Origin
 	// SaidAt is when the claim says it was made, where it says: an OpenVEX
-	// statement's timestamp. Nil where it states none.
+	// statement's last_updated, else its timestamp. Nil where it states none.
 	SaidAt *time.Time
 }
 

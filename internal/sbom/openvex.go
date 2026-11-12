@@ -48,9 +48,10 @@ type Statements struct {
 	// keep: an OpenVEX document's @id, a CSAF document's tracking id. Empty
 	// where it states none.
 	Identifier string
-	// SaidAt is when the document says it was issued: an OpenVEX document's
-	// timestamp, a CSAF document's current release date. Nil where it states
-	// none or one that does not parse.
+	// SaidAt is when the document says its current revision was issued: an
+	// OpenVEX document's last_updated, else its timestamp; a CSAF document's
+	// current release date. Nil where it states none or one that does not
+	// parse.
 	SaidAt *time.Time
 	Claims []Suppression
 }
@@ -87,7 +88,7 @@ func ReadStatements(r io.Reader, lim Limits) (Statements, error) {
 		return Statements{}, refusal.Errorf("suppressions are not in a format this reads: they say %q", trim(v.namespace))
 	}
 	return Statements{Publisher: strings.TrimSpace(v.author),
-		Identifier: strings.TrimSpace(v.identifier), SaidAt: v.issued, Claims: v.claims}, nil
+		Identifier: strings.TrimSpace(v.identifier), SaidAt: latest(v.updated, v.issued), Claims: v.claims}, nil
 }
 
 type suppressions struct {
@@ -97,9 +98,10 @@ type suppressions struct {
 	// author is who the document says issued it, and identifier its @id.
 	author     string
 	identifier string
-	// issued is the document's timestamp.
-	issued *time.Time
-	claims []Suppression
+	// issued is the document's timestamp, when it was first issued, and
+	// updated its last_updated, when it last changed.
+	issued, updated *time.Time
+	claims          []Suppression
 	// named counts every identifier this document makes the reader hold: a
 	// product a claim points at, and an identifier an issue also goes by.
 	// Charged as each is read.
@@ -152,6 +154,11 @@ func (v *suppressions) read() error {
 			value, err := v.b.StringOrSkip()
 			v.issued = stampOf(value)
 			return err
+		case "last_updated":
+			// Read leniently, as the timestamp is.
+			value, err := v.b.StringOrSkip()
+			v.updated = stampOf(value)
+			return err
 		case "statements":
 			return v.b.Array(func() error {
 				// Compared before the element is read, so that the claim past
@@ -193,6 +200,7 @@ func (v *suppressions) asCSAF(key string) error {
 func (v *suppressions) statement() (Suppression, error) {
 	claim := Suppression{Origin: FromStatement}
 	var impact, action string
+	var issued, updated *time.Time
 	err := v.b.Object(func(key string) error {
 		switch key {
 		case "vulnerability":
@@ -216,7 +224,11 @@ func (v *suppressions) statement() (Suppression, error) {
 		case "timestamp":
 			// Read leniently, as the document's own is.
 			value, err := v.b.StringOrSkip()
-			claim.SaidAt = stampOf(value)
+			issued = stampOf(value)
+			return err
+		case "last_updated":
+			value, err := v.b.StringOrSkip()
+			updated = stampOf(value)
 			return err
 		default:
 			return v.b.Skip()
@@ -225,6 +237,7 @@ func (v *suppressions) statement() (Suppression, error) {
 	if err != nil {
 		return Suppression{}, err
 	}
+	claim.SaidAt = latest(updated, issued)
 	own, other := impact, action
 	if claim.Status == Affected {
 		own, other = action, impact
@@ -409,4 +422,14 @@ func (v *suppressions) into(dst *Status) error {
 	}
 	*dst = Status(value)
 	return nil
+}
+
+// latest is when an OpenVEX document or statement last changed: its
+// last_updated where it states one, else its timestamp, which is when it was
+// first issued.
+func latest(updated, issued *time.Time) *time.Time {
+	if updated != nil {
+		return updated
+	}
+	return issued
 }

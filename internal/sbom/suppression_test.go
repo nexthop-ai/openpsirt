@@ -679,3 +679,34 @@ func TestAStatementTimeOutsideTheStoredYearsIsNoTime(t *testing.T) {
 		t.Errorf("a statement dated past 9999 in UTC reads as said at %v, want no time", at)
 	}
 }
+
+func TestAnOpenVEXTimeIsWhenItLastChanged(t *testing.T) {
+	// The format's timestamp is when a document or statement was first
+	// issued and last_updated when it last changed, so a revision in place
+	// is as new as its last change.
+	read, err := sbom.ReadStatements(strings.NewReader(`{"@context":"https://openvex.dev/ns/v0.2.0",
+		"@id":"https://example.test/vex/1","author":"Example",
+		"timestamp":"2026-01-01T00:00:00Z","last_updated":"2026-09-01T00:00:00Z",
+		"statements":[
+		  {"timestamp":"2026-02-01T00:00:00Z","last_updated":"2026-08-01T00:00:00Z",
+		   "vulnerability":{"name":"CVE-2026-1"},
+		   "status":"not_affected","products":[{"@id":"pkg:deb/debian/zlib1g@1.3"}]},
+		  {"last_updated":"not a time","timestamp":"2026-03-01T00:00:00Z",
+		   "vulnerability":{"name":"CVE-2026-2"},
+		   "status":"affected","products":[{"@id":"pkg:deb/debian/zlib1g@1.3"}]}]}`), sbom.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if at := read.SaidAt; at == nil || !at.Equal(time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a document last updated in September reads as said at %v", at)
+	}
+	if len(read.Claims) != 2 {
+		t.Fatalf("read %d claims, want 2", len(read.Claims))
+	}
+	if at := read.Claims[0].SaidAt; at == nil || !at.Equal(time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a statement last updated in August reads as said at %v", at)
+	}
+	if at := read.Claims[1].SaidAt; at == nil || !at.Equal(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a statement whose last update does not parse reads as said at %v, want its timestamp", at)
+	}
+}
