@@ -272,10 +272,8 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			t.Fatalf("putting the release back answered %d: %s", set.Code, set.Body.String())
 		}
 		// Putting a release back puts what is open in it back on the clock,
-		// and that rewrite happens away from the request. Run here as well so
-		// what follows is asked of a settled state rather than of a race: it
-		// computes the same deadlines, so the pass that is still in flight
-		// writes the same values.
+		// and that rewrite is a queued job nothing here runs. Run it here so
+		// what follows is asked of a settled state.
 		if _, err := finding.NewStore(r.DB.DB).Recompute(t.Context(),
 			finding.DefaultWindows()); err != nil {
 			t.Fatal(err)

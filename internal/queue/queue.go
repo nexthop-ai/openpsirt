@@ -241,6 +241,29 @@ func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (
 	return job, nil
 }
 
+// AddUnlessWaitingTx is AddTx for work any one run does all of, reporting
+// whether it added a job. Where a job of this kind and reference is waiting
+// unclaimed, that job takes this request too and nothing is added: it has not
+// started, so it reads whatever it decides from after this transaction
+// commits. Work already claimed may have read it before, so it is not counted.
+func (q *Queue) AddUnlessWaitingTx(ctx context.Context, db bun.IDB, kind, reference string) (bool, error) {
+	waiting, err := db.NewSelect().Model((*Job)(nil)).
+		Where(`"kind" = ?`, kind).
+		Where(`"reference" = ?`, reference).
+		Where(`"state" = ?`, Pending).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("ask whether the work is already waiting: %w", err)
+	}
+	if waiting {
+		return false, nil
+	}
+	if _, err := q.AddTx(ctx, db, kind, reference); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Depth counts work of one kind waiting to be done.
 //
 // Per kind, because the cap it feeds exists so that a runaway producer cannot

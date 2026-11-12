@@ -6,7 +6,10 @@
 package adminapi
 
 import (
+	"context"
+
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -37,7 +40,9 @@ func Register(api huma.API, in core.Deps) {
 		Scans: func() *ingest.Store {
 			return ingest.NewStore(in.DB.DB)
 		},
-		RewriteDeadlines: deadlinesRewritten(in),
+		RewriteDeadlines: func(ctx context.Context, tx bun.IDB) error {
+			return rewritingDeadlines(ctx, in.Logger, tx, in.Queue)
+		},
 	})
 	registerAdministration(api, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,

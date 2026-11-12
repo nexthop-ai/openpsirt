@@ -13,7 +13,7 @@ import (
 //
 // They share the Declaring handle and nothing else. Declaring something is an
 // administrator inventing a thing scans may be filed against; stating policy
-// on it moves what is on a clock at all, away from the request; reading it
+// on it moves what is on a clock at all, through a queued rewrite; reading it
 // answers what exists, narrowed to what the reader may see. One function
 // holding all three makes the middle group — the four that silently rewrite
 // what the tool reports — the hardest of the three to find.

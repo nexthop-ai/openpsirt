@@ -36,6 +36,7 @@ var alwaysRuns = []string{
 	"send what is owed outward",
 	"assign unheld work to teams",
 	"sweep every ruled product",
+	"rewrite deadlines after a policy change",
 	"apply analyzer runs",
 	"fail jobs whose worker died",
 }

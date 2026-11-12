@@ -31,6 +31,7 @@ dates each rewrite what the tool reports, so their record is evidence.
 | The record is written in the transaction making the change, and a failure to record fails the change with a refusal saying it was not made | A retry then changes nothing twice |
 | What follows the change is outside it: deactivation ends sessions inside, and hands work back after it commits, bounded by what they held, never by the request | Ending sessions is what deactivation means |
 | A grant and its withdrawal are recorded alike, minting a credential included | |
+| A setting, or a product's or release's policy or repositories, stated as it already stands leaves no row | A row per request says it changed on every save of an unchanged form |
 | A person recorded with administration or audit records each from not held, beside the row recording them; recorded again, each records only where it moved | An access review reads the trail for who was made an administrator |
 | A revocation that matched nothing leaves no row and is refused as not found: a grant, an estate grant, a removed group mapping, a team membership, a place on a case, a personal token, a pipeline key, a pinned identifier | Read as a withdrawal, it hands back work for a role never held |
 | Never the secret, and never the whole address: what a credential may send, and a destination's host | For Slack and Teams the address is the credential |

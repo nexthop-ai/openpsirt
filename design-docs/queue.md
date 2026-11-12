@@ -34,7 +34,8 @@ claim goes stale.
 | Rule | Reason |
 |---|---|
 | A job holds no payload | The queue stays small however large its subject |
-| Kinds are defined with the queue: read a scan, scan for vulnerabilities, sweep the assignment rules, apply an analyzer's run to its build | |
+| Kinds are defined with the queue: read a scan, scan for vulnerabilities, sweep the assignment rules, apply an analyzer's run to its build, check a replaced inventory, rewrite deadlines after a policy change | |
+| Work any one run does all of is queued once while a job for it waits unclaimed: the waiting job takes the later request, and one already claimed does not | A job not yet started reads what it decides from when it runs; a claimed one may have read it already |
 | A kind is stored in the row | Renaming one leaves queued work nothing claims |
 
 ## Exclusive handout
@@ -132,7 +133,7 @@ it takes a **lease** on the work's name under the same conditional update.
 |---|---|
 | Expiry | A lease lapses rather than only being handed back |
 | Retention | The holder asks for it again each cycle |
-| Release | Handed back on a clean shutdown by every pass that takes one except work run once a period, once its last cycle has ended, whether the stop came during a cycle or between two, on a bounded context of its own. A deadline rewrite a request started is ended once the server stops taking requests, and the shutdown waits for its release within the same grace |
+| Release | Handed back on a clean shutdown by every pass that takes one except work run once a period, once its last cycle has ended, whether the stop came during a cycle or between two, on a bounded context of its own |
 | Holder | The host and process an operator reads, plus random characters, since replicas on the host network share a name and every container process is the first |
 | First use | The row is made inside the taking transaction, leaving a row another replica made alone. A cluster refusing that at commit makes the take go again |
 | Duration | Outlasts a cycle, sized from how often the pass runs, so a replica stopping without release holds the work a few passes. Not renewed mid-pass. A process restarted in place after a crash is a new holder and waits out every lease the old one held, up to the mail and webhook leases' full length |
@@ -141,7 +142,7 @@ it takes a **lease** on the work's name under the same conditional update.
 |---|---|---|
 | May be skipped | Does nothing this cycle and asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; failing work whose worker never came back |
 | Once a period | Asks every few minutes whether the lease has lapsed, takes it for the period and leaves it to lapse; the holder is refused until then like any other replica, so the expiry records when the work is next due. It is never handed back on shutdown, and a failed pass hands it back so the next replica asking runs it | Sweeping every ruled product (`design-docs/access-assignment.md` § The sweep) |
-| Must happen | Waits for its turn, then applies. A failed take is a missed turn, asked again at the next poll; the wait ends only with its context | Rewriting deadlines after a policy change. One process runs one rewrite at a time per database, and changes arriving meanwhile are one more run reading the newest policy |
+| Must happen | Runs as a queued job, which waits for its turn, then applies. A failed take is a missed turn, asked again at the next poll; the wait ends only with its context, and a job ended before applying is tried again by the queue | Rewriting deadlines after a policy change, queued in the change's transaction; changes arriving while it waits are taken by it, and one arriving while it runs queues one more |
 
 Work that waits reads what it decides from after its turn comes, inside what
 serializes it.

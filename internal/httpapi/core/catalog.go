@@ -41,13 +41,12 @@ type Declaring struct {
 	// question the list exists to answer.
 	Findings func() *finding.Store
 	Scans    func() *ingest.Store
-	// RewriteDeadlines applies a changed line to what is already open,
-	// away from the request. Moving what a product triages moves what is
-	// on a clock at all, so it invalidates stored deadlines for the same
-	// reason changing a window does — and it goes through the same
-	// one-replica-at-a- time path, because two rewrites racing is the same
-	// problem whichever setting started them.
-	RewriteDeadlines func(ctx context.Context, what, value string)
+	// RewriteDeadlines queues the rewrite of what is already open, in the
+	// transaction moving a product's or a release's policy. Moving what a
+	// product triages, or when it goes out of support, moves what is on a
+	// clock at all, so it invalidates stored deadlines for the reason
+	// changing a window does, and goes through the same queued rewrite.
+	RewriteDeadlines func(ctx context.Context, tx bun.IDB) error
 }
 
 // Handle is the database a read-only route builds its store over.

@@ -21,7 +21,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/adminapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/issuedate"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -91,6 +90,8 @@ type passes struct {
 	talk      *notify.Talk
 	keeper    *attach.Keeper
 	assigning *finding.Sweeper
+	// rewriting rewrites stored deadlines after a policy change.
+	rewriting *finding.Rewriter
 	analyze   *analysis.Worker
 	// undertaker fails the jobs whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
@@ -151,6 +152,7 @@ func (p passes) loops() []loop {
 		{"send what is owed outward", p.outward.Run, 0},
 		{"assign unheld work to teams", p.assigning.Run, readInterval},
 		{"sweep every ruled product", p.assigning.CatchUp, 0},
+		{"rewrite deadlines after a policy change", p.rewriting.Run, readInterval},
 		{"apply analyzer runs", p.analyze.Run, readInterval},
 		{"fail jobs whose worker died", p.undertaker.Run, 0},
 	}
@@ -281,10 +283,6 @@ func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger,
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownGrace)
 	defer cancel()
 	shutdownErr := srv.Shutdown(shutdownCtx)
-	// A deadline rewrite a request started runs off the request, so the
-	// server's drain does not wait for it. Ended here, once no request can
-	// start another, it hands its lease back for the next process.
-	adminapi.StopRewrites(shutdownCtx)
 
 	// And give the workers the same bound, rather than none.
 	//
