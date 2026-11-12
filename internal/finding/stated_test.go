@@ -4,7 +4,9 @@
 package finding_test
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -182,6 +184,63 @@ func TestABuildsStatementNamesTheComponentAsTheBuildStatedIt(t *testing.T) {
 		}
 		if len(covered) != 1 || covered[0].Component != libnl.Name {
 			t.Errorf("the build's statement names %+v, want %s", covered, libnl.Name)
+		}
+	})
+}
+
+// rot13 is a name no fold or substring of the original matches.
+func rot13(name string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return 'a' + (r-'a'+13)%26
+		case r >= 'A' && r <= 'Z':
+			return 'A' + (r-'A'+13)%26
+		}
+		return r
+	}, name)
+}
+
+// The list and the trend show a component as its build stated it, so a name
+// typed into any of their filters matches that name, though the component row
+// holds the name another product stated first.
+func TestANameTypedIntoAFilterMatchesTheNameTheBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		f.shippedTo(t, elsewhere, stating(twoConsumers(), rot13))
+		f.shipped(t, twoConsumers())
+		f.applied(t, found("CVE-2026-1", libnl))
+		who := f.holding(t, access.PublicRead)
+
+		listed := func(filter finding.Filter) int {
+			t.Helper()
+			groups, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return len(groups)
+		}
+		for name, filter := range map[string]finding.Filter{
+			"component": {Components: []string{strings.ToUpper(libnl.Name)}},
+			"under":     {Under: swss.Name},
+			"search":    {Search: "libnl"},
+		} {
+			if listed(filter) == 0 {
+				t.Errorf("the %s filter, given the name the build stated, keeps nothing", name)
+			}
+		}
+		if n := listed(finding.Filter{Exclude: []string{libnl.Name}}); n != 0 {
+			t.Errorf("excluding the name the build stated keeps %d groups", n)
+		}
+
+		points, err := f.store.Trend(ctx, who, f.wholeProduct(), time.Time{}, 24*time.Hour, 2,
+			finding.Within{Component: libnl.Name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if last := points[len(points)-1]; last.Open != 1 {
+			t.Errorf("the trend of the component the build stated shows %d open, want 1", last.Open)
 		}
 	})
 }

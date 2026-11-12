@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // KeyMatches says a decision occurrence `de` covers the versions a finding's
@@ -359,6 +360,9 @@ func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products [
 	if err := s.purlComponentsFor(ctx, filter, products, all); err != nil {
 		return err
 	}
+	if err := s.statedNamesFor(ctx, filter, products, all); err != nil {
+		return err
+	}
 	needed, args := filter.decisionNeeded()
 	into := &filter.decidedIssues
 	if needed == "" {
@@ -484,6 +488,69 @@ func (f Filter) fixStates() []FixState {
 		}
 	}
 	return kept
+}
+
+// namesStated is the components the builds in a list's products stated under
+// each name a filter asks for.
+type namesStated struct {
+	components, excluded, under, search []int64
+}
+
+// statedNamesFor sets the components a build in these products stated under
+// the names a filter asks for. All is every product.
+func (s *Store) statedNamesFor(ctx context.Context, filter *Filter, products []int64, all bool) error {
+	filter.stated = namesStated{}
+	if !all && len(products) == 0 {
+		return nil
+	}
+	var err error
+	if names := trimmed(filter.Components); len(names) > 0 {
+		if filter.stated.components, err = statedAs(ctx, s.db, products, all,
+			`"n"."name_folded" IN (?)`, bun.List(foldedNames(names))); err != nil {
+			return err
+		}
+	}
+	if names := trimmed(filter.Exclude); len(names) > 0 {
+		if filter.stated.excluded, err = statedAs(ctx, s.db, products, all,
+			`"n"."name_folded" IN (?)`, bun.List(foldedNames(names))); err != nil {
+			return err
+		}
+	}
+	if under := strings.TrimSpace(filter.Under); under != "" && !filter.UnderTheBuild {
+		if filter.stated.under, err = statedAs(ctx, s.db, products, all,
+			`"n"."name_folded" = ?`, graph.Folded(under)); err != nil {
+			return err
+		}
+	}
+	if term := strings.TrimSpace(filter.Search); term != "" {
+		if filter.stated.search, err = statedAs(ctx, s.db, products, all,
+			`"n"."name_folded" LIKE ?`+database.LikeClause, "%"+containsTerm(term)+"%"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// statedAs is the components a build in these products stated under a name
+// the condition on the node's fold chooses, at any scan. All is every product.
+// Asked build by build, which the index on the node's build and fold answers.
+func statedAs(ctx context.Context, db bun.IDB, products []int64, all bool,
+	condition string, args ...any) ([]int64, error) {
+
+	builds := db.NewSelect().TableExpr(`"build" AS "sb"`).ColumnExpr(`"sb"."id"`)
+	if !all {
+		builds = builds.Join(`JOIN "branch_or_tag" AS "ss" ON "ss"."id" = "sb"."branch_or_tag_id"`).
+			Where(`"ss"."product_id" IN (?)`, bun.List(products))
+	}
+	var ids []int64
+	if err := db.NewSelect().Distinct().TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."component_id"`).
+		Where(`"n"."build_id" IN (?)`, builds).
+		Where(condition, args...).
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read the components stated under a name: %w", err)
+	}
+	return ids, nil
 }
 
 // purlComponentsFor sets the components a filter's package identifier

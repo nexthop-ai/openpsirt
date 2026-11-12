@@ -361,6 +361,17 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 			return nil, err
 		}
 	}
+	// The components a build stated under the name asked for, read once:
+	// the chart names a component as its build stated it, and the row can
+	// hold another product's name.
+	var stated []int64
+	if name := strings.TrimSpace(within.Component); name != "" && (all || len(products) > 0) {
+		var err error
+		if stated, err = statedAs(ctx, s.db, products, all, `"n"."name_folded" = ?`,
+			graph.Folded(name)); err != nil {
+			return nil, err
+		}
+	}
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	// The replaced components holding a finding, read once for each condition
 	// a caller asks with: a burndown asks with one condition twice, and on
@@ -376,8 +387,11 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 		// A component name is matched at any version: a chart of one version
 		// of one package is a chart of a moment.
 		if name := strings.TrimSpace(within.Component); name != "" {
-			q = q.Where(`"f"."component_id" IN (?)`,
-				componentsWhere(q, `"c"."name_folded" = ?`, graph.Folded(name)))
+			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return orStated(q.WhereOr(`"f"."component_id" IN (?)`,
+					componentsWhere(q, `"c"."name_folded" = ?`, graph.Folded(name))),
+					`"f"."component_id"`, stated)
+			})
 		}
 		if len(within.Beneath) > 0 {
 			// Only the replaced components holding a finding in the range read.
