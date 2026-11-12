@@ -307,32 +307,17 @@ func (s *server) described(v *view) (*file, error) {
 	if len(v.csaf) == 0 {
 		return nil, publish.ErrNotPublished
 	}
-	newest := csaf.Newest(v.csaf)
-	role := csaf.Provider
 	var keys []csaf.PublicKey
 	if s.Signer != nil {
-		role = csaf.TrustedProvider
 		keys = []csaf.PublicKey{{Fingerprint: s.Signer.Fingerprint(),
 			URL: s.Base + publish.KeysPath + s.Signer.Fingerprint() + ".asc"}}
 	}
-	return jsonFile(csaf.ProviderMetadata{
-		CanonicalURL: s.Base + publish.MetadataPath,
-		Distributions: []csaf.Distribution{{
-			DirectoryURL: s.Base + publish.DirectoryPath,
-			ROLIE: &csaf.ROLIE{Feeds: []csaf.FeedDescription{{
-				Summary:  "Security documents " + s.Who.Name + " publishes, TLP:" + advisory.Travelable + ".",
-				TLPLabel: advisory.Travelable,
-				URL:      s.Base + publish.FeedPath,
-			}}},
-		}},
-		LastUpdated: csaf.Stamp(newest),
-		Listed:      s.List,
-		Mirrored:    s.Mirror,
-		Version:     csaf.MetadataVersion,
-		Publisher:   advisory.IssuerOf(s.Who),
-		PublicKeys:  keys,
-		Role:        role,
-	}, time.Time{})
+	return jsonFile(csaf.Describe(csaf.Description{
+		Metadata: s.Base + publish.MetadataPath, Directory: s.Base + publish.DirectoryPath,
+		Feed: s.Base + publish.FeedPath, Name: s.Who.Name, TLP: advisory.Travelable,
+		Publisher: advisory.IssuerOf(s.Who), Listed: s.List, Mirrored: s.Mirror,
+		Keys: keys, Newest: csaf.Newest(v.csaf),
+	}), time.Time{})
 }
 
 // feed is every CSAF document as one ROLIE feed, each entry naming the files
@@ -349,7 +334,7 @@ func (s *server) feed(v *view) (*file, error) {
 	}
 	at := func(path string) string { return s.Base + publish.DirectoryPath + path }
 	return jsonFile(csaf.FeedOf(csaf.FeedName(s.Who.Prefix),
-		s.Who.Name+" CSAF documents (TLP:"+advisory.Travelable+")",
+		csaf.FeedTitle(s.Who.Name, advisory.Travelable),
 		s.Base+publish.FeedPath, at, beside, v.csaf), time.Time{})
 }
 

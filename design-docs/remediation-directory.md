@@ -58,6 +58,7 @@ is a copy.
 | The supplier reader follows this directory, which a test checks, reading only the fields it uses | A misshaped unused field leaves the listing readable |
 | A document's stated address and its path come from one rule: the tracking identifier names it, the initial release date folders it | |
 | A hash file sits beside each document and nothing else | The feed names it in the document's entry |
+| The description and the feed are built by the rule the served surface (`design-docs/publishing.md`) builds its own by; only the addresses, the files beside each document and the keys differ | One deployment describes itself one way |
 | The feed names itself by a token, never its address | The feed shape allows letters, digits, a plus, a hyphen, an underscore and a dot |
 | The list of changes and the feed are how outsiders follow publication: no subscriber list, no per-CVE notice | Configured destinations are this deployment's notifications (`design-docs/notifications-delivery.md`) |
 
