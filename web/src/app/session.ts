@@ -120,7 +120,7 @@ export async function signOut(
 // What a sign-out's answer means for this browser: nobody is signed in on it
 // any more, the proxy in front of the deployment holds the sign-in, or the
 // session is still live.
-export type SignOutAnswer = "ended" | "at-the-proxy" | "not-ended";
+type SignOutAnswer = "ended" | "at-the-proxy" | "not-ended";
 
 // The answer a sign-out's status means. A refusal for want of any session is
 // signed out; 409 is the server saying a proxy signed this browser in.

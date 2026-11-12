@@ -76,6 +76,19 @@ async function signedOut(status: number): Promise<string> {
 }
 
 describe("signing out", () => {
+  it("is not offered where the proxy signed the reader in, and says where it happens", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    const sent = answer("DELETE", () => ({ status: 204 }));
+    mount.render(screen(<Shell who={{ ...who, by_proxy: true }}>{null}</Shell>, "/start"));
+    await settle();
+    const you = mount.host().querySelector<HTMLButtonElement>('button[aria-label="You"]');
+    await act(async () => you?.click());
+    const buttons = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);
+    expect(buttons.some((text) => text?.startsWith("Sign out"))).toBe(false);
+    expect(mount.host().textContent).toContain("Sign out there");
+    expect(sent()).toHaveLength(0);
+  });
+
   it("says to sign out at the proxy where the proxy signed the reader in", async () => {
     const said = await signedOut(409);
     expect(said).toContain("Sign out there");

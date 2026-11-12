@@ -6982,7 +6982,7 @@ export interface paths {
         post?: never;
         /**
          * Sign out
-         * @description Ends the session the request arrived on, everywhere rather than in this browser alone — the session is stored, so it stops working whichever copy of the application answers next. A browser a trusted proxy signed in holds no session here, so its sign-out is refused with 409: it signs out at the proxy, which otherwise signs the next request straight back in.
+         * @description Ends the session the request arrived on; it stops working on every copy of the application. A browser the trusted proxy signed in holds no session here and is refused with 409; it signs out at the proxy.
          *
          *     Requires: your own sign-in, as a person and not a pipeline key
          */
@@ -16668,6 +16668,8 @@ export interface components {
              * @description The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
              */
             bulk_cap?: number;
+            /** @description Whether the trusted proxy in front of this deployment signed this browser in, so that signing out happens there */
+            by_proxy?: boolean;
             /** @description The chat platforms this deployment offers and what they chose, where it offers any */
             chat?: components["schemas"]["ChatBody"];
             /** @description They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names */

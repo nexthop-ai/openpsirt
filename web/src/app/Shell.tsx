@@ -912,31 +912,40 @@ function Me({ who }: { who: Who }) {
             Your account
             <span className="tag">tokens, digest</span>
           </Link>
-          <button
-            type="button"
-            className="opt"
-            role="menuitem"
-            // The sequence lives in session.ts, where its ordering can be
-            // asserted: what makes it correct is which parts run before the
-            // await and outside the try, and a click handler is not somewhere
-            // a test can reach that from.
-            disabled={leaving}
-            onClick={() => {
-              setLeaving(true);
-              setStuck(null);
-              void signOut(
-                async () => signedOutBy((await api.DELETE("/v1/session", {})).response.status),
-                (where) => window.location.assign(where),
-              ).then((answer) => {
-                if (answer === "ended") return;
-                setLeaving(false);
-                setStuck(answer);
-              });
-            }}
-          >
-            {stuck === "not-ended" ? "Try signing out again" : "Sign out"}
-            <span className="tag">{who.identity}</span>
-          </button>
+          {/* A sign-in the proxy holds ends at the proxy: there is no session
+              here to end, and the proxy signs the next request back in. */}
+          {who.by_proxy && (
+            <p className="hint" style={{ margin: "4px 10px" }}>
+              Your proxy signed you in. Sign out there.
+            </p>
+          )}
+          {!who.by_proxy && (
+            <button
+              type="button"
+              className="opt"
+              role="menuitem"
+              // The sequence lives in session.ts, where its ordering can be
+              // asserted: what makes it correct is which parts run before the
+              // await and outside the try, and a click handler is not somewhere
+              // a test can reach that from.
+              disabled={leaving}
+              onClick={() => {
+                setLeaving(true);
+                setStuck(null);
+                void signOut(
+                  async () => signedOutBy((await api.DELETE("/v1/session", {})).response.status),
+                  (where) => window.location.assign(where),
+                ).then((answer) => {
+                  if (answer === "ended") return;
+                  setLeaving(false);
+                  setStuck(answer);
+                });
+              }}
+            >
+              {stuck === "not-ended" ? "Try signing out again" : "Sign out"}
+              <span className="tag">{who.identity}</span>
+            </button>
+          )}
           {stuck === "not-ended" && (
             <p className="hint" role="alert" style={{ margin: "4px 10px" }}>
               Sign-out didn&rsquo;t reach the server. You&rsquo;re still signed in here.

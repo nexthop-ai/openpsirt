@@ -210,6 +210,21 @@ func TestSigningOutThroughTheProxyIsRefusedRatherThanAnsweredAsDone(t *testing.T
 	})
 }
 
+func TestTheAnswerAboutYourselfSaysWhetherTheProxySignedYouIn(t *testing.T) {
+	// The menu offers a sign-out only where there is a session to end.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.Body(t, "reader", http.MethodGet, "/v1/session/me"); got.Code != http.StatusOK ||
+			!strings.Contains(got.Text, `"by_proxy":true`) {
+			t.Errorf("a proxy arrival answered %d: %s", got.Code, got.Text)
+		}
+		issued := signIn(t, r, "reader")
+		got := asBrowser(t, r, issued, http.MethodGet, "/v1/session/me", "")
+		if got.Code != http.StatusOK || strings.Contains(got.Body.String(), "by_proxy") {
+			t.Errorf("a session of ours answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
 func TestSigningOutIsNotSomethingAKeyCanDo(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.AsKey(t, http.MethodDelete, "/v1/session"); got != http.StatusForbidden {

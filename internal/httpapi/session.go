@@ -31,11 +31,9 @@ func registerSession(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "sign-out", Method: http.MethodDelete, Path: "/v1/session",
 		Summary: "Sign out",
-		Description: "Ends the session the request arrived on, everywhere rather than in this " +
-			"browser alone — the session is stored, so it stops working whichever copy of the " +
-			"application answers next. A browser a trusted proxy signed in holds no session here, " +
-			"so its sign-out is refused with 409: it signs out at the proxy, which otherwise signs " +
-			"the next request straight back in.",
+		Description: "Ends the session the request arrived on; it stops working on every copy of " +
+			"the application. A browser the trusted proxy signed in holds no session here and is " +
+			"refused with 409; it signs out at the proxy.",
 		Tags:          []string{"Access"},
 		DefaultStatus: http.StatusNoContent,
 	}, core.OwnSubject, ""), func(ctx context.Context, _ *struct{}) (*SignOutOutput, error) {
