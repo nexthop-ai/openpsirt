@@ -138,11 +138,6 @@ func (p Paths) ModulePath(i int) (string, bool) {
 	return strings.TrimSuffix(p.modules[i], "/"), true
 }
 
-// Within is a path relative to the repository at position i.
-func (p Paths) Within(i int, rel string) string {
-	return strings.TrimPrefix(rel, p.modules[i])
-}
-
 // absolute resolves an address through its chain of named starting points to
 // an absolute one: a file URI's path, or an absolute path written bare. It is
 // false where the chain ends at an undefined name. Reading refused a run whose

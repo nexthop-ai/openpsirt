@@ -143,7 +143,7 @@ func TestASubtreeHoldingACycleIsEachComponentOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 		var ids []int64
-		if err := graph.Within(f.db.DB, f.buildID, f.componentNamed(t, curl.Name)).
+		if err := graph.WithinAny(f.db.DB, f.buildID, []int64{f.componentNamed(t, curl.Name)}, true).
 			Scan(ctx, &ids); err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +253,7 @@ func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 			t.Errorf("the root counts %+v beneath it, want the issue at the end of the chain", top)
 		}
 		var ids []int64
-		if err := graph.Within(f.db.DB, f.buildID, f.componentNamed(t, chain[0].Name)).
+		if err := graph.WithinAny(f.db.DB, f.buildID, []int64{f.componentNamed(t, chain[0].Name)}, true).
 			Scan(ctx, &ids); err != nil {
 			t.Fatal(err)
 		}
