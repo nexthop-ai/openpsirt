@@ -186,7 +186,7 @@ A revision is a fact about a moment: recorded, and read by requests.
 |---|---|
 | A revision is written only where its digest moved: the stated address, the publisher, the title, the product tree and the statements | Moving the deployment's address or publisher revises everything |
 | Turning publishing on for a product, or renaming a publishing one, is refused, naming the other, where a product that publishes or has published folds alike | The filename rule folds `edge.os` and `edge os` to one path; a withdrawn document keeps its path |
-| The pass refuses a path another product holds, naming the first and saying to turn the second off, and carries on with the rest | Reached only by turning both on at once |
+| The pass refuses a path another product holds, naming the path and the first product and saying to turn the second off, and carries on with the rest | Reached by turning both on at once, or by a tracking identifier folding alike across the boundary between product name and issue |
 | A rename is refused once a document that may name the part was served, withdrawn ones included | Readers hold documents by names |
 | Naming a part: a product, any document about it; a release, its OpenVEX document and, once it has a scanned build, every CSAF VEX document of its product; a variant, every document of its product once it has a scanned build | Which builds a revision named is in its bytes alone. Unscanned, a release or variant may be renamed |
 | The next revision is one past the last, with every earlier one in its history; its first release, and so its year folder, never moves | |
@@ -221,6 +221,7 @@ what moved.
 | One replica writes, under a lease | The conditional write stops a double revision when a lease is lost mid-pass |
 | A product that cannot be worked out is logged and skipped; its documents stay as they were | |
 | What has not moved is stepped over on a digest read; what has is decided again in its own transaction | |
+| That transaction writes a fresh value into the product's row, matched on its publishing, and re-reads the statuses published; either moved since generation, it writes nothing | Turning a product off withdraws its documents in a transaction writing that row, so a late write either matches nothing or is withdrawn by it |
 | Documents grow with decisions, never with scanner output | A document is an issue somebody decided |
 | A pass reads every build's decisions whatever is published, most of its cost (`design-docs/publishing-measurements.md`) | |
 

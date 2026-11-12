@@ -145,6 +145,7 @@ read answers from a snapshot and a write lands on whatever the row holds.
 | An issue | A merge, for every issue it names; a replaced inventory's check, for every issue it read as undated |
 | A build | A replaced inventory's check; a read asking whether a newer scan overtook it |
 | A product, a release and a variant | Recording that a VEX document went out, matching the name each had when it was generated |
+| A product | Writing one of its published documents, matching that it still publishes |
 | Every response window in force | Declaring a window counting from another, changing one, retiring one |
 | An incident | Naming or withdrawing a fix release, while the record stands |
 | A series | Applying one of its runs |

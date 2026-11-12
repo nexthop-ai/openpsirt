@@ -415,7 +415,8 @@ func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
 		}
 		_, err = w.pass.Product(t.Context(), w.anybody(), mustProduct(t, w, "edge os"), "all")
 		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(err.Error(), "of edge.os,") ||
-			!strings.Contains(err.Error(), "turn publishing off for this product") {
+			!strings.Contains(err.Error(), "turn publishing off for this product") ||
+			strings.Contains(err.Error(), "name folds") {
 			t.Errorf("the second product's document was refused as %v, want the path taken by edge.os", err)
 		}
 	})
@@ -511,6 +512,52 @@ func TestAWontFixNamingNothingToDoStatesThatNoFixIsPlanned(t *testing.T) {
 		}
 		if len(want) != 0 {
 			t.Errorf("no OpenVEX statement about %v", want)
+		}
+	})
+}
+
+// A pass that generated a product's documents before publishing was turned
+// off writes none of them after it: neither the document stating again what
+// it stated, nor a revision, nor a new one. Turned on again, the product
+// serves nothing until a pass works its documents out again.
+func TestAPassRacingATurnOffServesNothingWhenTurnedOnAgain(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		w.write()
+		// Who the pass generates for, read as the pass reads it before
+		// publishing is turned off.
+		subject := w.anybody()
+		statuses, err := publish.Statuses(t.Context(), w.DB.DB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Something new to say, so the late write would be a new document
+		// and a revision as well as one stated again.
+		w.decide(w.Build, "CVE-2026-1002", libnl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
+		// Turned off as an administrator turns it off.
+		w.publishes(w.Product, false)
+		if err := w.documents.WithdrawProduct(t.Context(), w.Product.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		wrote, err := w.pass.Product(t.Context(), subject, w.Product, statuses)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wrote.Revised != 0 {
+			t.Errorf("a pass generated before the turn-off wrote %d documents after it", wrote.Revised)
+		}
+		w.publishes(w.Product, true)
+		if listed := w.listed("all"); len(listed) != 0 {
+			t.Errorf("turned on again, the product serves %d documents no pass worked out since: %+v",
+				len(listed), listed)
 		}
 	})
 }

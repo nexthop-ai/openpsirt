@@ -5,6 +5,7 @@ package publish
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -188,11 +189,14 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 }
 
 // ErrPathTaken is a document whose path another product's document already
-// holds: two product names the standard's filename rule folds alike. Retrying
+// holds: two tracking identifiers the standard's filename rule folds alike,
+// from two product names that fold alike or from where one product's name
+// ends and its issue's begins. Retrying
 // never clears it, and neither does withdrawing the other product's, which
-// keeps its path; it is refused in words, naming the other product. Turning
-// publishing on for a product is refused where this would happen, so it is
-// reached only by two products turned on at once.
+// keeps its path; it is refused in words, naming the path and the other
+// product. Turning publishing on is refused where two product names fold
+// alike; a clash across the boundary between product and issue is refused
+// here, document by document.
 var ErrPathTaken = refusal.New("another product's document is published at the same path")
 
 // Statuses is which statuses the deployment publishes now.
@@ -244,6 +248,9 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		revised = false
 		now := s.now().UTC().Truncate(time.Microsecond)
+		if ok, err := stillPublishing(ctx, tx, productID, statuses); err != nil || !ok {
+			return err
+		}
 		was := new(Document)
 		err := tx.NewSelect().Model(was).
 			Where(`"pub"."product_id" = ?`, productID).
@@ -294,8 +301,8 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 				productID, one.Kind, one.Subject).
 			Scan(ctx, &other); {
 		case err == nil:
-			return fmt.Errorf("%w: %s is held by a document of %s, whose name folds to the same "+
-				"filename; turn publishing off for this product", ErrPathTaken, path, other)
+			return fmt.Errorf("%w: %s is held by a document of %s, whose tracking identifier "+
+				"folds to the same filename; turn publishing off for this product", ErrPathTaken, path, other)
 		case !database.IsNoRows(err):
 			return fmt.Errorf("read who publishes at %s: %w", path, err)
 		}
@@ -338,6 +345,37 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 		return nil
 	})
 	return revised, err
+}
+
+// stillPublishing takes the product's row, matched on its documents still
+// being published, and confirms the deployment still publishes the statuses
+// the document was generated under.
+//
+// The document was generated before this transaction opened. Turning a
+// product's publishing off withdraws its documents in the transaction that
+// writes the product row, so a write of a fresh value into that row, matched
+// on publishing, either waits for the turn-off and matches nothing, or commits
+// first and has its document withdrawn by it. A fresh value, because MySQL and
+// MariaDB skip a write that changes nothing and a cluster certifies only rows
+// written. A setting narrowed since generation writes nothing either; the next
+// pass generates under the setting in force.
+func stillPublishing(ctx context.Context, tx bun.IDB, productID int64, statuses string) (bool, error) {
+	result, err := tx.NewUpdate().Model((*catalog.Product)(nil)).
+		Set(`"taken_by" = ?`, rand.Text()).
+		Where(`"id" = ?`, productID).Where(`"publishes" = ?`, true).
+		Exec(ctx)
+	if err != nil {
+		return false, fmt.Errorf("confirm the product still publishes: %w", err)
+	}
+	n, err := database.Affected(result)
+	if err != nil || n == 0 {
+		return false, err
+	}
+	now, err := Statuses(ctx, tx)
+	if err != nil {
+		return false, err
+	}
+	return now == statuses, nil
 }
 
 // unchanged records that a document stating what it stated stands again, or
