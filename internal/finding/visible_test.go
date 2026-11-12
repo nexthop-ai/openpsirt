@@ -291,3 +291,63 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 		}
 	})
 }
+
+// A commitment carries no visibility of its own, so it is read through what it
+// is about: one over undisclosed work is told to nobody who may not read that
+// work, whether a decision argued for it or not.
+func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
+	for _, argued := range []bool{false, true} {
+		name := "without a decision"
+		if argued {
+			name = "argued by a decision"
+		}
+		t.Run(name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				f.shipped(t, twoConsumers())
+				f.foundOnLibnl(t)
+				if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+					Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				var decisionID *int64
+				if argued {
+					by := f.somebodyElse(t)
+					id := decisionSaying(t, f.db, by, "upgrade-needed")
+					f.decision(t, decisionRow{
+						By: by, Decision: id, Issue: f.issue(t, "CVE-2026-1"),
+						Occurrence: "libnl", State: "approved", Visibility: string(access.Private),
+					})
+					decisionID = &id
+				}
+				committer := f.someoneElse(t, access.PrivateTriage)
+				if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
+					f.componentID(t, libnl.Name), "3.9.0", nil, decisionID,
+					[]int64{f.build}, map[int64]string{}); err != nil {
+					t.Fatal(err)
+				}
+
+				for _, c := range []struct {
+					what string
+					who  access.Subject
+					want int
+				}{
+					{"a reader of disclosed work alone", f.holding(t, access.PublicRead), 0},
+					{"a reader of both", f.holding(t, access.PublicRead, access.PrivateRead), 1},
+				} {
+					planned, err := f.store.PlannedUpgradesFor(ctx, c.who, f.build)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(planned) != c.want {
+						t.Errorf("%s is told of %d commitments, want %d", c.what, len(planned), c.want)
+						continue
+					}
+					if c.want == 1 && planned[0].State != finding.UpgradePlanned {
+						t.Errorf("%s reads the commitment as %s, want planned", c.what, planned[0].State)
+					}
+				}
+			})
+		})
+	}
+}

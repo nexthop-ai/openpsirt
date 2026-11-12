@@ -2,7 +2,7 @@
 
 Declared fix intent, the commitments it writes, and how scans answer them.
 
-Satisfies REQ-19, REQ-28, REQ-34, REQ-35, REQ-36.
+Satisfies REQ-19, REQ-28, REQ-34, REQ-35, REQ-36, REQ-43.
 
 Deadlines, upstream currency, version ordering, advisories, the CSAF document,
 the VEX document and the provider directory have documents of their own
@@ -109,6 +109,7 @@ and the upgrades it waits on, here. One query, keyed on the fold at both ends.
 | Each row counts what is still open under it: distinct issues and their occurrences | A build is clear when it stops holding them |
 | A bump is keyed on its target as well as its source | Grouped on source alone, upgrades to 5.9.0 and 5.9.2 read as one row; on a real image 42 of 127 pairs carry more than one target |
 | The last tie breaks on the fold | Rows keep one order across pages |
+| A commitment is listed to a reader who may read what it is about: every occurrence its decision covers, or with no decision, some finding at its fold in the build, open or closed (REQ-43) | The row carries no visibility of its own, and a commitment over undisclosed work names the work |
 | One source at two versions in one build lists the earlier first, by the ecosystem's ordering (`design-docs/remediation-versions.md`), else by text | |
 
 ## Build-declared suppressions

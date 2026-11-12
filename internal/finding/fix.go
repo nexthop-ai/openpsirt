@@ -265,6 +265,9 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this build is waiting on: %w", err)
 	}
+	if rows, err = s.toldOf(ctx, buildID, visible, rows); err != nil {
+		return nil, err
+	}
 	if len(rows) == 0 {
 		return nil, nil
 	}
@@ -335,6 +338,69 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	return planned, nil
+}
+
+// toldOf keeps the commitments a reader at these visibilities may be told of.
+// The commitment row carries no visibility, so it is read through what it is
+// about. One made by a decision is shown where every occurrence the decision
+// covers is at a visibility the reader holds, the test reading the decision
+// itself makes. One without a decision is shown where some finding at its
+// fold in this build, open or closed, is: a commitment whose findings have all
+// closed has landed, and stays readable to whoever could read them.
+func (s *Store) toldOf(ctx context.Context, buildID int64, visible []access.Visibility,
+	rows []Upgrade) ([]Upgrade, error) {
+
+	var decisions []int64
+	var folds []string
+	for _, row := range rows {
+		if row.DecisionID != nil {
+			decisions = append(decisions, *row.DecisionID)
+		} else {
+			folds = append(folds, row.FoldKey)
+		}
+	}
+	withheld := map[int64]bool{}
+	if len(decisions) > 0 {
+		var ids []int64
+		if err := s.db.NewSelect().
+			TableExpr(`"decision_occurrence" AS "de"`).
+			ColumnExpr(`DISTINCT "de"."decision_id"`).
+			Where(`"de"."decision_id" IN (?)`, bun.List(decisions)).
+			Where(`"de"."visibility" NOT IN (?)`, bun.List(visible)).
+			Scan(ctx, &ids); err != nil {
+			return nil, fmt.Errorf("read which commitments argue about undisclosed work: %w", err)
+		}
+		for _, id := range ids {
+			withheld[id] = true
+		}
+	}
+	seen := map[string]bool{}
+	if len(folds) > 0 {
+		var held []string
+		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(`DISTINCT `+FoldedOn).
+			Where(kinds, kindArgs...).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(folds)).
+			Scan(ctx, &held); err != nil {
+			return nil, fmt.Errorf("read which commitments are about readable work: %w", err)
+		}
+		for _, fold := range held {
+			seen[fold] = true
+		}
+	}
+	told := rows[:0]
+	for _, row := range rows {
+		if row.DecisionID != nil && !withheld[*row.DecisionID] ||
+			row.DecisionID == nil && seen[row.FoldKey] {
+			told = append(told, row)
+		}
+	}
+	return told, nil
 }
 
 // movedTo changes what a commitment is moving to, or refuses where an
