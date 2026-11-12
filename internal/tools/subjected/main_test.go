@@ -6,6 +6,7 @@ package main
 import (
 	"go/parser"
 	"go/token"
+	"reflect"
 	"testing"
 )
 
@@ -365,12 +366,48 @@ func TestAnExemptionNamesItsReason(t *testing.T) {
 	if _, err := parseExempt([]byte("finding.Store.Apply\n")); err == nil {
 		t.Error("an exemption with no reason was accepted")
 	}
-	exempt, err := parseExempt([]byte("# a comment\n\nfinding.Store.Apply A background pass.\n"))
+	if _, err := parseExempt([]byte("finding.Store.Apply\t \n")); err == nil {
+		t.Error("an exemption followed by whitespace alone was accepted")
+	}
+	exempt, err := parseExempt([]byte("# a comment\n\nfinding.Store.Apply A background pass.\n" +
+		"finding.Store.Begin\tA background pass.\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exempt["finding.Store.Apply"] != "A background pass." {
-		t.Errorf("the exemption reads %v", exempt)
+	want := map[string]string{
+		"finding.Store.Apply": "A background pass.",
+		"finding.Store.Begin": "A background pass.",
+	}
+	if !reflect.DeepEqual(exempt, want) {
+		t.Errorf("the exemptions read %q, want %q", exempt, want)
+	}
+}
+
+// A method querying with no subject is reported unless exempt, and an
+// exemption naming a method that no longer does is reported too.
+func TestAnUnexemptMethodAndAStaleExemptionAreBothReported(t *testing.T) {
+	found := []method{{name: "finding.Store.Apply", at: "a.go:1"}, {name: "finding.Store.Leak", at: "a.go:9"}}
+	exempt := map[string]string{"finding.Store.Apply": "why", "finding.Store.Gone": "why"}
+	unexempt, stale, err := judge(found, 3, exempt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(unexempt, []method{{name: "finding.Store.Leak", at: "a.go:9"}}) {
+		t.Errorf("unexempt is %v, want the leak alone", unexempt)
+	}
+	if !reflect.DeepEqual(stale, []string{"finding.Store.Gone"}) {
+		t.Errorf("stale is %v, want the exemption nothing matches", stale)
+	}
+	unexempt, stale, err = judge(found[:1], 3, map[string]string{"finding.Store.Apply": "why"})
+	if err != nil || len(unexempt) != 0 || len(stale) != 0 {
+		t.Errorf("a covered set reported %v, %v, %v", unexempt, stale, err)
+	}
+}
+
+// Nothing examined reads the same as nothing wrong, so it is refused.
+func TestExaminingNoStoreMethodIsRefused(t *testing.T) {
+	if _, _, err := judge(nil, 0, map[string]string{}); err == nil {
+		t.Error("a run that examined no store method passed")
 	}
 }
 

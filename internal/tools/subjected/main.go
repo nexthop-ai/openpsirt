@@ -35,6 +35,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
@@ -90,21 +91,44 @@ func main() {
 		fmt.Fprintln(os.Stderr, "subjected:", err)
 		os.Exit(1)
 	}
-	if examined == 0 {
-		fmt.Fprintln(os.Stderr, "subjected: no store method or function was found, so this checked nothing")
+	unexempt, stale, err := judge(found, examined, exempt)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "subjected:", err)
 		os.Exit(1)
 	}
-	failed := false
+	if len(unexempt) > 0 {
+		fmt.Fprintln(os.Stderr, "these store methods and functions query with no subject to narrow by, "+
+			"and are not named in internal/tools/subjected/exempt.txt:")
+		for _, one := range unexempt {
+			fmt.Fprintf(os.Stderr, "  %s: %s\n", one.at, one.name)
+		}
+	}
+	for _, name := range stale {
+		fmt.Fprintf(os.Stderr, "  %s is exempt in internal/tools/subjected/exempt.txt and "+
+			"no longer queries without a subject\n", name)
+	}
+	if len(unexempt) > 0 || len(stale) > 0 {
+		os.Exit(1)
+	}
+	fmt.Printf("every store method and function that queries takes a subject or says why not "+
+		"(%d examined, %d exempt)\n", examined, len(exempt))
+}
+
+// judge is what the gate reports from the store methods and functions found
+// querying with no subject, against the exemptions: each one not exempt, and
+// each exemption naming one that no longer does, which one of that name added
+// later would be waved through by. Nothing examined is an error, since it
+// reads the same as nothing wrong.
+func judge(found []method, examined int, exempt map[string]string) ([]method, []string, error) {
+	if examined == 0 {
+		return nil, nil, fmt.Errorf("no store method or function was found, so this checked nothing")
+	}
+	var unexempt []method
 	named := map[string]bool{}
 	for _, one := range found {
 		named[one.name] = true
 		if _, ok := exempt[one.name]; !ok {
-			if !failed {
-				fmt.Fprintln(os.Stderr, "these store methods and functions query with no subject to narrow by, "+
-					"and are not named in internal/tools/subjected/exempt.txt:")
-			}
-			failed = true
-			fmt.Fprintf(os.Stderr, "  %s: %s\n", one.at, one.name)
+			unexempt = append(unexempt, one)
 		}
 	}
 	var stale []string
@@ -114,16 +138,7 @@ func main() {
 		}
 	}
 	sort.Strings(stale)
-	for _, name := range stale {
-		failed = true
-		fmt.Fprintf(os.Stderr, "  %s is exempt in internal/tools/subjected/exempt.txt and "+
-			"no longer queries without a subject\n", name)
-	}
-	if failed {
-		os.Exit(1)
-	}
-	fmt.Printf("every store method and function that queries takes a subject or says why not "+
-		"(%d examined, %d exempt)\n", examined, len(exempt))
+	return unexempt, stale, nil
 }
 
 // inTree is inSources over every package under internal/, keyed by directory
@@ -527,7 +542,8 @@ func builds(body *ast.BlockStmt) bool {
 }
 
 // parseExempt reads the exempt list: one method per line as
-// package.Type.Method, a tab or spaces, and the reason it takes no subject.
+// package.Type.Method, a run of tabs or spaces, and the reason it takes no
+// subject.
 // A line with no reason is refused, because the reason is the whole of what
 // makes an exemption reviewable.
 func parseExempt(list []byte) (map[string]string, error) {
@@ -540,7 +556,10 @@ func parseExempt(list []byte) (map[string]string, error) {
 		if text == "" || strings.HasPrefix(text, "#") {
 			continue
 		}
-		name, reason, _ := strings.Cut(text, " ")
+		name, reason := text, ""
+		if at := strings.IndexFunc(text, unicode.IsSpace); at >= 0 {
+			name, reason = text[:at], text[at:]
+		}
 		if strings.TrimSpace(reason) == "" {
 			return nil, fmt.Errorf("exempt.txt:%d: %s names no reason", line, name)
 		}
