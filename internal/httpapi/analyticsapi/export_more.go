@@ -227,15 +227,15 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 	})
 }
 
-// endStated is the end of a file's period as the file says it. A day named by
-// the caller is said as that day, which is not itself in the period; an open
-// end is the moment the file was asked for, since the day it falls on is
-// partly inside the period and a day said back would exclude it.
-func endStated(asked string, until time.Time) string {
+// boundStated is one side of a file's period as the file says it. A day named
+// by the caller is said as that day; a side the caller left open, or a rolling
+// window's start, is a moment within a day, and a day said back for it names a
+// period the file does not cover.
+func boundStated(asked string, at time.Time) string {
 	if asked == "" {
-		return core.Stamp(until)
+		return core.Stamp(at)
 	}
-	return asDay(until)
+	return asDay(at)
 }
 
 // asDay is a bound on a period as a file states it, and nothing where the
@@ -290,7 +290,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 		// What was asked for, printed on the file. A sheet headed "the record
 		// of decisions" over a narrowed population is a sheet nobody can
 		// check against anything.
-		about := []core.Stated{{Label: "from", Value: asDay(since)}, {Label: "to", Value: endStated(input.To, until)}}
+		about := []core.Stated{{Label: "from", Value: boundStated(input.From, since)}, {Label: "to", Value: boundStated(input.To, until)}}
 		if filter.InForce {
 			about = append(about, core.Stated{Label: "applies", Value: "still standing"})
 		}
@@ -547,7 +547,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "what has been changed administratively",
 			About: []core.Stated{
-				{Label: "from", Value: asDay(since)}, {Label: "to", Value: endStated(input.To, until)}, {Label: "kind", Value: string(input.Kind)},
+				{Label: "from", Value: boundStated(input.From, since)}, {Label: "to", Value: boundStated(input.To, until)}, {Label: "kind", Value: string(input.Kind)},
 			},
 			Header: []string{"at", "actor", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
 			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {

@@ -33,17 +33,18 @@ func TestTheAuditLogRefusesAPeriodHoldingNoDays(t *testing.T) {
 func TestAnAuditFileOpenAtTheEndStatesTheMomentItEnds(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
+		before := time.Now().UTC()
 		file := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
 			"/v1/audit.json?from=2026-01-01", "")
 		if file.Code != http.StatusOK {
 			t.Fatalf("exporting answered %d: %s", file.Code, file.Body.String())
 		}
-		if want := `"to":"` + time.Now().UTC().Format(time.DateOnly) + "T"; !strings.Contains(file.Body.String(), want) {
+		if !httpapitest.StatesAMomentSince(file.Body.String(), "to", before) {
 			t.Errorf("a file open at the end does not state the moment it ends: %s",
 				file.Body.String()[:min(300, len(file.Body.String()))])
 		}
 		unasked := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, "/v1/audit.json", "")
-		if want := `"to":"` + time.Now().UTC().Format(time.DateOnly) + "T"; !strings.Contains(unasked.Body.String(), want) {
+		if !httpapitest.StatesAMomentSince(unasked.Body.String(), "to", before) {
 			t.Errorf("a file asked for no period does not state the moment it ends: %s",
 				unasked.Body.String()[:min(300, len(unasked.Body.String()))])
 		}

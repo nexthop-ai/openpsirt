@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -346,4 +347,19 @@ type Changed struct {
 		Cleared bool   `json:"cleared"`
 	} `json:"items"`
 	Total int `json:"total"`
+}
+
+// StatesAMomentSince reports whether a file states label as a moment from
+// before to now, the way a file states a bound of its period nobody named.
+// A moment is said to the second, so before is taken to its second.
+func StatesAMomentSince(body, label string, before time.Time) bool {
+	found := regexp.MustCompile(`"` + regexp.QuoteMeta(label) + `":"([^"]*)"`).FindStringSubmatch(body)
+	if found == nil {
+		return false
+	}
+	at, err := time.Parse(time.RFC3339, found[1])
+	if err != nil {
+		return false
+	}
+	return !at.Before(before.Truncate(time.Second)) && !at.After(time.Now())
 }
