@@ -6,15 +6,11 @@ package main
 import (
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/nexthop-ai/openpsirt/internal/attach"
-	"github.com/nexthop-ai/openpsirt/internal/cverecord"
-	"github.com/nexthop-ai/openpsirt/internal/directory"
-	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/signing"
+	"unsafe"
 )
 
 // The passes a deployment runs beside the server, and the ones it does not.
@@ -50,7 +46,12 @@ var optional = []string{
 	"write the published advisory directory",
 	"fetch the CVE records",
 	"watch the signing key's expiry",
+	"write the published documents",
 }
+
+// sharedBy is every pass struct field that runs more than one pass, and how
+// many.
+var sharedBy = map[string]int{"assigning": 2}
 
 func TestWhatADeploymentWithNothingConfiguredStillRuns(t *testing.T) {
 	running := named((passes{}).loops())
@@ -71,22 +72,77 @@ func TestWhatADeploymentWithNothingConfiguredStillRuns(t *testing.T) {
 }
 
 // everythingConfigured is the passes of a deployment that configured every
-// optional one.
-func everythingConfigured() passes {
-	return passes{
-		post:    &notify.Post{},
-		talk:    &notify.Talk{},
-		keeper:  &attach.Keeper{},
-		publish: &directory.Writer{},
-		records: &cverecord.Fetcher{},
-		key:     &signing.Watch{},
+// optional one: every field set, read from the struct, so a field added to it
+// is configured here without anybody listing it.
+func everythingConfigured(t *testing.T) passes {
+	t.Helper()
+	var all passes
+	value := reflect.ValueOf(&all).Elem()
+	if value.NumField() == 0 {
+		t.Fatal("the passes hold no field, so this checked nothing")
+	}
+	for i := range value.NumField() {
+		field := value.Field(i)
+		if field.Kind() != reflect.Pointer {
+			t.Fatalf("%s is not a pass", value.Type().Field(i).Name)
+		}
+		setPass(field)
+	}
+	return all
+}
+
+// setPass sets one pass field to a zero pass that nothing runs. The field is
+// unexported, so it is set through its address.
+func setPass(field reflect.Value) {
+	//nolint:gosec // G103: a test setting the unexported fields of a struct in its own package
+	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.New(field.Type().Elem()))
+}
+
+// onlyConfigured is the passes of a deployment configuring one field alone.
+func onlyConfigured(t *testing.T, index int) passes {
+	t.Helper()
+	var one passes
+	setPass(reflect.ValueOf(&one).Elem().Field(index))
+	return one
+}
+
+func TestEveryPassFieldRunsAPass(t *testing.T) {
+	// A field nothing in loops reads is a pass constructed and never run.
+	fields := reflect.TypeFor[passes]().NumField()
+	want := fields
+	for name, n := range sharedBy {
+		if _, ok := reflect.TypeFor[passes]().FieldByName(name); !ok {
+			t.Errorf("%s is listed as running %d passes and is no field of the passes", name, n)
+		}
+		want += n - 1
+	}
+	if got := len(everythingConfigured(t).loops()); got != want {
+		t.Errorf("a deployment with every pass configured runs %d passes, and its %d fields run %d", got, fields, want)
+	}
+	// The fields whose absence stops a pass are the optional ones, one each.
+	nothing := len((passes{}).loops())
+	guarded := 0
+	for i := range fields {
+		added := len(onlyConfigured(t, i).loops()) - nothing
+		if added == 0 {
+			continue
+		}
+		guarded++
+		// A guarded field runs the passes it adds, one unless listed.
+		name := reflect.TypeFor[passes]().Field(i).Name
+		if runs := max(sharedBy[name], 1); added != runs {
+			t.Errorf("%s adds %d passes where it is configured, and is listed as running %d", name, added, runs)
+		}
+	}
+	if guarded != len(optional) {
+		t.Errorf("%d fields are guarded by being configured, and %d passes are listed as optional", guarded, len(optional))
 	}
 }
 
 func TestEveryOptionalPassRunsWhereItIsConfigured(t *testing.T) {
 	// The ones that are absent above, present here — which is what makes the
 	// test above a statement about configuration rather than about nil.
-	running := named(everythingConfigured().loops())
+	running := named(everythingConfigured(t).loops())
 	for _, want := range append(append([]string{}, alwaysRuns...), optional...) {
 		if !running[want] {
 			t.Errorf("%q does not run where it is configured", want)
@@ -102,7 +158,7 @@ func TestEveryPassSaysWhatItIsAndHowOftenItRuns(t *testing.T) {
 	// A pass added to the struct and left out of the list is one that stops
 	// running with nothing saying so, and an unnamed one is a line in a
 	// failure message that names nothing.
-	for _, one := range everythingConfigured().loops() {
+	for _, one := range everythingConfigured(t).loops() {
 		if one.what == "" {
 			t.Error("a pass runs under no name")
 		}

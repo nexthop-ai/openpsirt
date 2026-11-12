@@ -61,9 +61,9 @@ const askInterval = time.Minute
 //
 // Some of them may be absent because what they work on is not configured:
 // the mail sender, the chat sender, the attachment sweeper, the published
-// directory writer and the CVE record fetcher. The rest always run, and only
-// the ones that may be absent are guarded, so a guard is a condition that can
-// be false.
+// directory writer, the CVE record fetcher and the published documents
+// writer. The rest always run, and only the ones that may be absent are
+// guarded, so a guard is a condition that can be false.
 //
 // Grouped rather than passed one at a time. A call site with a parameter per
 // pass cannot be read, and they divide cleanly into what to serve and what to
@@ -164,9 +164,10 @@ func (p passes) loops() []loop {
 	// on is not configured: NewPost where no mail channel is, the chat sender
 	// where no platform is, NewKeeper where no attachment store is,
 	// directory.New where no address or no store for it is, the CVE record
-	// fetcher where the deployment keeps the snapshot itself, and the key's
-	// watch where documents go unsigned or the key never expires. These
-	// guards are the ones that say something.
+	// fetcher where the deployment keeps the snapshot itself, the published
+	// documents writer where nothing is published, and the key's watch where
+	// documents go unsigned or the key never expires. These guards are the
+	// ones that say something.
 	if p.post != nil {
 		all = append(all, loop{"send mail", p.post.Run, 0})
 	}
