@@ -110,10 +110,13 @@ type dependency struct {
 //
 // Licenses, hashes and external references are unioned by value: two catalogs
 // of one module often disagree about which of them they can see, and the union
-// is what is actually known. Properties are unioned by name, keeping what the first
-// producer said, because a property is a producer's own statement and there is
-// no basis here for preferring a later one — a disagreement is recorded as a
-// property of its own rather than resolved, so a reader can see it.
+// is what is actually known. Properties are unioned by name and value: a name
+// may repeat with a value each (a catalog writes every CPE it guessed under
+// one name), and a value either producer said is kept. A name each producer
+// gives exactly one value, and a different one, is a disagreement: it is
+// recorded as a property of its own rather than resolved, because a property
+// is a producer's own statement and there is no basis here for preferring a
+// later one.
 //
 // Every other field is left alone. The core fields are the identity or are
 // derived from it, and anything else a producer set is carried through
@@ -150,14 +153,8 @@ var unioned = []string{"licenses", "hashes", "externalReferences"}
 // the order it first appeared. It reports false where neither side is an
 // array, which is where there is nothing to join.
 func unionArrays(a, b json.RawMessage) (json.RawMessage, bool) {
-	var left, right []json.RawMessage
-	if len(a) > 0 && json.Unmarshal(a, &left) != nil {
-		return nil, false
-	}
-	if len(b) > 0 && json.Unmarshal(b, &right) != nil {
-		return nil, false
-	}
-	if len(left) == 0 && len(right) == 0 {
+	left, right, ok := decodeBoth[json.RawMessage](a, b)
+	if !ok {
 		return nil, false
 	}
 	seen := map[string]bool{}
@@ -183,40 +180,63 @@ type property struct {
 	Value string `json:"value"`
 }
 
-// mergeProperties keeps the first producer's value for a name and records a
-// second, different one as a property of its own, so a disagreement between
-// two catalogs of the same component is visible rather than silently decided.
-func mergeProperties(a, b json.RawMessage) (json.RawMessage, bool) {
-	var left, right []property
+// decodeBoth reads two JSON arrays of T. It reports false where either side
+// is malformed or neither holds anything, which is where there is nothing to
+// merge and the first copy is kept as it was.
+func decodeBoth[T any](a, b json.RawMessage) (left, right []T, ok bool) {
 	if len(a) > 0 && json.Unmarshal(a, &left) != nil {
-		return nil, false
+		return nil, nil, false
 	}
 	if len(b) > 0 && json.Unmarshal(b, &right) != nil {
-		return nil, false
+		return nil, nil, false
 	}
 	if len(left) == 0 && len(right) == 0 {
+		return nil, nil, false
+	}
+	return left, right, true
+}
+
+// mergeProperties keeps every distinct name and value either producer gave.
+// Where each producer gives a name exactly one value and the values differ,
+// the second is recorded as a disagreement property, so it is visible rather
+// than silently decided.
+func mergeProperties(a, b json.RawMessage) (json.RawMessage, bool) {
+	left, right, ok := decodeBoth[property](a, b)
+	if !ok {
 		return nil, false
 	}
-	held := map[string]string{}
+	values := func(props []property) map[string]map[string]bool {
+		out := map[string]map[string]bool{}
+		for _, p := range props {
+			if out[p.Name] == nil {
+				out[p.Name] = map[string]bool{}
+			}
+			out[p.Name][p.Value] = true
+		}
+		return out
+	}
+	said, saying := values(left), values(right)
+	held := map[property]bool{}
 	joined := make([]property, 0, len(left)+len(right))
 	for _, p := range left {
-		if _, seen := held[p.Name]; seen {
+		if held[p] {
 			continue
 		}
-		held[p.Name] = p.Value
+		held[p] = true
 		joined = append(joined, p)
 	}
 	for _, p := range right {
-		was, seen := held[p.Name]
 		switch {
-		case !seen:
-			held[p.Name] = p.Value
-			joined = append(joined, p)
-		case was != p.Value:
+		case held[p]:
+		case len(said[p.Name]) == 1 && len(saying[p.Name]) == 1:
+			held[p] = true
 			joined = append(joined, property{
 				Name:  "openpsirt:compose:disagreement:" + p.Name,
 				Value: p.Value,
 			})
+		default:
+			held[p] = true
+			joined = append(joined, p)
 		}
 	}
 	out, err := json.Marshal(joined)
@@ -521,7 +541,9 @@ func compose(root component, parts []part) (*document, error) {
 			continue
 		}
 		within := parts[owner[c.Ref]].within
-		if within == "" {
+		// The component a part sits inside is never inside itself, whichever
+		// input described it first.
+		if within == "" || c.Ref == within {
 			children = append(children, c.Ref)
 			continue
 		}

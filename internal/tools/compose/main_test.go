@@ -531,3 +531,67 @@ func TestAUnionedFieldTheFirstLacksIsCarriedFromTheSecond(t *testing.T) {
 		t.Errorf("licenses read %q, want what the second producer wrote", got)
 	}
 }
+
+func TestThePartAComponentSitsInsideNeverHoldsItself(t *testing.T) {
+	// The interface's inventory also describes the server, unplaced, and is
+	// read first, so it owns the server.
+	web := `{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "components": [
+	    {"bom-ref": "w", "type": "library", "name": "openpsirt-web", "purl": "pkg:npm/openpsirt-web"},
+	    {"bom-ref": "s", "type": "library", "name": "github.com/nexthop-ai/openpsirt",
+	     "purl": "pkg:golang/github.com/nexthop-ai/openpsirt"}
+	  ]
+	}`
+	composed, err := compose(component{Ref: "root", Type: "container", Name: "openpsirt-image"},
+		[]part{{doc: read(t, web), within: server}, {doc: read(t, theServer)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := kids(t, composed, "root"); !slices.Equal(got, []string{server}) {
+		t.Errorf("the image holds %v directly, want the server alone", got)
+	}
+	if got := kids(t, composed, server); slices.Contains(got, server) || !slices.Contains(got, "pkg:npm/openpsirt-web") {
+		t.Errorf("the server holds %v; want the interface and never itself", got)
+	}
+}
+
+func TestEveryValueOfARepeatedPropertyIsKeptWithoutADisagreement(t *testing.T) {
+	doc := func(ref string) string {
+		return `{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "components": [
+	    {"bom-ref": "` + ref + `", "type": "library", "name": "stdlib", "version": "go1.27.3",
+	     "purl": "pkg:golang/stdlib@go1.27.3",
+	     "properties": [{"name": "syft:cpe23", "value": "cpe:a"}, {"name": "syft:cpe23", "value": "cpe:b"}]}
+	  ]
+	}`
+	}
+	composed, err := image(read(t, doc("x")), read(t, doc("y")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(composed.Components[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "cpe:a") || !strings.Contains(string(body), "cpe:b") {
+		t.Errorf("a value of a repeated property was dropped: %s", body)
+	}
+	if strings.Contains(string(body), "disagreement") || strings.Count(string(body), "cpe:b") != 1 {
+		t.Errorf("two producers agreeing on every value were recorded as disagreeing: %s", body)
+	}
+}
+
+func TestAValueOfARepeatedPropertyOnlyTheSecondGaveIsAddedAsItsOwn(t *testing.T) {
+	body, ok := mergeProperties(
+		json.RawMessage(`[{"name":"syft:cpe23","value":"cpe:a"},{"name":"syft:cpe23","value":"cpe:b"}]`),
+		json.RawMessage(`[{"name":"syft:cpe23","value":"cpe:c"}]`))
+	if !ok {
+		t.Fatal("nothing merged")
+	}
+	want := `[{"name":"syft:cpe23","value":"cpe:a"},{"name":"syft:cpe23","value":"cpe:b"},{"name":"syft:cpe23","value":"cpe:c"}]`
+	if string(body) != want {
+		t.Errorf("merged %s, want %s", body, want)
+	}
+}
