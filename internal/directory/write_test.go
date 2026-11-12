@@ -4,6 +4,7 @@
 package directory_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/csv"
 	"encoding/hex"
@@ -815,6 +816,87 @@ func TestOneReplicaWritesTheDirectoryAtATime(t *testing.T) {
 			t.Errorf("handed the lease, the second replica wrote %+v: %v", written, err)
 		}
 	})
+}
+
+// A replica that lost the lease forgets what it last wrote: another replica
+// may have written the store meanwhile, so taking the lease back it writes
+// once rather than finding its own last set unmoved.
+func TestAReplicaTakingTheLeaseBackWritesAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		leases := queue.NewLeases(f.db)
+		f.issued(t, "A flaw in the recovery console")
+		one, two := f.writerOn(t, "one"), f.writerOn(t, "two")
+		if written, err := one.Write(ctx); err != nil || written.Documents != 1 {
+			t.Fatalf("the first replica wrote %+v: %v", written, err)
+		}
+		if err := leases.Release(ctx, directory.Lease, "one"); err != nil {
+			t.Fatal(err)
+		}
+		if written, err := two.Write(ctx); err != nil || written.Elsewhere {
+			t.Fatalf("handed the lease, the second replica wrote %+v: %v", written, err)
+		}
+		if written, err := one.Write(ctx); err != nil || !written.Elsewhere {
+			t.Fatalf("the first replica wrote %+v while the second held the lease: %v", written, err)
+		}
+		if err := leases.Release(ctx, directory.Lease, "two"); err != nil {
+			t.Fatal(err)
+		}
+		written, err := one.Write(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if written.Unchanged || written.Elsewhere {
+			t.Errorf("taking the lease back, the first replica wrote %+v, trusting what it wrote before", written)
+		}
+	})
+}
+
+// A pass that loses the lease partway stops before its next document, so two
+// replicas never write the store at once.
+func TestAPassLosingTheLeaseStopsWriting(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.issued(t, "A flaw in the recovery console")
+		f.issued(t, "A second flaw")
+		leases := queue.NewLeases(f.db)
+		stolen := &stealing{Storage: f.files, steal: func() {
+			if err := leases.Release(ctx, directory.Lease, "one"); err != nil {
+				t.Error(err)
+			}
+			if mine, err := leases.Take(ctx, directory.Lease, "two", time.Hour); err != nil || !mine {
+				t.Errorf("the second replica could not take the lease: %v %v", mine, err)
+			}
+		}}
+		writer := directory.New(f.db, directory.Published(stolen), issuer,
+			directory.Config{List: true, Mirror: false}, "one", f.logger)
+		written, err := writer.Write(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !written.Elsewhere {
+			t.Errorf("a pass that lost the lease after its first document went on: %+v", written)
+		}
+		// One document and the hash beside it.
+		if stolen.puts != 2 {
+			t.Errorf("a pass that lost the lease after its first document wrote %d files, want 2", stolen.puts)
+		}
+	})
+}
+
+// stealing is a store whose first file hands the lease to another replica.
+type stealing struct {
+	attach.Storage
+	steal func()
+	puts  int
+}
+
+func (s *stealing) Put(ctx context.Context, key string, body io.Reader, size int64, contentType string) error {
+	s.puts++
+	if s.puts == 1 {
+		s.steal()
+	}
+	return s.Storage.Put(ctx, key, body, size, contentType)
 }
 
 // readEdition is the edition an advisory says now, as somebody reading it is

@@ -145,10 +145,6 @@ func (s *Signer) Fingerprint() string { return s.fingerprint }
 // From is when the key that signs became valid.
 func (s *Signer) From() time.Time { return s.from }
 
-// Until is when the key that signs stops being valid, and whether it expires
-// at all.
-func (s *Signer) Until() (time.Time, bool) { return s.until, s.expires }
-
 // PublicKey is the armored public key, which a reader verifies signatures
 // with.
 func (s *Signer) PublicKey() []byte { return s.public }

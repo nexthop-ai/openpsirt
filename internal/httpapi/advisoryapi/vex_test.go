@@ -570,10 +570,8 @@ func TestAFlawThatWillNotBeFixedStatesWhatToDoOrThatNoFixIsPlanned(t *testing.T)
 	// beside it: what to do instead where the decision named it, and that no
 	// fix is planned where it named nothing.
 	//
-	// On every engine. Whether a decision with no mitigation is joined at all
-	// is what decides whether such a flaw is published, and a comparison
-	// against an empty string is the half an engine is most likely to answer
-	// differently on.
+	// On every engine: the covering read's join decides whether such a flaw
+	// is published.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"

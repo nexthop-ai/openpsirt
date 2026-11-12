@@ -217,18 +217,11 @@ func (w *Writer) report(ctx context.Context, written Written, err error) {
 // file that is not there yet is a reader fetching a 404; a file nothing names
 // yet is a reader who has not heard of it, and the next line fixes it.
 func (w *Writer) Write(ctx context.Context) (Written, error) {
-	// Held across the whole pass, read and writes alike, and taken for two
-	// cycles of it, since it is renewed only as a pass starts.
-	cycle := w.interval
-	if cycle <= 0 {
-		cycle = betweenWrites
-	}
-	mine, err := w.leases.Take(ctx, Lease, w.replica, 2*cycle)
-	if err != nil {
-		return Written{}, err
-	}
-	if !mine {
-		return Written{Elsewhere: true}, nil
+	// Held across the whole pass, read and writes alike: taken for two cycles
+	// as the pass starts and asked for again before every file, so a pass
+	// longer than its lease stops rather than writes beside another replica.
+	if mine, err := w.keep(ctx); err != nil || !mine {
+		return Written{Elsewhere: err == nil}, err
 	}
 	// The deployment looking at itself. It holds no role, so it decides
 	// nothing and may only read — and what it reads is what has already been
@@ -284,15 +277,38 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	}
 
 	for _, one := range published {
+		if mine, err := w.keep(ctx); err != nil || !mine {
+			return Written{Elsewhere: err == nil}, err
+		}
 		if err := w.document(ctx, one); err != nil {
 			return Written{}, err
 		}
+	}
+	if mine, err := w.keep(ctx); err != nil || !mine {
+		return Written{Elsewhere: err == nil}, err
 	}
 	if err := w.listings(ctx, published); err != nil {
 		return Written{}, err
 	}
 	w.wrote = fingerprinted
 	return Written{Documents: len(published), Held: held, Skipped: skipped}, nil
+}
+
+// keep takes the directory's lease, or renews it, for two cycles.
+//
+// Losing it forgets what this process last wrote: another replica may write
+// the store before it is taken back, and a pass then finding its own last set
+// unmoved would leave the other's files served.
+func (w *Writer) keep(ctx context.Context) (bool, error) {
+	cycle := w.interval
+	if cycle <= 0 {
+		cycle = betweenWrites
+	}
+	mine, err := w.leases.Take(ctx, Lease, w.replica, 2*cycle)
+	if err != nil || !mine {
+		w.wrote, w.held = "", 0
+	}
+	return mine, err
 }
 
 // fingerprint is the set of files a pass would write, as one value.

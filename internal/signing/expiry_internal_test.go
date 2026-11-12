@@ -30,7 +30,7 @@ func expiring(t *testing.T, lifetime uint32) *Signer {
 // log needs to act on.
 func TestSigningPastTheKeysExpiryNamesTheExpiry(t *testing.T) {
 	signer := expiring(t, 2*3600)
-	until, expires := signer.Until()
+	until, expires := signer.until, signer.expires
 	if !expires || until.Sub(signer.From()) != 2*time.Hour {
 		t.Fatalf("the key reads as expiring %v at %s, want two hours after %s", expires, until, signer.From())
 	}
@@ -53,7 +53,7 @@ func TestSigningPastTheKeysExpiryNamesTheExpiry(t *testing.T) {
 // expires is not watched.
 func TestTheKeysExpiryIsSaidAheadOfTime(t *testing.T) {
 	signer := expiring(t, 365*24*3600)
-	until, _ := signer.Until()
+	until := signer.until
 	for _, tc := range []struct {
 		name  string
 		at    time.Time
