@@ -34,7 +34,7 @@ recorded. Not from the findings list: what is recorded is what the list lacks.
 | Builds are sets of lines and variants ticked under one product, prefilled from the scope without constraint, the count of builds stated | One flaw is one issue in every build shipping the code |
 | The component is searched against what the build holds; a name held at two versions is asked | A typed name the server refuses |
 | The score is composed as a vector in words and computed on the server, settling the severity | One formula |
-| The scheme is picked and the metrics follow: version 4 asks eleven, version 3 eight, the two they share in different words; switching keeps shared answers | |
+| The scheme is picked and the metrics follow: version 4 asks eleven, version 3 eight, the two they share in different words; switching keeps shared answers, and a vector seeded or pasted keeps only the values its scheme offers | A value the scheme does not offer composes a vector the scoring refuses |
 | A new assessment is composed under 3.1; choosing version 4 says it publishes no score | A published advisory has no field for a version 4 score |
 | A score shows its scheme: beside the number where it leads, on the number where the band leads | The schemes are not comparable |
 | Weaknesses are suggested from the server's search over both name lists, by number or by words, most common first, and checked for shape only: CWE- and a number, at most sixteen; a bare number reads as that CWE | A picker refusing unknown identifiers refuses next year's |
@@ -84,6 +84,7 @@ is and § Dispositions what a ruling does.
 | Rows carry the title beside the reference and the holder, a team marked team | |
 | The list's new-report control opens flaw entry with the product picked | One form for every report |
 | Files attached on the page, or into a message, note or problem, are held on the report at once and listed together | |
+| Several files dropped at once are each tried; every one refused is named with its reason, and the rest are attached | One refusal says nothing about the next file |
 | An issue's reporter card carries its report's correspondence and notes and links the report, under the report rule; writing is offered to whoever works reports | |
 | Duplicates are listed on the issue, in the reporter card for a flaw recorded here, in their own card on a scanned issue, under the report rule | Absent, never empty, for a non-reader |
 
@@ -96,6 +97,7 @@ is and § Dispositions what a ruling does.
 | The standing notice sits above everything on the finding page (REQ-40), naming where disclosure happens: a ticket, a commit message, a chat; the row's chip is secondary | |
 | A screen lists what is approaching disclosure (REQ-38): soonest first, past due at the top, a date moved from it; a product the reader may not read undisclosed work in contributes nothing, not even a count (`design-docs/access-disclosure.md`) | The list is a disclosure |
 | A row is one issue in one product: Where names the product, components and every build in scope carrying it, the variant once where shared; Occurrences totals across those builds; the issue links its page. The row, its form and an act's answer are keyed on product and issue | The unit an embargo moves in |
+| Opening a row's form clears the answer to an act taken on another row | A refusal belongs to the row it was taken from |
 | The screen answers for the scope picked, sent with the request and named in the subtitle, or every product | |
 | It offers "Record a reported flaw" to whoever may record undisclosed in the scope's product, or any where none is picked, never labeled as starting a disclosure | An outside report starts a date; Disclose makes an issue public |
 | The empty screen says a flaw gets a date when sent in from outside or when an outside report is ruled its duplicate | |

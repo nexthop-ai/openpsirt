@@ -297,6 +297,9 @@ export function DisclosureDeadlines() {
                           type="button"
                           className="linkish"
                           onClick={() => {
+                            // One act serves every row, so its last refusal
+                            // belongs to the row it was taken from.
+                            move.reset();
                             setSaid(null);
                             setAsking(asking === key ? null : key);
                             setAct("extension");
