@@ -4,16 +4,109 @@
 package kind
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 )
 
-func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
-	all := consumers()
+// consumersIn is every constant of type Consumer a Go source declares, by its
+// value, whether typed in its declaration or converted in its value.
+func consumersIn(source []byte) ([]Consumer, error) {
+	file, err := parser.ParseFile(token.NewFileSet(), "", source, 0)
+	if err != nil {
+		return nil, err
+	}
+	var found []Consumer
+	for _, decl := range file.Decls {
+		group, ok := decl.(*ast.GenDecl)
+		if !ok || group.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range group.Specs {
+			value, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			named, ok := value.Type.(*ast.Ident)
+			typed := ok && named.Name == "Consumer"
+			for _, v := range value.Values {
+				if call, ok := v.(*ast.CallExpr); ok && !typed && len(call.Args) == 1 {
+					if callee, ok := call.Fun.(*ast.Ident); ok && callee.Name == "Consumer" {
+						v = call.Args[0]
+					}
+				} else if !typed {
+					continue
+				}
+				literal, ok := v.(*ast.BasicLit)
+				if !ok || literal.Kind != token.STRING {
+					continue
+				}
+				text, err := strconv.Unquote(literal.Value)
+				if err != nil {
+					return nil, err
+				}
+				found = append(found, Consumer(text))
+			}
+		}
+	}
+	return found, nil
+}
+
+// consumers is every consumer of findings this package declares, read from
+// its source so a constant added there is checked here.
+func consumers(t *testing.T) []Consumer {
+	t.Helper()
+	names, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var all []Consumer
+	for _, name := range names {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		source, err := os.ReadFile(name) //nolint:gosec // the package's own source
+		if err != nil {
+			t.Fatal(err)
+		}
+		found, err := consumersIn(source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		all = append(all, found...)
+	}
 	if len(all) == 0 {
 		t.Fatal("no consumers were found, so this checked nothing")
 	}
+	return all
+}
+
+func TestAConsumerConstantIsReadFromTheSource(t *testing.T) {
+	got, err := consumersIn([]byte(`package kind
+const (
+	Listed Consumer = "listed"
+	Other  Kind     = "other"
+	untyped         = "untyped"
+	Converted       = Consumer("converted")
+	Elsewhere       = Kind("elsewhere")
+)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []Consumer{"listed", "converted"}) {
+		t.Errorf("read %v, want [listed converted]", got)
+	}
+}
+
+func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
+	all := consumers(t)
 	for _, c := range all {
 		kinds := c.Kinds()
 		if len(kinds) == 0 {
@@ -40,7 +133,7 @@ var builtForAnalysis = map[Consumer]bool{
 }
 
 func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
-	for _, c := range consumers() {
+	for _, c := range consumers(t) {
 		if got, want := c.Includes(Analysis), builtForAnalysis[c]; got != want {
 			t.Errorf("%s includes analysis results: %v; want %v", c, got, want)
 		}
@@ -48,7 +141,7 @@ func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 }
 
 func TestOnlyTheSweepAndTheCodeFindingReadersLeaveRecordedFlawsOut(t *testing.T) {
-	for _, c := range consumers() {
+	for _, c := range consumers(t) {
 		if got, want := c.Includes(Entered), c != Closure && c != Evidence && c != CodeFindings &&
 			c != SecurityTestingStatistics; got != want {
 			t.Errorf("%s includes recorded flaws: %v; want %v", c, got, want)

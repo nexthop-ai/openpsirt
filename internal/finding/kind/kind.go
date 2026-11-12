@@ -182,15 +182,6 @@ const (
 	SecurityTestingStatistics Consumer = "security-testing-statistics"
 )
 
-// consumers is every consumer of findings.
-func consumers() []Consumer {
-	return []Consumer{
-		Closure, VersionCarry, Ranking, Triage, Assignment, Decisions, Inventory, Statistics,
-		Exports, Register, VEX, Advisories, Notifications, Evidence, CodeFindings,
-		SecurityTestingStatistics,
-	}
-}
-
 // Kinds is the kinds this consumer includes.
 //
 // A run's sweep covers what a scan of the inventory produces, and nothing a
