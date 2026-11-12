@@ -137,7 +137,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make subjected` | An exported store method or package function under `internal/` that queries without a subject, unless exempt with a reason. A store is a type with a method building a query or calling a function of its package that does; programs and test harnesses, packages importing testing that no program under `cmd/` links, are not read; a tree with no program is refused. Queries are followed within the package by name; another package's are not seen |
 | `make attached` | A doc comment describing a different declaration |
 | `make confined` | Engine-specific code outside the paths `design-docs/database.md` § Engine-specific code allows |
-| `make readable` | Source files a text tool will not read |
+| `make readable` | Source files a text tool will not read. Every file the walk reaches is read except a named binary kind, so a new text kind is read from its first commit |
 | `make unclaimed` | Every requirement named by a design document. A range names every number in it, matched by number whatever width it is written at |
 | `make vendored` | Copied files accounted for. See `design-docs/build-dependencies.md` § Copied files |
 | `make spdx` | License headers; `make spdx-fix` writes missing ones. See `design-docs/build-dependencies.md` § License headers |

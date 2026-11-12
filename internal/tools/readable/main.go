@@ -3,18 +3,11 @@
 
 // Command readable reports source files that a text tool will not read.
 //
-// A single stray NUL byte in a TypeScript file made grep treat it as binary,
-// and every text-based check in this repository skipped it silently: the
-// class-collision script, the design-token check, and every audit somebody ran
-// by hand. The screen it hid was the busiest one in the interface, and the
-// consequence was not a wrong answer but the absence of one — four components
-// it draws were reported as reached by nothing at all.
-//
-// That is the whole class this exists for. A control character in source is
-// never deliberate: a separator meant as a character is written as an escape,
-// which is what every other file here does. What is checked is the bytes, not
-// the meaning — anything outside tab, newline and carriage return, and the
-// file is named.
+// One control byte makes grep treat a file as binary, and every text-based
+// check then skips it without saying so. A control character in source is
+// never deliberate: a separator meant as a character is written as an escape.
+// What is checked is the bytes, not the meaning: anything outside tab, newline
+// and carriage return, and the file is named.
 package main
 
 import (
@@ -41,24 +34,19 @@ func carrying(body []byte) (byte, int, bool) {
 	return 0, 0, false
 }
 
-// text reports whether this is a file worth reading as one.
+// binary reports whether this is a file of a kind that is not text.
 //
-// By extension, because the alternative — sniffing the content — is the thing
-// that was fooled.
-func text(path string) bool {
+// Every other file is read, so a new text kind is checked from its first
+// commit and a new binary kind fails naming the file. By extension, because
+// sniffing the content is the thing that was fooled.
+func binary(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".go", ".ts", ".tsx", ".js", ".mjs", ".css", ".md", ".yaml", ".yml",
-		".json", ".sql", ".sh", ".html", ".txt", ".mod", ".sum", ".toml",
-		".svg", ".tpl", ".py", ".in", ".mk":
+	case ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp",
+		".woff", ".woff2", ".ttf", ".otf",
+		".xz", ".gz", ".zip", ".tar", ".pdf", ".wasm":
 		return true
 	}
-	switch name := filepath.Base(path); name {
-	case "Dockerfile", ".gitignore", ".dockerignore", ".prettierignore", "LICENSE", "NOTICE":
-		return true
-	default:
-		// Makefile.demo is a makefile whose extension is not a language.
-		return name == "Makefile" || strings.HasPrefix(name, "Makefile.")
-	}
+	return false
 }
 
 func main() {
@@ -67,7 +55,7 @@ func main() {
 	// than skipped: a byte that makes a text tool skip a file is not a Go
 	// question, and the five Go gates beside this one leave web out.
 	read, err := walk.Paths([]string{"vendor"}, func(path string) (bool, error) {
-		if !text(path) {
+		if binary(path) {
 			return false, nil
 		}
 		// The path comes from the walk over the directory this was started in,
