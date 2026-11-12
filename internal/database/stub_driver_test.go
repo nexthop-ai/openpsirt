@@ -10,6 +10,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/sqlitedialect"
 )
 
 // quoting is a driver whose every statement fails with an error quoting the
@@ -40,5 +43,31 @@ func TestAVersionQueryFailureIsScrubbedOfTheCredential(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "hunter2") {
 		t.Errorf("the error carries the password: %v", err)
+	}
+}
+
+// Narrowing the open limit lowers the idle limit to match, and widening it
+// again does not raise it. Put back with no idle limit applied, the pool keeps
+// as many idle as it may open.
+func TestTheIdleLimitIsPutBackAfterTheOpenLimitWasNarrowed(t *testing.T) {
+	pool := sql.OpenDB(quoting{password: "x"})
+	t.Cleanup(func() { _ = pool.Close() })
+	db := &DB{DB: bun.NewDB(pool, sqlitedialect.New())}
+	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(4)
+	db.RestoreIdle()
+	var held []*sql.Conn
+	for range 3 {
+		conn, err := pool.Conn(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		held = append(held, conn)
+	}
+	for _, conn := range held {
+		_ = conn.Close()
+	}
+	if idle := pool.Stats().Idle; idle != 3 {
+		t.Errorf("%d connections stayed idle of 3 returned, under an open limit of 4", idle)
 	}
 }

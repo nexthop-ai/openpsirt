@@ -67,6 +67,21 @@ func DefaultPool() Pool {
 // statistics a refresh has replaced.
 const sqliteConnLifetime = time.Minute
 
+// RestoreIdle puts back the idle limit after the open limit was narrowed,
+// which lowers the idle limit to match and does not raise it again when
+// widened: the limit applied, else the open limit, else the standard pool's
+// own default of two.
+func (db *DB) RestoreIdle() {
+	idle := db.Pool.MaxIdle
+	if idle <= 0 {
+		idle = db.Stats().MaxOpenConnections
+	}
+	if idle <= 0 {
+		idle = 2
+	}
+	db.SetMaxIdleConns(idle)
+}
+
 // apply sets the pool on an open database.
 func (p Pool) apply(db *DB, target Target) {
 	db.Pool = p
