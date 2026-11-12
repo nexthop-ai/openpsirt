@@ -137,7 +137,7 @@ func resolveRule(res obj, driver obj, extensions []obj) {
 	if id == "" {
 		id = str(ref, "id")
 	}
-	c, named := num(child(ref, "toolComponent"), "index")
+	c, named := extensionOf(child(ref, "toolComponent"), extensions)
 	if id == "" {
 		index, ok := num(res, "ruleIndex")
 		if n, has := num(ref, "index"); has {
@@ -162,6 +162,31 @@ func resolveRule(res obj, driver obj, extensions []obj) {
 	if id != "" && named && c >= 0 && c < len(extensions) {
 		res["rule"] = obj{"id": id, "toolComponent": obj{"index": c}}
 	}
+}
+
+// extensionOf is the position of the extension a component reference names:
+// by position, or else by GUID, or else by name. It is false for a reference
+// to the driver or to nothing the run lists.
+func extensionOf(ref obj, extensions []obj) (int, bool) {
+	if ref == nil {
+		return 0, false
+	}
+	if i, ok := num(ref, "index"); ok {
+		return i, true
+	}
+	for _, key := range []string{"guid", "name"} {
+		want := str(ref, key)
+		if want == "" {
+			continue
+		}
+		for i, ext := range extensions {
+			// A GUID is hexadecimal written in either case; a name is as written.
+			if got := str(ext, key); got == want || key == "guid" && strings.EqualFold(got, want) {
+				return i, true
+			}
+		}
+	}
+	return 0, false
 }
 
 // validRegion removes the end of a region that ends before it starts. clang's
@@ -197,6 +222,30 @@ func plainMessage(m obj) int {
 	}
 	delete(m, "markdown")
 	return 1
+}
+
+// renumber rewrites every position of an extension a run's tree cites, in a
+// result's rule, a notification's rule or descriptor, or a rule's
+// relationship, to the merged list's.
+func renumber(v any, moved map[int]int) {
+	switch t := v.(type) {
+	case obj:
+		for k, x := range t {
+			if c, ok := x.(obj); ok && k == "toolComponent" {
+				if i, ok := num(c, "index"); ok {
+					if to, ok := moved[i]; ok {
+						c["index"] = to
+					}
+				}
+				continue
+			}
+			renumber(x, moved)
+		}
+	case list:
+		for _, x := range t {
+			renumber(x, moved)
+		}
+	}
 }
 
 // merge folds the runs of one tool into one: clang writes a document per
@@ -251,12 +300,7 @@ func merge(runs []obj) obj {
 				}
 			}
 		}
-		for _, res := range objects(run, "results") {
-			component := child(child(res, "rule"), "toolComponent")
-			if c, ok := num(component, "index"); ok {
-				component["index"] = moved[c]
-			}
-		}
+		renumber(run, moved)
 		if str(driver, "version") == "" {
 			if v := str(child(tool, "driver"), "version"); v != "" {
 				driver["version"] = v

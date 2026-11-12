@@ -80,7 +80,7 @@ func (c Config) File(modules []Module, path string, start, end int) Link {
 		link.Unlinked = NotAPath
 		return link
 	}
-	revision, ok := escapedRevision(at.revision)
+	revision, ok := escapedPath(at.revision)
 	if !ok {
 		link.Unlinked = NotAPath
 		return link
@@ -325,9 +325,11 @@ func under(path, prefix string) bool {
 	return prefix == "" || path == prefix || strings.HasPrefix(path, prefix+"/")
 }
 
-// escapedPath is a path with each segment percent-encoded, refused where a
-// segment is empty or climbs out. A question mark or a hash in a file name
-// would otherwise end the path and steer the link.
+// escapedPath is a path, or a revision, with each segment percent-encoded,
+// refused where a segment is empty or climbs out. A question mark or a hash
+// in a file name would otherwise end the path and steer the link; a branch may
+// hold a slash, which a host reads as part of the branch, and a browser
+// resolves its dot segments out of the repository.
 func escapedPath(p string) (string, bool) {
 	if p == "" {
 		return "", false
@@ -340,23 +342,6 @@ func escapedPath(p string) (string, bool) {
 		segments[i] = url.PathEscape(s)
 	}
 	return strings.Join(segments, "/"), true
-}
-
-// escapedRevision is a commit, or a branch with each segment escaped. A
-// branch is the product's own statement and may hold a slash, which a host
-// reads as part of the branch. It is refused where a segment is empty or
-// climbs, as a path is: a browser resolves the dot segments and leaves the
-// repository.
-func escapedRevision(r string) (string, bool) {
-	return escapedPath(r)
-}
-
-// linkable is whether a branch is one escapedRevision links: no segment
-// empty, "." or "..", which git refuses in a branch name and a browser
-// resolves out of the repository.
-func linkable(branch string) bool {
-	_, ok := escapedRevision(branch)
-	return ok
 }
 
 // on is whether an address opens over https on the host a web address

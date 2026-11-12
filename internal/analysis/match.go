@@ -173,13 +173,11 @@ func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting) ([]ca
 		for _, r := range rows {
 			c := candidate{
 				findingID: r.FindingID, occurrence: r.Occurrence, key: r.MatchKey, unprinted: r.UnprintedKey,
-				functionKey: r.FunctionKey, lineKey: r.LineKey, message: r.Message, absent: absent[r.FindingID],
+				functionKey: r.FunctionKey, lineKey: r.LineKey, spot: spotOf(r.StartColumn, r.Message),
+				absent: absent[r.FindingID],
 			}
 			if r.StartLine != nil {
 				c.line = *r.StartLine
-			}
-			if r.StartColumn != nil {
-				c.column = *r.StartColumn
 			}
 			out = append(out, c)
 		}

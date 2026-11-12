@@ -130,26 +130,17 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 			keys = append(keys, k.Key)
 		}
 	}
-	type hit struct {
-		ID         int64      `bun:"id"`
-		Key        string     `bun:"match_key"`
-		Occurrence string     `bun:"occurrence_identity"`
-		BuildID    int64      `bun:"build_id"`
-		ClosedAt   *time.Time `bun:"closed_at"`
-		Column     *int       `bun:"start_column"`
-		Message    string     `bun:"message_text"`
-	}
-	byKey := map[string][]hit{}
+	byKey := map[string][]keyHit{}
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
 	for start := 0; start < len(keys); start += database.BatchSize {
 		end := min(start+database.BatchSize, len(keys))
-		var rows []hit
+		var rows []keyHit
 		if err := db.NewSelect().
 			TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 			ColumnExpr(`"f"."id", "ar"."match_key", "f"."occurrence_identity", "f"."build_id"`).
-			ColumnExpr(`"f"."closed_at", "ar"."start_column", "ar"."message_text"`).
+			ColumnExpr(`"f"."closed_at", "ar"."start_column"`).
 			Where(`"si"."series_id" = ?`, seriesID).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
 			Where(where, args...).
@@ -178,23 +169,22 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 	for _, c := range out {
 		used[c.occurrence] = true
 	}
-	// A hit at the result's column saying what it says is taken first, so
-	// results sharing a key keep their occurrences whatever order a run lists
-	// them in; the rest take what is left.
-	at := func(h hit, k Keyed) bool {
-		column := 0
-		if h.Column != nil {
-			column = *h.Column
-		}
-		return column == k.StartColumn && h.Message == k.Message
+	// Where results share a key, a hit at the result's column saying what it
+	// says is taken first, so they keep their occurrences whatever order a run
+	// lists them in; the rest take what is left. Only those hits' messages are
+	// read, since a key's hits span every build of the series.
+	shared := sharedKeys(fresh)
+	messages, err := messagesOf(ctx, db, byKey, shared)
+	if err != nil {
+		return err
 	}
 	for _, exact := range []bool{true, false} {
 		for i, k := range fresh {
-			if _, done := out[i]; done {
+			if _, done := out[i]; done || exact && !shared[k.Key] {
 				continue
 			}
 			for _, h := range byKey[k.Key] {
-				if used[h.Occurrence] || exact && !at(h, k) {
+				if used[h.Occurrence] || exact && !spotOf(h.Column, messages[h.ID]).of(k) {
 					continue
 				}
 				c := carried{occurrence: h.Occurrence, on: onKey, from: fromSeries}
@@ -208,4 +198,44 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 		}
 	}
 	return nil
+}
+
+// keyHit is a code finding of the series holding a key a result holds.
+type keyHit struct {
+	ID         int64      `bun:"id"`
+	Key        string     `bun:"match_key"`
+	Occurrence string     `bun:"occurrence_identity"`
+	BuildID    int64      `bun:"build_id"`
+	ClosedAt   *time.Time `bun:"closed_at"`
+	Column     *int       `bun:"start_column"`
+}
+
+// messagesOf is what each hit under a shared key last said, by finding.
+func messagesOf(ctx context.Context, db bun.IDB, byKey map[string][]keyHit, shared map[string]bool) (map[int64]string, error) {
+	var ids []int64
+	for k := range shared {
+		for _, h := range byKey[k] {
+			ids = append(ids, h.ID)
+		}
+	}
+	out := make(map[int64]string, len(ids))
+	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		var rows []struct {
+			FindingID int64  `bun:"finding_id"`
+			Message   string `bun:"message_text"`
+		}
+		if err := db.NewSelect().TableExpr(`"analysis_result" AS "ar"`).
+			ColumnExpr(`"ar"."finding_id", "ar"."message_text"`).
+			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
+			return err
+		}
+		for _, r := range rows {
+			out[r.FindingID] = r.Message
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read what the code findings sharing a key said: %w", err)
+	}
+	return out, nil
 }

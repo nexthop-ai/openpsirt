@@ -175,7 +175,7 @@ func (c *Config) Valid() error {
 		case p.Remote == "" && p.Snippets == nil && p.DisclosedSnippets == nil:
 			return refusal.Errorf("path %q says nothing: name a repository, whether snippets are kept, "+
 				"or whether they are disclosed", prefix)
-		case strings.ContainsAny(p.Branch, " \t\n?#\\"), p.Branch != "" && !linkable(p.Branch):
+		case strings.ContainsAny(p.Branch, " \t\n?#\\"), p.Branch != "" && !linkedBranch(p.Branch):
 			return refusal.Errorf("path %q: %q is not a branch name", prefix, p.Branch)
 		}
 		p.PrefixIdentity = identity(prefix)
@@ -305,4 +305,11 @@ func (s *Store) Replace(ctx context.Context, productID int64, c Config) error {
 		return fmt.Errorf("record the repository paths of product %d: %w", productID, err)
 	}
 	return nil
+}
+
+// linkedBranch is whether a branch is one a link carries: no segment empty,
+// "." or "..", which git refuses in a branch name.
+func linkedBranch(branch string) bool {
+	_, ok := escapedPath(branch)
+	return ok
 }

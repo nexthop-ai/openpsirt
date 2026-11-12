@@ -327,3 +327,104 @@ func TestTwoExtensionsSharingANameKeepTheirOwnRulesWhenForwarded(t *testing.T) {
 		}
 	}
 }
+
+// forwardedOne is the one run the client forwards for inputs.
+func forwardedOne(t *testing.T, inputs []uploadclient.Input) []byte {
+	t.Helper()
+	root := checkout(t, "git@github.com:example/sonic.git")
+	exit := 0
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
+		Root: root, Work: root, Series: "codeql/default", Built: time.Now().UTC(),
+		ExitStatus: &exit, Client: "openpsirt-upload test",
+	}, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want one", len(runs))
+	}
+	return runs[0].Doc
+}
+
+func TestAResultNamingItsExtensionByGUIDKeepsThatExtensionsRule(t *testing.T) {
+	pack := `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111",` +
+		`"rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	doc := forwardedOne(t, []uploadclient.Input{{Name: "a.sarif", Data: forwarded(pack,
+		forwardedAt("1", `"rule":{"id":"X","toolComponent":{"guid":"11111111-1111-1111-1111-111111111111"}}`))}})
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	if got := log.Runs[0].Results[0].Level; got != "error" {
+		t.Errorf("the result is at %q; want %q, the extension's rule's", got, "error")
+	}
+}
+
+func TestEveryExtensionPositionARunCitesFollowsTheMerge(t *testing.T) {
+	pack := `{"name":"pack","rules":[{"id":"Z","relationships":[{"target":{"id":"Z","toolComponent":{"index":0}}}]}]}`
+	packSecond := `{"name":"pack","rules":[{"id":"W","relationships":[{"target":{"id":"W","toolComponent":{"index":1}}}]}]}`
+	other := `{"name":"other","rules":[{"id":"Y"}]}`
+	first := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + pack +
+		`]},"results":[]}]}`
+	// The second document lists the pack second, and cites it there from a
+	// rule's relationship and from a notification.
+	second := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + other + "," +
+		packSecond + `]},"results":[],"invocations":[{"executionSuccessful":true,` +
+		`"toolExecutionNotifications":[{"message":{"text":"n"},"associatedRule":{"id":"W","toolComponent":{"index":1}}}]}]}]}`
+	doc := forwardedOne(t, []uploadclient.Input{
+		{Name: "a.sarif", Data: []byte(first)}, {Name: "b.sarif", Data: []byte(second)},
+	})
+	var got struct {
+		Runs []struct {
+			Tool struct {
+				Extensions []struct {
+					Name  string `json:"name"`
+					Rules []struct {
+						ID            string `json:"id"`
+						Relationships []struct {
+							Target struct {
+								ToolComponent struct{ Index int } `json:"toolComponent"`
+							} `json:"target"`
+						} `json:"relationships"`
+					} `json:"rules"`
+				} `json:"extensions"`
+			} `json:"tool"`
+			Invocations []struct {
+				Notifications []struct {
+					Rule struct {
+						ToolComponent struct{ Index int } `json:"toolComponent"`
+					} `json:"associatedRule"`
+				} `json:"toolExecutionNotifications"`
+			} `json:"invocations"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(doc, &got); err != nil {
+		t.Fatal(err)
+	}
+	run := got.Runs[0]
+	at := -1
+	for i, e := range run.Tool.Extensions {
+		if e.Name == "pack" {
+			at = i
+		}
+	}
+	if at < 0 {
+		t.Fatal("the merged run lists no pack")
+	}
+	for _, r := range run.Tool.Extensions[at].Rules {
+		for _, rel := range r.Relationships {
+			if rel.Target.ToolComponent.Index != at {
+				t.Errorf("rule %s relates to extension %d; want the pack, %d", r.ID, rel.Target.ToolComponent.Index, at)
+			}
+		}
+	}
+	var cited []int
+	for _, inv := range run.Invocations {
+		for _, n := range inv.Notifications {
+			cited = append(cited, n.Rule.ToolComponent.Index)
+		}
+	}
+	if len(cited) != 1 || cited[0] != at {
+		t.Errorf("the notification cites extensions %v; want the pack, %d", cited, at)
+	}
+}

@@ -30,18 +30,43 @@ type candidate struct {
 	functionKey string
 	lineKey     string
 	line        int
-	// column and message are where on its line the code finding was last
-	// seen and what it said, which tell apart code findings sharing a key.
-	column  int
-	message string
+	spot
 	// absent is whether the last comparable run did not see it.
 	absent bool
 }
 
-// sameSpot is whether a candidate was last seen at a result's column saying
-// what it says.
-func sameSpot(c candidate, k Keyed) bool {
-	return c.column == k.StartColumn && c.message == k.Message
+// spot is where on its line a code finding was last seen and what it said,
+// which tell apart code findings sharing a key.
+type spot struct {
+	column  int
+	message string
+}
+
+// spotOf is a spot as stored, a column of nothing being none.
+func spotOf(column *int, message string) spot {
+	s := spot{message: message}
+	if column != nil {
+		s.column = *column
+	}
+	return s
+}
+
+// of is whether a result is at the spot.
+func (s spot) of(k Keyed) bool {
+	return s.column == k.StartColumn && s.message == k.Message
+}
+
+// sharedKeys is the keys more than one result holds.
+func sharedKeys(results []Keyed) map[string]bool {
+	seen := make(map[string]bool, len(results))
+	shared := map[string]bool{}
+	for _, k := range results {
+		if seen[k.Key] {
+			shared[k.Key] = true
+		}
+		seen[k.Key] = true
+	}
+	return shared
 }
 
 // nearest is how many candidates sharing a result's line key, nearest it
@@ -113,13 +138,14 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 		// so each keeps the code finding it was paired with whatever order a
 		// run lists them in.
 		if layer.on == onKey {
+			shared := sharedKeys(results)
 			for r, res := range results {
 				ws := waiting[res.Key]
-				if takenR[r] || res.Key == "" {
+				if takenR[r] || !shared[res.Key] {
 					continue
 				}
 				for j, c := range ws {
-					if sameSpot(candidates[c], res) {
+					if candidates[c].of(res) {
 						waiting[res.Key] = append(ws[:j:j], ws[j+1:]...)
 						takenC[c], takenR[r] = true, true
 						out = append(out, pairing{result: r, candidate: c, on: layer.on})

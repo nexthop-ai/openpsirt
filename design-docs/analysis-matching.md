@@ -46,7 +46,7 @@ line, each on what the last left.
 | Rule | Reason |
 |---|---|
 | A code finding the last comparable run missed is a candidate in every layer; one it saw comes first on a tie | Of 28 absences hand-checked, 5 returned within two builds |
-| On the whole key, a code finding last seen at a result's column with its message is paired with it before any other sharing the key | Results sharing a key keep their code findings whatever order a run lists them in |
+| Where results of a run share a whole key, a code finding last seen at a result's column with its message is paired with it before any other holding the key | They keep their code findings whatever order a run lists them in |
 | The line layer offers the eight nearest code findings sharing the line key | A generated file holds thousands under one key |
 | Each sighting records its pairing layer | A dismissal carries on strong and lapses on probable (`design-docs/analysis-triage.md` § Code finding triage) |
 
@@ -70,7 +70,7 @@ key, so first seen on two builds at once it is one occurrence.
 | An occurrence is carried to one result of a run at most, and never one open on the build already | Two code findings open at one occurrence on one build would be answered by one decision |
 | Results of one run sharing a whole key open one occurrence each: the first at the key's, each later one at the key's with an ordinal, ordered by column then message | The key holds no column and no digits, so two flaws on one line share it; the first keeps the occurrence it always had |
 | An occurrence derived for a result that is open on the build already, under a key that has since moved, takes the next ordinal | |
-| Carried on the whole key, an occurrence last seen at a result's column with its message goes to that result before any other sharing the key | As on the build, whatever order a run lists them in |
+| Where results of a run share a whole key, an occurrence carried on it last seen at a result's column with its message goes to that result first | As on the build; only those code findings' messages are read, since a key's code findings span the series' builds |
 
 ## Fingerprint change
 
