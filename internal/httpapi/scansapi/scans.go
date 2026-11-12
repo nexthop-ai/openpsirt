@@ -186,8 +186,8 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		note("the upload could not be read: "+err.Error(), nil, nil)
 		return nil, refused
 	case err != nil:
-		// The spooled form failed to read, which is this server's fault and
-		// names a path on it: a fault, never the sender's document refused.
+		// The spooled form failed to read. That is this server's fault and
+		// names a path on it, so it is logged and answered as a fault.
 		return nil, core.WentWrong(in.Logger, "the upload could not be read", err)
 	}
 
