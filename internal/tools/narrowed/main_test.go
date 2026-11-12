@@ -311,3 +311,110 @@ func TestAClosureRebindingANameLeavesTheOuterResolution(t *testing.T) {
 		t.Error("the outer read without a subject was not reported")
 	}
 }
+
+// A refusal asks about one build, so a second build resolved beside it is read
+// narrowed only where a refusal asks about it too. A refusal about a name
+// derived from a resolution covers that resolution.
+func TestARefusalCoversOnlyTheBuildItAsksAbout(t *testing.T) {
+	for _, c := range []struct {
+		what     string
+		source   string
+		reported bool
+	}{
+		{
+			"a refusal about the first build and a read of the second",
+			`func f() {
+				a, _ := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				b, _ := core.LocatedVisibly(ctx, in, subject, q, s, v)
+				if !subject.Reads(access.Public, a.ProductID) {
+					return
+				}
+				store.Unnarrowed(ctx, b.ProductID)
+			}`,
+			true,
+		},
+		{
+			"a refusal about each build",
+			`func f() {
+				a, _ := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				b, _ := core.LocatedVisibly(ctx, in, subject, q, s, v)
+				if !subject.Reads(access.Public, a.ProductID) {
+					return
+				}
+				if !subject.Reads(access.Public, b.ProductID) {
+					return
+				}
+				store.Unnarrowed(ctx, a.ProductID, b.ProductID)
+			}`,
+			false,
+		},
+		{
+			"a refusal about a build derived from the second",
+			`func f() {
+				a, _ := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				b, _ := core.LocatedVisibly(ctx, in, subject, q, s, v)
+				if !subject.Reads(access.Public, a.ProductID) {
+					return
+				}
+				build, _ := catalog.BuildFor(ctx, b.ReleaseID, b.VariantID)
+				if !subject.Reads(access.Public, build.ProductID) {
+					return
+				}
+				store.Unnarrowed(ctx, b.ProductID)
+			}`,
+			false,
+		},
+		{
+			"a value collected from both over two statements, after a refusal about one",
+			`func f() {
+				a, _ := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				b, _ := core.LocatedVisibly(ctx, in, subject, q, s, v)
+				var ids []int64
+				ids = append(ids, a.ProductID)
+				ids = append(ids, b.ProductID)
+				if !subject.Reads(access.Public, a.ProductID) {
+					return
+				}
+				store.Unnarrowed(ctx, ids)
+			}`,
+			true,
+		},
+		{
+			"a value bound again from the second, after a refusal about the first",
+			`func f() {
+				a, _ := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				b, _ := core.LocatedVisibly(ctx, in, subject, q, s, v)
+				x := a.ProductID
+				if !subject.Reads(access.Public, a.ProductID) {
+					return
+				}
+				x = b.ProductID
+				store.Unnarrowed(ctx, x)
+			}`,
+			true,
+		},
+		{
+			"a value built from both, after a refusal about one",
+			`func f() {
+				a, _ := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				b, _ := core.LocatedVisibly(ctx, in, subject, q, s, v)
+				if !subject.Reads(access.Public, a.ProductID) {
+					return
+				}
+				both := []int64{a.ProductID, b.ProductID}
+				store.Unnarrowed(ctx, both)
+			}`,
+			true,
+		},
+	} {
+		body, closures := bodyOf(t, c.source)
+		resolved := resolvedOutside(body, closures)
+		if len(resolved) != 2 {
+			t.Fatalf("%s: %d resolutions found, want the two in the source", c.what, len(resolved))
+		}
+		loose, _, _ := looseIn(body, resolved)
+		if (len(loose) > 0) != c.reported {
+			t.Errorf("%s: reported %v, want reported=%v", c.what, loose, c.reported)
+		}
+	}
+}

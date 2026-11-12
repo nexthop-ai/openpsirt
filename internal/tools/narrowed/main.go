@@ -192,14 +192,15 @@ func resolvedOutside(body *ast.BlockStmt, closures []*ast.FuncLit) map[string]to
 //
 // One function rather than three called in order, because what it decides is
 // one question — is this read narrowed — and the parts only mean anything
-// together: a refusal exempts the whole function, and a name a resolver handed
-// back stands for the build that was resolved.
+// together: a refusal about a resolution exempts what comes after it, and a
+// name a resolver handed back stands for the build that was resolved.
 func looseIn(body *ast.BlockStmt, resolved map[string]token.Pos) (map[string][]token.Pos, int, int) {
 	held := len(resolved)
 	followed := 0
 	// The values the address resolvers handed back, which is where nearly every
 	// site does its reading.
-	for name, from := range derivedIn(body, resolved) {
+	derived, roots := derivedIn(body, resolved)
+	for name, from := range derived {
 		if _, already := resolved[name]; !already {
 			resolved[name] = from
 			followed++
@@ -212,14 +213,15 @@ func looseIn(body *ast.BlockStmt, resolved map[string]token.Pos) (map[string][]t
 	// A refusal covers what comes after it, so a use before it is still a
 	// read nothing narrowed. A use before the name was bound from the build
 	// is of some earlier value under the same name.
-	refusal := refusedAt(body, resolved)
+	refused := refusedAt(body, roots)
 	for name, bound := range resolved {
+		covered := coveredFrom(roots[name], refused)
 		var uses []token.Pos
 		for _, use := range unguarded(body, name) {
 			if use < bound {
 				continue
 			}
-			if !refusal.IsValid() || use < refusal {
+			if !covered.IsValid() || use < covered {
 				uses = append(uses, use)
 			}
 		}
@@ -228,6 +230,23 @@ func looseIn(body *ast.BlockStmt, resolved map[string]token.Pos) (map[string][]t
 		}
 	}
 	return loose, held, followed
+}
+
+// coveredFrom is where every resolution a name stands for has been refused,
+// and token.NoPos where one of them never is. A value built from two
+// resolutions is read narrowed only once both were asked about.
+func coveredFrom(roots map[string]bool, refused map[string]token.Pos) token.Pos {
+	covered := token.NoPos
+	for root := range roots {
+		at, ok := refused[root]
+		if !ok {
+			return token.NoPos
+		}
+		if at > covered {
+			covered = at
+		}
+	}
+	return covered
 }
 
 // functionBody is the body of a declared function or of a closure.
@@ -295,7 +314,7 @@ func binding(node ast.Node) (name string, call *ast.CallExpr, at token.Pos, ok b
 }
 
 // derivedIn returns every name bound from the names already resolved, followed
-// to a fixed point.
+// to a fixed point, and for every name the resolutions it stands for.
 //
 // The hop that consumed the check. Almost every site hands the resolved
 // names straight to one of the address resolvers and then reads through what
@@ -307,29 +326,57 @@ func binding(node ast.Node) (name string, call *ast.CallExpr, at token.Pos, ok b
 // A call carrying the subject is where a resolved build is narrowed, so what
 // it returns is not followed. Nor is a call's error, which says whether it
 // answered rather than what it answered about.
-func derivedIn(body *ast.BlockStmt, from map[string]token.Pos) map[string]token.Pos {
+func derivedIn(body *ast.BlockStmt, from map[string]token.Pos) (map[string]token.Pos, map[string]map[string]bool) {
 	known := map[string]token.Pos{}
+	roots := map[string]map[string]bool{}
 	for name, at := range from {
 		known[name] = at
+		roots[name] = map[string]bool{name: true}
 	}
 	found := map[string]token.Pos{}
 	for grew := true; grew; {
 		grew = false
 		ast.Inspect(body, func(node ast.Node) bool {
 			for _, bound := range bindings(node) {
-				if _, already := known[bound.name]; already || !mentions(bound.from, known) {
+				if !mentions(bound.from, known) {
 					continue
 				}
 				if call, isCall := bound.from.(*ast.CallExpr); isCall && carriesSubject(call) {
 					continue
 				}
-				known[bound.name], found[bound.name] = bound.at, bound.at
-				grew = true
+				if _, already := known[bound.name]; !already {
+					known[bound.name], found[bound.name] = bound.at, bound.at
+					roots[bound.name] = map[string]bool{}
+					grew = true
+				}
+				// A name bound again stands for every resolution any of its
+				// bindings read, so a build collected later joins the set.
+				for root := range rootsOf(bound.from, roots) {
+					if !roots[bound.name][root] {
+						roots[bound.name][root] = true
+						grew = true
+					}
+				}
 			}
 			return true
 		})
 	}
-	return found
+	return found, roots
+}
+
+// rootsOf is the resolutions an expression reads, through every name it
+// mentions that stands for one.
+func rootsOf(expr ast.Node, roots map[string]map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	ast.Inspect(expr, func(node ast.Node) bool {
+		if base, ok := node.(*ast.Ident); ok {
+			for root := range roots[base.Name] {
+				out[root] = true
+			}
+		}
+		return true
+	})
+	return out
 }
 
 // bound is one name and the value it is bound from.
@@ -488,8 +535,21 @@ func converts(call *ast.CallExpr) bool {
 // caller asked for undisclosed work, and a caller asking for what is published
 // went past it.
 //
-// It answers where the first refusal stands, and token.NoPos where none does.
-func refusedAt(body *ast.BlockStmt, names map[string]token.Pos) token.Pos {
+// It answers, for each resolution, where the first refusal asking about it
+// stands. A refusal asks about the resolutions whose names, or names derived
+// from them, its question selects a field of; a refusal about one build says
+// nothing about another resolved beside it.
+func refusedAt(body *ast.BlockStmt, roots map[string]map[string]bool) map[string]token.Pos {
+	refused := map[string]token.Pos{}
+	mark := func(at token.Pos, names []string) {
+		for _, name := range names {
+			for root := range roots[name] {
+				if _, already := refused[root]; !already {
+					refused[root] = at
+				}
+			}
+		}
+	}
 	for _, statement := range body.List {
 		switch branch := statement.(type) {
 		case *ast.IfStmt:
@@ -497,8 +557,8 @@ func refusedAt(body *ast.BlockStmt, names map[string]token.Pos) token.Pos {
 			// *widens* what follows — "may they also read what nobody has
 			// disclosed?" — is the same shape and the opposite act, and
 			// taking it for a refusal exempts the function that asks it.
-			if leaves(branch.Body) && refuses(branch.Cond, names) {
-				return branch.Pos()
+			if leaves(branch.Body) {
+				mark(branch.Pos(), refuses(branch.Cond, roots))
 			}
 		case *ast.SwitchStmt:
 			// A switch with no tag is a chain of ifs, and a case refusing
@@ -512,40 +572,39 @@ func refusedAt(body *ast.BlockStmt, names map[string]token.Pos) token.Pos {
 					continue
 				}
 				for _, cond := range arm.List {
-					if refuses(cond, names) {
-						return branch.Pos()
-					}
+					mark(branch.Pos(), refuses(cond, roots))
 				}
 			}
 		}
 	}
-	return token.NoPos
+	return refused
 }
 
-// refuses reports whether a condition is the refusal itself: the negation of a
-// question asked of the subject about one of these names. A positive question
-// that returns early answers those it admits and lets everybody else past.
-func refuses(cond ast.Expr, names map[string]token.Pos) bool {
+// refuses is the names a condition refuses about, where it is the refusal
+// itself: the negation of a question asked of the subject about a field of
+// one of these names. A positive question that returns early answers those it
+// admits and lets everybody else past, so it refuses about nothing.
+func refuses(cond ast.Expr, names map[string]map[string]bool) []string {
 	negated, ok := cond.(*ast.UnaryExpr)
 	if !ok || negated.Op != token.NOT {
-		return false
+		return nil
 	}
 	asked, ok := negated.X.(*ast.CallExpr)
 	if !ok || !carriesSubject(asked) {
-		return false
+		return nil
 	}
-	namesBuild := false
+	var named []string
 	ast.Inspect(asked, func(node ast.Node) bool {
 		if selector, ok := node.(*ast.SelectorExpr); ok {
 			if base, ok := selector.X.(*ast.Ident); ok {
 				if _, held := names[base.Name]; held {
-					namesBuild = true
+					named = append(named, base.Name)
 				}
 			}
 		}
 		return true
 	})
-	return namesBuild
+	return named
 }
 
 // leaves reports whether a branch ends the function, which is what makes it a
