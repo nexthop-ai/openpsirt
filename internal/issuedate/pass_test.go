@@ -77,7 +77,9 @@ func newPass(db *database.DB, asker issuedate.Asker, now *time.Time) *issuedate.
 func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+		// Starts at the real time, because Intern stamps first_seen_at from the
+		// real clock and an unknown issue's freshness is measured from it.
+		now := time.Now().UTC().Truncate(time.Microsecond)
 		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-0001"},
 			{Identifier: "CVE-2026-0002", Aliases: []string{"GHSA-aaaa-bbbb-cccc"}},
