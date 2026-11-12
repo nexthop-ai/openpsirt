@@ -19687,6 +19687,8 @@ export interface operations {
     "get-issue": {
         parameters: {
             query?: {
+                /** @description Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
+                product?: string;
                 limit?: number;
             };
             header?: never;

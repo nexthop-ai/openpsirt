@@ -66,8 +66,11 @@ type Sighting struct {
 // builds is a real answer and an unbounded one is a page nobody can read. The
 // number of products is counted with the total rather than off the page, so a
 // page cut short still says how many products carry the issue.
+//
+// A product, where one is given, narrows the rows, the total and the count of
+// products to it; zero is every product the subject may see.
 func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
-	vulnerabilityID int64, limit int) ([]Sighting, int, int, error) {
+	vulnerabilityID, productID int64, limit int) ([]Sighting, int, int, error) {
 
 	limit = database.AWholeBuild.Of(limit)
 	// Not merely empty: "here is nothing" and "you cannot ask" are
@@ -93,6 +96,9 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 			Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"f"."closed_at" IS NULL`)
+		if productID != 0 {
+			q = q.Where(`"st"."product_id" = ?`, productID)
+		}
 		return onlyReadable(q, subject, readable, all)
 	}
 

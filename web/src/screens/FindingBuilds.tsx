@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useIssue } from "../api/issue";
+import { useIssueIn } from "../api/issue";
 import { Failed } from "../ui/Failed";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { Required } from "../ui/Required";
@@ -50,9 +50,9 @@ export function AffectedBuilds({
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
     retry: false,
   });
-  // The builds holding it now. The same request the issue screen makes, under
-  // the same key, so opening this after reading that page asks nothing.
-  const holds = useIssue(vulnerability, open);
+  // The builds of this product holding it now, asked of this product alone so
+  // that rows in other products never make its answer look cut short.
+  const holds = useIssueIn(vulnerability, product, open);
 
   // A page in hand that is the whole answer.
   //
@@ -129,9 +129,9 @@ export function AffectedBuilds({
         <div className="alert">
           <strong>This is open at more builds than this screen can set</strong>
           <span>
-            {(holds.data?.total ?? 0).toLocaleString()} builds hold it, and this sends the whole
-            list — so writing from what is shown would close the rest as never affected. Close them
-            one build at a time from each build&rsquo;s own finding instead.
+            {(holds.data?.total ?? 0).toLocaleString()} builds and components carry it here, and
+            this sends the whole list — so writing from what is shown would close the rest as never
+            affected. Close them one build at a time from each build&rsquo;s own finding instead.
           </span>
         </div>
       ) : (
