@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -649,4 +650,27 @@ func coversAny(s sbom.Suppression, d graph.Described) bool {
 		}
 	}
 	return false
+}
+
+func TestAStatementTimeOutsideTheStoredYearsIsNoTime(t *testing.T) {
+	// A tool's unset time is the year 1, which MySQL and MariaDB cannot store.
+	// Read as no time, the statement is ordered by its upload; kept, recording
+	// it fails on two engines.
+	read, err := sbom.ReadStatements(strings.NewReader(`{"@context":"https://openvex.dev/ns/v0.2.0",
+		"@id":"https://example.test/vex/1","author":"Example","timestamp":"0001-01-01T00:00:00Z",
+		"statements":[
+		  {"timestamp":"2026-03-01T00:00:00Z","vulnerability":{"name":"CVE-2026-1"},
+		   "status":"not_affected","products":[{"@id":"pkg:deb/debian/zlib1g@1.3"}]}]}`), sbom.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read.SaidAt != nil {
+		t.Errorf("a document dated the year 1 reads as said at %v, want no time", read.SaidAt)
+	}
+	if len(read.Claims) != 1 {
+		t.Fatalf("read %d claims, want 1", len(read.Claims))
+	}
+	if at := read.Claims[0].SaidAt; at == nil || !at.Equal(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a statement dated March 2026 reads as said at %v", at)
+	}
 }

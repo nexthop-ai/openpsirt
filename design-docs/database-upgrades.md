@@ -235,6 +235,7 @@ where a stopped upgrade made it already.
 |---|---|
 | `advisory_issue` | A mark held while the issue is on the advisory: true on every row not taken off, null on the rest; and the issue unique on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § The advisory) |
 | `graph_node` | The name and the version the build stated and the name's fold, all empty, and an index of each build's nodes by the fold (`design-docs/data-model-graph.md` § The dependency graph) |
+| `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX) |
 
 | Table | Loses |
 |---|---|
@@ -251,6 +252,8 @@ where a stopped upgrade made it already.
 | The same stopped after the column, or after the rule holding the mark, on the servers | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a node | Upgraded, the table built as declared, the node holding no name or version |
 | The same stopped after the name, or after every node column and before the index, on the servers | Upgraded the same, nothing already made replaced |
+| A v0.12.0 database holding a received statement | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it |
+| The same stopped after the time, on the servers | Upgraded the same, nothing already made replaced |
 
 ## Limits
 

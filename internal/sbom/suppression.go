@@ -87,13 +87,19 @@ type Suppression struct {
 	SaidAt *time.Time
 }
 
-// stampOf reads a timestamp a document states, nil where it is empty or does
-// not parse. Read leniently, because a statement's time only orders it
-// against the publisher's other statements, and without one the upload order
-// does.
+// stampOf reads a timestamp a document states, nil where it is empty, does
+// not parse, or falls before the year 1000. Read leniently, because a
+// statement's time only orders it against the publisher's other statements,
+// and without one the upload order does. MySQL and MariaDB store no earlier
+// year, and a tool's unset time is the year 1: kept, recording the document
+// would fail on two engines and not the other two. A later year than 9999,
+// the last they store, does not parse.
 func stampOf(value string) *time.Time {
 	at, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(value))
 	if err != nil {
+		return nil
+	}
+	if at.UTC().Year() < 1000 {
 		return nil
 	}
 	at = at.UTC().Truncate(time.Microsecond)

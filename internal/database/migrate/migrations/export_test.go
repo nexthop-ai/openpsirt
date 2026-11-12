@@ -295,3 +295,18 @@ func StopV0130BeforeNodeIndex(ctx context.Context, db *database.DB) error {
 		return graphNodeColumnsV0130(u)
 	})
 }
+
+// StopV0130AfterStatementTime adds when each received statement was made and
+// nothing else: a start of the v0.13.0 upgrade on MySQL or MariaDB that
+// stopped after that column committed.
+func StopV0130AfterStatementTime(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(receivedStatementV0130(u.t), change{table: "received_vex_statement",
+			add: []added{{column: "said_at"}}})
+	})
+}
