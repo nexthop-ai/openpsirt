@@ -282,6 +282,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// one. An approval is a fact about a moment, so it is right that this
 	// stands — and it is still the first thing an auditor asks after a
 	// reorganization.
+	mayStillApprove, stillArgs := access.MayApproveWhere(`"ap"."approved_by"`, `"de"."product_id"`, `"de"."visibility"`)
 	var lapsed []struct {
 		DecisionID int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
@@ -306,23 +307,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(standing, held...).
 		// The right they used, checked against what they hold now rather than
 		// against what they held then: the question is whether the person who
-		// agreed could agree today. A grant made inactive by a change of mode
-		// is kept so the change can be undone, and it grants nothing while it
-		// sits there — so it is not a right somebody still holds.
-		Where(`NOT EXISTS (SELECT 1 FROM "role_grant" AS "rg"`+
-			` WHERE "rg"."person_id" = "ap"."approved_by" AND "rg"."product_id" = "de"."product_id"`+
-			` AND "rg"."active" = ? AND "rg"."role" = ?)`, true, access.Approver).
-		// Nor one held across every product, which is the same right reached
-		// by the other grant. Without this an approver holding it that way
-		// had every approval they ever gave reported as lapsed.
-		Where(`NOT EXISTS (SELECT 1 FROM "role_grant_all" AS "rga"`+
-			` WHERE "rga"."person_id" = "ap"."approved_by"`+
-			` AND "rga"."active" = ? AND "rga"."role" = ?)`, true, access.Approver).
-		// An administrator reaches every product, so one is never in this list
-		// however their grants read. Either half makes one: granted here, or
-		// named in configuration.
-		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
-			` WHERE "ad"."id" = "ap"."approved_by" AND ("ad"."is_admin" = ? OR "ad"."is_bootstrap" = ?))`, true, true).
+		// agreed could agree today, asked by the rule a signed-in approver is
+		// asked by. A grant made inactive by a change of mode grants nothing
+		// while it sits there, so it is not a right somebody still holds.
+		Where(`NOT `+mayStillApprove, stillArgs...).
 		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(int64(room))).Scan(ctx, &lapsed)

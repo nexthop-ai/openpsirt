@@ -198,10 +198,10 @@ func TestADecisionCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 	})
 }
 
-func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
-	// An administrator reaches every product, so what they agreed to has not
-	// lapsed however their grants read. Named in configuration is
-	// administration too, and the only kind some deployments have.
+func TestAnAdministratorWhoCouldNotApproveNowIsListed(t *testing.T) {
+	// An administrator holds no role ungranted, so one whose right to approve
+	// was withdrawn could not agree today and is listed like anybody else.
+	// Named in configuration is administration too.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
@@ -225,8 +225,23 @@ func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
 		if _, err := r.Rights.NameBootstrapAdmins(t.Context(), []string{"reviewer"}); err != nil {
 			t.Fatal(err)
 		}
-		if who := lapsedBy(); len(who) != 0 {
-			t.Errorf("an approver named in configuration is reported as having lost the right: %v", who)
+		if who := lapsedBy(); len(who) != 1 || who[0] != "reviewer" {
+			t.Errorf("an administrator who could not approve now is left off the list: %v", who)
+		}
+	})
+}
+
+func TestATriagerWhoMayStillApproveIsNotListed(t *testing.T) {
+	// A triager agrees to somebody else's decision without the approver
+	// capability, and still holding triage there could agree today.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.AgreedBy(t, "assigner", decision)
+		for _, row := range scrutiny(t, r, "private-triage", "").Lapsed {
+			if row.DecisionID == decision {
+				t.Errorf("an approval by a triager who still triages there is listed as lost: %+v", row)
+			}
 		}
 	})
 }
