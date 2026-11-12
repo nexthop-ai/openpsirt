@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { hiddenByPosition, printedActions, sweep } from "./printed-heads.mjs";
+import { componentRoots, hiddenByPosition, printedActions, sweep } from "./printed-heads.mjs";
 // @ts-expect-error - as above
 import { parse } from "./parsed.mjs";
 
@@ -29,6 +29,20 @@ describe("a screen head on paper", () => {
       {ok && (<span><button>Go</button></span>)}
       {ok ? <span className="noprint"><a href="/">CSV</a></span> : null}</div>;`);
     expect(found).toEqual({ examined: 2, found: ["x.tsx:2"] });
+  });
+
+  it("reports an action a component draws at its root under a head", () => {
+    const parts = parse(
+      `export function Add() { return (<><span><button>Add</button></span><i /></>); }
+       export function Crumb() { return <span className="crumbs"><b>run 7</b></span>; }`,
+      "parts.tsx",
+    );
+    const found = printedActions(
+      "x.tsx",
+      parse(`const x = <div className="screen-head"><h2>T</h2><Crumb /><Add /></div>;`, "x.tsx"),
+      componentRoots("parts.tsx", parts),
+    );
+    expect(found).toEqual({ examined: 2, found: ["parts.tsx:1"] });
   });
 
   it("reports a print rule hiding every span under a head", () => {
