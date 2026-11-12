@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
@@ -109,39 +108,13 @@ type EndedPart struct {
 // a reader would be told about words whose other half is about a finding they
 // may not see.
 func (s *Store) Whole(ctx context.Context, subject access.Subject, decisionID int64) (*Whole, error) {
-	decision := new(Decision)
-	if err := s.db.NewSelect().Model(decision).Where(`"id" = ?`, decisionID).Scan(ctx); err != nil {
-		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read decision %d", decisionID))
-	}
-	var rows []DecisionOccurrence
-	if err := s.db.NewSelect().Model(&rows).Relation("Decision").
-		Where(`"de"."decision_id" = ?`, decisionID).Order("de.id ASC").Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read what that decision covers: %w", err)
-	}
-	if len(rows) == 0 {
-		return nil, ErrNotTheirs
-	}
 	// The case grant is asked beside the product-wide question, because a
 	// collaborator reaches the decisions of the case they were brought into
 	// and every list that offers them a decision links here. Offered and then
 	// refused reads as a fault rather than as a rule.
-	var refused []int64
-	for _, row := range rows {
-		if !readableOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			refused = append(refused, row.ID)
-		}
-	}
-	if len(refused) > 0 {
-		// A code finding included in its flaw's case is read by the flaw's readers.
-		included, err := s.readsIncluded(ctx, subject, refused)
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range refused {
-			if !included[id] {
-				return nil, ErrNotTheirs
-			}
-		}
+	decision, rows, err := s.readableDecisionRows(ctx, subject, decisionID)
+	if err != nil {
+		return nil, err
 	}
 
 	whole := &Whole{Decision: *decision, DecisionOccurrence: rows[0], Rows: len(rows)}

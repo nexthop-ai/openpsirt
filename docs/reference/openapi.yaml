@@ -18941,7 +18941,7 @@ paths:
 
         Anybody who may argue about the decision may set it: a link is a note about where the conversation is rather than a decision, and needing a second person for it would leave it unset.
 
-        Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason.
+        Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason. A decision about a code finding recorded as a flaw is refused with 409: the flaw is judged instead.
 
         Requires: public-triage or private-triage or security-testing-triage on the product
       operationId: point-decision-elsewhere

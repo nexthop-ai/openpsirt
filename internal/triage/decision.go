@@ -117,32 +117,26 @@ type Decision struct {
 func (s *Store) PointAt(ctx context.Context, subject access.Subject, decisionID int64,
 	where string) error {
 
-	// Read as what they may see, then checked row by row for what they may
-	// argue about. The two are asked separately because the second
-	// question names the issue: somebody brought into one case may argue
-	// about it , and a check that only knew the product would refuse them.
-	_, rows, err := s.readableDecisionRows(ctx, subject, decisionID)
-	if err != nil {
-		return err
-	}
-	if len(rows) == 0 {
-		return ErrNotTheirs
-	}
-	for _, row := range rows {
-		if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			return ErrNotTheirs
-		}
-	}
 	where = strings.TrimSpace(where)
 	if err := markdown.Addressable(where); err != nil {
 		return err
 	}
-	if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set(`"elsewhere" = ?`, where).
-		Where(`"id" = ?`, decisionID).Exec(ctx); err != nil {
-		return fmt.Errorf("record where the work is: %w", err)
-	}
-	return nil
+	// Written as every other change to a decision is: the rows read and asked
+	// of inside the transaction that writes, a decision about a code finding
+	// recorded as a flaw refused, and the stamp moved. The rule names the
+	// issue, so somebody brought into one case may point its decisions
+	// somewhere.
+	return s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		if _, _, err := within.writableRows(ctx, subject, decisionID, mayDecideOn); err != nil {
+			return err
+		}
+		if _, err := tx.NewUpdate().Model((*Decision)(nil)).
+			Set(`"elsewhere" = ?`, where).
+			Where(`"id" = ?`, decisionID).Exec(ctx); err != nil {
+			return fmt.Errorf("record where the work is: %w", err)
+		}
+		return nil
+	})
 }
 
 // argument is what this decision says, in the shape a new decision is recorded from.

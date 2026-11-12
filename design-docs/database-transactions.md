@@ -122,7 +122,7 @@ read answers from a snapshot and a write lands on whatever the row holds.
 | Bringing a retired product, release or variant back | Still retired. A match of none records no return to use |
 | Collecting an upload nothing refers to | Still unattached, and not redacted since the page was read |
 | Moving a code finding recorded as a flaw, taking it back out, or disclosing its flaw | The visibility read, the flaw undisclosed, and the last analysis run describing the code finding, which a run writes before anything else about it |
-| Recording a code finding as a flaw; revising, withdrawing, approving, setting aside, sending back or undoing the approval of a decision | The decision's stamp as read, set to a new value |
+| Recording a code finding as a flaw; revising, withdrawing, approving, setting aside, sending back, undoing the approval of or pointing elsewhere a decision | The decision's stamp as read, set to a new value |
 
 | Decision stamp rule | Reason |
 |---|---|
