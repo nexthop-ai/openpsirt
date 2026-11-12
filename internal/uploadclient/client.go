@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/sarif/uribase"
 )
 
 // format is one kind of analyzer output this client reads.
@@ -336,7 +338,7 @@ func fingerprintOf(loc obj, src *source) string {
 	if str(art, "uriBaseId") != rootBase {
 		return ""
 	}
-	rel, ok := relativePath(str(art, "uri"))
+	rel, ok := uribase.RelativePath(str(art, "uri"))
 	if !ok {
 		return ""
 	}

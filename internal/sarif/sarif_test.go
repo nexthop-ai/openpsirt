@@ -324,6 +324,22 @@ func TestAddressesResolveThroughTheirStartingPoints(t *testing.T) {
 	}
 }
 
+func TestAChainEndingAtTheUndefinedRootIsUnderTheTop(t *testing.T) {
+	doc := run(`,"originalUriBaseIds":{"FRR":{"uri":"src/sonic-frr/frr/","uriBaseId":"SRCROOT"}},
+	"versionControlProvenance":[
+		{"repositoryUri":"https://github.com/sonic-net/sonic-buildimage","revisionId":"abc","mappedTo":{"uriBaseId":"SRCROOT"}},
+		{"repositoryUri":"https://github.com/FRRouting/frr","revisionId":"def","mappedTo":{"uriBaseId":"FRR"}}],
+	"results":[{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"bgpd/bgp_attr.c","uriBaseId":"FRR"}}}]}]`)
+	r := read(t, doc).Runs[0]
+	placed, dropped := Prepare(&r, "")
+	if len(placed) != 1 || dropped.Outside != 0 {
+		t.Fatalf("placed %+v, dropped %+v; want the result placed", placed, dropped)
+	}
+	if placed[0].Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" || placed[0].Module != 1 {
+		t.Errorf("placed at %q in module %d; want src/sonic-frr/frr/bgpd/bgp_attr.c in FRR's", placed[0].Path, placed[0].Module)
+	}
+}
+
 func TestAWindowsPathIsPlacedLikeAnyOther(t *testing.T) {
 	r := read(t, run(`,"results":[
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"file:///C:/build/sonic/src/a.c"}}}]},

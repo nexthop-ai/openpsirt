@@ -109,7 +109,8 @@ and entries are bounded across the upload as memory: placed results take about
 | A suppression with no status or `accepted` drops the result as `suppressed-by-the-tool`; `underReview` and `rejected` do not | |
 | `baselineState` `absent` drops the result as `absent` | It could never be found again |
 | Paths resolve through named starting points and place against the source root | Paths arrive absolute, as `file://`, relative, or under undefined starting points |
-| A path with no starting point is relative to the first invocation's working directory where that is in the checkout, else the top; one under the source root's own undefined name is relative to the top | cppcheck run from a subdirectory |
+| A path with no starting point is relative to the first invocation's working directory where that is in the checkout, else the top; one under the source root's own undefined name, directly or through a chain of starting points, is relative to the top | cppcheck run from a subdirectory |
+| The deployment and the upload client resolve a chain of starting points with one resolver | A document uploaded directly places as the client would have placed it |
 | A path outside the checkout drops its result, counted | |
 | A result repeating another on rule, path, line, column and message is dropped, counted | clang repeats a header per unit |
 | Whole-file contents, fixes and markdown messages are left out of every record, counted | |

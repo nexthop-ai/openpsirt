@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/nexthop-ai/openpsirt/internal/sarif/uribase"
 )
 
 // source reads the checkout's files, each once, for the fingerprints and
@@ -121,7 +123,7 @@ func (s *source) snippets(loc obj) {
 	if str(art, "uriBaseId") != rootBase || region == nil {
 		return
 	}
-	rel, ok := relativePath(str(art, "uri"))
+	rel, ok := uribase.RelativePath(str(art, "uri"))
 	if !ok {
 		return
 	}

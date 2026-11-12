@@ -8,6 +8,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/sarif/uribase"
 )
 
 // rootBase is the starting point every path inside the checkout is written
@@ -65,13 +67,7 @@ func slashed(s string) string {
 	return s
 }
 
-func isDriveRoot(s string) bool { return len(s) == 3 && hasDrive(s) }
-
-// hasDrive is whether a path opens with a drive letter.
-func hasDrive(s string) bool {
-	return len(s) >= 3 && s[1] == ':' && s[2] == '/' &&
-		(s[0] >= 'a' && s[0] <= 'z' || s[0] >= 'A' && s[0] <= 'Z')
-}
+func isDriveRoot(s string) bool { return len(s) == 3 && uribase.Drive(s) }
 
 // placement is where an address resolved to.
 type placement int
@@ -100,7 +96,7 @@ func (p *placer) rewrite(art obj, bases map[string]obj) {
 
 // fileURI is an absolute path as a file address.
 func fileURI(abs string) string {
-	if hasDrive(abs) {
+	if uribase.Drive(abs) {
 		abs = "/" + abs
 	}
 	return (&url.URL{Scheme: "file", Path: abs}).String()
@@ -109,7 +105,7 @@ func fileURI(abs string) string {
 // place resolves an address through its starting points. It reports a path
 // inside the checkout relative to its top, and any other as absolute.
 func (p *placer) place(uri, base string, bases map[string]obj) (placement, string) {
-	abs, ok := p.absolute(uri, base, bases, 0)
+	abs, ok := p.absolute(uri, base, bases)
 	if !ok {
 		return unplaced, ""
 	}
@@ -151,88 +147,39 @@ func (p *placer) inside(abs string) (string, bool) {
 // maxChain bounds how many starting points one address may pass through.
 const maxChain = 16
 
-// absolute is an address as an absolute, slash-separated, cleaned path.
-func (p *placer) absolute(uri, base string, bases map[string]obj, depth int) (string, bool) {
-	if depth > maxChain {
-		return "", false
-	}
-	if abs, ok := absolutePath(uri); ok {
-		return cleanAbs(abs), true
-	}
-	rel, ok := relativePath(uri)
+// absolute is an address as an absolute, slash-separated, cleaned path,
+// resolved as the deployment resolves it: a chain ending at the source root's
+// undefined name is under the top of the checkout, and one ending at no
+// starting point under the directory the tool ran in.
+func (p *placer) absolute(uri, base string, bases map[string]obj) (string, bool) {
+	at, start, ok := uribase.Resolve(uri, base, func(name string) (string, string, bool) {
+		b, ok := bases[name]
+		u := str(b, "uri")
+		return u, str(b, "uriBaseId"), ok && u != ""
+	}, maxChain)
 	if !ok {
 		return "", false
 	}
-	var from string
-	switch base {
-	case "":
-		from = p.work
-	case rootBase, "%SRCROOT%":
-		if b, ok := bases[base]; ok {
-			prefix, ok := p.absolute(str(b, "uri"), str(b, "uriBaseId"), bases, depth+1)
-			if !ok {
-				return "", false
-			}
-			from = prefix
-		} else {
-			from = p.root
-		}
-	default:
-		b, ok := bases[base]
-		if !ok {
-			return "", false
-		}
-		prefix, ok := p.absolute(str(b, "uri"), str(b, "uriBaseId"), bases, depth+1)
-		if !ok {
-			return "", false
-		}
-		from = prefix
+	switch start {
+	case uribase.FromRoot:
+		at = under(p.root, at)
+	case uribase.FromWork:
+		at = under(p.work, at)
 	}
+	return cleanAbs(at), true
+}
+
+// under is a relative path under an absolute directory.
+func under(dir, rel string) string {
 	if rel == "" {
-		return cleanAbs(from), true
+		return dir
 	}
-	return cleanAbs(strings.TrimSuffix(from, "/") + "/" + rel), true
-}
-
-// absolutePath is an address's path where it is absolute: a file URI, a path
-// from the root, or one opening with a drive letter.
-func absolutePath(uri string) (string, bool) {
-	s := strings.ReplaceAll(uri, `\`, "/")
-	if hasDrive(s) {
-		return s, true
-	}
-	if u, err := url.Parse(s); err == nil && u.Scheme != "" {
-		if !strings.EqualFold(u.Scheme, "file") {
-			return "", false
-		}
-		path := u.Path
-		if hasDrive(strings.TrimPrefix(path, "/")) {
-			path = strings.TrimPrefix(path, "/")
-		}
-		return path, path != ""
-	}
-	if strings.HasPrefix(s, "/") {
-		return s, true
-	}
-	return "", false
-}
-
-// relativePath is a relative address as a path, its escapes decoded.
-func relativePath(uri string) (string, bool) {
-	s := strings.ReplaceAll(uri, `\`, "/")
-	u, err := url.Parse(s)
-	if err != nil {
-		return s, true
-	}
-	if u.Scheme != "" {
-		return "", false
-	}
-	return u.Path, true
+	return strings.TrimSuffix(dir, "/") + "/" + rel
 }
 
 // cleanAbs is an absolute path with its dot steps resolved.
 func cleanAbs(s string) string {
-	if hasDrive(s) {
+	if uribase.Drive(s) {
 		return s[:2] + path.Clean(s[2:])
 	}
 	return path.Clean(s)
@@ -243,7 +190,7 @@ func cleanAbs(s string) string {
 // does, as the file systems that have drives compare it.
 func within(abs, root string) (string, bool) {
 	same := func(a, b string) bool { return a == b }
-	if hasDrive(root) || hasDrive(abs) {
+	if uribase.Drive(root) || uribase.Drive(abs) {
 		same = strings.EqualFold
 	}
 	if same(abs, root) {
