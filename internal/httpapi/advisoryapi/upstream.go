@@ -435,7 +435,10 @@ func inspect(ctx context.Context, in core.Deps, raw string) (upstream.Described,
 	if err != nil {
 		return upstream.Described{}, huma.Error422UnprocessableEntity(err.Error())
 	}
-	described, err := upstream.Inspect(ctx, upstream.Client(address, in.UpstreamRoots), address.String())
+	// Built for this request, so its connections are closed with it.
+	client := upstream.Client(address, in.UpstreamRoots)
+	defer client.CloseIdleConnections()
+	described, err := upstream.Inspect(ctx, client, address.String())
 	if err != nil {
 		return upstream.Described{}, huma.Error422UnprocessableEntity(
 			"that upstream could not be read: " + err.Error())

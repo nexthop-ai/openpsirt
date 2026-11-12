@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -278,7 +279,9 @@ func (w *world) trust() *upstream.Upstream {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	described, err := upstream.Inspect(w.t.Context(), upstream.Client(parsed, w.server.roots), address)
+	client := upstream.Client(parsed, w.server.roots)
+	defer client.CloseIdleConnections()
+	described, err := upstream.Inspect(w.t.Context(), client, address)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -378,6 +381,8 @@ type served struct {
 	tamper  map[string]func([]byte) []byte
 	missing map[string]bool
 	asked   []string
+	// open is how many connections to the surface are open.
+	open int
 	// answered is each path asked for and the status it was answered with.
 	answered map[string]int
 }
@@ -419,6 +424,16 @@ func serve(t *testing.T, w *world) *served {
 		rw.WriteHeader(rec.Code)
 		_, _ = rw.Write(body)
 	}))
+	s.server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		switch state {
+		case http.StateNew:
+			s.open++
+		case http.StateClosed, http.StateHijacked:
+			s.open--
+		}
+	}
 	s.server.StartTLS()
 	t.Cleanup(s.server.Close)
 	s.base = s.server.URL
@@ -433,6 +448,21 @@ func serve(t *testing.T, w *world) *served {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return s
+}
+
+// connections is how many connections to the surface are open once those
+// being closed have closed.
+func (s *served) connections() int {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		s.mu.Lock()
+		open := s.open
+		s.mu.Unlock()
+		if open == 0 || time.Now().After(deadline) {
+			return open
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // change has the surface answer one path with what alter makes of it.

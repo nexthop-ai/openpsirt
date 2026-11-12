@@ -70,6 +70,7 @@ excluded networks alike.
 | An address an administrator configured, a webhook or a chat server, uses the client without the address check: https only, no user in the address, no redirect | REQ-69 lets an operator's address reach anywhere |
 | An upstream an administrator named uses the client pinned to its host | `design-docs/upstream.md` § Requests |
 | An answer read back from a provider is bounded | An endless body exhausts memory |
+| Every client keeps at most 100 idle connections, closes one idle for 90 seconds, and bounds a TLS handshake by its request timeout | An idle connection holds a descriptor and two goroutines |
 
 ## Trusted-header sign-in
 

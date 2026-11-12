@@ -5,10 +5,12 @@ package outward
 
 import (
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -338,5 +340,54 @@ func TestOnlyThisMachineIsLoopback(t *testing.T) {
 		if got := Loopback(host); got != want {
 			t.Errorf("%q read as loopback %v, want %v", host, got, want)
 		}
+	}
+}
+
+// A client built for one call and dropped strands nothing: closing its idle
+// connections reaches the pool under the guard, and the pool is bounded and
+// expires what it keeps.
+func TestAClientBuiltForOneCallLeavesNoConnectionOpen(t *testing.T) {
+	var mu sync.Mutex
+	open := 0
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch state {
+		case http.StateNew:
+			open++
+		case http.StateClosed, http.StateHijacked:
+			open--
+		}
+	}
+	server.StartTLS()
+	defer server.Close()
+	client := Pinned(time.Second, strings.TrimPrefix(server.URL, "https://"),
+		server.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs)
+	resp, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	client.CloseIdleConnections()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		left := open
+		mu.Unlock()
+		if left == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d connections were still open after the client closed its idle ones", left)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	inner := client.Transport.(*guard).inner.(*http.Transport)
+	if inner.MaxIdleConns == 0 || inner.IdleConnTimeout == 0 || inner.TLSHandshakeTimeout == 0 {
+		t.Errorf("the pool is unbounded: %d idle connections, kept %v, handshake within %v",
+			inner.MaxIdleConns, inner.IdleConnTimeout, inner.TLSHandshakeTimeout)
 	}
 }

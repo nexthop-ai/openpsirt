@@ -251,10 +251,26 @@ func client(within time.Duration, reachable func(string) error,
 		},
 		Transport: &guard{
 			permits: permits,
-			inner:   &http.Transport{DialContext: dialer.DialContext},
+			// The pool bounded and its idle connections expired: a client
+			// built per call and dropped would otherwise strand each idle
+			// connection, its descriptor and its two goroutines for as long
+			// as the far end keeps it open.
+			inner: &http.Transport{
+				DialContext:         dialer.DialContext,
+				MaxIdleConns:        maxIdle,
+				IdleConnTimeout:     idleFor,
+				TLSHandshakeTimeout: within,
+			},
 		},
 	}
 }
+
+// maxIdle and idleFor bound the connections a client keeps open between
+// requests, across every host it reaches.
+const (
+	maxIdle = 100
+	idleFor = 90 * time.Second
+)
 
 // ErrRefused says the guarded client turned a request away itself: a redirect,
 // a scheme other than https, a host nobody configured, or a host an
@@ -285,6 +301,14 @@ func (r resolvedInto) Is(target error) bool { return target == ErrInside }
 type guard struct {
 	permits func(to *url.URL) error
 	inner   http.RoundTripper
+}
+
+// CloseIdleConnections closes the connections the client holds open between
+// requests, which a client built for one call does once it is done.
+func (g *guard) CloseIdleConnections() {
+	if closer, ok := g.inner.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
 }
 
 func (g *guard) RoundTrip(req *http.Request) (*http.Response, error) {

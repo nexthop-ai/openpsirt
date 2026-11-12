@@ -209,7 +209,9 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	if err != nil {
 		return took, err
 	}
+	// Built for this read, so its connections are closed with it.
 	client := Client(address, r.roots)
+	defer client.CloseIdleConnections()
 	meta, err := described(ctx, client, up.URL)
 	if err != nil {
 		// However the description failed — not found, refused, a TLS fault,
