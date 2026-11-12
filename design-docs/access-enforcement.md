@@ -71,16 +71,17 @@ A store method or function takes no subject only for one of these reasons:
 | A person's own record, keyed by them | Their saved views |
 
 Every package under `internal/` is read, but a program and a package of test
-fixtures. A store is a type one of whose methods builds a query. Its exported
-methods, and the package's exported functions, that query without a subject
-are named, with their reason, in a list `make subjected` holds them to
-(`design-docs/build.md` § Make targets). Querying through a helper of the same
-package counts as querying.
+fixtures. A store is a type one of whose methods builds a query or calls a
+function of its package that does. Its exported methods, and the package's
+exported functions, that query without a subject are named, with their
+reason, in a list `make subjected` holds them to (`design-docs/build.md`
+§ Make targets). Querying through a helper of the same package counts as
+querying.
 
 | Read | Rule |
 |---|---|
 | What an assignment rule would catch; the words in use on a product | Take a subject, since both read findings product-wide |
-| A product's assignment rules, the response windows and the products each is limited to, an upload's receipt, refusals and kept documents | The store decides what the subject reaches: the rules for whoever triages the product, a window narrowed to products the reader may know exist, the builds a key may upload to, an analyzer's refusals for whoever reads its receipts. The sweeps applying rules and watching windows read as the deployment |
+| A product's assignment rules, the response windows and the products each is limited to, an upload's receipt, refusals and kept documents | The store decides what the subject reaches: the rules for whoever triages the product, a window narrowed to products the reader may know exist, the builds a key may upload to, an analyzer's receipts and refusals for whoever reads them in the build's own product. The sweeps applying rules and watching windows read as the deployment |
 | The administration trail | Refuses a subject holding neither administration nor the audit permission, the deployment itself excepted. A refusal, since an empty page claims nobody changed anything |
 | Whether somebody may read; whether they may triage | One question each, asked in one place on the subject |
 | Whether any row of a group is undisclosed | The private rows counted and compared with zero |

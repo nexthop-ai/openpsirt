@@ -96,7 +96,7 @@ func (s *Store) Refused(ctx context.Context, r Refusal) error {
 func (s *Store) RefusalsOf(ctx context.Context, subject access.Subject, productID, buildID int64,
 	k kind.Kind, opensAt access.Visibility) ([]Refusal, error) {
 
-	if err := catalog.ReadsBuild(ctx, s.db, subject, buildID); err != nil {
+	if err := catalog.ReadsBuildIn(ctx, s.db, subject, productID, buildID); err != nil {
 		return nil, err
 	}
 	if !ReadsReceipts(subject, productID, opensAt) {

@@ -1148,6 +1148,26 @@ func (s *Store) ProductNames(ctx context.Context, ids []int64) (map[int64]string
 // was filed against it, by the rule access.Subject.ReadsBuild states. A build
 // nobody declared is ErrNotFound.
 func ReadsBuild(ctx context.Context, db bun.IDB, subject access.Subject, buildID int64) error {
+	_, err := readsBuild(ctx, db, subject, buildID)
+	return err
+}
+
+// ReadsBuildIn is ReadsBuild for a build its caller names as one of a product:
+// a build of another product is refused, so a check made against the product
+// holds for the build.
+func ReadsBuildIn(ctx context.Context, db bun.IDB, subject access.Subject, productID, buildID int64) error {
+	of, err := readsBuild(ctx, db, subject, buildID)
+	if err != nil {
+		return err
+	}
+	if of != productID {
+		return access.Denied(fmt.Sprintf("read what a build of product %d sent", productID))
+	}
+	return nil
+}
+
+// readsBuild is ReadsBuild, answering the build's product.
+func readsBuild(ctx context.Context, db bun.IDB, subject access.Subject, buildID int64) (int64, error) {
 	var build struct {
 		ProductID     int64 `bun:"product_id"`
 		BranchOrTagID int64 `bun:"branch_or_tag_id"`
@@ -1159,10 +1179,10 @@ func ReadsBuild(ctx context.Context, db bun.IDB, subject access.Subject, buildID
 		ColumnExpr(`"st"."product_id", "tg"."branch_or_tag_id", "tg"."variant_id"`).
 		Where(`"tg"."id" = ?`, buildID).
 		Scan(ctx, &build); err != nil {
-		return missingOr(err, fmt.Sprintf("build %d", buildID), fmt.Sprintf("look up which build %d is", buildID))
+		return 0, missingOr(err, fmt.Sprintf("build %d", buildID), fmt.Sprintf("look up which build %d is", buildID))
 	}
 	if !subject.ReadsBuild(build.ProductID, build.BranchOrTagID, build.VariantID) {
-		return access.Denied(fmt.Sprintf("read what a build of product %d sent", build.ProductID))
+		return 0, access.Denied(fmt.Sprintf("read what a build of product %d sent", build.ProductID))
 	}
-	return nil
+	return build.ProductID, nil
 }

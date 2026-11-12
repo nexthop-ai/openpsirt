@@ -24,7 +24,8 @@ var everything = access.Everything("the refusal tests")
 func TestARefusalIsReadOnlyByAReaderOfTheBuildsReceipts(t *testing.T) {
 	// A reason quotes what a sender sent, so it is read under the receipts'
 	// rule: somebody reading the product's disclosed work but not its security
-	// testing work is refused, as is a key for another product.
+	// testing work is refused, as is a key for another product and a build
+	// named as one of a product it is not of.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		f := fixture.New(t, db)
@@ -42,6 +43,16 @@ func TestARefusalIsReadOnlyByAReaderOfTheBuildsReceipts(t *testing.T) {
 			if !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%s was answered %d refusals and %v, want a refusal", name, len(got), err)
 			}
+		}
+		// Named as a build of a product where the subject does read the
+		// receipts: the build is of another product, so it is refused.
+		elsewhere := access.NewPerson(4, "elsewhere", false, map[int64][]access.Role{
+			f.Product.ID:     {access.PublicRead},
+			f.Product.ID + 1: {access.PublicRead, access.SecurityTestingRead},
+		}, 0)
+		if got, err := store.RefusalsOf(ctx, elsewhere, f.Product.ID+1, f.Build.ID, kind.Analysis,
+			access.SecurityTesting); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a build named as another product's was answered %d refusals and %v, want a refusal", len(got), err)
 		}
 		reader := access.NewPerson(3, "tester", false,
 			map[int64][]access.Role{f.Product.ID: {access.PublicRead, access.SecurityTestingRead}}, 0)
