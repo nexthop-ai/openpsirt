@@ -345,55 +345,93 @@ func TestARiseLapsesADecisionUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t
 	})
 }
 
+// lapsedUnderMergedName is a decision filed under a name that merged into the
+// fixture's issue, lapsed by a rise of that issue at the one open finding.
+func lapsedUnderMergedName(t *testing.T, f *fixture) *triage.DecisionOccurrence {
+	t.Helper()
+	ctx := t.Context()
+	filed := f.secondIssue(t)
+	in := f.build(t, f.product, "reaffirm-merged")
+	row := f.finds(t, in, f.component(t, "lib-merged", "1.2.3"), "merged", access.Public)
+	f.holdUnder(t, row, filed)
+	at := f.at()
+	at.VulnerabilityID, at.OccurrenceIdentity, at.ConsumerUpstream = filed, "merged", ""
+	judged := f.judged(t, at, 300)
+	if err := agreeTo(ctx, f.store, f.reviewer, judged.DecisionID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
+		Where(`"id" = ?`, filed).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	f.holdUnder(t, row, f.issue)
+	f.rateIssue(t, 980)
+	if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: in.build}); err != nil {
+		t.Fatal(err)
+	}
+	if state := f.stateOf(t, judged.ID); state != triage.LapsedState {
+		t.Fatalf("the decision under the merged name is %q after a rise; want it lapsed", state)
+	}
+	return judged
+}
+
+// reaffirmedOnce re-affirms a decision and returns the one row it writes.
+func reaffirmedOnce(t *testing.T, f *fixture, decisionID int64) triage.DecisionOccurrence {
+	t.Helper()
+	ctx := t.Context()
+	made, err := f.store.ReaffirmDecision(ctx, f.triager, triage.ReaffirmingDecision{
+		PreviousDecisionID: decisionID,
+		Reasoning:          "Still nothing an attacker sends reaches the parser.", By: f.proposer,
+		Bounds: triage.DefaultBounds(),
+	})
+	if err != nil {
+		t.Fatalf("re-affirming a decision under a merged name: %v", err)
+	}
+	if len(made.DecisionOccurrences) != 1 {
+		t.Fatalf("re-affirming wrote %d rows; want the one at the open finding", len(made.DecisionOccurrences))
+	}
+	var remade triage.DecisionOccurrence
+	if err := f.db.DB.NewSelect().Model(&remade).
+		Where(`"de"."id" = ?`, made.DecisionOccurrences[0]).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return remade
+}
+
 func TestADecisionUnderAMergedNameIsReaffirmedAtTheFindingsOfTheIssueItIsReadAs(t *testing.T) {
 	// A decision made under a name that later merged into another stays
 	// filed under the first, and its findings are held under the second. A
 	// rise lapses it there, and re-affirming it re-makes it at those findings,
 	// under the issue that stands, rather than finding nothing open.
 	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		filed := f.secondIssue(t)
-		in := f.build(t, f.product, "reaffirm-merged")
-		row := f.finds(t, in, f.component(t, "lib-merged", "1.2.3"), "merged", access.Public)
-		f.holdUnder(t, row, filed)
-		at := f.at()
-		at.VulnerabilityID, at.OccurrenceIdentity, at.ConsumerUpstream = filed, "merged", ""
-		judged := f.judged(t, at, 300)
-		if err := agreeTo(ctx, f.store, f.reviewer, judged.DecisionID, ""); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
-			Where(`"id" = ?`, filed).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		f.holdUnder(t, row, f.issue)
-		f.rateIssue(t, 980)
-		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: in.build}); err != nil {
-			t.Fatal(err)
-		}
-		if state := f.stateOf(t, judged.ID); state != triage.LapsedState {
-			t.Fatalf("the decision under the merged name is %q after a rise; want it lapsed", state)
-		}
-
-		made, err := f.store.ReaffirmDecision(ctx, f.triager, triage.ReaffirmingDecision{
-			PreviousDecisionID: judged.DecisionID,
-			Reasoning:          "Still nothing an attacker sends reaches the parser.", By: f.proposer,
-			Bounds: triage.DefaultBounds(),
-		})
-		if err != nil {
-			t.Fatalf("re-affirming a decision under a merged name: %v", err)
-		}
-		if len(made.DecisionOccurrences) != 1 {
-			t.Fatalf("re-affirming wrote %d rows; want the one at the open finding", len(made.DecisionOccurrences))
-		}
-		var remade triage.DecisionOccurrence
-		if err := f.db.DB.NewSelect().Model(&remade).
-			Where(`"de"."id" = ?`, made.DecisionOccurrences[0]).Scan(ctx); err != nil {
-			t.Fatal(err)
-		}
+		judged := lapsedUnderMergedName(t, f)
+		remade := reaffirmedOnce(t, f, judged.DecisionID)
 		if remade.VulnerabilityID != f.issue || remade.OccurrenceIdentity != "merged" {
 			t.Errorf("the re-made row is filed under issue %d at %q; want the issue that stands, %d, at the same occurrence",
 				remade.VulnerabilityID, remade.OccurrenceIdentity, f.issue)
+		}
+	})
+}
+
+func TestRowsUnderTwoNamesOfOneIssueAreReaffirmedOnce(t *testing.T) {
+	// One decision holding a row under each of two names that merged, at
+	// one occurrence and versions, leads to one finding. Re-made once per
+	// row, the second write repeats the first's live key and the whole act is
+	// refused as though a decision already stood there.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		judged := lapsedUnderMergedName(t, f)
+		var lapsed triage.DecisionOccurrence
+		if err := f.db.DB.NewSelect().Model(&lapsed).Where(`"de"."id" = ?`, judged.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		twin := lapsed
+		twin.ID, twin.LiveKey, twin.VulnerabilityID = 0, nil, f.issue
+		if _, err := f.db.DB.NewInsert().Model(&twin).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if remade := reaffirmedOnce(t, f, judged.DecisionID); remade.VulnerabilityID != f.issue {
+			t.Errorf("the re-made row is filed under issue %d; want %d", remade.VulnerabilityID, f.issue)
 		}
 	})
 }

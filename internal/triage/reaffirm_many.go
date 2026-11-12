@@ -399,12 +399,15 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	// occurrence identity is names alone while a row is keyed on the versions
 	// too, so one component at two versions under one consumer is two lapsed
 	// rows sharing an occurrence — and writing the same live key twice refuses the
-	// whole act with "a decision already stands here", which is false.
+	// whole act with "a decision already stands here", which is false. Keyed on
+	// the issue the finding is held under, since rows filed under two names
+	// that merged lead to one finding.
 	done := map[string]bool{}
 	for _, row := range lapsed {
 		key := occurrenceKey(row.ProductID, row.VulnerabilityID, row.OccurrenceIdentity)
 		for _, at := range atVersions(row, where[key]) {
-			written := key + "\x00" + at.ComponentUpstream + "\x00" + at.ConsumerUpstream
+			written := occurrenceKey(at.ProductID, at.VulnerabilityID, at.OccurrenceIdentity) +
+				"\x00" + at.ComponentUpstream + "\x00" + at.ConsumerUpstream
 			if done[written] {
 				continue
 			}
