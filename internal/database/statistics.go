@@ -7,7 +7,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -182,4 +184,29 @@ func analyzeTable(ctx context.Context, conn bun.Conn, table string) (bool, error
 		return false, fmt.Errorf("refresh the statistics of %s: %s", table, row.Message)
 	}
 	return false, nil
+}
+
+// AnalyzeAndLog runs AnalyzeEveryTable and says what it did: a failure as an
+// error, the tables it stepped over as a warning, and how many it analyzed
+// and how long it took. after ends each message, naming what the refresh
+// follows ("after the upgrade"), or is empty.
+//
+// A failure is logged and not returned: stale estimates make a statement slow,
+// never wrong, and every caller goes on.
+func AnalyzeAndLog(ctx context.Context, db *DB, logger *slog.Logger, after string) {
+	suffix := ""
+	if after != "" {
+		suffix = " " + after
+	}
+	started := time.Now()
+	done, err := AnalyzeEveryTable(ctx, db)
+	if err != nil {
+		logger.Error("could not refresh the planner's statistics"+suffix, "error", err)
+		return
+	}
+	if len(done.Skipped) > 0 {
+		logger.Warn("tables held by something else were not analyzed"+suffix, "tables", done.Skipped)
+	}
+	logger.Info("refreshed the planner's statistics"+suffix, "tables", done.Tables,
+		"took", time.Since(started).Round(time.Millisecond))
 }

@@ -122,6 +122,7 @@ catalog.Store.VariantsByID Not varying by reader: the names of variants a pipeli
 currency.Refresher.Once A background pass: one cycle of the currency refresher.
 currency.Refresher.Run A background pass: the currency refresher asks package indexes about components on a schedule.
 currency.RootOwners Not varying by reader: the names the deployment's own roots are published under. The unanswered list classifies against them and answers only the names its reader may see.
+database.AnalyzeAndLog A background pass: startup and the migrations refresh the engine's table statistics and log what they did.
 database.AnalyzeEveryTable A background pass: startup and the migrations refresh the engine's table statistics.
 database.DB.ServerTime Not varying by reader: the database server's own clock.
 database.InBatches Not varying by reader: an engine helper inserting rows its caller already chose.
