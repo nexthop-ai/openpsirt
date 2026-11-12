@@ -1,7 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// How a stylesheet's class rules are read, and which of them cannot be right.
+// How a stylesheet's class rules and a source file's class names are read,
+// and which of them cannot be right.
 //
 // A module of its own so that a test can import it. The program beside this
 // one does its work at import time — it walks the stylesheets, compiles
@@ -47,7 +48,7 @@ export function cssRules(text) {
 }
 
 // insideRule is whether the text at an offset sits in a block a rule opened,
-// at any depth, as against the top level or at-rule blocks alone.
+// at any depth. The top level and at-rule blocks alone are outside one.
 function insideRule(css, at) {
   const opened = [];
   for (let i = 0; i < at; i++) {
@@ -61,6 +62,19 @@ function insideRule(css, at) {
       .trim()
       .startsWith("@");
   });
+}
+
+// definedClasses is every class name a stylesheet's selectors carry, in the
+// order they first appear. Every class in a selector counts, a modifier's
+// included, since each is a name Tailwind may also answer for.
+export function definedClasses(text) {
+  const names = [];
+  for (const { selector } of cssRules(text)) {
+    for (const [, name] of selector.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) {
+      if (!names.includes(name)) names.push(name);
+    }
+  }
+  return names;
 }
 
 // rulesIn reads one stylesheet as two maps: what each bare class declares, and
@@ -147,4 +161,35 @@ export function unusedClasses(names, markup) {
         markup,
       ),
   );
+}
+
+// quotedRuns is the quoted and template text of a source file, each run with a
+// space either side, which is the markup a class can reach an element through.
+//
+// Comments go first, since many class names are also ordinary English words
+// in a sentence. A line comment opens on `//` not preceded by a colon or a
+// word character, so a URL inside a string is kept. A class inside an
+// interpolation is itself a quoted string, so nested runs are kept.
+export function quotedRuns(text) {
+  const bare = text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(?<![:\w])\/\/[^\n]*/g, " ");
+  const runs = [];
+  for (const [, single, double, template] of bare.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)) {
+    runs.push(` ${single ?? double ?? template ?? ""} `);
+  }
+  return runs.join("\n");
+}
+
+// writtenClasses is every literal class name a source file writes into a
+// `className`, with the line it is on. An interpolation in a template is
+// skipped, since what it holds is unknown here.
+export function writtenClasses(text) {
+  const out = [];
+  text.split("\n").forEach((line, i) => {
+    for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+      for (const word of (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, " ").split(/\s+/)) {
+        if (/^[A-Za-z][\w-]*$/.test(word)) out.push({ word, line: i + 1 });
+      }
+    }
+  });
+  return out;
 }
