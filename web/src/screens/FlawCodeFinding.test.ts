@@ -29,6 +29,21 @@ describe("a flaw recorded from a code finding", () => {
     expect(fixedFromCodeFinding(CODE_FINDING, "master", "broadcom")).toContain("0123456789ab");
   });
 
+  it("names the run that stopped detecting it, though a person stated a later fixed build", () => {
+    const stated = {
+      ...CODE_FINDING,
+      fixed_in: [
+        {
+          ...CODE_FINDING.fixed_in![0]!,
+          fixed: { run: 11, built: "2026-10-05T00:00:00Z", commit: "fedcba9876543210" },
+        },
+      ],
+    } as FlawCodeFinding;
+    const said = fixedFromCodeFinding(stated, "master", "broadcom");
+    expect(said).toContain("0123456789ab");
+    expect(said).not.toContain("fedcba987654");
+  });
+
   it("starts a fix on any other build from nothing", () => {
     expect(fixedFromCodeFinding(CODE_FINDING, "master", "mellanox")).toBe("");
     expect(fixedFromCodeFinding(null, "master", "broadcom")).toBe("");

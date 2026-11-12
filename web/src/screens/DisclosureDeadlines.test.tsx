@@ -5,7 +5,8 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildsWords, DisclosureDeadlines, embargoKey } from "./DisclosureDeadlines";
 import { remember } from "../app/scope";
-import { screen, serve, settle, mounted } from "../test/mount";
+import { answer, screen, serve, settle, mounted } from "../test/mount";
+import { change, press } from "../test/controls";
 
 const mount = mounted();
 
@@ -58,6 +59,37 @@ describe("the disclosure deadlines screen", () => {
     await settle();
     expect(mount.host().querySelectorAll('input[type="date"]')).toHaveLength(1);
     expect(mount.host().textContent).toContain("main, v1.0 · container");
+  });
+
+  it("opens another row's form without the refusal the last row was given", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: me };
+      if (path === "/v1/disclosure-deadlines") {
+        return { data: { items: [row("sonic"), row("openpsirt")], total: 2 } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    answer("POST", () => ({ status: 409 }));
+    mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
+    await settle();
+    const moves = () =>
+      Array.from(mount.host().querySelectorAll("button")).filter(
+        (each) => each.textContent === "Move or disclose",
+      );
+    act(() => moves()[0]?.click());
+    await settle();
+    change(mount.host().querySelector<HTMLInputElement>('input[type="date"]'), "2027-02-01");
+    change(
+      mount.host().querySelector<HTMLTextAreaElement>("textarea"),
+      "The vendor needs a month.",
+    );
+    await press(mount.host(), "Ask");
+    await settle();
+    expect(mount.host().textContent).toContain("That date was not moved.");
+    act(() => moves()[1]?.click());
+    await settle();
+    expect(mount.host().querySelectorAll('input[type="date"]')).toHaveLength(1);
+    expect(mount.host().textContent).not.toContain("That date was not moved.");
   });
 
   it("asks for the scope picked and says which it is", async () => {

@@ -74,7 +74,7 @@ the reader reads security testing material in.
 | Once recorded it reads Recorded as a flaw and shows the flaw, linked, in place of the decision; it reads Security testing only or Included in disclosure, the second with "Included in its flaw's disclosure" on hover | |
 | Include and Take out of disclosure are one button while the flaw is undisclosed, its collaborators listed beside; a security-testing-only one lists what including discloses above it | |
 | Withdraw flaw sits beside it while undisclosed, asks why, and says on hover it closes the flaw on every build | |
-| A recorded flaw's page shows its code finding to a reader of it: rule and place linked, state, suggested component, proposed builds, whether the record was withdrawn. Where the code finding is no longer detected on a build, Fixed here starts from the build that did not see it and a person closes it | |
+| A recorded flaw's page shows its code finding to a reader of it: rule and place linked, state, suggested component, proposed builds, whether the record was withdrawn. Where the code finding is no longer detected on a build, Fixed here starts from the build of the first run that did not see it, the build the card names, and a person closes it | |
 
 ## Suppression rules
 
