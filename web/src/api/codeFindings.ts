@@ -249,10 +249,10 @@ export function useFixCodeFinding(build: Build, occurrence: string) {
 export function useAssignCodeFinding(build: Build, occurrence: string) {
   const decided = useAfterCodeFinding();
   // A change of holder moves the holdings and the lists of who holds what.
-  const held = useAfterHandBack();
+  const handedOver = useAfterHandBack();
   const after = () => {
     decided();
-    held();
+    handedOver();
   };
   return useMutation({
     mutationFn: async (held: { kind: "person" | "team"; identity: string } | null) =>

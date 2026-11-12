@@ -71,8 +71,10 @@ export function AffectedBuilds({
     }
     return held;
   }, [holds.data, product]);
+  const cut = (holds.data?.total ?? rows.length) > rows.length;
   // Past the most one write names, the whole list cannot be sent either.
-  const partial = (holds.data?.total ?? rows.length) > rows.length || now.size > BUILDS_MOST;
+  const tooMany = now.size > BUILDS_MOST;
+  const partial = cut || tooMany;
 
   const set = useMutation({
     mutationFn: async (picked: string[]) =>
@@ -129,11 +131,20 @@ export function AffectedBuilds({
       ) : partial ? (
         <div className="alert">
           <strong>This is open at more builds than this screen can set</strong>
-          <span>
-            {(holds.data?.total ?? 0).toLocaleString()} builds and components carry it here, and
-            this sends the whole list — so writing from what is shown would close the rest as never
-            affected. Close them one build at a time from each build&rsquo;s own finding instead.
-          </span>
+          {cut ? (
+            <span>
+              {(holds.data?.total ?? 0).toLocaleString()} builds and components carry it here, and
+              this sends the whole list — so writing from what is shown would close the rest as
+              never affected. Close them one build at a time from each build&rsquo;s own finding
+              instead.
+            </span>
+          ) : (
+            <span>
+              {now.size.toLocaleString()} builds carry it here, and one change names at most{" "}
+              {BUILDS_MOST.toLocaleString()}. Close them one build at a time from each build&rsquo;s
+              own finding instead.
+            </span>
+          )}
         </div>
       ) : (
         <>

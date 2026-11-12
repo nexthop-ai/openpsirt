@@ -491,9 +491,10 @@ function Administered() {
   });
   const rows = changes.data?.items ?? [];
   // A refusal draws nothing: the section is asked only of an administrator or
-  // an auditor, and one whose role was withdrawn since is refused. A read that failed for any other reason is said, because
-  // an audit screen silently missing half of what it is for is the one place
-  // a quiet absence costs the most.
+  // an auditor, and one whose role was withdrawn since is refused. A read that
+  // failed for any other reason is said, because an audit screen silently
+  // missing half of what it is for is the one place a quiet absence costs the
+  // most.
   if (changes.isError) {
     return notYours(changes.error) ? null : (
       <div style={{ marginTop: 24 }}>
@@ -511,9 +512,6 @@ function Administered() {
       </div>
     );
   }
-  // Empty under a kind somebody picked is an answer, and the picker stays so
-  // it can be put back.
-  if (rows.length === 0 && showing === CHANGES_FIRST && !kind) return null;
 
   return (
     <div style={{ marginTop: 24 }} id="changes">
@@ -555,7 +553,10 @@ function Administered() {
           ))}
         </select>
       </div>
-      {rows.length === 0 && (
+      {/* Empty is an answer, said once the read is in; under a kind, the
+          picker stays so it can be put back. */}
+      {rows.length === 0 && !kind && <Empty title="No changes over this period" />}
+      {rows.length === 0 && kind && (
         <Empty title="No changes of that kind">
           <button
             type="button"

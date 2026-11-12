@@ -60,18 +60,20 @@ export function useFindingNeighbors(
     [list],
   );
   // By what the row is rather than by where it sat: a row may have moved or
-  // gone since it was drawn.
+  // gone since it was drawn. Across products one issue at one component is a
+  // row per product, so the product is part of what the row is.
   const indexIn = useMemo(
     () => (items: Item[]) =>
       items.findIndex(
         (row) =>
+          (!across || (row.product ?? "") === product) &&
           row.vulnerability === vulnerability &&
           row.component === component &&
           (row.version ?? "") === version &&
           (!ecosystem || (row.ecosystem ?? "") === ecosystem) &&
           (!namespace || (row.namespace ?? "") === namespace),
       ),
-    [vulnerability, component, version, ecosystem, namespace],
+    [across, product, vulnerability, component, version, ecosystem, namespace],
   );
   // The page the list itself holds under the same address, where the reader
   // came from it: the findings list caches its rows under this key. Where the

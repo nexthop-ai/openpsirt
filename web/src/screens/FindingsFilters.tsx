@@ -10,7 +10,7 @@ import { Words } from "../ui/Words";
 import { Unread } from "../ui/Reading";
 import type { Readable } from "../ui/Count";
 import { called, identifiersIn, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SUBTREE, sentFor, validFilter, withoutInvalid, type ListScope } from "./list";
 import { BUMP_FILTERS } from "./FindingsViews";
 // The findings list's filters, apart from the list itself.
@@ -873,7 +873,13 @@ export function Narrowed({
   clear: (chip: Active) => void;
   clearAll: () => void;
 }) {
-  const active = activeFilters(params, weaknesses, scope);
+  const { product, branch_or_tag: branchOrTag, variant } = scope;
+  // Each chip asks whether removing it changes the request, so they are worked
+  // out once per question.
+  const active = useMemo(
+    () => activeFilters(params, weaknesses, { product, branch_or_tag: branchOrTag, variant }),
+    [params, weaknesses, product, branchOrTag, variant],
+  );
   const where: { label: string; value: string; to: typeof scope }[] = [];
   if (scope.product) {
     where.push({

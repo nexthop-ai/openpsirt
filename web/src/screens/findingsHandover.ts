@@ -13,8 +13,8 @@ import type { Row, withinVariant } from "./list";
 export const NAMED_AT_ONCE = 2000;
 
 // The reads a decision on the findings list makes stale. The view counts are
-// held for five minutes, and two of them are not under the `findings` prefix,
-// so each is named.
+// held for five minutes and not all sit under the `findings` prefix, so each
+// is named.
 export const listReads = ["findings", "findings-by-component", "planned-upgrades", "holdings"];
 
 // useHandOver is the two ways the findings list hands rows to a person or a

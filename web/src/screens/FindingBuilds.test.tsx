@@ -58,6 +58,8 @@ describe("correcting which builds a flaw affects", () => {
     const sent = serving(many, many.length);
     await opened();
     expect(mount.host().textContent).toContain("more builds than this screen can set");
+    expect(mount.host().textContent).toContain("one change names at most 200");
+    expect(mount.host().textContent).not.toContain("writing from what is shown");
     expect(() => button(mount.host(), "Set which builds it affects")).toThrow();
     expect(sent()).toHaveLength(0);
   });

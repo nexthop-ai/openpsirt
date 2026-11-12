@@ -151,7 +151,7 @@ The next finding is reachable without going back (REQ-60); the form sat at about
 | The list travels with the finding as one value in the address | A filter added to the list collides with nothing on the finding |
 | The page the list holds answers first: a neighbor on either side, or an end of the whole list, asks nothing; a finding at a page edge with more beyond asks for the window below, where that window is wider than the page | |
 | The window is the list's page widened by one row at each end, and a neighbor is handed the list at its own page; at the largest page the window is the page and the walk ends at its edge | Widening backward alone leaves the page's last row outside its own window |
-| The row is found by what it is; where it cannot be, there is no walk | Under a state filter it may have moved |
+| The row is found by what it is, its product included across products; where it cannot be, there is no walk | Under a state filter it may have moved |
 | A walk from the list across every product reads that list's rows, steps into each neighbor's own product, and returns to that list; the finding's address marks it, and the mark never reaches a server | One product's rows are a subsequence of the spanning order |
 | A list that asked for everything is a list: present-and-empty differs from absent | |
 | What a saved filter prepares travels with the walk (`design-docs/interface-filters.md` § Saved filters) | |
