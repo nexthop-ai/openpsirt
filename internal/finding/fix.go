@@ -292,7 +292,7 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 	}
 	var open []closing
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := inFoldBatches(folds, func(batch []string) error {
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
 		var some []closing
 		if err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -409,15 +409,19 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 		for _, row := range covered {
 			withheld[row.DecisionID] = false
 		}
+		// A build's commitments are a read of the build, which no case
+		// widens: what each one closes is counted at what the reader reads
+		// of the product, so a case-only reach would show a commitment with
+		// nothing under it.
 		for _, row := range covered {
-			if !slices.Contains(access.VisibleOn(subject, row.ProductID, row.VulnerabilityID), row.Visibility) {
+			if !slices.Contains(access.Visible(subject, row.ProductID), row.Visibility) {
 				withheld[row.DecisionID] = true
 			}
 		}
 	}
 	seen := map[string]bool{}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := inFoldBatches(folds, func(batch []string) error {
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
 		var held []string
 		if err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -499,7 +503,7 @@ func (s *Store) packagesIn(ctx context.Context, buildID int64,
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	// Each fold's names sit wholly in one batch, so ordering each batch by
 	// name orders every fold's list.
-	if err := inFoldBatches(folds, func(batch []string) error {
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
 		var some []named
 		if err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -531,18 +535,6 @@ func (s *Store) packagesIn(ctx context.Context, buildID int64,
 	return out, nil
 }
 
-// inFoldBatches calls fn over folds a batch at a time, so no IN list passes
-// the length every engine accepts. Every read over the folds groups by fold,
-// so a fold's rows never span two batches.
-func inFoldBatches(folds []string, fn func([]string) error) error {
-	for start := 0; start < len(folds); start += database.BatchSize {
-		if err := fn(folds[start:min(start+database.BatchSize, len(folds))]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // holder is who carries a fold's work, where one party carries all of it.
 type holder struct {
 	party       *int64
@@ -563,7 +555,7 @@ func (s *Store) heldPerFold(ctx context.Context, buildID int64,
 	}
 	var rows []carried
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := inFoldBatches(folds, func(batch []string) error {
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
 		var some []carried
 		if err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).

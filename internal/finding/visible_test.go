@@ -296,7 +296,8 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 // is about: one over undisclosed work is told to nobody who may not read that
 // work. Without a decision that is its fold's findings in the build; argued by
 // a decision it is every occurrence the decision covers, whatever the build's
-// own findings are, a case the reader was brought into counting as reading it.
+// own findings are. A case widens no read of a build, so it reaches nothing
+// here.
 func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 	for _, argued := range []bool{false, true} {
 		name := "without a decision"
@@ -345,7 +346,7 @@ func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 						who  access.Subject
 						want int
 					}{"somebody on the issue's case", f.holding(t, access.PublicRead).OnCases(
-						map[int64][]int64{f.productID: {f.issue(t, "CVE-2026-1")}}), 1})
+						map[int64][]int64{f.productID: {f.issue(t, "CVE-2026-1")}}), 0})
 				}
 				for _, c := range cases {
 					planned, err := f.store.PlannedUpgradesFor(ctx, c.who, f.build)
