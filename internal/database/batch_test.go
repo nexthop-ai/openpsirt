@@ -4,7 +4,9 @@
 package database_test
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -235,4 +237,35 @@ func TestAKeyedInsertCarriesTheIdentifiersTheDatabaseStored(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestAListIsReadInBatchesNoLongerThanAnEngineTakes(t *testing.T) {
+	keys := make([]string, 2*database.BatchSize+1)
+	for i := range keys {
+		keys[i] = fmt.Sprint("fold-", i)
+	}
+	var read []string
+	batches := 0
+	if err := database.IDsInBatches(t.Context(), keys, func(_ context.Context, batch []string) error {
+		batches++
+		if len(batch) > database.BatchSize {
+			t.Errorf("a batch held %d keys, over %d", len(batch), database.BatchSize)
+		}
+		read = append(read, batch...)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if batches != 3 {
+		t.Errorf("%d batches were read, want 3", batches)
+	}
+	if !slices.Equal(read, keys) {
+		t.Errorf("the batches covered %d keys, want each of the %d once", len(read), len(keys))
+	}
+	if err := database.IDsInBatches(t.Context(), []int64(nil), func(context.Context, []int64) error {
+		t.Error("an empty list was read")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }

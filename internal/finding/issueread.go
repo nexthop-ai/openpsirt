@@ -233,17 +233,24 @@ func RecordedOutOfReach(ctx context.Context, db bun.IDB, subject access.Subject,
 		return out, nil
 	}
 	where, args := recordedOutOfReachOf(subject, `"ro"."id"`)
-	var withheld []int64
-	if err := db.NewSelect().
-		TableExpr(`"vulnerability" AS "ro"`).
-		ColumnExpr(`"ro"."id"`).
-		Where(`"ro"."id" IN (?)`, bun.List(ids)).
-		Where(where, args...).
-		Scan(ctx, &withheld); err != nil {
+	// A document names every issue of a build, so the list is read a batch
+	// at a time.
+	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		var withheld []int64
+		if err := db.NewSelect().
+			TableExpr(`"vulnerability" AS "ro"`).
+			ColumnExpr(`"ro"."id"`).
+			Where(`"ro"."id" IN (?)`, bun.List(batch)).
+			Where(where, args...).
+			Scan(ctx, &withheld); err != nil {
+			return err
+		}
+		for _, id := range withheld {
+			out[id] = true
+		}
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read where these issues were recorded: %w", err)
-	}
-	for _, id := range withheld {
-		out[id] = true
 	}
 	return out, nil
 }
