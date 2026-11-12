@@ -24,6 +24,7 @@ func strong(on string) bool { return on == onKey || on == onUnprinted }
 // described it.
 type candidate struct {
 	findingID   int64
+	occurrence  string
 	key         string
 	unprinted   string
 	functionKey string

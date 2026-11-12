@@ -64,6 +64,12 @@ these finds it, and opens at that occurrence, so its decision reaches it
 A result found nowhere opens at an occurrence derived from series and whole
 key, so first seen on two builds at once it is one occurrence.
 
+| Rule | Reason |
+|---|---|
+| An occurrence is carried to one result of a run at most, and never one open on the build already | Two code findings open at one occurrence on one build would be answered by one decision |
+| Results of one run sharing a whole key open one occurrence each: the first at the key's, each later one at the key's with an ordinal, ordered by column then message | The key holds no column and no digits, so two flaws on one line share it; the first keeps the occurrence it always had |
+| An occurrence derived for a result that is open on the build already, under a key that has since moved, takes the next ordinal | |
+
 ## Fingerprint change
 
 A run records its fingerprint schemes and the client's salt mark. Differing
@@ -89,7 +95,6 @@ parent build's.
 |---|---|
 | A moved result with no fingerprint and no function matches on its line alone | clang-tidy, and clang before 22. It pairs probably with the nearest same rule and message, and two passing each other can swap |
 | A new variant inherits on the whole key alone | Every layer carries only from the parent branch; a variant's first run takes a sibling's occurrences on equal whole keys |
-| A result equal to a moved code finding's first whole key opens at its occurrence | Occurrences mint from the first key; it is one flaw reported twice |
-| Two identical results in one build share an occurrence | |
+| A result equal to a moved code finding's first whole key, on another build, opens at its occurrence | Occurrences mint from the first key; it is one flaw reported twice |
 | A renamed file's results open as new | The path is in every key, so decisions do not follow |
 | Coverity is matched as plain SARIF | Its `mergeKey` is lost outside its JSON |

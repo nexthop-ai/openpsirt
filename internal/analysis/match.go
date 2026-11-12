@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -99,24 +100,14 @@ const (
 	partRelated = "related"
 )
 
-// match pairs a run's results with the findings its series holds open on
+// match pairs a run's results with the candidates its series holds open on
 // the build, one to one, layer by layer (pair, or pairAcross for a
 // fingerprint change). It reports the pairs, the
 // results nothing matched, the open findings the run did not see, and how
 // many of the pairs had been missed by an earlier run.
-func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keyed, printsChanged bool) (
-	map[int64]Keyed, []Keyed, []int64, int, error) {
+func match(candidates []candidate, open []series.Sighting, keyed []Keyed, printsChanged bool) (
+	map[int64]Keyed, []Keyed, []int64, int) {
 
-	absent := make(map[int64]bool, len(open))
-	ids := make([]int64, 0, len(open))
-	for _, s := range open {
-		ids = append(ids, s.FindingID)
-		absent[s.FindingID] = s.AbsentRunID != nil
-	}
-	candidates, err := candidatesOf(ctx, db, ids, absent)
-	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("read what the series holds open: %w", err)
-	}
 	matched := map[int64]Keyed{}
 	paired := make([]bool, len(keyed))
 	layers := pair
@@ -146,24 +137,40 @@ func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keye
 			missed = append(missed, s.FindingID)
 		}
 	}
-	return matched, fresh, missed, returned, nil
+	return matched, fresh, missed, returned
 }
 
-// candidatesOf is these findings as their newest sightings described them,
-// in the order of their identifiers.
-func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64]bool) ([]candidate, error) {
+// candidatesOf is the findings of these sightings as their newest sightings
+// described them, at their occurrences, in the order of their identifiers.
+func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting) ([]candidate, error) {
+	absent := make(map[int64]bool, len(open))
+	ids := make([]int64, 0, len(open))
+	for _, s := range open {
+		ids = append(ids, s.FindingID)
+		absent[s.FindingID] = s.AbsentRunID != nil
+	}
 	var out []candidate
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		var rows []result
-		if err := db.NewSelect().Model(&rows).
-			Column("finding_id", "match_key", "unprinted_key", "function_key", "line_key", "start_line").
-			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
+		var rows []struct {
+			FindingID    int64  `bun:"finding_id"`
+			Occurrence   string `bun:"occurrence_identity"`
+			MatchKey     string `bun:"match_key"`
+			UnprintedKey string `bun:"unprinted_key"`
+			FunctionKey  string `bun:"function_key"`
+			LineKey      string `bun:"line_key"`
+			StartLine    *int   `bun:"start_line"`
+		}
+		if err := db.NewSelect().TableExpr(`"analysis_result" AS "ar"`).
+			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
+			ColumnExpr(`"ar"."finding_id", "f"."occurrence_identity", "ar"."match_key", "ar"."unprinted_key"`).
+			ColumnExpr(`"ar"."function_key", "ar"."line_key", "ar"."start_line"`).
+			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
 			return err
 		}
 		for _, r := range rows {
 			c := candidate{
-				findingID: r.FindingID, key: r.MatchKey, unprinted: r.UnprintedKey, functionKey: r.FunctionKey,
-				lineKey: r.LineKey, absent: absent[r.FindingID],
+				findingID: r.FindingID, occurrence: r.Occurrence, key: r.MatchKey, unprinted: r.UnprintedKey,
+				functionKey: r.FunctionKey, lineKey: r.LineKey, absent: absent[r.FindingID],
 			}
 			if r.StartLine != nil {
 				c.line = *r.StartLine
@@ -172,23 +179,33 @@ func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("read what the series holds open: %w", err)
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].findingID < out[j].findingID })
-	return out, err
+	return out, nil
 }
 
-// open records each result new to this build as a finding, with what the run
-// said about it. A result the series holds elsewhere takes that code finding's occurrence,
-// so a decision on it reaches this build too; any other opens at an occurrence its
-// series and key name. It returns the findings.
-func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, productID, seriesID int64, fresh []Keyed,
-	rules map[string]int64, from map[int]carried, components map[string]int64, root int64) (
+// heldAt is the occurrences candidates are at.
+func heldAt(candidates []candidate) map[string]bool {
+	out := make(map[string]bool, len(candidates))
+	for _, c := range candidates {
+		out[c.occurrence] = true
+	}
+	return out
+}
+
+// open records each result new to this build as a finding at the occurrence
+// freshOccurrences gave it, with what the run said about it. It returns the
+// findings.
+func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, productID int64, fresh []Keyed,
+	occurrences []string, rules map[string]int64, from map[int]carried, components map[string]int64, root int64) (
 	[]int64, error) {
 
 	if len(fresh) == 0 {
 		return nil, nil
 	}
 	now := a.now().Truncate(time.Microsecond)
-	occurrences := freshOccurrences(seriesID, fresh, from)
 	for i := range fresh {
 		if c, ok := from[i]; ok {
 			fresh[i].On = c.on
@@ -231,15 +248,44 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 	return ids, nil
 }
 
-// freshOccurrences is the occurrence each result new to this build opens at: the code finding's
-// it was carried from, or the one its series and key name.
-func freshOccurrences(seriesID int64, fresh []Keyed, from map[int]carried) []string {
+// freshOccurrences is the occurrence each result new to this build opens at. A
+// result the series holds elsewhere takes that code finding's occurrence, so a
+// decision on it reaches this build too. Any other opens at the occurrence its
+// series and key name, or, where that is held on the build already or taken by
+// another result of the run, at the next that adds an ordinal to the key: two
+// results differing only in their column, or in the digits of their message,
+// share a key and are two code findings. The first of a key keeps the key
+// alone, and later results of one key are numbered in the order of their
+// columns and messages.
+func freshOccurrences(seriesID int64, fresh []Keyed, from map[int]carried, held map[string]bool) []string {
 	occurrences := make([]string, len(fresh))
-	for i, k := range fresh {
-		occurrences[i] = identity(seriesID, k.Key)
+	taken := make(map[string]bool, len(held)+len(from))
+	for o := range held {
+		taken[o] = true
+	}
+	var minted []int
+	for i := range fresh {
 		if c, ok := from[i]; ok {
 			occurrences[i] = c.occurrence
+			taken[c.occurrence] = true
+		} else {
+			minted = append(minted, i)
 		}
+	}
+	sort.SliceStable(minted, func(a, b int) bool {
+		x, y := fresh[minted[a]], fresh[minted[b]]
+		if x.StartColumn != y.StartColumn {
+			return x.StartColumn < y.StartColumn
+		}
+		return x.Message < y.Message
+	})
+	for _, i := range minted {
+		occurrence := identity(seriesID, fresh[i].Key)
+		for n := 1; taken[occurrence]; n++ {
+			occurrence = identity(seriesID, fresh[i].Key+"\x00"+strconv.Itoa(n))
+		}
+		taken[occurrence] = true
+		occurrences[i] = occurrence
 	}
 	return occurrences
 }
