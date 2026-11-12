@@ -6,6 +6,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -58,6 +59,36 @@ func TestASnapshotReadsWhatWasCommittedWhenItFirstRead(t *testing.T) {
 		}
 		if got := count(ctx, db); got != 2 {
 			t.Errorf("after the snapshot the table holds %d rows", got)
+		}
+	})
+}
+
+// TestASnapshotOutlastsPostgreSQLsBoundOnAnIdleTransaction pins a snapshot
+// against a server that ends a session idle inside a transaction: a file
+// written slowly between two pages still reads its second page. The pool is
+// narrowed to one connection, so the snapshot runs on the session given the
+// bound.
+func TestASnapshotOutlastsPostgreSQLsBoundOnAnIdleTransaction(t *testing.T) {
+	dbtest.Only(t, database.Postgres, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		db.SetMaxOpenConns(1)
+		t.Cleanup(func() { db.SetMaxOpenConns(db.Pool.MaxOpen) })
+		if _, err := db.ExecContext(ctx, `SET idle_in_transaction_session_timeout = '100ms'`); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = db.ExecContext(context.WithoutCancel(ctx), `RESET idle_in_transaction_session_timeout`)
+		})
+		err := database.Snapshot(ctx, db, func(ctx context.Context, view bun.IDB) error {
+			var n int
+			if err := view.NewRaw(`SELECT 1`).Scan(ctx, &n); err != nil {
+				return err
+			}
+			time.Sleep(400 * time.Millisecond)
+			return view.NewRaw(`SELECT 2`).Scan(ctx, &n)
+		})
+		if err != nil {
+			t.Fatalf("a snapshot idle past the server's bound failed: %v", err)
 		}
 	})
 }

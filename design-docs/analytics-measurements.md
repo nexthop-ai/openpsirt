@@ -345,3 +345,4 @@ runs shared the servers.
 | It clears within ten seconds of the snapshot ending | |
 | Without a snapshot it stays under 300 | The same writer for three minutes: at most 265 on MySQL and 271 on MariaDB |
 | A read inside the snapshot slows as rows it reads gain versions | A scan of the 10,000 updated rows went from 25 ms to about 0.7 to 0.9 s on MySQL, 14 ms to about 0.5 s on MariaDB |
+| On PostgreSQL vacuum keeps every row version that died while the snapshot was open, until it ends | Vacuum removes nothing the oldest open snapshot can still see; not measured here |

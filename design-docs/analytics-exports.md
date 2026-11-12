@@ -37,10 +37,11 @@ complete list exists to filter afterwards. A file is read one of three ways.
 | A list and its file are built from one function | |
 | A file takes its screen's filters, declared once; an undeclared filter is refused | An export dropping a filter showed eight rows on screen and seven thousand in the file |
 | Paging is kept apart from the filters | A file pages internally and offers no page size |
+| A file over a period says its end back as the day asked for, or, where none was, as the moment it was asked | The end is not itself in the period, so today said as an end excludes the rows the file holds from today |
 | A screen's file link carries its filters with each value of a list as its own repetition of the name, and never its page | The server reads `a,b` as one value named `a,b` |
 | Every page of a paged file, and every name a page carries, is read through one snapshot | Each page is its own statement, and a row written between two of them moves every later row, so the file repeats or skips a row and says it is complete |
 | A list grouped in the application from everything it reads is read whole, once | Paged, every page repeats the whole read: what keeps being put off is grouped from every deferral |
-| A failure part-way writes a line saying the file is incomplete, and is logged | The 200 has gone out, so nothing else tells an operator; a reader that went away is a warning |
+| A failure part-way writes a line saying the file is incomplete, and is logged | The 200 has gone out, so nothing else tells an operator; a reader that went away, or one too slow for the stall bound or the ceiling, is a warning |
 | A stream's cursor and a paged file's snapshot are held ten minutes at most, then cut with the incomplete marker | A slow reader otherwise holds a connection about 41 hours for 249,288 occurrences read in 1.9 s; on SQLite, the whole pool. A snapshot also holds back the engine's clean-up of old row versions: ten minutes beside 100 write transactions a second grew MySQL 8's history list to 139,646 and MariaDB's to 154,061 (`design-docs/analytics-measurements.md` § Export snapshots) |
 | Files reading the database as they are written are a fifth of the pool at once, at least one; one more is refused with 503 and a time to ask again | A file read whole holds no connection and takes no place |
 | A refusal is answered before the first byte | After it, a refusal sits inside a 200 |

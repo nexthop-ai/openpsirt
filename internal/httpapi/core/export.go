@@ -308,9 +308,10 @@ func writeExport(ctx huma.Context, in Deps, format, name string, out Exporting) 
 		// file is the only honest thing left: a file that simply stops is a
 		// file somebody reads as complete. Logged as well, because a 200 has
 		// already gone out and nothing else tells an operator. A reader that
-		// went away is a warning, the rest a fault.
+		// went away, or one too slow for the export's bounds, is a warning; the
+		// rest a fault.
 		level := slog.LevelError
-		if errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			level = slog.LevelWarn
 		}
 		Of(ctx.Context(), in).Log().Log(ctx.Context(), level, "an export stopped early",

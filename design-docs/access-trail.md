@@ -40,7 +40,7 @@ dates each rewrite what the tool reports, so their record is evidence.
 | A change against one product is about the name and the product joined by " on ": a grant, an estate grant as "on every product", and a group mapping. The trail builds the first two; a mapping names itself, held to the same shape by a test | A person's history matches that shape |
 | A person's role history is the rows about their identity alone and beside a product, without the group mappings configuration records | A group's name shares the column with an identity, and a group named as somebody is would report its mappings as their roles |
 | **It is read over a period, and leaves as a file**; asked for no period, it answers about everything | An access review covers a certificate's stretch |
-| The file's open end is the moment it was asked for, and says so | A change recorded while the file is written lies outside the period, so no page repeats a row |
+| The file's open end is the moment it was asked for, said as that moment | A change recorded while the file is written lies outside the period, so no page repeats a row |
 | On screen it grows to two hundred rows, newest first, and past that says the file holds every one; a larger page is refused | |
 
 ### Recorded writes
