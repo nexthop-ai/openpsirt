@@ -248,3 +248,30 @@ func TestAReadThatCannotAskForTheLeaseRecordsItFailedHere(t *testing.T) {
 		})
 	}
 }
+
+// A pass that lost the lease among the documents records nothing, so it never
+// reads as a clean read of an upstream the replica holding it reads.
+func TestAReadThatLostTheLeaseAmongTheDocumentsRecordsNothing(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		asked := 0
+		upstream.Keeping(w.reader, func(context.Context) (bool, error) {
+			asked++
+			return asked == 1, nil
+		})
+		if took := w.read(); !took.Filled {
+			t.Errorf("a read that lost the lease took %+v", took)
+		}
+		if asked < 2 {
+			t.Fatalf("the lease was asked for %d times, so no document was reached", asked)
+		}
+		up, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if up.ReachedAt != nil || up.FetchedAt != nil {
+			t.Error("a read that lost the lease among the documents recorded a read")
+		}
+	})
+}

@@ -272,7 +272,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	var documents []Document
 	if err := r.db.NewSelect().Model(&documents).Where(`"ud"."upstream_id" = ?`, up.ID).
 		Scan(ctx); err != nil {
-		return took, fmt.Errorf("read what was read of an upstream: %w", err)
+		return took, r.failedHere(ctx, up, local{fmt.Errorf("read what was read of an upstream: %w", err)})
 	}
 	recorded := make(map[string]Document, len(documents))
 	for _, one := range documents {
@@ -298,8 +298,9 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 				return took, r.failedHere(ctx, up, local{err})
 			}
 			if !mine {
+				// Another replica reads now; what it records stands.
 				took.Filled = true
-				break
+				return took, nil
 			}
 		}
 		tried[one.address] = true

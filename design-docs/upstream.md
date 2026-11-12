@@ -67,7 +67,7 @@ copy of the upstream ordinarily sits.
 | Listings one description names | 32, or the read is refused before any is fetched |
 | Entries every listing of one upstream names | 200,000 between them, or the read is refused |
 | Documents per pass per upstream | 200; a pass taking that many leaves the upstream due |
-| The lease | Asked for again before every listing and every document; a pass that lost it stops, leaves the upstream due and withdraws nothing, and one that lost it among the listings records nothing |
+| The lease | Asked for again before every listing and every document; a pass that lost it stops, leaves the upstream due, withdraws nothing and records nothing, since the replica holding it records what it reads |
 
 ## Reading
 

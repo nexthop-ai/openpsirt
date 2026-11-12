@@ -794,8 +794,8 @@ const mostOfAnError = 4096
 // meant to keep a write small is what makes it fail. The cut itself is the
 // shared one.
 //
-// Every writer of a job's last error goes through here, so each reason is
-// made storable alike: PostgreSQL refuses a NUL and invalid UTF-8, and a
+// Every reason a caller supplies to Fail or Postpone goes through here, so
+// each is made storable alike: PostgreSQL refuses a NUL and invalid UTF-8, and a
 // reason the write refuses leaves the job claimed.
 func head(s string, n int) string {
 	s = bound.Text(s)
