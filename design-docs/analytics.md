@@ -123,6 +123,8 @@ estate permanently late.
 | Only known names may be set | |
 | A stored minimum severity outside the severity words reads as none, and says it cannot be enforced | |
 | A failure to read a setting is reported, never read as unset | Defaults would change which deferrals need a second person |
+| A stored switch that is neither on nor off reads as unset, as an unparsable duration or count does | A hand-written value must not turn a default-on behavior off |
+| A renamed setting's own and former names are read in one statement | Read in two, a change moving the row between them reads as unset |
 | Every setting offered is read: the administrator's value, then the process's startup value, then the built-in default | |
 
 ## Limits
