@@ -4,6 +4,8 @@
 package publish_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -432,12 +434,16 @@ func TestADocumentWhosePathMovedStartsAgainAtTheNewOne(t *testing.T) {
 		}
 		// Held where an earlier shape of the tracking identifier put it.
 		old := publish.DirectoryPath + "2025/vex-sonic-cve-2026-1001.json"
+		sum := sha256.Sum256([]byte(old))
 		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
-			Set(`"path" = ?`, old).Set(`"path_digest" = ?`, strings.Repeat("c", 64)).
+			Set(`"path" = ?`, old).Set(`"path_digest" = ?`, hex.EncodeToString(sum[:])).
 			Set(`"tracking_id" = ?`, "VEX-sonic-CVE-2026-1001").Set(`"version" = ?`, 3).
 			Set(`"first_at" = ?`, now.FirstAt.AddDate(-1, 0, 0)).
 			Where(`"id" = ?`, now.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
+		}
+		if _, err := w.documents.At(ctx, w.anybody(), old, "all"); err != nil {
+			t.Fatalf("the old path serves nothing before the pass: %v", err)
 		}
 		wrote, err := w.pass.Once(ctx)
 		if err != nil {
@@ -455,8 +461,20 @@ func TestADocumentWhosePathMovedStartsAgainAtTheNewOne(t *testing.T) {
 			t.Errorf("the moved document is at %s as %s version %d, want %s as %s version 1",
 				moved.Path, moved.TrackingID, moved.Version, now.Path, now.TrackingID)
 		}
+		if moved.FirstAt.Year() != now.FirstAt.Year() {
+			t.Errorf("the moved document was first released in %d, want %d",
+				moved.FirstAt.Year(), now.FirstAt.Year())
+		}
 		if _, err := w.documents.At(ctx, w.anybody(), old, "all"); !errors.Is(err, publish.ErrNotPublished) {
 			t.Errorf("the old path answered %v, want nothing published there", err)
+		}
+		// Settled where it moved to, rather than moving again every pass.
+		again, err := w.pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.Revised != 0 {
+			t.Errorf("the pass after the move revised %d documents, want none", again.Revised)
 		}
 	})
 }
@@ -496,7 +514,7 @@ func TestTwoIssuesFoldedAlikeDoNotStopEachOther(t *testing.T) {
 			t.Errorf("published %d OpenVEX and %d CSAF documents, want one of each", openvex, csafCount)
 		}
 		_, err = w.pass.Product(t.Context(), w.anybody(), w.Product, "all")
-		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(strings.ToLower(err.Error()), "the document about ghsa-a") {
+		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(w.Product.DisplayName)+"'s document about ghsa-a") {
 			t.Errorf("the second issue's document was refused as %v, want the path taken by the first", err)
 		}
 	})

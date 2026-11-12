@@ -189,11 +189,12 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 }
 
 // ErrPathTaken is a document whose path another document already holds: two
-// issues of one product whose names the standard's filename rule folds alike.
-// Documents of two products never share a path, since a tracking identifier
-// opens on its product's identifier, a run of digits the first hyphen ends.
-// Retrying never clears it; it is refused in words naming the path and the
-// document holding it, and the pass carries on with the rest.
+// issues of one product whose names the standard's filename rule folds alike,
+// or a row still at a path an earlier shape of the tracking identifier gave.
+// Two products' documents never share a path otherwise, since a tracking
+// identifier opens on its product's identifier, a run of digits the first
+// hyphen ends. Retrying never clears it; it is refused in words naming the
+// path, the product and the issue holding it, and the pass carries on.
 var ErrPathTaken = refusal.New("another document is published at the same path")
 
 // Statuses is which statuses the deployment publishes now.
@@ -289,16 +290,20 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 			return err
 		}
 		path := one.path(at)
-		var other string
+		var other struct {
+			Product string `bun:"display_name"`
+			Subject string `bun:"subject"`
+		}
 		switch err := tx.NewSelect().Model((*Document)(nil)).
-			ColumnExpr(`"pub"."subject"`).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "pub"."product_id"`).
+			ColumnExpr(`"p"."display_name"`).ColumnExpr(`"pub"."subject"`).
 			Where(`"pub"."path_digest" = ?`, digestOf(path)).
 			Where(`NOT ("pub"."product_id" = ? AND "pub"."kind" = ? AND "pub"."subject" = ?)`,
 				productID, one.Kind, one.Subject).
 			Scan(ctx, &other); {
 		case err == nil:
-			return fmt.Errorf("%w: %s is held by the document about %s, whose name folds to "+
-				"the same filename", ErrPathTaken, path, other)
+			return fmt.Errorf("%w: %s is held by %s's document about %s", ErrPathTaken, path,
+				other.Product, other.Subject)
 		case !database.IsNoRows(err):
 			return fmt.Errorf("read who publishes at %s: %w", path, err)
 		}

@@ -179,8 +179,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			"covers it, or a document about it has been served, withdrawn or not. Retire the " +
 			"product and declare the intended one instead. It is also " +
 			"refused where a group mapping in configuration names the product or the new name; " +
-			"change the mapping first. Where the product publishes, a name folding to the same " +
-			"filename as another product that publishes, or has published, is refused.\n\n" +
+			"change the mapping first.\n\n" +
 			"The displayed name is what screens show and what a document names the product in " +
 			"prose. It may be corrected at any time.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
