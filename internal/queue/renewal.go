@@ -19,8 +19,8 @@ func LeaseFor(interval time.Duration) time.Duration {
 }
 
 // RenewEvery is how many steps a Renewal lets a pass take before it takes the
-// lease again: twenty-five requests at the outward timeout is well inside a
-// lease, and the pass is not a conditional update on every request.
+// lease again, so the pass is not a conditional update on every request. The
+// half-lease clock bound is what keeps a slow pass's lease.
 const RenewEvery = 25
 
 // Renewal takes a pass's lease again as the pass runs, every RenewEvery steps
