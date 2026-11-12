@@ -434,8 +434,8 @@ func (s *Store) ApproveDecision(ctx context.Context, subject access.Subject, dec
 
 	// Undone by its name in the path, stored as written, so a dot segment
 	// could never be undone.
-	if typedname.DotSegment(batch) {
-		return nil, refusal.Errorf("a batch's name %q is a path segment a browser resolves rather than sends", batch)
+	if err := typedname.Unclimbing("a batch's name", batch); err != nil {
+		return nil, err
 	}
 	if len(except) > 0 {
 		if strings.TrimSpace(because) == "" {

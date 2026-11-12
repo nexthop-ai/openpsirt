@@ -231,7 +231,9 @@ function anchor(node: Element) {
     // whatever opens. An absolute link to this deployment is a page of ours
     // and opens in place, as a relative one does.
     node.setAttribute("rel", "noreferrer noopener nofollow");
-    node.setAttribute("target", "_blank");
+    // A page opens in another tab, so the one being read stays. A mail link
+    // opens a mail program, and another tab would be left empty.
+    if (!/^mailto:/i.test(href)) node.setAttribute("target", "_blank");
   }
 }
 

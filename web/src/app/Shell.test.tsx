@@ -92,6 +92,9 @@ describe("signing out", () => {
   it("says to sign out at the proxy where the proxy signed the reader in", async () => {
     const said = await signedOut(409);
     expect(said).toContain("Sign out there");
+    // Offered again, it would clear the drafts again and be refused again.
+    const offered = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);
+    expect(offered.some((text) => text?.startsWith("Sign out"))).toBe(false);
     expect(said).not.toContain("didn’t reach the server");
   });
 

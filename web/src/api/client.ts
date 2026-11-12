@@ -27,8 +27,9 @@ export const api = createClient<paths>({
 });
 
 // A request with a path value that is a dot segment is answered here, as a
-// refusal, and never sent: the browser would send it to the route above, so
-// deleting a branch named ".." would ask to delete its product. Answered
+// refusal, and never sent: the browser would resolve it away, so the request
+// would reach another route, and revoking a token of a person named ".."
+// would revoke the caller's own token of that name. Answered
 // rather than thrown, so a caller reads it as it reads any refusal. Exported
 // so the rule can be pinned without a server.
 export const dotSegments: Middleware = {

@@ -61,7 +61,7 @@ dropped.
 |---|---|
 | One test-data file holds what submitted text may link to and what an outbound link may name once the two local schemes become paths; the submission check and the interface's renderer each keep a copy a test compares with it | A scheme accepted at submission and dropped on screen fails on the side not changed |
 | The refusal sentence and the operation description are built from the submission check's list | |
-| Outbound links carry no referrer and no live opener, and open in another tab; a link to this deployment opens in place | Followed in place, a link out replaces the finding or the unsaved decision the reader was on |
+| Outbound links carry no referrer and no live opener, and a page opens in another tab; a mail link and a link to this deployment open in place | Followed in place, a page replaces the finding or the unsaved decision the reader was on; a mail link opens a mail program |
 | A destination is judged as a browser reads it, inline, as a reference definition, and as an angle-bracket autolink | |
 | Character references are decoded first | `&#106;avascript:` is `javascript:` |
 | Leading and trailing control characters and spaces are removed, and every tab and newline anywhere | A browser does the same, so `/`, a tab, `/evil.example` is two separators |

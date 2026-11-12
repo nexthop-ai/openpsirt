@@ -187,8 +187,8 @@ unscanned.
 
 A name that is a path segment of its own addresses is never `.` or `..`. A
 browser resolves either before sending, percent-encoded or not, so the thing
-could never be opened and a write about it reaches the address above: deleting
-a branch named `..` would delete its product.
+could never be opened, and one in the middle of an address climbs: revoking a
+token of a person named `..` would revoke the caller's own token of that name.
 
 | Name | Treatment |
 |---|---|
@@ -196,7 +196,8 @@ a branch named `..` would delete its product.
 | A key, token, saved filter, team, label, supplier, outbound destination or approval batch | Refused |
 | A person recorded by an administrator or by configuration | Refused |
 | A person a group mapping would record at sign-in | Refused as any unknown arrival is, saying nothing of why |
-| A component in an inventory | The inventory is refused (`design-docs/ingest-parsing.md` § Tolerated and refused) |
+| A component in an inventory, other than its root | The inventory is refused (`design-docs/ingest-parsing.md` § Tolerated and refused) |
+| An inventory's root | Accepted; it is the build, addressed by the build's own names, and a producer scanning the current directory names it `.` |
 | An issue name in scanner output | No name: the issue goes by its others, and one with none is refused |
 | A display name | Accepted; it is never a path segment |
 | More dots, or dots within a name | Accepted; a browser sends them as written |

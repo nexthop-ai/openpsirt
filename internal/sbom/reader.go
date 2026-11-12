@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // refEdge is one declared dependency, still named by the identifiers the file
@@ -448,6 +449,13 @@ func (c *reader) finish() (*Document, error) {
 	for _, described := range c.described {
 		if described.Identity() == rootIdentity {
 			continue
+		}
+		// Every address about a component carries its name as a path
+		// segment, and a browser resolves "." and ".." away. The root is
+		// exempt: it is the build, addressed by the build's own names, and a
+		// producer scanning the current directory names it ".".
+		if err := typedname.Addressable("component name", described.Name); err != nil {
+			return nil, refusal.Errorf("%w, so it cannot be tracked", err)
 		}
 		c.doc.Components = append(c.doc.Components, described)
 	}

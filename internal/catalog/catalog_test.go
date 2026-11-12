@@ -260,7 +260,7 @@ func TestANameABrowserResolvesAsADotSegmentIsRefusedAtEveryLevel(t *testing.T) {
 				"branch or tag renamed":  s.RenameBranchOrTag(ctx, product.ID, branchOrTag.ID, name),
 				"variant renamed":        s.RenameVariant(ctx, product.ID, variant.ID, name),
 			} {
-				if !refusal.In(err) || !strings.Contains(err.Error(), "path segment") {
+				if !refusal.In(err) || !strings.Contains(err.Error(), "dot segment") {
 					t.Errorf("a %s as %q answered %v, want a refusal", what, name, err)
 				}
 			}

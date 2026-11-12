@@ -28,7 +28,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
-	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Component is a package at a version, shared across every product that ships
@@ -339,8 +338,7 @@ func (d Described) AsRoot() Described { return Described{Name: d.Name} }
 
 // Valid reports whether a described component can be stored.
 //
-// A name is the whole requirement, and one an address can carry: not a dot
-// segment. A version is not required: the format only requires
+// A name is the whole requirement. A version is not: the format only requires
 // a type and a name, so a component without one is ordinary output rather than
 // a broken file, and refusing it would throw away every other component in the
 // document alongside it.
@@ -352,9 +350,7 @@ func (d Described) Valid() error {
 	if strings.TrimSpace(d.Name) == "" {
 		return refusal.Errorf("component has no name")
 	}
-	// Every address about a component carries its name as a path segment, so
-	// one named "." or ".." could never be opened.
-	return typedname.Addressable("component name", d.Name)
+	return nil
 }
 
 // Components reads and writes the shared component catalog.

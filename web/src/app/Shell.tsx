@@ -822,6 +822,9 @@ function Me({ who }: { who: Who }) {
   // the page and offers it again.
   const [leaving, setLeaving] = useState(false);
   const [stuck, setStuck] = useState<"not-ended" | "at-the-proxy" | null>(null);
+  // Said by the answer about the reader, or learned from a refused sign-out
+  // where that answer predates it.
+  const atTheProxy = who.by_proxy || stuck === "at-the-proxy";
   // The choice made, and the machine's own answer. They differ for somebody who
   // has chosen nothing: the operating system is answering, and the menu has to
   // show which of the two that came out as while still marking the choice as
@@ -914,12 +917,16 @@ function Me({ who }: { who: Who }) {
           </Link>
           {/* A sign-in the proxy holds ends at the proxy: there is no session
               here to end, and the proxy signs the next request back in. */}
-          {who.by_proxy && (
-            <p className="hint" style={{ margin: "4px 10px" }}>
+          {atTheProxy && (
+            <p
+              className="hint"
+              role={stuck === "at-the-proxy" ? "alert" : undefined}
+              style={{ margin: "4px 10px" }}
+            >
               Your proxy signed you in. Sign out there.
             </p>
           )}
-          {!who.by_proxy && (
+          {!atTheProxy && (
             <button
               type="button"
               className="opt"
@@ -949,11 +956,6 @@ function Me({ who }: { who: Who }) {
           {stuck === "not-ended" && (
             <p className="hint" role="alert" style={{ margin: "4px 10px" }}>
               Sign-out didn&rsquo;t reach the server. You&rsquo;re still signed in here.
-            </p>
-          )}
-          {stuck === "at-the-proxy" && (
-            <p className="hint" role="alert" style={{ margin: "4px 10px" }}>
-              Your proxy signed you in. Sign out there.
             </p>
           )}
         </div>

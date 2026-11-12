@@ -30,20 +30,30 @@ func Matching(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-// Addressable refuses a name that is a dot segment, for a name that becomes a
-// path segment in the addresses about what it names.
+// Addressable refuses a name that is a dot segment as typed or as stored, for
+// a name stored in its matching form that becomes a path segment in the
+// addresses about what it names.
 //
 // A browser resolves "." and ".." before the request is sent, percent-encoded
-// or not, so the thing could never be opened and a request about it would
-// reach the address above it: removing a team member named ".." would ask to
-// delete the team. Checked on the name as typed and as stored.
+// or not, so the thing could never be opened, and a segment in the middle of
+// an address climbs: revoking a token of a person named ".." would revoke the
+// caller's own token of that name.
 func Addressable(what, name string) error {
-	if DotSegment(name) || DotSegment(Matching(name)) {
-		return refusal.Errorf("%s %q is a path segment a browser resolves rather than sends", what, name)
+	if err := Unclimbing(what, name); err != nil {
+		return err
+	}
+	return Unclimbing(what, Matching(name))
+}
+
+// Unclimbing refuses a name that is a dot segment exactly as written, for a
+// name stored as written.
+func Unclimbing(what, name string) error {
+	if DotSegment(name) {
+		return refusal.Errorf("%s %q is a dot segment, which a browser resolves away before sending", what, name)
 	}
 	return nil
 }
 
 // DotSegment reports whether a name is "." or "..", which a browser resolves
-// as a path segment rather than sending.
+// away as a path segment.
 func DotSegment(name string) bool { return name == "." || name == ".." }

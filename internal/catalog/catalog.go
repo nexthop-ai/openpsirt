@@ -183,7 +183,8 @@ func validName(what, name string) error {
 }
 
 // validAddressedName is validName for a name that is also a path segment in
-// every address about the thing it names; a display name is not.
+// every address about the thing it names. A display name is checked by
+// validName alone.
 func validAddressedName(what, name string) error {
 	if err := validName(what, name); err != nil {
 		return err

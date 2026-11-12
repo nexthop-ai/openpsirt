@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
@@ -265,7 +264,7 @@ func alpineBranch(distro string) string {
 
 // segment escapes one name into one path segment.
 //
-// A dot segment is refused rather than escaped. "." and ".." are resolved by
+// A dot segment is refused. "." and ".." are resolved by
 // the browser before the request is sent, so a component named that would
 // quietly reach a different page on the same site. Everything else,
 // separators included, is escaped into the segment it belongs to.

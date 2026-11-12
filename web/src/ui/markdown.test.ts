@@ -103,7 +103,6 @@ describe("the renderer", () => {
     // any other name renders and is ignored.
     for (const source of [
       "[the advisory](https://example.com/a)",
-      "[mail us](mailto:x@example.com)",
       "see CVE-2026-31431",
       "see GHSA-cfh5-3ghh-wfjx",
     ]) {
@@ -127,6 +126,15 @@ describe("the renderer", () => {
     // Ours, so it opens here rather than being sent away with a policy meant
     // for somebody else's site.
     expect(out).not.toContain('target="_blank"');
+  });
+
+  it("leaves a mail link without a tab of its own", () => {
+    const host = document.createElement("div");
+    host.innerHTML = render("[mail us](mailto:x@example.com)");
+    const link = host.querySelector("a[href]");
+    expect(link?.getAttribute("href")).toBe("mailto:x@example.com");
+    expect(link?.getAttribute("target")).toBeNull();
+    expect(link?.getAttribute("rel")).toBe("noreferrer noopener nofollow");
   });
 
   it("opens an absolute link to this deployment in place", () => {

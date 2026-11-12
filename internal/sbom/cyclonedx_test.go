@@ -374,9 +374,18 @@ func TestAComponentNamedAsADotSegmentIsRefused(t *testing.T) {
 	// a browser resolves "." and ".." away before sending.
 	for _, name := range []string{".", ".."} {
 		why := refuses(t, strings.Replace(minimal, `"name": "libc", `, `"name": "`+name+`", `, 1))
-		if !strings.Contains(why, "path segment") {
+		if !strings.Contains(why, "dot segment") {
 			t.Errorf("a component named %q was refused for another reason: %s", name, why)
 		}
+	}
+}
+
+func TestARootNamedAsADotSegmentIsOrdinary(t *testing.T) {
+	// A producer scanning the current directory names the root ".". The root
+	// is the build, addressed by the build's own names.
+	doc := read(t, strings.Replace(minimal, `"name": "product"`, `"name": "."`, 1))
+	if doc.Root.Name != "." || len(doc.Components) == 0 {
+		t.Errorf("read the root as %q beside %d components", doc.Root.Name, len(doc.Components))
 	}
 }
 
