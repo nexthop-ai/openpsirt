@@ -420,9 +420,12 @@ func renameV0110Stopping(ctx context.Context, tx bun.Tx, stopAfter string) (err 
 		return err
 	}
 	defer func() {
-		if undo := restore(); undo != nil && err == nil {
-			err = undo
+		// PostgreSQL's bound is the transaction's own, and a failed rename
+		// ends the transaction, so a reset there fails and says nothing.
+		if err != nil && r.u.engine == database.Postgres {
+			return
 		}
+		err = errors.Join(err, restore())
 	}()
 	for _, t := range tablesRenamedV0110 {
 		if err := r.table(t); err != nil {
@@ -478,19 +481,24 @@ func (r renamer) bound() (func() error, error) {
 	default:
 		return func() error { return nil }, nil
 	}
-	for _, stmt := range set {
-		if _, err := r.u.raw.ExecContext(r.u.ctx, stmt); err != nil {
-			return nil, fmt.Errorf("bound the wait to rename: %w", err)
-		}
-	}
-	return func() error {
+	// Each setting is put back on its own, and every one is tried: the
+	// connection goes back to the pool, and one left with foreign keys
+	// unchecked is a connection nothing reports.
+	undo := func(reset []string) error {
+		var failed error
 		for _, stmt := range reset {
 			if _, err := r.u.raw.ExecContext(context.WithoutCancel(r.u.ctx), stmt); err != nil {
-				return fmt.Errorf("lift the bound on the wait to rename: %w", err)
+				failed = errors.Join(failed, fmt.Errorf("lift the bound on the wait to rename: %w", err))
 			}
 		}
-		return nil
-	}, nil
+		return failed
+	}
+	for i, stmt := range set {
+		if _, err := r.u.raw.ExecContext(r.u.ctx, stmt); err != nil {
+			return nil, errors.Join(fmt.Errorf("bound the wait to rename: %w", err), undo(reset[:i]))
+		}
+	}
+	return func() error { return undo(reset) }, nil
 }
 
 func (r renamer) table(t tableRename) error {
@@ -701,8 +709,7 @@ func (r renamer) holders(table string) []string {
 	switch r.u.engine {
 	case database.Postgres:
 		asks = []asking{{`SELECT CONCAT("a"."pid", ' ', "l"."mode", ' ', COALESCE("a"."application_name", ''), ' ',
-				COALESCE("a"."state", ''), ' since ', "a"."xact_start", ': ',
-				LEFT(COALESCE("a"."query", ''), 200))
+				COALESCE("a"."state", ''), ' since ', "a"."xact_start")
 			FROM "pg_catalog"."pg_locks" AS "l"
 			JOIN "pg_catalog"."pg_stat_activity" AS "a" ON "a"."pid" = "l"."pid"
 			WHERE "l"."relation" = to_regclass(?) AND "l"."granted" AND "l"."pid" <> pg_backend_pid()`,
@@ -710,13 +717,12 @@ func (r renamer) holders(table string) []string {
 	default:
 		asks = []asking{
 			{`SELECT CONCAT("t"."PROCESSLIST_ID", ' ', "m"."LOCK_TYPE", ' ', COALESCE("t"."PROCESSLIST_USER", ''), ' ',
-				COALESCE("t"."PROCESSLIST_COMMAND", ''), ' ', COALESCE("t"."PROCESSLIST_TIME", 0), 's: ',
-				LEFT(COALESCE("t"."PROCESSLIST_INFO", ''), 200))
+				COALESCE("t"."PROCESSLIST_COMMAND", ''), ' ', COALESCE("t"."PROCESSLIST_TIME", 0), 's')
 			FROM "performance_schema"."metadata_locks" AS "m"
 			JOIN "performance_schema"."threads" AS "t" ON "t"."THREAD_ID" = "m"."OWNER_THREAD_ID"
 			WHERE "m"."OBJECT_SCHEMA" = DATABASE() AND "m"."OBJECT_NAME" = ? AND "m"."LOCK_STATUS" = 'GRANTED'
 			  AND "t"."PROCESSLIST_ID" <> CONNECTION_ID()`, []any{table}},
-			{`SELECT CONCAT("ID", ' ', "USER", ' ', "COMMAND", ' ', "TIME", 's: ', LEFT(COALESCE("INFO", ''), 200))
+			{`SELECT CONCAT("ID", ' ', "USER", ' ', "COMMAND", ' ', "TIME", 's')
 			FROM "information_schema"."PROCESSLIST"
 			WHERE "DB" = DATABASE() AND "ID" <> CONNECTION_ID()`, nil},
 		}

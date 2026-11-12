@@ -257,8 +257,9 @@ func stopAt(t *testing.T, after string, start func() (bool, error)) {
 }
 
 // A rename whose table another session holds waits its bound, says what holds
-// the table, and runs once the session lets go. SQLite holds the database for
-// the whole upgrade, so nothing waits there.
+// the table, and runs once the session lets go. What it says names the
+// session and never its statement, which can carry any value a query bound.
+// SQLite holds the database for the whole upgrade, so nothing waits there.
 func TestARenameWaitsForWhatHoldsItsTableAndSaysWhat(t *testing.T) {
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -272,7 +273,8 @@ func TestARenameWaitsForWhatHoldsItsTableAndSaysWhat(t *testing.T) {
 		}
 		defer func() { _ = holder.Rollback() }()
 		var n int
-		if err := holder.NewRaw(`SELECT COUNT(*) FROM "claim"`).Scan(ctx, &n); err != nil {
+		const secret = "a-token-the-holder-bound"
+		if err := holder.NewRaw(`SELECT COUNT(*) FROM "claim" WHERE ? <> ''`, secret).Scan(ctx, &n); err != nil {
 			t.Fatal(err)
 		}
 
@@ -302,6 +304,9 @@ func TestARenameWaitsForWhatHoldsItsTableAndSaysWhat(t *testing.T) {
 		if strings.Contains(said, "held_by=\"[nothing this session can see]\"") ||
 			strings.Contains(said, "could not be read") {
 			t.Errorf("the wait was logged without what holds the table:\n%s", said)
+		}
+		if strings.Contains(said, secret) {
+			t.Errorf("the wait was logged with the holder's statement:\n%s", said)
 		}
 		leaveAtLatest(t, ctx, db)
 	})

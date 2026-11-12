@@ -186,7 +186,7 @@ refuses a tag whose release is not frozen, before building anything.
 | Situation | What is done |
 |---|---|
 | The release's migration needs a fix after the freeze, before the tag or between candidates | Edit the migration and declarations, freeze again in the same pull request, and recreate any database a candidate built |
-| A tagged release's migration cannot finish on a deployment, and the owner approves a fix building the same schema | The file is edited, its digest rewritten, and a comment line in the record names it amended. The schema records stay; the schema test holds the edit to the tag's schema on every engine. A fix changing the schema goes in a later migration |
+| A tagged release's migration cannot finish on a deployment, or logs what it must not or leaves a connection changed, and the owner approves a fix building the same schema | The file is edited, its digest rewritten, and a comment line in the record names it amended. The schema records stay; the schema test holds the edit to the tag's schema on every engine. A fix changing the schema goes in a later migration |
 | A patch to an older line after a newer release is recorded | Not cut. A tag must be on `main`, which holds the newer record |
 
 ## Upgrade rehearsal
