@@ -393,7 +393,11 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		err = s.recorded(err)
 	}
 	if err != nil {
-		s.unrecorded(ctx, token, key)
+		if s.unrecorded(ctx, token, key) {
+			// The commit landed: the upload is done, and answering it failed
+			// would have the caller send a second copy.
+			return row, nil
+		}
 		return nil, fmt.Errorf("record an attachment: %w", err)
 	}
 	return row, nil
@@ -404,26 +408,30 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 // The row is what the sweep can see, so a failure leaves bytes nothing knows
 // about. The bytes are removed at once, because no record is left for a sweep
 // to find them by, and where that removal fails too, the key is logged,
-// because it is then the only thing that can find them. On a context of its own, because the
-// request's is often why the record failed: a client that went away.
+// because it is then the only thing that can find them. On a context of its
+// own, because the request's is often why the record failed: a client that
+// went away.
 //
 // A failure answered during the commit does not say the commit failed, so the
-// row is looked for first: bytes a committed row names stay with their row.
-func (s *Store) unrecorded(ctx context.Context, token, key string) {
+// row is looked for first: bytes a committed row names stay with their row,
+// and the answer says the row was found.
+func (s *Store) unrecorded(ctx context.Context, token, key string) bool {
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
 	defer cancel()
 	held, err := s.db.NewSelect().Model((*Attachment)(nil)).Where(`"token" = ?`, token).Count(cleanup)
-	if err != nil || held > 0 {
-		if err != nil {
-			s.log().ErrorContext(ctx, "an upload that may not have been recorded left bytes behind",
-				"key", key, "error", err)
-		}
-		return
+	if err != nil {
+		s.log().ErrorContext(ctx, "an upload that may not have been recorded left bytes behind",
+			"key", key, "error", err)
+		return false
+	}
+	if held > 0 {
+		return true
 	}
 	if removed := s.files.Delete(cleanup, key); removed != nil {
 		s.log().ErrorContext(ctx, "an upload that could not be recorded left bytes behind",
 			"key", key, "error", removed)
 	}
+	return false
 }
 
 // uploadLock names the turn an upload's transaction takes before it reads how

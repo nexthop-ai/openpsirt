@@ -1035,24 +1035,25 @@ func TestAnUploadWhoseBytesCouldNotBeRemovedNamesTheKey(t *testing.T) {
 	})
 }
 
-// A commit the driver reports as failed may have committed, and the bytes its
-// row names stay.
+// A commit the driver reports as failed may have committed: the bytes its row
+// names stay, and the upload is answered as the success it was.
 func TestAnUploadReportedFailedAfterItsCommitKeepsItsBytes(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.who(t, access.PublicTriage)
 		store := attach.NewStore(f.db.DB, f.files)
 		attach.Recorded(store, func(error) error { return context.Canceled })
-		if _, err := store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
-			"evidence.log", strings.NewReader("abc"), 3, roomy, plenty, plenty, false); err == nil {
-			t.Fatal("the reported failure was not returned")
+		got, err := store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
+			"evidence.log", strings.NewReader("abc"), 3, roomy, plenty, plenty, false)
+		if err != nil || got == nil {
+			t.Fatalf("a committed upload answered %v", err)
 		}
 		var rows []attach.Attachment
 		if err := f.db.NewSelect().Model(&rows).Where(`"filename" = ?`, "evidence.log").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if len(rows) != 1 {
-			t.Fatalf("the committed upload holds %d rows", len(rows))
+		if len(rows) != 1 || rows[0].ID != got.ID {
+			t.Fatalf("the committed upload holds %d rows, answered %d", len(rows), got.ID)
 		}
 		if _, err := f.files.Open(ctx, rows[0].ObjectKey); err != nil {
 			t.Errorf("the bytes a committed row names were removed: %v", err)
