@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -145,10 +146,8 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	cmd.Stderr = &errs
 	cmd.WaitDelay = waitDelay
 
-	// What the scanner said is published on the producer's receipt, because
-	// it is what tells them why.
 	if err := background.Run(cmd); err != nil {
-		return Result{}, refusal.Errorf("run %s: %w: %s", g.executable(), err, tail(errs.String()))
+		return Result{}, g.failed(ctx, timeout, err, errs.String())
 	}
 	// A report past its ceiling fails the run and complaints past theirs do
 	// not: a report read in part reads as a product that stopped having
@@ -169,6 +168,23 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	// nothing is watching — as nothing is here.
 	result.Caution = tail(strings.TrimSpace(errs.String()))
 	return result, nil
+}
+
+// failed says why a run of the scanner ended without a report.
+//
+// What the scanner said is published on the producer's receipt, because it is
+// what tells them why, as is how it ended. Where it never started, the error
+// names the executable and what the operating system said of it, which is
+// configuration and stays in the log.
+func (g Grype) failed(ctx context.Context, timeout time.Duration, err error, said string) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return refusal.Errorf("the scanner did not finish within %s: %s", timeout, tail(said))
+	}
+	var exited *exec.ExitError
+	if errors.As(err, &exited) {
+		return refusal.Errorf("the scanner failed (%s): %s", exited.ProcessState, tail(said))
+	}
+	return fmt.Errorf("run %s: %w", g.executable(), err)
 }
 
 // matchDetail is how the scanner says it reached one match.

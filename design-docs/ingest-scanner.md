@@ -41,6 +41,12 @@ references, and a producer controls the first.
 | Addresses per match | Bounded apart, since the two multiply |
 | One execution's wall-clock time | A stalled scanner fails as a run; the bound stays under one hold (`design-docs/queue.md`), and the process refuses to start otherwise |
 
+| A run ending without a report | Its receipt says |
+|---|---|
+| The scanner exited or was killed | How it ended and the end of what it said |
+| The wall-clock bound passed | The bound and the end of what it said |
+| The scanner never started | That the scan could not be completed; the executable and the operating system's error go to the log, as configuration |
+
 ## Ratings a report carries
 
 A report states ratings of one issue from several sources and two scorable

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -227,5 +228,31 @@ func TestTheScannersUpdateCheckIsAnOperatorsToTurnOn(t *testing.T) {
 	if !strings.Contains(result.Caution, "GRYPE_CHECK_FOR_APP_UPDATE=true") ||
 		strings.Contains(result.Caution, "GRYPE_CHECK_FOR_APP_UPDATE=false") {
 		t.Errorf("the operator's setting did not reach the scanner as written:\n%s", result.Caution)
+	}
+}
+
+// What a failed run publishes is how the scanner ended and what it said. The
+// executable's path is the operator's configuration, and a scanner that never
+// started is told only in the log.
+func TestAFailedRunPublishesNoExecutablePath(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("the test binary: %v", err)
+	}
+	_, failed := scanning(t, "complaint-and-fail", scanner.Limits{MaxComplaint: 256})
+	if !refusal.In(failed) || strings.Contains(failed.Error(), self) {
+		t.Errorf("a scanner that exited 1 is published as %v", failed)
+	}
+	if !strings.Contains(failed.Error(), "exit status 1") {
+		t.Errorf("how the scanner ended is not said: %v", failed)
+	}
+
+	missing := filepath.Join(t.TempDir(), "grype")
+	_, unstarted := scanner.Grype{Path: missing}.Scan(t.Context(), strings.NewReader(`{"components":[]}`))
+	if unstarted == nil || refusal.In(unstarted) {
+		t.Errorf("a scanner that never started is published as %v", unstarted)
+	}
+	if !strings.Contains(unstarted.Error(), missing) {
+		t.Errorf("the log is not told which executable failed: %v", unstarted)
 	}
 }
