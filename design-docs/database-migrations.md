@@ -256,3 +256,4 @@ done.
 | Limit | Detail |
 |---|---|
 | The concurrency test does not cover the advisory lock | Every caller takes the in-process mutex first, so goroutines driven through the normal path pass with the advisory lock deleted. The suite drives the advisory lock from two pools directly (`design-docs/database.md` § Test harness) |
+| Any account can hold the migration lock | Any account on a MySQL or MariaDB server, or any role with CONNECT on the PostgreSQL database, can take the migration lock and hold every start behind it; the waiter's log line names the connection to end |
