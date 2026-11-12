@@ -326,11 +326,11 @@ func TestPuttingBackWorkAlreadyPutBackIsNotRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner.Arm(1)
-	if err := q.Requeue(ctx, job.ID); err != nil {
+	if err := q.Requeue(ctx, admin, job.ID); err != nil {
 		t.Errorf("putting back work that reads put back answered %v", err)
 	}
 	// And a job that never failed is still refused.
-	if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotFailed) {
+	if err := q.Requeue(ctx, admin, job.ID); !errors.Is(err, queue.ErrNotFailed) {
 		t.Errorf("putting back a job that is waiting answered %v", err)
 	}
 }

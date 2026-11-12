@@ -24,6 +24,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -808,7 +809,13 @@ func held(res sql.Result) error {
 // stopped, and evidence nobody can reach is evidence nobody has: a job that
 // stops being retried with nowhere to see it is the same silence as one that
 // is retried for ever.
-func (q *Queue) FailedJobs(ctx context.Context, limit int) ([]Job, int, error) {
+//
+// Read only by an administrator, refused here: a last error can name a
+// component or package address of a finding the reader holds nothing on.
+func (q *Queue) FailedJobs(ctx context.Context, by access.Subject, limit int) ([]Job, int, error) {
+	if err := by.Administering("read the failed jobs"); err != nil {
+		return nil, 0, err
+	}
 	if limit <= 0 || limit > FailedJobsCeiling {
 		limit = FailedJobsCeiling
 	}
@@ -847,7 +854,12 @@ var ErrNotFailed = errors.New("that job has not failed")
 // came back with one attempt left would fail again on the next
 // transient failure. The last error is kept until something overwrites it, so
 // the evidence of the previous run survives the decision to try again.
-func (q *Queue) Requeue(ctx context.Context, id int64) error {
+//
+// Done only by an administrator, refused here, as the list it acts on is.
+func (q *Queue) Requeue(ctx context.Context, by access.Subject, id int64) error {
+	if err := by.Administering("put a failed job back"); err != nil {
+		return err
+	}
 	var matched bool
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		now := q.now().Truncate(time.Microsecond)
