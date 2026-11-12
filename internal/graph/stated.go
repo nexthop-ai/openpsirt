@@ -24,6 +24,14 @@ func NodeName(node, component string) string {
 	return `COALESCE("` + node + `"."name", "` + component + `"."name")`
 }
 
+// NodeFolded is the name a build stated, folded as a component's name is, where
+// the query joins the node as node and the component as component. A listing
+// that groups by name groups by this, so a row is grouped under the name it is
+// shown with.
+func NodeFolded(node, component string) string {
+	return `COALESCE("` + node + `"."name_folded", "` + component + `"."name_folded")`
+}
+
 // NodeVersion is the version a build stated, where the query joins the node as
 // node and the component as component.
 func NodeVersion(node, component string) string {
