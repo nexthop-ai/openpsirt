@@ -122,8 +122,12 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 			t.Errorf("the file does not say what it is: %v", states(lines))
 		}
 		release := httpapitest.RowsUnder(lines)[1]
-		if release[0] != "mine" || release[1] != "master" {
+		if release[0] != "mine" || release[2] != "master" {
 			t.Errorf("the release is not in the file: %v", release)
+		}
+		// The names a screen shows, beside the names addresses carry.
+		if release[1] != httpapitest.ShownAs("mine") || release[3] != "Master" {
+			t.Errorf("the release is not named as screens name it: %v", release)
 		}
 	})
 }

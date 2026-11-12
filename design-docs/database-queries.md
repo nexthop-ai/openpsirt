@@ -136,7 +136,7 @@ comparison.
 | The query builder writes text as valid UTF-8, an invalid byte becoming U+FFFD | It writes every value into the statement text |
 | A NUL fails the statement on PostgreSQL and SQLite, before reaching the engine, and is dropped on MySQL and MariaDB | |
 | Text another program wrote is stored whatever its encoding, each NUL dropped where it is read | A scanner's output, git's account of a remote, an inventory, a VEX document, a package index's answer, a CVE record and a supplier's answer carry any bytes |
-| Repairing such text replaces each run of invalid bytes with one U+FFFD, and a decoded document's map keys are repaired as its values are | A repaired value still finds the entry keyed by it, such as a package index's release dates by version |
+| Repairing such text replaces each run of invalid bytes with one U+FFFD, then drops each NUL, and a decoded document's map keys are repaired as its values are | A NUL dropped first would join the bytes beside it into a character nobody wrote. A repaired value still finds the entry keyed by it, such as a package index's release dates by version |
 
 A test on each engine ends a scan run with a failure, a caution and versions
 carrying invalid bytes and a NUL, and records a patch repository failure

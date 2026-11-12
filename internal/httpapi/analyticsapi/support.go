@@ -143,7 +143,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 				state = "ended"
 			}
 			written = append(written, []string{
-				row.Product, row.BranchOrTag, string(row.Kind), state, row.EndedOn,
+				row.Product, row.ProductName, row.BranchOrTag, row.BranchOrTagName,
+				string(row.Kind), state, row.EndedOn,
 				strconv.FormatBool(row.Inherited),
 				strconv.Itoa(row.EndedDays), strconv.Itoa(row.Open),
 			})
@@ -151,7 +152,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "releases out of support",
 			Header: []string{
-				"product", "branch_or_tag", "kind", "state", "ended_on", "inherited",
+				"product", "product name", "branch_or_tag", "branch or tag name", "kind", "state",
+				"ended_on", "inherited",
 				"ended_days", "open",
 			},
 			Held: written,

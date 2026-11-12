@@ -20,8 +20,10 @@ func TestTextDropsNULAndReplacesInvalidBytes(t *testing.T) {
 	if got := bound.Text("a\xff\xfeb"); got != "a\uFFFDb" {
 		t.Errorf("a run of two invalid bytes came back as %q", got)
 	}
-	if got := bound.Text("a\xff\x00\xfeb"); got != "a\uFFFDb" {
-		t.Errorf("a run split by a NUL came back as %q", got)
+	// A NUL is dropped after invalid bytes are replaced, so it never joins
+	// the bytes either side into a character.
+	if got := bound.Text("\xc3\x00\xa9"); got != "\uFFFD\uFFFD" {
+		t.Errorf("bytes either side of a NUL came back as %q", got)
 	}
 }
 
