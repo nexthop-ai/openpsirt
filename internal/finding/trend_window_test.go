@@ -10,7 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-func TestATrendWindowOutOfRangeIsRefusedRatherThanReplaced(t *testing.T) {
+func TestATrendWindowOutOfRangeIsRefused(t *testing.T) {
 	day := 24 * time.Hour
 	for name, c := range map[string]struct {
 		step  time.Duration
