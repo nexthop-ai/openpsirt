@@ -4,7 +4,10 @@
 package advisory
 
 import (
+	"context"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -63,4 +66,13 @@ func Between(s *Store, fn func()) {
 		}
 		return ordinary()
 	}
+}
+
+// Where reports where the advisory named stands, as the advisory read does.
+func (s *Store) Where(ctx context.Context, subject access.Subject, identifier string) (*Standing, error) {
+	row, err := s.byName(ctx, subject, identifier)
+	if err != nil {
+		return nil, err
+	}
+	return s.StandingOf(ctx, subject, row)
 }

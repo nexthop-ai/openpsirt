@@ -401,25 +401,14 @@ type Standing struct {
 	AgreedBy []string
 }
 
-// Where reports where the advisory stands, without generating its document.
+// StandingOf reports where an advisory already read stands, without
+// generating its document, naming the edition that read pointed at.
 //
 // Somebody deciding whether to read it, agree to it or publish it is asking
 // before anything is assembled, and assembling a document to find out whether
 // it may go out reads every flaw it covers to answer a question about two
-// rows.
-func (s *Store) Where(ctx context.Context, subject access.Subject,
-	identifier string) (*Standing, error) {
-
-	row, err := s.byName(ctx, subject, identifier)
-	if err != nil {
-		return nil, err
-	}
-	return s.StandingOf(ctx, subject, row)
-}
-
-// StandingOf is Where for an advisory already read, naming the edition that
-// read pointed at. A screen showing what it read names that edition, so an
-// edit committing after the read leaves the number behind the words, which an
+// rows. A screen showing what it read names that edition, so an edit
+// committing after the read leaves the number behind the words, which an
 // agreement to it is refused for, never ahead of them.
 //
 // row is one byName answered, through Covers, which has already narrowed it.

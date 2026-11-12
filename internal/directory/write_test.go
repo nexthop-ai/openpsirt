@@ -903,7 +903,11 @@ func (s *stealing) Put(ctx context.Context, key string, body io.Reader, size int
 // told, which is what agreeing to it names.
 func readEdition(t *testing.T, store *advisory.Store, reader access.Subject, named string) int {
 	t.Helper()
-	where, err := store.Where(t.Context(), reader, named)
+	row, _, err := store.Covers(t.Context(), reader, named)
+	if err != nil {
+		t.Fatalf("reading %s: %v", named, err)
+	}
+	where, err := store.StandingOf(t.Context(), reader, row)
 	if err != nil {
 		t.Fatalf("reading %s: %v", named, err)
 	}
