@@ -10,18 +10,11 @@ import (
 )
 
 // A decision no design document names is a defect, built or not. This gate is
-// what AGENTS.md means by "the other direction is checked by the gate", and it
-// had no test — so the step that decides whether a hundred and thirty-two
-// decisions are claimed by a document or merely near one had an exit code for
-// its evidence.
-
-// twoDigits is the width the requirements are written at, which is what a
-// range expands against.
-var twoDigits = map[string]int{"REQ": 2, "SEC": 2}
+// what AGENTS.md means by "the other direction is checked by the gate".
 
 func has(named map[string]bool, want ...string) bool {
 	for _, id := range want {
-		if !named[id] {
+		if !named[canonical(id)] {
 			return false
 		}
 	}
@@ -46,9 +39,8 @@ func TestWhatADocumentNames(t *testing.T) {
 			[]string{"REQ-08", "REQ-17", "REQ-25"}, []string{"REQ-09", "REQ-18"},
 		},
 		{
-			// The form the documents state a run in. A hundred and thirty-two
-			// decisions are claimed by a range endpoint and nothing else,
-			// so what this expands to is the whole of their audit trail.
+			// The form the documents state a run in. A decision claimed by a
+			// range alone has this expansion for its whole audit trail.
 			"a range, which names everything between",
 			"an explanation and an approval, REQ-23 to REQ-25",
 			[]string{"REQ-23", "REQ-24", "REQ-25"}, []string{"REQ-22", "REQ-26"},
@@ -72,29 +64,31 @@ func TestWhatADocumentNames(t *testing.T) {
 			nil, []string{"REQ-22"},
 		},
 	} {
-		named := identifiersIn(c.text, twoDigits)
+		named := identifiersIn(c.text)
 		if !has(named, c.named...) {
 			t.Errorf("%s: %q named %v, want all of %v", c.what, c.text, keys(named), c.named)
 		}
 		for _, id := range c.notNamed {
-			if named[id] {
+			if named[canonical(id)] {
 				t.Errorf("%s: %q was read as naming %s", c.what, c.text, id)
 			}
 		}
 	}
 }
 
-func TestARangeIsWrittenAtTheWidthTheRequirementsUse(t *testing.T) {
-	// The identifiers are zero-padded, so a range expanded at the wrong width
-	// produces names no requirement has — and every one of them then reads as
-	// a decision nothing claims.
-	named := identifiersIn("REQ-08 to REQ-10", map[string]int{"REQ": 2})
-	if !has(named, "REQ-08", "REQ-09", "REQ-10") {
-		t.Errorf("a padded range expanded to %v", keys(named))
+func TestARangeNamesItsRequirementsWhateverWidthTheyAreWrittenAt(t *testing.T) {
+	// Requirements are matched by number. A two-digit range in an area that
+	// has reached three digits still names the two-digit requirements inside
+	// it, and nothing outside it.
+	named := identifiersIn("REQ-08 to REQ-10")
+	for _, id := range []string{"REQ-08", "REQ-09", "REQ-10", "REQ-009"} {
+		if !named[canonical(id)] {
+			t.Errorf("a range expanded to %v, which misses %s", keys(named), id)
+		}
 	}
-	for _, wrong := range []string{"REQ-8", "REQ-9", "REQ-008"} {
-		if named[wrong] {
-			t.Errorf("a range expanded to %s, which is no requirement's name", wrong)
+	for _, wrong := range []string{"REQ-07", "REQ-11", "REQ-100"} {
+		if named[canonical(wrong)] {
+			t.Errorf("a range expanded to %s, which is outside it", wrong)
 		}
 	}
 }
@@ -114,15 +108,12 @@ func TestTheRequirementsTableIsReadAsRows(t *testing.T) {
 		"## 4. Out of scope",
 		"| REQ-99 | Out of scope |",
 	}, "\n")
-	want, width, err := requirementsIn(text)
+	want, err := requirementsIn(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(want, []string{"REQ-01", "SEC-10"}) {
 		t.Errorf("read %v, want the two in force and in the section", want)
-	}
-	if width["REQ"] != 2 || width["SEC"] != 2 {
-		t.Errorf("read widths %v", width)
 	}
 }
 
@@ -131,7 +122,7 @@ func TestASectionHoldingNoRequirementChecksNothingAndIsRefused(t *testing.T) {
 		"## 3. Requirements\nprose only\n## 4. Out of scope\n",
 		"no sections at all",
 	} {
-		if _, _, err := requirementsIn(text); err == nil {
+		if _, err := requirementsIn(text); err == nil {
 			t.Errorf("%q was read as a list of requirements", text)
 		}
 	}

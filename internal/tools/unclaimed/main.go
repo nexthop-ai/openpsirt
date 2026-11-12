@@ -67,13 +67,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, "unclaimed:", err)
 		os.Exit(2)
 	}
-	want, width, err := requirementsIn(string(decisions))
+	want, err := requirementsIn(string(decisions))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "unclaimed:", err)
 		os.Exit(2)
 	}
 
-	named, err := namedByDesigns(width)
+	named, err := namedByDesigns()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "unclaimed:", err)
 		os.Exit(2)
@@ -81,7 +81,7 @@ func main() {
 
 	var missing []string
 	for _, id := range want {
-		if !named[id] {
+		if !named[canonical(id)] {
 			missing = append(missing, id)
 		}
 	}
@@ -113,32 +113,43 @@ func main() {
 }
 
 // requirementsIn is every requirement in force in the text of REQUIREMENTS.md,
-// in the order it lists them, with the widest number each area's identifiers
-// carry. A requirement recorded as withdrawn is left out: it is history rather
-// than an obligation, and asking a design document to describe it would be
-// asking for a description of something that is not there. A section holding
-// no requirement is refused, since reading nothing would check nothing.
-func requirementsIn(text string) ([]string, map[string]int, error) {
+// in the order it lists them. A requirement recorded as withdrawn is left out:
+// it is history rather than an obligation, and asking a design document to
+// describe it would be asking for a description of something that is not there.
+// A section holding no requirement is refused, since reading nothing would
+// check nothing.
+func requirementsIn(text string) ([]string, error) {
 	from, to := strings.Index(text, inForceFrom), strings.Index(text, inForceTo)
 	if from < 0 || to < 0 || to < from {
-		return nil, nil, fmt.Errorf("REQUIREMENTS.md has no section of requirements")
+		return nil, fmt.Errorf("REQUIREMENTS.md has no section of requirements")
 	}
 	var want []string
-	width := map[string]int{}
 	for _, match := range row.FindAllStringSubmatch(text[from:to], -1) {
 		id, body := match[1], match[2]
 		if strings.HasPrefix(strings.TrimSpace(strings.TrimLeft(body, "*")), "Withdrawn") {
 			continue
 		}
 		want = append(want, id)
-		if n := len(id) - 4; n > width[id[:3]] {
-			width[id[:3]] = n
-		}
 	}
 	if len(want) == 0 {
-		return nil, nil, fmt.Errorf("the section of requirements holds no requirement in force, so this checked nothing")
+		return nil, fmt.Errorf("the section of requirements holds no requirement in force, so this checked nothing")
 	}
-	return want, width, nil
+	return want, nil
+}
+
+// canonical is an identifier as its area and number, without the padding its
+// number is written at, so REQ-08 and REQ-008 are one requirement.
+func canonical(id string) string {
+	area, digits, _ := strings.Cut(id, "-")
+	return key(area, digits)
+}
+
+func key(area, digits string) string {
+	n, err := strconv.Atoi(digits)
+	if err != nil {
+		return area + "-" + digits
+	}
+	return area + "-" + strconv.Itoa(n)
 }
 
 // namedByDesigns collects every requirement identifier the design documents name.
@@ -146,7 +157,7 @@ func requirementsIn(text string) ([]string, map[string]int, error) {
 // Design documents only. A requirement named in a commit message or a code
 // comment is not described anywhere permanent — a comment describes one
 // function rather than the system.
-func namedByDesigns(width map[string]int) (map[string]bool, error) {
+func namedByDesigns() (map[string]bool, error) {
 	designs, err := fs.Glob(here, "design-docs/*.md")
 	if err != nil {
 		return nil, err
@@ -157,23 +168,24 @@ func namedByDesigns(width map[string]int) (map[string]bool, error) {
 		if err != nil {
 			return nil, err
 		}
-		for id := range identifiersIn(string(body), width) {
+		for id := range identifiersIn(string(body)) {
 			named[id] = true
 		}
 	}
 	return named, nil
 }
 
-// identifiersIn is every requirement one document names, ranges expanded.
+// identifiersIn is every requirement one document names, ranges expanded,
+// each in its canonical form.
 //
 // Separate from the file reading so it can be asked directly. A range is how
 // the documents state a run of them — "REQ-23 to REQ-25" names all three — and
 // expanding one is the step that decides whether a decision claimed only by a
 // range endpoint is claimed by a document or merely near one.
-func identifiersIn(text string, width map[string]int) map[string]bool {
+func identifiersIn(text string) map[string]bool {
 	named := map[string]bool{}
 	for _, id := range one.FindAllString(text, -1) {
-		named[id] = true
+		named[canonical(id)] = true
 	}
 	for _, span := range spans.FindAllStringSubmatch(text, -1) {
 		// Never across areas. "REQ-70 to SEC-02" is two identifiers in a
@@ -185,7 +197,7 @@ func identifiersIn(text string, width map[string]int) map[string]bool {
 		first, _ := strconv.Atoi(span[2])
 		last, _ := strconv.Atoi(span[4])
 		for n := first; n <= last; n++ {
-			named[fmt.Sprintf("%s-%0*d", span[1], width[span[1]], n)] = true
+			named[key(span[1], strconv.Itoa(n))] = true
 		}
 	}
 	return named

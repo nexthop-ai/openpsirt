@@ -138,7 +138,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make attached` | A doc comment describing a different declaration |
 | `make confined` | Engine-specific code outside the paths `design-docs/database.md` § Engine-specific code allows |
 | `make readable` | Source files a text tool will not read |
-| `make unclaimed` | Every requirement named by a design document |
+| `make unclaimed` | Every requirement named by a design document. A range names every number in it, matched by number whatever width it is written at |
 | `make vendored` | Copied files accounted for. See `design-docs/build-dependencies.md` § Copied files |
 | `make spdx` | License headers; `make spdx-fix` writes missing ones. See `design-docs/build-dependencies.md` § License headers |
 | `make pins-check` | Versions pinned in two files agree |
