@@ -7,6 +7,7 @@ Benchmark runs behind the inventory delta and comparison rules in
 
 - [Inventory delta timings](#inventory-delta-timings)
 - [Comparison timings](#comparison-timings)
+- [Stated-name lookup timings](#stated-name-lookup-timings)
 
 ## Inventory delta timings
 
@@ -35,3 +36,19 @@ of thousands of names under a second.
 Comparing the master branch of a switch image built for two platforms, 6,866
 components against 6,748: 211 names differ, in 18 to 29 ms on each of the four
 engines, measured on 2026-09-27, one engine at a time.
+
+## Stated-name lookup timings
+
+Measured on 2026-11-12, one engine at a time, by
+`TestMeasureSearchingByTheNameABuildStated`: one product of eight builds of
+the full-size switch image, 52 weekly rescans moving two hundredths of the
+packages on the build read, 57,967 nodes and 6,843 open findings. The
+lookup is the components the product's builds stated under the name; the
+page is the findings list's first fifty groups, the lookup included.
+
+| Filter | Stated components | PostgreSQL lookup, page | MySQL lookup, page |
+|---|---|---|---|
+| Search `ssl` | 10 | 5.7 ms, 34 ms | 13 ms, 39 ms |
+| Search `lib` | 648 | 7.2 ms, 53 ms | 12 ms, 52 ms |
+| Search `linux-image` | 2 | 5.9 ms, 30 ms | 11 ms, 36 ms |
+| Component `openssl` | | 0.74 ms, 19 ms | 0.15 ms, 19 ms |
