@@ -540,6 +540,34 @@ func TestAFlawWidensToTheVersionItWasRecordedAgainst(t *testing.T) {
 	})
 }
 
+func TestAFlawIsNotWidenedToABuildHoldingItsNameAsSeveralOtherComponents(t *testing.T) {
+	// Neither of the added build's two components by the name is the one
+	// recorded, so which the flaw affects is the caller's to say.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		libnlOld := at(libnl.Name, "3.5.0")
+		f.shippedTo(t, other, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, teamd, libnlOld, libnlNew},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+				{Parent: swss, Child: libnlOld}, {Parent: teamd, Child: libnlNew}},
+		})
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID, []int64{f.build, other}, "")
+		if !errors.Is(err, finding.ErrSeveralLikeIt) {
+			t.Errorf("widening to a build holding the name twice answered %v, want ErrSeveralLikeIt", err)
+		}
+	})
+}
+
 func TestABuildAnotherEditTookOutFirstIsNotCountedAsClosedAgain(t *testing.T) {
 	// Two people taking one build out at once: the second's answer counts
 	// the builds it closed, and the first closed this one.

@@ -19,11 +19,13 @@ var purlTablesV0130 = []string{"component", "graph_node", "image_version"}
 // purlBatchV0130 is how many rows one read of the credential step takes.
 const purlBatchV0130 = 5_000
 
-// purlCredentialsV0130 takes any credential out of the addresses a package
-// identifier's qualifiers hold, as v0.13.0 stores them. Only a row holding a
-// qualifier and an "@" after it is read, and only a row holding a credential
-// is written, so a start after one that stopped part way writes what the
-// first missed. The qualifiers are outside identity, so no identity moves.
+// purlCredentialsV0130 rewrites the package identifiers v0.12.0 stored as
+// v0.13.0 stores them: the slashes after the scheme dropped, and any
+// credential and query taken out of the addresses its qualifiers hold. Only a
+// row starting "pkg:/" or holding an address after its qualifiers start is
+// read, written plain or escaped, and only a row that changes is written, so
+// a start after one that stopped part way writes what the first missed.
+// Identity is read from neither part, so no identity moves.
 func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
 	return purlCredentialsInBatchesV0130(ctx, tx, purlBatchV0130)
 }
@@ -38,7 +40,8 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 				purl string
 			}
 			rows, err := tx.QueryContext(ctx, `SELECT "id", "purl" FROM "`+table+`"
-				WHERE "id" > ? AND "purl" LIKE ? ORDER BY "id" LIMIT ?`, after, "%?%@%", batch)
+				WHERE "id" > ? AND ("purl" LIKE ? OR LOWER("purl") LIKE ? OR "purl" LIKE ?) ORDER BY "id" LIMIT ?`,
+				after, "%?%://%", "%?%3a%2f%2f%", "pkg:/%", batch)
 			if err != nil {
 				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
@@ -76,11 +79,17 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 	return nil
 }
 
-// purlWithoutCredentialV0130 is a package identifier with any credential, and
-// the query, taken out of each qualifier holding an address, as v0.13.0
-// stores one. A qualifier holding an address that does not parse is dropped,
-// since where its credential ends cannot be told.
+// purlWithoutCredentialV0130 is a package identifier as v0.13.0 stores one:
+// the slashes after its scheme dropped, and any credential and query taken
+// out of each qualifier holding an address. A qualifier holding an address
+// that does not parse is dropped, since where its credential ends cannot be
+// told, and so are the pairs after an address whose query is written
+// unescaped, since they are that query.
 func purlWithoutCredentialV0130(purl string) string {
+	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.HasPrefix(rest, "/") &&
+		!strings.ContainsAny(scheme, "/?#") {
+		purl = scheme + ":" + strings.TrimLeft(rest, "/")
+	}
 	body, qualifiers, found := strings.Cut(purl, "?")
 	if !found {
 		return purl
@@ -105,11 +114,14 @@ func purlWithoutCredentialV0130(purl string) string {
 		parsed, err := url.Parse(address)
 		switch {
 		case err != nil:
-		case parsed.User == nil:
+		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery:
 			kept = append(kept, pair)
 		default:
 			parsed.User, parsed.RawQuery, parsed.ForceQuery = nil, "", false
 			kept = append(kept, key+"="+qualifierEscapedV0130(parsed.String()))
+		}
+		if strings.Contains(value, "?") {
+			break
 		}
 	}
 	purl = body

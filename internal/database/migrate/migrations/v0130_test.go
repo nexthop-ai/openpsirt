@@ -4,6 +4,7 @@
 package migrations_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -167,11 +168,20 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 			}
 			return out
 		}
-		const (
-			leaky = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git&arch=amd64" //nolint:gosec // G101: the credential this upgrade takes out
-			clean = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git&arch=amd64"
-			kept  = "pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"
-		)
+		//nolint:gosec // G101: the credentials this upgrade takes out
+		cases := []struct{ stored, want string }{
+			{"pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git&arch=amd64",
+				"pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git&arch=amd64"},
+			{"pkg:golang/example.com/e@v1?vcs_url=git%2Bhttps%3A%2F%2Foauth2%3Aglpat-SECRET%40gitlab.example.com%2Fe.git",
+				"pkg:golang/example.com/e@v1?vcs_url=git%2Bhttps://gitlab.example.com/e.git"},
+			{"pkg:generic/fw@1?download_url=https%3A%2F%2Fexample.com%2Ffw.bin%3Fprivate_token%3DSECRET&arch=arm64",
+				"pkg:generic/fw@1?download_url=https://example.com/fw.bin&arch=arm64"},
+			{"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin?X-Amz-Credential=A&X-Amz-Signature=SECRET",
+				"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin"},
+			{"pkg://deb/debian/curl@8.5.0", "pkg:deb/debian/curl@8.5.0"},
+			{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
+				"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"},
+		}
 		exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
 		product := id(`SELECT MAX("id") FROM "product"`)
 		exec(`INSERT INTO "branch_or_tag" ("product_id", "name", "display_name", "kind", "created_at")
@@ -186,9 +196,10 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 		exec(`INSERT INTO "scan" ("build_id", "content_hash", "built_at", "received_at", "parser_version",
 			"status", "components") VALUES (?, ?, ?, ?, ?, ?, ?)`, build, "hash", at, at, "test", "accepted", 2)
 		scan := id(`SELECT MAX("id") FROM "scan"`)
-		for _, purl := range []string{leaky, kept} {
+		for i, c := range cases {
+			purl, key := c.stored, fmt.Sprintf("identity-%d", i)
 			exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
-				"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, purl[:20], purl, "x", "1", "x", purl[:20], at)
+				"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, key, purl, "x", "1", "x", key, at)
 			component := id(`SELECT MAX("id") FROM "component"`)
 			exec(`INSERT INTO "graph_node" ("build_id", "component_id", "is_root", "opened_scan_id", "purl")
 				VALUES (?, ?, ?, ?, ?)`, build, component, false, scan, purl)
@@ -204,8 +215,13 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 			if err := db.DB.NewRaw(`SELECT "purl" FROM "`+table+`" ORDER BY "id"`).Scan(ctx, &got); err != nil {
 				t.Fatal(err)
 			}
-			if len(got) != 2 || got[0] != clean || got[1] != kept {
-				t.Errorf("%s holds %q after the upgrade, want %q and %q", table, got, clean, kept)
+			if len(got) != len(cases) {
+				t.Fatalf("%s holds %d identifiers after the upgrade, want %d", table, len(got), len(cases))
+			}
+			for i, c := range cases {
+				if got[i] != c.want {
+					t.Errorf("%s holds %q after the upgrade for %q, want %q", table, got[i], c.stored, c.want)
+				}
 			}
 		}
 		leaveAtLatest(t, ctx, db)

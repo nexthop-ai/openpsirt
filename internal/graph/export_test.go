@@ -38,3 +38,7 @@ func (s *Store) AssemblingAtMost(n int) *Store {
 	bounded.ours = n
 	return &bounded
 }
+
+// StatedPurl is a package identifier as a row holds it, for a test that pins
+// what is taken out of its qualifiers.
+var StatedPurl = statedPurl

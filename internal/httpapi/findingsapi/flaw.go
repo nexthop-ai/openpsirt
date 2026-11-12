@@ -102,7 +102,6 @@ type RecordedAsFlawBody struct {
 	IncludedInDisclosure bool   `json:"included_in_disclosure" doc:"Whether the code finding is included in its flaw's disclosure"`
 }
 
-// codeFindingPath is one code finding, addressed by its occurrence on one build.
 // flawActRequiring declares an act on a code finding's flaw record, which
 // takes both security testing and private triage on the product, because it
 // joins security testing work to a flaw private triage holds.
@@ -111,6 +110,7 @@ func flawActRequiring(op huma.Operation) huma.Operation {
 		access.SecurityTestingTriage, access.PrivateTriage)
 }
 
+// codeFindingPath is one code finding, addressed by its occurrence on one build.
 const codeFindingPath = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}"
 
 // codeFindingAt is the reader, the build and the product a route about one code finding
@@ -308,7 +308,6 @@ func registerFlaw(api huma.API, in core.Deps) {
 	}), including(false))
 }
 
-// codeFindingBuilds is builds as an answer states them.
 // bodyBuilds resolves the builds a request body names in a product, refusing
 // an undeclared one by naming it. Asked only after the caller is authorized on
 // the product.
@@ -331,6 +330,7 @@ func bodyBuilds(ctx context.Context, in core.Deps, subject access.Subject, produ
 	return out, nil
 }
 
+// codeFindingBuilds is builds as an answer states them.
 func codeFindingBuilds(builds []analysis.BuildName) []CodeFindingBuild {
 	out := make([]CodeFindingBuild, 0, len(builds))
 	for _, b := range builds {

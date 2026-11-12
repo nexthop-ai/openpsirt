@@ -312,14 +312,15 @@ func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int6
 	}
 	var several *graph.Ambiguous
 	if errors.As(err, &several) {
-		return 0, "", ErrSeveralOtherVersions
+		return 0, "", ErrSeveralLikeIt
 	}
 	return id, name, err
 }
 
-// ErrSeveralOtherVersions says a build added to a recorded flaw ships its
-// component at several versions, none the one it was recorded against.
-var ErrSeveralOtherVersions = refusal.New("that build holds the component at more than one version, " +
+// ErrSeveralLikeIt says a build added to a recorded flaw holds its
+// component's name as several components, none at the version, ecosystem and
+// namespace it was recorded against.
+var ErrSeveralLikeIt = refusal.New("that build holds more than one component by that name, " +
 	"none of them the one this flaw was recorded against, so which it affects cannot be told: " +
 	"record the flaw for that build on its own")
 

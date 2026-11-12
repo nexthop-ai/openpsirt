@@ -114,7 +114,7 @@ func productLabels(ctx context.Context, a core.Administering) (map[string]string
 func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
 	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
 		mode, err := settings(db).Word(ctx, setting.RoleMode,
-			[]string{string(access.GroupBound), string(access.Direct)}, string(access.Direct))
+			access.ModeWords(), string(access.Direct))
 		if err != nil {
 			return "", fmt.Errorf("read where roles come from: %w", err)
 		}

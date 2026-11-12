@@ -813,3 +813,24 @@ func TestAPackageIdentifierIsStoredWithoutSlashesAfterItsScheme(t *testing.T) {
 		}
 	})
 }
+
+// A qualifier's address loses its credential and its query however it is
+// written: escaped as the specification asks, or plain with its query running
+// on into the pairs after it.
+func TestAQualifierAddressIsStoredWithoutItsCredentialOrQuery(t *testing.T) {
+	//nolint:gosec // G101: the credentials this takes out
+	for _, c := range []struct{ stated, want string }{
+		{"pkg:golang/example.com/e@v1?vcs_url=git%2Bhttps%3A%2F%2Foauth2%3Aglpat-SECRET%40gitlab.example.com%2Fe.git",
+			"pkg:golang/example.com/e@v1?vcs_url=git%2Bhttps://gitlab.example.com/e.git"},
+		{"pkg:generic/fw@1?download_url=https%3A%2F%2Fexample.com%2Ffw.bin%3Fprivate_token%3DSECRET&arch=arm64",
+			"pkg:generic/fw@1?download_url=https://example.com/fw.bin&arch=arm64"},
+		{"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin?X-Amz-Credential=A&X-Amz-Signature=SECRET",
+			"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin"},
+		{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
+			"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"},
+	} {
+		if got := graph.StatedPurl(c.stated); got != c.want {
+			t.Errorf("%s is stored as %s, want %s", c.stated, got, c.want)
+		}
+	}
+}

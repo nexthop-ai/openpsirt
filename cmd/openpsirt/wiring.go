@@ -210,7 +210,7 @@ func signInProviders(ctx context.Context, cfg config.Config, logger *slog.Logger
 func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 	return func(ctx context.Context) access.Mode {
 		mode, err := settings.Word(ctx, setting.RoleMode,
-			[]string{string(access.GroupBound), string(access.Direct)}, string(access.Direct))
+			access.ModeWords(), string(access.Direct))
 		if err != nil {
 			return access.Direct
 		}

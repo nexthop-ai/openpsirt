@@ -245,10 +245,11 @@ func decodedPath(path string) string {
 }
 
 // statedPurl is a package identifier as a row holds it: trimmed, with the
-// slashes after the scheme dropped, and with any credential taken out of a
-// qualifier's address. A qualifier such as `vcs_url` or `download_url` names
-// an address, a build pipeline can write it with a token in it, and the
-// identifier reaches every reader of the component.
+// slashes after the scheme dropped, and with any credential and query taken
+// out of a qualifier's address. A qualifier such as `vcs_url` or
+// `download_url` names an address, a build pipeline can write it with a token
+// in its user or its query, and the identifier reaches every reader of the
+// component.
 func statedPurl(purl string) string {
 	purl = strings.TrimSpace(purl)
 	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.HasPrefix(rest, "/") &&
@@ -261,7 +262,7 @@ func statedPurl(purl string) string {
 	}
 	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
 	pairs := strings.Split(qualifiers, "&")
-	kept := pairs[:0]
+	kept := make([]string, 0, len(pairs))
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
 		if !found {
@@ -280,12 +281,17 @@ func statedPurl(purl string) string {
 		switch {
 		case err != nil:
 			// Where its credential ends cannot be told, so it is not kept.
-		case parsed.User == nil:
+		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery:
 			kept = append(kept, pair)
 		default:
 			if cleaned := sourcelink.WithoutCredential(address); cleaned != "" {
 				kept = append(kept, key+"="+qualifierEscaped(cleaned))
 			}
+		}
+		if strings.Contains(value, "?") {
+			// An address whose query is written unescaped carries the
+			// pairs after it as that query, so they are not kept.
+			break
 		}
 	}
 	purl = body

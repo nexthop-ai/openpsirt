@@ -32,7 +32,7 @@ hashed to a fixed width.
 | Architecture is among the qualifiers excluded | It is already the variant |
 | One reduction, the identifier specification's, for every ecosystem | Nothing here knows which producer wrote a document |
 | The row holds every text a producer states with surrounding space taken off: identifiers, name, version, source package and version, supplier and license | Identity already reads the name and version trimmed. MySQL and MariaDB ignore a trailing space in an equality and PostgreSQL, SQLite and the application do not, so an untrimmed version matches the decision keyed on it, trimmed, on two engines of four |
-| A package identifier is stored with the slashes after its scheme dropped, and a qualifier's address without its credential or query, on the row, the node and an image version | A pipeline writes `vcs_url` and `download_url` with a token in them, and the identifier reaches every reader of the component. A qualifier holding an address that does not parse is dropped, since where its credential ends cannot be told |
+| A package identifier is stored with the slashes after its scheme dropped, and a qualifier's address without its credential or query, on the row, the node and an image version | A pipeline writes `vcs_url` and `download_url` with a token in them, and the identifier reaches every reader of the component. A qualifier holding an address that does not parse is dropped, since where its credential ends cannot be told, and so are the pairs after an address whose query is written unescaped, since they are that query |
 
 ### Container images
 

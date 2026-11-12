@@ -906,7 +906,7 @@ func registerAffects(api huma.API, in core.Deps) {
 				errors.Is(err, finding.ErrTooManyOccurrences),
 				errors.Is(err, finding.ErrNoBuild),
 				errors.Is(err, finding.ErrSeveralProducts),
-				errors.Is(err, finding.ErrSeveralOtherVersions):
+				errors.Is(err, finding.ErrSeveralLikeIt):
 				return nil, core.Asked(in.Logger, err)
 			case errors.Is(err, finding.ErrNoSuchComponent):
 				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())

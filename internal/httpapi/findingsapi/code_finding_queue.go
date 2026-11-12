@@ -314,7 +314,6 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 	registerCodeFindingQueueAcross(api, in)
 }
 
-// queueOutput is a page of the code finding queue as the lists answer it.
 // codeFindingsListed answers one page of a code finding list.
 func codeFindingsListed(ctx context.Context, in core.Deps, subject access.Subject, scope analysis.Scope,
 	state CodeFindingState, paging core.Paging) (*CodeFindingsOutput, error) {
@@ -348,6 +347,7 @@ func codeFindingFileRows(in core.Deps, subject access.Subject, scope analysis.Sc
 	}
 }
 
+// queueOutput is a page of the code finding queue as the lists answer it.
 func queueOutput(ctx context.Context, in core.Deps, queue *analysis.Queue) (*CodeFindingsOutput, error) {
 	out := &CodeFindingsOutput{}
 	out.Body.Total, out.Body.Waiting, out.Body.Ruled = queue.Total, queue.Waiting, queue.Ruled
