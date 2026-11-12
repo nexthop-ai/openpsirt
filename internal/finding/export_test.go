@@ -37,8 +37,8 @@ func WordAt(rank int) string { return wordAt(rank) }
 // cannot, which is why the columns beside it exist.
 func Exploiting(urgency int64) bool { return urgency >= exploiting }
 
-// JudgingAfter puts fn between a judgment reading the report and writing to
-// it, for the test.
+// JudgingAfter puts fn between a judgment's early refusals and the
+// transaction writing it, for the test.
 //
 // Exported for the test alone: the condition on the write exists for two
 // people judging one claim at the same moment, and the read above it answers

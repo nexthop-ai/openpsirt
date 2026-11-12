@@ -543,8 +543,8 @@ type Store struct {
 	// or nothing for the unguessable one. Carried on the store so a test can
 	// fix the sequence a collision is drawn again from.
 	draws drawing
-	// afterReadingReport runs between a judgment reading the report and
-	// writing to it, so a test can put another writer in that window. The
+	// afterReadingReport runs between a judgment's early refusals and the
+	// transaction writing it, so a test can put another writer in that window. The
 	// window is the whole of what the condition on the write is for, and
 	// waiting for two callers to land in it by themselves is a test that
 	// passes by not racing.

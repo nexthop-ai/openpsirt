@@ -102,7 +102,7 @@ func (s *Store) Retitle(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.mayWrite(ctx, subject, row, "retitle an advisory"); err != nil {
+	if err := s.mayWrite(ctx, s.db, subject, row, "retitle an advisory"); err != nil {
 		return nil, nil, err
 	}
 	title = strings.TrimSpace(title)
@@ -114,10 +114,16 @@ func (s *Store) Retitle(ctx context.Context, subject access.Subject,
 	}
 
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		if err := s.mayWrite(ctx, tx, subject, row, "retitle an advisory"); err != nil {
+			return err
+		}
 		now := s.now().UTC().Truncate(time.Microsecond)
 		_, err := openEdition(ctx, tx, row.ID, subject.ID, title, now)
 		return err
 	})
+	if errors.Is(err, access.ErrDenied) {
+		return nil, nil, err
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("retitle an advisory: %w", err)
 	}
@@ -241,7 +247,7 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	if err := s.mayWrite(ctx, subject, row, "agree to an advisory"); err != nil {
+	if err := s.mayWrite(ctx, s.db, subject, row, "agree to an advisory"); err != nil {
 		return nil, err
 	}
 	// An advisory covering nothing states nothing, so there is nothing to
@@ -263,6 +269,16 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 
 	var given *Agreement
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// Who may agree, and whether there is anything to agree to, are
+		// asked again here: what the advisory covers moves under an edit.
+		if err := s.mayWrite(ctx, tx, subject, row, "agree to an advisory"); err != nil {
+			return err
+		}
+		if covered, err := coveredBy(ctx, tx, subject, row.ID); err != nil {
+			return err
+		} else if len(covered) == 0 {
+			return ErrNothingToSay
+		}
 		now := s.now().UTC().Truncate(time.Microsecond)
 		// Read inside the transaction, because the edition the advisory
 		// points at is what is being agreed to and it moves under an edit.
@@ -336,7 +352,8 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 	})
 	switch {
 	case errors.Is(err, ErrSamePerson), errors.Is(err, ErrAlreadyAgreed),
-		errors.Is(err, ErrNothingToSay), errors.Is(err, ErrEditionMoved):
+		errors.Is(err, ErrNothingToSay), errors.Is(err, ErrEditionMoved),
+		errors.Is(err, access.ErrDenied):
 		return nil, err
 	case err != nil:
 		return nil, fmt.Errorf("agree to an advisory: %w", err)
@@ -359,11 +376,14 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	if err := s.mayWrite(ctx, subject, row, "take back an agreement"); err != nil {
+	if err := s.mayWrite(ctx, s.db, subject, row, "take back an agreement"); err != nil {
 		return err
 	}
 	var taken int64
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		if err := s.mayWrite(ctx, tx, subject, row, "take back an agreement"); err != nil {
+			return err
+		}
 		now := s.now().UTC().Truncate(time.Microsecond)
 		result, err := tx.NewUpdate().Model((*Approval)(nil)).
 			Set(`"withdrawn_at" = ?`, now).
@@ -376,6 +396,9 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 		taken, err = database.Affected(result)
 		return err
 	})
+	if errors.Is(err, access.ErrDenied) {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("take back an agreement: %w", err)
 	}
@@ -579,14 +602,14 @@ func Statuses() []string { return []string{StatusDraft, StatusFinal, StatusInter
 // The refusal is a denial rather than the answer a name nobody minted gets.
 // Whoever reaches this has already been handed the advisory by name, so
 // telling them it does not exist contradicts the read they just performed.
-func (s *Store) mayWrite(ctx context.Context, subject access.Subject, row *Advisory,
+func (s *Store) mayWrite(ctx context.Context, db bun.IDB, subject access.Subject, row *Advisory,
 	what string) error {
 
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return access.Denied(what)
 	}
 	var products []int64
-	err := s.db.NewSelect().
+	err := db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
 		ColumnExpr(`DISTINCT "ac"."product_id"`).
 		Where(`"ac"."advisory_id" = ?`, row.ID).

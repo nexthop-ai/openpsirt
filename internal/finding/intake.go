@@ -269,9 +269,6 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	if s.afterReadingReport != nil {
-		s.afterReadingReport()
-	}
 	// The issue has to be one this subject may already be told of here.
 	// Without it, pointing a report at an identifier would say whether that
 	// identifier is open in this product — which is the lookup every other
@@ -283,14 +280,34 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 	if !reachable {
 		return nil, ErrNoSuchIssueHere
 	}
+	if s.afterReadingReport != nil {
+		s.afterReadingReport()
+	}
 
+	// Both reads above are early refusals. The report and whether the issue
+	// may be told of here are read again where the judgment is written, and
+	// those decide: an issue merged away or closed here since is refused, and
+	// a retry reads both afresh.
 	var now time.Time
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		now = s.now().UTC().Truncate(time.Microsecond)
+		inside, err := reportIn(ctx, tx, productID, reference)
+		if err != nil {
+			return err
+		}
+		reachable, err := MayBeToldOfWithin(ctx, tx, subject, productID, vulnerabilityID)
+		if err != nil {
+			return err
+		}
+		if !reachable {
+			return ErrNoSuchIssueHere
+		}
+		row = inside
 		return judgeReport(ctx, tx, row.ID, vulnerabilityID, subject.ID, now, "judge that report")
 	})
 	switch {
-	case errors.Is(err, ErrAlreadyJudged), errors.Is(err, ErrIssueReported):
+	case errors.Is(err, ErrAlreadyJudged), errors.Is(err, ErrIssueReported),
+		errors.Is(err, ErrNoSuchReport), errors.Is(err, ErrNoSuchIssueHere):
 		return nil, err
 	case database.IsDuplicate(err):
 		// One report is the record of an issue. A second pointed at the same
