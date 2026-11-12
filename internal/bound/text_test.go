@@ -20,6 +20,9 @@ func TestTextDropsNULAndReplacesInvalidBytes(t *testing.T) {
 	if got := bound.Text("a\xff\xfeb"); got != "a\uFFFDb" {
 		t.Errorf("a run of two invalid bytes came back as %q", got)
 	}
+	if got := bound.Text("a\xff\x00\xfeb"); got != "a\uFFFDb" {
+		t.Errorf("a run split by a NUL came back as %q", got)
+	}
 }
 
 // A key is repaired as its value is, so a repaired value still finds its entry:
