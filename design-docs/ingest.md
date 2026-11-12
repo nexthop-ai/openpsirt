@@ -57,7 +57,7 @@ without its suppressions reports every carried patch as open.
 
 | Order | Step | Reason |
 |---|---|---|
-| 0 | Admission before the form is read: the sender authorized for the build, a declared length past the request bound refused, a place held among the uploads this server reads at once | The form streams to a temporary file. The handler asks step 1 again |
+| 0 | Admission before the form is read: the sender authorized for the build, a declared length past the request bound refused, a place held among the uploads this server reads at once. An authorization check that fails without a refusal is a fault, logged and answered in fixed words | The form streams to a temporary file. The handler asks step 1 again |
 | 1 | The build is declared and the sender may file, one query naming which of product, branch or tag, or variant is missing (REQ-07) | An unauthorized sender may not measure the backlog |
 | 2 | The backlog is not too deep | Cheapest refusal once the sender is known |
 | 3 | One pass reads the inventory's header and hashes it; claim documents are hashed beside it | Every hash covers the bytes that arrived |

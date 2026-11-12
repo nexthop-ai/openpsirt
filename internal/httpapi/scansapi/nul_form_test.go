@@ -18,7 +18,21 @@ import (
 
 // A form field holding a NUL is refused naming the field, before anything is
 // stored. The file beside it is not typed input and is not what refuses it.
+//
+// The media type is matched as the form parser matches it, regardless of
+// capitals, so a header spelled Multipart/Form-Data is checked too.
 func TestAFormFieldHoldingANULIsRefusedNamingTheField(t *testing.T) {
+	for name, spelled := range map[string]func(string) string{
+		"lower case": func(kind string) string { return kind },
+		"capitals": func(kind string) string {
+			return "Multipart/Form-Data" + strings.TrimPrefix(kind, "multipart/form-data")
+		},
+	} {
+		t.Run(name, func(t *testing.T) { formWithANUL(t, spelled) })
+	}
+}
+
+func formWithANUL(t *testing.T, spelled func(string) string) {
 	twoIngest(t, queue.Options{}, func(t *testing.T, f *httpapitest.IngestFixture) {
 		var body bytes.Buffer
 		form := multipart.NewWriter(&body)
@@ -36,7 +50,7 @@ func TestAFormFieldHoldingANULIsRefusedNamingTheField(t *testing.T) {
 			t.Fatal(err)
 		}
 		req := httptest.NewRequest(http.MethodPost, f.Path, &body)
-		req.Header.Set("Content-Type", form.FormDataContentType())
+		req.Header.Set("Content-Type", spelled(form.FormDataContentType()))
 		rec := httptest.NewRecorder()
 		f.Handler.ServeHTTP(rec, f.Sending(req))
 		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "form field note holds a NUL character") {

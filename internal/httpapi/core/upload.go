@@ -7,9 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -79,6 +79,11 @@ func BoundedForm(api huma.API, in Deps, admission Admission) func(ctx huma.Conte
 		in := Of(ctx.Context(), in)
 		if admission.Admit != nil {
 			if err := admission.Admit(ctx); err != nil {
+				// A refusal is answered as the handler would answer it; a
+				// fault is logged and answered in fixed words.
+				if !errors.As(err, new(huma.StatusError)) {
+					err = WentWrong(in.Logger, "that upload could not be admitted", err)
+				}
 				writeRefusal(api, ctx, err)
 				return
 			}
@@ -120,7 +125,9 @@ func BoundedForm(api huma.API, in Deps, admission Admission) func(ctx huma.Conte
 		defer in.Uploads.give()
 
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
-		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		// The media type as the form parser reads it, which ignores capitals:
+		// a header the parser reads as a form is checked here as one.
+		if kind, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err == nil && kind == "multipart/form-data" {
 			var over *http.MaxBytesError
 			if err := r.ParseMultipartForm(humachi.MultipartMaxMemory); errors.As(err, &over) {
 				tooLarge()
