@@ -696,15 +696,29 @@ func NewStore(db bun.IDB) *Store {
 //
 // A setting with a former name answers from a row under that name where none
 // is under its own, so a value written there still holds.
+//
+// Both names are read in one statement, which sees one snapshot on every
+// engine: read in two, a change committing between them moves the row from
+// the former name to the own one after the first read looked, and the
+// setting reads as unset.
 func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
-	value, set, err := s.read(ctx, name)
-	if err != nil || set {
-		return value, set, err
-	}
+	names := []string{name}
 	if former, ok := formerNames[name]; ok {
-		return s.read(ctx, former)
+		names = append(names, former)
 	}
-	return "", false, nil
+	var rows []Setting
+	if err := s.db.NewSelect().Model(&rows).
+		Where(`"name" IN (?)`, bun.List(names)).Scan(ctx); err != nil {
+		return "", false, fmt.Errorf("read the %q setting: %w", name, err)
+	}
+	value, set := "", false
+	for _, row := range rows {
+		if row.Name == name {
+			return row.Value, true, nil
+		}
+		value, set = row.Value, true
+	}
+	return value, set, nil
 }
 
 // read reads the row under one name.
