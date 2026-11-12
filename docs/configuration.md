@@ -627,8 +627,15 @@ notification area in the interface still works.
 
 `MAIL_FROM` and `MAIL_SERVER` are both needed for mail to happen at all — a
 server with nobody to send as is half a configuration, and either alone sends
-nothing rather than failing at startup. Credentials are optional, and are
-refused over a connection the server would not secure with STARTTLS.
+nothing rather than failing at startup. Credentials are optional. A message
+goes only over a connection the server secured with STARTTLS, since a network
+that strips STARTTLS from the server's answer looks like a server offering
+none. `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` accepts a server without it, and a
+deployment that sets it is told so at every start:
+
+```
+WARN mail may cross the network in the clear server=relay.internal:25
+```
 
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
@@ -636,6 +643,7 @@ refused over a connection the server would not secure with STARTTLS.
 | `OPENPSIRT_MAIL_SERVER` | `mail.server` | The SMTP server as `host:port`, e.g. `smtp.example.com:587` | unset |
 | `OPENPSIRT_MAIL_USERNAME` | `mail.username` | Username, where the server wants one. Sent only after STARTTLS | unset |
 | `OPENPSIRT_MAIL_PASSWORD` | `mail.password` | Password for that username. Sent only after STARTTLS | unset |
+| `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` | `mail.allow_plaintext` | Send to a server that offers no STARTTLS, which is otherwise refused. For a relay on a network you accept mail crossing in the clear; credentials are still never sent without STARTTLS | off |
 
 Who gets what is not configuration: each person chooses in their own settings,
 and the daily digest is off until somebody asks for it. Mail carries a notice as

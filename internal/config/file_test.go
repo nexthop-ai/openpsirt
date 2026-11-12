@@ -117,7 +117,7 @@ var everySetting = map[string]string{
 	"SCANNER_MAX_MATCHES": "301", "SCANNER_MAX_REFERENCES": "31",
 
 	"MAIL_FROM": "psirt@example.test", "MAIL_SERVER": "smtp.example.test:587",
-	"MAIL_USERNAME": "mailer", "MAIL_PASSWORD": "mail-secret",
+	"MAIL_USERNAME": "mailer", "MAIL_PASSWORD": "mail-secret", "MAIL_ALLOW_PLAINTEXT": "true",
 	"SLACK_TOKEN": "xoxb-1", "ZULIP_SITE": "https://chat.example.test",
 	"ZULIP_EMAIL": "bot@example.test", "ZULIP_KEY": "zulip-key",
 

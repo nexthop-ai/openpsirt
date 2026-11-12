@@ -5,8 +5,10 @@ package notify
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"fmt"
 	"mime"
 	"net"
@@ -55,6 +57,9 @@ type Mail struct {
 	// roots is what the server's certificate is checked against once the
 	// connection is secured. Nil is the system's.
 	roots *x509.CertPool
+	// plaintext accepts a server that offers no STARTTLS, for a password-less
+	// relay on a network the operator accepts mail crossing in the clear.
+	plaintext bool
 }
 
 // NewMail returns a channel over the SMTP server at addr, or nil where the
@@ -62,7 +67,7 @@ type Mail struct {
 //
 // Nil rather than an error: not configuring mail is a choice an operator is
 // entitled to make, and the tool works without it.
-func NewMail(addr, from, username, password string) *Mail {
+func NewMail(addr, from, username, password string, plaintext bool) *Mail {
 	addr, from = strings.TrimSpace(addr), strings.TrimSpace(from)
 	if addr == "" || from == "" {
 		return nil
@@ -70,7 +75,7 @@ func NewMail(addr, from, username, password string) *Mail {
 	return &Mail{
 		addr: addr, from: from,
 		username: strings.TrimSpace(username), password: password,
-		timeout: defaultMailTimeout,
+		timeout: defaultMailTimeout, plaintext: plaintext,
 	}
 }
 
@@ -82,10 +87,11 @@ func (m *Mail) Name() string { return "mail" }
 
 // Send carries one message to one address.
 //
-// STARTTLS where the server offers it, and credentials only over a connection
-// that has been secured — a password sent in the clear to whatever answered on
-// that port is a password given away, and an operator who configured one is
-// entitled to assume it is not.
+// Only over a connection STARTTLS secured, unless the operator accepted
+// plaintext, and credentials never otherwise: a message names findings and
+// people, and a password sent in the clear is a password given away. A
+// connection whose STARTTLS was stripped on the way reads as a server offering
+// none, so offering it is not left to the server.
 func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 	to = strings.TrimSpace(to)
 	if to == "" {
@@ -121,11 +127,15 @@ func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 		}
 		secured = true
 	}
+	if !secured && m.username != "" {
+		return refusal.New("the mail server offered no STARTTLS, and a password " +
+			"sent in the clear is a password given away")
+	}
+	if !secured && !m.plaintext {
+		return refusal.New("the mail server offered no STARTTLS, and OPENPSIRT_MAIL_ALLOW_PLAINTEXT " +
+			"is not set to send mail across the network in the clear")
+	}
 	if m.username != "" {
-		if !secured {
-			return refusal.New("the mail server offered no STARTTLS, and a password " +
-				"sent in the clear is a password given away")
-		}
 		if err := client.Auth(smtp.PlainAuth("", m.username, m.password, host)); err != nil {
 			return fmt.Errorf("sign in to the mail server: %w", err)
 		}
@@ -141,7 +151,11 @@ func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 	if err != nil {
 		return fmt.Errorf("write a message: %w", err)
 	}
-	if _, err := writer.Write(headers(m.from, to, message)); err != nil {
+	id, err := messageID(m.from)
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(headers(m.from, to, time.Now().UTC(), id, message)); err != nil {
 		return fmt.Errorf("write a message: %w", err)
 	}
 	if err := writer.Close(); err != nil {
@@ -155,16 +169,38 @@ func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 // The subject is encoded rather than written through, because it comes from
 // this application's own words today and from a finding's one day, and a
 // header is not a place to discover that something contained a newline.
-func headers(from, to string, m Message) []byte {
+//
+// Date and Message-ID are written here, since RFC 5322 requires the one and
+// some receivers refuse a message without the other, and a relay that adds
+// neither is a relay this has to work through. The body is UTF-8 sent as it
+// is, which the encoding header says.
+func headers(from, to string, at time.Time, id string, m Message) []byte {
 	var out strings.Builder
 	out.WriteString("From: " + sanitizedHeader(from) + "\r\n")
 	out.WriteString("To: " + sanitizedHeader(to) + "\r\n")
+	out.WriteString("Date: " + at.UTC().Format(time.RFC1123Z) + "\r\n")
+	out.WriteString("Message-ID: " + id + "\r\n")
 	out.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", oneLine(m.Subject)) + "\r\n")
 	out.WriteString("MIME-Version: 1.0\r\n")
 	out.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
+	out.WriteString("Content-Transfer-Encoding: 8bit\r\n")
 	out.WriteString("\r\n")
 	out.WriteString(strings.ReplaceAll(m.Text, "\n", "\r\n"))
 	return []byte(out.String())
+}
+
+// messageID is a new message's identifier: random, at the domain of the
+// address it is sent as.
+func messageID(from string) (string, error) {
+	var random [16]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return "", fmt.Errorf("name a message: %w", err)
+	}
+	domain := "openpsirt.invalid"
+	if _, after, ok := strings.Cut(oneLine(from), "@"); ok && after != "" {
+		domain = strings.Trim(after, "<> ")
+	}
+	return "<" + hex.EncodeToString(random[:]) + "@" + domain + ">", nil
 }
 
 // sanitizedHeader keeps an address to one line.

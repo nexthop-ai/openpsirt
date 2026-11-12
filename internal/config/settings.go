@@ -75,6 +75,7 @@ var settings = []setting{
 	{"MAIL_SERVER", "mail.server", text},
 	{"MAIL_USERNAME", "mail.username", text},
 	{"MAIL_PASSWORD", "mail.password", text},
+	{"MAIL_ALLOW_PLAINTEXT", "mail.allow_plaintext", boolean},
 
 	{"SLACK_TOKEN", "chat.slack.token", text},
 	{"ZULIP_SITE", "chat.zulip.site", text},

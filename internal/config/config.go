@@ -124,6 +124,9 @@ type Config struct {
 	MailServer   string
 	MailUsername string
 	MailPassword string
+	// MailAllowPlaintext sends mail to a server offering no STARTTLS, which
+	// is otherwise refused. Never with a password.
+	MailAllowPlaintext bool
 	// SlackToken is a Slack app's bot token, and the Zulip three are a Zulip
 	// bot's server, address and key. Each is a chat platform this deployment
 	// may post to and send people direct messages on, and absent is ordinary.
@@ -417,6 +420,7 @@ func load(given map[string]string) (Config, error) {
 		MailServer:          r.text("MAIL_SERVER", ""),
 		MailUsername:        r.text("MAIL_USERNAME", ""),
 		MailPassword:        r.text("MAIL_PASSWORD", ""),
+		MailAllowPlaintext:  r.boolean("MAIL_ALLOW_PLAINTEXT", false),
 		SlackToken:          r.text("SLACK_TOKEN", ""),
 		ZulipSite:           r.text("ZULIP_SITE", ""),
 		ZulipEmail:          r.text("ZULIP_EMAIL", ""),

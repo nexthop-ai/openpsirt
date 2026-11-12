@@ -78,7 +78,10 @@ kind reaches mail in the digest alone (`design-docs/notifications-work.md`
 | A server and a sender are configured together or not at all, refused at startup, logging which arrived | Half reads as no mail configured |
 | Tried five times, then left unsent and readable | |
 | Somebody with no address is sent nothing, in the query | |
-| STARTTLS is offered, and no password goes without it | |
+| Nothing is sent without STARTTLS unless the operator accepts plaintext, warned at every start | A stripped STARTTLS reads as a server offering none |
+| No password goes without STARTTLS, plaintext accepted or not | |
+| The server's certificate is checked against the system's authorities, which `SSL_CERT_FILE` and `SSL_CERT_DIR` set | A private authority needs no setting of its own |
+| A message carries its date, a random identifier at the sender's domain, and says its body is 8-bit UTF-8 | RFC 5322 requires the date, and some receivers refuse a message without an identifier; not every relay adds them |
 | Nothing logs the password, and nothing redacts it | Nothing formats the configuration; whatever does adds the redaction |
 
 ## Outbound HTTP
