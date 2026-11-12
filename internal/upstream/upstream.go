@@ -232,8 +232,12 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, productID 
 		return nil, err
 	}
 	var out *Upstream
-	if err := finding.EnsureStatementsLock(ctx, s.db); err != nil {
-		return nil, err
+	// Made where this opens the transaction; a caller recording inside its
+	// own makes it before, and takes it first.
+	if pool, ok := database.Handle(s.db); ok {
+		if err := finding.EnsureStatementsLock(ctx, pool); err != nil {
+			return nil, err
+		}
 	}
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		out = nil

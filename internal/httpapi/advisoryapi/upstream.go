@@ -224,7 +224,14 @@ func registerUpstream(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 	}) (*struct{}, error) {
 		in := core.Of(ctx, in)
+		if err := finding.EnsureStatementsLock(ctx, in.DB); err != nil {
+			return nil, core.NotRecorded(in.Log(), err)
+		}
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+			// First, as every transaction setting statements aside takes it.
+			if err := finding.TakeStatements(ctx, tx); err != nil {
+				return core.NotRecorded(in.Logger, err)
+			}
 			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
 			if err != nil {
 				return err
