@@ -142,9 +142,9 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		}
 		var rule *analysis.SuppressionRule
 		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
-			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
+			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 			if err != nil {
-				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+				return err
 			}
 			if rule, err = analysis.ProposeRule(ctx, tx, subject, product.ID, analysis.Proposal{
 				Rule: input.Body.Rule, Prefix: input.Body.Prefix,
@@ -181,9 +181,9 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		}
 		var rule *analysis.SuppressionRule
 		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
-			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
+			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 			if err != nil {
-				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+				return err
 			}
 			rule, err = analysis.ApproveRule(ctx, tx, subject, product.ID, input.ID, time.Now())
 			switch {
@@ -218,9 +218,9 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		return &struct{}{}, core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
-			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
+			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 			if err != nil {
-				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+				return err
 			}
 			rule, err := analysis.RetireRule(ctx, tx, subject, product.ID, input.ID, time.Now())
 			switch {
@@ -245,6 +245,19 @@ func suppressionRulesProduct(ctx context.Context, in core.Deps, name string) (ac
 		return access.Subject{}, err
 	}
 	return subject, nil
+}
+
+// ruleProduct is the product a suppression rule act names, resolved inside the
+// act's transaction as this subject may see it, and refused as not there
+// otherwise.
+func ruleProduct(ctx context.Context, in core.Deps, tx bun.Tx, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := catalog.NewStore(tx).VisibleProduct(ctx, subject, name)
+	if err != nil {
+		return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+	}
+	return product, nil
 }
 
 func noteSuppressionRule(ctx context.Context, in core.Deps, tx bun.Tx, product string, rule analysis.SuppressionRule,

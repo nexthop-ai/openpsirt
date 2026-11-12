@@ -108,8 +108,8 @@ type Worked struct {
 // unbounded where none was.
 //
 // A zero start is the beginning, which is what a period's zero side means.
-// Written once because four statements here take it and a default substituted
-// in one of them is a figure over a window nobody asked for.
+// Every statement here bounding a start takes it, because a default
+// substituted in one of them is a figure over a window nobody asked for.
 func from(q *bun.SelectQuery, column string, since time.Time) *bun.SelectQuery {
 	if since.IsZero() {
 		return q
@@ -226,9 +226,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		GroupExpr(`"de"."decision_id", ` + rating.EffectiveExpr).
 		OrderExpr(`MIN("de"."proposed_at") DESC`).
 		Limit(measuredAtMost + 1)
-	if !since.IsZero() {
-		q = q.Where(`"de"."proposed_at" >= ?`, since)
-	}
+	q = from(q, `"de"."proposed_at"`, since)
 	q = only.narrow(readableBy(q, subject, "de"))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return Measures{}, fmt.Errorf("read how long triage is taking: %w", err)
@@ -275,9 +273,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 		Where(`"de"."sent_back_at" IS NOT NULL`).
 		Where(`"de"."sent_back_at" < ?`, until)
-	if !since.IsZero() {
-		back = back.Where(`"de"."sent_back_at" >= ?`, since)
-	}
+	back = from(back, `"de"."sent_back_at"`, since)
 	if err := only.narrow(readableBy(back, subject, "de")).Scan(ctx, &out.SentBack); err != nil {
 		return Measures{}, fmt.Errorf("read how much came back: %w", err)
 	}
