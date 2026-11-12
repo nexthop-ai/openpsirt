@@ -47,6 +47,7 @@ writes their URLs to the git-ignored `local.mk`, which the makefile includes.
 | Each data directory is in memory under a cap: 1 GB PostgreSQL, 3 GB MySQL and MariaDB, 256 MB the floor server | Past it a write fails as a full disk on that server; unbounded, the four grow into the memory the tests run in. Two weeks of a workstation's runs left 349 MB, 1.6 GB, 1.6 GB and 47 MB, and the caps leave a 16 GB runner over 8 GB |
 | One server is below the supported version floor | The old-server refusal is exercised |
 | The URLs are read when make starts | The run writing `local.mk` is not the run using it |
+| A harness session on MySQL or MariaDB waits 60 seconds for a metadata lock, unless its URL sets `lock_wait_timeout` | The servers default to a year on MySQL and a day on MariaDB, so a server wedged on a lock it never grants hangs every statement needing it to the test binary's timeout; bounded, the waiting statement fails and is named |
 
 `design-docs/build-measurements.md` § Server processor time has the timings.
 
