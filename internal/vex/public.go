@@ -102,8 +102,8 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	if !subject.Reads(access.Public, named.ProductID) {
 		return nil, access.Denied(fmt.Sprintf("read disclosed findings in product %d", named.ProductID))
 	}
-	// Withheld against anybody at all whoever asks: what this returns is
-	// published, so a subject reaching undisclosed work would otherwise
+	// Withheld against the published reader, whoever asks: what this returns
+	// is published, so a subject reaching undisclosed work would otherwise
 	// publish the names it reaches.
 	got, err := s.gather(ctx, named, buildID, gathering{
 		visible:  []access.Visibility{access.Public},
