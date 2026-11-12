@@ -44,6 +44,10 @@ type Store struct {
 	// checked and before the row is written, so a test can hold two uploads
 	// in the window a concurrent writer would otherwise slip through.
 	beforeRecord func()
+	// recorded replaces the error an upload's transaction answered, so a test
+	// can report a failure for a transaction that committed, as a driver does
+	// when the caller goes away during the commit.
+	recorded func(error) error
 }
 
 // NewStore returns a store over db, keeping bytes in files.
@@ -385,22 +389,42 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		_, err := tx.NewInsert().Model(row).Exec(ctx)
 		return err
 	})
+	if s.recorded != nil {
+		err = s.recorded(err)
+	}
 	if err != nil {
-		// The row is what the sweep can see, so a failure here leaves bytes
-		// nothing knows about. Removed now rather than left for a reaper that
-		// has no record to work from — and where that removal fails too, the
-		// key is said out loud, because it is then the only thing that can
-		// find them. Removed on a context of its own, because the request's
-		// is often why the record failed: a client that went away.
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
-		defer cancel()
-		if removed := s.files.Delete(cleanup, key); removed != nil {
-			s.log().ErrorContext(ctx, "an upload that could not be recorded left bytes behind",
-				"key", key, "error", removed)
-		}
+		s.unrecorded(ctx, token, key)
 		return nil, fmt.Errorf("record an attachment: %w", err)
 	}
 	return row, nil
+}
+
+// unrecorded removes the bytes of an upload whose transaction failed.
+//
+// The row is what the sweep can see, so a failure leaves bytes nothing knows
+// about. Removed now rather than left for a reaper with no record to work
+// from, and where that removal fails too, the key is logged, because it is
+// then the only thing that can find them. On a context of its own, because the
+// request's is often why the record failed: a client that went away.
+//
+// A failure answered during the commit does not say the commit failed, so the
+// row is looked for first: bytes a committed row names stay, for the sweep to
+// collect with their row.
+func (s *Store) unrecorded(ctx context.Context, token, key string) {
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
+	defer cancel()
+	held, err := s.db.NewSelect().Model((*Attachment)(nil)).Where(`"token" = ?`, token).Count(cleanup)
+	if err != nil || held > 0 {
+		if err != nil {
+			s.log().ErrorContext(ctx, "an upload that may not have been recorded left bytes behind",
+				"key", key, "error", err)
+		}
+		return
+	}
+	if removed := s.files.Delete(cleanup, key); removed != nil {
+		s.log().ErrorContext(ctx, "an upload that could not be recorded left bytes behind",
+			"key", key, "error", removed)
+	}
 }
 
 // uploadLock names the turn an upload's transaction takes before it reads how

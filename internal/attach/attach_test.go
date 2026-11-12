@@ -1035,6 +1035,31 @@ func TestAnUploadWhoseBytesCouldNotBeRemovedNamesTheKey(t *testing.T) {
 	})
 }
 
+// A commit the driver reports as failed may have committed, and the bytes its
+// row names stay.
+func TestAnUploadReportedFailedAfterItsCommitKeepsItsBytes(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		store := attach.NewStore(f.db.DB, f.files)
+		attach.Recorded(store, func(error) error { return context.Canceled })
+		if _, err := store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
+			"evidence.log", strings.NewReader("abc"), 3, roomy, plenty, plenty, false); err == nil {
+			t.Fatal("the reported failure was not returned")
+		}
+		var rows []attach.Attachment
+		if err := f.db.NewSelect().Model(&rows).Where(`"filename" = ?`, "evidence.log").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("the committed upload holds %d rows", len(rows))
+		}
+		if _, err := f.files.Open(ctx, rows[0].ObjectKey); err != nil {
+			t.Errorf("the bytes a committed row names were removed: %v", err)
+		}
+	})
+}
+
 // undeletable is a store that deletes nothing.
 type undeletable struct{ attach.Storage }
 

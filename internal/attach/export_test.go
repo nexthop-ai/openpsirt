@@ -29,6 +29,10 @@ func MintToken() (string, error) { return mintToken() }
 // checked and the row being written.
 func BeforeRecord(s *Store, fn func()) { s.beforeRecord = fn }
 
+// Recorded replaces the error an upload's transaction answered with what fn
+// makes of it.
+func Recorded(s *Store, fn func(error) error) { s.recorded = fn }
+
 // ObjectStore is a bucket on a stand-in object store on a loopback address,
 // holding what it is sent in memory, and the address it answers on. It is
 // closed when the test ends.
