@@ -245,21 +245,37 @@ const (
 			"",
 		},
 		{
-			// The shape a block left behind takes once somebody corrects its
-			// opening word to match the declaration under it: two docs on one
-			// symbol, both rendered under one name, and the first about
-			// something else.
+			// The shape a block left behind takes: two docs on one symbol,
+			// both rendered under one name, and the first about something
+			// else.
 			"two doc comments glued together with no blank line",
 			`package p
 
-// Narrow takes a wide thing and makes it narrow.
+// Widen takes a narrow thing and makes it wide.
 //
 // It was here first.
 // Narrow is the other one, which is the real doc.
 func Narrow() {}
 `,
-			inPackage("Narrow"),
-			1,
+			// One report for the opening naming Widen, one for the real doc
+			// starting part way down.
+			inPackage("Narrow", "Widen"),
+			2,
+			"",
+		},
+		{
+			// Go's doc comment of several paragraphs: a summary, a blank
+			// comment line, and a paragraph opening on the name again.
+			"a doc comment whose later paragraph opens on its own name",
+			`package p
+
+// Narrow takes a wide thing and makes it narrow.
+//
+// Narrow is safe for concurrent use.
+func Narrow() {}
+`,
+			inPackage("Narrow", "Widen"),
+			0,
 			"",
 		},
 		{

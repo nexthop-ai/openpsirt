@@ -45,6 +45,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -132,14 +133,12 @@ func detached(path string, source []byte, declared map[string]bool) []string {
 	}
 	var bad []string
 	for _, block := range documented(path, file) {
-		first := strings.TrimSpace(block.doc.List[0].Text)
-		first = strings.TrimPrefix(first, "//")
-		match := opens.FindStringSubmatch(strings.TrimSpace(first))
+		match := opens.FindStringSubmatch(text(block.doc.List[0]))
 		if match == nil {
 			continue
 		}
 		named := match[1]
-		if slicesContains(block.names, named) {
+		if slices.Contains(block.names, named) {
 			continue
 		}
 		// A test's own name is a sentence rather than a symbol, so the
@@ -171,22 +170,23 @@ func detached(path string, source []byte, declared map[string]bool) []string {
 // glued reports a doc comment that is two blocks with no blank line between
 // them, so Go hands both to the second one's declaration.
 //
-// The shape a block left behind takes once somebody corrects its opening word
-// to match: the first paragraph documents something else and reads as this
-// declaration's, and godoc renders both under one name. It is found by the
-// declaration's own name opening a line that is not the first — the real doc
-// starting part way down means everything above it belongs to somebody else.
+// The shape a block left behind takes: the first paragraph opens on another
+// symbol the package declares, a later one opens on this declaration's own
+// name, and godoc renders both under this one. The real doc starting part way
+// down means everything above it belongs to somebody else. A first paragraph
+// opening on the declaration's own name is the ordinary doc comment of several
+// paragraphs, and is left alone.
 func glued(path string, fset *token.FileSet, file *ast.File,
 	declared map[string]bool) []string {
 	var bad []string
 	for _, block := range documented(path, file) {
-		// Only where the block above is itself somebody's doc comment, which
-		// is what makes this two blocks rather than one. A run of constants
-		// introduced by a paragraph about the run is the ordinary shape here,
-		// and its opening names no symbol.
-		opening := strings.TrimSpace(strings.TrimPrefix(
-			strings.TrimSpace(block.doc.List[0].Text), "//"))
-		if head := opens.FindStringSubmatch(opening); head == nil || !declared[head[1]] {
+		// Only where the block above is somebody else's doc comment, which is
+		// what makes this two blocks rather than one. A run of constants
+		// introduced by a paragraph about the run opens on no symbol, and a
+		// doc whose first paragraph opens on its own name is one doc in
+		// several paragraphs, the form Go's doc comments take.
+		head := opens.FindStringSubmatch(text(block.doc.List[0]))
+		if head == nil || !declared[head[1]] || slices.Contains(block.names, head[1]) {
 			continue
 		}
 		for i, line := range block.doc.List {
@@ -197,14 +197,12 @@ func glued(path string, fset *token.FileSet, file *ast.File,
 			// wraps, and a wrapped line beginning with the symbol's own name
 			// mid-sentence is ordinary prose — "the published\n// score where
 			// there is not" is not a second block.
-			before := strings.TrimSpace(strings.TrimPrefix(
-				strings.TrimSpace(block.doc.List[i-1].Text), "//"))
+			before := text(block.doc.List[i-1])
 			if before != "" && !strings.HasSuffix(before, ".") {
 				continue
 			}
-			text := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line.Text), "//"))
-			match := opens.FindStringSubmatch(text)
-			if match == nil || !slicesContains(block.names, match[1]) {
+			match := opens.FindStringSubmatch(text(line))
+			if match == nil || !slices.Contains(block.names, match[1]) {
 				continue
 			}
 			bad = append(bad, fmt.Sprintf(
@@ -294,9 +292,7 @@ func floating(path string, fset *token.FileSet, file *ast.File,
 		if group.Pos() < header {
 			continue
 		}
-		first := strings.TrimSpace(strings.TrimPrefix(
-			strings.TrimSpace(group.List[0].Text), "//"))
-		match := opens.FindStringSubmatch(first)
+		match := opens.FindStringSubmatch(text(group.List[0]))
 		if match == nil || !declared[match[1]] {
 			continue
 		}
@@ -443,11 +439,7 @@ func receiver(fn *ast.FuncDecl) string {
 	return ""
 }
 
-func slicesContains(all []string, want string) bool {
-	for _, one := range all {
-		if one == want {
-			return true
-		}
-	}
-	return false
+// text is a line comment's words, without its marker or the space around it.
+func text(c *ast.Comment) string {
+	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(c.Text), "//"))
 }
