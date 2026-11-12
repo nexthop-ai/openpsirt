@@ -121,6 +121,7 @@ order is precedence: the first matching rule places the work.
 |---|---|
 | A rule places findings or vulnerability reports, chosen first, and the form says what each kind does before it is filled | |
 | A report rule takes no key; its preview says how many unheld open reports it would place | |
+| The name and keys are sent trimmed | |
 | Saving says the sweep has started | One rule can place thousands, so it is queued |
 | The finding names the rule that placed it on the holder card, and says taking it picks up unheld work the rule will not take back | |
 | Both are read off the occurrences the reader may read, the ones the card shows | Read off an unreadable one, the holder names who works undisclosed work |

@@ -62,6 +62,7 @@ as a link, by the type the server decided.
 | Rule | Reason |
 |---|---|
 | A refusal is shown beside the control: a file over the deployment's size, a deployment with no room | |
+| The file's name is the link text with brackets, angle brackets, emphasis marks and backslashes escaped | A stored name keeps them, and unescaped they end the link or read as refused markup |
 | A reference becomes a path on this origin before anything renders it | Its scheme is unknown to browsers, so the sanitizer would drop it |
 | An image pointing anywhere else loses the whole element | Such text is refused at submission; an older one would draw a broken icon |
 | The finding lists what is attached beside rendering it, a removed file listed saying so and why | A file in an unread revision is still record |

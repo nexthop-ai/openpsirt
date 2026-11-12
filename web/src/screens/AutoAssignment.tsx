@@ -153,9 +153,9 @@ export function AutoAssignment() {
         await api.POST("/v1/products/{product}/assignment-rules", {
           params: { path: { product } },
           body: reports
-            ? { name, team, reports: true }
+            ? { name: name.trim(), team, reports: true }
             : {
-                name,
+                name: name.trim(),
                 team,
                 ...(upstream.trim() ? { upstream: upstream.trim() } : {}),
                 ...(beneath.trim() ? { beneath: beneath.trim() } : {}),

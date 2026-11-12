@@ -53,7 +53,7 @@ const field = (selector: string) => mount.host().querySelector<HTMLInputElement>
 const text = () => mount.host().textContent ?? "";
 
 async function fill(upstream: string) {
-  change(field('input[placeholder="kernel to the platform team"]'), "kernel rule");
+  change(field('input[placeholder="kernel to the platform team"]'), " kernel rule ");
   change(
     Array.from(mount.host().querySelectorAll<HTMLSelectElement>("select")).find((each) =>
       each.textContent?.includes("Pick a team"),
@@ -65,7 +65,7 @@ async function fill(upstream: string) {
 }
 
 describe("the rules that assign work to a team", () => {
-  it("adds a rule naming only the key that was given", async () => {
+  it("adds a rule naming only the key that was given, every field trimmed", async () => {
     const { post } = await drawn(() => 2);
     await fill(" linux* ");
     expect(text()).toContain("Catches 2 components");

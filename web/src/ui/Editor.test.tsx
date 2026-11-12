@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { belongTo } from "../app/drafts";
 import { Editor } from "./Editor";
+import { render } from "./markdown";
 import { Thread } from "./Thread";
 import { mounted, screen, serve, settle } from "../test/mount";
 
@@ -237,5 +238,31 @@ describe("naming somebody and attaching a file", () => {
         ?.click(),
     );
     expect(field()).toBeNull();
+  });
+
+  it("stays one image whatever brackets or markup it holds", async () => {
+    serve(() => undefined);
+    vi.spyOn(api, "POST").mockImplementation((async () => ({
+      data: {
+        filename: "a]b<i>_x*.png",
+        reference: `attachment:${"a".repeat(32)}`,
+        inline: true,
+      },
+      error: undefined,
+      response: new Response(null, { status: 201 }),
+    })) as never);
+    mount.render(screen(<Mentioning />));
+    await settle();
+    const chooser = mount.host().querySelector<HTMLInputElement>('input[type="file"]');
+    Object.defineProperty(chooser, "files", {
+      value: [new File(["x"], "a]b<i>_x*.png")],
+      configurable: true,
+    });
+    await act(async () => chooser?.dispatchEvent(new Event("change", { bubbles: true })));
+    await settle();
+    const host = document.createElement("div");
+    host.innerHTML = render(said() ?? "");
+    expect(host.querySelectorAll("img")).toHaveLength(1);
+    expect(host.querySelector("img")?.getAttribute("alt")).toBe("a]b<i>_x*.png");
   });
 });

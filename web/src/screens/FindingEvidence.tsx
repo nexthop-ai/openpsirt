@@ -164,7 +164,11 @@ export function References({
   }[];
 }) {
   const [whole, setWhole] = useState(false);
-  const all = advisory ? [{ url: advisory, kind: "advisory" }, ...refs] : refs;
+  // One row per address: a scanner's list often carries the advisory again,
+  // and sometimes one address twice.
+  const all = [...(advisory ? [{ url: advisory, kind: "advisory" }] : []), ...refs].filter(
+    (ref, i, every) => !ref.url || every.findIndex((each) => each.url === ref.url) === i,
+  );
   if (all.length === 0) return null;
   const order: Record<Body<"ReferenceBody">["kind"], number> = {
     patch: 0,
@@ -177,8 +181,8 @@ export function References({
     <div className="evblock">
       <h4>References</h4>
       <ul className="refs">
-        {(whole ? sorted : sorted.slice(0, SHOWN_REFERENCES)).map((ref) => (
-          <li key={ref.url}>
+        {(whole ? sorted : sorted.slice(0, SHOWN_REFERENCES)).map((ref, i) => (
+          <li key={`${ref.kind ?? ""} ${ref.url ?? ""} ${i}`}>
             <span className={ref.kind === "patch" ? "kind patch" : "kind"}>{ref.kind}</span>{" "}
             <span className="ref">
               <Away url={ref.url} />
@@ -321,8 +325,8 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
     <div className="evblock">
       <h4>Issue records</h4>
       <ul className="refs">
-        {links.map((link) => (
-          <li key={link.url}>
+        {links.map((link, i) => (
+          <li key={`${link.url ?? ""} ${i}`}>
             <span className="kind">{link.name}</span> <Away url={link.url} />
           </li>
         ))}
