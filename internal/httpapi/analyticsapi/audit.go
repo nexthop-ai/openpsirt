@@ -202,19 +202,11 @@ func (a Auditing) narrow(ctx context.Context, in core.Deps,
 		}
 		filter.BuildID = build.ID
 	}
-	from, err := core.CalendarDate(a.From)
+	// The period every other report reads, so a day named twice or an end
+	// before the start is refused here as it is there.
+	since, until, err := core.Period{From: a.From, To: a.To}.Window(0, time.Now().UTC())
 	if err != nil {
 		return filter, since, until, err
-	}
-	to, err := core.CalendarDate(a.To)
-	if err != nil {
-		return filter, since, until, err
-	}
-	if from != nil {
-		since = *from
-	}
-	if to != nil {
-		until = *to
 	}
 	return filter, since, until, nil
 }
