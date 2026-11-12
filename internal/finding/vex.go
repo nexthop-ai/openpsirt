@@ -414,7 +414,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Where(`"source" = ?`, from.Source).
 			Where(`"document_id" = ?`, identifier).
 			Where(`"digest" = ?`, from.Digest).
-			Where(heldByItsDocument).
+			Where(HeldByItsDocument).
 			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("ask what is already held: %w", err)
@@ -445,7 +445,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
 			Where(`"document_id" = ?`, identifier).
-			Where(heldByItsDocument)
+			Where(HeldByItsDocument)
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
 		}

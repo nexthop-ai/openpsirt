@@ -65,11 +65,11 @@ func TakeStatements(ctx context.Context, tx bun.IDB) error {
 	return nil
 }
 
-// heldByItsDocument chooses the statements a document still makes: those in
+// HeldByItsDocument chooses the statements a document still makes: those in
 // force, and those a newer statement from the same publisher overtook, which
 // a revision repeating them keeps. A statement its own document's revision
 // set aside is in neither.
-const heldByItsDocument = `("superseded_at" IS NULL OR "overtaken_by" IS NOT NULL)`
+const HeldByItsDocument = `("superseded_at" IS NULL OR "overtaken_by" IS NOT NULL)`
 
 // subjectOf is what a statement is about: the issue, the component at the
 // version named, and the product it ships inside. Two statements from one
@@ -132,7 +132,7 @@ func newestStands(ctx context.Context, tx bun.IDB, productID int64, publisher, s
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, source).
 			Where(`"vulnerability" IN (?)`, bun.List(issues[from:to])).
-			Where(heldByItsDocument).
+			Where(HeldByItsDocument).
 			Scan(ctx); err != nil {
 			return 0, fmt.Errorf("read what the publisher has said about these issues: %w", err)
 		}

@@ -268,7 +268,7 @@ func (s *Store) forget(ctx context.Context, tx bun.IDB, held *Upstream, now time
 		Set(`"overtaken_by" = NULL`).
 		Where(`"product_id" = ?`, held.ProductID).
 		Where(`"source" = ?`, finding.FromUpstream).
-		Where(`("superseded_at" IS NULL OR "overtaken_by" IS NOT NULL)`).
+		Where(finding.HeldByItsDocument).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("set aside what an upstream said: %w", err)
 	}
