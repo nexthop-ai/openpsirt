@@ -212,6 +212,16 @@ func slotName(namespace, fingerprint string, slot int) string {
 	return fmt.Sprintf("%s%s_%02d", namespace, hex.EncodeToString(sum[:6]), slot)
 }
 
+// harnessMade reports whether a database name is one this harness could have
+// made: lower-case letters, digits and underscores. The name is written into
+// statements between quotes, so a name another account made holding a quote
+// is left rather than dropped.
+func harnessMade(name string) bool {
+	return harnessName.MatchString(name)
+}
+
+var harnessName = regexp.MustCompile(`^[a-z0-9_]+$`)
+
 // slotShape matches a name slotName gives, in namespace, and captures the
 // fingerprint's hash.
 func slotShape(namespace string) *regexp.Regexp {
@@ -318,6 +328,10 @@ func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string
 	var errs []error
 	for _, name := range names {
 		if want != nil && !want(name) {
+			continue
+		}
+		if !harnessMade(name) {
+			errs = append(errs, fmt.Errorf("left %q: not a name this harness makes", name))
 			continue
 		}
 		taken, free, err := lockAll(ctx, conn, engine, locksOf(name))

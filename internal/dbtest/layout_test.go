@@ -159,3 +159,15 @@ func TestAMeasurementsEmptyingLeavesEveryTableEmptyAndForeignKeysEnforced(t *tes
 		}
 	})
 }
+
+// A test's handle carries the settings its pool was opened with, so a test
+// narrowing the pool for a while puts back what was there. Read as zero, the
+// open limit put back is none at all, on the pool every later test shares.
+func TestAHandleCarriesThePoolSettingsItWasOpenedWith(t *testing.T) {
+	Each(t, func(t *testing.T, db *database.DB) {
+		if db.Pool.MaxOpen <= 0 || db.Pool.MaxOpen != db.Stats().MaxOpenConnections {
+			t.Errorf("the handle says its pool opens %d, and the pool opens %d",
+				db.Pool.MaxOpen, db.Stats().MaxOpenConnections)
+		}
+	})
+}
