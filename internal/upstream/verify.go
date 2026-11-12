@@ -182,11 +182,22 @@ func checkSignature(ctx context.Context, client *http.Client, address string, bo
 }
 
 // keyringOf reads the armored public keys an upstream signs with and answers
-// them with their fingerprints as a set.
+// them with their fingerprints as a set. Each key fetched from its own address
+// is its own armored block, and a block is read one at a time.
 func keyringOf(armored string) (openpgp.EntityList, string, error) {
-	keyring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armored))
-	if err != nil {
-		return nil, "", refusal.Errorf("those public keys do not read: %v", err)
+	var keyring openpgp.EntityList
+	for rest := armored; strings.TrimSpace(rest) != ""; {
+		block := rest
+		if end := strings.Index(rest, armorEnd); end >= 0 {
+			block, rest = rest[:end+len(armorEnd)], rest[end+len(armorEnd):]
+		} else {
+			rest = ""
+		}
+		one, err := openpgp.ReadArmoredKeyRing(strings.NewReader(block))
+		if err != nil {
+			return nil, "", refusal.Errorf("those public keys do not read: %v", err)
+		}
+		keyring = append(keyring, one...)
 	}
 	if len(keyring) == 0 || len(keyring) > MostKeys {
 		return nil, "", refusal.Errorf("an upstream signs with one to %d keys, and this names %d",
@@ -198,6 +209,9 @@ func keyringOf(armored string) (openpgp.EntityList, string, error) {
 	}
 	return keyring, FingerprintOf(strings.Join(fingerprints, ",")), nil
 }
+
+// armorEnd closes one armored public key block.
+const armorEnd = "-----END PGP PUBLIC KEY BLOCK-----"
 
 // MostKeys is how many keys an upstream may sign with at once: one, and the
 // one it is rotating to, with room to spare.

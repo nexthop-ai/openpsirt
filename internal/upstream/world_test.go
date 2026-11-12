@@ -197,25 +197,7 @@ func (w *world) write() {
 // trust has the fork trust the upstream, confirming the key it names.
 func (w *world) trust() *upstream.Upstream {
 	w.t.Helper()
-	address := w.server.base + publish.MetadataPath
-	parsed, err := upstream.Address(address)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	client := upstream.Client(parsed, w.server.roots)
-	defer client.CloseIdleConnections()
-	described, err := upstream.Inspect(w.t.Context(), client, address)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	up, err := upstream.NewStore(w.DB.DB).Trust(w.t.Context(), w.admin, w.fork.ID, upstream.Trusting{
-		URL: address, Publisher: described.Publisher,
-		Fingerprint: described.Fingerprint, PublicKey: described.PublicKey,
-	})
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	return up
+	return w.trustAt(w.server.base + publish.MetadataPath)
 }
 
 // read reads the fork's upstream once, as the pass would.
@@ -299,10 +281,13 @@ type served struct {
 	who    publisher.Named
 	signer *signing.Signer
 	// mu guards what the hand changes: a document's bytes, a file left out,
-	// and what the provider description says about the key.
+	// a path answered with a redirect or with what another path holds, and
+	// what the provider description says about the key.
 	mu      sync.Mutex
 	tamper  map[string]func([]byte) []byte
 	missing map[string]bool
+	moved   map[string]bool
+	alias   map[string]string
 	asked   []string
 	// open is how many connections to the surface are open.
 	open int
@@ -319,15 +304,24 @@ func serve(t *testing.T, w *world) *served {
 		t.Fatal(err)
 	}
 	s := &served{signer: signer, tamper: map[string]func([]byte) []byte{}, missing: map[string]bool{},
-		answered: map[string]int{}}
+		moved: map[string]bool{}, alias: map[string]string{}, answered: map[string]int{}}
 	var handler http.Handler
 	s.server = httptest.NewUnstartedServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		s.mu.Lock()
 		s.asked = append(s.asked, req.URL.Path)
-		missing, tamper := s.missing[req.URL.Path], s.tamper[req.URL.Path]
+		missing, tamper, moved := s.missing[req.URL.Path], s.tamper[req.URL.Path], s.moved[req.URL.Path]
+		for from, to := range s.alias {
+			if strings.HasPrefix(req.URL.Path, from) {
+				req.URL.Path = to + strings.TrimPrefix(req.URL.Path, from)
+			}
+		}
 		s.mu.Unlock()
-		if missing {
+		switch {
+		case missing:
 			http.NotFound(rw, req)
+			return
+		case moved:
+			http.Redirect(rw, req, s.base+"/moved.json", http.StatusFound)
 			return
 		}
 		rec := httptest.NewRecorder()
@@ -400,6 +394,21 @@ func (s *served) drop(path string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.missing[path] = true
+}
+
+// redirect has the surface answer one path with a redirect.
+func (s *served) redirect(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.moved[path] = true
+}
+
+// serveAs has the surface answer one path, and the files beside it, with what
+// another path holds.
+func (s *served) serveAs(path, as string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.alias[path] = as
 }
 
 // documents is every CSAF document the upstream lists, by path.
@@ -600,7 +609,9 @@ func (w *world) trustAt(address string) *upstream.Upstream {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	described, err := upstream.Inspect(w.t.Context(), upstream.Client(parsed, w.server.roots), address)
+	client := upstream.Client(parsed, w.server.roots)
+	defer client.CloseIdleConnections()
+	described, err := upstream.Inspect(w.t.Context(), client, address)
 	if err != nil {
 		w.t.Fatal(err)
 	}

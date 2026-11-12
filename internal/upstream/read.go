@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
@@ -82,6 +83,10 @@ func Inspect(ctx context.Context, client *http.Client, address string) (Describe
 	named, at := keyIn(meta)
 	if named == "" {
 		return out, nil
+	}
+	if len(at) > MostKeys {
+		return Described{}, refusal.Errorf("an upstream signs with one to %d keys, and that provider "+
+			"description names %d", MostKeys, len(at))
 	}
 	var armored []string
 	for _, one := range at {
@@ -190,13 +195,22 @@ type Reader struct {
 	keep func(context.Context) (bool, error)
 	// most is how many documents one read takes: MostPerPass.
 	most int
-	now  func() time.Time
+	// listed is how many entries the listings may name: mostListed.
+	listed int
+	now    func() time.Time
+
+	// refused is, by upstream, each address refused at the moment its
+	// listing named, held by this process alone. A pass tries those after
+	// every other entry it reads, so entries refused every time never take
+	// the whole of a pass and starve the ones listed after them.
+	mu      sync.Mutex
+	refused map[int64]map[string]string
 }
 
 // NewReader returns a reader over db, checking an upstream's certificate
 // against roots, nil for the system's authorities.
 func NewReader(db bun.IDB, limits sbom.Limits, roots *x509.CertPool) *Reader {
-	return &Reader{db: db, limits: limits, roots: roots, most: MostPerPass,
+	return &Reader{db: db, limits: limits, roots: roots, most: MostPerPass, listed: mostListed,
 		now: func() time.Time { return time.Now().UTC() }}
 }
 
@@ -238,7 +252,12 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		_ = json.Unmarshal([]byte(up.Listings), &held)
 	}
 	entries, kept, moved, skipped, err := r.listings(ctx, client, up.URL, meta, held)
-	if err != nil {
+	switch {
+	case errors.Is(err, errLeaseLost):
+		// Another replica reads now; what it records stands.
+		took.Filled = true
+		return took, nil
+	case err != nil:
 		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 	}
 	if !moved {
@@ -255,12 +274,12 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		recorded[one.URL] = one
 	}
 	current := make(map[string]bool, len(entries))
-	var refused []error
 	for _, one := range entries {
 		current[one.address] = true
-		if was, ok := recorded[one.address]; ok && was.ListedAt == one.at {
-			continue
-		}
+	}
+	var refused []error
+	tried, refusedNow := map[string]bool{}, map[string]string{}
+	for _, one := range r.inTurn(up.ID, entries, recorded) {
 		if took.Documents+took.Refused >= r.most {
 			took.Filled = true
 			break
@@ -274,11 +293,15 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 				break
 			}
 		}
+		tried[one.address] = true
 		changed, err := r.document(ctx, client, up, one, keyring)
 		var refusedDoc unreadable
 		switch {
-		case errors.As(err, &refusedDoc):
+		case errors.As(err, &refusedDoc), errors.Is(err, outward.ErrRefused):
+			// A redirect is refused like an entry on another host: the same
+			// way every time, so the read goes on past it.
 			took.Refused++
+			refusedNow[one.address] = one.at
 			refused = append(refused, fmt.Errorf("%s: %w", one.address, err))
 			continue
 		case err != nil:
@@ -304,10 +327,12 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		took.Moved = true
 	}
 
-	// A pass that left documents unread or refused keeps no validator, so
-	// the next pass reads the listings whole and comes back for them.
+	// A pass that left documents unread or refused, or entries it could not
+	// read, keeps no validator, so the next pass reads the listings whole,
+	// comes back for them, and records again what stopped it.
+	r.remember(up.ID, current, tried, refusedNow)
 	listings := kept
-	if took.Filled || took.Refused > 0 {
+	if took.Filled || took.Refused > 0 || skipped > 0 {
 		listings = ""
 	}
 	var failed error
@@ -320,6 +345,47 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 			"so nothing it stopped listing is withdrawn", skipped)
 	}
 	return took, NewStore(r.db).reached(ctx, up, listings, "", failed, took.Filled)
+}
+
+// inTurn is the entries a read takes, in the order it takes them: each listed
+// at a moment other than the one recorded, those refused at that same moment
+// last time after the rest.
+func (r *Reader) inTurn(upstreamID int64, entries []listed, recorded map[string]Document) []listed {
+	r.mu.Lock()
+	before := r.refused[upstreamID]
+	r.mu.Unlock()
+	var fresh, again []listed
+	for _, one := range entries {
+		if was, ok := recorded[one.address]; ok && was.ListedAt == one.at {
+			continue
+		}
+		if at, ok := before[one.address]; ok && at == one.at {
+			again = append(again, one)
+			continue
+		}
+		fresh = append(fresh, one)
+	}
+	return append(fresh, again...)
+}
+
+// remember keeps what a read refused for the next: each refusal it made, and
+// each earlier one still listed that it did not try again.
+func (r *Reader) remember(upstreamID int64, listed, tried map[string]bool, refusedNow map[string]string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for address, at := range r.refused[upstreamID] {
+		if listed[address] && !tried[address] {
+			refusedNow[address] = at
+		}
+	}
+	if len(refusedNow) == 0 {
+		delete(r.refused, upstreamID)
+		return
+	}
+	if r.refused == nil {
+		r.refused = map[int64]map[string]string{}
+	}
+	r.refused[upstreamID] = refusedNow
 }
 
 // listings reads every listing a provider description names, answering the
@@ -364,12 +430,33 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 	}
 	slices.Sort(addresses)
 	addresses = slices.Compact(addresses)
+	if len(addresses) > mostListings {
+		return nil, "", false, 0, refusal.Errorf("that provider description names %d listings, "+
+			"and this reads at most %d", len(addresses), mostListings)
+	}
+	for _, where := range addresses {
+		if !onHost(base, where) {
+			return nil, "", false, 0, refusal.Errorf("that provider description names a listing at %s, "+
+				"and only the configured host is reached, over https", where)
+		}
+	}
 
 	read := func(validators bool) ([]listed, map[string]cached, int, error) {
 		kept := map[string]cached{}
 		var out []listed
 		unchanged := 0
 		for _, address := range addresses {
+			// The lease is asked for before each listing as well as each
+			// document: a listing is read whole and may take its whole
+			// request time.
+			if r.keep != nil {
+				switch mine, err := r.keep(ctx); {
+				case err != nil:
+					return nil, nil, 0, err
+				case !mine:
+					return nil, nil, 0, errLeaseLost
+				}
+			}
 			validator := &cached{}
 			if validators {
 				if was, ok := held[address]; ok {
@@ -394,6 +481,10 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 			}
 			if err != nil {
 				return nil, nil, 0, err
+			}
+			if len(out)+len(entries) > r.listed {
+				return nil, nil, 0, refusal.Errorf("the upstream's listings name more than the %d "+
+					"documents this reads", r.listed)
 			}
 			out = append(out, entries...)
 		}
@@ -439,6 +530,14 @@ func encoded(kept map[string]cached) string {
 // mostListingValidators bounds what is kept of the validators.
 const mostListingValidators = 64 << 10
 
+// mostListings bounds the feeds or lists of changes one description names,
+// each read whole. A provider writes one per label it serves.
+const mostListings = 32
+
+// mostListed bounds the entries every listing of one upstream names between
+// them, all held at once while a pass compares them with what was read.
+const mostListed = 200_000
+
 // fromFeed reads the documents one feed lists.
 func fromFeed(address string, body []byte) ([]listed, error) {
 	var feed csaf.Feed
@@ -464,17 +563,30 @@ func fromFeed(address string, body []byte) ([]listed, error) {
 }
 
 // entryOf is one document a listing names, or an entry that cannot be read
-// where it names no document or no moment, or an address this cannot record.
-// An entry that cannot be read leaves the listing unread in full.
+// where it names no document or no moment, an address this cannot record, or
+// one off https on the listing's own host, which is never requested. An entry
+// that cannot be read leaves the listing unread in full.
 func entryOf(listing, named, at string) listed {
 	if at == "" || named == "" {
 		return listed{skipped: true}
 	}
 	where, err := resolve(listing, named)
-	if err != nil || len(where) > MostURL {
+	if err != nil || len(where) > MostURL || !onHost(listing, where) {
 		return listed{skipped: true}
 	}
 	return listed{address: where, at: bound.HeadRunes(at, database.NameWidth)}
+}
+
+// onHost reports whether an address is https on the host, at the port, of
+// another. The client refuses another host, and sends plain http to the same
+// one.
+func onHost(base, where string) bool {
+	from, err := url.Parse(base)
+	if err != nil {
+		return false
+	}
+	to, err := url.Parse(where)
+	return err == nil && to.Scheme == "https" && to.User == nil && strings.EqualFold(to.Host, from.Host)
 }
 
 // fromChanges reads the documents a directory's list of changes names: a path
@@ -497,6 +609,10 @@ func fromChanges(address string, body []byte) ([]listed, error) {
 		out = append(out, entryOf(address, strings.TrimSpace(row[0]), strings.TrimSpace(row[1])))
 	}
 }
+
+// errLeaseLost says another replica took the lease on reading while a pass
+// read the listings.
+var errLeaseLost = errors.New("the lease on reading upstreams was lost")
 
 // errWithdrawn says the upstream stopped being trusted as it was while a pass
 // ran.
@@ -557,11 +673,17 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 		}
 		moved = was.Digest != digest
 		if was.ID != 0 && was.TrackingID != tracking {
-			// The address now holds another document: what the one
-			// before it said is set aside.
-			if _, _, err := finding.NewStore(tx).RecordStatements(ctx, recordedAs(up), up.ProductID,
-				supplied(up, was.TrackingID, was.URL, was.Digest), nil); err != nil {
+			// The address now holds another document: what the one before
+			// it said is set aside, unless another address still serves it.
+			elsewhere, err := servedElsewhere(ctx, tx, up, was)
+			if err != nil {
 				return err
+			}
+			if !elsewhere {
+				if _, _, err := finding.NewStore(tx).RecordStatements(ctx, recordedAs(up), up.ProductID,
+					supplied(up, was.TrackingID, was.URL, was.Digest), nil); err != nil {
+					return err
+				}
 			}
 		}
 		from := supplied(up, tracking, one.address, digest)
@@ -634,13 +756,9 @@ func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) erro
 		// The same document read at another address — an upstream that
 		// moved — already replaced what this one said, so only the record
 		// of where it was read goes.
-		elsewhere, err := tx.NewSelect().Model((*Document)(nil)).
-			Where(`"ud"."upstream_id" = ?`, up.ID).
-			Where(`"ud"."tracking_id" = ?`, was.TrackingID).
-			Where(`"ud"."id" <> ?`, was.ID).
-			Exists(ctx)
+		elsewhere, err := servedElsewhere(ctx, tx, up, was)
 		if err != nil {
-			return fmt.Errorf("read whether a document moved: %w", err)
+			return err
 		}
 		if elsewhere {
 			_, err := tx.NewDelete().Model((*Document)(nil)).Where(`"id" = ?`, was.ID).Exec(ctx)
@@ -655,6 +773,21 @@ func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) erro
 		}
 		return nil
 	})
+}
+
+// servedElsewhere reports whether the document recorded at one address is
+// recorded at another of the upstream's as well, whose statements are the same
+// record and stand while it is listed there.
+func servedElsewhere(ctx context.Context, tx bun.IDB, up Upstream, was Document) (bool, error) {
+	elsewhere, err := tx.NewSelect().Model((*Document)(nil)).
+		Where(`"ud"."upstream_id" = ?`, up.ID).
+		Where(`"ud"."tracking_id" = ?`, was.TrackingID).
+		Where(`"ud"."id" <> ?`, was.ID).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether a document is served at another address: %w", err)
+	}
+	return elsewhere, nil
 }
 
 // supplied is where an upstream's statements came from: one of its documents.

@@ -32,7 +32,7 @@ Neighbors: `design-docs/publishing.md` (what this deployment publishes),
 | One upstream per product | A fork descends from one project |
 | The upstream is named by the address of its CSAF `provider-metadata.json`, over https, with a host and no user, spilled or otherwise | A spilled password reads as the host it is pinned to (`design-docs/access-trail.md` § Spilled user information) |
 | An administrator inspects it, learning whose statements they are and the key's fingerprint, then trusts it by sending the fingerprint back; another fingerprint is refused naming the current one | |
-| The keys are those the description names, at its addresses, and must carry the fingerprints it states, or the set is refused. The whole set is trusted, up to four, and the armored keys are kept | A rotation is trusted with both |
+| The keys are those the description names, at its addresses, and must carry the fingerprints it states, or the set is refused. The whole set is trusted, up to four, and the armored keys are kept; a key at its own address is armored alone, and every block is read | A rotation is trusted with both |
 | An upstream naming no key is trusted unsigned, documents checked against their digests alone | |
 | The publisher is fixed at trust, as the description named it then | |
 | Trusting the same address again keeps what was read, and clears a key offered in place of the trusted one | |
@@ -51,6 +51,8 @@ copy of the upstream ordinarily sits.
 |---|---|
 | Only that host, at its port: a description, feed or list of changes naming another host is refused before anything is resolved | |
 | https only, no redirect followed, no user in an address | |
+| A listing entry naming a document off https or on another host is never requested, and counts as an entry that cannot be read | |
+| A document answered with a redirect is refused alone, and the read goes on | It is refused the same way every time |
 | Two minutes for one request, in which a listing or document is read whole | |
 | A read, and the inspection before trusting an upstream, build a client of their own and close its connections when done | A client dropped with connections open strands them until the far end closes them |
 
@@ -61,9 +63,11 @@ copy of the upstream ordinarily sits.
 | A document | 32 MiB, and the bounds every VEX document read here is held to |
 | A digest file | 4 KiB |
 | A signature | 64 KiB |
-| A public key | 1 MiB |
+| A public key | 1 MiB, and four named by a description |
+| Listings one description names | 32, or the read is refused before any is fetched |
+| Entries every listing of one upstream names | 200,000 between them, or the read is refused |
 | Documents per pass per upstream | 200; a pass taking that many leaves the upstream due |
-| The lease | Asked for again before every document; a pass that lost it stops, leaves the upstream due and withdraws nothing |
+| The lease | Asked for again before every listing and every document; a pass that lost it stops, leaves the upstream due and withdraws nothing, and one that lost it among the listings records nothing |
 
 ## Reading
 
@@ -79,6 +83,9 @@ reaches out, settled by a lease.
 | What is gone | A document no listing names is withdrawn only by a complete read: every listing read whole, every entry naming a document and a moment, every moved document taken and checked. Otherwise nothing is withdrawn, and an unreadable entry is recorded as what stopped the read |
 | A moved upstream | Its first complete read lets a document under the same tracking identifier replace the old address's, as a revision, and withdraws what the new address does not list |
 | A document | Compared against the digest served beside it, and its signature where a key is trusted. One failing either is not taken, and the next pass reads the listings whole |
+| An entry that cannot be read | The pass keeps no validator, so the next reads the listings whole and records it again; an answer that nothing moved never clears it |
+| A document refused again | Each replica remembers what it refused at the moment its listing named, and tries those after every other entry, so refusals at the head of a listing never fill a pass |
+| An address that comes to hold another document | What the document it held said is set aside, unless another listed address still holds that document |
 | Its name | The tracking identifier it names itself by; its next revision replaces its statements |
 | A security advisory | Read, recorded as read, nothing kept |
 
