@@ -405,6 +405,20 @@ func Affected(res sql.Result) (int64, error) {
 	return n, nil
 }
 
+// MovedAll reads an update that matched on what the transaction read. Fewer
+// rows than want means some moved since, which is a lost race the retry
+// helper takes again. A failure to read the count is wrapped in doing.
+func MovedAll(res sql.Result, want int, doing string) error {
+	n, err := Affected(res)
+	if err != nil {
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	if n != int64(want) {
+		return fmt.Errorf("%s: %w", doing, ErrGoAgain)
+	}
+	return nil
+}
+
 // Changed reports whether a statement matched any row. A failure to read the
 // count is wrapped in act, which names what the statement was doing.
 func Changed(res sql.Result, act string) (bool, error) {
