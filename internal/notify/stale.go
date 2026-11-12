@@ -729,8 +729,11 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Identifier, row.Product, when),
-			Link:    weblink.ProductFindings(row.Product, row.Identifier),
-			Private: row.Undisclosed,
+			Link: weblink.ProductFindings(row.Product, row.Identifier),
+			// Undisclosed whatever the issue is: the reporter and the fact of
+			// the letter are the report, and nothing leaving the deployment
+			// names it.
+			Private: true,
 			// One issue, so a collaborator brought onto that case keeps
 			// reading it after the pass that wrote it.
 			ProductID:       &row.ProductID,

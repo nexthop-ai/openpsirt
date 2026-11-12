@@ -197,7 +197,6 @@ type Unanswered struct {
 	Product         string
 	ReportedBy      string
 	ReceivedOn      *time.Time
-	Undisclosed     bool
 	// AssignedTo is the party holding it, a person or a team's queue, and
 	// absent where nobody does. It decides who is told.
 	AssignedTo *int64
@@ -241,7 +240,6 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		Identifier      string     `bun:"identifier"`
 		ReportedBy      string     `bun:"reported_by"`
 		ReceivedOn      *time.Time `bun:"received_on"`
-		Undisclosed     int        `bun:"undisclosed"`
 		AssignedTo      *int64     `bun:"assigned_to"`
 	}
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
@@ -262,7 +260,6 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`MIN("fr"."reported_by") AS "reported_by"`).
 		ColumnExpr(`MIN("fr"."received_on") AS "received_on"`).
 		ColumnExpr(`MIN("fr"."assigned_to") AS "assigned_to"`).
-		ColumnExpr(access.WithheldCountAs(`"f"."visibility"`, "undisclosed")).
 		Where(nothingSent).
 		// A flaw found here has nobody outside to answer.
 		Where(`"fr"."found_here" = ?`, false).
@@ -285,7 +282,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 			VulnerabilityID: row.VulnerabilityID, ProductID: row.ProductID,
 			Product: row.Product, Identifier: row.Identifier,
 			ReportedBy: row.ReportedBy, ReceivedOn: row.ReceivedOn,
-			Undisclosed: row.Undisclosed > 0, AssignedTo: row.AssignedTo,
+			AssignedTo: row.AssignedTo,
 		})
 	}
 	return out, nil
@@ -294,9 +291,6 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 // unacknowledgedWithoutIssue is every unanswered report with no issue:
 // unjudged, and ruled something other than an issue, which is still owed an
 // answer.
-//
-// Undisclosed always. There is no issue to be public about, and nobody has
-// decided that what a stranger sent is safe to repeat.
 func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, error) {
 	var rows []struct {
 		ReportID   int64      `bun:"report_id"`
@@ -330,7 +324,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 			ReportID: row.ReportID, Reference: row.Reference,
 			ProductID: row.ProductID, Product: row.Product,
 			ReportedBy: row.ReportedBy, ReceivedOn: row.ReceivedOn,
-			Undisclosed: true, AssignedTo: row.AssignedTo,
+			AssignedTo: row.AssignedTo,
 		})
 	}
 	return out, nil

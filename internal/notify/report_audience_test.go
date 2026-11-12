@@ -6,12 +6,14 @@ package notify_test
 import (
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
@@ -276,6 +278,66 @@ func TestAHolderReadingReportsAcrossEveryProductIsToldOfTheirReport(t *testing.T
 			if a.told(t, a.worker, kind) != 0 {
 				t.Errorf("%s: the report was told to everybody who works reports, as though nobody held it", kind)
 			}
+		}
+	})
+}
+
+// An unanswered report on an issue every product already knows of is still
+// undisclosed: the reporter and the letter are the report, so the notice is
+// private and what leaves the deployment names neither.
+func TestAnUnansweredReportOnADisclosedIssueLeavesTheDeploymentUnnamed(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		db := w.DB.DB
+		a := newAudienceWorld(t, w)
+		ids, err := finding.NewVulnerabilities(db).Intern(ctx,
+			[]finding.Named{{Identifier: "CVE-2026-7777", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		interned, err := graph.NewComponents(db).Intern(ctx, []graph.Described{
+			{Purl: "pkg:generic/libfoo@1.0", Name: "libfoo", Version: "1.0"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var componentID int64
+		for _, id := range interned {
+			componentID = id
+		}
+		if _, err := db.NewInsert().Model(&finding.Finding{
+			BuildID: w.Build.ID, Kind: finding.Vulnerable, Visibility: access.Public,
+			VulnerabilityID: ids["CVE-2026-7777"], ComponentID: componentID,
+			OccurrenceIdentity: "place-of-libfoo", OpenedAt: time.Now().UTC().Truncate(time.Microsecond),
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		report := a.report(t, nil)
+		issue := ids["CVE-2026-7777"]
+		if _, err := db.NewUpdate().Model(report).Set(`"vulnerability_id" = ?`, issue).
+			WherePK().Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		watch := notify.NewWatch(db, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var rows []notify.Notification
+		if err := db.NewSelect().Model(&rows).
+			Where(`"person_id" = ?`, a.worker.ID).Where(`"kind" = ?`, notify.Unanswered).
+			Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("whoever works reports was told %d unanswered reports, want 1", len(rows))
+		}
+		if !rows[0].Private {
+			t.Error("the notice about an unanswered report is not private")
+		}
+		if text := notify.Compose(rows[0], "https://psirt.example.test").Text; strings.Contains(text, "A Researcher") ||
+			strings.Contains(text, "CVE-2026-7777") {
+			t.Errorf("what leaves the deployment names the report: %q", text)
 		}
 	})
 }
