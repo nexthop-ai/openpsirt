@@ -205,8 +205,9 @@ func TestAReadThatLostTheLeaseReadsNoListing(t *testing.T) {
 	})
 }
 
-// A pass that cannot ask for the lease failed here, so it records that in
-// fixed words, never the database's own, and leaves the upstream due.
+// A pass that cannot ask for the lease failed here, so where it still holds the
+// lease it records that in fixed words, never the database's own, and leaves
+// the upstream due.
 func TestAReadThatCannotAskForTheLeaseRecordsItFailedHere(t *testing.T) {
 	for _, at := range []struct {
 		name  string
@@ -219,7 +220,7 @@ func TestAReadThatCannotAskForTheLeaseRecordsItFailedHere(t *testing.T) {
 				asked := 0
 				upstream.Keeping(w.reader, func(context.Context) (bool, error) {
 					asked++
-					if asked > at.after {
+					if asked == at.after+1 {
 						return false, errors.New("the database went away")
 					}
 					return true, nil
@@ -272,6 +273,32 @@ func TestAReadThatLostTheLeaseAmongTheDocumentsRecordsNothing(t *testing.T) {
 		}
 		if up.ReachedAt != nil || up.FetchedAt != nil {
 			t.Error("a read that lost the lease among the documents recorded a read")
+		}
+	})
+}
+
+// A pass that failed here and cannot show it still holds the lease records
+// nothing, since another replica may have read the upstream since.
+func TestAFailureHereWithoutTheLeaseRecordsNothing(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		upstream.Keeping(w.reader, func(context.Context) (bool, error) {
+			return false, errors.New("the database went away")
+		})
+		up, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil || up == nil {
+			t.Fatalf("the fork trusts no upstream: %v", err)
+		}
+		if _, err := w.reader.From(t.Context(), *up); err == nil {
+			t.Fatal("a read that could not ask for the lease reported nothing")
+		}
+		up, err = upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if up.Failed != "" || up.FetchedAt != nil {
+			t.Errorf("a read without the lease recorded %q", up.Failed)
 		}
 	})
 }

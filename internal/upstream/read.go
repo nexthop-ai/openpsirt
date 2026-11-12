@@ -194,7 +194,7 @@ type Reader struct {
 	// nil for the system's.
 	roots *x509.CertPool
 	// keep reports whether this replica still holds the lease on reading, and
-	// is asked before each document. Nil reads without asking.
+	// is asked before each listing and each document. Nil reads without asking.
 	keep func(context.Context) (bool, error)
 	// most is how many documents one read takes: MostPerPass.
 	most int
@@ -660,10 +660,16 @@ func (l local) Unwrap() error { return l.err }
 // words, since a database's own text is never shown, and leaves the upstream
 // due, so one that repeats shows on the upstream rather than in the log alone.
 // What was read and the key offered stay as they were. A pass cut short by
-// shutdown records none.
+// shutdown records none, and so does one this replica cannot show still holds
+// the lease, since the replica holding it records what it reads.
 func (r *Reader) failedHere(ctx context.Context, up Upstream, err error) error {
 	if ctx.Err() != nil {
 		return err
+	}
+	if r.keep != nil {
+		if mine, asked := r.keep(ctx); asked != nil || !mine {
+			return err
+		}
 	}
 	if marked := NewStore(r.db).reached(ctx, up, up.Listings, up.KeyOffered, errFailedHere, true); marked != nil {
 		return errors.Join(err, marked)
