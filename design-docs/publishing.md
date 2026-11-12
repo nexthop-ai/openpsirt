@@ -111,7 +111,8 @@ stated outright. A component nobody judged gets no statement.
 | An issue open and undecided, a deferral, and a decision awaiting its second person state nothing; a document left with no statement is not served | |
 | Under investigation is never stated | No decision records somebody looking |
 | Disclosed findings only, in a product anybody at all reads | An undisclosed flaw of ours is in no statement, document, list or count (REQ-37) |
-| Where a flaw of ours about an issue is out of anybody's reach, the issue's other names and description are left out | The flaw wrote its minted name and summary onto the shared issue row |
+| Where a flaw of ours about an issue is out of anybody's reach, the issue's other names and description are left out, whoever reads the facts | The flaw wrote its minted name and summary onto the shared issue row |
+| The facts and the document of one build are read by one pipeline | A rule about what a statement rests on or withholds holds for both |
 | A decision in force states affected without a second person | Saying an issue applies hides nothing |
 | A supplier's statement about its own product is not passed on | That is the suppliers kind of the build document, chosen on purpose |
 | Each branch, tag and variant in use is read at its last scan, once scanned; one out of support is still published (REQ-15) | A reader still runs it |

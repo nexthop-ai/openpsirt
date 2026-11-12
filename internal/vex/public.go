@@ -102,75 +102,19 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	if !subject.Reads(access.Public, named.ProductID) {
 		return nil, access.Denied(fmt.Sprintf("read disclosed findings in product %d", named.ProductID))
 	}
-	visible := []access.Visibility{access.Public}
-
-	rows, placed, err := finding.CoveredInBuild(ctx, s.idb(), named.ProductID, buildID, visible,
-		s.carrying())
+	// Withheld against anybody at all whoever asks: what this returns is
+	// published, so a subject reaching undisclosed work would otherwise
+	// publish the names it reaches.
+	got, err := s.gather(ctx, named, buildID, gathering{
+		visible:  []access.Visibility{access.Public},
+		reach:    new(access.Published([]int64{named.ProductID})),
+		affected: true,
+	})
 	if err != nil {
 		return nil, err
 	}
-	affected, err := finding.AffectedInBuild(ctx, s.idb(), named.ProductID, buildID, visible,
-		s.carrying())
-	if err != nil {
-		return nil, err
-	}
-	fixed, err := s.patched(ctx, buildID, visible)
-	if err != nil {
-		return nil, err
-	}
-	// Refused rather than truncated, for the reason the document of one build
-	// is: a document that stopped at a ceiling says nothing about everything
-	// past it.
-	if len(rows)+len(affected)+len(placed)+len(fixed) > s.carrying() {
-		return nil, fmt.Errorf("%w: %s %s %s states more than %d statements",
-			ErrTooLarge, named.Product, named.BranchOrTag, named.Variant, s.carrying())
-	}
-
-	decided := make([]int64, 0, len(rows)+len(placed)+len(affected))
-	for _, row := range rows {
-		decided = append(decided, row.DecidedBy)
-	}
-	for _, row := range placed {
-		decided = append(decided, row.DecidedBy)
-	}
-	for _, row := range affected {
-		decided = append(decided, row.DecidedBy)
-	}
-	said, err := finding.StatedBy(ctx, s.idb(), decided)
-	if err != nil {
-		return nil, err
-	}
-	issues := make([]int64, 0, len(rows)+len(affected)+len(placed)+len(fixed))
-	for _, row := range rows {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	for _, row := range affected {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	for _, row := range fixed {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	for _, row := range placed {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	alsoCalled, err := s.namesOf(ctx, issues)
-	if err != nil {
-		return nil, err
-	}
-	// An issue a flaw of ours recorded out of the subject's reach wrote onto
-	// publishes none of its other names: one of them is the name minted for
-	// it, which is the one thing about it that must not travel.
-	withheld, err := finding.RecordedOutOfReach(ctx, s.idb(), subject, issues)
-	if err != nil {
-		return nil, err
-	}
-	for issue := range withheld {
-		delete(alsoCalled, issue)
-	}
-	root, err := s.rootOf(ctx, named, buildID)
-	if err != nil {
-		return nil, err
-	}
+	rows, placed, affected, fixed := got.rows, got.placed, got.affected, got.fixed
+	said, alsoCalled, root := got.said, got.alsoCalled, got.root
 	built := &Built{}
 	if root != build(named) {
 		built.Root = root

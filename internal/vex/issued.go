@@ -144,18 +144,13 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			BuildID: build.ID, Kind: kind, Digest: digest,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
-		// Scanned into a value rather than read through a cursor: a cursor
-		// left open while the insert runs is two statements interleaved on one
-		// connection, which one engine tolerates and another refuses.
-		var highest int
-		if err := tx.NewSelect().Model((*Published)(nil)).
-			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
-			Where(`"build_id" = ?`, build.ID).
-			Where(`"kind" = ?`, kind).
-			Scan(ctx, &highest); err != nil {
+		// The number the document carries, read by the rule a generated
+		// document's version is.
+		next, err := s.within(tx).revision(ctx, build.ID, kind)
+		if err != nil {
 			return err
 		}
-		recorded.Ordinal = highest + 1
+		recorded.Ordinal = next
 		// The bytes that go out, numbered and dated. What the digest covers
 		// was settled above; the version and the moment are what this
 		// transaction decides.
@@ -325,6 +320,10 @@ var ErrNoSuchRevision = refusal.New("no document went out as that revision")
 // the next one generated after an issuance is the second, and says so before
 // it goes out, because the bytes an operator sends have to carry the number
 // they will be known by.
+//
+// Scanned into a value rather than read through a cursor: a cursor left open
+// while an insert runs is two statements interleaved on one connection, which
+// one engine tolerates and another refuses.
 func (s *Store) revision(ctx context.Context, buildID int64, kind Kind) (int, error) {
 	var highest int
 	err := s.idb().NewSelect().Model((*Published)(nil)).
