@@ -57,7 +57,7 @@ a document is generated.
 | The build is named by the package identifier its inventory gave its root, else by its names | A scanner matches the product against the root |
 | A component with no package identifier is named as the build calls it | An omission reads as "no claim" |
 | Every statement carries its issue's other names, without repeating the primary (REQ-18) | A customer's scanner uses its own database's names |
-| An issue that is also a flaw of ours undisclosed anywhere carries no other names in a document of disclosed work; a preview keeps them | One is the flaw's minted name (REQ-37) |
+| An issue that is also a flaw of ours undisclosed anywhere carries no other names in a document of disclosed work; a preview keeps them only where its reader may read every flaw recorded about the issue | One is the flaw's minted name (REQ-37), and reading undisclosed work in one product reads nothing in another |
 | Ordered here, never by the engine | The same state gives the same bytes |
 | A build with more statements than one document carries is refused, naming the build and the number, never truncated | A truncated document claims nothing about the rest. The ceiling is well above anything real |
 

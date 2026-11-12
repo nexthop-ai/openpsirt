@@ -118,7 +118,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// nobody stands behind in what went out, and a retry records a
 		// document describing a database that has moved.
 		doc, err := s.within(tx).document(ctx, who, named, build,
-			[]access.Visibility{access.Public}, kind)
+			[]access.Visibility{access.Public}, access.Published([]int64{named.ProductID}), kind)
 		if err != nil {
 			return err
 		}
@@ -273,7 +273,8 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 	if err != nil {
 		return nil, fmt.Errorf("read what last went out: %w", err)
 	}
-	doc, err := s.document(ctx, who, named, build, []access.Visibility{access.Public}, kind)
+	doc, err := s.document(ctx, who, named, build, []access.Visibility{access.Public},
+		access.Published([]int64{named.ProductID}), kind)
 	if err != nil {
 		return nil, err
 	}
