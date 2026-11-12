@@ -140,10 +140,7 @@ func alreadyMade(ctx context.Context, tx *sql.Tx, stmt string) (bool, error) {
 		return exists(ctx, tx, asking, mysqlIndexProbe, m[2], m[1])
 	}
 	if m := addsColumn.FindStringSubmatch(stmt); m != nil {
-		return exists(ctx, tx, asking,
-			`SELECT 1 FROM "information_schema"."COLUMNS"
-			 WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?`,
-			m[1], m[2])
+		return exists(ctx, tx, asking, mysqlColumnProbe, m[1], m[2])
 	}
 	return false, nil
 }
@@ -152,6 +149,15 @@ func alreadyMade(ctx context.Context, tx *sql.Tx, stmt string) (bool, error) {
 // name: the table, then the index.
 const mysqlIndexProbe = `SELECT 1 FROM "information_schema"."STATISTICS"
 			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "INDEX_NAME" = ? LIMIT 1`
+
+// mysqlColumnProbe and postgresColumnProbe ask whether a table holds a column
+// of a name: the table, then the column. A condition appended narrows it.
+const (
+	mysqlColumnProbe = `SELECT 1 FROM "information_schema"."COLUMNS"
+			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?`
+	postgresColumnProbe = `SELECT 1 FROM "information_schema"."columns"
+			WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?`
+)
 
 // exists reports whether a query answers a row. Asking names the question in
 // an error.

@@ -60,67 +60,53 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 	// out, and says so, within the second and a half it is given.
 	shortAttempts(t)
 
-	for name, env := range map[database.Engine]string{
-		database.Postgres: postgresURLEnv,
-		database.MySQL:    mysqlURLEnv,
-		database.MariaDB:  mariadbURLEnv,
-	} {
-		t.Run(string(name), func(t *testing.T) {
-			// This is an internal test of the migrate package and dbtest
-			// depends on migrate, so the narrowing comes from the package
-			// below both rather than from a second copy of the parsing here.
-			engines.SkipUnless(t, name)
-			address := os.Getenv(env)
-			if address == "" {
-				t.Skipf("%s is not set, so the migration lock is untested here", env)
-			}
-			ctx := t.Context()
+	servers(t, func(t *testing.T, name database.Engine, address string) {
+		ctx := t.Context()
 
-			// Two pools, as two instances would be.
-			first := open(t, address)
-			second := open(t, address)
+		// Two pools, as two instances would be.
+		first := open(t, address)
+		second := open(t, address)
 
-			release, err := acquire(ctx, first)
-			if err != nil {
-				t.Fatalf("first instance could not take the lock: %v", err)
-			}
+		release, err := acquire(ctx, first)
+		if err != nil {
+			t.Fatalf("first instance could not take the lock: %v", err)
+		}
 
-			// The whole point: while one holds it, another must not get it.
-			// And the wait names the session in the way, because any
-			// account that can connect may take the lock and an operator
-			// told "another instance" looks for a replica.
-			said := &lines{}
-			waiting, cancel := context.WithTimeout(WithEngine(ctx, name, said.logger()), 1500*time.Millisecond)
-			defer cancel()
-			if release2, err := acquire(waiting, second); err == nil {
-				_ = release2(ctx)
-				_ = release(ctx)
-				t.Fatal("a second instance took the migration lock while it was held")
-			}
-			if want := map[database.Engine]string{
-				database.Postgres: "server process ",
-				database.MySQL:    "connection ",
-				database.MariaDB:  "connection ",
-			}[name]; !strings.Contains(said.String(), "waiting for the migration lock") ||
-				!strings.Contains(said.String(), want) {
-				t.Errorf("the wait does not name the holder: %q", said.String())
-			}
+		// The whole point: while one holds it, another must not get it.
+		// And the wait names the session in the way, because any
+		// account that can connect may take the lock and an operator
+		// told "another instance" looks for a replica.
+		said := &lines{}
+		waiting, cancel := context.WithTimeout(WithEngine(ctx, name, said.logger()), 1500*time.Millisecond)
+		defer cancel()
+		if release2, err := acquire(waiting, second); err == nil {
+			_ = release2(ctx)
+			_ = release(ctx)
+			t.Fatal("a second instance took the migration lock while it was held")
+		}
+		if want := map[database.Engine]string{
+			database.Postgres: "server process ",
+			database.MySQL:    "connection ",
+			database.MariaDB:  "connection ",
+		}[name]; !strings.Contains(said.String(), "waiting for the migration lock") ||
+			!strings.Contains(said.String(), want) {
+			t.Errorf("the wait does not name the holder: %q", said.String())
+		}
 
-			if err := release(ctx); err != nil {
-				t.Fatalf("release: %v", err)
-			}
+		if err := release(ctx); err != nil {
+			t.Fatalf("release: %v", err)
+		}
 
-			// And once released, the next instance must get it — a lock that
-			// is never released is as broken as one that never excludes.
-			release2, err := acquire(ctx, second)
-			if err != nil {
-				t.Fatalf("lock was not released: %v", err)
-			}
-			if err := release2(ctx); err != nil {
-				t.Errorf("release by the second instance: %v", err)
-			}
-		})
-	}
+		// And once released, the next instance must get it — a lock that
+		// is never released is as broken as one that never excludes.
+		release2, err := acquire(ctx, second)
+		if err != nil {
+			t.Fatalf("lock was not released: %v", err)
+		}
+		if err := release2(ctx); err != nil {
+			t.Errorf("release by the second instance: %v", err)
+		}
+	})
 }
 
 // shortAttempts makes each attempt at the lock one second and each line about
@@ -522,6 +508,10 @@ func TestAnInMemoryDatabaseHasNoSecondProcessToExclude(t *testing.T) {
 }
 
 // servers is each server engine a run may reach, with its address.
+//
+// This is an internal test of the migrate package and dbtest depends on
+// migrate, so the narrowing comes from the package below both rather than
+// from a second copy of the parsing here.
 func servers(t *testing.T, each func(t *testing.T, engine database.Engine, address string)) {
 	for engine, env := range map[database.Engine]string{
 		database.Postgres: postgresURLEnv,
@@ -741,30 +731,19 @@ func TestAReleaseReadsWhetherTheLockWasHeld(t *testing.T) {
 // intermediary killing an idle session, or a failover — and the server hands
 // the lock to whoever waits.
 func TestALockLostPartWayFailsTheMigration(t *testing.T) {
-	for name, env := range map[database.Engine]string{
-		database.Postgres: postgresURLEnv,
-		database.MySQL:    mysqlURLEnv,
-		database.MariaDB:  mariadbURLEnv,
-	} {
-		t.Run(string(name), func(t *testing.T) {
-			engines.SkipUnless(t, name)
-			address := os.Getenv(env)
-			if address == "" {
-				t.Skipf("%s is not set", env)
-			}
-			db := open(t, address)
-			killer := open(t, address)
-			ctx := t.Context()
-			quiet := slog.New(slog.DiscardHandler)
+	servers(t, func(t *testing.T, _ database.Engine, address string) {
+		db := open(t, address)
+		killer := open(t, address)
+		ctx := t.Context()
+		quiet := slog.New(slog.DiscardHandler)
 
-			err := withLock(ctx, db, quiet, func(ctx context.Context) error {
-				return endHolder(ctx, killer)
-			})
-			if err == nil || !strings.Contains(err.Error(), "may have migrated at the same time") {
-				t.Errorf("a migration that lost its lock part way answered %v", err)
-			}
+		err := withLock(ctx, db, quiet, func(ctx context.Context) error {
+			return endHolder(ctx, killer)
 		})
-	}
+		if err == nil || !strings.Contains(err.Error(), "may have migrated at the same time") {
+			t.Errorf("a migration that lost its lock part way answered %v", err)
+		}
+	})
 }
 
 // endHolder ends the session holding the migration lock of the database a

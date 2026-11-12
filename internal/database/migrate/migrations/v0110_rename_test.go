@@ -30,20 +30,7 @@ func seedTriageV0100(t *testing.T, ctx context.Context, db *database.DB) triageV
 	t.Helper()
 	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(query string, args ...any) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seeding(t, ctx, db)
 	person, product := declared.Person.ID, declared.Product.ID
 	exec(`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "exploited", "first_seen_at", "issue_id")
 		VALUES (?, ?, ?, ?, ?)`, "cve-2026-4500", "cve-2026-4500", false, at, 0)
@@ -129,20 +116,7 @@ func seedIncidentsV0100(t *testing.T, ctx context.Context, db *database.DB) inci
 	t.Helper()
 	worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 3, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(query string, args ...any) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seeding(t, ctx, db)
 	person := id(`SELECT "id" FROM "person" WHERE "identity" = ?`, world.PersonIdentity)
 	product := id(`SELECT "id" FROM "product" WHERE "name" = ?`, world.ProductName)
 	tag := id(`SELECT "id" FROM "stream" WHERE "product_id" = ? AND "name" = ?`, product, world.TagName)

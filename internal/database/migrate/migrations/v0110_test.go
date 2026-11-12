@@ -25,20 +25,7 @@ func seedIssuesV0100(t *testing.T, ctx context.Context, db *database.DB) issuesV
 	t.Helper()
 	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(query string, args ...any) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seeding(t, ctx, db)
 	issue := func(name string) int64 {
 		t.Helper()
 		exec(`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "exploited", "first_seen_at", "issue_id")
@@ -189,12 +176,7 @@ func seedReportsV0100(t *testing.T, ctx context.Context, db *database.DB, issues
 	t.Helper()
 	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
+	exec, _ := seeding(t, ctx, db)
 	// The third report's issue is a flaw of its own, made one recorded here
 	// the way the issues seed makes its recorded one, so the issues seed's
 	// untouched issue stays untouched.
