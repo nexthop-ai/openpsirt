@@ -471,7 +471,8 @@ func TestAnIssueReadForAReaderOmitsTheSummaryAFlawOutOfReachWrote(t *testing.T) 
 		elsewhere := access.NewPerson(2, "elsewhere", false,
 			map[int64][]access.Role{f.productID + 1000: {access.PublicRead, access.PrivateRead}}, 0)
 		recorder := f.planner(t, access.PublicRead, access.PrivateRead)
-		for _, columns := range [][]string{nil, {"id", "identifier", "description"}} {
+		// Naming columns without the identifier still answers by it.
+		for _, columns := range [][]string{nil, {"id", "identifier", "description"}, {"identifier", "description"}} {
 			held, err := finding.IssuesFor(ctx, f.db.DB, elsewhere, []int64{issue}, columns...)
 			if err != nil {
 				t.Fatal(err)

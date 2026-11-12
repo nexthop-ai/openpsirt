@@ -13,6 +13,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/uptrace/bun"
 
@@ -58,12 +59,13 @@ func issuesNamed(ctx context.Context, db bun.IDB, subject access.Subject,
 	// The description too, for the one line the row shows of it. One lookup
 	// for the page either way, and the row is already being read for the
 	// identifier beside it.
-	return IssuesFor(ctx, db, subject, ids, "id", "identifier", "severity", "description")
+	return IssuesFor(ctx, db, subject, ids, "identifier", "severity", "description")
 }
 
 // IssuesFor reads these issue rows, by identifier, as this subject may be told
 // them: a description a flaw recorded out of the subject's reach wrote is left
-// out (WithholdRecorded). Every column is read where none is named.
+// out (WithholdRecorded). Every column is read where none is named, and the
+// identifier the answer is keyed by is read whichever are.
 //
 // The one read of issue rows by identifier for a reader, so what is withheld
 // from one surface showing an issue row is withheld from every one.
@@ -77,6 +79,9 @@ func IssuesFor(ctx context.Context, db bun.IDB, subject access.Subject, ids []in
 	var issues []Vulnerability
 	q := db.NewSelect().Model(&issues).Where(`"id" IN (?)`, bun.List(ids))
 	if len(columns) > 0 {
+		if !slices.Contains(columns, "id") {
+			columns = append([]string{"id"}, columns...)
+		}
 		q = q.Column(columns...)
 	}
 	if err := q.Scan(ctx); err != nil {
