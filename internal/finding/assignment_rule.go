@@ -628,10 +628,12 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 			Where(`"n"."build_id" = ?`, build).
 			Where(`"n"."closed_scan_id" IS NULL`).
 			Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
+				// The component's row name or the name the build stated.
 				if glob, like := globbed(name); glob {
-					return q.Where(`"c"."name_folded" LIKE ?`+database.LikeClause, like)
+					return q.Where(`("c"."name_folded" LIKE ?`+database.LikeClause+
+						` OR "n"."name_folded" LIKE ?`+database.LikeClause+`)`, like, like)
 				}
-				return q.Where(`"c"."name_folded" = ?`, name)
+				return q.Where(`("c"."name_folded" = ? OR "n"."name_folded" = ?)`, name, name)
 			}).
 			// One more than the cap, so that reaching it is distinguishable
 			// from landing on it exactly. The cap is the store's, not the

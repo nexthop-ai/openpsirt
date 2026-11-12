@@ -122,11 +122,17 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 	}
 	if f.Component != "" {
 		kinds, args := kindsOf(kind.Decisions, "cf")
+		// The component's row name or the name its build stated, which is
+		// the one each row shows.
+		folded := graph.Folded(f.Component)
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON "cc"."id" = "cf"."component_id"`+
-			` WHERE `+finding.DecisionOccurrenceFiledAt("de", "cf")+` AND "cc"."name_folded" = ?`+
+			` WHERE `+finding.DecisionOccurrenceFiledAt("de", "cf")+
+			` AND ("cc"."name_folded" = ? OR EXISTS (SELECT 1 FROM "graph_node" AS "cn"`+
+			` WHERE "cn"."build_id" = "cf"."build_id" AND "cn"."is_root" IN (FALSE, TRUE)`+
+			` AND "cn"."component_id" = "cf"."component_id" AND "cn"."name_folded" = ?))`+
 			` AND `+kinds+`)`,
-			append([]any{graph.Folded(f.Component)}, args...)...)
+			append([]any{folded, folded}, args...)...)
 	}
 	// One build, with the build's own product required to be the one that
 	// made the decision: an occurrence identity carries no product, so the match

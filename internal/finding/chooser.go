@@ -105,6 +105,7 @@ func (s *Store) Matching(ctx context.Context, subject access.Subject, scope Scop
 		Where(`"n"."closed_scan_id" IS NULL`).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr(`"c"."name_folded" LIKE ?`+database.LikeClause, like).
+				WhereOr(`COALESCE("n"."name_folded", '') LIKE ?`+database.LikeClause, like).
 				WhereOr(`COALESCE("c"."upstream_folded", '') LIKE ?`+database.LikeClause, like)
 		})
 	var out []SourceMatch

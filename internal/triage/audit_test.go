@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -492,6 +494,42 @@ func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T
 				t.Errorf("decision occurrence %d is listed twice", row.ID)
 			}
 			seen[row.ID] = true
+		}
+	})
+}
+
+// The record shows a component as its build stated it, so the name on the
+// screen finds it though the component row holds another.
+func TestTheRecordIsFoundByTheNameTheBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		at := f.at()
+		in := f.build(t, f.product, "for-the-record")
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		f.finds(t, in, libfoo, at.OccurrenceIdentity, access.Public)
+		f.agreed(t, at)
+
+		scan, _, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
+			BuildID: in.build, ContentHash: "stated", BuiltAt: time.Now().UTC().Add(-time.Hour),
+			ParserVersion: "test",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewRaw(`INSERT INTO "graph_node" ("build_id", "component_id",
+			"opened_scan_id", "is_root", "name", "version", "name_folded") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			in.build, libfoo, scan.ID, false, "libfoo-bin", "1.2.3", graph.Folded("libfoo-bin")).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		_, total, err := f.store.Audit(ctx, f.reviewer, triage.Filter{Component: "LIBFOO-BIN"},
+			time.Time{}, time.Time{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 {
+			t.Errorf("filtering on the name the build stated found %d, want 1", total)
 		}
 	})
 }

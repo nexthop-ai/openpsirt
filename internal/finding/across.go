@@ -280,7 +280,8 @@ func foldsNamed(db bun.IDB, buildIDs []int64, names ...string) *bun.SelectQuery 
 	}
 	return q.Where(`"nn"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"nn"."closed_scan_id" IS NULL`).
-		Where(`("cn"."name_folded" IN (?) OR "cn"."upstream_folded" IN (?))`, bun.List(folded), bun.List(folded))
+		Where(`("cn"."name_folded" IN (?) OR "cn"."upstream_folded" IN (?) OR "nn"."name_folded" IN (?))`,
+			bun.List(folded), bun.List(folded), bun.List(folded))
 }
 
 // namedOnce is these names folded, each once and sorted, the blank ones

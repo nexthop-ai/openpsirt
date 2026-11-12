@@ -337,8 +337,13 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("("+onTheRecord+`COALESCE("cl"."outcome", '') ELSE '' END) IN (?)`,
 			bun.List(r.Outcomes))
 	}
+	// The component's row name or the name the row's build stated, which is
+	// the one the register shows.
 	if r.Component != "" {
-		q = q.Where(`"c"."name_folded" = ?`, graph.Folded(r.Component))
+		folded := graph.Folded(r.Component)
+		q = q.Where(`("c"."name_folded" = ? OR "f"."component_id" IN (SELECT "rn"."component_id"`+
+			` FROM "graph_node" AS "rn" WHERE "rn"."build_id" = "f"."build_id" AND "rn"."name_folded" = ?))`,
+			folded, folded)
 	}
 	if r.Issue != "" {
 		// Typed, so matched on the folded name the way the issue was stored.

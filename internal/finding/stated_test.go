@@ -234,6 +234,35 @@ func TestANameTypedIntoAFilterMatchesTheNameTheBuildStated(t *testing.T) {
 			t.Errorf("excluding the name the build stated keeps %d groups", n)
 		}
 
+		rows, _, err := f.store.Register(ctx, who, f.build, finding.Registering{Component: libnl.Name}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 0 {
+			t.Errorf("the register's component filter, given the name the build stated, keeps nothing")
+		}
+		folds, err := finding.FoldsNamed(ctx, f.db.DB, []int64{f.build}, libnl.Name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(folds) == 0 {
+			t.Errorf("the name the build stated reaches nothing for the code-finding queue")
+		}
+		caught, err := f.store.WouldMatch(ctx, f.planner(t, access.PublicTriage), f.productID, "", libnl.Name, 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if caught.Total == 0 {
+			t.Errorf("a rule beneath the name the build stated catches nothing")
+		}
+		matches, err := f.store.Matching(ctx, who, f.wholeProduct(), "libnl", 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(matches) == 0 {
+			t.Errorf("the component chooser finds nothing under the name the build stated")
+		}
+
 		points, err := f.store.Trend(ctx, who, f.wholeProduct(), time.Time{}, 24*time.Hour, 2,
 			finding.Within{Component: libnl.Name})
 		if err != nil {
