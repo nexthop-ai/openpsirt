@@ -1,9 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { useClickAway } from "./away";
-import { moved, summary, toggled } from "./choices";
+import { useId } from "react";
+import { summary, toggled } from "./choices";
+import { useMenu } from "./menu";
 
 // A filter as one button that names itself and what it is set to, and opens a
 // short menu of its values.
@@ -40,11 +40,6 @@ export function FilterMenu({
   // What the button says while nothing narrows.
   anything?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const box = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const items = useRef<(HTMLButtonElement | null)[]>([]);
   const menuId = useId();
 
   const offered = multi ? options.filter(([word]) => word !== "") : options;
@@ -52,25 +47,14 @@ export function FilterMenu({
   const on = picked.length > 0;
   const says = summary(picked, anything);
 
-  useClickAway(box, open, () => setOpen(false), false);
-
-  useEffect(() => {
-    if (open) items.current[active]?.focus();
-  }, [open, active]);
-
-  function show() {
-    // Opened on what is picked, so a keyboard lands where the answer is.
-    const at = offered.findIndex(([word]) =>
-      word === "" ? chosen.length === 0 : chosen.includes(word),
-    );
-    setActive(Math.max(0, at));
-    setOpen(true);
-  }
-
-  function close() {
-    setOpen(false);
-    trigger.current?.focus();
-  }
+  // Opened on what is picked, so a keyboard lands where the answer is.
+  const menu = useMenu<HTMLButtonElement>({
+    count: offered.length,
+    startAt: () =>
+      offered.findIndex(([word]) => (word === "" ? chosen.length === 0 : chosen.includes(word))),
+    escapeAnywhere: false,
+  });
+  const { open, active, setActive, box, trigger, items, close, onTriggerKey } = menu;
 
   function choose(word: string) {
     if (!multi) {
@@ -79,28 +63,6 @@ export function FilterMenu({
       return;
     }
     onChange(toggled(offered, chosen, word, !chosen.includes(word)));
-  }
-
-  function onTriggerKey(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      show();
-    }
-  }
-
-  function onMenuKey(event: KeyboardEvent<HTMLDivElement>) {
-    const next = moved(event.key, active, offered.length);
-    if (next !== undefined) {
-      event.preventDefault();
-      setActive(next);
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close();
-      return;
-    }
-    if (event.key === "Tab") setOpen(false);
   }
 
   return (
@@ -113,7 +75,7 @@ export function FilterMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        onClick={() => (open ? setOpen(false) : show())}
+        onClick={menu.toggle}
         onKeyDown={onTriggerKey}
       >
         <span className="k">{label}</span>
@@ -128,7 +90,7 @@ export function FilterMenu({
           className="filterlist"
           role="menu"
           aria-label={label}
-          onKeyDown={onMenuKey}
+          onKeyDown={menu.onListKey}
         >
           {offered.map(([word, name], i) => {
             const checked = word === "" ? chosen.length === 0 : chosen.includes(word);

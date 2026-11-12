@@ -7,7 +7,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, type Body } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { fileAt } from "../../api/links";
-import { askForScope, useScope } from "../../app/scope";
+import { useScope } from "../../app/scope";
 import { useWho } from "../../app/session";
 import { counted, heldLine, holding } from "../../app/families";
 import { Failed } from "../../ui/Failed";
@@ -20,6 +20,7 @@ import { AddedDone, Burn, BurnLegend, paceWords } from "../../ui/Burn";
 import { Sheet } from "./Sheet";
 import { scopeWords } from "./catalog";
 import { Downloads } from "../../ui/Downloads";
+import { NeedsOneBuild } from "../../ui/NeedsOneBuild";
 
 // What is left from a day 0, and whether the pace reaches zero.
 //
@@ -187,14 +188,7 @@ export function Burndown() {
         <Empty title="Nothing to list." detail={heldLine(dependencies)} />
       ) : needsBuild ? (
         <section className="panel">
-          <Empty
-            title="This needs one build."
-            detail="At or under a component is read on one build. Pick a branch and a variant."
-          >
-            <button type="button" className="btn" onClick={askForScope}>
-              Pick a build
-            </button>
-          </Empty>
+          <NeedsOneBuild />
         </section>
       ) : burndown.isPending ? (
         <Loading />

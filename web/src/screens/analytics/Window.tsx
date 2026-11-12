@@ -53,6 +53,7 @@ export function windowStart(days: number): string {
 // wordsFor is what one window is called, wherever it is named.
 export function wordsFor(days: number): string {
   if (days >= LONGEST) return "everything";
+  if (days === 730) return "two years";
   if (days === 365) return "a year";
   return `${days} days`;
 }
@@ -60,9 +61,26 @@ export function wordsFor(days: number): string {
 // coveringWords is the same window as the phrase a sheet's heading takes.
 export function coveringWords(days: number): string {
   if (days >= LONGEST) return "everything";
+  if (days === 730) return "the last two years";
   if (days === 365) return "the last year";
   return `the last ${days} days`;
 }
+
+// weeksWords is what a window counted in weeks is called, by the same rule.
+export function weeksWords(weeks: number): string {
+  if (weeks === 104) return "two years";
+  if (weeks === 52) return "a year";
+  return `${weeks} weeks`;
+}
+
+// The windows a trend is asked over, by step, with each step's default. Two
+// years is the longest the server answers for in either.
+const TREND_DAYS = [14, 30, 90, 365, 730] as const;
+export const TREND_WEEKS = [4, 13, 26, 52, 104] as const;
+export const MOST_DAYS = 730;
+export const MOST_WEEKS = 104;
+export const FIRST_DAYS = 30;
+export const FIRST_WEEKS = 13;
 
 // A period is two dates rather than a rolling window, because a window ending
 // today cannot say "last financial year" — which is the question an auditor
@@ -250,7 +268,7 @@ export function useSheetWindow(fallback: number) {
 }
 
 // The step the sheet is drawn in, carried in the address.
-export function StepSegments({ daily }: { daily: boolean }) {
+function StepSegments({ daily }: { daily: boolean }) {
   const [params, setParams] = useSearchParams();
   const pick = (week: boolean) => {
     const next = new URLSearchParams(params);
@@ -269,5 +287,34 @@ export function StepSegments({ daily }: { daily: boolean }) {
         Weekly
       </button>
     </div>
+  );
+}
+
+// TrendWindow is a trend sheet's step and window, daily unless weekly is
+// picked, with the words the window is called by.
+export function TrendWindow({
+  daily,
+  days,
+  weeks,
+}: {
+  daily: boolean;
+  days: number;
+  weeks: number;
+}) {
+  return (
+    <>
+      <StepSegments daily={daily} />
+      {daily ? (
+        <Segments label="Window" param="days" offered={TREND_DAYS} chosen={days} words={wordsFor} />
+      ) : (
+        <Segments
+          label="Window"
+          param="weeks"
+          offered={TREND_WEEKS}
+          chosen={weeks}
+          words={weeksWords}
+        />
+      )}
+    </>
   );
 }

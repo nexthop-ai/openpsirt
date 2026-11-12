@@ -257,6 +257,17 @@ describe("the backlog over time", () => {
     expect(links("CSV")[0]).toContain("weeks=52");
   });
 
+  it("prints the window by the name its control gives it", async () => {
+    scoped({ product: "sonic" });
+    serve((path) =>
+      path === "/v1/trend" ? { data: { items: [point("2026-01-04", 5)] } } : undefined,
+    );
+    mount.render(screen(<Backlog />, "/analytics/backlog?days=730"));
+    await settle();
+    expect(mount.host().querySelector(".printhead p")?.textContent).toContain("two years");
+    expect(mount.host().querySelector(".printhead p")?.textContent).not.toContain("730 days");
+  });
+
   it("says nothing is open or moving, with no panels, where every step is empty", async () => {
     serve((path) =>
       path === "/v1/trend" ? { data: { items: [empty("2026-01-04")] } } : undefined,
