@@ -7,7 +7,7 @@
 // and parsing them is most of what each check costs. So the trees are built the
 // first time any check asks and every other check reads them. Nothing that
 // reads a tree changes it.
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
@@ -59,4 +59,16 @@ export function interfaceSources() {
     return { file, text, source: parse(text, file) };
   });
   return parsed;
+}
+
+// isMain says whether a module is the program node was started with. Both
+// paths are resolved through links first: node names the program by the path
+// it was given and the module by its real path, so through a symbolic link a
+// plain comparison says no and the check runs nothing and exits clean.
+export function isMain(meta, program = process.argv[1]) {
+  try {
+    return realpathSync(program ?? "") === realpathSync(meta.filename);
+  } catch {
+    return false;
+  }
 }
