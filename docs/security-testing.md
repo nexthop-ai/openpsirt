@@ -79,7 +79,9 @@ Output of several analyzers is sent as one upload per analyzer, each under a
 series of its own, named once per analyzer as `--series TOOL=NAME`: for
 example `--series clang=clang-sa --series cppcheck=cppcheck-all`. The tool is
 the name its output gives it, in any case. `write` stores each analyzer's run
-in a file of its own, the analyzer's name before the extension.
+in a file of its own, the analyzer's name before the extension, in lower case
+with every character other than letters, digits, `.`, `_` and `-` written as
+`-`.
 
 #### Scanners this upload refuses
 

@@ -49,6 +49,7 @@ openpsirt-upload write --series [TOOL=]NAME... --output FILE OUTPUT...
 | HTML reports and output directories are refused | They carry source |
 | One tool's outputs merge into one run: rules by identifier, results and invocations concatenated, unit counts added | |
 | Several tools are one upload each; `write` names each file by tool before the extension; one refused does not stop the rest | A series is one tool |
+| `write` reduces a tool's name to lower-case letters, digits, `.`, `_` and `-`, every other character a `-`, with no leading `.`, and `analyzer` where nothing is left; two tools reduced to one file name are refused | The name is the analyzer's own, and a `/` or `..` in it would write elsewhere |
 | Several tools need `--series TOOL=NAME` each; bare `--series NAME` serves one tool | A shared name changes when tools change |
 | `--rule`, `--rules-file`, `--tool-version`, `--exit-status` and `--units-analyzed` are refused for several tools | Each describes one |
 | One tool named twice in `--series` is refused | |

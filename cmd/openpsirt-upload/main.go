@@ -252,6 +252,17 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		if out == "" {
 			return errors.New("write needs --output")
 		}
+		// Two analyzers whose names differ only where a file name cannot
+		// would write one file, the second over the first.
+		by := map[string]string{}
+		for _, r := range runs {
+			path := written(out, r.Tool, len(runs))
+			if other, taken := by[path]; taken {
+				return fmt.Errorf("the analyzers %q and %q would both be written to %s: write each one's output separately",
+					other, r.Tool, path)
+			}
+			by[path] = r.Tool
+		}
 		for _, r := range runs {
 			if err := os.WriteFile(written(out, r.Tool, len(runs)), r.Doc, 0o644); err != nil { //nolint:gosec // G306,G703: the document is for the pipeline to read, at the path it named
 				return err
@@ -312,12 +323,26 @@ func uploader() *http.Client {
 // written is where write puts one analyzer's document: the path named, or,
 // where the output is of several, that path with the analyzer's name before
 // its extension.
+//
+// The name is the one the analyzer gives itself, so it is reduced to what a
+// file name holds safely: lower-case letters, digits, ".", "_" and "-", with
+// every other character a "-" and no leading ".". A "/" or ".." left in it
+// would write somewhere other than beside the path named.
 func written(out, tool string, runs int) string {
 	if runs == 1 {
 		return out
 	}
+	safe := strings.TrimLeft(strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-' {
+			return r
+		}
+		return '-'
+	}, strings.ToLower(tool)), ".")
+	if safe == "" {
+		safe = "analyzer"
+	}
 	ext := filepath.Ext(out)
-	return strings.TrimSuffix(out, ext) + "." + tool + ext
+	return strings.TrimSuffix(out, ext) + "." + safe + ext
 }
 
 // units is how many entries a compilation database holds: each is a unit
