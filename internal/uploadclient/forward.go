@@ -128,20 +128,23 @@ func settle(run obj, at *placer) settled {
 
 // resolveRule names a result's rule by its identifier. A rule cited by
 // position is looked up in the component the result names, and the position
-// removed, since merging runs reorders their rules.
+// removed, since merging runs reorders their rules. A rule of an extension
+// keeps naming its extension, since the driver or another extension may
+// define the same identifier.
 func resolveRule(res obj, driver obj, extensions []obj) {
 	ref := child(res, "rule")
 	id := str(res, "ruleId")
 	if id == "" {
 		id = str(ref, "id")
 	}
+	c, named := num(child(ref, "toolComponent"), "index")
 	if id == "" {
 		index, ok := num(res, "ruleIndex")
 		if n, has := num(ref, "index"); has {
 			index, ok = n, true
 		}
 		component := driver
-		if c, has := num(child(ref, "toolComponent"), "index"); has {
+		if named {
 			component = nil
 			if c >= 0 && c < len(extensions) {
 				component = extensions[c]
@@ -156,6 +159,9 @@ func resolveRule(res obj, driver obj, extensions []obj) {
 	}
 	delete(res, "ruleIndex")
 	delete(res, "rule")
+	if id != "" && named && c >= 0 && c < len(extensions) {
+		res["rule"] = obj{"id": id, "toolComponent": obj{"index": c}}
+	}
 }
 
 // validRegion removes the end of a region that ends before it starts. clang's
@@ -194,9 +200,12 @@ func plainMessage(m obj) int {
 }
 
 // merge folds the runs of one tool into one: clang writes a document per
-// translation unit, and the deployment reads one run of each tool. Rules are
-// listed once, by identifier, and every result names its rule by identifier
-// after settling, so an extension's rules join the driver's.
+// translation unit, and the deployment reads one run of each tool. The
+// driver's rules are listed once, by identifier, and each extension's within
+// that extension, extensions being one where they share a name, or else a
+// GUID. A result names its rule by identifier after settling, and a rule of an
+// extension by its extension's position, which is rewritten to the merged
+// list's.
 func merge(runs []obj) obj {
 	if len(runs) == 1 {
 		return runs[0]
@@ -206,15 +215,49 @@ func merge(runs []obj) obj {
 	seen := map[string]bool{}
 	var rules list
 	var results, invocations list
+	var extensions list
+	extensionAt := map[string]int{}
+	extensionRules := []map[string]bool{}
 	units, counted := 0, false
 	for _, run := range runs {
 		tool := child(run, "tool")
-		for _, component := range append([]obj{child(tool, "driver")}, objects(tool, "extensions")...) {
-			for _, rule := range objects(component, "rules") {
-				if id := str(rule, "id"); id != "" && !seen[id] {
-					seen[id] = true
-					rules = append(rules, rule)
+		for _, rule := range objects(child(tool, "driver"), "rules") {
+			if id := str(rule, "id"); id != "" && !seen[id] {
+				seen[id] = true
+				rules = append(rules, rule)
+			}
+		}
+		moved := map[int]int{}
+		for i, ext := range objects(tool, "extensions") {
+			key := "name " + str(ext, "name")
+			if str(ext, "name") == "" {
+				key = "guid " + str(ext, "guid")
+			}
+			at, ok := extensionAt[key]
+			if !ok || key == "guid " {
+				at = len(extensions)
+				extensionAt[key] = at
+				kept := obj{}
+				for k, v := range ext {
+					kept[k] = v
 				}
+				kept["rules"] = list{}
+				extensions = append(extensions, kept)
+				extensionRules = append(extensionRules, map[string]bool{})
+			}
+			moved[i] = at
+			merged := extensions[at].(obj)
+			for _, rule := range objects(ext, "rules") {
+				if id := str(rule, "id"); id != "" && !extensionRules[at][id] {
+					extensionRules[at][id] = true
+					merged["rules"] = append(merged["rules"].(list), rule)
+				}
+			}
+		}
+		for _, res := range objects(run, "results") {
+			component := child(child(res, "rule"), "toolComponent")
+			if c, ok := num(component, "index"); ok {
+				component["index"] = moved[c]
 			}
 		}
 		if str(driver, "version") == "" {
@@ -236,7 +279,11 @@ func merge(runs []obj) obj {
 		}
 	}
 	driver["rules"] = rules
-	delete(child(first, "tool"), "extensions")
+	if len(extensions) > 0 {
+		child(first, "tool")["extensions"] = extensions
+	} else {
+		delete(child(first, "tool"), "extensions")
+	}
 	if results != nil {
 		first["results"] = results
 	} else {

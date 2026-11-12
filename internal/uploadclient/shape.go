@@ -31,9 +31,12 @@ var (
 		"defaultConfiguration": {"level": nil},
 		"properties":           {"tags": nil, "security-severity": nil, "precision": nil},
 	}
-	componentShape = shape{"name": nil, "version": nil, "semanticVersion": nil, "rules": ruleShape}
+	// A GUID stays for merging, which holds two documents' extensions as one
+	// where they share a name or else a GUID.
+	componentShape = shape{"name": nil, "guid": nil, "version": nil, "semanticVersion": nil, "rules": ruleShape}
 	resultShape    = shape{
 		"ruleId": nil, "level": nil, "kind": nil, "baselineState": nil,
+		"rule":             {"id": nil, "toolComponent": {"index": nil}},
 		"suppressions":     {"status": nil},
 		"message":          messageShape,
 		"locations":        locationShape,

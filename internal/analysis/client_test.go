@@ -234,3 +234,58 @@ func TestEveryMemberTheDeploymentReadsSurvivesTheClient(t *testing.T) {
 		t.Errorf("tool %+v, automation %q", forwarded.Tool, forwarded.AutomationID)
 	}
 }
+
+// forwarded is a SARIF document of a tool whose driver and an extension both
+// define the rule X, at different levels, with the results given.
+func forwarded(extensions, results string) []byte {
+	return []byte(`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql",` +
+		`"rules":[{"id":"X","defaultConfiguration":{"level":"note"}}]},"extensions":[` + extensions + `]},` +
+		`"results":[` + results + `]}]}`)
+}
+
+// forwardedAt is a result at a line of a.c citing its rule as given.
+func forwardedAt(line, rule string) string {
+	return `{` + rule + `,"message":{"text":"m"},"locations":[{"physicalLocation":` +
+		`{"artifactLocation":{"uri":"a.c"},"region":{"startLine":` + line + `}}}]}`
+}
+
+func TestAForwardedResultKeepsTheRuleOfTheExtensionItNames(t *testing.T) {
+	root := checkout(t, "git@github.com:example/sonic.git")
+	pack := `{"name":"pack","rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	other := `{"name":"other","rules":[{"id":"Y"}]}`
+	inputs := []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(pack,
+			forwardedAt("1", `"ruleId":"X","rule":{"id":"X","toolComponent":{"index":0}}`)+","+
+				forwardedAt("2", `"ruleId":"X"`))},
+		// The second document lists the pack second, so its position moves
+		// when the two are merged.
+		{Name: "b.sarif", Data: forwarded(other+","+pack,
+			forwardedAt("3", `"rule":{"index":0,"toolComponent":{"index":1}}`))},
+	}
+	exit := 0
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
+		Root: root, Work: root, Series: "codeql/default", Built: time.Now().UTC(),
+		ExitStatus: &exit, Client: "openpsirt-upload test",
+	}, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want the two documents merged", len(runs))
+	}
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(runs[0].Doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	levels := map[int]string{}
+	for _, res := range log.Runs[0].Results {
+		if len(res.Locations) > 0 {
+			levels[res.Locations[0].StartLine] = res.Level
+		}
+	}
+	for line, want := range map[int]string{1: "error", 2: "note", 3: "error"} {
+		if levels[line] != want {
+			t.Errorf("the result on line %d is at %q; want %q, its own rule's", line, levels[line], want)
+		}
+	}
+}
