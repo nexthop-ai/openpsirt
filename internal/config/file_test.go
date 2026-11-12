@@ -370,13 +370,18 @@ func TestARefusalOfAMalformedFileRepeatsNoValue(t *testing.T) {
 		"[mail]\npassword = correcthorsebattery\n",
 		"[mail]\npassword = \"s\" correcthorsebattery\n",
 		"[mail]\npassword = 'correcthorsebattery\n",
+		// A number out of range is repeated bare.
+		"[mail]\npassword = 123456789012345678901234\n",
+		"[mail]\npassword = 1.5e999\n",
+		"[mail]\npassword = -123456789012345678901234\n",
 	} {
 		_, err := LoadFile(writeFile(t, body), nil)
 		if err == nil {
 			t.Errorf("%q was accepted", body)
 			continue
 		}
-		if strings.Contains(err.Error(), "correcthorsebattery") {
+		if strings.Contains(err.Error(), "correcthorsebattery") ||
+			strings.Contains(err.Error(), "12345678901234567890") || strings.Contains(err.Error(), "e999") {
 			t.Errorf("the refusal repeats what the file holds: %v", err)
 		}
 		if !strings.Contains(err.Error(), "line 2") {

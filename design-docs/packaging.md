@@ -167,7 +167,7 @@ never both (REQ-83).
 | A value of the wrong type is refused, never converted | |
 | An unknown key is refused, naming it | |
 | A list entry holding a comma is refused | It would split |
-| A malformed file is refused naming the line | |
+| A malformed file is refused naming the line, with what the parser repeats from the file hidden: anything it quotes, and a number | The file holds secrets, and a number out of range is repeated bare |
 | A file others may read or write is refused, asking for 0600 | It holds the secrets |
 | A file owned by anyone but the process's user or root is refused | Its owner can rewrite it; a mounted secret is root's |
 | The file is opened once, and every check is on what was opened | A swap between check and read would go unchecked |

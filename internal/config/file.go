@@ -104,8 +104,10 @@ var geteuid = os.Geteuid
 // process running as me: its own user's, or root's, as a mounted secret is.
 func ownedAcceptably(owner, me int) bool { return owner == me || owner == 0 }
 
-// quoted is text the parser quotes in a message about what it could not read.
-var quoted = regexp.MustCompile(`"(?:[^"\\]|\\.)*"|'[^']*'`)
+// repeated is text the parser repeats from the file in a message about what
+// it could not read: anything it quotes, and a number, which a message about
+// a number out of range repeats bare.
+var repeated = regexp.MustCompile(`"(?:[^"\\]|\\.)*"|'[^']*'|[-+]?\b[0-9][0-9A-Za-z_.:+-]*`)
 
 // parseFile reads a configuration file into the values the loader reads,
 // keyed by environment name and spelled as the environment spells them.
@@ -114,9 +116,9 @@ func parseFile(raw string) (map[string]string, error) {
 	if _, err := toml.Decode(raw, &tree); err != nil {
 		var parse toml.ParseError
 		if errors.As(err, &parse) {
-			// The parser quotes what it could not read, which in a file of
+			// The parser repeats what it could not read, which in a file of
 			// secrets may be a password written without its quotes.
-			said := quoted.ReplaceAllString(parse.Message, "(hidden)")
+			said := repeated.ReplaceAllString(parse.Message, "(hidden)")
 			if parse.LastKey != "" {
 				return nil, fmt.Errorf("line %d, at %s: %s", parse.Position.Line, parse.LastKey, said)
 			}
