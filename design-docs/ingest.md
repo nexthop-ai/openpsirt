@@ -134,7 +134,7 @@ Nightly scans are transient; tagged releases are kept and fetched back
 
 | Rule | Reason |
 |---|---|
-| A branch scan's contents go when it is applied, when the build applies a newer scan, when it is older than the scan the build shows, and after its last failed attempt | A re-send writes the bytes anew |
+| A branch scan's contents go when it is applied, when the build applies a newer scan, when it is older than the scan the build shows, and after its last attempt is refused. A last attempt failing for a fault of this server keeps them until the build applies a newer scan | A re-send writes the bytes anew; a job put back after a fault reads them again |
 | A branch scan set aside for a newer one not yet applied keeps its contents | It is read again if the newer one fails |
 | Kind, size and hash of what arrived outlive the contents | Recovery is a re-send, which the hash checks |
 | A released document answers 410, and on screen is no link | |

@@ -166,9 +166,14 @@ func (r *Reader) Once(ctx context.Context) (*Result, error) {
 				r.logger.Error("could not bring back the scan this one had overtaken",
 					"scan", job.Reference, "error", back)
 			}
-			// Nothing reads a failed scan again: a re-send of the same bytes
+			// Nothing reads a refused scan again: a re-send of the same bytes
 			// writes them anew, and a job put back is told to ask for them.
-			r.letGoFailed(settled, job.Reference)
+			// One that failed for a fault of this server keeps them, since a
+			// job put back can still read them; the build's next applied scan
+			// lets go of them.
+			if refusal.In(err) {
+				r.letGoFailed(settled, job.Reference)
+			}
 			return nil
 		})
 	if ending.HandedOver {

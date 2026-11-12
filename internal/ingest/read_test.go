@@ -1144,6 +1144,49 @@ func TestABranchScanThatFailedForGoodLetsGoOfWhatItSent(t *testing.T) {
 	})
 }
 
+// A branch scan whose last attempt failed for a fault of this server keeps
+// what it sent: nothing is wrong with the document, and a job put back reads it
+// again. The build's next applied scan lets go of it.
+func TestABranchScanThatFailedForAFaultKeepsWhatItSent(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		once := queue.DefaultOptions()
+		once.MaxAttempts = 1
+		q := queue.New(f.db, once)
+		away := func(from, to string) {
+			t.Helper()
+			if _, err := f.db.ExecContext(context.WithoutCancel(ctx),
+				`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
+				t.Fatal(err)
+			}
+		}
+		moved := false
+		t.Cleanup(func() {
+			if moved {
+				away("graph_edge_away", "graph_edge")
+			}
+		})
+		reader := ingest.NewReader(f.db, q, sbom.Limits{},
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test").BeforeApplying(func() {
+			away("graph_edge", "graph_edge_away")
+			moved = true
+		})
+		scanID := f.store(t, f.branch, time.Now().UTC().Add(-time.Hour), anInventory)
+		if _, err := q.Add(ctx, queue.Parse, strconv.FormatInt(scanID, 10)); err != nil {
+			t.Fatal(err)
+		}
+		_, err := reader.Once(ctx)
+		away("graph_edge_away", "graph_edge")
+		moved = false
+		if err == nil || refusal.In(err) {
+			t.Fatalf("the read answered %v, want a fault", err)
+		}
+		if held := f.held(t, scanID); held != 1 {
+			t.Errorf("a branch scan that failed for a fault holds %d documents, want what it sent", held)
+		}
+	})
+}
+
 // A branch scan set aside while a newer one waits keeps what it sent, because
 // it is read again if the newer one fails. Once the newer one is applied,
 // nothing reads it again.
