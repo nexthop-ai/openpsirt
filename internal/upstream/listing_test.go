@@ -205,28 +205,46 @@ func TestAReadThatLostTheLeaseReadsNoListing(t *testing.T) {
 	})
 }
 
-// A pass that cannot ask for the lease failed here, so it records nothing
-// against the upstream and leaves it due.
-func TestAReadThatCannotAskForTheLeaseRecordsNothing(t *testing.T) {
-	fixture.Each(t, func(t *testing.T, f *fixture.World) {
-		w := newWorld(t, f)
-		w.trust()
-		upstream.Keeping(w.reader, func(context.Context) (bool, error) {
-			return false, errors.New("the database went away")
+// A pass that cannot ask for the lease failed here, so it records that in
+// fixed words, never the database's own, and leaves the upstream due.
+func TestAReadThatCannotAskForTheLeaseRecordsItFailedHere(t *testing.T) {
+	for _, at := range []struct {
+		name  string
+		after int
+	}{{"before a listing", 0}, {"before a document", 1}} {
+		t.Run(at.name, func(t *testing.T) {
+			fixture.Each(t, func(t *testing.T, f *fixture.World) {
+				w := newWorld(t, f)
+				w.trust()
+				asked := 0
+				upstream.Keeping(w.reader, func(context.Context) (bool, error) {
+					asked++
+					if asked > at.after {
+						return false, errors.New("the database went away")
+					}
+					return true, nil
+				})
+				up, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+				if err != nil || up == nil {
+					t.Fatalf("the fork trusts no upstream: %v", err)
+				}
+				if _, err := w.reader.From(t.Context(), *up); err == nil {
+					t.Fatal("a read that could not ask for the lease reported nothing")
+				}
+				if asked <= at.after {
+					t.Fatalf("the lease was asked for %d times, so the failure was never reached", asked)
+				}
+				up, err = upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if up.FetchedAt != nil {
+					t.Error("a read that failed here moved the upstream out of the due set")
+				}
+				if up.Failed != "this deployment failed, not the upstream; its log says why" {
+					t.Errorf("a read that failed here recorded %q", up.Failed)
+				}
+			})
 		})
-		up, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
-		if err != nil || up == nil {
-			t.Fatalf("the fork trusts no upstream: %v", err)
-		}
-		if _, err := w.reader.From(t.Context(), *up); err == nil {
-			t.Fatal("a read that could not ask for the lease reported nothing")
-		}
-		up, err = upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if up.FetchedAt != nil || up.Failed != "" {
-			t.Errorf("a read that could not ask for the lease recorded an attempt: failed %q", up.Failed)
-		}
-	})
+	}
 }

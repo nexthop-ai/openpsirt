@@ -261,7 +261,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		took.Filled = true
 		return took, nil
 	case errors.As(err, new(local)):
-		return took, err
+		return took, r.failedHere(ctx, up, err)
 	case err != nil:
 		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 	}
@@ -293,7 +293,11 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		// never runs on past it beside a second replica's. One lost leaves the
 		// read incomplete and the upstream due.
 		if r.keep != nil {
-			if mine, err := r.keep(ctx); err != nil || !mine {
+			mine, err := r.keep(ctx)
+			if err != nil {
+				return took, r.failedHere(ctx, up, local{err})
+			}
+			if !mine {
 				took.Filled = true
 				break
 			}
@@ -310,7 +314,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 			refused = append(refused, fmt.Errorf("%s: %w", one.address, err))
 			continue
 		case errors.As(err, new(local)):
-			return took, err
+			return took, r.failedHere(ctx, up, err)
 		case err != nil:
 			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 		}
@@ -328,7 +332,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 			continue
 		}
 		if err := r.withdraw(ctx, up, address); errors.As(err, new(local)) {
-			return took, err
+			return took, r.failedHere(ctx, up, err)
 		} else if err != nil {
 			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 		}
@@ -645,19 +649,36 @@ var errLeaseLost = errors.New("the lease on reading upstreams was lost")
 var errWithdrawn = refusal.New("that upstream is no longer trusted as it was")
 
 // local is a failure of this deployment during a pass, its database or its
-// lease, and says nothing about the upstream. The pass records nothing against
-// the upstream, which stays due, and the error reaches the log alone, since a
-// database's own text is never shown.
+// lease, and says nothing about the upstream.
 type local struct{ err error }
 
 func (l local) Error() string { return l.err.Error() }
 func (l local) Unwrap() error { return l.err }
 
+// failedHere records a failure of this deployment against an upstream in fixed
+// words, since a database's own text is never shown, and leaves the upstream
+// due, so one that repeats shows on the upstream rather than in the log alone.
+// What was read and the key offered stay as they were. A pass cut short by
+// shutdown records none.
+func (r *Reader) failedHere(ctx context.Context, up Upstream, err error) error {
+	if ctx.Err() != nil {
+		return err
+	}
+	if marked := NewStore(r.db).reached(ctx, up, up.Listings, up.KeyOffered, errFailedHere, true); marked != nil {
+		return errors.Join(err, marked)
+	}
+	return err
+}
+
+// errFailedHere is what an upstream records where this deployment, not the
+// upstream, stopped the pass.
+var errFailedHere = refusal.New("this deployment failed, not the upstream; its log says why")
+
 // localUnlessRefused marks a failure recording what a document said as this
 // deployment's, unless it is a refusal of what the document holds, which is
 // the upstream's.
 func localUnlessRefused(err error) error {
-	if err == nil || refusal.In(err) {
+	if err == nil || database.Publishable(err) {
 		return err
 	}
 	return local{err}
