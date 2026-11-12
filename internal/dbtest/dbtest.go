@@ -42,6 +42,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -834,11 +835,44 @@ func connect(ctx context.Context, raw string) (*database.DB, database.Target, er
 	if err != nil {
 		return nil, database.Target{}, err
 	}
+	if target.Engine == database.MySQL || target.Engine == database.MariaDB {
+		if target, err = database.ParseURL(boundLockWait(raw)); err != nil {
+			return nil, database.Target{}, err
+		}
+	}
 	db, err := database.Open(ctx, target)
 	if err != nil {
 		return nil, target, fmt.Errorf("open %s: %w", target.Redacted, err)
 	}
 	return db, target, nil
+}
+
+// lockWait is how long a harness session on MySQL or MariaDB waits for a
+// metadata lock before its statement fails. The servers' own default is a
+// year on MySQL and a day on MariaDB, so a server wedged on a lock it never
+// grants hangs every statement that needs it until the test binary's timeout,
+// naming nothing; bounded, the statement waiting fails and is named.
+const lockWait = 60 * time.Second
+
+// boundLockWait is a MySQL or MariaDB URL with its sessions' lock_wait_timeout
+// set to lockWait, unless the URL sets one itself. The driver sets every
+// parameter it does not know as a session variable on each connection it
+// opens, so every connection of the pool carries it.
+func boundLockWait(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Query().Has("lock_wait_timeout") {
+		return raw
+	}
+	// Appended to the URL as written, which keeps every other byte of it.
+	bound := "lock_wait_timeout=" + strconv.Itoa(int(lockWait/time.Second))
+	switch {
+	case u.RawQuery == "" && !strings.Contains(raw, "?"):
+		return raw + "?" + bound
+	case strings.HasSuffix(raw, "?") || strings.HasSuffix(raw, "&"):
+		return raw + bound
+	default:
+		return raw + "&" + bound
+	}
 }
 
 // migrateFresh applies every migration to the database at url and closes it.
