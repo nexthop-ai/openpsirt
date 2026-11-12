@@ -19113,7 +19113,7 @@ export interface operations {
                 days?: number;
                 /** @description Limit to decisions made in one product, by name */
                 product?: string;
-                /** @description Limit to decisions this team's members proposed, by team name */
+                /** @description Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team */
                 team?: string;
                 /** @description The most rows to return */
                 limit?: number;
@@ -19874,7 +19874,7 @@ export interface operations {
                 days?: number;
                 /** @description Limit to decisions made in one product, by name */
                 product?: string;
-                /** @description Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows */
+                /** @description Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team */
                 team?: string;
             };
             header?: never;

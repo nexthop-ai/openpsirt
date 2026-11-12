@@ -80,7 +80,7 @@ func registerMeasures(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.Period
 		Product string `query:"product" doc:"Limit to decisions made in one product, by name"`
-		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows"`
+		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team"`
 	}) (*struct{ Body MeasuresBody }, error) {
 		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
@@ -104,12 +104,6 @@ func registerMeasures(api huma.API, in core.Deps) {
 			ToDecide: spreadBodies(got.ToDecide), ToAgree: spreadBodies(got.ToAgree),
 			SentBack: got.SentBack, Sampled: got.Sampled, Capped: got.Capped,
 			Worked: make([]WorkedBody, 0, len(got.Throughput)),
-		}
-		// Who is on a team is an administrator's to know. Per-person rows
-		// narrowed to a team name its members, so anybody else asking about
-		// a team is given its totals alone.
-		if input.Team != "" && core.Administrating(ctx) != nil {
-			got.Throughput = nil
 		}
 		for _, one := range got.Throughput {
 			body.Worked = append(body.Worked, WorkedBody{

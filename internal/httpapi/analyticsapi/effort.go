@@ -52,7 +52,7 @@ func registerEffort(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.Period
 		Product string `query:"product" doc:"Limit to decisions made in one product, by name"`
-		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, by team name"`
+		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most rows to return"`
 		Offset  int    `query:"offset" minimum:"0" doc:"How many rows to skip, in the order the report is sorted"`
 	}) (*core.OverPeriod[SpentBody], error) {
@@ -98,6 +98,15 @@ func measuring(ctx context.Context, in core.Deps, subject access.Subject,
 	product, team string) (triage.Measuring, error) {
 
 	var only triage.Measuring
+	// Who is on a team is an administrator's to know, and a narrowing to a
+	// team's people answers it to anybody who can difference two reports.
+	// Refused before the name is resolved, so a team that exists and one
+	// that does not are refused alike.
+	if team != "" {
+		if err := core.Administrating(ctx); err != nil {
+			return only, err
+		}
+	}
 	if product != "" {
 		// Resolved against what the caller may see, and a product they may
 		// not read answers as one nobody declared — anything else turns a

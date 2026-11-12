@@ -19526,12 +19526,12 @@ paths:
           schema:
             description: Limit to decisions made in one product, by name
             type: string
-        - description: Limit to decisions this team's members proposed, by team name
+        - description: Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team
           explode: false
           in: query
           name: team
           schema:
-            description: Limit to decisions this team's members proposed, by team name
+            description: Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team
             type: string
         - description: The most rows to return
           explode: false
@@ -21275,12 +21275,12 @@ paths:
           schema:
             description: Limit to decisions made in one product, by name
             type: string
-        - description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows
+        - description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team
           explode: false
           in: query
           name: team
           schema:
-            description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows
+            description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team
             type: string
       responses:
         "200":

@@ -45,10 +45,15 @@ export function Effort() {
   // asking how their own people are doing read the deployment's numbers
   // otherwise. In the address like the period, so a narrowed sheet is
   // something somebody sends.
-  const team = params.get("team") ?? "";
+  //
+  // An administrator's alone, because who is on a team is theirs to know.
+  const who = useWho().data;
+  const administers = Boolean(who?.admin);
+  const team = administers ? (params.get("team") ?? "") : "";
 
   const teams = useQuery({
     queryKey: ["teams"],
+    enabled: administers,
     queryFn: async () => unwrap(await api.GET("/v1/teams", {})),
     retry: false,
   });
@@ -56,7 +61,6 @@ export function Effort() {
   // Decisions on either family, narrowed by the server to the reader: for a
   // reader of neither at the scope, an empty report reads as a quiet period,
   // so it is neither asked nor drawn.
-  const who = useWho().data;
   const decides = decidesAt(who, at.product);
 
   const spent = useQuery({

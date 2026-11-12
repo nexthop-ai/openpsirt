@@ -297,6 +297,7 @@ arguments, reach, people, and outcomes.
 | The subject is reached through findings at the decision's occurrences, in its own product, readable by the reader | A decision about something removed still names it; an unreadable finding's name is the disclosure |
 | Dated by proposal | The audit log's rule |
 | It takes the common period, and one product or one team picked from the teams that exist | |
+| Only an administrator narrows it to a team, and the screen offers the team picker to an administrator alone | `design-docs/access-assignment.md` § Teams; a team's figures differenced against the audit log's proposers name its members |
 | It pages, its total counting every row before the limit | |
 
 ## Triage latency
@@ -319,7 +320,7 @@ longest:
 | It narrows to one product or one team's people | |
 | A team narrows waits by proposer and throughput by who did each piece | |
 | A team with nobody on it measures nothing | A narrowing never widens |
-| Only an administrator gets a team's per-person rows; anybody else its totals | `design-docs/access-assignment.md` § Teams |
+| Only an administrator narrows it to a team; anybody else is refused before the team is looked up | `design-docs/access-assignment.md` § Teams; a team's totals differenced against the audit log's proposers name its members |
 
 ## Repeated deferrals
 
