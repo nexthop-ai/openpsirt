@@ -1684,4 +1684,7 @@ before uploading anything new under that name:
    the name of the real publisher.
 
 The answer to the first step says how many statements it set aside. A set-aside
-statement stays readable beside any approval granted on it.
+statement stays readable beside any approval granted on it, and each approved
+decision that cites one raises a "cited statement changed" alert, which stands
+until the decision is made again against the statements the second step
+recorded.
