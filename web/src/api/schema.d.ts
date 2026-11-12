@@ -15062,7 +15062,10 @@ export interface components {
             closed: number;
         };
         RetiredBody: {
+            /** @description The release's name, as addresses name it */
             branch_or_tag: string;
+            /** @description The release as screens show it */
+            branch_or_tag_name: string;
             /** @description The date has passed. False is a release that is about to go out of support */
             ended: boolean;
             /**
@@ -15084,7 +15087,10 @@ export interface components {
              * @description Issues open against it, counted at components rather than at every occurrence they sit at
              */
             open: number;
+            /** @description The product's name, as addresses name it */
             product: string;
+            /** @description The product as screens show it */
+            product_name: string;
         };
         RetiredOutputBody: {
             /**

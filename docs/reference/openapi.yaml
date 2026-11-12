@@ -12536,6 +12536,10 @@ components:
       additionalProperties: false
       properties:
         branch_or_tag:
+          description: The release's name, as addresses name it
+          type: string
+        branch_or_tag_name:
+          description: The release as screens show it
           type: string
         ended:
           description: The date has passed. False is a release that is about to go out of support
@@ -12561,10 +12565,16 @@ components:
           format: int64
           type: integer
         product:
+          description: The product's name, as addresses name it
+          type: string
+        product_name:
+          description: The product as screens show it
           type: string
       required:
         - product
         - branch_or_tag
+        - product_name
+        - branch_or_tag_name
         - kind
         - ended_on
         - ended_days

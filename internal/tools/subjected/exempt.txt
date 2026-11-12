@@ -81,7 +81,6 @@ analysis.Applier.Apply A background pass: the analyzer worker applies one stored
 analysis.CodeFindingName A helper over a narrowed read: it names a flaw record the collaborator grant already read for the caller with a subject, inside the same transaction.
 attach.Attached A helper over a narrowed read: it marks the uploads that text refers to as attached, after the caller stored that text under its own authorization.
 attach.Store.Sweep A background pass: the attachment sweep removes uploads no stored text ever referred to.
-catalog.Store.BranchOrTagByName Not varying by reader: resolving a release name inside a product the route resolved for the caller.
 catalog.Store.BranchesAndTagsByID Not varying by reader: the names of releases a pipeline key already points at. Its route requires administration.
 catalog.Store.BranchesAndTagsEndingBy Not varying by reader: which releases will be out of support by a date, read by the catalog beside its own narrowed answer.
 catalog.Store.BranchesAndTagsPastEndOfLife Not varying by reader: which releases are out of support by a date, a fact of the catalog every narrowed read and sweep excludes alike.
@@ -119,7 +118,6 @@ catalog.Store.SetPublishes Who is asking: it records whether a product publishes
 catalog.Store.SetReleasedOn Who is asking: it records when a release went out. Its route requires administration.
 catalog.Store.SetVariantCustomerFacing Who is asking: it records whether a variant ships to customers. Its route requires administration.
 catalog.Store.TagBranchesAndTags A background pass: the deadline sweep reads which releases cannot change.
-catalog.Store.VariantByName Not varying by reader: resolving a variant name inside a product the route resolved for the caller.
 catalog.Store.VariantsByID Not varying by reader: the names of variants a pipeline key already points at. Its route requires administration.
 currency.Refresher.Once A background pass: one cycle of the currency refresher.
 currency.Refresher.Run A background pass: the currency refresher asks package indexes about components on a schedule.

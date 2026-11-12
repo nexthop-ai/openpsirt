@@ -20,9 +20,13 @@ import (
 // RetiredBody is one release that has gone out of support, and what is still
 // open against it.
 type RetiredBody struct {
-	Product     string        `json:"product"`
-	BranchOrTag string        `json:"branch_or_tag"`
-	Kind        core.LineKind `json:"kind" doc:"Whether this line moves"`
+	Product     string `json:"product" doc:"The product's name, as addresses name it"`
+	BranchOrTag string `json:"branch_or_tag" doc:"The release's name, as addresses name it"`
+	// ProductName and BranchOrTagName are what a screen shows, which the
+	// names above are not once anybody spelled them with capitals.
+	ProductName     string        `json:"product_name" doc:"The product as screens show it"`
+	BranchOrTagName string        `json:"branch_or_tag_name" doc:"The release as screens show it"`
+	Kind            core.LineKind `json:"kind" doc:"Whether this line moves"`
 	// EndedOn is the date support ended: the release's own where it stated
 	// one, its product's otherwise.
 	EndedOn string `json:"ended_on" doc:"The date support ended, as YYYY-MM-DD"`
@@ -222,6 +226,7 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 		since := int(today.Sub(release.EndedOn).Hours() / 24)
 		rows = append(rows, RetiredBody{
 			Product: release.Product, BranchOrTag: release.BranchOrTag,
+			ProductName: release.ProductShown, BranchOrTagName: release.BranchOrTagShown,
 			Kind: core.LineKind(release.Kind), EndedOn: release.EndedOn.UTC().Format(time.DateOnly),
 			Inherited: release.Inherited,
 			EndedDays: since,

@@ -61,7 +61,7 @@ own. The catalog screen also holds the files reachable nowhere else.
 |---|---|
 | Program overview | Fixed against appearing, time to fix since first sighting and since publication, aging and whether anybody looked, the two triage waits, what keeps being put off, what was argued away. Seven, thirty or ninety days or two dates, named in the printed header |
 | Last upload per build | The estate, longest silent first: builds scanned, gone quiet, or declared and never filed against |
-| Releases out of support | Releases past their date and, asked for, those about to pass: how long ago or left, and issues still open, ordered by what is open. Past end of life nothing is overdue, so asking is the only way to see it. An inherited date says so |
+| Releases out of support | Releases past their date and, asked for, those about to pass: how long ago or left, and issues still open, ordered by what is open. Past end of life nothing is overdue, so asking is the only way to see it. An inherited date says so. A retired release, or one of a retired product, is left out. Each is named as screens name it, beside the name its address carries |
 | Backlog over time | `design-docs/analytics-program.md` § Trends |
 | Findings burndown | `design-docs/analytics-program.md` § Burndown sheet |
 | Approval quality | `design-docs/analytics-controls.md` § Approval quality |
