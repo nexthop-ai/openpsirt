@@ -11,7 +11,7 @@ import { Unread } from "../ui/Reading";
 import type { Readable } from "../ui/Count";
 import { called, identifiersIn, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
 import { useState } from "react";
-import { BENEATH_PARTS, validFilter } from "./list";
+import { BENEATH_PARTS, sentFor, validFilter, withoutInvalid, type ListScope } from "./list";
 // The findings list's filters, apart from the list itself.
 //
 // Everything the server can narrow by is here, named for what it asks, each
@@ -258,6 +258,9 @@ export function activeFilters(
   // The names of the weaknesses the address asks for, where they have been
   // read.
   weaknesses?: Map<string, Named>,
+  // Where the list is asked. Given, a chip is drawn only where removing it
+  // changes the request the list sends there.
+  scope?: ListScope,
 ): Active[] {
   const out: Active[] = [];
   // A value the list does not send draws no chip: it narrows nothing.
@@ -357,7 +360,8 @@ export function activeFilters(
     at("beneath") && [at("beneath"), at("beneath_version")].filter(Boolean).join(" "),
     [["beneath", ""], ...BENEATH_PARTS.map((part): [string, string] => [part, ""])],
   );
-  add("beneath_purl", "At or under", at("beneath_purl"));
+  // One root is sent, and a component names the narrower.
+  if (!at("beneath")) add("beneath_purl", "At or under", at("beneath_purl"));
   if (at("under_build") === "yes") add("under_build", "Held directly by the build", "only");
   // One chip per component hidden, and the page has no second list of them:
   // hiding drew its own row saying the same names the summary already said,
@@ -407,7 +411,9 @@ export function activeFilters(
     "Across variants",
     SPREADS.find(([word]) => word !== "" && word === at("variants"))?.[1].toLowerCase() ?? "",
   );
-  return out;
+  if (!scope) return out;
+  const sent = JSON.stringify(sentFor(params, scope));
+  return out.filter((chip) => JSON.stringify(sentFor(without(params, chip), scope)) !== sent);
 }
 
 // The address with one chip's filter removed. A pair naming a word removes
@@ -435,7 +441,7 @@ export function without(params: URLSearchParams, chip: Active): URLSearchParams 
 // applied in turn — so a filter the summary does not name is not silently
 // cleared by "clear all" either.
 export function withoutAny(params: URLSearchParams): URLSearchParams {
-  let next = params;
+  let next = withoutInvalid(params);
   for (const each of activeFilters(params)) next = without(next, each);
   return next;
 }
@@ -866,7 +872,7 @@ export function Narrowed({
   clear: (chip: Active) => void;
   clearAll: () => void;
 }) {
-  const active = activeFilters(params, weaknesses);
+  const active = activeFilters(params, weaknesses, scope);
   const where: { label: string; value: string; to: typeof scope }[] = [];
   if (scope.product) {
     where.push({

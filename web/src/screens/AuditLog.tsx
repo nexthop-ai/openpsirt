@@ -461,7 +461,12 @@ function Administered() {
   // Past what the route answers in one request, the file is how the rest is
   // read; asking for more would be refused and take the section with it.
   const longest = CHANGES_MOST;
+  // An administrator's or an auditor's record; asked of nobody else, so the
+  // section never draws for a reader it is refused to.
+  const who = useWho().data;
+  const reads = Boolean(who?.admin || who?.audits);
   const changes = useQuery({
+    enabled: reads,
     queryKey: ["administered", sent.from, sent.to, kind, showing],
     queryFn: async () =>
       unwrap(
@@ -476,8 +481,6 @@ function Administered() {
           },
         }),
       ),
-    // An administrator's or an auditor's screen; anybody else is refused and
-    // the section is simply absent for them.
     retry: false,
     // Show more keeps the rows in hand while the longer page is read; any
     // other change of question draws the loading line instead.
@@ -499,6 +502,7 @@ function Administered() {
       </div>
     );
   }
+  if (!reads) return null;
   if (changes.isPending) {
     return (
       <div style={{ marginTop: 24 }}>

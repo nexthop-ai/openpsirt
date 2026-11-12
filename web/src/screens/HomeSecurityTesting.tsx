@@ -161,6 +161,7 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
     ? [one, at.branch_or_tag, at.variant].filter(Boolean).join(" · ")
     : `${products.length.toLocaleString()} ${products.length === 1 ? "product" : "products"}`;
   const trend = trends.data && named(trends.data, !one);
+  const tiers = tierParts((trend?.points ?? []).map((point) => point.by_tier));
   const series = coverages.flatMap((each) => each.data?.items ?? []);
   const quiet = series.filter((item) => item.quiet);
   const oldest = judging.data?.oldest;
@@ -339,10 +340,10 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
                 <>
                   <Stack
                     rows={trend.points.map((point) => ({ at: point.at, ...point.by_tier }))}
-                    parts={tierParts(trend.points.map((point) => point.by_tier))}
+                    parts={tiers}
                   />
                   <div className="legend">
-                    {tierParts(trend.points.map((point) => point.by_tier)).map((part) => (
+                    {tiers.map((part) => (
                       <span key={part.key}>
                         <i style={{ background: part.color }} /> {part.label}
                       </span>

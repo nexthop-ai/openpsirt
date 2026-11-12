@@ -25,6 +25,9 @@ export function useIssue(vulnerability: string, enabled = true) {
 // The largest page the issue endpoint answers.
 export const ISSUE_MOST = 500;
 
+// The most builds one write of an issue's affected builds names.
+export const BUILDS_MOST = 200;
+
 // Where one issue sits in one product, every row the endpoint answers: the
 // affected-builds editor sends the product's whole list, so it needs that
 // product's answer whole, whatever other products hold.

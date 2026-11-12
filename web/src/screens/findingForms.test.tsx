@@ -68,6 +68,20 @@ describe("the references a finding cites", () => {
     );
     expect(mount.host().querySelectorAll("li")).toHaveLength(2);
   });
+
+  it("keeps a patch at the advisory's address as a patch", () => {
+    mount.render(
+      screen(
+        <References
+          advisory="https://example.com/a"
+          refs={[{ url: "https://example.com/a", kind: "patch" }]}
+        />,
+      ),
+    );
+    const rows = mount.host().querySelectorAll("li");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.querySelector(".kind")?.textContent).toBe("patch");
+  });
 });
 
 describe("recording that a product was exploited", () => {

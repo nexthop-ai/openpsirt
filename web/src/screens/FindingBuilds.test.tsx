@@ -50,6 +50,18 @@ describe("correcting which builds a flaw affects", () => {
     expect(sent()).toHaveLength(0);
   });
 
+  it("writes nothing where it is open at more builds than one write names", async () => {
+    const many = Array.from({ length: 201 }, (_, i) => ({
+      branch_or_tag: `b${i}`,
+      variant: "broadcom",
+    }));
+    const sent = serving(many, many.length);
+    await opened();
+    expect(mount.host().textContent).toContain("more builds than this screen can set");
+    expect(() => button(mount.host(), "Set which builds it affects")).toThrow();
+    expect(sent()).toHaveLength(0);
+  });
+
   it("edits one product's builds however many rows other products hold", async () => {
     serving([{ branch_or_tag: "master", variant: "broadcom" }], 1);
     await opened();

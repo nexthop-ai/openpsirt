@@ -160,19 +160,28 @@ export function References({
   }[];
 }) {
   const [whole, setWhole] = useState(false);
-  // One row per address: a scanner's list often carries the advisory again,
-  // and sometimes one address twice.
-  const all = [...(advisory ? [{ url: advisory, kind: "advisory" }] : []), ...refs].filter(
-    (ref, i, every) => !ref.url || every.findIndex((each) => each.url === ref.url) === i,
-  );
-  if (all.length === 0) return null;
   const order: Record<Body<"ReferenceBody">["kind"], number> = {
     patch: 0,
     advisory: 1,
     report: 2,
     documentation: 3,
   };
-  const sorted = [...all].sort((a, b) => (own(order, a.kind) ?? 9) - (own(order, b.kind) ?? 9));
+  const rank = (ref: { kind?: string }) => own(order, ref.kind) ?? 9;
+  // One row per address: a scanner's list often carries the advisory again,
+  // and sometimes one address twice. The row kept is the one whose kind ranks
+  // first, so a patch at the advisory's address keeps its label and place.
+  const listed = [...(advisory ? [{ url: advisory, kind: "advisory" }] : []), ...refs];
+  const all = listed.filter(
+    (ref, i) =>
+      !ref.url ||
+      !listed.some(
+        (other, j) =>
+          other.url === ref.url &&
+          (rank(other) < rank(ref) || (rank(other) === rank(ref) && j < i)),
+      ),
+  );
+  if (all.length === 0) return null;
+  const sorted = [...all].sort((a, b) => rank(a) - rank(b));
   return (
     <div className="evblock">
       <h4>References</h4>
