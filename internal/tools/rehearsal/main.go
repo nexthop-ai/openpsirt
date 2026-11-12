@@ -255,7 +255,9 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 
 	var faults []string
 	r.step("the rows %s left", r.from)
-	held, err := r.count(ctx, fromTables)
+	// Every table the release's schema record names exists by construction,
+	// so failing to count one is a fault, never an absent table.
+	held, err := r.count(ctx, fromTables, setOf(fromTables))
 	if err != nil {
 		return nil, err
 	}
@@ -284,10 +286,14 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if applied, err := r.version(ctx); err != nil {
 		return nil, err
 	} else if applied != current {
-		faults = append(faults, fmt.Sprintf("the upgrade reached schema version %d, and this tree carries %d", applied, current))
+		// A schema short of this tree's lacks tables this tree declares, so
+		// counting them would bury the fault under a missing table.
+		return append(faults, fmt.Sprintf("the upgrade reached schema version %d, and this tree carries %d", applied, current)), nil
 	}
 	upgradedTables := unionTables(fromTables, dbtest.Tables())
-	upgraded, err := r.count(ctx, upgradedTables)
+	// A name only the release used is gone after the renames, so only this
+	// tree's own tables are required.
+	upgraded, err := r.count(ctx, upgradedTables, setOf(dbtest.Tables()))
 	if err != nil {
 		return nil, err
 	}
@@ -470,25 +476,18 @@ func connect(ctx context.Context, raw string) (*database.DB, error) {
 }
 
 // count reads how many rows each table holds, with nothing running against
-// the database.
-func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
+// the database. A table in required that cannot be counted stops the run.
+func (r *run) count(ctx context.Context, tables []string, required map[string]bool) (Counts, error) {
 	db, err := connect(ctx, r.hostURL)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = db.Close() }()
-	counts := Counts{}
-	for _, table := range tables {
+	return Tally(tables, required, func(table string) (int64, error) {
 		var n int64
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+table+`"`).Scan(&n); err != nil {
-			// A table the side being counted does not hold is absent from
-			// the answer, which Compare reads as gone or not made.
-			_, _ = fmt.Fprintf(r.log, "count %s: %v\n", table, err)
-			continue
-		}
-		counts[table] = n
-	}
-	return counts, nil
+		err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+table+`"`).Scan(&n)
+		return n, err
+	}, r.log)
 }
 
 // answer acknowledges every report the release holds against a product it
@@ -710,35 +709,52 @@ func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
 		}
 	}
 	slices.Sort(paths)
-	var faults []string
-	asked, skipped, answered := 0, 0, 0
+	var results []getResult
+	skipped := 0
 	for _, path := range paths {
 		filled, complete := fillPath(path, names)
 		if !complete {
 			skipped++
 			continue
 		}
-		asked++
 		status, body, err := r.get(ctx, filled)
+		results = append(results, getResult{path: filled, status: status, body: body, err: err})
+	}
+	faults, answered, err := classifyGets(results, r.log)
+	r.note("asked %d GET operations, %d answered 2xx; skipped %d whose parameters the seed has no name for",
+		len(results), answered, skipped)
+	return faults, err
+}
+
+// getResult is one GET the sweep asked and what came back.
+type getResult struct {
+	path   string
+	status int
+	body   []byte
+	err    error
+}
+
+// classifyGets reports a GET that failed or answered 5xx as a fault and
+// counts a 2xx as answered; anything else is logged. A sweep that reached
+// nothing but refusals asked as nobody, and a refusal says nothing about
+// whether the query behind it works, so no 2xx is an error.
+func classifyGets(results []getResult, log io.Writer) (faults []string, answered int, err error) {
+	for _, got := range results {
 		switch {
-		case err != nil:
-			faults = append(faults, fmt.Sprintf("GET %s: %v", filled, err))
-		case status >= 500:
-			faults = append(faults, fmt.Sprintf("GET %s answered %d: %s", filled, status, head(body)))
-		case status < 300:
+		case got.err != nil:
+			faults = append(faults, fmt.Sprintf("GET %s: %v", got.path, got.err))
+		case got.status >= 500:
+			faults = append(faults, fmt.Sprintf("GET %s answered %d: %s", got.path, got.status, head(got.body)))
+		case got.status >= 200 && got.status < 300:
 			answered++
 		default:
-			_, _ = fmt.Fprintf(r.log, "GET %s: %d %s\n", filled, status, head(body))
+			_, _ = fmt.Fprintf(log, "GET %s: %d %s\n", got.path, got.status, head(got.body))
 		}
 	}
-	r.note("asked %d GET operations, %d answered 2xx; skipped %d whose parameters the seed has no name for",
-		asked, answered, skipped)
-	// A sweep that reached nothing but refusals asked as nobody, and a
-	// refusal says nothing about whether the query behind it works.
 	if answered == 0 {
-		return nil, errors.New("no GET answered 2xx, so the sweep checked nothing")
+		return nil, 0, errors.New("no GET answered 2xx, so the sweep checked nothing")
 	}
-	return faults, nil
+	return faults, answered, nil
 }
 
 func (r *run) get(ctx context.Context, path string) (int, []byte, error) {
@@ -860,6 +876,14 @@ func unionTables(a, b []string) []string {
 		}
 	}
 	return keys(seen)
+}
+
+func setOf(names []string) map[string]bool {
+	set := make(map[string]bool, len(names))
+	for _, name := range names {
+		set[name] = true
+	}
+	return set
 }
 
 func keys(m map[string]bool) []string {

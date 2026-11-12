@@ -4,6 +4,8 @@
 package main
 
 import (
+	"errors"
+	"io"
 	"slices"
 	"strings"
 	"testing"
@@ -120,5 +122,34 @@ func TestASeedBelowTheRenamesWithNoAcknowledgedReportIsRefused(t *testing.T) {
 	}
 	if empty := Unseeded(renamesV0110-1, held, 0); len(empty) != 1 {
 		t.Errorf("want the missing acknowledgement reported, got %v", empty)
+	}
+}
+
+func TestARequiredTableThatCannotBeCountedStopsTheRun(t *testing.T) {
+	ask := func(table string) (int64, error) {
+		if table == "finding" {
+			return 0, errors.New("lock wait timeout")
+		}
+		return 4, nil
+	}
+	_, err := Tally([]string{"scan", "finding"}, map[string]bool{"scan": true, "finding": true}, ask, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "finding") {
+		t.Fatalf("a required table that could not be counted was not refused by name: %v", err)
+	}
+}
+
+func TestAnOptionalTableThatCannotBeCountedIsLeftOut(t *testing.T) {
+	ask := func(table string) (int64, error) {
+		if table == "old_name" {
+			return 0, errors.New("no such table")
+		}
+		return 4, nil
+	}
+	counts, err := Tally([]string{"scan", "old_name"}, map[string]bool{"scan": true}, ask, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := counts["old_name"]; ok || counts["scan"] != 4 {
+		t.Errorf("counts = %v, want scan alone", counts)
 	}
 }
