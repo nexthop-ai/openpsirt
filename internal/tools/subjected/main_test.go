@@ -35,6 +35,10 @@ func (w *Watcher) Pass(ctx context.Context) error {
 	return w.store.Unnarrowed(ctx, 1)
 }
 
+func (d *Delegating) Read(ctx context.Context, db bun.IDB, id int64) error {
+	return read(ctx, db, id)
+}
+
 func Function(ctx context.Context, db bun.IDB, id int64) error {
 	return read(ctx, db, id)
 }
@@ -65,8 +69,8 @@ func twice(a int) int { return a * 2 }
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 9 {
-		t.Errorf("%d store methods and functions were examined, want the seven exported store methods "+
+	if examined != 10 {
+		t.Errorf("%d store methods and functions were examined, want the eight exported store methods "+
 			"and the two exported functions that query", examined)
 	}
 	reported := map[string]bool{}
@@ -81,6 +85,7 @@ func twice(a int) int { return a * 2 }
 		"finding.Store.unexported":    false,
 		"finding.Other.Elsewhere":     true,
 		"finding.Watcher.Pass":        false,
+		"finding.Delegating.Read":     true,
 		"finding.Function":            true,
 		"finding.FunctionNarrowed":    false,
 		"finding.FunctionPure":        false,

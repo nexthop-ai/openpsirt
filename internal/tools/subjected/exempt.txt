@@ -76,6 +76,7 @@ access.Store.Withdraw Who is asking: it withdraws a role on a product. Its route
 access.Store.WithdrawEstateRole Who is asking: it withdraws a role held across every product. Its route requires administration.
 advisory.AnyIssuedForBranchOrTag Not varying by reader: whether any advisory names a release. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 advisory.AnyIssuedForProduct Not varying by reader: whether any advisory names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+analysis.Applier.Apply A background pass: the analyzer worker applies one stored run to its build.
 analysis.CodeFindingName A helper over a narrowed read: it names a flaw record the collaborator grant already read for the caller with a subject, inside the same transaction.
 attach.Attached A helper over a narrowed read: it marks the uploads that text refers to as attached, after the caller stored that text under its own authorization.
 attach.Store.Sweep A background pass: the attachment sweep removes uploads no stored text ever referred to.
@@ -323,6 +324,8 @@ triage.Store.PeopleNamed Not varying by reader: who an identifier is, for a reco
 triage.Store.Undecided A helper over a narrowed read: it keeps the places a caller already resolved that nothing stands at.
 triage.TrailAbout A helper over a narrowed read: it names an exploitation record for the trail, inside a write that authorized the product.
 upstream.Again A background pass: it queues a product's builds to be scanned again, from the upstream pass and inside upstream changes only an administrator makes.
+upstream.Pass.Once A background pass: one cycle of reading the upstreams due a read.
+upstream.Pass.Run A background pass: it reads upstream release feeds on a schedule.
 upstream.Reader.From A background pass: the upstream pass reads one upstream and records what it read.
 vex.AnyIssuedForBranchOrTag Not varying by reader: whether any VEX document names a release. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 vex.AnyIssuedForProduct Not varying by reader: whether any VEX document names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.

@@ -26,8 +26,9 @@ type undisclosedSeed struct {
 
 // seedUndisclosed writes a disclosed finding for a public reader to read, and
 // beside it: a recorded flaw, a decision over it with a comment naming the
-// reader, a report, an advisory covering the flaw, a promise to upgrade a
-// package whose findings are undisclosed, and security testing work.
+// reader, a report, an advisory covering the flaw, a file attached to it, a
+// promise to upgrade a package whose findings are undisclosed, and security
+// testing work.
 func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 	t.Helper()
 	ctx := t.Context()
@@ -66,18 +67,43 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 
 	codeFinding := httpapitest.SeededCodeFinding(t, r)
 
+	// A file attached to the flaw, and a team, so the routes naming either
+	// are asked.
+	body, kind := httpapitest.Form(t,
+		httpapitest.Part{Field: "file", Filename: "socket.txt", Content: "Undisclosed attachment about the socket"},
+		httpapitest.Part{Field: "evidence", Content: "true"})
+	attached := r.Post(t, "private-triage", http.MethodPost, "/v1/products/mine/issues/"+flaw+"/attachments", body, kind)
+	if attached.Code != http.StatusCreated {
+		t.Fatalf("attaching a file answered %d: %s", attached.Code, attached.Body.String())
+	}
+	var file struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(attached.Body.Bytes(), &file); err != nil || file.Token == "" {
+		t.Fatalf("attaching a file returned no token: %s", attached.Body.String())
+	}
+	if _, _, err := r.Rights.DeclareTeam(ctx, "kernel", "Kernel"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Identifiers the routes take as numbers are tried over the first few,
+	// which is where a test database numbers what was seeded.
+	numbers := []string{"1", "2", "3", "4", "5", "6"}
+
 	return undisclosedSeed{
 		marks: []string{
 			flaw, "management socket", "Undisclosed reasoning", "Undisclosed comment",
 			reference, "Undisclosed report", advisory, "Undisclosed upgrade", "CVE-2026-CURL", "8.5.0-1",
-			codeFinding,
+			codeFinding, "Undisclosed attachment",
 		},
 		fill: map[string][]string{
 			"{product}": {"mine"}, "{branch_or_tag}": {"master"}, "{variant}": {"broadcom", "hidden"},
 			"{format}": {"csv", "json"}, "{issue}": {"CVE-2026-9999", flaw, "CVE-2026-CURL1"},
 			"{component}": {"libnl-3-200", "libcurl4t64"}, "{occurrence}": {occurrence, codeFinding},
-			"{id}": {httpapitest.Itoa(decision)}, "{reference}": {reference}, "{advisory}": {advisory},
-			"{identity}": {"reader"},
+			"{id}": append([]string{httpapitest.Itoa(decision)}, numbers...), "{reference}": {reference},
+			"{advisory}": {advisory}, "{identity}": {"reader"}, "{token}": {file.Token}, "{team}": {"kernel"},
+			"{run}": numbers, "{sbom}": numbers, "{document}": numbers, "{version}": numbers,
+			"{ruling}": numbers, "{note}": numbers,
 		},
 	}
 }
@@ -116,13 +142,20 @@ func TestNothingUndisclosedReachesAPublicReader(t *testing.T) {
 	// whichever route it is behind.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		seed := seedUndisclosed(t, r)
-		answered := 0
+		answered, asked := 0, 0
 		for _, op := range r.API.OpenAPI().Paths {
 			operation := op.Get
 			if operation == nil {
 				continue
 			}
-			for _, path := range filledEvery(operation.Path, seed.fill) {
+			paths := filledEvery(operation.Path, seed.fill)
+			// Every read is asked: a parameter the seed cannot fill is a read
+			// this walk would pass without looking at.
+			if len(paths) == 0 {
+				t.Errorf("GET %s has a parameter the walk fills with nothing, so it is never asked", operation.Path)
+			}
+			asked++
+			for _, path := range paths {
 				got := r.Body(t, "reader", http.MethodGet, path)
 				if got.Code != http.StatusOK {
 					continue
@@ -140,10 +173,9 @@ func TestNothingUndisclosedReachesAPublicReader(t *testing.T) {
 		}
 		// A walk that reached nothing looks exactly like one that found
 		// nothing undisclosed.
-		if answered == 0 {
-			t.Fatal("no operation answered the reader, so this checked nothing")
+		if asked == 0 || answered == 0 {
+			t.Fatalf("%d operations were asked and %d answers came back, so this checked nothing", asked, answered)
 		}
-		t.Logf("%d reads answered the reader", answered)
 		// The reader does read the disclosed finding, so a clean walk is a
 		// narrowing rather than a refusal of everything.
 		var found struct {

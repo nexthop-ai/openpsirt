@@ -9,7 +9,7 @@
 // a route handing it a row identifier reads whatever the identifier names,
 // whoever asked. Every package under internal/ is read as parsed Go, except a
 // program and a package of test fixtures. A type is a store where one of its
-// methods builds a query. Its exported methods, and the package's exported
+// methods builds a query or calls a function of its package that does. Its exported methods, and the package's exported
 // functions, that query and take no access.Subject fail the gate unless named
 // in exempt.txt with the reason they take none.
 //
@@ -182,10 +182,13 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 		}
 	}
 	querying := queryingNames(all)
-	// A store is a type one of whose methods builds a query itself.
+	// A store is a type one of whose methods builds a query itself or calls a
+	// function of this package that does. A method reached by name alone is
+	// not followed here: a name two receivers share would make a store of a
+	// type that queries nothing.
 	stores := map[string]bool{}
 	for _, one := range all {
-		if one.fn.Recv != nil && builds(one.fn.Body) {
+		if one.fn.Recv != nil && (builds(one.fn.Body) || callsQuerying(one.fn.Body, querying)) {
 			stores[receiverOf(one.fn)] = true
 		}
 	}
@@ -281,6 +284,21 @@ func calledBy(body *ast.BlockStmt, imported map[string]bool) []string {
 		return true
 	})
 	return called
+}
+
+// callsQuerying reports whether a body calls, by its bare name, a function of
+// this package that queries.
+func callsQuerying(body *ast.BlockStmt, querying map[string]bool) bool {
+	found := false
+	ast.Inspect(body, func(node ast.Node) bool {
+		if call, ok := node.(*ast.CallExpr); ok {
+			if fun, ok := call.Fun.(*ast.Ident); ok && querying[fun.Name] {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
 }
 
 // importNames is the names a file refers to its imported packages by: the
