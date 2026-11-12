@@ -125,6 +125,7 @@ decision.
 | Text written by people comes back as markdown, the only representation, with no parameter asking for markup (REQ-65) | The server refused what its policy forbids at submission (REQ-67); later rules are the renderer's (`design-docs/text.md`) |
 | A moment is stated in UTC, in RFC 3339, in a response and a file alike, converted before writing | A driver hands back the process's zone, so a literal `Z` would lie |
 | A day is the UTC day of its moment, in a response, a report and an export | |
+| A test reads every server package's source and refuses a time formatted with a layout, the time package's, a literal holding the reference year or a package-level constant of the same package, from anything but a conversion to UTC; a function keeping the offset on purpose is listed with its reason and reported once it no longer does | CI runs in UTC, where a missing conversion changes nothing |
 | Every moment goes through one renderer, and a test refuses an API body carrying a time value for the encoder | |
 | A moment not known is left out, its field optional, never the year 1 or an empty string | |
 | A published document states its dates as its format requires, in UTC | |

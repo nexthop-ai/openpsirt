@@ -104,7 +104,7 @@ func (f *Fetcher) Once(ctx context.Context) (bool, error) {
 	// The day's own archive, and the day before's where the release is the
 	// one tagged for midnight and carries that instead.
 	for _, when := range []time.Time{day, day.AddDate(0, 0, -1)} {
-		name := when.Format(time.DateOnly) + archiveSuffix
+		name := when.UTC().Format(time.DateOnly) + archiveSuffix
 		if held != nil && held.from == name {
 			return false, nil
 		}

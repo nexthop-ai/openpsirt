@@ -171,7 +171,7 @@ func (s *Signer) Sign(body []byte, at time.Time) ([]byte, error) {
 		if s.expires && !at.Before(s.until) {
 			return nil, fmt.Errorf("sign the document: %w: the key %s expired at %s, "+
 				"before the document's date %s: %w", ErrExpired, s.fingerprint,
-				s.until.Format(time.RFC3339), at.UTC().Format(time.RFC3339), err)
+				s.until.UTC().Format(time.RFC3339), at.UTC().Format(time.RFC3339), err)
 		}
 		return nil, fmt.Errorf("sign the document: %w", err)
 	}
