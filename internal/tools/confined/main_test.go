@@ -4,6 +4,9 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -42,12 +45,34 @@ func TestWhatCountsAsAskingAnEngineDirectly(t *testing.T) {
 		{"a row lock three of them have", "\t`SELECT 1 FOR UPDATE`", true},
 		{"PostgreSQL's lock", "\t`SELECT pg_advisory_lock(1)`", true},
 		{"MySQL's lock", "\t`SELECT GET_LOCK('x', 1)`", true},
+		{"an engine compared as a value", "\tif db.Server.Engine == other {", true},
+		{"an engine compared by its name", "\tif r.engine != \"sqlite\" {", true},
+		{"an engine's name compared the other way round", "\tif \"postgres\" == engine {", true},
+		{"a switch on an engine's name", "\tcase \"mariadb\":", true},
+		{"a switch on an engine's name second in its list", "\tcase other, \"mysql\":", true},
+		{"a local engine compared", "\tif engine == want {", true},
+		{"a switch on another name", "\tcase \"postgresql-ish\", \"x\":", false},
+		{"a row handed back, which MySQL cannot", "\t`INSERT INTO t (a) VALUES (?) RETURNING \"id\"`", true},
+		{"the builder asking for a row back", "\tq.Returning(\"id\")", true},
+		{"PostgreSQL's aggregate of text", "\t`SELECT STRING_AGG(name, ',')`", true},
+		{"MySQL's aggregate of text", "\t`SELECT GROUP_CONCAT(name)`", true},
+		{"MySQL's last identifier", "\t`SELECT LAST_INSERT_ID()`", true},
+		{"PostgreSQL's array expansion", "\t`SELECT * FROM unnest(?)`", true},
+		{"a statistics refresh", "\t`ANALYZE \"finding\"`", true},
+		{"a catalog", "\t`SELECT 1 FROM information_schema.tables`", true},
+		{"PostgreSQL's catalog", "\t`SELECT 1 FROM pg_catalog.pg_class`", true},
+		{"SQLite's catalog", "\t`SELECT name FROM sqlite_master`", true},
+		{"PostgreSQL's cast", "\t`SELECT ?::timestamptz`", true},
 
 		{"ordinary go", "\tfor _, row := range rows {", false},
 		{"a portable query", "\tdb.NewSelect().Model(&x).Where(\"id = ?\", id)", false},
 		{"a word that merely contains one", "\t// the postgresql documentation", false},
+		{"an insert asking for no row back", "\tq.Returning(\"\").Exec(ctx)", false},
+		{"an engine's role asked of the database package", "\tif db.Server.Engine.IsProduction() {", false},
+		{"an address with a double colon", "\taddr := \"[::1]:80\"", false},
+		{"a name that merely holds an engine's", "\tname := \"postgres-data\"", false},
 	} {
-		if got := asking.MatchString(c.line); got != c.want {
+		if got := asks(c.line, engineConstant("database")) != ""; got != c.want {
 			t.Errorf("%s: reported=%v, want %v: %q", c.what, got, c.want, c.line)
 		}
 	}
@@ -73,30 +98,36 @@ func TestChoosingWhichEngineATestRunsOnIsNotABranch(t *testing.T) {
 	}
 }
 
-func TestWhereAnEngineMayBeNamedIsTheListTheDocumentHolds(t *testing.T) {
-	// design-docs/database.md holds the same list in prose, and two copies is the
-	// thing this program exists to catch — so the list is checked for saying
-	// something rather than for being exactly what somebody last typed.
-	if len(allowed) == 0 {
-		t.Fatal("nowhere is allowed to name an engine, so every file would be reported")
+func TestTheAllowedPathsAreTheOnesTheDocumentNames(t *testing.T) {
+	doc, err := os.ReadFile(filepath.Join("..", "..", "..", document))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, where := range allowed {
-		if !strings.HasSuffix(where, "/") && !strings.HasSuffix(where, ".go") {
-			t.Errorf("%q is neither a directory nor a file, so it matches by accident", where)
-		}
+	paths := documented(doc)
+	if len(paths) == 0 {
+		t.Fatalf("%s names no allowed path, so this compared nothing", document)
 	}
-	// The database package is the rule's whole point, and this program has to
-	// be exempt or it reports every pattern it looks for.
-	for _, want := range []string{"internal/database/", "internal/tools/confined/"} {
-		found := false
-		for _, where := range allowed {
-			if where == want {
-				found = true
-			}
-		}
-		if !found {
-			t.Errorf("%q is not allowed to name an engine", want)
-		}
+	for _, apart := range disagreements(allowed, paths) {
+		t.Error(apart)
+	}
+}
+
+func TestAPathInOneListAndNotTheOtherIsReportedBothWays(t *testing.T) {
+	doc := []byte("| Rule | Reason |\n|---|---|\n" +
+		"| The allowed paths are `internal/database/` and `internal/dbtest/` | x |\n" +
+		"| Elsewhere `internal/finding/` is named and is no path | |\n")
+	paths := documented(doc)
+	if !slices.Equal(paths, []string{"internal/database/", "internal/dbtest/"}) {
+		t.Fatalf("read %q from the row, want its two code spans alone", paths)
+	}
+	if got := disagreements([]string{"internal/database/", "internal/dbtest/"}, paths); got != nil {
+		t.Errorf("two lists that agree: %q, want nothing", got)
+	}
+	got := disagreements([]string{"internal/database/", "internal/finding/"}, paths)
+	if len(got) != 2 ||
+		!strings.Contains(got[0], "internal/finding/ is allowed here and not named") ||
+		!strings.Contains(got[1], "internal/dbtest/ is named in the document and not allowed") {
+		t.Errorf("one path each way: %q, want both reported", got)
 	}
 }
 
@@ -109,5 +140,34 @@ func TestAFileOutsideTheAllowedPathsIsReportedAndOneInsideIsNot(t *testing.T) {
 	}
 	if got := violations("internal/database/x.go", text); got != nil {
 		t.Errorf("inside the database package, got %q, want nothing", got)
+	}
+}
+
+func TestAnEngineConstantIsReadUnderAnyImportName(t *testing.T) {
+	text := []byte("package finding\n\nimport db \"" + databasePackage + "\"\n\n" +
+		"func f(e db.Engine) bool {\n\treturn e == db.Postgres\n}\n")
+	got := violations("internal/finding/x.go", text)
+	if len(got) != 1 || !strings.HasPrefix(got[0], "internal/finding/x.go:6: db.Postgres") {
+		t.Errorf("an aliased constant: got %q, want the one line naming it", got)
+	}
+	plain := []byte("package finding\n\nfunc f() int {\n\treturn db.Rows\n}\n")
+	if got := violations("internal/finding/x.go", plain); got != nil {
+		t.Errorf("a selector on another name: got %q, want nothing", got)
+	}
+}
+
+func TestAOneEngineClosureIsLetPastAndSQLBesideASelectingCallIsRead(t *testing.T) {
+	inside := []byte("package schema\n\nfunc TestX(t *testing.T) {\n" +
+		"\tdbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {\n" +
+		"\t\t_, _ = db.QueryContext(ctx, `SELECT name FROM sqlite_master`)\n" +
+		"\t})\n}\n")
+	if got := violations("internal/schema/x_test.go", inside); got != nil {
+		t.Errorf("SQL inside a closure for one engine: got %q, want nothing", got)
+	}
+	beside := []byte("package schema\n\nfunc TestX(t *testing.T) {\n" +
+		"\tq := `INSERT INTO t ON CONFLICT DO NOTHING`; dbtest.Each(t, database.SQLite, fn)\n}\n")
+	got := violations("internal/schema/x_test.go", beside)
+	if len(got) != 1 || !strings.HasSuffix(got[0], "ON CONFLICT") {
+		t.Errorf("SQL beside a harness call outside its closure: got %q, want it reported", got)
 	}
 }
