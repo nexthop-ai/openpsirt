@@ -19,12 +19,14 @@ import { compile } from "tailwindcss";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  cssRules,
+  definedClasses,
   emits,
   positionedModifiers,
   rulesIn,
   styleless as unstyled,
   unusedClasses,
+  quotedRuns,
+  writtenClasses,
 } from "./class-rules.mjs";
 import { createRequire } from "node:module";
 import { sourceFiles, SRC as src } from "./parsed.mjs";
@@ -36,10 +38,8 @@ const stylesheets = sourceFiles({ ext: [".css"] });
 // only shape a single-class utility can collide with.
 const defined = new Map();
 for (const file of stylesheets) {
-  for (const { selector } of cssRules(await readFile(file, "utf8"))) {
-    for (const [, name] of selector.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) {
-      if (!defined.has(name)) defined.set(name, path.relative(src, file));
-    }
+  for (const name of definedClasses(await readFile(file, "utf8"))) {
+    if (!defined.has(name)) defined.set(name, path.relative(src, file));
   }
 }
 
@@ -140,26 +140,16 @@ const clashing = names.filter((name) => emits(emitted, name));
 // Class names are built as well as written: a template literal puts
 // `col ${kind}` in the markup and the modifier appears nowhere as a literal,
 // so anything stricter than "a quoted run somewhere" reports names that are
-// plainly in use. That tolerance stays: a name at the head of a template still
-// matches, and so does one a helper returns.
-//
-// What does not stay is prose. Many of these names are also ordinary English
-// words in a comment — "editor", "found", "steps", "bar" — and a space either
-// side of a word in a sentence would read as the class applied. Comments go
-// first, then only the quoted runs are kept, nested ones included: a class
-// inside an interpolation is itself a quoted string.
+// plainly in use: a name at the head of a template still matches, and so does
+// one a helper returns. Prose in a comment is not markup; `quotedRuns` says
+// how it is dropped.
 //
 // The generated client is left out by the walker every gate shares: it is the
 // API document as TypeScript, and a word in an operation's description is not
 // markup.
 const sources = [];
 for (const full of sourceFiles({ ext: [".ts", ".tsx"], tests: true })) {
-  const text = (await readFile(full, "utf8"))
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(?<![:\w])\/\/[^\n]*/g, " ");
-  for (const [, single, double, template] of text.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)) {
-    sources.push(` ${single ?? double ?? template ?? ""} `);
-  }
+  sources.push(quotedRuns(await readFile(full, "utf8")));
 }
 const markup = sources.join("\n");
 
@@ -204,18 +194,12 @@ let markupSeen = 0;
 let classesSeen = 0;
 for (const full of sourceFiles({ ext: [".ts", ".tsx"], tests: true })) {
   markupSeen++;
-  const lines = (await readFile(full, "utf8")).split("\n");
-  lines.forEach((line, i) => {
-    for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
-      for (const word of (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, " ").split(/\s+/)) {
-        if (!/^[A-Za-z][\w-]*$/.test(word)) continue;
-        classesSeen++;
-        if (!defined.has(word) && !written.has(word)) {
-          written.set(word, `${path.relative(src, full)}:${i + 1}`);
-        }
-      }
+  for (const { word, line } of writtenClasses(await readFile(full, "utf8"))) {
+    classesSeen++;
+    if (!defined.has(word) && !written.has(word)) {
+      written.set(word, `${path.relative(src, full)}:${line}`);
     }
-  });
+  }
 }
 const alone = await compile('@import "tailwindcss";', {
   base: process.cwd(),
