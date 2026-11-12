@@ -202,6 +202,8 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 			{"a plain http address", "http://hooks.example.test/t/abc"},
 			{"a name and password in the address",
 				"https://hooks.slack.com@127.0.0.1/services/x"},
+			{"a password the parser reads as a host and port",
+				"https://bot:1234/T0KEN@hooks.example.test/services/x"},
 			{"an address that is not one", "not-an-address"},
 		} {
 			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPost, at,

@@ -157,7 +157,7 @@ func TestAnUnknownSubcommandIsRefused(t *testing.T) {
 		// distinction being pinned.
 		t.Setenv("OPENPSIRT_DATABASE_URL", "")
 		t.Setenv("OPENPSIRT_AUTO_MIGRATE", "false")
-		err := run(c.args, quiet, quiet)
+		err := run(c.args, os.Environ(), quiet, quiet)
 		named := err != nil && strings.Contains(err.Error(), "unknown command")
 		if named != c.refused {
 			t.Errorf("%v: refused as unknown = %v, want %v (err %v)",
@@ -178,7 +178,7 @@ func TestAnUnknownMigrateActionIsRefusedBeforeConnecting(t *testing.T) {
 	}
 	defer func() { _ = quiet.Close() }()
 	t.Setenv("OPENPSIRT_DATABASE_URL", "")
-	err = run([]string{"migrate", "statsu"}, quiet, quiet)
+	err = run([]string{"migrate", "statsu"}, os.Environ(), quiet, quiet)
 	if err == nil || !strings.Contains(err.Error(), "unknown migrate action") {
 		t.Errorf("answered %v, want the action refused by name", err)
 	}
@@ -221,7 +221,7 @@ func TestMigratingGivesUpOnADatabaseThatNeverAnswers(t *testing.T) {
 	t.Setenv("OPENPSIRT_DATABASE_URL", "postgres://u:p@"+silent.Addr().String()+"/x?sslmode=disable")
 	t.Setenv("OPENPSIRT_STARTUP_TIMEOUT", "500ms")
 	done := make(chan error, 1)
-	go func() { done <- run([]string{"migrate", "up"}, quiet, quiet) }()
+	go func() { done <- run([]string{"migrate", "up"}, os.Environ(), quiet, quiet) }()
 	select {
 	case err := <-done:
 		if err == nil || !strings.Contains(err.Error(), "gave up connecting to the database") {

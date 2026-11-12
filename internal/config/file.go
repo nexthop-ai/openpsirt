@@ -36,7 +36,8 @@ import (
 func LoadFile(path string, environ []string) (Config, error) {
 	var ours []string
 	for _, kv := range environ {
-		if name, _, _ := strings.Cut(kv, "="); strings.HasPrefix(name, envPrefix) {
+		name, value, _ := strings.Cut(kv, "=")
+		if key, prefixed := strings.CutPrefix(name, envPrefix); prefixed && !incidental(key, value) {
 			ours = append(ours, name)
 		}
 	}

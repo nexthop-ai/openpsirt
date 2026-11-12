@@ -54,7 +54,7 @@ func runOut(t *testing.T, args ...string) (string, error) {
 		t.Fatal(err)
 	}
 	defer func() { _ = quiet.Close() }()
-	ran := run(args, out, quiet)
+	ran := run(args, os.Environ(), out, quiet)
 	written, err := os.ReadFile(out.Name())
 	if err != nil {
 		t.Fatal(err)

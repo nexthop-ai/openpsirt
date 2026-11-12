@@ -31,15 +31,15 @@ func TestTheHealthCheckAsksWhereTheServerListens(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("OPENPSIRT_ADDR", "0.0.0.0:"+port)
-	if err := run([]string{"health"}, quiet, quiet); err != nil {
+	if err := run([]string{"health"}, os.Environ(), quiet, quiet); err != nil {
 		t.Errorf("a server listening where the configuration says was reported unhealthy: %v", err)
 	}
 	alive = false
-	if err := run([]string{"health"}, quiet, quiet); err == nil {
+	if err := run([]string{"health"}, os.Environ(), quiet, quiet); err == nil {
 		t.Error("a server answering 503 was reported healthy")
 	}
 	t.Setenv("OPENPSIRT_ADDR", "127.0.0.1:1")
-	if err := run([]string{"health"}, quiet, quiet); err == nil {
+	if err := run([]string{"health"}, os.Environ(), quiet, quiet); err == nil {
 		t.Error("a port nothing listens on was reported healthy")
 	}
 }

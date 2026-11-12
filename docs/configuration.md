@@ -7,7 +7,14 @@ name in each, side by side in the tables below: the variable, which starts
 process starts with nothing set but a database — and a value that is set and
 cannot be read stops the process with the setting named, rather than falling
 back to the default. A switch spelled wrongly that silently reads as its
-opposite is worse than a refusal to start.
+opposite is worse than a refusal to start. For the same reason, a variable
+starting `OPENPSIRT_` that names no setting stops the process, naming it. The
+variables Kubernetes gives a pod for a Service whose name starts `openpsirt`,
+named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more, are not settings
+and are left alone where the value has a service link's shape: an address, a
+port number, a protocol, or `tcp://<address>:<port>`. So are the
+address and key [openpsirt-upload](security-testing.md) reads, and the
+variables of the test suite and of the interface's development server.
 
 In the environment, a switch takes `true` or `false` (also `1`, `0`, `t`, `f`,
 in any case). A duration is written as Go reads it: `30s`, `5m`, `12h`. A
@@ -58,7 +65,7 @@ openpsirt migrate up --config /etc/openpsirt/openpsirt.toml
 | Permissions | Readable and writable by its owner alone, `chmod 600`, owned by the user the process runs as. A file anybody else may read or write is refused at startup: it holds the database password and every secret below |
 | Refused at startup | A key that is not a setting, a value of the wrong type, a list entry holding a comma, and a file that is not TOML. Each refusal names the key, or the line |
 | Refusals | A refusal that stops the process names the key, as `database.max_open`, rather than the variable. A refusal answered to a request names both. A log line, a hint on a screen and the API reference name the variable, which the tables pair with the key |
-| Kubernetes | A pod gets variables for every Service in its namespace, named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more. For a Service called `openpsirt` they start `OPENPSIRT_`, and are refused beside a file. A pod configured by file sets `enableServiceLinks: false` |
+| Kubernetes | A pod gets variables for every Service in its namespace, named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more. For a Service called `openpsirt` they start `OPENPSIRT_`, and are left alone, beside a file or not |
 
 Every rule in the tables applies to a value from the file exactly as to one
 from the environment: the defaults, the zero read as unset, and every value
@@ -1640,3 +1647,9 @@ v0.10.2 named `reaffirm-claim`.
 | Change | What to do |
 |---|---|
 | An issue taken off an advisory and put back keeps every stretch it was on, so an advisory issued during any of them is read as naming it. v0.12.0 kept only the last stretch, and the upgrade cannot recover an earlier one | Nothing the upgrade can do. Where v0.12.0 saw an issue taken off, put back and taken off again, an advisory issued during an earlier stretch is read as not naming it: what went out is shown to readers who may not see that issue, and a rename that issuance should refuse is allowed |
+| A variable starting `OPENPSIRT_` that names no setting stops the process at startup, naming it. v0.12.0 ignored it, so a misspelled setting kept its default | Correct or unset each variable the refusal names. Kubernetes service links are not refused |
+| A database URL with a port, no user name and no database, whose query holds an unescaped `@` followed by a host, such as `postgres://u:12?a=b@db`, is refused at startup as a password cut short. An `@` in a `user` or `password` parameter is not. v0.12.0 handed the driver the host `u` | Percent-encode each `/`, `?`, `#` and `@` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
+| An object store endpoint, `OPENPSIRT_BASE_URL`, `OPENPSIRT_DIRECTORY_URL`, `OPENPSIRT_ZULIP_SITE` or `openpsirt-upload --url` whose password holds an unescaped `/`, `?` or `#`, such as `https://key:12/ab@minio:9000`, is refused. v0.12.0 read the host as `key` | Percent-encode each `/`, `?`, `#` and `@` in the user name and password |
+| `openpsirt-upload` refuses a plain `http` address that is not this machine. v0.12.0 sent the key over it unencrypted | Use the `https` address. Inside a network you trust, give `--allow-http` |
+| `openpsirt-upload write` names each analyzer's file with the analyzer's name in lower-case letters, digits, `.`, `_` and `-`, every other character a `-`. v0.12.0 wrote the name as the analyzer gave it | Look for the new name where a script picks the file up by its name |
+| The Helm chart salts the checksum that rolls the pods when a chart-held secret changes, and keeps the salt in the Secret `<fullname>-rollout-salt`, where `<fullname>` is `fullnameOverride` where set, otherwise the release name followed by `-openpsirt` unless it holds `openpsirt` already. The first upgrade rolls the pods once | Where the chart is rendered with no cluster, `helm template` or Argo CD, set `rolloutSalt` to a long random value, or the pods roll on every render |

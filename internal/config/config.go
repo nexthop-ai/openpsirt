@@ -9,16 +9,13 @@
 package config
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -360,19 +357,44 @@ type Store struct {
 	Dir       string
 }
 
-// Load reads configuration from the environment.
+// Load reads configuration from the environment, given in the form
+// os.Environ gives it.
 //
 // A value that is set and cannot be read is a startup error naming the
 // variable, never a silent fallback. "PLAIN_HTTP=false" turning Secure
 // cookies off, or "AUTO_MIGRATE=0" still migrating, is a setting that does
 // the opposite of what it says — worse than refusing to start, because the
-// operator has no reason to look.
-func Load() (Config, error) {
-	given := map[string]string{}
+// operator has no reason to look. A variable carrying the prefix that names
+// no setting is refused for the same reason, since a misspelled switch
+// leaves its default in force. Kubernetes service links, the upload client's
+// variables, the interface development server's and the test suite's own are
+// the exceptions.
+// Where a name is set twice the first is read, as the process reads it.
+func Load(environ []string) (Config, error) {
+	known := make(map[string]bool, len(settings))
 	for _, one := range settings {
-		if v, ok := os.LookupEnv(envPrefix + one.env); ok {
-			given[one.env] = v
+		known[one.env] = true
+	}
+	given := map[string]string{}
+	var unknown []string
+	for _, kv := range environ {
+		name, value, _ := strings.Cut(kv, "=")
+		key, ours := strings.CutPrefix(name, envPrefix)
+		switch {
+		case !ours:
+		case known[key]:
+			if _, twice := given[key]; !twice {
+				given[key] = value
+			}
+		case incidental(key, value):
+		case !slices.Contains(unknown, name):
+			unknown = append(unknown, name)
 		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return Config{}, fmt.Errorf("%s: not a setting: check its spelling",
+			strings.Join(unknown, ", "))
 	}
 	return load(given)
 }
@@ -781,134 +803,6 @@ func absoluteBase(base string) error {
 	return nil
 }
 
-// apart refuses a published directory that is the attachment store, or holds
-// it, or sits inside it.
-//
-// What the directory holds is served to anybody, and an attachment is fetched
-// only after its finding's visibility is checked (REQ-70). Sharing one store
-// serves every attachment unauthenticated. A bucket wins over a folder in each,
-// so each is compared in the form it takes.
-func apart(directory, attachments Store) error {
-	if bucket := strings.TrimSpace(directory.Bucket); bucket != "" {
-		if other := strings.TrimSpace(attachments.Bucket); strings.EqualFold(bucket, other) &&
-			sameEndpoint(directory.Endpoint, attachments.Endpoint) {
-			return fmt.Errorf("OPENPSIRT_DIRECTORY_BUCKET: names the attachment store's " +
-				"bucket, and everything in the directory is served to anybody: give the " +
-				"directory a bucket of its own")
-		}
-		return nil
-	}
-	dir, other := strings.TrimSpace(directory.Dir), strings.TrimSpace(attachments.Dir)
-	if dir == "" || other == "" || strings.TrimSpace(attachments.Bucket) != "" {
-		return nil
-	}
-	dir, err := resolved(dir)
-	if err != nil {
-		return fmt.Errorf("OPENPSIRT_DIRECTORY_DIR: %w", err)
-	}
-	other, err = resolved(other)
-	if err != nil {
-		return fmt.Errorf("OPENPSIRT_ATTACHMENT_DIR: %w", err)
-	}
-	if within(dir, other) || within(other, dir) {
-		return fmt.Errorf("OPENPSIRT_DIRECTORY_DIR: is, holds or sits inside " +
-			"OPENPSIRT_ATTACHMENT_DIR, and everything in the directory is served to " +
-			"anybody: give each a folder of its own")
-	}
-	return nil
-}
-
-// sameEndpoint reports whether two object store endpoints may name one
-// service, and so one bucket where the names match.
-//
-// Each is compared as the service it reaches: a name and password
-// in the address are handed over as credentials and taken out of it, a
-// scheme's default port is no port, and capitals and slashes around the path
-// mean nothing. Every Amazon address of one partition is one service, because
-// a bucket's name is unique across it. An empty endpoint is whatever the SDK
-// resolves, from the environment, a profile or the region, so it is the same
-// as any endpoint. An endpoint that does not parse is taken to be the same.
-// Either way the doubt refuses.
-func sameEndpoint(a, b string) bool {
-	if strings.TrimSpace(a) == "" || strings.TrimSpace(b) == "" {
-		return true
-	}
-	one, read := storeService(a)
-	two, readToo := storeService(b)
-	return !read || !readToo || one == two
-}
-
-// awsService is the service every Amazon S3 endpoint of the commercial
-// partition reaches, and the domain of every partition's endpoints.
-const awsService = "amazonaws.com"
-
-// storeService is the service an object store endpoint reaches, as a host,
-// a port where the port is not the scheme's default, and a path where there
-// is one, and whether the endpoint could be read. Every endpoint of one AWS
-// partition reaches one service, since a bucket name is unique across it:
-// China, GovCloud, and the rest.
-func storeService(endpoint string) (string, bool) {
-	parsed, err := url.Parse(strings.TrimSpace(endpoint))
-	if err != nil || parsed.Host == "" {
-		return "", false
-	}
-	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
-	// The China partition first, since its domain ends in the other's.
-	for _, domain := range []string{awsService + ".cn", awsService} {
-		if host == domain || strings.HasSuffix(host, "."+domain) {
-			// GovCloud's regions share the domain and are a partition
-			// of their own.
-			if strings.HasPrefix(host, "us-gov-") || strings.Contains(host, ".us-gov-") {
-				return "us-gov." + domain, true
-			}
-			return domain, true
-		}
-	}
-	switch port := parsed.Port(); {
-	case port == "",
-		port == "443" && strings.EqualFold(parsed.Scheme, "https"),
-		port == "80" && strings.EqualFold(parsed.Scheme, "http"):
-	default:
-		host = net.JoinHostPort(host, port)
-	}
-	if path := strings.Trim(parsed.EscapedPath(), "/"); path != "" {
-		host += "/" + path
-	}
-	return host, true
-}
-
-// resolved is a folder as an absolute path with every symbolic link in it
-// followed, so that two names for one folder compare as one. A folder not
-// made yet is resolved through the nearest one above it that exists.
-func resolved(path string) (string, error) {
-	path, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	below := ""
-	for {
-		followed, err := filepath.EvalSymlinks(path)
-		if err == nil {
-			return filepath.Join(followed, below), nil
-		}
-		if !errors.Is(err, fs.ErrNotExist) {
-			return "", err
-		}
-		parent := filepath.Dir(path)
-		if parent == path {
-			return filepath.Join(path, below), nil
-		}
-		below = filepath.Join(filepath.Base(path), below)
-		path = parent
-	}
-}
-
-// within reports whether path is root or a folder below it.
-func within(root, path string) bool {
-	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
 // plainAddress reads an address that stands alone: a scheme from schemes, a
 // host, and no credentials, query or fragment, an empty query included.
 //
@@ -927,6 +821,12 @@ func plainAddress(name, raw string, schemes ...string) (*url.URL, error) {
 			name, strings.Join(schemes, " or "), shown)
 	case parsed.Host == "":
 		return nil, fmt.Errorf("%s: names no host: %q", name, shown)
+	case redact.Stray(parsed) && strings.Contains(parsed.EscapedPath()+parsed.RawQuery+parsed.EscapedFragment(), "@"):
+		// The sign of a password holding an unescaped "/", "?" or "#" is also
+		// what an "@" in a path looks like, so the refusal names both.
+		return nil, fmt.Errorf("%s: holds an @ after its host, which reads as a user name "+
+			"or password cut short: percent-encode / ? # @ in a password, and an @ "+
+			"in a path as %%40: %q", name, shown)
 	case parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "":
 		return nil, fmt.Errorf("%s: names the address alone, with no query, "+
 			"fragment or credentials: %q", name, shown)

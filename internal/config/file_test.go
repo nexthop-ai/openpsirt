@@ -197,7 +197,7 @@ func TestAFileAndTheEnvironmentConfigureTheSame(t *testing.T) {
 		t.Setenv(envPrefix+one.env, raw)
 		file.WriteString(one.file + " = " + literal(one.kind, raw) + "\n")
 	}
-	fromEnv, err := Load()
+	fromEnv, err := Load(os.Environ())
 	if err != nil {
 		t.Fatalf("the environment: %v", err)
 	}
@@ -258,18 +258,24 @@ func TestTheEnvironmentAndAFileAreNeverBothRead(t *testing.T) {
 		"http_proxy=http://proxy:3128", "https_proxy=http://proxy:3128", "no_proxy=localhost",
 		"GRYPE_DB_CACHE_DIR=/var/cache/openpsirt/grype", "GRYPE_DB_AUTO_UPDATE=false",
 		"PGSSLMODE=require", "AWS_REGION=eu-west-1",
+		// A Kubernetes service link, for a Service named for the deployment.
+		"OPENPSIRT_SERVICE_HOST=10.0.0.1", "OPENPSIRT_PORT=tcp://10.0.0.1:8080",
+		// The upload client's, set in a job that runs both programs.
+		"OPENPSIRT_URL=https://psirt.example.com", "OPENPSIRT_KEY=k",
+		// The test suite's, which every program the build runs inherits.
+		"OPENPSIRT_TEST_POSTGRES_URL=postgres://localhost/test",
 	}
 	if _, err := LoadFile(path, theirs); err != nil {
 		t.Fatalf("a variable that is not the deployment's own was refused: %v", err)
 	}
 
-	ours := []string{"OPENPSIRT_MAIL_PASSWORD=x", "OPENPSIRT_DATABASE_URL=", "OPENPSIRT_TEST_POSTGRES_URL=y"}
+	ours := []string{"OPENPSIRT_MAIL_PASSWORD=x", "OPENPSIRT_DATABASE_URL=", "OPENPSIRT_DIRECTORY_URL=y"}
 	_, err := LoadFile(path, append(theirs, ours...))
 	if err == nil {
 		t.Fatal("a file with the deployment's own variables beside it was read")
 	}
 	named, _, _ := strings.Cut(err.Error(), " is set beside")
-	want := "OPENPSIRT_DATABASE_URL, OPENPSIRT_MAIL_PASSWORD, OPENPSIRT_TEST_POSTGRES_URL"
+	want := "OPENPSIRT_DATABASE_URL, OPENPSIRT_DIRECTORY_URL, OPENPSIRT_MAIL_PASSWORD"
 	if named != want {
 		t.Errorf("the refusal names %q, want every one of the deployment's and nothing else: %q",
 			named, want)
@@ -408,7 +414,7 @@ func TestAValueRefusedFromTheEnvironmentIsRefusedFromAFile(t *testing.T) {
 		t.Run(c.key+"="+c.value, func(t *testing.T) {
 			one := lookup(t, c.key)
 			t.Setenv(envPrefix+c.key, c.value)
-			if _, err := Load(); err == nil {
+			if _, err := Load(os.Environ()); err == nil {
 				t.Fatalf("the environment accepted %s=%q, so this case pins nothing", c.key, c.value)
 			}
 			_, err := LoadFile(writeFile(t, one.file+" = "+literal(one.kind, c.value)+"\n"), nil)
@@ -548,7 +554,7 @@ func TestGroupRolesWithNoSourceOfGroupsAreRefused(t *testing.T) {
 			for key, value := range env {
 				t.Setenv(envPrefix+key, value)
 			}
-			if _, err := Load(); err == nil || !strings.Contains(err.Error(), "nothing here says which groups") {
+			if _, err := Load(os.Environ()); err == nil || !strings.Contains(err.Error(), "nothing here says which groups") {
 				t.Errorf("answered %v", err)
 			}
 		})
@@ -564,7 +570,7 @@ func TestGroupRolesWithNoSourceOfGroupsAreRefused(t *testing.T) {
 			for key, value := range env {
 				t.Setenv(envPrefix+key, value)
 			}
-			if _, err := Load(); err != nil && strings.Contains(err.Error(), "nothing here says which groups") {
+			if _, err := Load(os.Environ()); err != nil && strings.Contains(err.Error(), "nothing here says which groups") {
 				t.Errorf("a source of groups was not counted: %v", err)
 			}
 		})

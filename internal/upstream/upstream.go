@@ -33,6 +33,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -107,8 +108,10 @@ func Address(raw string) (*url.URL, error) {
 		return nil, fmt.Errorf("%w, of at most %d characters", ErrUnusable, MostURL)
 	}
 	at, err := url.Parse(raw)
+	// A password holding an unescaped "/", "?" or "#" parses with its start
+	// as the host the upstream would be pinned to.
 	if err != nil || at.Scheme != "https" || at.Host == "" || at.User != nil ||
-		at.Opaque != "" {
+		at.Opaque != "" || redact.Stray(at) {
 		return nil, ErrUnusable
 	}
 	return at, nil

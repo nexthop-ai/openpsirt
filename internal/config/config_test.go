@@ -4,9 +4,12 @@
 package config
 
 import (
+	"context"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +17,90 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
+// A variable carrying the prefix that names no setting is refused, naming it,
+// since a misspelled switch would leave its default in force. The variables
+// Kubernetes gives a pod for a Service whose name begins with the prefix are
+// read as what they are.
+func TestAVariableThatIsNotASettingIsRefused(t *testing.T) {
+	for _, name := range []string{
+		"OPENPSIRT_DB_REQUIRE_ENCRYPTON",
+		"OPENPSIRT_PLAIN_HTTP_",
+		"OPENPSIRT_",
+		"OPENPSIRT_BASEURL",
+	} {
+		_, err := Load([]string{"OPENPSIRT_ADDR=:8080", name + "=true"})
+		if err == nil || !strings.Contains(err.Error(), name+": not a setting") {
+			t.Errorf("%s answered %v, want a refusal naming it", name, err)
+		}
+	}
+	// A setting misspelled into the shape of a service link, with a value
+	// no link has.
+	for _, kv := range []string{
+		"OPENPSIRT_MAIL_PORT=587",
+		"OPENPSIRT_DATABASE_PORT=5432",
+		"OPENPSIRT_PORT=8080",
+		"OPENPSIRT_DATABASE_SERVICE_HOST=db.example.test",
+		"OPENPSIRT_SERVICE_PORT=http",
+		"OPENPSIRT_PORT_80_TCP_PROTO=http",
+	} {
+		name, _, _ := strings.Cut(kv, "=")
+		_, err := Load([]string{kv})
+		if err == nil || !strings.Contains(err.Error(), name+": not a setting") {
+			t.Errorf("%s answered %v, want a refusal naming it", kv, err)
+		}
+	}
+	_, err := Load([]string{"OPENPSIRT_TWO=1", "OPENPSIRT_ONE=1", "OPENPSIRT_TWO=2"})
+	if err == nil || !strings.Contains(err.Error(), "OPENPSIRT_ONE, OPENPSIRT_TWO: not a setting") {
+		t.Errorf("two answered %v, want a refusal naming each once, in order", err)
+	}
+
+	links := []string{
+		"OPENPSIRT_SERVICE_HOST=10.0.0.1",
+		"OPENPSIRT_SERVICE_PORT=8080",
+		"OPENPSIRT_SERVICE_PORT_HTTP=8080",
+		"OPENPSIRT_PORT=tcp://10.0.0.1:8080",
+		"OPENPSIRT_PORT_8080_TCP=tcp://10.0.0.1:8080",
+		"OPENPSIRT_PORT_8080_TCP_PROTO=tcp",
+		"OPENPSIRT_PORT_8080_TCP_PORT=8080",
+		"OPENPSIRT_PORT_8080_TCP_ADDR=10.0.0.1",
+		"OPENPSIRT_POSTGRESQL_SERVICE_HOST=10.0.0.2",
+		"OPENPSIRT_POSTGRESQL_PORT_5432_TCP_ADDR=10.0.0.2",
+		"OPENPSIRT_POSTGRESQL_PORT_5432_TCP_PORT=5432",
+		"OPENPSIRT_POSTGRESQL_PORT=tcp://[fd00::2]:5432",
+		"OPENPSIRT_X_SERVICE_SERVICE_HOST=fd00::3",
+		// Services named openpsirt-api-service and openpsirt-service, whose
+		// names end in a link's suffix.
+		"OPENPSIRT_API_SERVICE_PORT=tcp://10.0.0.5:8080",
+		"OPENPSIRT_API_SERVICE_SERVICE_PORT=8080",
+		"OPENPSIRT_SERVICE_PORT=tcp://10.0.0.6:8080",
+		// A named port whose name ends in another suffix.
+		"OPENPSIRT_SERVICE_PORT_HTTP_ADDR=8080",
+		"OPENPSIRT_SERVICE_PORT_TCP_PROTO=8080",
+		"OPENPSIRT_TEST_POSTGRES_URL=postgres://localhost/test",
+		// The interface's development server's.
+		"OPENPSIRT_DEV_USER=admin",
+		// The upload client's, set in a job that runs both programs.
+		"OPENPSIRT_URL=https://psirt.example.com", "OPENPSIRT_KEY=k",
+		"PATH=/usr/bin",
+	}
+	if _, err := Load(links); err != nil {
+		t.Errorf("Kubernetes service links were refused: %v", err)
+	}
+}
+
+// Where a name is set twice the first is read, as the process reads it.
+func TestTheFirstOfAVariableSetTwiceIsRead(t *testing.T) {
+	c, err := Load([]string{"OPENPSIRT_ADDR=:1", "OPENPSIRT_ADDR=:2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Addr != ":1" {
+		t.Errorf("read %q, want the first, :1", c.Addr)
+	}
+}
+
 func TestLoadDefaults(t *testing.T) {
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatalf("Load with nothing set: %v", err)
 	}
@@ -99,7 +184,7 @@ func TestLoadRejectsBadValues(t *testing.T) {
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)
-			_, err := Load()
+			_, err := Load(os.Environ())
 			if err == nil {
 				t.Fatalf("%s=%q was accepted", tc.key, tc.value)
 			}
@@ -123,7 +208,7 @@ func TestThePublishedAddressIsNormalizedWhicheverWayItWasWritten(t *testing.T) {
 	} {
 		t.Run(given, func(t *testing.T) {
 			t.Setenv(envPrefix+"DIRECTORY_URL", given)
-			cfg, err := Load()
+			cfg, err := Load(os.Environ())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -148,7 +233,7 @@ func TestATrustedHeaderHonoredFromAnywhereIsRefused(t *testing.T) {
 		t.Run(sources, func(t *testing.T) {
 			t.Setenv(envPrefix+"TRUSTED_HEADER", "X-User")
 			t.Setenv(envPrefix+"TRUSTED_SOURCES", sources)
-			_, err := Load()
+			_, err := Load(os.Environ())
 			if err == nil {
 				t.Fatalf("TRUSTED_SOURCES=%q was accepted, so the header is honored "+
 					"from every address", sources)
@@ -163,7 +248,7 @@ func TestATrustedHeaderHonoredFromAnywhereIsRefused(t *testing.T) {
 // The patch branch lookups reach out to hosts a report chooses, so a
 // deployment that says nothing about them has them off.
 func TestPatchBranchesAreOffUnlessTheDeploymentTurnsThemOn(t *testing.T) {
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +259,7 @@ func TestPatchBranchesAreOffUnlessTheDeploymentTurnsThemOn(t *testing.T) {
 
 func TestTheExcludedListIsReadUnderItsName(t *testing.T) {
 	t.Setenv(envPrefix+"OUTBOUND_EXCLUDED", "corp.example.com")
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +273,7 @@ func TestATrustedHeaderAndTheSourcesItIsReadFromAreAcceptedTogether(t *testing.T
 	// the pair outright.
 	t.Setenv(envPrefix+"TRUSTED_HEADER", "X-User")
 	t.Setenv(envPrefix+"TRUSTED_SOURCES", "10.0.0.0/8,192.168.0.0/16")
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatalf("a header with the networks it is read from was refused: %v", err)
 	}
@@ -203,7 +288,7 @@ func TestAMailServerAndWhoItSendsAsAreAcceptedTogether(t *testing.T) {
 	// case it is.
 	t.Setenv(envPrefix+"MAIL_SERVER", "smtp.example.test:587")
 	t.Setenv(envPrefix+"MAIL_FROM", "psirt@example.test")
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatalf("a server with somebody to send as was refused: %v", err)
 	}
@@ -233,7 +318,7 @@ func TestASwitchMeansWhatItSays(t *testing.T) {
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)
-			c, err := Load()
+			c, err := Load(os.Environ())
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
@@ -247,7 +332,7 @@ func TestASwitchMeansWhatItSays(t *testing.T) {
 func TestADurationIsReadAsWritten(t *testing.T) {
 	t.Setenv(envPrefix+"SHUTDOWN_GRACE", "45s")
 	t.Setenv(envPrefix+"DB_MAX_OPEN", "7")
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -262,7 +347,7 @@ func TestADurationIsReadAsWritten(t *testing.T) {
 func TestLoadReadsEnvironment(t *testing.T) {
 	t.Setenv(envPrefix+"ADDR", "127.0.0.1:9999")
 	t.Setenv(envPrefix+"LOG_LEVEL", "debug")
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -275,7 +360,7 @@ func TestLoadReadsEnvironment(t *testing.T) {
 }
 
 func TestAutoMigrateIsOnByDefault(t *testing.T) {
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -291,7 +376,7 @@ func TestASignInLifetimeOverTheCeilingIsRefusedAtStartup(t *testing.T) {
 	// an administrator's key, because nobody can sign in.
 	t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://test.db")
 	t.Setenv("OPENPSIRT_SESSION_LIFETIME", "8760h")
-	if _, err := Load(); err == nil {
+	if _, err := Load(os.Environ()); err == nil {
 		t.Fatal("a sign-in lasting a year was accepted at startup")
 	} else if !strings.Contains(err.Error(), access.MaxSessionLifetime.String()) {
 		t.Errorf("the refusal does not say the limit: %v", err)
@@ -300,7 +385,7 @@ func TestASignInLifetimeOverTheCeilingIsRefusedAtStartup(t *testing.T) {
 	// The ceiling itself, and the ordinary case, both start.
 	for _, lifetime := range []string{access.MaxSessionLifetime.String(), "12h"} {
 		t.Setenv("OPENPSIRT_SESSION_LIFETIME", lifetime)
-		if _, err := Load(); err != nil {
+		if _, err := Load(os.Environ()); err != nil {
 			t.Errorf("a lifetime of %s was refused: %v", lifetime, err)
 		}
 	}
@@ -340,7 +425,7 @@ func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
 	} {
 		t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://test.db")
 		t.Setenv("OPENPSIRT_BASE_URL", c.base)
-		_, err := Load()
+		_, err := Load(os.Environ())
 		if (err != nil) != c.refused {
 			t.Errorf("%s (%q): refused = %v, want %v (%v)",
 				c.what, c.base, err != nil, c.refused, err)
@@ -348,6 +433,22 @@ func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
 		if err != nil && !strings.Contains(err.Error(), "OPENPSIRT_BASE_URL") {
 			t.Errorf("%s (%q): the refusal does not name the variable: %v", c.what, c.base, err)
 		}
+	}
+}
+
+// An "@" in a published address's path reads as a password cut short, so its
+// refusal says how to write one that is not.
+func TestAnAtSignInAnAddressPathIsRefusedSayingHowToWriteIt(t *testing.T) {
+	t.Setenv(envPrefix+"DIRECTORY_URL", "https://cdn.example.test/gh/org/advisories@main/csaf")
+	_, err := Load(os.Environ())
+	if err == nil || !strings.Contains(err.Error(), "%40") || !strings.Contains(err.Error(), envPrefix+"DIRECTORY_URL") {
+		t.Errorf("answered %v, want a refusal naming the setting and %%40", err)
+	}
+	// A fragment holding no "@" is refused as a fragment.
+	t.Setenv(envPrefix+"DIRECTORY_URL", "https://cdn.example.test/csaf#top")
+	_, err = Load(os.Environ())
+	if err == nil || strings.Contains(err.Error(), "%40") || !strings.Contains(err.Error(), "fragment") {
+		t.Errorf("answered %v, want a refusal naming the fragment", err)
 	}
 }
 
@@ -368,6 +469,9 @@ func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
 			"https://user:hunter2@psirt.example.test:bad/",
 			"http://user:hunter2@psirt.example.test/",
 			"https://hunter2@psirt.example.test/",
+			// A password holding an unescaped "/" parses with its start as
+			// the host and the rest in the path.
+			"https://user:12/hunter2@psirt.example.test/csaf",
 		} {
 			t.Run(key+" "+value, func(t *testing.T) {
 				t.Setenv(envPrefix+key, value)
@@ -375,7 +479,7 @@ func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
 					t.Setenv(envPrefix+"ZULIP_EMAIL", "bot@chat.example.test")
 					t.Setenv(envPrefix+"ZULIP_KEY", "k")
 				}
-				_, err := Load()
+				_, err := Load(os.Environ())
 				if err == nil {
 					t.Fatal("an address carrying credentials was accepted")
 				}
@@ -394,7 +498,7 @@ func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
 // blank field, is no address at all rather than one made of spaces.
 func TestABlankDirectoryAddressIsNoAddress(t *testing.T) {
 	t.Setenv(envPrefix+"DIRECTORY_URL", "   ")
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,7 +514,7 @@ func TestADirectoryStoreWithNoAddressIsRefused(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 			t.Setenv(envPrefix+key, "/tmp/csaf")
 			t.Setenv(envPrefix+"DIRECTORY_URL", "  ")
-			_, err := Load()
+			_, err := Load(os.Environ())
 			if err == nil {
 				t.Fatalf("%s with no address was accepted", key)
 			}
@@ -425,7 +529,7 @@ func TestADirectoryStoreWithNoAddressIsRefused(t *testing.T) {
 // empty entries a template leaves: an empty name matches everything.
 func TestTheInternalNamesAreReadAsAList(t *testing.T) {
 	t.Setenv(envPrefix+"UPSTREAM_INTERNAL", " a, ,b,")
-	c, err := Load()
+	c, err := Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,12 +550,12 @@ func TestAZulipServerIsReachedOverHTTPSAlone(t *testing.T) {
 		"https://chat.example.test/?x", "https://chat.example.test/?",
 		"https://chat.example.test/#f", "https://chat.example.test/zulip"} {
 		t.Setenv("OPENPSIRT_ZULIP_SITE", site)
-		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "OPENPSIRT_ZULIP_SITE") {
+		if _, err := Load(os.Environ()); err == nil || !strings.Contains(err.Error(), "OPENPSIRT_ZULIP_SITE") {
 			t.Errorf("a Zulip server at %q answered %v, want it refused by name", site, err)
 		}
 	}
 	t.Setenv("OPENPSIRT_ZULIP_SITE", "https://chat.example.test")
-	if _, err := Load(); err != nil {
+	if _, err := Load(os.Environ()); err != nil {
 		t.Errorf("a whole Zulip configuration was refused: %v", err)
 	}
 }
@@ -474,12 +578,53 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 	if err := os.Symlink(filepath.Join(root, "private"), filepath.Join(root, "link-to-private")); err != nil {
 		t.Fatal(err)
 	}
+	// A link to a folder not made yet, inside private.
+	if err := os.Symlink(filepath.Join(root, "private", "pub"), filepath.Join(root, "dangling")); err != nil {
+		t.Fatal(err)
+	}
+	// A relative link to a folder not made yet, inside private, reached
+	// through a link one folder shallower than where it sits.
+	if err := os.Symlink(filepath.Join(root, "served", "attachments"), filepath.Join(root, "shallow")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", "..", "private", "rel"), filepath.Join(root, "served", "attachments", "rel")); err != nil {
+		t.Fatal(err)
+	}
+	resolves := map[string][]string{
+		"minio":                           {"10.0.0.5"},
+		"minio.storage.svc.cluster.local": {"10.0.0.5"},
+		"localhost":                       {"::1", "127.0.0.1"},
+	}
+	lookupHost = func(_ context.Context, host string) ([]string, error) {
+		if found, ok := resolves[host]; ok {
+			return slices.Clone(found), nil
+		}
+		if host == "flaky" {
+			return nil, &net.DNSError{Err: "i/o timeout", Name: host, IsTimeout: true}
+		}
+		return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
+	}
+	t.Cleanup(func() { lookupHost = net.DefaultResolver.LookupHost })
 	for _, c := range []struct {
 		what    string
 		set     map[string]string
 		refused string
 	}{
 		{"one bucket", map[string]string{"DIRECTORY_BUCKET": "psirt", "ATTACHMENT_BUCKET": "PSIRT"}, "DIRECTORY_BUCKET"},
+		// A short name and a cluster name, or a name and its address, reach
+		// one server.
+		{"one bucket on two names of one server", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "http://minio:9000",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "http://minio.storage.svc.cluster.local:9000",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on a name whose lookup failed", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "http://flaky:9000",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "http://minio:9000",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on a name and its address", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "http://127.0.0.1:9000",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "http://localhost:9000",
+		}, "DIRECTORY_BUCKET"},
 		{"one bucket on one endpoint", map[string]string{
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio.example.test/",
 			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://MINIO.example.test",
@@ -539,6 +684,12 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 		{"the attachments inside the directory through a link", map[string]string{
 			"DIRECTORY_DIR": root + "/linked", "ATTACHMENT_DIR": root + "/served/attachments",
 		}, "DIRECTORY_DIR"},
+		{"the directory inside the attachments through a link to a folder not made yet", map[string]string{
+			"DIRECTORY_DIR": root + "/dangling", "ATTACHMENT_DIR": root + "/private",
+		}, "DIRECTORY_DIR"},
+		{"the directory inside the attachments through a relative link to a folder not made yet", map[string]string{
+			"DIRECTORY_DIR": root + "/shallow/rel", "ATTACHMENT_DIR": root + "/private",
+		}, "DIRECTORY_DIR"},
 		{"the directory inside the attachments through a link", map[string]string{
 			"DIRECTORY_DIR": root + "/link-to-private/csaf", "ATTACHMENT_DIR": root + "/private",
 		}, "DIRECTORY_DIR"},
@@ -563,6 +714,19 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.example.test/tenant-b/",
 		}, ""},
 		// The China partition is a namespace of its own.
+		// A bucket's own name in the host says nothing of the partition.
+		{"one bucket named like GovCloud on two commercial endpoints", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://corp-us-gov-mirror.s3.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.amazonaws.com",
+		}, "DIRECTORY_BUCKET"},
+		{"one bucket on two GovCloud spellings", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3-fips-us-gov-west-1.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://psirt.s3.us-gov-east-1.amazonaws.com",
+		}, "DIRECTORY_BUCKET"},
+		{"one name on Amazon and on Amazon GovCloud's dashed address", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3-us-gov-west-1.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.us-east-1.amazonaws.com",
+		}, ""},
 		{"one name on Amazon and on Amazon GovCloud", map[string]string{
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.us-gov-west-1.amazonaws.com",
 			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.us-east-1.amazonaws.com",
@@ -579,7 +743,7 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 			for key, value := range c.set {
 				t.Setenv(envPrefix+key, value)
 			}
-			_, err := Load()
+			_, err := Load(os.Environ())
 			if c.refused == "" {
 				if err != nil {
 					t.Errorf("refused: %v", err)
