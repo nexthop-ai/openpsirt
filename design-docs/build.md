@@ -136,7 +136,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make narrowed` | A build resolved for a case-only participant is read with a subject or refused first. Bound resolutions and values derived from them are followed; inline uses are not |
 | `make subjected` | An exported store method or package function under `internal/` that queries without a subject, unless exempt with a reason. A store is a type with a method building a query or calling a function of its package that does; programs and test harnesses, packages importing testing that no program under `cmd/` links, are not read; a tree with no program is refused. Queries are followed within the package by name; another package's are not seen |
 | `make attached` | A doc comment describing a different declaration |
-| `make confined` | Engine-specific code outside its two allowed places |
+| `make confined` | Engine-specific code outside the paths `design-docs/database.md` § Engine-specific code allows |
 | `make readable` | Source files a text tool will not read |
 | `make unclaimed` | Every requirement named by a design document |
 | `make vendored` | Copied files accounted for. See `design-docs/build-dependencies.md` § Copied files |
