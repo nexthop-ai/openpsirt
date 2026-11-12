@@ -18,9 +18,14 @@
 // An invalidation whose key is a name is resolved to the literal it names: a
 // constant holding an array, or the variable of a `for … of` over a literal
 // list of arrays, which is one invalidation per entry. A shorthand
-// `{ queryKey }` is the same name. Any other key it cannot read is reported,
-// and so are options handed over as anything but an object literal, so a key
-// nobody can check fails the gate rather than passing it.
+// `{ queryKey }` is the same name. A key opening on a name is resolved the same
+// way: a constant holding a string, or the variable of a `for … of` over a
+// literal list of strings, or over a constant holding one, which is one
+// invalidation per word. Any other key
+// it cannot read is reported, an invalidation opening on a name it cannot
+// resolve included, and so are options handed over as anything but an object
+// literal, so a key nobody can check fails the gate rather than passing it. A
+// read whose key opens on a name it cannot resolve is reported too.
 import path from "node:path";
 import ts from "typescript";
 
@@ -106,6 +111,42 @@ function literalKeys(key) {
   return entries.every((entry) => ts.isArrayLiteralExpression(entry)) ? entries : null;
 }
 
+const isWord = (node) => ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
+
+// The words a key's first element stands for where it is a name: what a
+// constant holding a string is bound to, or each word of a literal list a
+// `for … of` loops over. Null where the element is not a name, or is one bound
+// to nothing literal.
+function openingWords(array) {
+  const first = array.elements.length > 0 ? bare(array.elements[0]) : null;
+  if (!first || !ts.isIdentifier(first)) return null;
+  const bound = binding(first.text, first);
+  if (!bound) return null;
+  let value = bare(bound.value);
+  if (!bound.each) return isWord(value) ? [value.text] : null;
+  // The list looped over may itself be a name, bound to a literal list.
+  if (ts.isIdentifier(value)) {
+    const list = binding(value.text, value);
+    value = list && !list.each ? bare(list.value) : value;
+  }
+  if (!ts.isArrayLiteralExpression(value)) return null;
+  const entries = value.elements.map(bare);
+  return entries.every(isWord) ? entries.map((entry) => entry.text) : null;
+}
+
+// The literal prefixes a key stands for, one per word its opening name can
+// hold, or null where the key opens on something that cannot be read.
+function prefixesOf(array) {
+  const words = openingWords(array);
+  if (words) {
+    const rest = literalPrefix({ elements: array.elements.slice(1) });
+    return words.map((word) => ({ words: [word, ...rest.words], open: rest.open }));
+  }
+  const prefix = literalPrefix(array);
+  if (array.elements.length > 0 && prefix.words.length === 0) return null;
+  return [prefix];
+}
+
 // What a call on the query client does with the options it is handed: an
 // invalidation, something else that names a key without declaring a read, or
 // nothing of the kind.
@@ -143,10 +184,18 @@ export function keysIn(text, file = "x.tsx", source = parse(text, file)) {
         const called = calledAs(node);
         const keys = literalKeys(key);
         if (called === "invalidateQueries") {
-          if (keys) for (const each of keys) invalidates.push({ at, ...literalPrefix(each) });
-          else invalidates.push({ at, words: [], open: true, unread: true });
+          const prefixes = keys && keys.map(prefixesOf);
+          if (prefixes && prefixes.every(Boolean)) {
+            for (const each of prefixes.flat()) invalidates.push({ at, ...each });
+          } else {
+            invalidates.push({ at, words: [], open: true, unread: true });
+          }
         } else if (keys && !NAMING.has(called)) {
-          for (const each of keys) reads.push({ at, ...literalPrefix(each) });
+          for (const each of keys) {
+            const prefixes = prefixesOf(each);
+            if (prefixes) for (const prefix of prefixes) reads.push({ at, ...prefix });
+            else reads.push({ at, words: [], open: true, unread: true });
+          }
         }
       }
     }
@@ -167,12 +216,16 @@ export function reaches(invalidation, read) {
 }
 
 // stale is every invalidation, across a set of files, that reaches no read in
-// any of them, and every invalidation whose key could not be read, which is
-// reported with a null key.
+// any of them, and every invalidation or read whose key could not be read,
+// which is reported with a null key. A read whose key opens on something
+// unreadable would otherwise reach every invalidation.
 export function stale(files) {
-  const reads = files.flatMap((each) => each.reads);
+  const reads = files.flatMap((each) => each.reads).filter((read) => !read.unread);
   const found = [];
   for (const each of files) {
+    for (const read of each.reads) {
+      if (read.unread) found.push({ file: each.file, at: read.at, key: null });
+    }
     for (const invalidation of each.invalidates) {
       if (invalidation.unread) {
         found.push({ file: each.file, at: invalidation.at, key: null });
