@@ -404,19 +404,20 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	// that merged lead to one finding.
 	// Where two rows lead to one, an undisclosed one keeps it undisclosed,
 	// whichever is read first.
-	done := map[string]int{}
+	done := map[string]bool{}
+	proposed := map[string]int{}
 	for _, row := range lapsed {
 		key := occurrenceKey(row.ProductID, row.VulnerabilityID, row.OccurrenceIdentity)
 		for _, at := range atVersions(row, where[key]) {
 			written := occurrenceKey(at.ProductID, at.VulnerabilityID, at.OccurrenceIdentity) +
 				"\x00" + at.ComponentUpstream + "\x00" + at.ConsumerUpstream
-			if i, seen := done[written]; seen {
-				if i >= 0 && proposals[i].Occurrence.Visibility == access.Public {
-					proposals[i].Occurrence.Visibility = row.Visibility
-				}
+			if i, held := proposed[written]; held && proposals[i].Occurrence.Visibility == access.Public {
+				proposals[i].Occurrence.Visibility = row.Visibility
+			}
+			if done[written] {
 				continue
 			}
-			done[written] = -1
+			done[written] = true
 			if at.Kind == kind.Analysis {
 				codeFinding := fmt.Sprintf("%d\x00%s", at.ProductID, at.OccurrenceIdentity)
 				if !asked[codeFinding] {
@@ -437,7 +438,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 			// still holds; it is not an occasion to change who may see it.
 			at.Visibility = row.Visibility
 			occurrences[row.OccurrenceIdentity] = true
-			done[written] = len(proposals)
+			proposed[written] = len(proposals)
 			proposals = append(proposals, remade(*previous, at, reasoning, by,
 				severity[[2]int64{row.ProductID, row.VulnerabilityID}], full))
 		}

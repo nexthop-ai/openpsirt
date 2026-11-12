@@ -122,6 +122,7 @@ was made at.
 | A row replaced by a later decision of another made at its occurrence after it stopped standing is not re-made; an earlier sibling at another version replaces nothing, nor do rows of one decision | The later one is what the occurrence last said |
 | A row whose versions are still open is re-made at them alone | It lapsed for a rating, its code unmoved |
 | A row filed under an issue that merged into another is re-made at the findings the other holds, filed under it | A merge moves the findings and leaves the decision filed where it was made |
+| A re-made row keeps the visibility of the row it re-makes; rows leading to one occurrence and versions are re-made once, undisclosed where any of them was | Re-affirming is not an occasion to change who may see it. Rows under two names that merged lead to one finding |
 | The rating in force is read for every row together, one statement per product | 2,000 issues read 1.74 s one at a time on PostgreSQL and 11 ms together; 461 ms and 7 ms on MySQL |
 
 Lapsed decisions are reached by the findings list's `lapsed` state and the
