@@ -79,19 +79,16 @@ const resetWait = 5 * time.Second
 // common idle timeouts by the margin the pool's minute does.
 var keepAliveEvery = 30 * time.Second
 
-// keepAlive uses a pinned connection on a timer until stopped. The stop waits
-// for the last use to finish, because a connection is not safe to use from
-// two goroutines and the release comes next.
-func keepAlive(ctx context.Context, conn *sql.Conn) (stop func()) {
-	done := make(chan struct{})
-	finished := make(chan struct{})
+// keepAlive uses a pinned connection on a timer until stopped.
+func keepAlive(ctx context.Context, conn *sql.Conn) keeper {
+	k := keeper{done: make(chan struct{}), finished: make(chan struct{})}
 	go func() {
-		defer close(finished)
+		defer close(k.finished)
 		tick := time.NewTicker(keepAliveEvery)
 		defer tick.Stop()
 		for {
 			select {
-			case <-done:
+			case <-k.done:
 				return
 			case <-tick.C:
 				// No deadline: both drivers close a connection whose query
@@ -103,9 +100,26 @@ func keepAlive(ctx context.Context, conn *sql.Conn) (stop func()) {
 			}
 		}
 	}()
-	return func() {
-		close(done)
-		<-finished
+	return k
+}
+
+// keeper is a keep-alive running on the lock's connection.
+type keeper struct {
+	done     chan struct{}
+	finished chan struct{}
+}
+
+// stop ends the keep-alive and waits for its last use to finish, because the
+// release comes next on the same connection, for as long as ctx allows. A use
+// still running when ctx ends is one a stalled connection holds, and stop
+// says so rather than waiting on it.
+func (k keeper) stop(ctx context.Context) error {
+	close(k.done)
+	select {
+	case <-k.finished:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("the connection holding the migration lock did not answer: %w", ctx.Err())
 	}
 }
 
@@ -185,9 +199,14 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 			}
 			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, "") })
 		}
-		stop := keepAlive(ctx, conn)
+		keeping := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
-			stop()
+			if err := keeping.stop(ctx); err != nil {
+				// The connection goes back once the stalled use ends, which
+				// it does when the driver gives up on it.
+				go func() { <-keeping.finished; closeConn() }()
+				return err
+			}
 			defer closeConn()
 			// pg_advisory_unlock answers false when this session did not hold
 			// the lock. Executing it without reading the result would report
@@ -230,9 +249,14 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 			}
 			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, name) })
 		}
-		stop := keepAlive(ctx, conn)
+		keeping := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
-			stop()
+			if err := keeping.stop(ctx); err != nil {
+				// The connection goes back once the stalled use ends, which
+				// it does when the driver gives up on it.
+				go func() { <-keeping.finished; closeConn() }()
+				return err
+			}
 			defer closeConn()
 			// RELEASE_LOCK answers 0 when held by another session and NULL
 			// when no such lock exists. Neither is an error to the driver.

@@ -49,15 +49,8 @@ func RefreshStatistics(ctx context.Context, db *DB) error {
 	if db.Stats().MaxOpenConnections == 1 {
 		return nil
 	}
-	idle := db.Pool.MaxIdle
-	if idle <= 0 {
-		idle = db.Stats().MaxOpenConnections
-	}
-	if idle <= 0 {
-		idle = 2 // the standard pool's own default
-	}
 	db.SetMaxIdleConns(0)
-	db.SetMaxIdleConns(idle)
+	db.RestoreIdle()
 	return nil
 }
 
