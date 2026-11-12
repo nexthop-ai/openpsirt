@@ -1325,6 +1325,53 @@ func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
 	})
 }
 
+// The list and the file state every change alike, column for column: who
+// made it and their name, what it was about, both values, and whether an
+// absent value was never set or was cleared.
+func TestTheChangeListAndItsFileStateEveryChangeAlike(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for _, value := range []string{`{"minimum_severity":"high"}`, `{"minimum_severity":""}`} {
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/products/mine/minimum-severity",
+				value); got.Code >= 300 {
+				t.Fatalf("setting the floor answered %d: %s", got.Code, got.Body.String())
+			}
+		}
+		var list struct {
+			Items []map[string]any `json:"items"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?limit=200", &list)
+		file := httpapitest.AsPerson(t, r, "admin", http.MethodGet, "/v1/administration/changes.csv", "")
+		lines, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := httpapitest.RowsUnder(lines)
+		if len(body) < 3 || len(body)-1 != len(list.Items) {
+			t.Fatalf("the list holds %d changes and the file %d rows", len(list.Items), len(body)-1)
+		}
+		header := body[0]
+		for i, item := range list.Items {
+			row := body[i+1]
+			for column, name := range header {
+				said := ""
+				switch v := item[name].(type) {
+				case string:
+					said = v
+				case bool:
+					said = strconv.FormatBool(v)
+				case nil:
+					if name == "unset" || name == "cleared" {
+						said = "false"
+					}
+				}
+				if said != row[column] {
+					t.Errorf("change %d: the list states %s as %q and the file as %q", i, name, said, row[column])
+				}
+			}
+		}
+	})
+}
+
 // A trail row and an answer name what a typed name resolved to, so one product,
 // alias or key scope is spelled one way however a request spelled it.
 func TestATrailRowNamesWhatATypedNameResolvedTo(t *testing.T) {

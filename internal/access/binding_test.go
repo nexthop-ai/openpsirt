@@ -748,3 +748,31 @@ func TestAGroupBringsAnSecurityTestingRole(t *testing.T) {
 		}
 	})
 }
+
+// The mappings in force read back in the order configuration's own list is
+// parsed into, so the two compare position by position.
+func TestMappingsInForceListInTheOrderConfigurationIsParsedInto(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		stated, err := access.ParseGroupRoles(
+			"security=private-read@sonic;admins=admin;security=public-triage;admins=public-read@sonic")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.ApplyMappings(ctx, stated); err != nil {
+			t.Fatal(err)
+		}
+		stored, err := f.store.Mappings(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(stored) != len(stated) {
+			t.Fatalf("%d mappings read back from %d stated", len(stored), len(stated))
+		}
+		for i := range stated {
+			if stored[i] != stated[i] {
+				t.Errorf("mapping %d reads back as %+v, configuration parsed %+v", i, stored[i], stated[i])
+			}
+		}
+	})
+}

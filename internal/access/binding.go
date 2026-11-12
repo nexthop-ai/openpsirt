@@ -132,10 +132,7 @@ func mappingsIn(ctx context.Context, db bun.IDB) ([]Mapping, error) {
 	for _, binding := range over {
 		out = append(out, Mapping{Group: binding.GroupName, Grants: string(binding.Grants)})
 	}
-	slices.SortFunc(out, func(a, b Mapping) int {
-		return strings.Compare(a.Group+"\x00"+a.Product+"\x00"+a.Grants,
-			b.Group+"\x00"+b.Product+"\x00"+b.Grants)
-	})
+	slices.SortFunc(out, compareMappings)
 	return out, nil
 }
 

@@ -11960,6 +11960,23 @@ components:
         - cut
         - open
       type: object
+    ReleasedOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ReleasedOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        released:
+          description: Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
+          format: int64
+          type: integer
+      required:
+        - released
+      type: object
     Remediation:
       additionalProperties: false
       properties:
@@ -15584,40 +15601,6 @@ components:
             - "null"
       required:
         - items
-      type: object
-    Withdraw-estate-roleResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/Withdraw-estate-roleResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        released:
-          description: Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
-          format: int64
-          type: integer
-      required:
-        - released
-      type: object
-    Withdraw-roleResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/Withdraw-roleResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        released:
-          description: Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
-          format: int64
-          type: integer
-      required:
-        - released
       type: object
     WorkedBody:
       additionalProperties: false
@@ -22212,7 +22195,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Withdraw-roleResponse"
+                $ref: "#/components/schemas/ReleasedOutputBody"
           description: OK
         default:
           content:
@@ -22252,7 +22235,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Withdraw-estate-roleResponse"
+                $ref: "#/components/schemas/ReleasedOutputBody"
           description: OK
         default:
           content:

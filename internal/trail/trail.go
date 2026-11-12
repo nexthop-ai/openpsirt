@@ -302,13 +302,13 @@ func MapGroups(ctx context.Context, db bun.IDB, mappings []access.Mapping,
 		}
 		store := NewStore(db)
 		for _, mapping := range mapped.Removed {
-			if err := store.RecordByConfiguration(ctx, Role, mapping.String(),
+			if err := store.RecordByConfiguration(ctx, Role, mappingAbout(mapping),
 				Said(mapping.Grants, true), nil); err != nil {
 				return err
 			}
 		}
 		for _, mapping := range mapped.Added {
-			if err := store.RecordByConfiguration(ctx, Role, mapping.String(),
+			if err := store.RecordByConfiguration(ctx, Role, mappingAbout(mapping),
 				nil, Said(mapping.Grants, true)); err != nil {
 				return err
 			}
@@ -365,6 +365,22 @@ const onProduct = " on "
 // name of what changed and the product. About reads a name's history back by
 // this shape, so every producer of a per-product row builds it here.
 func OnProduct(name, product string) string { return name + onProduct + product }
+
+// OnEveryProduct is what a change made across every product is recorded
+// about, in the per-product shape so About reads it with the rest.
+func OnEveryProduct(name string) string { return OnProduct(name, "every product") }
+
+// mappingAbout is what a change to one group mapping is recorded about,
+// built through OnProduct like every other per-product row.
+func mappingAbout(m access.Mapping) string {
+	if m.Product != "" {
+		return OnProduct(m.Group, m.Product)
+	}
+	if _, over := m.Over(); over {
+		return m.String()
+	}
+	return OnEveryProduct(m.Group)
+}
 
 // InCase is what a change to who is on one undisclosed case is recorded about:
 // the product, the issue and the person. The column is sized for three maximal
@@ -425,6 +441,11 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 // ASCII letters, and identities are compared exactly, so `alice@example.com`
 // would otherwise report the roles of `Alice@example.com`. The pattern stays,
 // because it is what an index on the column serves.
+//
+// A role row configuration wrote is a group mapping, about a group rather
+// than anybody's account, and is left out: a group's name shares the column
+// with a person's identity, so a group named as somebody is would report its
+// mappings as roles that person held.
 func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name string,
 	limit, offset int) ([]Change, int, error) {
 
@@ -434,7 +455,7 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 			return q.Where(`"about" = ?`, name).
 				WhereOr(`("about" LIKE ?`+database.LikeClause+` AND SUBSTR("about", 1, ?) = ?)`,
 					database.LikeEscaped(name)+onProduct+"%", utf8.RuneCountInString(prefix), prefix)
-		})
+		}).Where(`NOT ("kind" = ? AND "actor" = ?)`, Role, ByConfiguration)
 	}
 	return s.page(ctx, by, kind, narrow, limit, offset, fmt.Sprintf("what changed about %q", name))
 }

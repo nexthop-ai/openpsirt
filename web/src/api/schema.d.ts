@@ -14676,6 +14676,19 @@ export interface components {
              */
             open: number;
         };
+        ReleasedOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReleasedOutputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
+             */
+            released: number;
+        };
         Remediation: {
             category: string;
             details: string;
@@ -16751,32 +16764,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["WindowBody"][] | null;
-        };
-        "Withdraw-estate-roleResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Withdraw-estate-roleResponse.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
-             */
-            released: number;
-        };
-        "Withdraw-roleResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Withdraw-roleResponse.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
-             */
-            released: number;
         };
         WorkedBody: {
             /**
@@ -20603,7 +20590,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Withdraw-roleResponse"];
+                    "application/json": components["schemas"]["ReleasedOutputBody"];
                 };
             };
             /** @description Error */
@@ -20635,7 +20622,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Withdraw-estate-roleResponse"];
+                    "application/json": components["schemas"]["ReleasedOutputBody"];
                 };
             };
             /** @description Error */

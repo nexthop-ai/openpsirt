@@ -107,11 +107,16 @@ func ParseGroupRoles(raw string) ([]Mapping, error) {
 		}
 		out = append(out, mappings...)
 	}
-	slices.SortFunc(out, func(a, b Mapping) int {
-		return strings.Compare(a.Group+"\x00"+a.Product+"\x00"+a.Grants,
-			b.Group+"\x00"+b.Product+"\x00"+b.Grants)
-	})
+	slices.SortFunc(out, compareMappings)
 	return slices.Compact(out), nil
+}
+
+// compareMappings is the one order mappings are listed in: by group, then
+// product, then what is granted. Configuration's list and the stored one are
+// both sorted by it, so the two compare position by position.
+func compareMappings(a, b Mapping) int {
+	return strings.Compare(a.Group+"\x00"+a.Product+"\x00"+a.Grants,
+		b.Group+"\x00"+b.Product+"\x00"+b.Grants)
 }
 
 // parseEntry reads one group's entry.

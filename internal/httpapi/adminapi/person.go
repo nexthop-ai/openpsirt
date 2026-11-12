@@ -160,20 +160,13 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 		body.HeldTotal = total
 		// Named together rather than per row: the trail holds who by number,
 		// and fifty changes made by two people are two names to read.
-		changers := make([]int64, 0, len(changes))
-		for _, change := range changes {
-			if person := change.Person(); person != 0 {
-				changers = append(changers, person)
-			}
-		}
-		who, err := core.WhoSigned(ctx, in.DB.DB, changers)
+		views, err := core.ChangeViews(ctx, in.DB.DB, changes)
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot read who made those changes", err)
 		}
-		for _, change := range changes {
+		for _, view := range views {
 			body.Held = append(body.Held, HeldChangeBody{
-				At: core.Stamp(change.At), By: who.Identity(change.Person()),
-				About: change.Name, Was: core.OrBlank(change.Was), Now: core.OrBlank(change.Became),
+				At: view.At, By: view.By, About: view.About, Was: view.Was, Now: view.Became,
 			})
 		}
 
