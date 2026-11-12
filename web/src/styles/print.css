@@ -36,8 +36,7 @@
   .noprint,
   .filters,
   .controls,
-  .tabs2,
-  .screen-head > span {
+  .tabs2 {
     display: none !important;
   }
   .app,
