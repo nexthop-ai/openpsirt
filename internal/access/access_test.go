@@ -52,6 +52,32 @@ func holding(t *testing.T, f *fixture, identity, displayName string, product int
 	return person
 }
 
+// minted is what a token minted for a person for an hour resolves to, narrowed
+// to product where it is not nil and to holds where any are given.
+func minted(t *testing.T, f *fixture, personID int64, name string, product *int64,
+	holds ...access.Role) access.Subject {
+	t.Helper()
+	_, secret, err := f.store.NewToken(t.Context(), personID, name, product, holds, time.Hour, 0)
+	if err != nil {
+		t.Fatalf("minting %s: %v", name, err)
+	}
+	subject, err := f.store.ResolveToken(t.Context(), secret)
+	if err != nil {
+		t.Fatalf("resolving %s: %v", name, err)
+	}
+	return subject
+}
+
+// admin is an administrator named admin.
+func admin(t *testing.T, f *fixture) *access.Account {
+	t.Helper()
+	person, err := f.store.Ensure(t.Context(), "admin", "Admin", new(true), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return person
+}
+
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {

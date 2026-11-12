@@ -34,10 +34,7 @@ func TestDeclaringATeamOrAMembershipTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		const callers, rounds = 4, 8
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		admin := admin(t, f)
 		member, err := f.store.Ensure(ctx, "member", "Member", nil, nil)
 		if err != nil {
 			t.Fatal(err)
