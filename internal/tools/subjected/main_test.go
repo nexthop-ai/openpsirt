@@ -115,7 +115,8 @@ func twice(a int) int { return a * 2 }
 
 func TestACallIntoAnotherPackageIsNotTakenForOneOfThisPackages(t *testing.T) {
 	// strings.Replace is not this package's Replace, whatever that does, and
-	// a local named as an import could be is still this package's. An exported
+	// a local or package-level name an import could be called is still this
+	// package's. An exported
 	// method of an unexported or generic type is reached from other packages
 	// through a constructor or an interface, so it is read.
 	source := []byte(`package sourcelink
@@ -139,6 +140,8 @@ func Local(ctx context.Context, s *Store) error { return s.Replace(ctx, 1) }
 
 func Shadowed(ctx context.Context, store *Store) error { return store.Replace(ctx, 1) }
 
+func Declared(ctx context.Context) error { return store.Replace(ctx, 1) }
+
 func (c *chunks) Read(ctx context.Context) error {
 	return c.db.NewSelect().Scan(ctx)
 }
@@ -147,7 +150,13 @@ func (c *Cache[K, V]) Get(ctx context.Context) error {
 	return c.db.NewSelect().Scan(ctx)
 }
 `)
-	found, _, err := inSource("sourcelink", "r.go", source)
+	found, _, err := inSources("sourcelink", map[string][]byte{
+		"r.go": source,
+		"v.go": []byte(`package sourcelink
+
+var store = &Store{}
+`),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,6 +168,7 @@ func (c *Cache[K, V]) Get(ctx context.Context) error {
 		"sourcelink.Store.Replace": true,
 		"sourcelink.Local":         true,
 		"sourcelink.Shadowed":      true,
+		"sourcelink.Declared":      true,
 		"sourcelink.Normalize":     false,
 		"sourcelink.Fold":          false,
 		"sourcelink.chunks.Read":   true,

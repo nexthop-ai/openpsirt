@@ -185,6 +185,10 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 	}
 	sort.Strings(paths)
 	var all []declared
+	// Names the package declares at its top level, in any file. The parser
+	// resolves only within one file, so a package-level variable of another
+	// file is as unresolved as an import's name.
+	own := map[string]bool{}
 	for _, path := range paths {
 		file, err := parser.ParseFile(fset, path, sources[path], 0)
 		if err != nil {
@@ -201,6 +205,16 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
 				all = append(all, declared{fn: fn, path: path, imported: imported})
 			}
+			for _, name := range topLevel(decl) {
+				own[name] = true
+			}
+		}
+	}
+	// A name the package declares is its own, whatever an import path
+	// suggests it might be called.
+	for _, one := range all {
+		for name := range own {
+			delete(one.imported, name)
 		}
 	}
 	querying := queryingNames(all)
@@ -386,6 +400,29 @@ func importsTesting(file *ast.File) bool {
 		}
 	}
 	return false
+}
+
+// topLevel is the names one top-level declaration declares in its package.
+func topLevel(decl ast.Decl) []string {
+	var names []string
+	switch d := decl.(type) {
+	case *ast.FuncDecl:
+		if d.Recv == nil {
+			names = append(names, d.Name.Name)
+		}
+	case *ast.GenDecl:
+		for _, spec := range d.Specs {
+			switch s := spec.(type) {
+			case *ast.ValueSpec:
+				for _, name := range s.Names {
+					names = append(names, name.Name)
+				}
+			case *ast.TypeSpec:
+				names = append(names, s.Name.Name)
+			}
+		}
+	}
+	return names
 }
 
 // importNames is the names a file may refer to its imported packages by: the
