@@ -294,6 +294,11 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 
 	gone, orphaned, failed := 0, 0, 0
 	for i := range stale {
+		// A stopped pass stops claiming: every claim after the stop fails,
+		// and each would log an error naming a row nothing is wrong with.
+		if err := ctx.Err(); err != nil {
+			return gone, err
+		}
 		row := &stale[i]
 		// The row first, and the bytes after. The other order ran the guard
 		// after the loss it exists to prevent: a comment attaching the file
