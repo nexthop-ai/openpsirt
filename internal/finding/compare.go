@@ -208,7 +208,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 	// release a customer has been on for a year has as many fixed entries as
 	// the release note is long, and asking about each separately made the
 	// screen's cost a count of round trips.
-	gone, err := s.whyGone(ctx, toBuild, comparison.Fixed)
+	gone, err := s.whyGone(ctx, toBuild, visible, comparison.Fixed)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	// Counted through whyGone and onlyFixes rather than by a filter of its
 	// own, because a second spelling of "what counts as a fix" is how the
 	// listed half and the counted half came to disagree in the first place.
-	why, err := s.whyGone(ctx, toBuild, gone)
+	why, err := s.whyGone(ctx, toBuild, []access.Visibility{access.Private}, gone)
 	if err != nil {
 		return 0, err
 	}
@@ -361,7 +361,13 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 // landed before that line was first scanned: saying "removed" would publish
 // "we dropped the component" into a release note about a component that is
 // still there at a newer version.
-func (s *Store) whyGone(ctx context.Context, buildID int64, fixed []Changed) (map[string]Gone, error) {
+//
+// Read at the visibilities the entries were drawn at. A merged flaw files an
+// undisclosed row under a disclosed issue's identifier, so a pair can close at
+// two visibilities in one build, and the explanation of a disclosed entry is
+// never an undisclosed row's.
+func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Visibility,
+	fixed []Changed) (map[string]Gone, error) {
 	why := make(map[string]Gone, len(fixed))
 	if len(fixed) == 0 {
 		return why, nil
@@ -415,6 +421,7 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, fixed []Changed) (ma
 			ColumnExpr(`COALESCE("f"."closed_run_id", 0) AS "closed_run"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(`"f"."closed_at" IS NOT NULL`).
 			Where(`"v"."identifier" IN (?)`, bun.List(issues)).
 			Where(`"cp"."name" IN (?)`, bun.List(components)).

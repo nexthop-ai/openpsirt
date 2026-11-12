@@ -6,6 +6,7 @@ package finding_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -210,6 +211,70 @@ func TestAFixedEntrySaysWhichVersionItMovedTo(t *testing.T) {
 		if notes := finding.Notes(about("v2"), comparison); !strings.Contains(notes,
 			libnl.Version+" → "+libnlNew.Version) {
 			t.Errorf("the note does not say what it was upgraded to:\n%s", notes)
+		}
+	})
+}
+
+func TestADisclosedEntryIsNeverExplainedByAnUndisclosedRow(t *testing.T) {
+	// A merged flaw files an undisclosed row under a disclosed issue's
+	// identifier, so one build can close the same issue at the same component
+	// at two visibilities. A comparison leaving undisclosed work out explains
+	// the disclosed entry by the disclosed row, even where the undisclosed one
+	// closed later.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		carried := []finding.Reported{found("CVE-2026-1", libnl)}
+
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), carried); err != nil {
+			t.Fatal(err)
+		}
+		earlier := f.build
+		later := f.anotherBuild(t, "v2")
+		f.shippedTo(t, later, twoConsumers())
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), carried); err != nil {
+			t.Fatal(err)
+		}
+		f.shippedTo(t, later, bumpedLibnl())
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), nil); err != nil {
+			t.Fatal(err)
+		}
+
+		// The undisclosed row beside it, closed after it with a reason and a
+		// version of its own.
+		var closed finding.Finding
+		if err := f.db.DB.NewSelect().Model(&closed).
+			Where(`"f"."build_id" = ?`, later).
+			Where(`"f"."vulnerability_id" = ?`, f.issueID(t, "CVE-2026-1")).
+			Where(`"f"."closed_at" IS NOT NULL`).
+			Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		undisclosed := closed
+		undisclosed.ID = 0
+		undisclosed.Visibility = access.Private
+		undisclosed.OccurrenceIdentity = strings.Repeat("0", len(closed.OccurrenceIdentity))
+		after := closed.ClosedAt.Add(time.Minute)
+		undisclosed.ClosedAt = &after
+		undisclosed.ClosedRunID = nil
+		undisclosed.ClosedBecause = finding.Fixed
+		undisclosed.MovedTo = "9.9.9-undisclosed"
+		if _, err := f.db.DB.NewInsert().Model(&undisclosed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicRead, access.PrivateRead)
+		comparison, err := f.store.Compare(ctx, who, earlier, later, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		row, ok := entries(comparison.Fixed)["CVE-2026-1"]
+		if !ok {
+			t.Fatalf("the bump did not appear as fixed: %+v", comparison.Fixed)
+		}
+		if row.Because != finding.Upgraded || row.MovedTo != libnlNew.Version {
+			t.Errorf("the disclosed entry went because %q to %q, want %q to %q",
+				row.Because, row.MovedTo, finding.Upgraded, libnlNew.Version)
 		}
 	})
 }
