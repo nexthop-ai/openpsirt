@@ -104,7 +104,7 @@ within one: 7.5 to 7.6 is the same decision. An unrated issue is measured from m
 | The carried agreement names its origin, is guarded on the revision, and shows as carried | |
 | All of it is one transaction | |
 | Only a lapsed occurrence with nothing decided since is re-affirmed | |
-| Re-affirming a whole decision or many asks the same of each; one with a withdrawn row is refused | Its author took it back |
+| Re-affirming a whole decision or many asks the same of each; one with a withdrawn row is refused | Somebody took it back |
 
 ## Whole-action re-affirmation
 

@@ -190,7 +190,7 @@ func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
 //
 // A decision with any lapsed row out of the subject's reach is left off:
 // re-affirming acts on the whole decision, and would refuse it. So is a decision
-// with a withdrawn row: its author took it back, and a withdrawal leaves a
+// with a withdrawn row: somebody took it back, and a withdrawal leaves a
 // row that had already lapsed as it was.
 func (s *Store) lapsedOfYours(subject access.Subject) *bun.SelectQuery {
 	outOfReach, reachArgs := notDecidableWhere(subject, "dn")
