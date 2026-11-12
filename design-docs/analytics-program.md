@@ -73,6 +73,7 @@ build's first scan is a baseline rather than new work.
 | Rule | Reason |
 |---|---|
 | A step is a day or a week, sent as a count of days (1 to 730) or of weeks (1 to 104); both in one request is refused; neither is twelve weeks | Two years is the widest window (`design-docs/analytics.md` § The period a report covers) |
+| The trend refuses a window the edge would not send: no steps, more than 730, or a step of nothing or past a year; the vulnerability and code finding trends share the one bound | A default in place of a bad window draws a chart nobody asked for |
 | Steps end at midnight UTC, the last at the coming one; each point is dated by its last day | A day holds whole days, and a fix at 23:00 lands on its own date |
 | A step holds the interval after the previous step's end, up to and including its own end | A moment on a boundary belongs to the step it ends |
 | The read covers findings open at the window's start or opened since, through now; whether an issue was present before the window is asked of the findings closed before it, for the issues the window's read did not reach opened at or before the start | Cost follows the window's start, not the deployment's age (REQ-74) |

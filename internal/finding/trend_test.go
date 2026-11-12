@@ -133,31 +133,13 @@ func TestATrendCountsNothingFromOutsideTheRangeItDraws(t *testing.T) {
 	})
 }
 
-func TestATrendWithNoStepStillDrawsARange(t *testing.T) {
-	// The step arrives as a query parameter and the loop walks whatever it
-	// says, so zero would draw one instant however many times.
+func TestATrendWithNoStepIsRefused(t *testing.T) {
+	// A step of nothing draws one instant however many times; the edge never
+	// asks for one, so the store refuses it rather than drawing another.
 	each(t, func(t *testing.T, f *fixture) {
-		f.shipped(t, twoConsumers())
-		run := f.run(t)
-		f.seenAt(t, run, time.Now().UTC().Add(-20*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.build, run,
-			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
-			t.Fatal(err)
-		}
-
-		points, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
-			time.Time{}, 0, 4, finding.Within{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(points) != 4 {
-			t.Fatalf("%d points, want 4", len(points))
-		}
-		for i := 1; i < len(points); i++ {
-			if !points[i].At.After(points[i-1].At) {
-				t.Fatalf("point %d is at %v, the same instant or earlier than point %d",
-					i, points[i].At, i-1)
-			}
+		if _, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
+			time.Time{}, 0, 4, finding.Within{}); err == nil {
+			t.Fatal("a trend over steps of nothing was drawn; want it refused")
 		}
 	})
 }

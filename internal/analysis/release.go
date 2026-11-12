@@ -16,7 +16,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/series"
-	"github.com/nexthop-ai/openpsirt/internal/typedname"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
@@ -78,15 +77,7 @@ func ByRelease(ctx context.Context, db bun.IDB, subject access.Subject, scope Sc
 		Where(`"t"."branch_or_tag_id" = "s"."id"`).
 		Where(`"sr"."status" = ?`, series.Applied).
 		Where(named, namedArgs...)
-	if scope.VariantID != nil {
-		analyzed = analyzed.Where(`"t"."variant_id" = ?`, *scope.VariantID)
-	}
-	if scope.Method != "" {
-		analyzed = analyzed.Where(`"se"."kind" = ?`, methodKinds[scope.Method])
-	}
-	if scope.Series != "" {
-		analyzed = analyzed.Where(`"se"."name_folded" = ?`, typedname.Matching(scope.Series))
-	}
+	analyzed = scope.runsIn(analyzed)
 	var tags []struct {
 		ID    int64     `bun:"id"`
 		Name  string    `bun:"name"`

@@ -640,6 +640,25 @@ func (scope Scope) builtIn(q *bun.SelectQuery) *bun.SelectQuery {
 	return scope.inScope(q)
 }
 
+// runsIn narrows a statement over series runs, each run's build under "t" and
+// its series under "se", to the scope's branch or tag, variant, method and
+// series: the runs a figure or a marker over the scope reads.
+func (scope Scope) runsIn(q *bun.SelectQuery) *bun.SelectQuery {
+	if scope.BranchOrTagID != nil {
+		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
+	}
+	if scope.VariantID != nil {
+		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
+	}
+	if scope.Method != "" {
+		q = q.Where(`"se"."kind" = ?`, methodKinds[scope.Method])
+	}
+	if scope.Series != "" {
+		q = q.Where(`"se"."name_folded" = ?`, typedname.Matching(scope.Series))
+	}
+	return q
+}
+
 // narrow keeps a statement over the findings under "f", their sightings under
 // "si" and their builds under "t" to the scope's branch or tag, variant,
 // holder, method, component, build, subtree and series, after inScope has kept
