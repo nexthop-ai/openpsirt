@@ -87,6 +87,7 @@ parameters.
 | The rate asked for no period is the lifetime figure | |
 | The change log takes no default window | It must not look like it answers about everything |
 | A trend's window is a count of daily or weekly steps | It is a series |
+| Every sheet calls a window by one rule, on its control and its printed heading alike: two years, a year, or the count of days or weeks; a trend sheet offers one set of windows per step | A reader comparing two sheets cannot otherwise tell whether they asked the same question |
 | The longest window offered is two years | On the full-size image after a year of weekly rescans, 730 daily steps read in 448 ms on PostgreSQL and 1,031 ms on MySQL 8.4 (`design-docs/analytics-measurements.md` § Daily trend) |
 
 ## Settings

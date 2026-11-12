@@ -11,7 +11,7 @@ import {
 } from "../../api/codeFindings";
 import { fileAt } from "../../api/links";
 import { counted, heldLine, holding, type Holding } from "../../app/families";
-import { askForScope, useScope } from "../../app/scope";
+import { useScope } from "../../app/scope";
 import { useWho } from "../../app/session";
 import { Empty } from "../../ui/Empty";
 import { Wide } from "../../ui/Wide";
@@ -19,6 +19,7 @@ import { CODE_FINDING_METHODS } from "../codeFindings";
 import { TIERS } from "../codeTrend";
 import { scopeWords } from "./catalog";
 import { Downloads } from "../../ui/Downloads";
+import { NeedsOneBuild } from "../../ui/NeedsOneBuild";
 
 // What the security testing figures share: the narrowing they read from the
 // address and the picker, the frame they draw in place of figures a reader
@@ -27,13 +28,6 @@ import { Downloads } from "../../ui/Downloads";
 // Every figure is counted per testing method and never beside a dependency
 // figure; a reader who does not read security testing material in the
 // product is told so in one line rather than shown zeros.
-
-// The windows offered, as the trend offers them.
-export const WEEKS = [4, 13, 26, 52, 104] as const;
-
-export function weeksWords(n: number): string {
-  return n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`;
-}
 
 // The narrowing in the address, over the picker's scope. A branch and a
 // variant the address names stand over the picker's, so a link from a queue
@@ -88,7 +82,8 @@ type FigureFile =
   | "/v1/products/{product}/code-finding-time-to-fix.{format}"
   | "/v1/products/{product}/code-finding-precision.{format}"
   | "/v1/products/{product}/analysis-coverage.{format}"
-  | "/v1/products/{product}/code-findings-by-release.{format}";
+  | "/v1/products/{product}/code-findings-by-release.{format}"
+  | "/v1/products/{product}/code-finding-trend.{format}";
 
 // The figure's file as CSV and JSON, with the narrowing on screen.
 export function Files({
@@ -138,14 +133,7 @@ export function Gate({
   if (needsBuild) {
     return (
       <section className="panel">
-        <Empty
-          title="This needs one build."
-          detail="At or under a component is read on one build. Pick a branch and a variant."
-        >
-          <button type="button" className="btn" onClick={askForScope}>
-            Pick a build
-          </button>
-        </Empty>
+        <NeedsOneBuild />
       </section>
     );
   }
