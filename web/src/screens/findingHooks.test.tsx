@@ -60,6 +60,33 @@ describe("where a finding sits in the list it was opened from", () => {
     expect(seen?.previous?.row.vulnerability).toBe("CVE-2026-0001");
   });
 
+  it("walks a list across products through that list's own rows", async () => {
+    const asked = serve((path) =>
+      path === "/v1/findings"
+        ? {
+            data: {
+              items: [
+                { ...row("CVE-2026-0001"), product: "edgeos" },
+                { ...row("CVE-2026-0002"), product: "sonic" },
+                { ...row("CVE-2026-0003"), product: "edgeos" },
+              ],
+              total: 120,
+            },
+          }
+        : undefined,
+    );
+    mount.render(screen(<Walk walking from="state=undecided&across=1&offset=50" />));
+    await settle();
+    const paths = (asked.mock.calls as unknown as [string, unknown][]).map(([path]) => path);
+    expect(paths).toContain("/v1/findings");
+    expect(paths).not.toContain("/v1/products/{product}/findings");
+    expect(seen?.at).toBe(50);
+    expect(seen?.previous?.row.vulnerability).toBe("CVE-2026-0001");
+    const next = new URL(seen?.next?.to ?? "", "http://here");
+    expect(next.pathname).toContain("/products/edgeos/");
+    expect(next.searchParams.get("from")).toContain("across=1");
+  });
+
   // The page the findings list drew under an address, cached where the list
   // caches it.
   function listed(from: string, items: ReturnType<typeof row>[], total: number) {

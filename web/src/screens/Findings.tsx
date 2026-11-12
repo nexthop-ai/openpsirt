@@ -44,6 +44,7 @@ import { useWeaknessNames } from "../ui/cwe";
 // is 153 pages of one product's findings, which is not a list anybody
 // assembles a day's work out of.
 import {
+  ACROSS,
   acrossProducts,
   asAsked,
   BY_DEFAULT,
@@ -296,8 +297,9 @@ export function Findings() {
     const now = new URLSearchParams(asked);
     if (branchOrTag) now.set("branch_or_tag", branchOrTag);
     if (variant) now.set("variant", variant);
+    if (spanning) now.set(ACROSS, "1");
     return now.toString();
-  }, [asked, branchOrTag, variant]);
+  }, [asked, branchOrTag, variant, spanning]);
 
   // The decision a saved filter prepares, where this list is exactly one somebody
   // kept and that one prepares anything. Read off the address rather than
