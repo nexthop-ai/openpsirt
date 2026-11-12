@@ -220,8 +220,8 @@ export function useAgree() {
         }),
       ),
     onSuccess: done,
-    // Refused for an edition moved, the screen reads the advisory again, so
-    // the next press names the edition it then shows.
+    // Refused for an edition moved, the screen reads every panel again, so
+    // the next press names the edition they then show.
     onError: (error) => {
       if (statusOf(error) === 409) done();
     },

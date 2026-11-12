@@ -8358,7 +8358,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description The edition of the advisory that was read, as reading it reports
+             * @description The edition agreed to: the oldest one the advisory, its releases and its document named when read
              */
             edition: number;
         };

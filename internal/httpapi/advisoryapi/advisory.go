@@ -452,7 +452,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
-			Edition int `json:"edition" minimum:"1" doc:"The edition of the advisory that was read, as reading it reports"`
+			Edition int `json:"edition" minimum:"1" doc:"The edition agreed to: the oldest one the advisory, its releases and its document named when read"`
 		}
 	}) (*struct {
 		Status int

@@ -944,7 +944,7 @@ components:
           readOnly: true
           type: string
         edition:
-          description: The edition of the advisory that was read, as reading it reports
+          description: "The edition agreed to: the oldest one the advisory, its releases and its document named when read"
           format: int64
           minimum: 1
           type: integer
