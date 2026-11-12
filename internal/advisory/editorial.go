@@ -401,7 +401,24 @@ type Standing struct {
 	AgreedBy []string
 }
 
-// StandingOf reports where an advisory already read stands, without
+// Read is an advisory, what it covers, and where it stands, for a screen
+// showing all three: the standing names the edition the row read points at,
+// so the number is never newer than the title and covers beside it.
+func (s *Store) Read(ctx context.Context, subject access.Subject,
+	identifier string) (*Advisory, []Covered, *Standing, error) {
+
+	row, held, err := s.Covers(ctx, subject, identifier)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	standing, err := s.standingOf(ctx, subject, row)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return row, held, standing, nil
+}
+
+// standingOf reports where an advisory already read stands, without
 // generating its document, naming the edition that read pointed at.
 //
 // Somebody deciding whether to read it, agree to it or publish it is asking
@@ -411,8 +428,8 @@ type Standing struct {
 // committing after the read leaves the number behind the words, which an
 // agreement to it is refused for, never ahead of them.
 //
-// row is one byName answered, through Covers, which has already narrowed it.
-func (s *Store) StandingOf(ctx context.Context, subject access.Subject, row *Advisory) (*Standing, error) {
+// row is one byName answered, which has already narrowed it to the subject.
+func (s *Store) standingOf(ctx context.Context, subject access.Subject, row *Advisory) (*Standing, error) {
 	agreed, err := s.agreed(ctx, row)
 	if err != nil {
 		return nil, err

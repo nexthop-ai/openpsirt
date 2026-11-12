@@ -155,9 +155,9 @@ type Written struct {
 	// Both count advisories.
 	Documents int
 	Held      int
-	// Skipped is how many advisories were left out because their newest
-	// issued document that may travel could not be read back, each logged as
-	// the pass met it. No older revision is carried in its place, since revisions share a
+	// Skipped is how many advisories were left out because the first issued
+	// document not known to be held back could not be read back, each logged
+	// as the pass met it. No older revision is carried in its place, since revisions share a
 	// path.
 	Skipped int
 	// Unchanged says the pass found the directory already holding what it
@@ -238,8 +238,8 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	// the pass. Issued bytes are kept for ever, and one that no longer reads
 	// would otherwise keep every advisory issued after it out of the
 	// directory for good. Failed only where nothing at all could be read:
-	// counted in advisories, since an unreadable newest revision that may
-	// travel leaves out its advisory and every revision before it.
+	// counted in advisories, since the first revision not known to be held
+	// back, unreadable, leaves out its advisory and every revision before it.
 	published, held, unread := publishable(sent)
 	if len(unread) > 0 && len(published) == 0 && held == 0 {
 		return Written{}, fmt.Errorf("no published document could be read back: %w",

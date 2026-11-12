@@ -184,13 +184,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		store := advisory.NewStore(in.DB.DB)
-		row, held, err := store.Covers(ctx, subject, input.Advisory)
-		if err != nil {
-			return nil, advisoryRefused(in, err, "the advisory could not be read")
-		}
-		// The edition the row read names, so the number shown is never
-		// newer than the title and covers shown beside it.
-		where, err := store.StandingOf(ctx, subject, row)
+		row, held, where, err := store.Read(ctx, subject, input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be read")
 		}

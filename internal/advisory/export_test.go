@@ -74,5 +74,10 @@ func (s *Store) Where(ctx context.Context, subject access.Subject, identifier st
 	if err != nil {
 		return nil, err
 	}
-	return s.StandingOf(ctx, subject, row)
+	return s.standingOf(ctx, subject, row)
+}
+
+// StandingOf reports where an advisory already read stands.
+func (s *Store) StandingOf(ctx context.Context, subject access.Subject, row *Advisory) (*Standing, error) {
+	return s.standingOf(ctx, subject, row)
 }
