@@ -167,3 +167,112 @@ func TestMeasureSearchingByTheNameABuildStated(t *testing.T) {
 		t.Logf("component openssl: stated components read in %v; the list's first page in %v", exact, listed)
 	})
 }
+
+// everyProduct is how many products a reader holding every one reads across.
+const everyProduct = 16
+
+// What the same lookup adds to the list across products, for a reader
+// granted every product of a deployment of several, each holding the image in
+// several builds.
+func TestMeasureSearchingByTheNameABuildStatedAcrossProducts(t *testing.T) {
+	doc := fullSizeImage(t)
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		w := world.New(t, db)
+		store := finding.NewStore(db.DB)
+		now := time.Now().UTC()
+		image := doc.Snapshot(graph.Described{Name: "sonic", Version: "1.0"})
+		var seq int
+		scanned := func(buildID int64) {
+			seq++
+			scan, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
+				BuildID: buildID, ContentHash: fmt.Sprintf("scan-%d", seq), BuiltAt: now.Add(-time.Hour),
+				ParserVersion: "measure",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := world.ApplyGraph(ctx, db.DB, buildID, scan.ID, image); err != nil {
+				t.Fatal(err)
+			}
+		}
+		grants := map[int64][]access.Role{}
+		var products []int64
+		for p := range everyProduct {
+			product, variant := w.Product, w.Customer
+			if p > 0 {
+				product = w.DeclareProduct(fmt.Sprintf("product-%d", p), fmt.Sprintf("Product %d", p))
+				variant = w.DeclareVariant(product, "customer", true)
+			}
+			products = append(products, product.ID)
+			grants[product.ID] = []access.Role{access.PublicRead, access.PrivateRead}
+			var read int64
+			for n := range statedBuilds {
+				tag := w.DeclareBranchOrTag(product, fmt.Sprintf("v1.%d", n), catalog.Tag, nil)
+				build := w.BuildFor(tag, variant)
+				scanned(build.ID)
+				read = build.ID
+			}
+			// One issue on every package of one build of the product.
+			run, err := store.Begin(ctx, finding.Run{BuildID: read, Scanner: "measure",
+				ScannerVersion: "0", DatabaseVersion: "0", RanHere: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var reported []finding.Reported
+			for i, c := range image.Components {
+				if c.Purl != "" {
+					reported = append(reported, finding.Reported{
+						Issue:     finding.Named{Identifier: fmt.Sprintf("CVE-2026-%05d", i), Severity: "high"},
+						Component: c,
+					})
+				}
+			}
+			if _, err := store.Apply(ctx, read, run.ID, reported); err != nil {
+				t.Fatal(err)
+			}
+		}
+		dbtest.SettleStatistics(t, db)
+
+		var nodes, findings int
+		if err := db.DB.NewSelect().TableExpr(`"graph_node"`).ColumnExpr(`COUNT(*)`).Scan(ctx, &nodes); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).Scan(ctx, &findings); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%d products of %d builds, %d nodes, %d findings", everyProduct, statedBuilds, nodes, findings)
+
+		who := access.NewPerson(1, "a reader", false, grants, 0)
+		median := func(read func() error) time.Duration {
+			var took []time.Duration
+			for range 6 {
+				start := time.Now()
+				if err := read(); err != nil {
+					t.Fatal(err)
+				}
+				took = append(took, time.Since(start))
+			}
+			took = took[1:]
+			slices.Sort(took)
+			return took[len(took)/2]
+		}
+		for _, term := range []string{"", "ssl", "lib", "linux-image"} {
+			var matched []int64
+			stated := time.Duration(0)
+			if term != "" {
+				stated = median(func() (err error) {
+					matched, err = finding.StatedAs(ctx, db.DB, products, false,
+						`"n"."name_folded" LIKE ?`+database.LikeClause, "%"+term+"%")
+					return err
+				})
+			}
+			listed := median(func() error {
+				_, _, err := store.Anywhere(ctx, who, 50, 0, finding.Filter{Search: term})
+				return err
+			})
+			t.Logf("search %q: %d components stated under it, read in %v; the list's first page in %v",
+				term, len(matched), stated, listed)
+		}
+	})
+}

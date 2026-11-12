@@ -52,3 +52,18 @@ page is the findings list's first fifty groups, the lookup included.
 | Search `lib` | 648 | 7.2 ms, 53 ms | 12 ms, 52 ms |
 | Search `linux-image` | 2 | 5.9 ms, 30 ms | 11 ms, 36 ms |
 | Component `openssl` | | 0.74 ms, 19 ms | 0.15 ms, 19 ms |
+
+Across products, by
+`TestMeasureSearchingByTheNameABuildStatedAcrossProducts`: a reader granted
+sixteen products, each of eight builds of the full-size switch image and one
+build carrying an issue on every package, 878,976 nodes and 302,224 open
+findings. The page is the list across products. Without a search the first
+page is 488 ms on PostgreSQL and 1.14 s on MySQL. The lookup reads every
+node of every build in scope, so it grows with the nodes the reader's
+products hold.
+
+| Filter | Stated components | PostgreSQL lookup, page | MySQL lookup, page |
+|---|---|---|---|
+| Search `ssl` | 6 | 81 ms, 216 ms | 390 ms, 589 ms |
+| Search `lib` | 428 | 94 ms, 277 ms | 366 ms, 742 ms |
+| Search `linux-image` | 1 | 73 ms, 199 ms | 325 ms, 442 ms |
