@@ -277,31 +277,41 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		folds = append(folds, row.FoldKey)
 	}
+	slices.Sort(folds)
+	folds = slices.Compact(folds)
 
 	// open is what is still open under each of them, and which packages
 	// those are. Joined from the finding rather than from the commitment,
 	// because coverage is a match on the fold rather than a row somebody
 	// wrote: a vulnerability published tonight against the same package is
 	// covered by this morning's commitment with nobody acting.
-	var open []struct {
+	type closing struct {
 		Fold        string `bun:"fold"`
 		Issues      int    `bun:"issues"`
 		Occurrences int    `bun:"places"`
 	}
+	var open []closing
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
-		Where(kinds, kindArgs...).
-		ColumnExpr(`COUNT(*) AS "places"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr(FoldedOn).
-		Scan(ctx, &open); err != nil {
+	if err := inFoldBatches(folds, func(batch []string) error {
+		var some []closing
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(FoldedOn+` AS "fold"`).
+			ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
+			Where(kinds, kindArgs...).
+			ColumnExpr(`COUNT(*) AS "places"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
+			GroupExpr(FoldedOn).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		open = append(open, some...)
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read what those bumps would close: %w", err)
 	}
 	counts := make(map[string]struct{ Issues, Occurrences int }, len(open))
@@ -407,7 +417,7 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 	}
 	seen := map[string]bool{}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	for start := 0; start < len(folds); start += database.BatchSize {
+	if err := inFoldBatches(folds, func(batch []string) error {
 		var held []string
 		if err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -416,13 +426,16 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 			Where(kinds, kindArgs...).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			Where(FoldedOn+" IN (?)", bun.List(folds[start:min(start+database.BatchSize, len(folds))])).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
 			Scan(ctx, &held); err != nil {
-			return nil, fmt.Errorf("read which commitments are about readable work: %w", err)
+			return err
 		}
 		for _, fold := range held {
 			seen[fold] = true
 		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("read which commitments are about readable work: %w", err)
 	}
 	told := rows[:0]
 	for _, row := range rows {
@@ -477,25 +490,35 @@ type packages struct {
 func (s *Store) packagesIn(ctx context.Context, buildID int64,
 	visible []access.Visibility, folds []string) (map[string]packages, error) {
 
-	var rows []struct {
+	type named struct {
 		Fold     string `bun:"fold"`
 		Upstream string `bun:"upstream"`
 		Name     string `bun:"name"`
 	}
+	var rows []named
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Where(kinds, kindArgs...).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
-		ColumnExpr(`"c"."name" AS "name"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr(FoldedOn+`, "c"."name"`).
-		OrderExpr(`"c"."name"`).
-		Scan(ctx, &rows); err != nil {
+	// Each fold's names sit wholly in one batch, so ordering each batch by
+	// name orders every fold's list.
+	if err := inFoldBatches(folds, func(batch []string) error {
+		var some []named
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(FoldedOn+` AS "fold"`).
+			ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
+			ColumnExpr(`"c"."name" AS "name"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
+			GroupExpr(FoldedOn+`, "c"."name"`).
+			OrderExpr(`"c"."name"`).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		rows = append(rows, some...)
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read which packages a bump moves: %w", err)
 	}
 	out := make(map[string]packages, len(folds))
@@ -506,6 +529,18 @@ func (s *Store) packagesIn(ctx context.Context, buildID int64,
 		out[row.Fold] = one
 	}
 	return out, nil
+}
+
+// inFoldBatches calls fn over folds a batch at a time, so no IN list passes
+// the length every engine accepts. Every read over the folds groups by fold,
+// so a fold's rows never span two batches.
+func inFoldBatches(folds []string, fn func([]string) error) error {
+	for start := 0; start < len(folds); start += database.BatchSize {
+		if err := fn(folds[start:min(start+database.BatchSize, len(folds))]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // holder is who carries a fold's work, where one party carries all of it.
@@ -519,36 +554,44 @@ type holder struct {
 func (s *Store) heldPerFold(ctx context.Context, buildID int64,
 	visible []access.Visibility, folds []string) (map[string]holder, error) {
 
-	var rows []struct {
+	type carried struct {
 		Fold        string `bun:"fold"`
 		Least       *int64 `bun:"least_holder"`
 		Most        *int64 `bun:"most_holder"`
 		Occurrences int    `bun:"places"`
 		Held        int    `bun:"held"`
 	}
+	var rows []carried
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Where(kinds, kindArgs...).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		// The party rather than a name: the column holds a party, which may be
-		// a person or a team, and the name is looked up once for the few that
-		// come back rather than joined per row.
-		ColumnExpr(`MIN("f"."assigned_to") AS "least_holder"`).
-		ColumnExpr(`MAX("f"."assigned_to") AS "most_holder"`).
-		// Two counts rather than a conditional sum: that sum comes back as a
-		// decimal on two of the four engines, and the cast that makes it an
-		// integer is spelled per engine. Counted, a group is wholly held when
-		// the count of holders is the count of rows.
-		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`COUNT("f"."assigned_to") AS "held"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr(FoldedOn).
-		Scan(ctx, &rows); err != nil {
+	if err := inFoldBatches(folds, func(batch []string) error {
+		var some []carried
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(FoldedOn+` AS "fold"`).
+			// The party rather than a name: the column holds a party, which may be
+			// a person or a team, and the name is looked up once for the few that
+			// come back rather than joined per row.
+			ColumnExpr(`MIN("f"."assigned_to") AS "least_holder"`).
+			ColumnExpr(`MAX("f"."assigned_to") AS "most_holder"`).
+			// Two counts rather than a conditional sum: that sum comes back as a
+			// decimal on two of the four engines, and the cast that makes it an
+			// integer is spelled per engine. Counted, a group is wholly held when
+			// the count of holders is the count of rows.
+			ColumnExpr(`COUNT(*) AS "places"`).
+			ColumnExpr(`COUNT("f"."assigned_to") AS "held"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
+			GroupExpr(FoldedOn).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		rows = append(rows, some...)
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read who is carrying these: %w", err)
 	}
 	out := make(map[string]holder, len(rows))
