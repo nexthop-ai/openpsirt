@@ -574,7 +574,7 @@ type AdvisoryBody struct {
 	// where the advisory stands.
 	Status   core.AdvisoryStatus `json:"status,omitempty" doc:"Where the document is in its life. Final where somebody agrees to what it says now, interim where it has gone out and nobody does, draft before either"`
 	Agreed   int                 `json:"agreed,omitempty" doc:"How many people agree to what it says now. None means it cannot go out"`
-	Edition  int                 `json:"edition,omitempty" doc:"The edition the advisory says now, counting from one. Agreeing to it names this edition"`
+	Edition  int                 `json:"edition,omitempty" doc:"The edition the advisory pointed at when read, never newer than the title and covers beside it"`
 	AgreedBy []AgreerBody        `json:"agreed_by,omitempty" doc:"Who agrees to what it says now, oldest first"`
 	Changed  *bool               `json:"changed,omitempty" doc:"Whether the document generated now says something different from the last one that went out"`
 	MintedAt string              `json:"minted_at"`

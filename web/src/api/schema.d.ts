@@ -7926,7 +7926,7 @@ export interface components {
             covers: components["schemas"]["CoveredBody"][] | null;
             /**
              * Format: int64
-             * @description The edition the advisory says now, counting from one. Agreeing to it names this edition
+             * @description The edition the advisory pointed at when read, never newer than the title and covers beside it
              */
             edition?: number;
             minted_at: string;
