@@ -154,14 +154,16 @@ function ahead(seconds: number): string {
 // The units an interval is said in, largest that fits winning.
 //
 // One table for both sides of now, so "3 days ago" and "in 3 days" answer
-// alike about the same interval.
+// alike about the same interval. A year is 365 days: n calendar years span
+// 365n days and fewer than 365 leap days, so the floor names n, and twelve
+// months still outrun one.
 const SCALE: [number, string][] = [
   [60, "minute"],
   [3600, "hour"],
   [86400, "day"],
   [604800, "week"],
   [2629800, "month"],
-  [31557600, "year"],
+  [31536000, "year"],
 ];
 
 // magnitude is how long an interval is, in words, with no sense of direction.

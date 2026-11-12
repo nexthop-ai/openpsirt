@@ -320,22 +320,35 @@ describe("the findings burndown", () => {
     expect(text()).toContain("Not converging: backlog growing about 3 a day.");
   });
 
+  // The burndown's one field, read afresh: the box is redrawn when the
+  // address's choice moves.
+  const chooser = () =>
+    mount.host().querySelector<HTMLInputElement>('input[aria-label="Component or purl"]');
+  const typed = async (value: string) => {
+    change(chooser(), value);
+    await act(async () => chooser()?.form?.requestSubmit());
+    await settle();
+  };
+
   it("chooses by purl where the typed text is one, and by name otherwise", async () => {
     const spy = serve((path) => (path === "/v1/burndown" ? answer({}) : undefined));
     mount.render(screen(<Burndown />, "/analytics/findings-burndown"));
     await settle();
-    const box = mount
-      .host()
-      .querySelector<HTMLInputElement>('input[aria-label="Component or purl"]');
-    const type = async (value: string) => {
-      change(box, value);
-      await act(async () => box?.form?.requestSubmit());
-      await settle();
-    };
-    await type("pkg:github/sonic-net/");
+    await typed("pkg:github/sonic-net/");
     expect(askedOf(spy, "/v1/burndown").at(-1)).toEqual({ purl: "pkg:github/sonic-net/" });
-    await type("swss");
+    await typed("swss");
     expect(askedOf(spy, "/v1/burndown").at(-1)).toEqual({ component: "swss" });
+  });
+
+  it("empties the box when Everything clears the choice", async () => {
+    serve((path) => (path === "/v1/burndown" ? answer({}) : undefined));
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown"));
+    await settle();
+    await typed("openssl");
+    expect(chooser()?.value).toBe("openssl");
+    await press("Everything");
+    await settle();
+    expect(chooser()?.value).toBe("");
   });
 
   it("names the ecosystem of a chosen package only where two share a name", async () => {

@@ -319,7 +319,7 @@ function Drawn({
       <section className="panel">
         <h3>Not fixed by {by}</h3>
         {parts.length === 0 ? (
-          <Empty title="No series has a code finding in these steps." />
+          <Empty title="No code finding in these steps." />
         ) : (
           <>
             <Stack rows={split} parts={parts} />
@@ -338,12 +338,12 @@ function Drawn({
       </section>
 
       <section className="panel">
-        <h3>Week by week</h3>
+        <h3>{unit === "days" ? "Day by day" : "Week by week"}</h3>
         <Wide>
           <table>
             <thead>
               <tr>
-                <th>Week ending</th>
+                <th>{unit === "days" ? "Day" : "Week ending"}</th>
                 <th className="num">Not fixed</th>
                 <th className="num">New</th>
                 <th className="num">Fixed</th>
@@ -360,7 +360,7 @@ function Drawn({
                 <tr key={point.at}>
                   <td className="id">{point.at}</td>
                   <td className="num">{point.not_fixed.toLocaleString()}</td>
-                  {/* The first week has nothing to differ from. */}
+                  {/* The first step has nothing to differ from. */}
                   <td className="num">{i === 0 ? "—" : point.opened.toLocaleString()}</td>
                   <td className="num">{i === 0 ? "—" : point.fixed.toLocaleString()}</td>
                   {parts.map((part) => (

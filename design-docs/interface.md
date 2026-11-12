@@ -220,7 +220,7 @@ Every count says what it is a count of (REQ-60).
 | Absolute | The UTC day, never localized: the server writes a day from the moment in UTC, and a moment sent with an offset is shown as the UTC day it falls on. Every stored instant on a screen goes through one formatter, a key's or token's last use included |
 | To the minute | The UTC day and minute, saying UTC, for a moment correlated with another: a comment, a grant, a scan arriving |
 | Typed to the minute | In UTC, labeled so, defaulting to now in UTC; the minute typed is the minute shown |
-| Relative | For staleness, one scale in both directions, with the absolute form on the title |
+| Relative | For staleness, one scale in both directions, with the absolute form on the title. Its year is 365 days, so a year reads as one on the day it ends |
 
 A value that is not a stored moment is drawn as nothing in both forms: the shape
 is checked, because a bare number parses as a year, and so is the calendar day,

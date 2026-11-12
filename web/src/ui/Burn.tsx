@@ -250,7 +250,7 @@ export function BurnLegend() {
 // What the burndown shows, for a screen reader.
 function burnLabel(points: BurnPoint[], start: number, ahead: Projection): string {
   const now = points[points.length - 1]?.left ?? 0;
-  return `Left from ${start.toLocaleString()} to ${now.toLocaleString()} over ${points.length} days; ${paceWords(ahead)}`;
+  return `Left from ${start.toLocaleString()} to ${now.toLocaleString()} over ${points.length} days; ${paceWords(ahead, now)}`;
 }
 
 // The projection in words: the day it reaches zero, or that it does not.
