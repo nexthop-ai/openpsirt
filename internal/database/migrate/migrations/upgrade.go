@@ -525,21 +525,11 @@ func (u *upgrader) hasColumn(table, column string) (bool, error) {
 		columns, err := u.sqliteColumns(table)
 		return columns[column], err
 	}
-	query := `SELECT 1 FROM "information_schema"."columns"
-		WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?`
+	query := postgresColumnProbe
 	if u.engine != database.Postgres {
-		query = `SELECT 1 FROM "information_schema"."COLUMNS"
-			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ? LIMIT 1`
+		query = mysqlColumnProbe
 	}
-	var probe int
-	err := u.tx.QueryRowContext(u.ctx, query, table, column).Scan(&probe)
-	if database.IsNoRows(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("ask whether %s has column %s: %w", table, column, err)
-	}
-	return true, nil
+	return exists(u.ctx, u.tx, fmt.Sprintf("%s has column %s", table, column), query, table, column)
 }
 
 // dropDefault drops a column's default on the three servers where it holds
@@ -551,13 +541,9 @@ func (u *upgrader) dropDefault(table, column string) error {
 	if u.engine == database.SQLite {
 		return nil
 	}
-	query := `SELECT 1 FROM "information_schema"."columns"
-		WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?
-		AND "column_default" IS NOT NULL`
+	query := postgresColumnProbe + ` AND "column_default" IS NOT NULL`
 	if u.engine != database.Postgres {
-		query = `SELECT 1 FROM "information_schema"."COLUMNS"
-			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?
-			AND "COLUMN_DEFAULT" IS NOT NULL LIMIT 1`
+		query = mysqlColumnProbe + ` AND "COLUMN_DEFAULT" IS NOT NULL`
 	}
 	held, err := exists(u.ctx, u.tx, fmt.Sprintf("%s.%s has a default", table, column), query, table, column)
 	if err != nil || !held {
