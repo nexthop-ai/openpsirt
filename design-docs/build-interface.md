@@ -64,6 +64,8 @@ Satisfies REQ-75.
 | An export nothing else names | Fails, the interface's half of `make unreachable`; a test counts as a caller |
 | An address no route answers, or one built outside the route module | Fails, and every query parameter the route table lists is held to a read on its screen. A Go test holds server links to the same table. `design-docs/interface.md` § The route table |
 | An invalidation whose key no read's key starts with | Fails: the cache matches by prefix, so it refreshes nothing. Compared as far as each key is literal |
+| The files a check reads | One definition for every check and its source directory: the interface's source, generated files and tests left out unless a check asks for tests |
+| A check started as a program | Recognized through symbolic links in its path, so it runs; one not recognized would run nothing and exit clean |
 
 ## Limits
 

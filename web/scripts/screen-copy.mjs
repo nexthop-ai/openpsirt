@@ -14,13 +14,9 @@
 // and fragments, and a pattern that skips expressions skips exactly the
 // branches the long sentences hide in.
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
-import { interfaceSources, parse } from "./parsed.mjs";
-
-const here = import.meta.dirname;
-const src = path.join(here, "..", "src");
+import { interfaceSources, isMain, parse, SRC as src } from "./parsed.mjs";
 
 // The most words one paragraph, hint, or empty-state detail may put on screen.
 export const BOUND = 20;
@@ -247,7 +243,7 @@ export function sweepNames() {
   return { found, examined };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+if (isMain(import.meta)) {
   const names = sweepNames();
   if (names.examined === 0) {
     console.error("No control, heading or label was found, so this checked nothing.");

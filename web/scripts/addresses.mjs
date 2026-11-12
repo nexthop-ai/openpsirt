@@ -24,10 +24,7 @@ import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
-import { interfaceSources, parse } from "./parsed.mjs";
-
-const here = import.meta.dirname;
-const src = path.join(here, "..", "src");
+import { interfaceSources, parse, SRC as src } from "./parsed.mjs";
 
 // The one file an address may be put together in.
 const BUILDER = path.join("app", "routes.ts");
