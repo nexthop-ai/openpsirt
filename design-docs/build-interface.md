@@ -64,7 +64,8 @@ Satisfies REQ-75.
 |---|---|
 | An export nothing else names | Fails, the interface's half of `make unreachable`; a test counts as a caller |
 | An address no route answers, or one built outside the route module | Fails, and every query parameter the route table lists is held to a read on its screen. A Go test holds server links to the same table. `design-docs/interface.md` § The route table |
-| An invalidation whose key no read's key starts with | Fails: the cache matches by prefix, so it refreshes nothing. Compared as far as each key is literal |
+| An invalidation whose key no read's key starts with | Fails: the cache matches by prefix, so it refreshes nothing. Compared as far as each key is literal; a key opening on a name is read through the constant or the literal list the name is bound to, one key per word |
+| An invalidation or read whose key opens on something unreadable | Fails: an invalidation nobody can check passes unseen, and such a read would reach every invalidation |
 
 ## Limits
 
