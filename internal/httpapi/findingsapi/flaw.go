@@ -22,7 +22,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// CodeFindingBuild is one build a flaw record names.
+// CodeFindingBuild is one build a request names by its branch or tag and
+// variant.
 type CodeFindingBuild struct {
 	BranchOrTag string `json:"branch_or_tag" minLength:"1" doc:"A branch or a tag"`
 	Variant     string `json:"variant" minLength:"1" doc:"The way that line is built"`
@@ -102,6 +103,14 @@ type RecordedAsFlawBody struct {
 }
 
 // codeFindingPath is one code finding, addressed by its occurrence on one build.
+// flawActRequiring declares an act on a code finding's flaw record, which
+// takes both security testing and private triage on the product, because it
+// joins security testing work to a flaw private triage holds.
+func flawActRequiring(op huma.Operation) huma.Operation {
+	return core.Requiring(op, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
+		access.SecurityTestingTriage, access.PrivateTriage)
+}
+
 const codeFindingPath = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}"
 
 // codeFindingAt is the reader, the build and the product a route about one code finding
@@ -147,7 +156,7 @@ func refusedFlawRecord(in core.Deps, err error) error {
 }
 
 func registerFlaw(api huma.API, in core.Deps) {
-	huma.Register(api, core.Requiring(huma.Operation{
+	huma.Register(api, flawActRequiring(huma.Operation{
 		OperationID: "get-code-finding-flaw", Method: http.MethodGet, Path: codeFindingPath + "/flaw",
 		Summary: "Get the offer to record a code finding as a flaw",
 		Description: "Returns what recording a confirmed code finding as a flaw here is offered: the " +
@@ -157,13 +166,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 			"flaw against those is refused, and the builds holding it that the code finding's series never " +
 			"analyzed.",
 		Tags: []string{"Findings"},
-	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
-		access.SecurityTestingTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-	}) (*struct{ Body FlawOfferBody }, error) {
+	}), func(ctx context.Context, input *core.CodeFindingRoute) (*struct{ Body FlawOfferBody }, error) {
 		in := core.Of(ctx, in)
 		at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
@@ -191,7 +194,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 		return &struct{ Body FlawOfferBody }{Body: body}, nil
 	})
 
-	huma.Register(api, core.Requiring(huma.Operation{
+	huma.Register(api, flawActRequiring(huma.Operation{
 		OperationID: "record-code-finding-as-flaw", Method: http.MethodPost, Path: codeFindingPath + "/flaw",
 		Summary: "Record a confirmed code finding as a flaw",
 		Description: "Records a confirmed code finding as a flaw in this product, found here and " +
@@ -205,13 +208,9 @@ func registerFlaw(api huma.API, in core.Deps) {
 			"with the flaw. Left out, the code findings are security testing only and linked.\n\n" +
 			"A code finding nobody confirmed, or one already recorded as a flaw, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
-		access.SecurityTestingTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body        struct {
+	}), func(ctx context.Context, input *struct {
+		core.CodeFindingRoute
+		Body struct {
 			Builds    []CodeFindingBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
 			Component string             `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Ecosystem string             `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
@@ -234,18 +233,9 @@ func registerFlaw(api huma.API, in core.Deps) {
 		if err := analysis.MayRecordAsFlaw(subject, at.named.ProductID); err != nil {
 			return nil, refusedFlawRecord(in, err)
 		}
-		names := catalog.NewStore(in.DB.DB)
-		buildIDs := make([]int64, 0, len(input.Body.Builds))
-		for _, b := range input.Body.Builds {
-			located, err := names.LocateVisible(ctx, subject, input.Product, b.BranchOrTag, b.Variant)
-			if err != nil {
-				return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
-			}
-			build, err := core.BuildRow(ctx, in, located.BranchOrTagID, located.VariantID)
-			if err != nil {
-				return nil, err
-			}
-			buildIDs = append(buildIDs, build.ID)
+		buildIDs, err := bodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
+		if err != nil {
+			return nil, err
 		}
 		done, err := analysis.RecordAsFlaw(ctx, in.DB.DB, subject, analysis.Recording{
 			ProductID: at.named.ProductID, OccurrenceIdentity: input.Occurrence, IncludeInDisclosure: input.Body.IncludeInDisclosure,
@@ -273,18 +263,8 @@ func registerFlaw(api huma.API, in core.Deps) {
 		}}, nil
 	})
 
-	including := func(include bool) func(context.Context, *struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-	}) (*struct{}, error) {
-		return func(ctx context.Context, input *struct {
-			Product     string `path:"product"`
-			BranchOrTag string `path:"branch_or_tag"`
-			Variant     string `path:"variant"`
-			Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		}) (*struct{}, error) {
+	including := func(include bool) func(context.Context, *core.CodeFindingRoute) (*struct{}, error) {
+		return func(ctx context.Context, input *core.CodeFindingRoute) (*struct{}, error) {
 			in := core.Of(ctx, in)
 			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
@@ -305,7 +285,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 			return &struct{}{}, nil
 		}
 	}
-	huma.Register(api, core.Requiring(huma.Operation{
+	huma.Register(api, flawActRequiring(huma.Operation{
 		OperationID: "include-code-finding-in-disclosure", Method: http.MethodPut, Path: codeFindingPath + "/flaw/disclosure",
 		Summary: "Include a code finding in its flaw's disclosure",
 		Description: "Includes a security-testing-only code finding in its flaw's disclosure, with every code finding linked to the " +
@@ -315,9 +295,8 @@ func registerFlaw(api huma.API, in core.Deps) {
 			"Recorded in the administration trail. A code finding not recorded as a flaw, one already included, or " +
 			"one whose flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
-		access.SecurityTestingTriage, access.PrivateTriage), including(true))
-	huma.Register(api, core.Requiring(huma.Operation{
+	}), including(true))
+	huma.Register(api, flawActRequiring(huma.Operation{
 		OperationID: "exclude-code-finding-from-disclosure", Method: http.MethodDelete, Path: codeFindingPath + "/flaw/disclosure",
 		Summary: "Take a code finding out of its flaw's disclosure",
 		Description: "Takes a code finding out of its flaw's disclosure while the flaw is undisclosed, with " +
@@ -326,11 +305,32 @@ func registerFlaw(api huma.API, in core.Deps) {
 			"Recorded in the administration trail. A code finding not recorded as a flaw, one that is security testing only, or one whose " +
 			"flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
-		access.SecurityTestingTriage, access.PrivateTriage), including(false))
+	}), including(false))
 }
 
 // codeFindingBuilds is builds as an answer states them.
+// bodyBuilds resolves the builds a request body names in a product, refusing
+// an undeclared one by naming it. Asked only after the caller is authorized on
+// the product.
+func bodyBuilds(ctx context.Context, in core.Deps, subject access.Subject, product string,
+	builds []CodeFindingBuild) ([]int64, error) {
+
+	names := catalog.NewStore(in.DB.DB)
+	out := make([]int64, 0, len(builds))
+	for _, b := range builds {
+		at, err := names.LocateVisible(ctx, subject, product, b.BranchOrTag, b.Variant)
+		if err != nil {
+			return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
+		}
+		build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, build.ID)
+	}
+	return out, nil
+}
+
 func codeFindingBuilds(builds []analysis.BuildName) []CodeFindingBuild {
 	out := make([]CodeFindingBuild, 0, len(builds))
 	for _, b := range builds {
@@ -375,18 +375,10 @@ type CodeFindingCollaboratorBody = CollaboratorBody
 
 func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Administering) {
 	const path = codeFindingPath + "/collaborators"
-	type codeFindingInput = struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-	}
+	type codeFindingInput = core.CodeFindingRoute
 	type personInput = struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Identity    string `path:"identity"`
+		core.CodeFindingRoute
+		Identity string `path:"identity"`
 	}
 	// recorded is the flaw record of the code finding a route names, where the reader
 	// reads security testing work in the product: who is on a code finding is managed by its
@@ -477,12 +469,20 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 			var h *finding.CodeFindingFlaw
 			var person *access.Account
 			var added bool
+			var flaw string
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				var name string
 				var err error
 				if h, name, err = changing(ctx, tx, at, input.Occurrence); err != nil {
 					return err
 				}
+				// Read with the grant, so the notice names the flaw the grant
+				// was made on.
+				names, err := finding.NewVulnerabilities(tx).NamesByID(ctx, []int64{h.VulnerabilityID})
+				if err != nil {
+					return core.WentWrong(in.Logger, "the flaw a code finding was recorded as could not be named", err)
+				}
+				flaw = names[h.VulnerabilityID]
 				rights := access.NewStore(tx)
 				if person, err = core.PersonNamed(ctx, a.Logger, rights, input.Identity); err != nil {
 					return err
@@ -505,13 +505,9 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 			if !added {
 				return &struct{}{}, nil
 			}
-			flaw, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, []int64{h.VulnerabilityID})
-			if err != nil {
-				in.Log().Error("could not name the flaw a code finding was recorded as", "error", err)
-			}
 			core.Tell(ctx, in, "could not say that somebody was granted a code finding", notify.Telling{
 				PersonID: person.ID, Kind: notify.BroughtIn,
-				Body: "You have been granted the static analysis code finding behind " + flaw[h.VulnerabilityID] +
+				Body: "You have been granted the static analysis code finding behind " + flaw +
 					" in " + at.named.Product + ". You can read its evidence, and nothing else of that product.",
 				Link:    weblink.CodeFinding(at.named.Product, at.named.BranchOrTag, at.named.Variant, h.OccurrenceIdentity),
 				Private: true,

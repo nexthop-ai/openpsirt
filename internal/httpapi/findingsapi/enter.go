@@ -12,7 +12,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -114,10 +113,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			// is minted per product — so the product is the level
 			// this is recorded at and the builds are what it
 			// names.
-			Builds []struct {
-				BranchOrTag string `json:"branch_or_tag" minLength:"1" doc:"A branch or a tag"`
-				Variant     string `json:"variant" minLength:"1" doc:"The way that line is built"`
-			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take"`
+			Builds []CodeFindingBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take"`
 			FlawFields
 			Component string `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Version   string `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
@@ -144,18 +140,9 @@ func registerEntry(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
-		buildIDs := make([]int64, 0, len(input.Body.Builds))
-		for _, build := range input.Body.Builds {
-			at, err := names.LocateVisible(ctx, subject, input.Product, build.BranchOrTag, build.Variant)
-			if err != nil {
-				return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
-			}
-			build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
-			if err != nil {
-				return nil, err
-			}
-			buildIDs = append(buildIDs, build.ID)
+		buildIDs, err := bodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
+		if err != nil {
+			return nil, err
 		}
 
 		rows, identifier, err := finding.NewStore(in.DB.DB).Sweeping(in.Queue).Enter(ctx, subject, finding.Entering{
@@ -877,11 +864,8 @@ func registerAffects(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue" doc:"The identifier it was filed under"`
 		Body          struct {
-			Builds []struct {
-				BranchOrTag string `json:"branch_or_tag" minLength:"1"`
-				Variant     string `json:"variant" minLength:"1"`
-			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding"`
-			Reason string `json:"reason,omitempty" doc:"The reason any build is being taken out. Required whenever one is"`
+			Builds []CodeFindingBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding"`
+			Reason string             `json:"reason,omitempty" doc:"The reason any build is being taken out. Required whenever one is"`
 		}
 	}) (*struct{ Body AffectsBody }, error) {
 		in := core.Of(ctx, in)
@@ -905,17 +889,9 @@ func registerAffects(api huma.API, in core.Deps) {
 			return nil, err
 		}
 
-		buildIDs := make([]int64, 0, len(input.Body.Builds))
-		for _, build := range input.Body.Builds {
-			at, err := core.LocatedVisibly(ctx, in, subject, input.Product, build.BranchOrTag, build.Variant)
-			if err != nil {
-				return nil, err
-			}
-			build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
-			if err != nil {
-				return nil, err
-			}
-			buildIDs = append(buildIDs, build.ID)
+		buildIDs, err := bodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
+		if err != nil {
+			return nil, err
 		}
 
 		changed, err := finding.NewStore(in.DB.DB).Sweeping(in.Queue).Affects(ctx, subject,
@@ -929,7 +905,8 @@ func registerAffects(api huma.API, in core.Deps) {
 				errors.Is(err, finding.ErrNoReason),
 				errors.Is(err, finding.ErrTooManyOccurrences),
 				errors.Is(err, finding.ErrNoBuild),
-				errors.Is(err, finding.ErrSeveralProducts):
+				errors.Is(err, finding.ErrSeveralProducts),
+				errors.Is(err, finding.ErrSeveralOtherVersions):
 				return nil, core.Asked(in.Logger, err)
 			case errors.Is(err, finding.ErrNoSuchComponent):
 				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())

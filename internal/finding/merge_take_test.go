@@ -118,3 +118,26 @@ func TestTwoMergesOfOneIssueAtOnceLeaveOneIssue(t *testing.T) {
 		}
 	})
 }
+
+// Two writers meeting one new issue at once both record it: the second finds
+// the first's row once its insert collides, and the issue is one row.
+func TestTwoWritersRecordingOneNewIssueAtOnceBothSucceed(t *testing.T) {
+	servers(t, func(t *testing.T, f *fixture) {
+		const name = "CVE-2026-8301"
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "vulnerability", "vulnerability", 2*time.Second,
+			func() error {
+				return mergeWithin(context.Background(), f.db.DB, finding.Named{Identifier: name})
+			})
+		if err := mergeWithin(t.Context(), hooked, finding.Named{Identifier: name}); err != nil {
+			t.Fatalf("the writer that lost the race: %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival: %v", err)
+		}
+		held, err := f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).
+			Where(`"identifier_folded" = ?`, finding.FoldIdentifier(name)).Count(t.Context())
+		if err != nil || held != 1 {
+			t.Errorf("the issue is held by %d rows (%v), want one", held, err)
+		}
+	})
+}

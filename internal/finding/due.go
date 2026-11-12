@@ -233,10 +233,6 @@ type Late struct {
 	// Occurrences is how many occurrences this issue has in this component. One
 	// row covers all of them, because they are one thing to answer.
 	Occurrences int `bun:"places"`
-	// AssignedHigh and AssignedCount decide whether one name can be reported
-	// for the group. They are read and then discarded.
-	AssignedHigh  *int64 `bun:"assigned_high"`
-	AssignedCount int    `bun:"assigned_count"`
 	// Total is how many rows the question has in all, counted after the
 	// grouping and before the limit. It rides on the page rather than being
 	// asked for separately, and it is read off the first row and discarded.
@@ -449,9 +445,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// Named only where every occurrence has the same person. Reporting one of
 		// several would tell somebody a finding is being dealt with when most
 		// of it is not.
-		ColumnExpr(`MIN("f"."assigned_to") AS "assigned_to"`).
-		ColumnExpr(`MAX("f"."assigned_to") AS "assigned_high"`).
-		ColumnExpr(`COUNT("f"."assigned_to") AS "assigned_count"`).
+		ColumnExpr(soleHolderExpr + ` AS "assigned_to"`).
 		// The number of groups the question has, counted over the grouped
 		// result and before the limit. A screen that counted its own page said
 		// two hundred over a list of four hundred and sixty-two.
@@ -470,12 +464,6 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	var late []Late
 	if err := query.Scan(ctx, &late); err != nil {
 		return nil, 0, fmt.Errorf("read what is running out of time: %w", err)
-	}
-	for i := range late {
-		if late[i].AssignedCount != late[i].Occurrences || late[i].AssignedTo == nil ||
-			late[i].AssignedHigh == nil || *late[i].AssignedTo != *late[i].AssignedHigh {
-			late[i].AssignedTo = nil
-		}
 	}
 	// A page past the end of the answer carries no row to read the count off.
 	// The groups are counted on their own in that case, which is the one call
@@ -989,3 +977,9 @@ func (s *Store) everyProduct(ctx context.Context) ([]int64, error) {
 	}
 	return products, nil
 }
+
+// soleHolderExpr is the party holding every occurrence a grouped row over
+// findings under "f" covers, and NULL where any is unheld or two hold them.
+const soleHolderExpr = `CASE WHEN COUNT("f"."assigned_to") = COUNT(*)
+	AND MIN("f"."assigned_to") = MAX("f"."assigned_to")
+	THEN MIN("f"."assigned_to") END`

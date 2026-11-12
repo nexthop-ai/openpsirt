@@ -252,28 +252,13 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what the merged issues are rated: %w", err)
 	}
-	keptRates := map[int64]bool{}
-	for _, r := range rated {
-		if r.VulnerabilityID == kept {
-			keptRates[r.ProductID] = true
-		}
+	moved, err := moveOrDrop(ctx, v.db, (*IssueRating)(nil), rated, kept, gone, "a rating in force",
+		func(r IssueRating) int64 { return r.VulnerabilityID }, func(r IssueRating) int64 { return r.ProductID },
+		func(r IssueRating) int64 { return r.ID })
+	if err != nil {
+		return err
 	}
-	for _, r := range rated {
-		if r.VulnerabilityID != gone {
-			continue
-		}
-		if keptRates[r.ProductID] {
-			if _, err := v.db.NewDelete().Model((*IssueRating)(nil)).
-				Where(`"id" = ?`, r.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("leave the kept issue's rating in force: %w", err)
-			}
-			continue
-		}
-		if _, err := v.db.NewUpdate().Model((*IssueRating)(nil)).
-			Set(`"vulnerability_id" = ?`, kept).
-			Where(`"id" = ?`, r.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("carry a rating in force to the issue it rates: %w", err)
-		}
+	for _, r := range moved {
 		// Everything open against the issue in that product now ranks and is
 		// clocked by it, including what the kept issue held before.
 		if err := rerank(ctx, v.db, r.ProductID, kept, r.Severity); err != nil {
@@ -293,28 +278,10 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read how the merged issues were recorded: %w", err)
 	}
-	keptRecorded := map[int64]bool{}
-	for _, r := range recorded {
-		if r.VulnerabilityID == kept {
-			keptRecorded[r.ProductID] = true
-		}
-	}
-	for _, r := range recorded {
-		if r.VulnerabilityID != gone {
-			continue
-		}
-		var err error
-		if keptRecorded[r.ProductID] {
-			_, err = v.db.NewDelete().Model((*RecordedRating)(nil)).
-				Where(`"id" = ?`, r.ID).Exec(ctx)
-		} else {
-			_, err = v.db.NewUpdate().Model((*RecordedRating)(nil)).
-				Set(`"vulnerability_id" = ?`, kept).
-				Where(`"id" = ?`, r.ID).Exec(ctx)
-		}
-		if err != nil {
-			return fmt.Errorf("carry how a flaw was recorded to the issue it is: %w", err)
-		}
+	if _, err := moveOrDrop(ctx, v.db, (*RecordedRating)(nil), recorded, kept, gone, "how a flaw was recorded",
+		func(r RecordedRating) int64 { return r.VulnerabilityID }, func(r RecordedRating) int64 { return r.ProductID },
+		func(r RecordedRating) int64 { return r.ID }); err != nil {
+		return err
 	}
 
 	// A label is a product's word on a row, kept only while it is on it, so it
@@ -330,29 +297,11 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		product, component int64
 		label              string
 	}
-	on := map[marked]bool{}
-	for _, t := range labels {
-		if t.VulnerabilityID == kept {
-			on[marked{t.ProductID, t.ComponentID, t.Label}] = true
-		}
-	}
-	for _, t := range labels {
-		if t.VulnerabilityID != gone {
-			continue
-		}
-		key := marked{t.ProductID, t.ComponentID, t.Label}
-		q := v.db.NewUpdate().Model((*Label)(nil)).Set(`"vulnerability_id" = ?`, kept)
-		if on[key] {
-			if _, err := v.db.NewDelete().Model((*Label)(nil)).
-				Where(`"id" = ?`, t.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("take off a mark the kept issue already has: %w", err)
-			}
-			continue
-		}
-		on[key] = true
-		if _, err := q.Where(`"id" = ?`, t.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("carry a mark to the issue it marks: %w", err)
-		}
+	if _, err := moveOrDrop(ctx, v.db, (*Label)(nil), labels, kept, gone, "a mark",
+		func(t Label) int64 { return t.VulnerabilityID },
+		func(t Label) marked { return marked{t.ProductID, t.ComponentID, t.Label} },
+		func(t Label) int64 { return t.ID }); err != nil {
+		return err
 	}
 
 	why, err := v.supersededBecause(ctx, kept, absorbed)
@@ -630,4 +579,39 @@ func orBlank(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// moveOrDrop carries the absorbed issue's rows to the kept issue, and drops
+// each whose key the kept issue already holds: one issue carries one of each.
+// It answers the rows it moved. A row moved holds its key, so a second
+// absorbed row of that key is dropped.
+func moveOrDrop[T any, K comparable](ctx context.Context, db bun.IDB, model any, rows []T, kept, gone int64,
+	what string, issue func(T) int64, key func(T) K, id func(T) int64) ([]T, error) {
+
+	on := map[K]bool{}
+	for _, r := range rows {
+		if issue(r) == kept {
+			on[key(r)] = true
+		}
+	}
+	var moved []T
+	for _, r := range rows {
+		if issue(r) != gone {
+			continue
+		}
+		k := key(r)
+		if on[k] {
+			if _, err := db.NewDelete().Model(model).Where(`"id" = ?`, id(r)).Exec(ctx); err != nil {
+				return nil, fmt.Errorf("leave the kept issue's own %s: %w", what, err)
+			}
+			continue
+		}
+		on[k] = true
+		if _, err := db.NewUpdate().Model(model).Set(`"vulnerability_id" = ?`, kept).
+			Where(`"id" = ?`, id(r)).Exec(ctx); err != nil {
+			return nil, fmt.Errorf("carry %s to the issue it is about: %w", what, err)
+		}
+		moved = append(moved, r)
+	}
+	return moved, nil
 }

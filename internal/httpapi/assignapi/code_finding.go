@@ -42,11 +42,8 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 	}, core.PerProduct, "At the code finding's visibility. Giving it to somebody else also needs "+
 		"assigner. Taking a code finding nobody holds, or handing back your own, does not.",
 		core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body        struct {
+		core.CodeFindingRoute
+		Body struct {
 			Person string `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
 			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}

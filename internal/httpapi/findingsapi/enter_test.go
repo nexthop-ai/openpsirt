@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strconv"
 	"strings"
@@ -877,6 +878,41 @@ func TestScoringAnEmptyVectorIsRefusedRatherThanAnswered(t *testing.T) {
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/score?vector=", "")
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("an empty vector answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAnUndeclaredBuildInABodyIsNamedByEveryRouteTakingBuilds(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
+				`"summary":"The management socket answers before anyone authenticated.","severity":"critical"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+
+		const typo = `[{"branch_or_tag":"master","variant":"broadcm"}]`
+		entering := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+			`{"builds":`+typo+`,"summary":"Another.","severity":"critical"}`)
+		affecting := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+recorded.Identifier+"/builds", `{"builds":`+typo+`}`)
+		for what, answer := range map[string]*httptest.ResponseRecorder{
+			"recording a flaw": entering, "setting the builds it affects": affecting,
+		} {
+			if answer.Code != http.StatusNotFound || !strings.Contains(answer.Body.String(), "broadcm") {
+				t.Errorf("%s against an undeclared variant answered %d: %s", what, answer.Code, answer.Body.String())
+			}
+		}
+		if entering.Body.String() != affecting.Body.String() {
+			t.Errorf("the two routes refuse one undeclared build differently\n recording: %s\n affecting: %s",
+				entering.Body.String(), affecting.Body.String())
 		}
 	})
 }

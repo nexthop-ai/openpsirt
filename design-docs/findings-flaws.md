@@ -61,6 +61,9 @@ One identifier, one finding per occurrence in every build that ships it.
 | A component at an occurrence, keyed exactly as a scanned one (REQ-17), derived from the build's graph | A hand-recorded and a scanned copy of one flaw share decisions. A component can have several occurrences |
 | Against the build itself, the occurrence is the root, with no name of its own | The product's name differs per variant |
 | A name the build holds more than once is refused with the choices, through the shared component lookup | A switch image ships three vendored copies of one library, and thirteen names held at one version by two components |
+| A build added to the set later holds the flaw where its first row is: the added build's root for a flaw against the build, otherwise the component at that row's version, ecosystem and namespace, then at its ecosystem and namespace, then by name | The request names builds alone, so the row makes the choice. A root's name differs per variant |
+| An added build holding the component at several versions, none of them the row's, is refused | Which it affects cannot be told from the row, and recording the flaw for that build says |
+| A build taken out is counted where the edit closed a row of it | Two people narrowing at once each answer for what they closed |
 
 ## Recorded words on a shared issue
 

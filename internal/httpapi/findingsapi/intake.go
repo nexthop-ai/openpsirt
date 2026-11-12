@@ -140,13 +140,10 @@ func registerIntake(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593" doc:"The reference this deployment minted"`
 	}) (*struct{ Body ReportBody }, error) {
 		in := core.Of(ctx, in)
-		subject, product, err := productForReports(ctx, in, input.Product)
+		_, _, row, err := readReport(ctx, in, input.Product, input.Reference, "that report could not be read",
+			(*finding.Store).ReportBy)
 		if err != nil {
 			return nil, err
-		}
-		row, err := finding.NewStore(in.DB.DB).ReportBy(ctx, subject, product.ID, input.Reference)
-		if err != nil {
-			return nil, refusedReport(in, err, "that report could not be read")
 		}
 		body, err := reportBody(ctx, in, *row)
 		if err != nil {
@@ -275,14 +272,11 @@ func registerIntake(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*attachmentsOutput, error) {
 		in := core.Of(ctx, in)
-		subject, product, err := productForReports(ctx, in, input.Product)
+		files := in.Attachments()
+		subject, product, row, err := readReport(ctx, in, input.Product, input.Reference, "that report could not be read",
+			(*finding.Store).ReportBy)
 		if err != nil {
 			return nil, err
-		}
-		files := in.Attachments()
-		row, err := finding.NewStore(in.DB.DB).ReportBy(ctx, subject, product.ID, input.Reference)
-		if err != nil {
-			return nil, refusedReport(in, err, "that report could not be read")
 		}
 		rows, err := files.ForReport(ctx, subject, product.ID, row.ID)
 		if err != nil {
@@ -292,6 +286,25 @@ func registerIntake(api huma.API, in core.Deps) {
 	})
 
 	registerRulings(api, in)
+}
+
+// readReport resolves the product a report route names and reads one thing of
+// the report the route names, refusing as every report route refuses. what
+// names the read in a failure.
+func readReport[T any](ctx context.Context, in core.Deps, product, reference, what string,
+	read func(*finding.Store, context.Context, access.Subject, int64, string) (T, error)) (
+	access.Subject, *catalog.Product, T, error) {
+
+	var none T
+	subject, named, err := productForReports(ctx, in, product)
+	if err != nil {
+		return access.Subject{}, nil, none, err
+	}
+	got, err := read(finding.NewStore(in.DB.DB), ctx, subject, named.ID, reference)
+	if err != nil {
+		return access.Subject{}, nil, none, refusedReport(in, err, what)
+	}
+	return subject, named, got, nil
 }
 
 // productForReports resolves the product a report route names.

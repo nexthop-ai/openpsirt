@@ -11,7 +11,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -131,7 +130,7 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 		return &struct{ Body FlawCodeFindingBody }{Body: body}, nil
 	})
 
-	huma.Register(api, core.Requiring(huma.Operation{
+	huma.Register(api, flawActRequiring(huma.Operation{
 		OperationID: "undo-code-finding-flaw", Method: http.MethodPost, Path: codeFindingPath + "/flaw/withdrawal",
 		Summary: "Undo recording a code finding as a flaw",
 		Description: "Undoes recording a code finding as a flaw while its flaw is undisclosed, with every code finding linked " +
@@ -142,13 +141,9 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 			"`because` is required. Recorded in the administration trail. A code finding not recorded as a flaw, or one " +
 			"whose flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Both security-testing-triage and private-triage on the product.",
-		access.SecurityTestingTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body        struct {
+	}), func(ctx context.Context, input *struct {
+		core.CodeFindingRoute
+		Body struct {
 			Because string `json:"because" minLength:"1" doc:"Why the flaw record is undone, in markdown"`
 		}
 	}) (*struct{}, error) {

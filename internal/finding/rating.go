@@ -112,12 +112,26 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 	for _, generation := range held {
 		known[generation] = true
 	}
-	var missing []CVSS
+	// The worst of each generation the report states, whatever order it
+	// states them in.
+	worst := map[int]CVSS{}
+	var generations []int
 	for _, rating := range ratings {
 		if rating.Generation <= 0 || rating.ScoreCenti <= 0 ||
 			strings.TrimSpace(rating.Vector) == "" {
 			continue
 		}
+		kept, seen := worst[rating.Generation]
+		if !seen {
+			generations = append(generations, rating.Generation)
+		}
+		if !seen || rating.ScoreCenti > kept.ScoreCenti {
+			worst[rating.Generation] = rating
+		}
+	}
+	var missing []CVSS
+	for _, generation := range generations {
+		rating := worst[generation]
 		if known[rating.Generation] {
 			if _, err := rating.setOn(v.db.NewUpdate().Model((*CVSS)(nil))).
 				Where(`"vulnerability_id" = ?`, id).

@@ -199,14 +199,7 @@ var ErrPathTaken = refusal.New("another document is published at the same path")
 
 // Statuses is which statuses the deployment publishes now.
 func Statuses(ctx context.Context, db bun.IDB) (string, error) {
-	value, set, err := setting.NewStore(db).Get(ctx, setting.PublishedStatuses)
-	if err != nil {
-		return "", err
-	}
-	if !set || value != setting.SettledStatuses {
-		return setting.EveryStatus, nil
-	}
-	return setting.SettledStatuses, nil
+	return setting.NewStore(db).Word(ctx, setting.PublishedStatuses, setting.StatusLimits(), setting.EveryStatus)
 }
 
 // key is what one document is about within its product.

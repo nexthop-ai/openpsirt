@@ -5,6 +5,7 @@ package finding
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -90,18 +92,11 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 	if len(standing) == 0 {
 		return nil, ErrNothingOpenThere
 	}
-	// The name the flaw's own build stated, which is what another build of
-	// the product knows the component as. The row's name may be another
-	// product's, and another build may state it for a different package.
-	component, err := s.ComponentNameIn(ctx, standing[0].BuildID, standing[0].ComponentID)
-	if err != nil {
-		return nil, err
-	}
 	for build := range wanted {
 		if standingAt(standing, build) {
 			continue
 		}
-		if _, _, err := carrying(ctx, s.db, build, Entering{Component: component}); err != nil {
+		if _, _, err := likeIn(ctx, s.db, build, &standing[0]); err != nil {
 			return nil, err
 		}
 	}
@@ -170,13 +165,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			return fmt.Errorf("read how much one action may write: %w", err)
 		}
 
-		// The flaw's subject and where each added build holds it, read here:
-		// a build that stopped shipping the component since the early check
-		// is refused rather than given a finding under its root.
-		component, err := (&Store{db: tx, now: s.now}).ComponentNameIn(ctx, rows[0].BuildID, rows[0].ComponentID)
-		if err != nil {
-			return err
-		}
+		// Where each added build holds the flaw's subject is read here: a
+		// build that stopped shipping the component since the early check is
+		// refused rather than given a finding under its root.
 
 		// Widening first. A build added and then immediately closed by the
 		// same call is not something to guard against — the two sets are
@@ -187,7 +178,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			if here[build] {
 				continue
 			}
-			componentID, name, err := carrying(ctx, tx, build, Entering{Component: component})
+			componentID, name, err := likeIn(ctx, tx, build, &rows[0])
 			if err != nil {
 				return err
 			}
@@ -222,36 +213,115 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			}
 		}
 
-		out.Closed = len(leaving)
-		if len(closing) == 0 {
-			return nil
+		// Each build taken out is counted where this closed a row of it: a
+		// concurrent edit that closed its rows first took it out, and this
+		// did not.
+		for build := range leaving {
+			var ofBuild []int64
+			for i := range rows {
+				if rows[i].BuildID == build {
+					ofBuild = append(ofBuild, rows[i].ID)
+				}
+			}
+			closed := int64(0)
+			if err := database.IDsInBatches(ctx, ofBuild, func(ctx context.Context, batch []int64) error {
+				result, err := tx.NewUpdate().Model((*Finding)(nil)).
+					Set(`"closed_at" = ?`, now).
+					Set(`"closed_by" = ?`, subject.ID).
+					Set(`"closed_note" = ?`, because).
+					Set(`"closed_because" = ?`, Invalid).
+					Where(`"id" IN (?)`, bun.List(batch)).
+					// Still open, checked as the write happens: two people
+					// editing the set at once is ordinary, and the second must
+					// not overwrite the first's reason.
+					Where(`"closed_at" IS NULL`).
+					Exec(ctx)
+				if err != nil {
+					return fmt.Errorf("take build %d back out: %w", build, err)
+				}
+				matched, err := database.Affected(result)
+				if err != nil {
+					return fmt.Errorf("take build %d back out: %w", build, err)
+				}
+				closed += matched
+				return nil
+			}); err != nil {
+				return err
+			}
+			if closed > 0 {
+				out.Closed++
+			}
 		}
-		return database.IDsInBatches(ctx, closing, func(ctx context.Context, batch []int64) error {
-			result, err := tx.NewUpdate().Model((*Finding)(nil)).
-				Set(`"closed_at" = ?`, now).
-				Set(`"closed_by" = ?`, subject.ID).
-				Set(`"closed_note" = ?`, because).
-				Set(`"closed_because" = ?`, Invalid).
-				Where(`"id" IN (?)`, bun.List(batch)).
-				// Still open, checked as the write happens: two people editing
-				// the set at once is ordinary, and the second must not
-				// overwrite the first's reason.
-				Where(`"closed_at" IS NULL`).
-				Exec(ctx)
-			if err != nil {
-				return fmt.Errorf("take %d builds back out: %w", len(batch), err)
-			}
-			if _, err := database.Affected(result); err != nil {
-				return fmt.Errorf("take %d builds back out: %w", len(batch), err)
-			}
-			return nil
-		})
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
+
+// likeIn resolves what in an added build holds the flaw a row records, and the
+// name its occurrence is keyed on.
+//
+// Resolved from the row's component, not its name alone: a flaw recorded
+// against a build's root is recorded against the added build's root, whose
+// name is the variant's own, and a component the added build ships at several
+// versions is the one at the row's version, ecosystem and namespace. Where the
+// build ships it at none of those, the name alone decides, with the ecosystem
+// and namespace first.
+func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int64, string, error) {
+	root, err := db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		Where(`"n"."build_id" = ?`, like.BuildID).
+		Where(`"n"."component_id" = ?`, like.ComponentID).
+		Where(`"n"."is_root" = ?`, true).
+		Exists(ctx)
+	if err != nil {
+		return 0, "", fmt.Errorf("read whether the flaw is recorded against its build: %w", err)
+	}
+	if root {
+		return carrying(ctx, db, buildID, Entering{})
+	}
+	var c struct {
+		Name    string `bun:"name"`
+		Version string `bun:"version"`
+		Purl    string `bun:"purl"`
+	}
+	// The name and version the flaw's own build stated, which is what another
+	// build of the product knows the component as. The row's may be another
+	// product's, and another build may state them for a different package.
+	if err := db.NewSelect().TableExpr(`"component" AS "c"`).
+		ColumnExpr(graph.BuildName("?", `"c"."id"`, "c")+` AS "name"`, like.BuildID).
+		ColumnExpr(graph.BuildVersion("?", `"c"."id"`, "c")+` AS "version"`, like.BuildID).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
+		Where(`"c"."id" = ?`, like.ComponentID).
+		Scan(ctx, &c); err != nil {
+		return 0, "", fmt.Errorf("look up what component %d is: %w", like.ComponentID, err)
+	}
+	parts := graph.PartsOfPurl(c.Purl)
+	ecosystem := graph.EcosystemOf(c.Purl)
+	id, name, err := carrying(ctx, db, buildID, Entering{Component: c.Name, Version: c.Version,
+		Ecosystem: ecosystem, Namespace: parts.Namespace})
+	if !errors.Is(err, ErrNoSuchComponent) {
+		return id, name, err
+	}
+	id, name, err = carrying(ctx, db, buildID, Entering{Component: c.Name, Ecosystem: ecosystem,
+		Namespace: parts.Namespace})
+	if errors.Is(err, ErrNoSuchComponent) {
+		id, name, err = carrying(ctx, db, buildID, Entering{Component: c.Name})
+	}
+	var several *graph.Ambiguous
+	if errors.As(err, &several) {
+		return 0, "", ErrSeveralOtherVersions
+	}
+	return id, name, err
+}
+
+// ErrSeveralOtherVersions says a build added to a recorded flaw ships its
+// component at several versions, none the one it was recorded against.
+var ErrSeveralOtherVersions = refusal.New("that build holds the component at more than one version, " +
+	"none of them the one this flaw was recorded against, so which it affects cannot be told: " +
+	"record the flaw for that build on its own")
 
 // openIn is the finding this flaw makes in a build that has just been added to
 // its set.

@@ -78,9 +78,17 @@ func (s *Store) AssignReport(ctx context.Context, subject access.Subject, produc
 		update := tx.NewUpdate().Model((*FlawReport)(nil)).
 			Where(`"id" = ?`, row.ID).
 			Where(`"evaluated_at" IS NULL`)
-		if to == nil {
+		// The holder it already has keeps the time they took it, since
+		// nothing moved, and is asked in the write so a move landing since
+		// the read sends this round again.
+		kept := to != nil && sameHolder(row.AssignedTo, to)
+		switch {
+		case to == nil:
 			update = update.Set(`"assigned_to" = ?`, nil).Set(`"assigned_at" = ?`, nil)
-		} else {
+		case kept:
+			update = update.Set(`"assigned_to" = ?`, *to).Set(`"assigned_at" = "assigned_at"`).
+				Where(`"assigned_to" = ?`, *to)
+		default:
 			update = update.Set(`"assigned_to" = ?`, *to).Set(`"assigned_at" = ?`, now)
 		}
 		// Asked in the write, so an assignment landing between the read above
@@ -98,6 +106,9 @@ func (s *Store) AssignReport(ctx context.Context, subject access.Subject, produc
 			return err
 		}
 		if moved == 0 {
+			if kept {
+				return fmt.Errorf("keep who holds the report: %w", database.ErrGoAgain)
+			}
 			if !dispatches {
 				return heldElsewhere(productID)
 			}
@@ -216,8 +227,9 @@ func (s *Store) ReportHoldings(ctx context.Context, subject access.Subject,
 		Where(`"fr"."evaluated_at" IS NULL`).
 		Where(`"fr"."product_id" IN (?)`, bun.List(products)).
 		Where(`"fr"."assigned_to" IS NOT NULL`).
+		// Unbounded: one row per party holding a report, and a party left out
+		// would read as holding none.
 		GroupExpr(`"fr"."assigned_to"`).
-		Limit(int64(database.InBulk.Most)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read how many reports each holds: %w", err)
 	}
@@ -344,15 +356,22 @@ func routeReport(ctx context.Context, tx bun.IDB, row *FlawReport, now time.Time
 // applyReportRule is one report rule's share of a sweep: the product's open
 // reports nobody holds, placed in the rule's team's queue where a member reads
 // undisclosed work there.
+//
+// Whether the rule and its team are live and whether a member reads undisclosed
+// work are read in the transaction that places, so a retry asks them again.
 func (s *Store) applyReportRule(ctx context.Context, productID int64, rule AssignmentRule,
-	party int64, room int) (read, placed int, err error) {
+	room int) (read, placed int, err error) {
 
-	reads, err := access.NewStore(s.db).AnyMemberReads(ctx, rule.TeamID, productID, access.Private)
-	if err != nil || !reads {
-		return 0, 0, err
-	}
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		read, placed = 0, 0
+		party, err := liveParty(ctx, tx, rule.ID)
+		if err != nil || party == 0 {
+			return err
+		}
+		reads, err := access.NewStore(tx).AnyMemberReads(ctx, rule.TeamID, productID, access.Private)
+		if err != nil || !reads {
+			return err
+		}
 		var ids []int64
 		if err := tx.NewSelect().Model((*FlawReport)(nil)).Column("id").
 			Where(`"fr"."product_id" = ?`, productID).

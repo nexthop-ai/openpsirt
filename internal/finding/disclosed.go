@@ -148,9 +148,13 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "places")).
 		ColumnExpr(`COUNT(CASE WHEN "f"."visibility" = ? THEN 1 END) AS "public"`, access.Public).
-		ColumnExpr(`COALESCE(MAX(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN "f"."disclose_at" END), `+
-			`MAX(CASE WHEN "f"."visibility" = ? THEN "f"."disclose_at" END)) AS "ends"`,
-			access.Private, access.Private).
+		// The open ones decide whenever one is held, undated included: an
+		// open occurrence with no date beside a closed one dated is an issue
+		// with no date.
+		ColumnExpr(`CASE WHEN COUNT(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN 1 END) > 0 `+
+			`THEN MAX(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN "f"."disclose_at" END) `+
+			`ELSE MAX(CASE WHEN "f"."visibility" = ? THEN "f"."disclose_at" END) END AS "ends"`,
+			access.Private, access.Private, access.Private).
 		Where(kinds, kindArgs...).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 		Where(inThisProductAs(`"f"."build_id"`), productID).

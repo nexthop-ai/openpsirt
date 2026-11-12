@@ -490,7 +490,7 @@ var administrativeActs = []trailedAct{
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := issues.AlsoKnownAs(ctx, who, issue, name); err != nil {
+			if _, err := issues.AlsoKnownAs(ctx, who, issue, name); err != nil {
 				t.Fatalf("recording the name to remove: %v", err)
 			}
 			return httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete,

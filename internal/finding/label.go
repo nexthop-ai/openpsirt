@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
@@ -73,25 +74,29 @@ func (s *Store) LabelIt(ctx context.Context, subject access.Subject, productID,
 	if err := typedname.Addressable("a label", typed); err != nil {
 		return err
 	}
-	held, err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID)
-	if err != nil {
-		return err
-	}
-	at := s.now().UTC().Truncate(time.Microsecond)
-	for _, component := range held {
-		row := &Label{
-			ProductID: productID, VulnerabilityID: vulnerabilityID, ComponentID: component,
-			Label: folded, Typed: strings.TrimSpace(typed),
-			AddedBy: subject.ID, AddedAt: at,
+	// One act: the right to mark and every package of the fold are read and
+	// written together, so a failure partway labels none of it, and a retry
+	// asks the right again.
+	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		held, err := (&Store{db: tx, now: s.now}).mayMark(ctx, subject, productID, vulnerabilityID, componentID)
+		if err != nil {
+			return err
 		}
-		if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
-			if on, err := s.labeled(ctx, productID, vulnerabilityID, component, folded); err == nil && on {
-				continue
-			}
+		at := s.now().UTC().Truncate(time.Microsecond)
+		rows := make([]Label, 0, len(held))
+		for _, component := range held {
+			rows = append(rows, Label{
+				ProductID: productID, VulnerabilityID: vulnerabilityID, ComponentID: component,
+				Label: folded, Typed: strings.TrimSpace(typed),
+				AddedBy: subject.ID, AddedAt: at,
+			})
+		}
+		// A package already carrying the word keeps the spelling it has.
+		if err := database.InBatchesKeeping(ctx, tx, rows); err != nil {
 			return fmt.Errorf("mark it: %w", err)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // Unlabel takes a word off the packages of the fold the caller may triage.
@@ -103,18 +108,20 @@ func (s *Store) LabelIt(ctx context.Context, subject access.Subject, productID,
 func (s *Store) Unlabel(ctx context.Context, subject access.Subject, productID,
 	vulnerabilityID, componentID int64, typed string) error {
 
-	held, err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID)
-	if err != nil {
-		return err
-	}
-	if _, err := s.db.NewDelete().Model((*Label)(nil)).
-		Where(`"product_id" = ?`, productID).
-		Where(`"vulnerability_id" = ?`, vulnerabilityID).
-		Where(`"component_id" IN (?)`, bun.List(held)).
-		Where(`"label" = ?`, LabelAs(typed)).Exec(ctx); err != nil {
-		return fmt.Errorf("take the mark off: %w", err)
-	}
-	return nil
+	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		held, err := (&Store{db: tx, now: s.now}).mayMark(ctx, subject, productID, vulnerabilityID, componentID)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.NewDelete().Model((*Label)(nil)).
+			Where(`"product_id" = ?`, productID).
+			Where(`"vulnerability_id" = ?`, vulnerabilityID).
+			Where(`"component_id" IN (?)`, bun.List(held)).
+			Where(`"label" = ?`, LabelAs(typed)).Exec(ctx); err != nil {
+			return fmt.Errorf("take the mark off: %w", err)
+		}
+		return nil
+	})
 }
 
 // mayMark refuses somebody who may not argue about this finding, and answers
@@ -133,15 +140,7 @@ func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
 		return nil, refused
 	}
 	var held []int64
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	q := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`"f"."component_id"`).
-		Where(inThisProductAs(`"f"."build_id"`), productID).
-		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
-		Where(kinds, kindArgs...)
-	if err := InTheFoldOf(q, componentID).
-		GroupExpr(`"f"."component_id"`).
+	if err := s.foldPackagesHere(productID, vulnerabilityID, componentID).
 		Having(`SUM(CASE WHEN "f"."visibility" IN (?) THEN 1 ELSE 0 END) > 0`, bun.List(triaged)).
 		OrderExpr(`"f"."component_id"`).
 		Scan(ctx, &held); err != nil {
@@ -151,6 +150,20 @@ func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
 		return nil, refused
 	}
 	return held, nil
+}
+
+// foldPackagesHere reads the packages of a component's fold holding a finding
+// of the issue in the product, one row each, for the caller to narrow by
+// visibility. Marking and reading a word ask it of the same packages.
+func (s *Store) foldPackagesHere(productID, vulnerabilityID, componentID int64) *bun.SelectQuery {
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	q := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`"f"."component_id"`).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(kinds, kindArgs...)
+	return InTheFoldOf(q, componentID).GroupExpr(`"f"."component_id"`)
 }
 
 // LabelsOn is what is on one finding's fold, as first typed, one entry per word.
@@ -165,16 +178,8 @@ func (s *Store) LabelsOn(ctx context.Context, productID, vulnerabilityID,
 		return []string{}, nil
 	}
 	var readable []int64
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	q := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`"f"."component_id"`).
-		Where(inThisProductAs(`"f"."build_id"`), productID).
-		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+	if err := s.foldPackagesHere(productID, vulnerabilityID, componentID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(kinds, kindArgs...)
-	if err := InTheFoldOf(q, componentID).
-		GroupExpr(`"f"."component_id"`).
 		OrderExpr(`"f"."component_id"`).
 		Scan(ctx, &readable); err != nil {
 		return nil, fmt.Errorf("read which packages of the fold may be read: %w", err)
@@ -251,22 +256,6 @@ func (s *Store) LabelsInUse(ctx context.Context, subject access.Subject,
 		out = append(out, row.Typed)
 	}
 	return out, nil
-}
-
-// labeled says whether one word is already on one finding.
-func (s *Store) labeled(ctx context.Context, productID, vulnerabilityID,
-	componentID int64, folded string) (bool, error) {
-
-	on, err := s.db.NewSelect().Model((*Label)(nil)).
-		Column("ft.id").
-		Where(`"ft"."product_id" = ?`, productID).
-		Where(`"ft"."vulnerability_id" = ?`, vulnerabilityID).
-		Where(`"ft"."component_id" = ?`, componentID).
-		Where(`"ft"."label" = ?`, folded).Exists(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read whether it is marked: %w", err)
-	}
-	return on, nil
 }
 
 // markKey is one row of a list: an issue at a fold.
@@ -352,19 +341,30 @@ func (s *Store) labelsFor(ctx context.Context, productID int64, rows []decorated
 	if err != nil {
 		return nil, err
 	}
-	said := map[markKey]map[string]bool{}
+	return firstSpellings(found, func(row foldMark) markKey {
+		return markKey{row.VulnerabilityID, row.Fold}
+	}, wanted), nil
+}
+
+// firstSpellings is each wanted row's words, as first typed, one entry per
+// word, from marks read in the order they were put on.
+func firstSpellings[K comparable](found []foldMark, key func(foldMark) K,
+	wanted map[K]bool) map[K][]string {
+
+	out := map[K][]string{}
+	said := map[K]map[string]bool{}
 	for _, row := range found {
-		key := markKey{row.VulnerabilityID, row.Fold}
-		if !wanted[key] || said[key][row.Label] {
+		at := key(row)
+		if !wanted[at] || said[at][row.Label] {
 			continue
 		}
-		if said[key] == nil {
-			said[key] = map[string]bool{}
+		if said[at] == nil {
+			said[at] = map[string]bool{}
 		}
-		said[key][row.Label] = true
-		out[key] = append(out[key], row.Typed)
+		said[at][row.Label] = true
+		out[at] = append(out[at], row.Typed)
 	}
-	return out, nil
+	return out
 }
 
 // acrossKey is one row of the list that spans products: an issue at a fold,
@@ -402,17 +402,7 @@ func (s *Store) labelsAcross(ctx context.Context, subject access.Subject, readab
 	if err != nil {
 		return nil, err
 	}
-	said := map[acrossKey]map[string]bool{}
-	for _, row := range found {
-		key := acrossKey{row.ProductID, row.VulnerabilityID, row.Fold}
-		if !wanted[key] || said[key][row.Label] {
-			continue
-		}
-		if said[key] == nil {
-			said[key] = map[string]bool{}
-		}
-		said[key][row.Label] = true
-		out[key] = append(out[key], row.Typed)
-	}
-	return out, nil
+	return firstSpellings(found, func(row foldMark) acrossKey {
+		return acrossKey{row.ProductID, row.VulnerabilityID, row.Fold}
+	}, wanted), nil
 }

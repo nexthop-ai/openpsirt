@@ -68,16 +68,17 @@ var handNamed = regexp.MustCompile(
 //
 // Recording a name it already goes by is not a failure — the state asked for
 // is the state that holds — and recording one another issue holds is refused
-// rather than silently merging two records.
+// rather than silently merging two records. Added is whether the name was
+// new to it, so a caller records an act only when one happened.
 func (v *Vulnerabilities) AlsoKnownAs(ctx context.Context, subject access.Subject,
-	id int64, alias string) error {
+	id int64, alias string) (added bool, err error) {
 
 	name := normalize(alias)
 	if name == "" {
-		return refusal.Errorf("a name has to say something")
+		return false, refusal.Errorf("a name has to say something")
 	}
 	if !handNamed.MatchString(name) {
-		return ErrNotAHandName
+		return false, ErrNotAHandName
 	}
 
 	// One act, one transaction, through the one helper. Recording the name
@@ -87,7 +88,8 @@ func (v *Vulnerabilities) AlsoKnownAs(ctx context.Context, subject access.Subjec
 	// Everything it decides from is read inside, because a retry runs
 	// against a database that has moved and one of those reads is whether
 	// the name is free .
-	return database.Within(ctx, v.db, func(ctx context.Context, tx bun.IDB) error {
+	err = database.Within(ctx, v.db, func(ctx context.Context, tx bun.IDB) error {
+		added = false
 		var issue Vulnerability
 		if err := tx.NewSelect().Model(&issue).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			return fmt.Errorf("read what this issue is: %w", err)
@@ -131,6 +133,7 @@ func (v *Vulnerabilities) AlsoKnownAs(ctx context.Context, subject access.Subjec
 			}).Exec(ctx); err != nil {
 				return fmt.Errorf("record the name %q goes by: %w", name, err)
 			}
+			added = true
 		case err != nil:
 			return fmt.Errorf("read what goes by that name: %w", err)
 		case held.VulnerabilityID != id:
@@ -151,6 +154,7 @@ func (v *Vulnerabilities) AlsoKnownAs(ctx context.Context, subject access.Subjec
 		}
 		return nil
 	})
+	return added && err == nil, err
 }
 
 // NoLongerKnownAs removes a name somebody recorded by hand for an issue.

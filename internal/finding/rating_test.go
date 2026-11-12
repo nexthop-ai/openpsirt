@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -189,6 +190,34 @@ func TestTheIssuesNumberIsTheNewestRatingWhole(t *testing.T) {
 		}
 		if len(held) != 2 || held[1].ScoreCenti != 820 {
 			t.Errorf("holds %+v, want the version 3 rating raised to 8.2", held)
+		}
+	})
+}
+
+func TestTwoRatingsOfOneGenerationInOneReportKeepTheWorstInEitherOrder(t *testing.T) {
+	// A report listing one generation twice keeps its higher number, so what
+	// is held does not depend on which publisher the report listed first.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		lower := finding.CVSS{Generation: 3, ScoreCenti: 750, Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+			Version: "3.1", Source: "ghsa"}
+		higher := finding.CVSS{Generation: 3, ScoreCenti: 980, Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+			Version: "3.1", Source: "nvd"}
+		for i, order := range [][]finding.CVSS{{lower, higher}, {higher, lower}} {
+			name := fmt.Sprintf("CVE-2026-62%02d", i)
+			filed, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{{
+				Identifier: name, Severity: "high", Ratings: order,
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			held, err := finding.NewVulnerabilities(db.DB).Ratings(ctx, filed[name])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(held) != 1 || held[0].ScoreCenti != higher.ScoreCenti || held[0].Source != higher.Source {
+				t.Errorf("listed %s first, the issue holds %+v, want the higher rating alone", order[0].Source, held)
+			}
 		}
 	})
 }

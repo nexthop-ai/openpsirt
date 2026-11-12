@@ -50,11 +50,11 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 		if _, _, err := readable(ctx, a, a.Handle()); err != nil {
 			return nil, err
 		}
-		stored, _, err := settings(a.Handle()).Get(ctx, setting.RoleMode)
+		mode, err := roleModeIn(settings)(ctx, a.Handle())
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot read where roles come from", err)
 		}
-		return &struct{ Body ModeBody }{Body: ModeBody{Mode: core.Mode(access.AsMode(stored))}}, nil
+		return &struct{ Body ModeBody }{Body: ModeBody{Mode: core.Mode(mode)}}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -113,11 +113,12 @@ func productLabels(ctx context.Context, a core.Administering) (map[string]string
 // is given — which is the transaction deciding, rather than this.
 func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
 	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
-		stored, _, err := settings(db).Get(ctx, setting.RoleMode)
+		mode, err := settings(db).Word(ctx, setting.RoleMode,
+			[]string{string(access.GroupBound), string(access.Direct)}, string(access.Direct))
 		if err != nil {
 			return "", fmt.Errorf("read where roles come from: %w", err)
 		}
-		return access.AsMode(stored), nil
+		return access.Mode(mode), nil
 	}
 }
 

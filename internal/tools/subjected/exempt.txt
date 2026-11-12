@@ -315,6 +315,7 @@ setting.Store.FormerNames A background pass: startup reports settings still held
 setting.Store.Get Not varying by reader: a deployment setting.
 setting.Store.SetIfAbsent Not varying by reader: the deployment's sign-in key, minted once by whichever process asks first.
 setting.Store.Switch Not varying by reader: whether a deployment switch is on.
+setting.Store.Word Not varying by reader: a deployment setting read as one of a few words.
 sourcelink.Store.Config Not varying by reader: what a product says about its repositories, read after the caller authorized the code finding or on a screen only an administrator reaches.
 sourcelink.Store.Replace Who is asking: an administrator stating a product's repositories, on a route only an administrator reaches.
 supplier.Store.CaughtUp A background pass: the supplier pass records how far it read a source.

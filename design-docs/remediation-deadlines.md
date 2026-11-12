@@ -79,6 +79,7 @@ sees a listing does not extend the window.
 | A deadline nobody can meet is not set | The only act stopping it is recording a decision, which the deadline asks for. On the demo's two SONiC images, seeded 2026-09-23, 95,497 of 335,491 open findings had no fix released (28.5%) and 14,196 more were an upstream refusal (4.2%) |
 | A tag carries no deadline | No work lands in it. All 26 open findings on the demo's one tag carried an unmeetable deadline before this rule, and tags accumulate |
 | An unstated fix state stays on the clock | A scanner's silence is not upstream saying no |
+| A group or finding of several occurrences has nothing to take only where none of its occurrences is in a state on the clock | Read off the least and greatest state words, a group saying none, unknown and wont-fix past end of life read as nothing to take while its unknown occurrence is out of support |
 
 ## Exploited refusals
 

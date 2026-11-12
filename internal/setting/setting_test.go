@@ -260,3 +260,33 @@ func limitOf(t *testing.T, s *setting.Store) int {
 	}
 	return got
 }
+
+func TestAWordSettingReadsAsItsDefaultUnlessItHoldsAWordItTakes(t *testing.T) {
+	eachSetting(t, func(t *testing.T, s *setting.Store) {
+		ctx := t.Context()
+		words := setting.StatusLimits()
+		read := func() string {
+			t.Helper()
+			got, err := s.Word(ctx, setting.PublishedStatuses, words, setting.EveryStatus)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		if got := read(); got != setting.EveryStatus {
+			t.Errorf("unset read as %q, want the default", got)
+		}
+		for value, want := range map[string]string{
+			setting.SettledStatuses: setting.SettledStatuses,
+			"settled-ish":           setting.EveryStatus,
+			"":                      setting.EveryStatus,
+		} {
+			if _, _, err := s.Change(ctx, setting.PublishedStatuses, value); err != nil {
+				t.Fatal(err)
+			}
+			if got := read(); got != want {
+				t.Errorf("%q read as %q, want %q", value, got, want)
+			}
+		}
+	})
+}

@@ -15,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // The findings list across every product somebody may see.
@@ -94,12 +93,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// The deployment's line, which a product that states none inherits.
 	deployment := NoMinimumSeverity
 	if !wasBelow {
-		word, set, err := setting.NewStore(s.db).Get(ctx, setting.MinimumSeverity)
-		if err != nil {
+		var err error
+		if deployment, err = deploymentMinimumSeverity(ctx, s.db); err != nil {
 			return nil, 0, err
-		}
-		if set && word != "" {
-			deployment = word
 		}
 	}
 	// A caller may raise the line for the whole page — that is what the
@@ -114,33 +110,17 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 
 	// pastEOL is which releases are past their date, read once for the
 	// page. This list spans products and resolves no build identifiers, so
-	// the two questions are conditions here rather than a narrowing of a
-	// target list — the same rule, applied where this query can reach it.
-	var pastEOL []int64
-	if filter.Workable.asks() && len(filter.Workable.Support) == 1 {
-		var err error
-		if pastEOL, err = catalog.NewStore(s.db).
-			BranchesAndTagsPastEndOfLife(ctx, s.now().UTC()); err != nil {
-			return nil, 0, err
-		}
+	// the narrowing is a condition here rather than a narrowing of a target
+	// list.
+	pastEOL, err := filter.Workable.pastEOL(ctx, s.db, s.now().UTC())
+	if err != nil {
+		return nil, 0, err
 	}
 
 	// readable is the open occurrences this subject may read, in the releases
 	// asked for, with the build and its branch or tag joined.
 	readable := func(q *bun.SelectQuery) *bun.SelectQuery {
-		if len(filter.Workable.Kinds) == 1 {
-			q = q.Where(`"st"."kind" = ?`, filter.Workable.Kinds[0])
-		}
-		if len(filter.Workable.Support) == 1 {
-			switch {
-			case filter.Workable.Support[0] == PastEndOfLife && len(pastEOL) == 0:
-				q = q.Where("1 = 0")
-			case filter.Workable.Support[0] == PastEndOfLife:
-				q = q.Where(`"st"."id" IN (?)`, bun.List(pastEOL))
-			case len(pastEOL) > 0:
-				q = q.Where(`"st"."id" NOT IN (?)`, bun.List(pastEOL))
-			}
-		}
+		q = filter.Workable.where(q, pastEOL)
 		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
@@ -296,56 +276,24 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Builds          int    `bun:"builds"`
 		decorated
 	}
-	body := narrow(s.db.NewSelect()).
+	body := groupDecorations(narrow(s.db.NewSelect()).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
-		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
+		ColumnExpr(`MIN(` + catalog.ShownExpr("p") + `) AS "product_name"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
+		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN("st"."name") AS "branch_or_tag"`).
 		ColumnExpr(`MIN("va"."name") AS "variant"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 		// The two exploitation flags, which the packed number above cannot
 		// tell apart. A column this query does not select is left at its zero
 		// value, so both are selected here as on the per-product list.
-		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(incidentAcross+` AS "incident"`).
-		ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
-		ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
-		// Whether anything here carries a score at all, and the scheme it is
-		// on. This list spans products, so it is the one place a version 3
-		// number and a version 4 number sit in the same column.
-		ColumnExpr(`MAX(CASE WHEN `+ScoreHere+` IS NULL THEN 0 ELSE 1 END) AS "scored"`).
-		ColumnExpr(`MAX(COALESCE(`+ScoreVersionHere+`, '')) AS "score_version"`).
-		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
-		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
-		ColumnExpr(openDue+` AS "due_at"`).
-		// One undisclosed occurrence makes the group undisclosed, counted rather
-		// than aggregated over the word — a maximum of the word returns
-		// "public" for a mixed group, which is the one case it matters for.
-		ColumnExpr(`SUM(CASE WHEN "f"."visibility" = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
-			access.Private).
-		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
-		// Both ends, because a group whose occurrences disagree is mixed and a
-		// minimum alone answers with one of the disagreeing values.
-		ColumnExpr(`MIN("f"."fix_state") AS "fix_state_least"`).
-		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
-		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
-		// How many occurrences a person recorded, which is what says an unrated
-		// group is waiting on a rating rather than off the clock.
-		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
-		ColumnExpr(`MIN(COALESCE("f"."matched", '')) AS "matched"`).
-		ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
-		ColumnExpr(`MIN("f"."consumer_id") AS "consumer_id"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
-		ColumnExpr(`SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END) AS "direct"`).
-		ColumnExpr(`0 AS "total"`)
+		ColumnExpr(exploitedAcross + ` AS "exploited"`).
+		ColumnExpr(incidentAcross + ` AS "incident"`).
+		ColumnExpr(`0 AS "total"`))
 	// The decision state of each, spelled once for every list
 	// that asks (see decided.go). Across products the row names its own.
 	body = decisionCounts(body, `"st"."product_id"`, nil,

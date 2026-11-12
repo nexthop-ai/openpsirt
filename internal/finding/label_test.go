@@ -4,9 +4,15 @@
 package finding_test
 
 import (
+	"context"
+	"strings"
+	"sync"
 	"testing"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -329,6 +335,59 @@ func TestALabelThatIsADotSegmentIsRefused(t *testing.T) {
 			if err := f.store.LabelIt(t.Context(), who, f.productID, issue, component, label); !refusal.In(err) {
 				t.Errorf("a label %q answered %v, want a refusal", label, err)
 			}
+		}
+	})
+}
+
+// secondInsertFails fails every statement inserting into one table after the
+// first, by handing the driver a context that has already ended.
+type secondInsertFails struct {
+	table    string
+	mu       sync.Mutex
+	inserted int
+}
+
+func (h *secondInsertFails) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if !strings.HasPrefix(strings.TrimSpace(e.Query), "INSERT") || !strings.Contains(e.Query, `"`+h.table+`"`) &&
+		!strings.Contains(e.Query, "`"+h.table+"`") {
+		return ctx
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.inserted++
+	if h.inserted < 2 {
+		return ctx
+	}
+	failed, cancel := context.WithCancel(ctx)
+	cancel()
+	return failed
+}
+
+func (h *secondInsertFails) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+func TestALabelIsPutOnTheWholeFoldOrOnNoneOfIt(t *testing.T) {
+	// Labeling is one act over every package of the fold: a write failing
+	// partway leaves no package labeled.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		lib, tool := f.curlFold(t)
+		who := f.someoneElse(t, access.PublicTriage)
+		issue := f.issueID(t, "CVE-2026-CURL")
+		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
+
+		hooked := dbtest.Hooked(f.db, &secondInsertFails{table: "finding_label"})
+		err := finding.NewStore(hooked.DB).LabelIt(ctx, who, f.productID, issue, viaTool, "Vendor")
+		labeled, readErr := f.db.DB.NewSelect().Model((*finding.Label)(nil)).
+			Where(`"vulnerability_id" = ?`, issue).
+			Where(`"component_id" IN (?)`, bun.List([]int64{viaLib, viaTool})).Count(ctx)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		switch {
+		case err == nil && labeled != 2:
+			t.Errorf("labeling succeeded and %d of the fold's two packages carry the word", labeled)
+		case err != nil && labeled != 0:
+			t.Errorf("labeling failed (%v) and left %d of the fold's two packages carrying the word", err, labeled)
 		}
 	})
 }

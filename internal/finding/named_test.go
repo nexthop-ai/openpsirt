@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -249,6 +250,57 @@ func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
 		}
 		if checked == 0 {
 			t.Fatal("no statement over the findings was seen, so this checked nothing")
+		}
+	})
+}
+
+func TestAPlannedUpgradeReachesEveryVersionPairAtAnOccurrenceByItsEarliestDeadline(t *testing.T) {
+	// One occurrence under two consumers of one name at two versions holds two
+	// version pairs, each its own decision, and the deadline a promise is
+	// measured against is the earlier of the two.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		swssNew := at("libswsscommon", "2.0.0")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{swss, swssNew, libnl},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: swssNew},
+				{Parent: swss, Child: libnl}, {Parent: swssNew, Child: libnl}},
+		})
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{
+			found("CVE-2026-61", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		soon, later := time.Now().UTC().Add(24*time.Hour).Truncate(time.Second),
+			time.Now().UTC().Add(90*24*time.Hour).Truncate(time.Second)
+		for consumer, due := range map[int64]time.Time{rowOf(t, f, swss): later, rowOf(t, f, swssNew): soon} {
+			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).Set(`"due_at" = ?`, due).
+				Where(`"consumer_id" = ?`, consumer).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		reached, err := f.store.OccurrencesOnComponentWithin(ctx, f.db.DB, f.holding(t, access.PublicTriage),
+			f.productID, []int64{f.build}, libnl.Name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(reached) != 1 || len(reached[0].Occurrences) != 2 {
+			t.Fatalf("the upgrade reached %+v, want one component at two version pairs", reached)
+		}
+		pairs := map[string]bool{}
+		earliest := reached[0].Occurrences[0].DueAt
+		for _, occurrence := range reached[0].Occurrences {
+			pairs[occurrence.ConsumerUpstream] = true
+			if occurrence.DueAt != nil && (earliest == nil || occurrence.DueAt.Before(*earliest)) {
+				earliest = occurrence.DueAt
+			}
+		}
+		if !pairs[swss.Version] || !pairs[swssNew.Version] {
+			t.Errorf("the upgrade reached the consumer versions %v, want both", pairs)
+		}
+		if earliest == nil || !earliest.Equal(soon) {
+			t.Errorf("the earliest deadline it reached is %v, want %v", earliest, soon)
 		}
 	})
 }

@@ -28,8 +28,10 @@ resolves to one row, and a decision holds across all of them (REQ-18).
 | Identifiers compare in one case | Every scheme is case-insensitive and reports disagree on case |
 | A name given twice is one name, under a unique index on its normalized form | A report may list its own identifier among its aliases |
 | The filed name, folded, is what makes one issue one row | |
+| Two writers recording one new issue, name or reference at once both succeed: the one whose write collides goes again and reads the other's row | Two replicas apply two scans naming one new issue together, and a collision failing the whole scan charges the job an attempt |
 | What a finding screen reports (holder, placing rule) is asked of the whole fold: one name for the group, empty where its occurrences disagree | Asked per component, one rule reads as none and as all |
 | Recording a name by hand asks for triage in every product the issue is open in, at each occurrence's visibility, refused whole | From then every product's scans resolve the name here and inherit its decisions |
+| Recording a name the issue already goes by succeeds, writes nothing and adds no entry to the record of changes | A client retrying the request leaves one addition, the real one |
 | A report naming two issues held apart merges them (§ Merged issues) | One issue is one issue under every name |
 
 ## Merged issues

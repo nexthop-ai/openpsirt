@@ -153,9 +153,16 @@ func TestACVEAssignedLaterBecomesAnotherNameForTheSameIssue(t *testing.T) {
 			t.Errorf("the new name does not resolve: %+v", byNewName)
 		}
 
-		// Recording it again changes nothing.
+		// Recording it again changes nothing, and records no act.
+		var before httpapitest.Changed
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?limit=1", &before)
 		if code := alias("private-triage", "CVE-2027-0001"); code != http.StatusNoContent {
 			t.Errorf("recording a name it already goes by answered %d", code)
+		}
+		var after httpapitest.Changed
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?limit=1", &after)
+		if after.Total != before.Total {
+			t.Errorf("recording a name it already goes by added %d changes", after.Total-before.Total)
 		}
 
 		// A name another issue already answers to is refused rather than
