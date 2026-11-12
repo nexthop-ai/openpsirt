@@ -130,14 +130,14 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make openapi-current` | The committed API document against the code |
 | `make sbom` | This project's CycloneDX inventory |
 | `make web-check` | Interface install, type check, formatting, linters, tests with coverage, class-name checks, generated client against the API document. Refuses without npm |
-| `make unreachable` | Exported code nothing reaches. Functions, types, constants and variables by package and name through imports; methods by name alone, and by a call alone where a struct field shares the name. A declaration naming itself is not a use: a method's receiver, a type's reference to itself, a recursive call. A test counts as a caller; the database library's query hook methods count as called |
+| `make unreachable` | Exported code nothing reaches. Functions, types, constants and variables by package and name through imports; methods by name alone, and by a call alone where a struct field shares the name. A declaration naming itself is not a use: a type named by its own methods or fields, a recursive call. A test counts as a caller; the database library's query hook methods count as called |
 | `make negatives` | A 404 built from or detailed with an error's text, in any spelling the parsed Go allows: the error's method, a value named like an error, or a name bound earlier in the declaration |
-| `make granted` | A function reaching one grant table reaches the other, through the table name, a model's struct tag, a type built from the model, a package-level name's value, another package's exported constant or variable, or a call to an exempt reader of one table. Exempt functions are named by file, receiver and name, with reasons; an exemption matching nothing fails. A reader is followed into its callers by the name called, whatever the receiver |
+| `make granted` | A function reaching one grant table reaches the other, through the table name, a model's struct tag, a type built from the model, a package-level name's value, another package's exported constant or variable, or a call to an exempt reader listing half of what somebody holds. Exempt functions are named by file, receiver and name, with reasons; an exemption matching nothing fails. A reader is followed into its callers by the name called, whatever the receiver |
 | `make narrowed` | A build resolved for a case-only participant is read with a subject or refused first. A refusal covers the resolutions its question names, directly or through a value derived from one; a value built from two resolutions is covered once both are refused. Bound resolutions and values derived from them are followed; inline uses are not |
 | `make subjected` | An exported store method or package function under `internal/` that queries without a subject, unless exempt with a reason. An exemption naming one that no longer queries without a subject fails, and so does a run examining none. A store is a type with a method building a query or calling a function of its package that does; programs and test harnesses, packages importing testing that no program under `cmd/` links, are not read; a tree with no program is refused. Queries are followed within the package by name; another package's are not seen |
 | `make attached` | A doc comment describing a different declaration |
 | `make confined` | Engine-specific code outside the paths `design-docs/database.md` § Engine-specific code allows |
-| `make readable` | Source files a text tool will not read. Every file the walk reaches is read except a named binary kind, so a new text kind is read from its first commit |
+| `make readable` | Source files a text tool will not read. Every file git does not ignore is read, except a named binary kind, `vendor/`, and the directories every walk skips, so a new text kind is read from its first commit and build output is not |
 | `make unclaimed` | Every requirement named by a design document. A range names every number in it, matched by number whatever width it is written at |
 | `make vendored` | Copied files accounted for. See `design-docs/build-dependencies.md` § Copied files |
 | `make spdx` | License headers; `make spdx-fix` writes missing ones. See `design-docs/build-dependencies.md` § License headers |
@@ -265,7 +265,7 @@ directory and reads the interface.
 | The count is of what the caller kept, never what it was shown | |
 | Every gate prints how much it read | |
 | A skipped directory is matched by name at any depth | Nested dependency directories are covered |
-| A gate reading what is committed, the license-header and copied-file gates, lists the tree through the same reader: what git tracks, less the skipped directories | One place decides what the tree is |
+| A gate reading what is committed, the license-header and copied-file gates, lists the tree through the same reader: what git tracks, less the skipped directories. `make readable` lists it through the same reader with untracked files git does not ignore added | One place decides what the tree is |
 | A change to the reader takes the whole gate | It decides what every check reads |
 
 ## Static analysis

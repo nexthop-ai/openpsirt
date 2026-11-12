@@ -99,24 +99,37 @@ func Paths(extra []string, visit func(path string) (bool, error)) (int, error) {
 }
 
 // Tracked is every file git tracks in the working directory's checkout,
-// less those under a skipped directory, for a gate that reads what is
-// committed rather than what is on disk.
+// less those under a skipped directory, for a gate whose set of files is the
+// committed tree. Each file's content is read from the working tree.
 func Tracked() ([]string, error) {
-	listed, err := exec.Command("git", "ls-files", "-z").Output()
+	return listed("tracked files", "ls-files", "-z")
+}
+
+// Unignored is Tracked with the files git would add beside them: every file
+// on disk that no ignore rule covers, for a gate reading the change about to
+// be committed. Build output is ignored, so it is not read.
+func Unignored() ([]string, error) {
+	return listed("files git does not ignore", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+}
+
+func listed(what string, args ...string) ([]string, error) {
+	out, err := exec.Command("git", args...).Output() //nolint:gosec // G204: arguments fixed by its callers in this file
 	if err != nil {
 		return nil, fmt.Errorf("listing the tree: %w", err)
 	}
-	tracked := trackedIn(listed, Skipped())
-	return tracked, sawSomething(len(tracked), "tracked files")
+	files := trackedIn(out, Skipped())
+	return files, sawSomething(len(files), what)
 }
 
-// trackedIn reads git's NUL-separated listing, dropping an empty entry and
-// a path with a directory named in skip.
+// trackedIn reads git's NUL-separated listing, once per path, dropping an
+// empty entry, a listed directory and a path with a directory named in skip.
 func trackedIn(listed []byte, skip []string) []string {
 	var tracked []string
 	for _, each := range bytes.Split(listed, []byte{0}) {
 		path := string(each)
-		if path == "" {
+		// A directory git lists as a whole is a nested repository, which holds
+		// no file to read; an unmerged path is listed once per stage.
+		if path == "" || strings.HasSuffix(path, "/") || slices.Contains(tracked, path) {
 			continue
 		}
 		dirs := strings.Split(path, "/")
