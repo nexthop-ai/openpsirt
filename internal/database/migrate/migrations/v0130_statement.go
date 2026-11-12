@@ -109,9 +109,19 @@ func receivedStatementNewestV0130(ctx context.Context, tx bun.Tx) error {
 		Scan(ctx, &shared); err != nil {
 		return fmt.Errorf("read the subjects more than one statement stands on: %w", err)
 	}
+	// A list in one statement stays within what every engine binds, and one
+	// subject's statements share an issue, so a slice of issues holds each
+	// subject whole.
+	const batch = 500
 	issues := map[int64][]string{}
+	type about struct {
+		product int64
+		issue   string
+	}
+	seen := map[about]bool{}
 	for _, one := range shared {
-		if !slices.Contains(issues[one.ProductID], one.Issue) {
+		if key := (about{one.ProductID, one.Issue}); !seen[key] {
+			seen[key] = true
 			issues[one.ProductID] = append(issues[one.ProductID], one.Issue)
 		}
 	}
@@ -122,37 +132,65 @@ func receivedStatementNewestV0130(ctx context.Context, tx bun.Tx) error {
 	}
 	slices.Sort(products)
 	for _, product := range products {
-		var rows []struct {
-			subjectV0130
-			ID         int64     `bun:"id"`
-			UploadedAt time.Time `bun:"uploaded_at"`
-		}
-		if err := tx.NewSelect().TableExpr(`"received_vex_statement"`).
-			ColumnExpr(`"id", "uploaded_at", "product_id", "publisher", "source", "vulnerability", "purl",
-				"component", "about", "within_purl", "within", "within_about"`).
-			Where(`"product_id" = ?`, product).
-			Where(`"vulnerability" IN (?)`, bun.List(issues[product])).
-			Where(`"superseded_at" IS NULL`).
-			Scan(ctx, &rows); err != nil {
-			return fmt.Errorf("read the statements standing on those subjects: %w", err)
-		}
-		newest := map[string]int{}
-		for i, row := range rows {
-			at, held := newest[row.key()]
-			if !held || row.UploadedAt.After(rows[at].UploadedAt) ||
-				row.UploadedAt.Equal(rows[at].UploadedAt) && row.ID > rows[at].ID {
-				newest[row.key()] = i
+		named := issues[product]
+		for from := 0; from < len(named); from += batch {
+			if err := receivedStatementNewestOfV0130(ctx, tx, product,
+				named[from:min(from+batch, len(named))], now); err != nil {
+				return err
 			}
 		}
-		for i, row := range rows {
-			if at := newest[row.key()]; at != i {
-				if _, err := tx.NewUpdate().TableExpr(`"received_vex_statement"`).
-					Set(`"superseded_at" = ?`, now).
-					Set(`"overtaken_by" = ?`, rows[at].ID).
-					Where(`"id" = ?`, row.ID).
-					Exec(ctx); err != nil {
-					return fmt.Errorf("set aside a statement a newer one overtook: %w", err)
-				}
+	}
+	return nil
+}
+
+// receivedStatementNewestOfV0130 sets aside, among one product's statements
+// in force about the issues named, each that a newer one about its subject
+// overtook. The rows one statement overtakes are set aside together.
+func receivedStatementNewestOfV0130(ctx context.Context, tx bun.Tx, product int64, issues []string,
+	now time.Time) error {
+	const batch = 500
+	var rows []struct {
+		subjectV0130
+		ID         int64     `bun:"id"`
+		UploadedAt time.Time `bun:"uploaded_at"`
+	}
+	if err := tx.NewSelect().TableExpr(`"received_vex_statement"`).
+		ColumnExpr(`"id", "uploaded_at", "product_id", "publisher", "source", "vulnerability", "purl",
+			"component", "about", "within_purl", "within", "within_about"`).
+		Where(`"product_id" = ?`, product).
+		Where(`"vulnerability" IN (?)`, bun.List(issues)).
+		Where(`"superseded_at" IS NULL`).
+		Scan(ctx, &rows); err != nil {
+		return fmt.Errorf("read the statements standing on those subjects: %w", err)
+	}
+	newest := map[string]int{}
+	for i, row := range rows {
+		at, held := newest[row.key()]
+		if !held || row.UploadedAt.After(rows[at].UploadedAt) ||
+			row.UploadedAt.Equal(rows[at].UploadedAt) && row.ID > rows[at].ID {
+			newest[row.key()] = i
+		}
+	}
+	overtook := map[int64][]int64{}
+	for i, row := range rows {
+		if at := newest[row.key()]; at != i {
+			overtook[rows[at].ID] = append(overtook[rows[at].ID], row.ID)
+		}
+	}
+	by := make([]int64, 0, len(overtook))
+	for id := range overtook {
+		by = append(by, id)
+	}
+	slices.Sort(by)
+	for _, newer := range by {
+		older := overtook[newer]
+		for from := 0; from < len(older); from += batch {
+			if _, err := tx.NewUpdate().TableExpr(`"received_vex_statement"`).
+				Set(`"superseded_at" = ?`, now).
+				Set(`"overtaken_by" = ?`, newer).
+				Where(`"id" IN (?)`, bun.List(older[from:min(from+batch, len(older))])).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("set aside a statement a newer one overtook: %w", err)
 			}
 		}
 	}

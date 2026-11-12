@@ -134,6 +134,8 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 	type named struct {
 		Component int64  `bun:"component_id"`
 		Name      string `bun:"name_folded"`
+		Opened    int64  `bun:"opened_scan_id"`
+		Node      int64  `bun:"id"`
 	}
 	read := func(live bool) ([]named, error) {
 		var rows []named
@@ -145,7 +147,12 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 		if live {
 			q = q.Where(`"n"."closed_scan_id" IS NULL`)
 		} else {
-			q = q.Where(`"n"."closed_scan_id" IS NOT NULL`)
+			// Oldest first, so the name the build last stated for a
+			// component it held under two is the one kept below, as
+			// BuildFolded reads it.
+			q = q.ColumnExpr(`"n"."opened_scan_id", "n"."id"`).
+				Where(`"n"."closed_scan_id" IS NOT NULL`).
+				OrderExpr(`"n"."opened_scan_id", "n"."id"`)
 		}
 		if err := q.Scan(ctx, &rows); err != nil {
 			return nil, err
@@ -167,11 +174,16 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 		byName[row.Name] = append(byName[row.Name], row.Component)
 	}
 	out := map[int64][]int64{}
+	last := map[int64]string{}
 	for _, row := range closed {
-		if live[row.Component] || len(byName[row.Name]) == 0 {
-			continue
+		if !live[row.Component] {
+			last[row.Component] = row.Name
 		}
-		out[row.Component] = byName[row.Name]
+	}
+	for component, name := range last {
+		if len(byName[name]) > 0 {
+			out[component] = byName[name]
+		}
 	}
 	return out, nil
 }

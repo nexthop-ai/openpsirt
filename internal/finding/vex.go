@@ -522,17 +522,14 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		// 1.4 and 1.3. The caller is waiting on the answer, so this is a
 		// request rather than a background pass.
 		//
-		// The batch is sized for the narrowest engine rather than for the
-		// fastest: PostgreSQL binds at most 65,535 parameters in one
-		// statement.
-		for from := 0; from < len(toInsert); from += statementsPerInsert {
-			to := min(from+statementsPerInsert, len(toInsert))
-			batch := toInsert[from:to]
-			if _, err := tx.NewInsert().Model(&batch).Exec(ctx); err != nil {
-				return fmt.Errorf("record what they said: %w", err)
-			}
-			recorded += len(batch)
+		// The identifiers the rows carry afterwards are the ones the store
+		// assigned, on a server numbering in steps as well, because the rows
+		// an upload inserted are told apart from the rows it overtakes by
+		// them.
+		if err := database.InBatches(ctx, tx, toInsert); err != nil {
+			return fmt.Errorf("record what they said: %w", err)
 		}
+		recorded += len(toInsert)
 
 		// Every row the document held, with what it says now: a row moved to
 		// another placement leaves the subject it was about.
@@ -749,14 +746,6 @@ func namingTheSamePackage(said []Statement, purl string) []Statement {
 // sourceTree is the package type a source tree is named with where it is named
 // as a package identifier at all.
 const sourceTree = "generic"
-
-// statementsPerInsert is how many claims one insert states.
-//
-// Bounded by what an engine will bind in one statement rather than by what is
-// fast: PostgreSQL takes 65,535 parameters, and five hundred claims leave room
-// for a hundred and thirty columns each, so a column added to a claim does not
-// make the bound the thing that breaks.
-const statementsPerInsert = 500
 
 // MostPublisher is how long the name of whoever published a statement may be,
 // and MostDocumentName how long the name the publisher gave the document may
