@@ -42,6 +42,16 @@ type ReleaseCoveringBody struct {
 	MadeOn             []MadeOnBody `json:"made_on" doc:"The builds the decision was made on: the one on screen when it was proposed and every one chosen beside it. Empty where none was recorded"`
 }
 
+// AdvisoryReleasesOutput is what an advisory states about each release, and
+// the edition that is.
+type AdvisoryReleasesOutput struct {
+	Edition int `header:"Advisory-Edition" doc:"The edition of the advisory these releases were read at, which agreeing to what they say names"`
+	Body    struct {
+		Items []AdvisoryReleaseBody `json:"items"`
+		Total int                   `json:"total,omitempty"`
+	}
+}
+
 // MadeOnBody is one build a decision was made on.
 type MadeOnBody struct {
 	BranchOrTag string `json:"branch_or_tag"`
@@ -62,22 +72,24 @@ func registerReleases(api huma.API, in core.Deps) {
 			"it was made on is not flagged. " +
 			"`changed` is true where the status differs from what an agreement standing on " +
 			"what the advisory says now saw; the agreement stands.\n\n" +
+			"The `Advisory-Edition` header names the edition these were read at; agreeing " +
+			"to what they show names the oldest edition among this, the advisory and its document.\n\n" +
 			"An advisory covering a product you hold nothing on answers as one that does " +
 			"not exist.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory" doc:"The identifier the advisory is tracked by"`
-	}) (*core.ListOutput[AdvisoryReleaseBody], error) {
+	}) (*AdvisoryReleasesOutput, error) {
 		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		rows, err := advisory.NewStore(in.DB.DB).Releases(ctx, subject, input.Advisory)
+		rows, edition, err := advisory.NewStore(in.DB.DB).ReleasesAt(ctx, subject, input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the releases could not be read")
 		}
-		out := &core.ListOutput[AdvisoryReleaseBody]{}
+		out := &AdvisoryReleasesOutput{Edition: edition}
 		out.Body.Total = len(rows)
 		out.Body.Items = make([]AdvisoryReleaseBody, 0, len(rows))
 		for _, one := range rows {

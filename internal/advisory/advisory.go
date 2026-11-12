@@ -87,17 +87,26 @@ func NewStore(db *bun.DB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// ForAdvisory assembles the document for one advisory.
+// ForAdvisoryAt assembles the document for one advisory, with the edition the
+// advisory read pointed at as it was assembled, for a screen agreeing to what
+// it shows.
 //
 // One entry per issue the advisory covers, and one product branch per product
 // those issues are covered in. The standard carries vulnerabilities as an
 // array, which is what lets several embargoed flaws be released together as
 // one document on one date.
-func (s *Store) ForAdvisory(ctx context.Context, subject access.Subject, who publisher.Named,
-	identifier string) (*Document, error) {
+func (s *Store) ForAdvisoryAt(ctx context.Context, subject access.Subject, who publisher.Named,
+	identifier string) (*Document, int, error) {
 
-	doc, _, err := s.forAdvisory(ctx, subject, who, identifier)
-	return doc, err
+	doc, row, err := s.forAdvisory(ctx, subject, who, identifier)
+	if err != nil {
+		return nil, 0, err
+	}
+	edition, err := s.editionOf(ctx, row)
+	if err != nil {
+		return nil, 0, err
+	}
+	return doc, edition, nil
 }
 
 // forAdvisory is the same, answering with the advisory it resolved on the way.

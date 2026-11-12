@@ -72,26 +72,37 @@ export function useAdvisoryDocument(advisory: string, covers: number) {
   return useQuery({
     enabled: covers > 0,
     queryKey: ["advisory-document", advisory],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/advisories/{advisory}/document", { params: { path: { advisory } } }),
-      ),
+    queryFn: async () => {
+      const answer = await api.GET("/v1/advisories/{advisory}/document", {
+        params: { path: { advisory } },
+      });
+      return { body: unwrap(answer), edition: editionOf(answer.response) };
+    },
     retry: false,
   });
+}
+
+// The edition of the advisory a response was read at, which agreeing to what
+// it shows names. Nothing where the response names none.
+function editionOf(response: Response): number | undefined {
+  const said = Number(response.headers.get("Advisory-Edition"));
+  return Number.isInteger(said) && said > 0 ? said : undefined;
 }
 
 // What the document states about each release, and the decision behind it.
 export function useAdvisoryReleases(
   advisory: string,
   covers: number,
-): UseQueryResult<{ items: AdvisoryRelease[] | null }> {
+): UseQueryResult<{ body: { items: AdvisoryRelease[] | null }; edition?: number }> {
   return useQuery({
     enabled: covers > 0,
     queryKey: ["advisory-releases", advisory],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/advisories/{advisory}/releases", { params: { path: { advisory } } }),
-      ),
+    queryFn: async () => {
+      const answer = await api.GET("/v1/advisories/{advisory}/releases", {
+        params: { path: { advisory } },
+      });
+      return { body: unwrap(answer), edition: editionOf(answer.response) };
+    },
   });
 }
 

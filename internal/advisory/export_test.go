@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/publisher"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -80,4 +81,17 @@ func (s *Store) Where(ctx context.Context, subject access.Subject, identifier st
 // StandingOf reports where an advisory already read stands.
 func (s *Store) StandingOf(ctx context.Context, subject access.Subject, row *Advisory) (*Standing, error) {
 	return s.standingOf(ctx, subject, row)
+}
+
+// ForAdvisory assembles the document for one advisory.
+func (s *Store) ForAdvisory(ctx context.Context, subject access.Subject, who publisher.Named,
+	identifier string) (*Document, error) {
+	doc, _, err := s.ForAdvisoryAt(ctx, subject, who, identifier)
+	return doc, err
+}
+
+// Releases is every release of every issue the advisory covers.
+func (s *Store) Releases(ctx context.Context, subject access.Subject, identifier string) ([]Placed, error) {
+	out, _, err := s.ReleasesAt(ctx, subject, identifier)
+	return out, err
 }

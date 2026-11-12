@@ -5,6 +5,7 @@ package advisoryapi_test
 
 import (
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -49,6 +50,22 @@ func TestAReleaseIsMarkedAffectedBySomebodyWhoTriagesIt(t *testing.T) {
 		httpapitest.Read(t, r, "private-triage", releases, &after)
 		if len(after.Items) == 0 || !after.Items[0].Marked {
 			t.Errorf("the marked release reads %+v", after.Items)
+		}
+
+		// The releases and the document each name the edition they were read
+		// at, the one the advisory names, so a screen agrees to what it shows.
+		var it struct {
+			Edition int `json:"edition"`
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/advisories/"+named, &it)
+		for _, path := range []string{releases, "/v1/advisories/" + named + "/document"} {
+			got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, path, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s answered %d: %s", path, got.Code, got.Body.String())
+			}
+			if edition := got.Header().Get("Advisory-Edition"); edition != strconv.Itoa(it.Edition) || it.Edition < 2 {
+				t.Errorf("%s names edition %q after the mark, want %d", path, edition, it.Edition)
+			}
 		}
 	})
 }

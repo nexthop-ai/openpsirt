@@ -442,16 +442,28 @@ func (s *Store) standingOf(ctx context.Context, subject access.Subject, row *Adv
 	if err != nil {
 		return nil, err
 	}
-	standing := &Standing{
+	edition, err := s.editionOf(ctx, row)
+	if err != nil {
+		return nil, err
+	}
+	return &Standing{
 		Status: statusOf(len(gone) > 0, len(agreed) > 0), Agreed: agreed, AgreedBy: by,
+		Edition: edition,
+	}, nil
+}
+
+// editionOf is the ordinal of the edition an advisory read points at, and
+// zero for one with none.
+func (s *Store) editionOf(ctx context.Context, row *Advisory) (int, error) {
+	var edition int
+	if row.EditionID == nil {
+		return 0, nil
 	}
-	if row.EditionID != nil {
-		if err := s.db.NewSelect().Model((*Edition)(nil)).Column("ordinal").
-			Where(`"id" = ?`, *row.EditionID).Scan(ctx, &standing.Edition); err != nil {
-			return nil, fmt.Errorf("read which edition it says: %w", err)
-		}
+	if err := s.db.NewSelect().Model((*Edition)(nil)).Column("ordinal").
+		Where(`"id" = ?`, *row.EditionID).Scan(ctx, &edition); err != nil {
+		return 0, fmt.Errorf("read which edition it says: %w", err)
 	}
-	return standing, nil
+	return edition, nil
 }
 
 // agreers is who gave each agreement, by sign-in identity, in the order given.

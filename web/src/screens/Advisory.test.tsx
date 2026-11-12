@@ -96,6 +96,24 @@ describe("one advisory", () => {
     ]);
   });
 
+  it("agrees to the oldest edition any panel was read at", async () => {
+    serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition: 4 } };
+      }
+      if (path === "/v1/advisories/{advisory}/releases") {
+        return { data: { items: [] }, headers: { "Advisory-Edition": "3" } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const posted = answer("POST", () => ({ data: {} }));
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    expect(posted().map(bodyOf)).toEqual([{ edition: 3 }]);
+  });
+
   it("reads the advisory again when its edition moved, and agrees to the new one", async () => {
     let edition = 3;
     serve((path) => {

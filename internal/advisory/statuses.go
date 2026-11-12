@@ -72,16 +72,29 @@ func placed(ctx context.Context, db bun.IDB, subject access.Subject,
 	return out, nil
 }
 
-// Releases is every release of every issue the advisory covers, with what the
-// document states about it, the decision it stands under, and whether that
-// moved since an agreement standing on what the advisory says now.
-func (s *Store) Releases(ctx context.Context, subject access.Subject,
-	identifier string) ([]Placed, error) {
+// ReleasesAt is every release of every issue the advisory covers, with what
+// the document states about it, the decision it stands under, and whether that
+// moved since an agreement standing on what the advisory says now; and the
+// edition the advisory read pointed at, for a screen agreeing to what it
+// shows. The marks are read after it, so they are never older than the
+// edition named.
+func (s *Store) ReleasesAt(ctx context.Context, subject access.Subject,
+	identifier string) ([]Placed, int, error) {
 
 	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
+	edition, err := s.editionOf(ctx, row)
+	if err != nil {
+		return nil, 0, err
+	}
+	out, err := s.releasesOf(ctx, subject, row)
+	return out, edition, err
+}
+
+// releasesOf is Releases for an advisory already read.
+func (s *Store) releasesOf(ctx context.Context, subject access.Subject, row *Advisory) ([]Placed, error) {
 	out, err := placed(ctx, s.db, subject, row.ID)
 	if err != nil {
 		return nil, err

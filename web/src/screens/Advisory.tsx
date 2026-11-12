@@ -107,13 +107,21 @@ export function Advisory() {
       <Document advisory={advisory} covers={covers.length} read={document} />
       <Agreement
         advisory={advisory}
-        edition={it?.edition ?? 0}
+        edition={shown(it?.edition, releases.data?.edition, document.data?.edition)}
         agreed={agreed}
         by={it?.agreed_by ?? []}
       />
       <Issued advisory={advisory} read={issuances} agreed={agreed} changed={it?.changed} />
     </>
   );
+}
+
+// The edition the screen shows: the oldest any panel was read at. A panel read
+// at an older edition than the advisory shows less than it says, so agreeing
+// names that one and is refused until every panel is read again.
+function shown(...editions: (number | undefined)[]): number {
+  const read = editions.filter((one): one is number => one !== undefined && one > 0);
+  return read.length === 0 ? 0 : Math.min(...read);
 }
 
 // The title, as a row of the compose panel. Left empty the document names the
@@ -273,7 +281,7 @@ function Releases({
   read: ReturnType<typeof useAdvisoryReleases>;
 }) {
   const mark = useMarkRelease();
-  const rows = read.data?.items ?? [];
+  const rows = read.data?.body.items ?? [];
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
@@ -408,8 +416,11 @@ function Document({
   covers: number;
   read: ReturnType<typeof useAdvisoryDocument>;
 }) {
-  const written = useMemo(() => (read.data ? JSON.stringify(read.data, null, 2) : ""), [read.data]);
-  const tracking = read.data?.document?.tracking;
+  const written = useMemo(
+    () => (read.data ? JSON.stringify(read.data.body, null, 2) : ""),
+    [read.data],
+  );
+  const tracking = read.data?.body.document?.tracking;
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
@@ -429,7 +440,7 @@ function Document({
             <span className="id">{tracking?.id}</span> · version {tracking?.version} ·{" "}
             {tracking?.status} ·{" "}
             <span title="How far the document may travel. Red while anything it covers is still held back">
-              {read.data?.document?.distribution?.tlp?.label}
+              {read.data?.body.document?.distribution?.tlp?.label}
             </span>{" "}
             ·{" "}
             <a

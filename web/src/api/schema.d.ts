@@ -221,6 +221,8 @@ export interface paths {
          *
          *     The document is generated, not published. Nothing is sent anywhere. Recording that it was issued is a separate request, and what it keeps is a digest of what was generated, so that whether what you published is still what this would generate can be answered.
          *
+         *     The `Advisory-Edition` header names the edition the document was generated from.
+         *
          *     How far the document may travel is its distribution label, red while anything it covers is still held back. `tracking.status` says where the document is in its life. Reaching a disclosure date discloses nothing, so nothing here does either.
          *
          *     An advisory covering no issue is refused: the standard requires at least one. Requires a publisher configured for this deployment, because a document naming none is not a valid CSAF document.
@@ -366,6 +368,8 @@ export interface paths {
          * @description Every release of every issue this advisory covers, with the status its document states and the decision behind it.
          *
          *     A release whose every open occurrence is covered by approved, live decisions with one outcome names the earliest of them, with the builds it was made on. `elsewhere` is true where that decision records the builds it was made on and none of them is of this release's variant. Another branch or tag of a variant it was made on is not flagged. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
+         *
+         *     The `Advisory-Edition` header names the edition these were read at; agreeing to what they show names the oldest edition among this, the advisory and its document.
          *
          *     An advisory covering a product you hold nothing on answers as one that does not exist.
          *
@@ -7989,6 +7993,17 @@ export interface components {
             variant: string;
             vulnerability: string;
         };
+        AdvisoryReleasesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdvisoryReleasesOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdvisoryReleaseBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         AdvisoryTakenBody: {
             /**
              * Format: uri
@@ -12238,17 +12253,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AdvisoryListedBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodyAdvisoryReleaseBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyAdvisoryReleaseBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["AdvisoryReleaseBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -17188,6 +17192,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Advisory-Edition"?: number;
                     [name: string]: unknown;
                 };
                 content: {
@@ -17385,10 +17390,11 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    "Advisory-Edition"?: number;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyAdvisoryReleaseBody"];
+                    "application/json": components["schemas"]["AdvisoryReleasesOutputBody"];
                 };
             };
             /** @description Error */

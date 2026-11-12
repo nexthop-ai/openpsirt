@@ -77,6 +77,13 @@ func advisoryRefused(in core.Deps, err error, what string) error {
 	return core.WentWrong(in.Logger, what, err)
 }
 
+// AdvisoryDocumentOutput is an advisory's generated document, and the
+// edition it was generated from.
+type AdvisoryDocumentOutput struct {
+	Edition int `header:"Advisory-Edition" doc:"The edition of the advisory the document was generated from, which agreeing to what it says names"`
+	Body    *advisory.Document
+}
+
 func registerAdvisory(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "start-advisory", Method: http.MethodPost, Path: "/v1/advisories",
@@ -327,6 +334,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"that it was issued is a separate request, and what it keeps is a digest of " +
 			"what was generated, so that whether what you published is still what this " +
 			"would generate can be answered.\n\n" +
+			"The `Advisory-Edition` header names the edition the document was generated from.\n\n" +
 			"How far the document may travel is its distribution label, red while " +
 			"anything it covers is still held back. `tracking.status` says where the " +
 			"document is in its life. Reaching a disclosure date discloses nothing, so " +
@@ -337,18 +345,18 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
-	}) (*struct{ Body *advisory.Document }, error) {
+	}) (*AdvisoryDocumentOutput, error) {
 		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		doc, err := advisory.NewStore(in.DB.DB).ForAdvisory(ctx, subject, in.Publisher,
+		doc, edition, err := advisory.NewStore(in.DB.DB).ForAdvisoryAt(ctx, subject, in.Publisher,
 			input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be generated")
 		}
-		return &struct{ Body *advisory.Document }{Body: doc}, nil
+		return &AdvisoryDocumentOutput{Edition: edition, Body: doc}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{

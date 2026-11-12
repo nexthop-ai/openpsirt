@@ -44,8 +44,9 @@ export function mounted(): {
   };
 }
 
-// One answer the fake server gives: a body, or a status with no body.
-export type Answer = { data?: unknown; status?: number };
+// One answer the fake server gives: a body, or a status with no body, and the
+// headers beside it.
+export type Answer = { data?: unknown; status?: number; headers?: Record<string, string> };
 
 type Served = (path: string, init: unknown) => Answer | undefined;
 
@@ -81,7 +82,7 @@ function answering(answer: Served) {
     return {
       data: ok ? said.data : undefined,
       error: ok ? undefined : { detail: `HTTP ${status}` },
-      response: new Response(null, { status }),
+      response: new Response(null, { status, headers: said.headers }),
     };
   }) as never;
 }
