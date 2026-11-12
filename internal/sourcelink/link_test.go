@@ -162,6 +162,18 @@ func TestARunRepositoryWithNoRemoteLeavesTheProductsBranchToLink(t *testing.T) {
 	}
 }
 
+func TestAProductPrefixAboveARunRepositoryWithNoRemoteLinksNothing(t *testing.T) {
+	c := hosted(t)
+	c.Paths = []Path{{Prefix: "", Remote: "https://github.com/sonic-net/sonic-buildimage", Branch: "master"}}
+	if err := c.Valid(); err != nil {
+		t.Fatal(err)
+	}
+	modules := []Module{checkout[0], {Path: "src/sonic-swss", Revision: top}}
+	if got := c.File(modules, "src/sonic-swss/orchagent/orch.cpp", 12, 12); got.URL != "" {
+		t.Errorf("linked %s; want nothing, the outer repository holding only a pointer at the path", got.URL)
+	}
+}
+
 func TestOneCommitWrittenAbbreviatedAndInFullIsUnchanged(t *testing.T) {
 	c := hosted(t)
 	after := append([]Module(nil), checkout...)

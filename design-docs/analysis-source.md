@@ -75,7 +75,7 @@ administrative trail.
 | Each segment of the path and of an approximate link's branch is percent-encoded; an empty, `.` or `..` segment unlinks the place | |
 | A finished address must be `https` on the web address's host, or the place is unlinked | The last check after substitution |
 | A repository whose working tree differed from its commit is marked patched | The link shows the source before the patch |
-| A path no run repository holds links to the product's branch for its longest prefix, marked approximate; a run repository whose remote is absent or unreadable holds nothing for this | The commit is unknown, and the branch has moved since |
+| A path no run repository holds links to the product's branch for its longest prefix, marked approximate; a run repository whose remote is absent or unreadable holds nothing for this, and takes only a prefix at its own path or within it | The commit is unknown, and the branch has moved since; a prefix above it is the outer repository, where the path is a submodule pointer |
 | A place with no line opens the file; an end before the start is the start | |
 | A code finding no longer open carries its repository's comparison between the newest build seeing it and the first not, or says both are one commit, unpatched | Unchanged code means no fix there, and a build-time patch is invisible to commits |
 | A commit written abbreviated is the one written in full that it begins, regardless of capitals | git resolves an abbreviation so |

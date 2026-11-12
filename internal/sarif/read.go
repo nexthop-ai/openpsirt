@@ -334,7 +334,7 @@ func (rd *reader) run() (Run, error) {
 		case "originalUriBaseIds":
 			run.Bases = map[string]ArtifactLocation{}
 			return rd.b.Object(func(name string) error {
-				if len(run.Bases) == rd.lim.MaxBases {
+				if _, again := run.Bases[name]; !again && len(run.Bases) == rd.lim.MaxBases {
 					return over("named starting points in a run", rd.lim.MaxBases)
 				}
 				if err := rd.hold(); err != nil {
@@ -607,7 +607,8 @@ func (rd *reader) rule(discarded *Discarded) (Rule, error) {
 				if err != nil {
 					return err
 				}
-				if len(rule.messages) == rd.lim.MaxRules {
+				// A repeated name replaces its entry, so it adds nothing to bound.
+				if _, again := rule.messages[id]; !again && len(rule.messages) == rd.lim.MaxRules {
 					return over("message strings on a rule", rd.lim.MaxRules)
 				}
 				rule.messages[id] = s
@@ -822,10 +823,11 @@ func (rd *reader) result(discarded *Discarded) (Result, pending, error) {
 				if err != nil {
 					return err
 				}
-				if len(res.Fingerprints) == rd.lim.MaxLocations {
+				scheme = bound.Head(scheme, docread.MostQuoted)
+				if _, again := res.Fingerprints[scheme]; !again && len(res.Fingerprints) == rd.lim.MaxLocations {
 					return over("fingerprints on a result", rd.lim.MaxLocations)
 				}
-				res.Fingerprints[bound.Head(scheme, docread.MostQuoted)] = rd.text(s)
+				res.Fingerprints[scheme] = rd.text(s)
 				return rd.hold()
 			})
 		case "fixes":

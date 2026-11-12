@@ -427,14 +427,15 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject,
 func (s *Store) ProposeGrouped(ctx context.Context, subject access.Subject, decided Proposal,
 	at func(context.Context, bun.IDB) (Occurrence, []Occurrence, error)) (*DecisionOccurrence, error) {
 
-	first := decided
-	proposals := []Proposal{first}
+	var proposals []Proposal
 	var recorded []*DecisionOccurrence
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		proposals = nil
 		occurrence, occurrences, err := at(ctx, tx)
 		if err != nil {
 			return err
 		}
+		first := decided
 		first.Occurrence = occurrence
 		proposals = append(proposals[:0], first)
 		for _, occurrence := range occurrences {

@@ -144,19 +144,17 @@ func (p *placer) inside(abs string) (string, bool) {
 	return "", false
 }
 
-// maxChain bounds how many starting points one address may pass through.
-const maxChain = 16
-
 // absolute is an address as an absolute, slash-separated, cleaned path,
 // resolved as the deployment resolves it: a chain ending at the source root's
 // undefined name is under the top of the checkout, and one ending at no
-// starting point under the directory the tool ran in.
+// starting point under the directory the tool ran in. A chain passes through
+// each starting point the run names once at most, so one longer is a cycle.
 func (p *placer) absolute(uri, base string, bases map[string]obj) (string, bool) {
 	at, start, ok := uribase.Resolve(uri, base, func(name string) (string, string, bool) {
 		b, ok := bases[name]
 		u := str(b, "uri")
 		return u, str(b, "uriBaseId"), ok && u != ""
-	}, maxChain)
+	}, len(bases))
 	if !ok {
 		return "", false
 	}

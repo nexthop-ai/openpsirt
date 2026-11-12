@@ -289,3 +289,41 @@ func TestAForwardedResultKeepsTheRuleOfTheExtensionItNames(t *testing.T) {
 		}
 	}
 }
+
+func TestTwoExtensionsSharingANameKeepTheirOwnRulesWhenForwarded(t *testing.T) {
+	root := checkout(t, "git@github.com:example/sonic.git")
+	strict := `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111","rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	lenient := `{"name":"pack","guid":"22222222-2222-2222-2222-222222222222","rules":[{"id":"X","defaultConfiguration":{"level":"note"}}]}`
+	inputs := []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(strict,
+			forwardedAt("1", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+		{Name: "b.sarif", Data: forwarded(lenient,
+			forwardedAt("2", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+	}
+	exit := 0
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
+		Root: root, Work: root, Series: "codeql/default", Built: time.Now().UTC(),
+		ExitStatus: &exit, Client: "openpsirt-upload test",
+	}, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want the two documents merged", len(runs))
+	}
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(runs[0].Doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	levels := map[int]string{}
+	for _, res := range log.Runs[0].Results {
+		if len(res.Locations) > 0 {
+			levels[res.Locations[0].StartLine] = res.Level
+		}
+	}
+	for line, want := range map[int]string{1: "error", 2: "note"} {
+		if levels[line] != want {
+			t.Errorf("the result on line %d is at %q; want %q, its own extension's", line, levels[line], want)
+		}
+	}
+}

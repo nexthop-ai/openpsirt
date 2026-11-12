@@ -202,8 +202,8 @@ func plainMessage(m obj) int {
 // merge folds the runs of one tool into one: clang writes a document per
 // translation unit, and the deployment reads one run of each tool. The
 // driver's rules are listed once, by identifier, and each extension's within
-// that extension, extensions being one where they share a name, or else a
-// GUID. A result names its rule by identifier after settling, and a rule of an
+// that extension, extensions being one where they share a name, a GUID and a
+// version, and an extension stating none of the three its own. A result names its rule by identifier after settling, and a rule of an
 // extension by its extension's position, which is rewritten to the merged
 // list's.
 func merge(runs []obj) obj {
@@ -229,12 +229,9 @@ func merge(runs []obj) obj {
 		}
 		moved := map[int]int{}
 		for i, ext := range objects(tool, "extensions") {
-			key := "name " + str(ext, "name")
-			if str(ext, "name") == "" {
-				key = "guid " + str(ext, "guid")
-			}
+			key := str(ext, "name") + "\x00" + str(ext, "guid") + "\x00" + str(ext, "version")
 			at, ok := extensionAt[key]
-			if !ok || key == "guid " {
+			if !ok || key == "\x00\x00" {
 				at = len(extensions)
 				extensionAt[key] = at
 				kept := obj{}

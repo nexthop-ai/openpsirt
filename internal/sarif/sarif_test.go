@@ -230,6 +230,27 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 	}
 }
 
+func TestANameRepeatedAtItsBoundAddsNothingToRefuse(t *testing.T) {
+	for name, c := range map[string]struct {
+		doc string
+		lim func(*Limits)
+	}{
+		"bases": {run(`,"originalUriBaseIds":{"A":{},"A":{}}`), func(l *Limits) { l.MaxBases = 1 }},
+		"message strings": {`{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"messageStrings":` +
+			`{"a":{"text":"x"},"a":{"text":"y"}}}]}}}]}`, func(l *Limits) { l.MaxRules = 1 }},
+		"fingerprints": {run(`,"results":[{"partialFingerprints":{"a":"1","a":"2"}}]`),
+			func(l *Limits) { l.MaxLocations = 1 }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lim := limits()
+			c.lim(&lim)
+			if _, err := NewUpload(lim).Read(strings.NewReader(c.doc)); err != nil {
+				t.Errorf("refused: %v; want a name given twice read as one entry", err)
+			}
+		})
+	}
+}
+
 func TestEveryEntryReadCountsTowardWhatTheUploadHolds(t *testing.T) {
 	step := `{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}}`
 	rules := func(rules string) string {

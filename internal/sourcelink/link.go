@@ -224,8 +224,10 @@ type located struct {
 // longest prefix, its remote read against the repository holding it where it
 // is relative, or else the repository the product names for the path. A run's
 // repository with no remote that can be read names none, so the product's
-// answers for it.
+// answers for it, at its path or within it: a prefix above it is the
+// repository holding it, where the path is a submodule's pointer.
 func (c Config) locate(modules []Module, path string) (located, bool) {
+	floor := 0
 	if inner := innermost(modules, path); inner >= 0 {
 		m := modules[inner]
 		remote := m.Remote
@@ -238,8 +240,11 @@ func (c Config) locate(modules []Module, path string) (located, bool) {
 				within: strings.TrimPrefix(strings.TrimPrefix(path, m.Path), "/"), patched: m.Changed,
 			}, true
 		}
+		floor = len(m.Path)
 	}
-	best := longest(len(c.Paths), path, func(i int) (string, bool) { return c.Paths[i].Prefix, c.Paths[i].Remote != "" })
+	best := longest(len(c.Paths), path, func(i int) (string, bool) {
+		return c.Paths[i].Prefix, c.Paths[i].Remote != "" && len(c.Paths[i].Prefix) >= floor
+	})
 	if best < 0 {
 		return located{}, false
 	}
@@ -344,6 +349,14 @@ func escapedPath(p string) (string, bool) {
 // repository.
 func escapedRevision(r string) (string, bool) {
 	return escapedPath(r)
+}
+
+// linkable is whether a branch is one escapedRevision links: no segment
+// empty, "." or "..", which git refuses in a branch name and a browser
+// resolves out of the repository.
+func linkable(branch string) bool {
+	_, ok := escapedRevision(branch)
+	return ok
 }
 
 // on is whether an address opens over https on the host a web address

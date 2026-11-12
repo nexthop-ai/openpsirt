@@ -30,8 +30,18 @@ type candidate struct {
 	functionKey string
 	lineKey     string
 	line        int
+	// column and message are where on its line the code finding was last
+	// seen and what it said, which tell apart code findings sharing a key.
+	column  int
+	message string
 	// absent is whether the last comparable run did not see it.
 	absent bool
+}
+
+// sameSpot is whether a candidate was last seen at a result's column saying
+// what it says.
+func sameSpot(c candidate, k Keyed) bool {
+	return c.column == k.StartColumn && c.message == k.Message
 }
 
 // nearest is how many candidates sharing a result's line key, nearest it
@@ -97,6 +107,25 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 		for _, c := range order {
 			if k := layer.ofC(candidates[c]); !takenC[c] && k != "" {
 				waiting[k] = append(waiting[k], c)
+			}
+		}
+		// Results sharing a key are told apart by column and message first,
+		// so each keeps the code finding it was paired with whatever order a
+		// run lists them in.
+		if layer.on == onKey {
+			for r, res := range results {
+				ws := waiting[res.Key]
+				if takenR[r] || res.Key == "" {
+					continue
+				}
+				for j, c := range ws {
+					if sameSpot(candidates[c], res) {
+						waiting[res.Key] = append(ws[:j:j], ws[j+1:]...)
+						takenC[c], takenR[r] = true, true
+						out = append(out, pairing{result: r, candidate: c, on: layer.on})
+						break
+					}
+				}
 			}
 		}
 		for r, res := range results {

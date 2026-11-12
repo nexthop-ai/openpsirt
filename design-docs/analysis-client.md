@@ -48,7 +48,7 @@ openpsirt-upload write --series [TOOL=]NAME... --output FILE OUTPUT...
 | clang's plain `plist` is not to be sent | It drops cross-file diagnostics |
 | A property list whose dictionary key has no value, or that holds nothing, is refused | A key with no value never ends the containers around it, so the files listed after it are read or the list is refused |
 | HTML reports and output directories are refused | They carry source |
-| One tool's outputs merge into one run: the driver's rules listed once by identifier, extensions one where they share a name or else a GUID with each one's rules listed once within it, results and invocations concatenated, unit counts added | A result citing an extension's rule keeps citing that extension at its merged position |
+| One tool's outputs merge into one run: the driver's rules listed once by identifier, extensions one where they share a name, a GUID and a version, with each one's rules listed once within it, results and invocations concatenated, unit counts added | A result citing an extension's rule keeps citing that extension at its merged position |
 | Several tools are one upload each; `write` names each file by tool before the extension; one refused does not stop the rest | A series is one tool |
 | `write` reduces a tool's name to lower-case letters, digits, `.`, `_` and `-`, every other character a `-`, with no `.` at either end, and `analyzer` where nothing is left; two tools reduced to one file name are refused | The name is the analyzer's own, and a `/` or `..` in it would write elsewhere. Windows drops a trailing `.`, so two names differing by one are one file |
 | Several tools need `--series TOOL=NAME` each; bare `--series NAME` serves one tool | A shared name changes when tools change |

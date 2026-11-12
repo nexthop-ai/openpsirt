@@ -159,21 +159,27 @@ func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting) ([]ca
 			FunctionKey  string `bun:"function_key"`
 			LineKey      string `bun:"line_key"`
 			StartLine    *int   `bun:"start_line"`
+			StartColumn  *int   `bun:"start_column"`
+			Message      string `bun:"message_text"`
 		}
 		if err := db.NewSelect().TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			ColumnExpr(`"ar"."finding_id", "f"."occurrence_identity", "ar"."match_key", "ar"."unprinted_key"`).
 			ColumnExpr(`"ar"."function_key", "ar"."line_key", "ar"."start_line"`).
+			ColumnExpr(`"ar"."start_column", "ar"."message_text"`).
 			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
 			return err
 		}
 		for _, r := range rows {
 			c := candidate{
 				findingID: r.FindingID, occurrence: r.Occurrence, key: r.MatchKey, unprinted: r.UnprintedKey,
-				functionKey: r.FunctionKey, lineKey: r.LineKey, absent: absent[r.FindingID],
+				functionKey: r.FunctionKey, lineKey: r.LineKey, message: r.Message, absent: absent[r.FindingID],
 			}
 			if r.StartLine != nil {
 				c.line = *r.StartLine
+			}
+			if r.StartColumn != nil {
+				c.column = *r.StartColumn
 			}
 			out = append(out, c)
 		}

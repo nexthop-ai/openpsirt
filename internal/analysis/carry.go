@@ -136,6 +136,8 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 		Occurrence string     `bun:"occurrence_identity"`
 		BuildID    int64      `bun:"build_id"`
 		ClosedAt   *time.Time `bun:"closed_at"`
+		Column     *int       `bun:"start_column"`
+		Message    string     `bun:"message_text"`
 	}
 	byKey := map[string][]hit{}
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
@@ -147,7 +149,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 			ColumnExpr(`"f"."id", "ar"."match_key", "f"."occurrence_identity", "f"."build_id"`).
-			ColumnExpr(`"f"."closed_at"`).
+			ColumnExpr(`"f"."closed_at", "ar"."start_column", "ar"."message_text"`).
 			Where(`"si"."series_id" = ?`, seriesID).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
 			Where(where, args...).
@@ -176,21 +178,33 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 	for _, c := range out {
 		used[c.occurrence] = true
 	}
-	for i, k := range fresh {
-		if _, done := out[i]; done {
-			continue
+	// A hit at the result's column saying what it says is taken first, so
+	// results sharing a key keep their occurrences whatever order a run lists
+	// them in; the rest take what is left.
+	at := func(h hit, k Keyed) bool {
+		column := 0
+		if h.Column != nil {
+			column = *h.Column
 		}
-		for _, h := range byKey[k.Key] {
-			if used[h.Occurrence] {
+		return column == k.StartColumn && h.Message == k.Message
+	}
+	for _, exact := range []bool{true, false} {
+		for i, k := range fresh {
+			if _, done := out[i]; done {
 				continue
 			}
-			c := carried{occurrence: h.Occurrence, on: onKey, from: fromSeries}
-			if h.BuildID == buildID && h.ClosedAt != nil {
-				c.from = fromReopened
+			for _, h := range byKey[k.Key] {
+				if used[h.Occurrence] || exact && !at(h, k) {
+					continue
+				}
+				c := carried{occurrence: h.Occurrence, on: onKey, from: fromSeries}
+				if h.BuildID == buildID && h.ClosedAt != nil {
+					c.from = fromReopened
+				}
+				used[h.Occurrence] = true
+				out[i] = c
+				break
 			}
-			used[h.Occurrence] = true
-			out[i] = c
-			break
 		}
 	}
 	return nil
