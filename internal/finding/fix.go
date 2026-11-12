@@ -377,6 +377,13 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 			Scan(ctx, &covered); err != nil {
 			return nil, fmt.Errorf("read what the commitments' decisions cover: %w", err)
 		}
+		// A decision covering nothing is one reading it answers as absent.
+		for _, id := range decisions {
+			withheld[id] = true
+		}
+		for _, row := range covered {
+			withheld[row.DecisionID] = false
+		}
 		for _, row := range covered {
 			if !slices.Contains(access.VisibleOn(subject, row.ProductID, row.VulnerabilityID), row.Visibility) {
 				withheld[row.DecisionID] = true

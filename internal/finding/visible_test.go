@@ -364,3 +364,27 @@ func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 		})
 	}
 }
+
+// A commitment argued by a decision that covers nothing is told to nobody, as
+// reading that decision answers it absent.
+func TestACommitmentWhoseDecisionCoversNothingIsToldToNobody(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.foundOnLibnl(t)
+		id := decisionSaying(t, f.db, f.somebodyElse(t), "upgrade-needed")
+		committer := f.someoneElse(t, access.PrivateTriage)
+		if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
+			f.componentID(t, libnl.Name), "3.9.0", nil, &id,
+			[]int64{f.build}, map[int64]string{}); err != nil {
+			t.Fatal(err)
+		}
+		planned, err := f.store.PlannedUpgradesFor(ctx, f.holding(t, access.PublicRead, access.PrivateRead), f.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(planned) != 0 {
+			t.Errorf("a reader of everything is told of %d commitments over a decision covering nothing", len(planned))
+		}
+	})
+}

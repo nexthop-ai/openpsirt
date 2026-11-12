@@ -364,8 +364,8 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 //
 // Read at the visibilities the entries were drawn at. A merged flaw files an
 // undisclosed row under a disclosed issue's identifier, so a pair can close at
-// two visibilities in one build, and the explanation of a disclosed entry is
-// never an undisclosed row's.
+// two visibilities in one build, and an entry is never explained by a row the
+// comparison leaves out.
 func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Visibility,
 	fixed []Changed) (map[string]Gone, error) {
 	why := make(map[string]Gone, len(fixed))
