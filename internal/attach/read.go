@@ -295,8 +295,8 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 	gone, orphaned, failed := 0, 0, 0
 	var stopped error
 	for i := range stale {
-		// A stopped pass stops claiming: every claim after the stop fails,
-		// and each would log an error naming a row nothing is wrong with.
+		// A stopped pass stops claiming here, and only here: a claim runs on
+		// a context of its own, so one made after the stop succeeds.
 		if stopped = ctx.Err(); stopped != nil {
 			break
 		}
