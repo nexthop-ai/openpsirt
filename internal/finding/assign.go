@@ -1092,7 +1092,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 	if err != nil {
 		return nil, 0, err
 	}
-	shipped, err := componentsNamed(ctx, s.db, components)
+	shipped, err := componentsNamed(ctx, s.db, components, buildIDs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1115,7 +1115,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 				ProductID: head.ProductID, VulnerabilityID: head.VulnerabilityID}])
 			row.Vulnerability, row.Severity = issue.Identifier, issue.InForce()
 		}
-		if component, held := shipped[head.ComponentID]; held {
+		if component, held := shipped.at(head.ComponentID, head.BuildID); held {
 			row.Component, row.Version, row.Purl = component.Name, component.Version, component.Purl
 		}
 		if build, held := builds[head.BuildID]; held {

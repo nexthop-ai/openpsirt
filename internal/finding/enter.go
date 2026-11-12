@@ -818,8 +818,23 @@ func productNameOf(ctx context.Context, db bun.IDB, productID int64) (string, er
 	return name, nil
 }
 
-// ComponentName reads what one component is called, for an answer that has to
-// name what it just recorded against.
+// ComponentNameIn reads what a build calls one component, for an answer that
+// has to name what it just recorded against.
+func (s *Store) ComponentNameIn(ctx context.Context, buildID, componentID int64) (string, error) {
+	var name string
+	err := s.db.NewSelect().
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr(graph.BuildName("?", `"c"."id"`, "c"), buildID).
+		Where(`"c"."id" = ?`, componentID).
+		Scan(ctx, &name)
+	if err != nil {
+		return "", fmt.Errorf("look up what component %d is called: %w", componentID, err)
+	}
+	return name, nil
+}
+
+// ComponentName reads what one component is called, as its occurrence
+// identity names it.
 func (s *Store) ComponentName(ctx context.Context, componentID int64) (string, error) {
 	var name string
 	err := s.db.NewSelect().

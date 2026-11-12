@@ -274,8 +274,8 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64) ([]mo
 		// The name as a producer wrote it, for the listing to show. Two
 		// producers writing one dependency in different capitals are one name
 		// here, and either spelling names the same thing on a screen.
-		ColumnExpr(`"c"."name" AS "dsp"`).
-		ColumnExpr(`"c"."version" AS "ver"`).
+		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
+		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		// The build's own root is not one of its components, and its version
 		// is not stored, so it can neither arrive nor move.

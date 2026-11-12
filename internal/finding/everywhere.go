@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // One issue, everywhere it sits.
@@ -127,12 +128,13 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		FixedIn     string     `bun:"fixed_in"`
 	}
 	sightings := narrow(s.db.NewSelect()).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`MIN("c"."version") AS "version"`).
+		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+		ColumnExpr(graph.NodeVersion("sn", "c")+` AS "version"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
@@ -155,8 +157,11 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		// ten. Folding them was wrong on its own terms too: the row carries
 		// one version and one fix version, and two versions of a name are two
 		// different pieces of work.
-		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."id"`).
-		OrderExpr(`"p"."name", "st"."name", "va"."name", "c"."name", "c"."id"`).
+		// The name and version the build stated are grouped on as well, one
+		// value each for a component in a build.
+		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."version", "c"."id", `+
+			`"sn"."name", "sn"."version"`).
+		OrderExpr(`"p"."name", "st"."name", "va"."name", "component", "c"."id"`).
 		Limit(int64(limit)).
 		Scan(ctx, &rows)
 	if err != nil {

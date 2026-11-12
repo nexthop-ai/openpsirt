@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // Reach is how far a decision travels, in the three parts somebody deciding
@@ -185,13 +186,14 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(graph.NodeVersion("sn", "c")+` AS "version"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
@@ -201,9 +203,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		GroupExpr(`"f"."occurrence_identity", "f"."build_id", "st"."name", "st"."display_name", "va"."name", "va"."display_name", `+
-			`"c"."version", `+
+			`"c"."version", "sn"."version", `+
 			ComponentUpstreamExpr+", "+ConsumerUpstreamExpr).
-		OrderExpr(`"st"."name", "va"."name", "c"."version"`).
+		OrderExpr(`"st"."name", "va"."name", "version"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return Reach{}, fmt.Errorf("look for the same issue elsewhere: %w", err)

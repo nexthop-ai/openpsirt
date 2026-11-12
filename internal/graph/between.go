@@ -65,8 +65,8 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 		ColumnExpr(`"n"."build_id" AS "tgt"`).
 		ColumnExpr(`"n"."is_root" AS "rt"`).
 		ColumnExpr(`"c"."name_folded" AS "nm"`).
-		ColumnExpr(`"c"."name" AS "dsp"`).
-		ColumnExpr(`"c"."version" AS "ver"`).
+		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
+		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
 		Where(`"n"."build_id" IN (?)`, bun.List([]int64{fromID, toID})).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Scan(ctx, &nodes)

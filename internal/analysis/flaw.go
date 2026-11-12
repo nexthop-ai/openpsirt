@@ -462,7 +462,7 @@ func componentOf(ctx context.Context, db bun.IDB, buildID, componentID int64) (n
 	var out named
 	var root int
 	if err := db.NewSelect().TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."name", "c"."purl"`).
+		ColumnExpr(graph.BuildName("?", `"c"."id"`, "c")+` AS "name", "c"."purl"`, buildID).
 		ColumnExpr(`CASE WHEN `+wasRoot("?", `"c"."id"`)+` THEN 1 ELSE 0 END AS "root"`, buildID, true).
 		Where(`"c"."id" = ?`, componentID).
 		Scan(ctx, &out.Name, &out.Purl, &root); err != nil {
@@ -481,7 +481,7 @@ func resembling(ctx context.Context, db bun.IDB, buildID int64, dir string) ([]n
 	var held []named
 	if err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		ColumnExpr(`DISTINCT "c"."name", "c"."purl"`).
+		ColumnExpr(`DISTINCT `+graph.NodeName("n", "c")+` AS "name", "c"."purl"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).
@@ -545,6 +545,19 @@ func seenIn(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity
 func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, component string,
 	choice graph.Choice) ([]BuildName, error) {
 
+	// The product's builds in use, as a condition on the node, which the
+	// name is looked up within.
+	inUse := `"n"."build_id" IN (SELECT "t"."id" FROM "build" AS "t"
+		JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"
+		JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"
+		WHERE "s"."product_id" = ? AND "s"."retired_at" IS NULL AND "va"."retired_at" IS NULL)`
+	named, err := graph.NamedAs(ctx, db, component, inUse, productID)
+	if err != nil {
+		return nil, err
+	}
+	if len(named) == 0 {
+		return nil, nil
+	}
 	var rows []struct {
 		BuildName
 		Version string `bun:"version"`
@@ -556,12 +569,16 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 		Join(`JOIN "graph_node" AS "n" ON "n"."build_id" = "t"."id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
-		ColumnExpr(`"c"."version", "c"."purl"`).
+		ColumnExpr(graph.NodeVersion("n", "c")+` AS "version", "c"."purl"`).
 		Where(`"s"."product_id" = ?`, productID).
 		Where(`"s"."retired_at" IS NULL`).
 		Where(`"va"."retired_at" IS NULL`).
 		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`"c"."name_folded" = ?`, graph.Folded(component)).
+		Where(`"n"."component_id" IN (?)`, bun.List(named)).
+		// Per node as well: a component one build states under the name is
+		// not under it in a build stating another.
+		Where(`("c"."name_folded" = ? OR "n"."name_folded" = ?)`,
+			graph.Folded(component), graph.Folded(component)).
 		Where(`NOT EXISTS (SELECT 1 FROM "series_run" AS "sr" WHERE "sr"."build_id" = "t"."id" AND "sr"."series_id" = ?)`,
 			seriesID).
 		OrderExpr(`"s"."name" ASC, "va"."name" ASC`).
@@ -812,7 +829,7 @@ func RecordAsFlaw(ctx context.Context, db bun.IDB, subject access.Subject, in Re
 	if err != nil {
 		return nil, err
 	}
-	component, err := store.ComponentName(ctx, rows[0].ComponentID)
+	component, err := store.ComponentNameIn(ctx, rows[0].BuildID, rows[0].ComponentID)
 	if err != nil {
 		return nil, err
 	}

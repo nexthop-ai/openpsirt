@@ -7,8 +7,13 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
+
+// shownComponent is the name a finding's build stated for its component,
+// which a message names and a grouping groups on.
+var shownComponent = graph.NodeName("sn", "c")
 
 // A finding with the names a message has to say.
 //
@@ -37,7 +42,8 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		// And whatever the row's own product rates the issue. Every watch
 		// spans products, and a rating belongs to one — so what an alert
 		// calls critical is what the product it is about calls critical.
-		Join(rating.For(rating.OnBranchOrTag))
+		Join(rating.For(rating.OnBranchOrTag)).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`))
 	if consumer {
 		q = q.Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`)
 	}
@@ -45,7 +51,7 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
-		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(shownComponent + ` AS "component"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		// The product and the issue as identifiers too: what a message says is
 		// a name, and what a later read narrows by is a column.

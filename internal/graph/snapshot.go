@@ -53,6 +53,18 @@ type Node struct {
 	// component is built from, without credentials. An analyzer's result in
 	// that repository is placed on the component.
 	Repository string `bun:"repository,nullzero"`
+	// Name and Version are what this build stated the component is called
+	// and at which version. The component row holds what the first report
+	// of it stated, and a package identifier names one component whatever
+	// version field a report puts beside it, so the row's can be another
+	// product's. A scanner is given these and every screen shows them. Null
+	// on a node written before they were kept, which reads the row's; an
+	// empty version is one the build stated none for.
+	Name    string `bun:"name"`
+	Version string `bun:"version"`
+	// NameFolded is Name folded as the component's name is, which a name
+	// somebody types is matched on.
+	NameFolded string `bun:"name_folded"`
 }
 
 // Edge is one component depending on another.
@@ -203,7 +215,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 		}
 
 		wanted := map[int64]stated{}
-		wanted[ids[root.Identity()]] = stated{isRoot: true}
+		wanted[ids[root.Identity()]] = stated{isRoot: true, name: strings.TrimSpace(root.Name)}
 		for _, d := range snap.Components {
 			stored := asStored(d)
 			id := ids[stored.Identity()]
@@ -213,6 +225,8 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 					upstreamName:    strings.TrimSpace(stored.UpstreamName),
 					upstreamVersion: strings.TrimSpace(stored.UpstreamVersion),
 					repository:      statedRepository(stored.Repository),
+					name:            strings.TrimSpace(stored.Name),
+					version:         strings.TrimSpace(stored.Version),
 				}
 			}
 		}
@@ -293,8 +307,8 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"c"."id" AS "component_id"`).
-		ColumnExpr(`"c"."name" AS "name"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(NodeName("n", "c")+` AS "name"`).
+		ColumnExpr(NodeVersion("n", "c")+` AS "version"`).
 		ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
 		ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
 		ColumnExpr(`"n"."purl" AS "purl"`).
@@ -581,22 +595,29 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, buildID int64,
 	name string, which Choice) (int64, error) {
 
 	version, ecosystem := which.Version, which.Ecosystem
+	// A name somebody types is matched without regard to capitals, through
+	// the fold stored beside the component's name and the build's own.
+	named, err := NamedAs(ctx, db, name, `"n"."build_id" = ?`, buildID)
+	if err != nil {
+		return 0, err
+	}
+	if len(named) == 0 {
+		return 0, fmt.Errorf("%w: %q", ErrNoComponent, name)
+	}
 
 	query := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"c"."id" AS "id"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(NodeVersion("n", "c")+` AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
-		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(NodeName("n", "c")+` AS "name"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
-		// A name somebody types is matched without regard to capitals,
-		// through the fold stored beside the name.
-		Where(`"c"."name_folded" = ?`, Folded(name)).
+		Where(`"n"."component_id" IN (?)`, bun.List(named)).
 		OrderExpr(`"c"."id"`)
 	if version != "" {
-		query = query.Where(`"c"."version" = ?`, version)
+		query = query.Where(NodeVersion("n", "c")+` = ?`, version)
 	}
 	if ecosystem != "" {
 		// The ecosystem is escaped and the trailing "/%" is not: the first is
@@ -1049,14 +1070,15 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 	query = query.Join(`JOIN "component" AS "c" ON "c"."id" = "fn"."component_id"`)
 	return childrenJoin(openIssuesJoin(query, readable, buildID, only), buildID, only).
 		ColumnExpr(`"c"."id" AS "component_id"`).
-		ColumnExpr(`"c"."name" AS "name"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(NodeName("fn", "c") + ` AS "name"`).
+		ColumnExpr(NodeVersion("fn", "c") + ` AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
-		// kids.n and open.n are grouped on as well as selected. Each is one
-		// value per c.id and so adds nothing, but the engines that enforce
-		// the rule strictly will not take a column from a joined subquery on
-		// the strength of a primary key belonging to a different table.
-		GroupExpr(`"c"."id", "c"."name", "c"."version", "kids"."n", "open"."n"`).
+		// The node's columns, kids.n and open.n are grouped on as well as
+		// selected. Each is one value per c.id, since a build holds one open
+		// node per component, and so adds nothing, but the engines that
+		// enforce the rule strictly will not take a column from another table
+		// on the strength of a primary key belonging to this one.
+		GroupExpr(`"c"."id", "c"."name", "c"."version", "fn"."name", "fn"."version", "kids"."n", "open"."n"`).
 		// Anything that opens comes before anything that does not, and within
 		// each the most findings first.
 		//
@@ -1067,7 +1089,8 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 		// contains no branches is a list, and the reader never learns the
 		// build has containers in it at all.
 		// The identifier last, so two components of one name keep one order.
-		OrderExpr(`CASE WHEN COALESCE("kids"."n", 0) > 0 THEN 0 ELSE 1 END, findings DESC, "c"."name", "c"."id"`)
+		OrderExpr(`CASE WHEN COALESCE("kids"."n", 0) > 0 THEN 0 ELSE 1 END, findings DESC, ` +
+			NodeName("fn", "c") + `, "c"."id"`)
 }
 
 // openIssuesJoin adds how many issues are open against each component "c" in
@@ -1354,29 +1377,33 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, buildID int6
 	limit = database.AList.Of(limit)
 
 	// The components matched, each once however many occurrences it sits at. The
-	// name is matched on its folded form, which is lowercased and trimmed
+	// name is matched on its folded form, the component's or the one the build
+	// stated, which is lowercased and trimmed
 	// when stored, so no engine is asked to compare loosely; and the term is
 	// escaped as well as folded, so a term of "%" searches for a percent sign.
 	// The build's own root is not one of its components, which is what the
 	// count beside the list says.
-	matched := `(SELECT DISTINCT "n"."component_id" AS "cid"
+	matched := `(SELECT DISTINCT "n"."component_id" AS "cid",
+		` + NodeName("n", "m") + ` AS "stated_name", ` + NodeVersion("n", "m") + ` AS "stated_version"
 		FROM "graph_node" AS "n"
 		JOIN "component" AS "m" ON "m"."id" = "n"."component_id"
 		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."is_root" = ?
-		  AND "m"."name_folded" LIKE ?` + database.LikeClause + `) AS "matched"`
+		  AND ("m"."name_folded" LIKE ?` + database.LikeClause + `
+		    OR "n"."name_folded" LIKE ?` + database.LikeClause + `)) AS "matched"`
 
 	var rows []Neighbor
+	like := "%" + database.LikeEscaped(Folded(term)) + "%"
 	query := s.db.NewSelect().
-		TableExpr(matched, buildID, false, "%"+database.LikeEscaped(Folded(term))+"%").
+		TableExpr(matched, buildID, false, like, like).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "matched"."cid"`)
 	err = childrenJoin(openIssuesJoin(query, readable, buildID, nil), buildID, nil).
 		ColumnExpr(`"c"."id" AS "component_id"`).
-		ColumnExpr(`"c"."name" AS "name"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"matched"."stated_name" AS "name"`).
+		ColumnExpr(`"matched"."stated_version" AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
 		// The identifier last, because a build ships one name at more than
 		// one version and the limit cuts by this order.
-		OrderExpr(`"findings" DESC, "c"."name", "c"."id"`).
+		OrderExpr(`"findings" DESC, "matched"."stated_name", "c"."id"`).
 		Limit(int64(limit)).
 		Scan(ctx, &rows)
 	if err != nil {

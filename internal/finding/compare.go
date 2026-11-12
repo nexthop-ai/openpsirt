@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -155,7 +156,8 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 			// it publishes, which is the copy that leaves the building.
 			Join(rating.Here, productID).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-			ColumnExpr(`"c"."name" AS "component"`).
+			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+			ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
 			ColumnExpr(`MIN(COALESCE("f"."arrived_from", '')) AS "arrived_from"`).
@@ -169,7 +171,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 			ColumnExpr(`COALESCE("v"."advisory", '') AS "advisory"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			GroupExpr(`"v"."identifier", "c"."name", ` + rating.EffectiveExpr +
+			GroupExpr(`"v"."identifier", ` + graph.NodeName("sn", "c") + `, ` + rating.EffectiveExpr +
 				`, "f"."closed_because", "v"."exploited", "v"."advisory"`)
 		return q.Where(`"f"."closed_at" IS NULL`)
 	}
@@ -293,11 +295,12 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-			ColumnExpr(`"c"."name" AS "component"`).
+			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+			ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" = ?`, access.Private).
 			Where(`"f"."closed_at" IS NULL`).
-			GroupExpr(`"v"."identifier", "c"."name"`).
+			GroupExpr(`"v"."identifier", `+graph.NodeName("sn", "c")).
 			Scan(ctx, &rows)
 		return rows, err
 	}
@@ -508,7 +511,8 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-		ColumnExpr(`"c"."name" AS "component"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		ColumnExpr(graph.NodeName("sn", "c") + ` AS "component"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		// The soonest of them, which is the date a coordinator reads against.
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
@@ -521,7 +525,7 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"v"."identifier", "c"."name"`)
+		GroupExpr(`"v"."identifier", ` + graph.NodeName("sn", "c"))
 	if err := q.Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read how far this build has decided what it still has: %w", err)
 	}
@@ -573,7 +577,8 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(KeyMatches).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-		ColumnExpr(`"c"."name" AS "component"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
 		ColumnExpr(`"cl"."id" AS "claim"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		// One value per group, because the group is one decision: which bytes an
@@ -583,7 +588,7 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"v"."identifier", "c"."name", "cl"."id", "cl"."outcome"`).
+		GroupExpr(`"v"."identifier", `+graph.NodeName("sn", "c")+`, "cl"."id", "cl"."outcome"`).
 		Scan(ctx, &said)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)

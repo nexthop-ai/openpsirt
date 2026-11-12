@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -388,7 +389,8 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
-		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
+		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
 		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -493,7 +495,8 @@ func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, buil
 	}
 	err = occurrenceColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
-		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
+		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
 		Apply(inFoldOf(buildID, vulnerabilityID, componentID, visible)).
 		OrderExpr(`consumer, "occurrence_identity", component_upstream, consumer_upstream`).

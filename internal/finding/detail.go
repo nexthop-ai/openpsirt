@@ -403,9 +403,9 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	return evidence
 }
 
-// versionsOf reads the version each of these components ships at, in one
-// statement.
-func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]graph.Step, error) {
+// versionsOf reads the version each of these components ships at in a build,
+// as the build stated it, in one statement.
+func (s *Store) versionsOf(ctx context.Context, buildID int64, ids []int64) (map[int64]graph.Step, error) {
 	if len(ids) == 0 {
 		return map[int64]graph.Step{}, nil
 	}
@@ -417,7 +417,7 @@ func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]graph.St
 	if err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`"c"."id" AS "id"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(graph.BuildVersion("?", `"c"."id"`, "c")+` AS "version"`, buildID).
 		ColumnExpr(`"c"."purl" AS "purl"`).
 		Where(`"c"."id" IN (?)`, bun.List(ids)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what those ship at: %w", err)
@@ -573,14 +573,16 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 		// The supplier's statement answering this occurrence on some routes, and
 		// the product it answers through.
 		Join(`LEFT JOIN "received_vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
-		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
 		// The package of the fold this occurrence is. A fold covers every
 		// binary one source package was built at one version, so an occurrence
 		// named only by its consumer would leave a reader unable to tell curl's
 		// from libcurl4t64's.
-		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(`"f"."disclose_at" AS "disclose_at"`).
@@ -659,6 +661,15 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 	var component graph.Component
 	if err := s.db.NewSelect().Model(&component).Where(`"id" = ?`, componentID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this component is: %w", err)
+	}
+	// The row holds what the first product to describe it stated; the build
+	// is shown as it stated itself.
+	if err := s.db.NewSelect().TableExpr(`"component" AS "c"`).
+		ColumnExpr(graph.BuildName("?", `"c"."id"`, "c")+` AS "name"`, buildID).
+		ColumnExpr(graph.BuildVersion("?", `"c"."id"`, "c")+` AS "version"`, buildID).
+		Where(`"c"."id" = ?`, componentID).
+		Scan(ctx, &component.Name, &component.Version); err != nil {
+		return nil, fmt.Errorf("read what this build calls this component: %w", err)
 	}
 
 	var aliases []Alias
@@ -788,7 +799,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 	// The last step of a way down is the package the occurrence is, which now
 	// varies within a fold: a chain ending in curl and one ending in
 	// libcurl4t64 are two ways to two different packages of one bump.
-	shipped, err := s.versionsOf(ctx, wanted)
+	shipped, err := s.versionsOf(ctx, buildID, wanted)
 	if err != nil {
 		return nil, err
 	}

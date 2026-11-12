@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -510,12 +511,13 @@ func (s *Store) packagesIn(ctx context.Context, buildID int64,
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(FoldedOn+` AS "fold"`).
 			ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
-			ColumnExpr(`"c"."name" AS "name"`).
+			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+			ColumnExpr(graph.NodeName("sn", "c")+` AS "name"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(FoldedOn+" IN (?)", bun.List(batch)).
-			GroupExpr(FoldedOn+`, "c"."name"`).
-			OrderExpr(`"c"."name"`).
+			GroupExpr(FoldedOn+`, `+graph.NodeName("sn", "c")).
+			OrderExpr(graph.NodeName("sn", "c")).
 			Scan(ctx, &some); err != nil {
 			return err
 		}

@@ -507,8 +507,8 @@ func (s *Store) packagesAcross(ctx context.Context, buildIDs []int64, held heldB
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(SourceName+` AS "source"`).
 		ColumnExpr(SourceVersion+` AS "source_version"`).
-		ColumnExpr(`"c"."name" AS "name"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(graph.NodeName("n", "c")+` AS "name"`).
+		ColumnExpr(graph.NodeVersion("n", "c")+` AS "version"`).
 		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
 		ColumnExpr(`COALESCE("c"."summary", '') AS "summary"`).
 		ColumnExpr(`COALESCE("c"."project_url", '') AS "project_url"`).
@@ -522,7 +522,7 @@ func (s *Store) packagesAcross(ctx context.Context, buildIDs []int64, held heldB
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).
 		Where(`"n"."component_id" IN (?)`, bun.List(ids)).
-		OrderExpr(`"st"."name", "va"."name", "c"."name", "c"."version"`).
+		OrderExpr(`"st"."name", "va"."name", "name", "version"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read a source package across its builds: %w", err)

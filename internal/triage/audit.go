@@ -455,11 +455,13 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
 		ColumnExpr(`"earliest"."decision_occurrence_id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"v"."identifier" AS "issue"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`"c"."version" AS "version"`).
-		ColumnExpr(`COALESCE("uc"."name", ?) AS "consumer"`, "").
+		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+		ColumnExpr(graph.NodeVersion("sn", "c")+` AS "version"`).
+		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, ?) AS "consumer"`, "").
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		Scan(ctx, &rows)

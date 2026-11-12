@@ -469,11 +469,13 @@ func (s *Store) registerQuery(productID int64,
 		Join(WordsJoin("sr")).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		ColumnExpr(graph.NodeName("sn", "c") + ` AS "component"`).
+		ColumnExpr(graph.NodeVersion("sn", "c") + ` AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
-		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
+		ColumnExpr(`COALESCE(` + graph.NodeName("sun", "uc") + `, '') AS "consumer"`).
 		// A decision counts where it is live or where it lapsed. Lapsed is what
 		// happened to it and is part of the record; a superseded one is not,
 		// and reporting it would say an occurrence is decided when it is not.
@@ -518,7 +520,7 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`COALESCE("sr"."justification", '') AS "stated_why"`).
 		ColumnExpr(WordsColumn + ` AS "stated_words"`).
 		ColumnExpr(`COALESCE("sr"."document", '') AS "stated_file"`).
-		OrderExpr(`"v"."identifier", "c"."name", "f"."occurrence_identity"`)
+		OrderExpr(`"v"."identifier", "component", "f"."occurrence_identity"`)
 }
 
 // onTheRecord opens the case expression each of the decision occurrence's own

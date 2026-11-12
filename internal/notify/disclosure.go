@@ -198,7 +198,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 			}
 			return `"f"."disclose_at" <= ?`
 		}(), time.Now().UTC()).
-		GroupExpr(`"p"."name", "st"."name", "va"."name", "c"."name", "v"."identifier", "st"."product_id", "v"."id"`).
+		GroupExpr(`"p"."name", "st"."name", "va"."name", `+shownComponent+`, "v"."identifier", "st"."product_id", "v"."id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is past its disclosure date: %w", err)

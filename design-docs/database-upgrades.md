@@ -234,15 +234,23 @@ where a stopped upgrade made it already.
 | Table | Gains |
 |---|---|
 | `advisory_issue` | A mark held while the issue is on the advisory: true on every row not taken off, null on the rest; and the issue unique on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § The advisory) |
+| `graph_node` | The name and the version the build stated and the name's fold, all empty, and an index of each build's nodes by the fold (`design-docs/data-model-graph.md` § The dependency graph) |
 
 | Table | Loses |
 |---|---|
 | `advisory_issue` | The issue unique on the advisory over every row, dropped once the rule holding the mark stands. MySQL and MariaDB hold the advisory's foreign key on an index led by its column and refuse to drop the last one |
 
+| Upgrade note | Detail |
+|---|---|
+| Names and versions | A node from before the upgrade shows the component's name and version, and is found by the component's name, until its build is scanned again |
+| VEX statements filed under a file name | Stay in force beside a later upload's; `docs/configuration.md` § From v0.12.0 says what to do |
+
 | Check, on each engine | What it holds |
 |---|---|
 | A v0.12.0 database holding an issue on an advisory and one taken off | Upgraded, the table built as declared, the first marked, the second not, the second may be put back and the first may not be put on twice |
 | The same stopped after the column, or after the rule holding the mark, on the servers | Upgraded the same, nothing already made replaced |
+| A v0.12.0 database holding a node | Upgraded, the table built as declared, the node holding no name or version |
+| The same stopped after the name, or after every node column and before the index, on the servers | Upgraded the same, nothing already made replaced |
 
 ## Limits
 

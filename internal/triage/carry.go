@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -408,8 +409,9 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		ColumnExpr(`COALESCE("dr"."body", '') AS "reasoning"`).
 		// The new line's contents at that occurrence, if anything.
-		ColumnExpr(`COALESCE((SELECT MIN("c"."name") FROM "finding" AS "f"
+		ColumnExpr(`COALESCE((SELECT MIN(`+graph.NodeName("sn", "c")+`) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
+			`+graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)+`
 			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
 			AS "component"`, append([]any{toBuild}, kindArgs...)...).

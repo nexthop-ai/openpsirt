@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
@@ -62,18 +63,18 @@ type Evidence struct {
 }
 
 // placedOn selects the component a code finding "f" is placed on, joined as
-// "co": its name; its version while the build still ships it, empty once a
-// later inventory moved it, because a finding keeps the component it opened
-// on; and 1 where it is the build itself. It takes true.
+// "co": its name, as the build stated it; its version as the build states it
+// while the build still ships it, empty once a later inventory moved it,
+// because a finding keeps the component it opened on; and 1 where it is the
+// build itself. It takes true.
 //
 // A live node is asked as a closing scan of nought, which no index on the
 // closing scan answers: with statistics as loaded MySQL 8.4 read every live
 // node of the deployment through that index for each row, 0.48 s for the
 // page's rows against 3 ms.
-var placedOn = `"co"."name" AS "component", ` +
-	`CASE WHEN EXISTS (SELECT 1 FROM "graph_node" AS "gv" WHERE "gv"."build_id" = "f"."build_id" ` +
-	`AND "gv"."component_id" = "f"."component_id" AND COALESCE("gv"."closed_scan_id", 0) = 0) ` +
-	`THEN "co"."version" ELSE '' END AS "component_version", ` +
+var placedOn = graph.BuildName(`"f"."build_id"`, `"f"."component_id"`, "co") + ` AS "component", ` +
+	`COALESCE((SELECT ` + graph.NodeVersion("gv", "co") + ` FROM "graph_node" AS "gv" WHERE "gv"."build_id" = "f"."build_id" ` +
+	`AND "gv"."component_id" = "f"."component_id" AND COALESCE("gv"."closed_scan_id", 0) = 0), '') AS "component_version", ` +
 	`CASE WHEN ` + wasRoot(`"f"."build_id"`, `"f"."component_id"`) + ` THEN 1 ELSE 0 END AS "on_build"`
 
 // wasRoot is whether a component was ever a build's root, given each as a SQL

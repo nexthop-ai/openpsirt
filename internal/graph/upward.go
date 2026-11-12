@@ -99,8 +99,9 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, buildID int64)
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`MIN("c"."name") AS "name"`).
-		ColumnExpr(`MIN("c"."version") AS "version"`).
+		Join(StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		ColumnExpr(`MIN(`+NodeName("sn", "c")+`) AS "name"`).
+		ColumnExpr(`MIN(`+NodeVersion("sn", "c")+`) AS "version"`).
 		ColumnExpr(`MIN("c"."purl") AS "purl"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		Where(`"f"."build_id" = ?`, buildID).

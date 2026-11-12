@@ -376,7 +376,12 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, 0, err
 	}
-	shipped, err := componentsNamed(ctx, s.db, components)
+	// Each row is named as the build it links to stated it.
+	pageBuilds := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		pageBuilds = append(pageBuilds, row.BuildID)
+	}
+	shipped, err := componentsNamed(ctx, s.db, components, pageBuilds)
 	if err != nil {
 		return nil, 0, err
 	}

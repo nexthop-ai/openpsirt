@@ -21,6 +21,23 @@ import (
 func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	wanted map[int64]stated) (map[int64]int64, int, int, error) {
 
+	// A node written before the name and version were kept holds neither,
+	// and reads the component row's. It is given the row's here, in one
+	// statement for the build: compared bare, every one of them reads as
+	// restated, and a real image is hundreds of thousands of statements.
+	// The comparison below then restates only those the build states
+	// differently.
+	if _, err := tx.NewUpdate().TableExpr(`"graph_node"`).
+		Set(`"name" = (SELECT "c"."name" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
+		Set(`"version" = (SELECT "c"."version" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
+		Set(`"name_folded" = (SELECT "c"."name_folded" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
+		Where(`"build_id" = ?`, buildID).
+		Where(`"closed_scan_id" IS NULL`).
+		Where(`"name" IS NULL`).
+		Exec(ctx); err != nil {
+		return nil, 0, 0, fmt.Errorf("give older nodes the name and version they read: %w", err)
+	}
+
 	var open []Node
 	err := tx.NewSelect().Model(&open).
 		Where(`"build_id" = ?`, buildID).
@@ -49,7 +66,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			if node.Purl != says.purl || node.CPE != says.cpe ||
 				node.UpstreamName != says.upstreamName ||
 				node.UpstreamVersion != says.upstreamVersion ||
-				node.Repository != says.repository {
+				node.Repository != says.repository ||
+				node.Name != says.name || node.Version != says.version {
 				restated[node.ID] = says
 			}
 			continue
@@ -68,6 +86,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			Purl: says.purl, CPE: says.cpe,
 			UpstreamName: says.upstreamName, UpstreamVersion: says.upstreamVersion,
 			Repository: says.repository,
+			Name:       says.name, Version: says.version, NameFolded: Folded(says.name),
 		})
 	}
 	// One statement per node. A build restates an identifier rarely, and
@@ -80,6 +99,9 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			Set(`"upstream_name" = ?`, nullable(says.upstreamName)).
 			Set(`"upstream_version" = ?`, nullable(says.upstreamVersion)).
 			Set(`"repository" = ?`, nullable(says.repository)).
+			Set(`"name" = ?`, says.name).
+			Set(`"version" = ?`, says.version).
+			Set(`"name_folded" = ?`, Folded(says.name)).
 			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return nil, 0, 0, fmt.Errorf("record what the build states about a component: %w", err)
 		}
@@ -140,6 +162,7 @@ type stated struct {
 	purl, cpe                     string
 	upstreamName, upstreamVersion string
 	repository                    string
+	name, version                 string
 }
 
 // nullable is a stated identifier as the column holds it: absent where the

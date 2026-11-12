@@ -460,7 +460,7 @@ func (s *Store) climb(ctx context.Context, buildID int64, componentIDs []int64) 
 	)
 	SELECT "u"."node" AS "node", "e"."parent_id" AS "parent",
 	       "n"."component_id" AS "component_id", "n"."is_root" AS "is_root",
-	       "c"."name" AS "name", "c"."version" AS "version", "c"."purl" AS "purl"
+	       `+NodeName("n", "c")+` AS "name", `+NodeVersion("n", "c")+` AS "version", "c"."purl" AS "purl"
 	FROM "up" AS "u"
 	JOIN "graph_node" AS "n" ON "n"."id" = "u"."node"
 	JOIN "component" AS "c" ON "c"."id" = "n"."component_id"
@@ -500,7 +500,7 @@ func (s *Store) underRoot(ctx context.Context, buildID int64, rows []rise) ([]ri
 	if err := s.db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"n"."id" AS "node", "n"."component_id" AS "component_id", "n"."is_root" AS "is_root"`).
-		ColumnExpr(`"c"."name" AS "name", "c"."version" AS "version", "c"."purl" AS "purl"`).
+		ColumnExpr(NodeName("n", "c")+` AS "name", `+NodeVersion("n", "c")+` AS "version", "c"."purl" AS "purl"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).
