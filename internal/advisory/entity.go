@@ -107,6 +107,11 @@ type Cover struct {
 	// from an advisory is a question a deleted row does not answer.
 	RemovedAt *time.Time `bun:"removed_at"`
 	RemovedBy *int64     `bun:"removed_by"`
+	// Live is true while the issue is on the advisory and null once taken
+	// off, so the issue is unique on the advisory among the rows holding it.
+	// Putting it back writes another row: each stretch it was on is kept,
+	// because an issuance names what was on the advisory when it went out.
+	Live *bool `bun:"live"`
 }
 
 // Covered is one issue an advisory covers, by the names a reader knows them
@@ -323,34 +328,26 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 		// Asked inside the transaction, because the unique constraint is what
 		// actually decides it and a count read outside describes a database
 		// that has moved. The count is what turns the constraint into a
-		// refusal a caller can act on.
-		var held Cover
-		err := tx.NewSelect().Model(&held).
+		// refusal a caller can act on. Asked of every name the issue goes
+		// by, which the constraint cannot see.
+		held, err := tx.NewSelect().Model((*Cover)(nil)).
 			Where(`"advisory_id" = ?`, row.ID).
 			Where(`"product_id" = ?`, named.ID).
 			Where(finding.FiledUnder(filed.Issue), issue.ID).
-			Limit(1).Scan(ctx)
-		switch {
-		case err != nil && !database.IsNoRows(err):
+			Where(`"removed_at" IS NULL`).
+			Exists(ctx)
+		if err != nil {
 			return err
-		case err == nil && held.RemovedAt == nil:
-			return ErrAlreadyCovered
-		case err == nil:
-			// Taken off before and put back. The row is revived rather than a
-			// second one written, which is what keeps the pair unique — and
-			// it reads as what it is: on the advisory again, put there by
-			// whoever did that.
-			if _, err = tx.NewUpdate().Model((*Cover)(nil)).
-				Set(`"removed_at" = NULL`).Set(`"removed_by" = NULL`).
-				Set(`"added_at" = ?`, added).Set(`"added_by" = ?`, subject.ID).
-				Where(`"id" = ?`, held.ID).Exec(ctx); err != nil {
-				return err
-			}
-			return reopen(ctx, tx, row, subject.ID, added)
 		}
+		if held {
+			return ErrAlreadyCovered
+		}
+		// Taken off before and put back is another row, beside the one
+		// recording the stretch it was on before.
+		live := true
 		_, err = tx.NewInsert().Model(&Cover{
 			AdvisoryID: row.ID, ProductID: named.ID, VulnerabilityID: issue.ID,
-			AddedAt: added, AddedBy: subject.ID,
+			AddedAt: added, AddedBy: subject.ID, Live: &live,
 		}).Exec(ctx)
 		// The count above turns the constraint into a refusal a caller can
 		// act on, and the constraint is what actually decides it: two writers
@@ -405,6 +402,7 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 		res, err := tx.NewUpdate().Model((*Cover)(nil)).
 			Set(`"removed_at" = ?`, removed).
 			Set(`"removed_by" = ?`, subject.ID).
+			Set(`"live" = NULL`).
 			Where(`"advisory_id" = ?`, row.ID).
 			Where(`"product_id" = ?`, named.ID).
 			Where(finding.FiledUnder(filed.Issue), issue.ID).
