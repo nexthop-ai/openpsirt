@@ -602,6 +602,24 @@ func TestANameCannotBreakOutOfTheHeaderItIsWrittenInto(t *testing.T) {
 	}
 }
 
+// A name past ASCII is carried in the extended parameter and only as ASCII in
+// the quoted one, so the header is one an object store signs and a browser
+// still names the file as it was uploaded.
+func TestANameBeyondASCIIIsCarriedInTheExtendedParameter(t *testing.T) {
+	got := attach.Disposition(&attach.Attachment{Filename: "отчёт; v=2.pdf",
+		ContentType: "application/pdf"})
+	want := `attachment; filename="_____; v=2.pdf"; filename*=UTF-8''` +
+		`%D0%BE%D1%82%D1%87%D1%91%D1%82%3B%20v%3D2.pdf`
+	if got != want {
+		t.Errorf("the disposition reads %q, want %q", got, want)
+	}
+	for _, r := range got {
+		if r > 0x7e {
+			t.Fatalf("the disposition carries %q, which a header cannot", r)
+		}
+	}
+}
+
 // An object the store will not delete is named and stepped over, and the rows
 // after it are still collected.
 func TestAnUndeletableObjectDoesNotStallTheSweep(t *testing.T) {
