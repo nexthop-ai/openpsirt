@@ -92,17 +92,17 @@ func SchemeOf(ecosystem string) Scheme {
 
 // longest is how long a string may be and still be a version.
 //
-// Two of the schemes build a structure proportional to what they are given
-// rather than walking it: a Maven version is a tree with a level per hyphen,
-// and a PEP 440 release segment is a part per dot. Measured, two megabytes of
-// "1-1-1-…" allocates 393 MB, and both operands are read before either is
-// compared. A scan document may be hundreds of megabytes, the fixed-in field
-// it carries is free text, and nothing between there and here cuts it up — so
-// without this a version nobody meant is a request for memory.
+// Schemes build a structure proportional to what they are given rather than
+// walking it: a Maven version is a tree with a level per hyphen, and a PEP 440
+// release, a semantic release or pre-release, and a NuGet version's labels
+// are a part per dot. Measured, two megabytes of "1-1-1-…" allocates 393 MB
+// as a Maven version, and both operands are read before either is compared. A
+// scan document may be hundreds of megabytes, the fixed-in field it carries is
+// free text, and nothing between there and here cuts it up — so without this
+// a version nobody meant is a request for memory.
 //
-// Checked here rather than in the two schemes that need it, because the next
-// scheme added is the one where somebody forgets. The four that stream are
-// unaffected by the check and would be unaffected by its absence.
+// Checked in Order and Leads rather than in each scheme, so every scheme is
+// held to it, the next one added included.
 //
 // The bound is far above every real version and far below any size worth
 // allocating for. The longest in the taken suites is 30 bytes.
