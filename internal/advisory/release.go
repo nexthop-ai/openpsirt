@@ -267,7 +267,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
 		GroupExpr(`"t"."branch_or_tag_id", "t"."variant_id"`)
-	if err := finding.WhollyCovered(q, productID, visible, finding.ForReleases).Scan(ctx, &rows); err != nil {
+	if err := finding.WhollyCovered(q, productID, visible).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read which releases a decision covers: %w", err)
 	}
 	out := make(map[[2]int64]*Grounds, len(rows))

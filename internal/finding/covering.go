@@ -30,44 +30,21 @@ type Covering struct {
 	DecidedBy int64  `bun:"decided_by"`
 }
 
-// Reader is which document a coverage is read for, which decides the outcomes
-// that cover an occurrence.
-type Reader int
-
-const (
-	// ForStatements is the VEX document of one build. A decision that it will
-	// not be fixed covers an occurrence only where it names what a holder can do
-	// instead: the format requires an action on an affected statement, so one
-	// without a mitigation has nothing to publish and falls through to
-	// silence.
-	ForStatements Reader = iota
-	// ForReleases is an advisory, release by release. A decision that it will
-	// not be fixed covers an occurrence whether or not it names a mitigation,
-	// because the document says no fix is planned there either way.
-	ForReleases
-)
-
-// StatedOutcomes is every outcome that covers an occurrence for some reader,
-// which is every outcome a published document states.
+// StatedOutcomes is every outcome a published document states.
 func StatedOutcomes() []string {
 	return []string{OutcomeNotApplicable, OutcomeMismatched, OutcomeAlreadyFixed, OutcomeWontFix}
 }
 
-// coveringOutcomes is the outcomes that cover an occurrence for one reader:
-// every stated outcome, and a decision that it will not be fixed only where it
-// names a mitigation for a reader that publishes one.
-func coveringOutcomes(reader Reader) string {
-	wontFix := `("cl"."outcome" = '` + OutcomeWontFix + `' AND COALESCE("cl"."mitigation", '') <> '')`
-	if reader == ForReleases {
-		wontFix = `"cl"."outcome" = '` + OutcomeWontFix + `'`
-	}
-	var plain []string
+// coveringOutcomes is the outcomes that cover an occurrence: every outcome a
+// published document states. A decision that it will not be fixed covers an
+// occurrence whether or not it names a mitigation, because a document says no
+// fix is planned where it names none.
+func coveringOutcomes() string {
+	quoted := make([]string, 0, len(StatedOutcomes()))
 	for _, outcome := range StatedOutcomes() {
-		if outcome != OutcomeWontFix {
-			plain = append(plain, "'"+outcome+"'")
-		}
+		quoted = append(quoted, "'"+outcome+"'")
 	}
-	return `("cl"."outcome" IN (` + strings.Join(plain, ", ") + `) OR ` + wontFix + `)`
+	return `"cl"."outcome" IN (` + strings.Join(quoted, ", ") + `)`
 }
 
 // WhollyCovered narrows a grouped read of findings to the groups whose every
@@ -104,19 +81,18 @@ func coveringOutcomes(reader Reader) string {
 // column composes a statement from several decisions that no record ever
 // held.
 func WhollyCovered(q *bun.SelectQuery, productID int64,
-	visible []access.Visibility, reader Reader) *bun.SelectQuery {
+	visible []access.Visibility) *bun.SelectQuery {
 
-	return covered(q, productID, visible, reader).
+	return covered(q, productID, visible).
 		Having(`COUNT("cl"."id") = COUNT(*)`).
 		Having(`COUNT(DISTINCT "cl"."outcome") = 1`)
 }
 
 // covered joins each open finding of a grouped read to the approved, live
-// decisions covering it for one reader, and adds the outcome and the earliest
+// decisions covering it, and adds the outcome and the earliest
 // decision occurrence as the columns Covering reads. Safe as an aggregate only
 // where the caller refuses a group whose occurrences disagree about the outcome.
-func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility,
-	reader Reader) *bun.SelectQuery {
+func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility) *bun.SelectQuery {
 
 	return q.
 		Join(`LEFT JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
@@ -125,7 +101,7 @@ func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility,
 			AND "de"."visibility" IN (?)
 			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "decision" AS "mc"
 				WHERE "mc"."id" = "de"."decision_id")`), productID, bun.List(visible)).
-		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id" AND ` + coveringOutcomes(reader)).
+		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id" AND ` + coveringOutcomes()).
 		ColumnExpr(`MIN("cl"."outcome") AS "outcome"`).
 		ColumnExpr(`MIN("de"."id") AS "decided_by"`).
 		Where(`"f"."closed_at" IS NULL`)

@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -108,9 +109,8 @@ type Statement struct {
 	// not_affected. It is the same vocabulary a dismissal already records.
 	Justification string `json:"justification,omitempty"`
 	// ActionStatement is what a holder can do about a flaw that is not going
-	// to be fixed. The format requires one on an affected statement, which is
-	// why silence is not an option there and why only a decision carrying a
-	// mitigation is published as one.
+	// to be fixed, or that no fix is planned where the decision named
+	// nothing. The format requires one on an affected statement.
 	ActionStatement string `json:"action_statement,omitempty"`
 	// ImpactStatement is what stops the flaw, where somebody named it.
 	//
@@ -718,10 +718,10 @@ func statusOf(outcome string) string {
 
 // statuses is the format's status for each outcome a document states.
 var statuses = map[string]string{
-	finding.OutcomeNotApplicable: "not_affected",
-	finding.OutcomeMismatched:    "not_affected",
-	finding.OutcomeAlreadyFixed:  "fixed",
-	finding.OutcomeWontFix:       "affected",
+	finding.OutcomeNotApplicable: NotAffected,
+	finding.OutcomeMismatched:    NotAffected,
+	finding.OutcomeAlreadyFixed:  Fixed,
+	finding.OutcomeWontFix:       Affected,
 }
 
 // subject is what a statement names the component by: its package
@@ -737,31 +737,55 @@ func subject(purl, component string) string {
 	return purl
 }
 
-// claimed is the statement an agreed decision makes about one component beneath
-// one product, in the words the decision it rests on states.
+// fields is what an agreed decision states, field by field: its status, and
+// the words that go with that status.
+type fields struct {
+	status, justification, impact, action string
+}
+
+// fieldsOf is what an agreed decision states, by its outcome and the words it
+// rests on.
 //
 // The same sentence goes in a different field depending on what is being said
 // about it. On a decision that something does not apply it is why, beside the
 // category a machine reads; on one that will not be fixed it is what to do
-// instead, which is the field the format asks for and the reason such a decision
-// is published at all.
+// instead, which is the field the format asks for.
+//
+// A decision that will not be fixed and names nothing to do instead says that
+// no fix is planned: both formats require an action on an affected statement,
+// and the reasoning behind the decision is a triager's argument to a second
+// person, never published.
+func fieldsOf(outcome string, words finding.Stated) (fields, error) {
+	out := fields{status: statusOf(outcome)}
+	switch out.status {
+	case "":
+		return fields{}, fmt.Errorf("outcome %q has no VEX status", outcome)
+	case NotAffected:
+		out.justification = words.Justification
+		out.impact = words.Mitigation
+	case Affected:
+		out.action = words.Mitigation
+		if strings.TrimSpace(out.action) == "" {
+			out.action = NoFixPlanned
+		}
+	}
+	return out, nil
+}
+
+// claimed is the statement an agreed decision makes about one component beneath
+// one product, in the words the decision it rests on states.
 func claimed(issue Issue, product, about, outcome string, words finding.Stated) (Statement, error) {
-	statement := Statement{
+	stated, err := fieldsOf(outcome, words)
+	if err != nil {
+		return Statement{}, err
+	}
+	return Statement{
 		Vulnerability: issue,
 		Timestamp:     words.ProposedAt.UTC(),
 		Products:      []Shipped{{ID: product, Subcomponents: []Inside{{ID: about}}}},
-		Status:        statusOf(outcome),
-	}
-	switch statement.Status {
-	case "":
-		return Statement{}, fmt.Errorf("outcome %q has no VEX status", outcome)
-	case "not_affected":
-		statement.Justification = words.Justification
-		statement.ImpactStatement = words.Mitigation
-	case "affected":
-		statement.ActionStatement = words.Mitigation
-	}
-	return statement, nil
+		Status:        stated.status, Justification: stated.justification,
+		ImpactStatement: stated.impact, ActionStatement: stated.action,
+	}, nil
 }
 
 // identify is what the document calls itself, which is the same string every

@@ -454,3 +454,63 @@ func TestMovingTheAddressRevisesEveryDocument(t *testing.T) {
 		}
 	})
 }
+
+// A decision that it will not be fixed is stated affected with what to do
+// instead where the decision named it, and that no fix is planned where it
+// named nothing: both formats require an action on an affected statement, and
+// an empty one fails a reader's validator for the whole document.
+func TestAWontFixNamingNothingToDoStatesThatNoFixIsPlanned(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1001", openssl, decision{outcome: triage.WontFix})
+		w.decide(w.Build, "CVE-2026-1002", libnl,
+			decision{outcome: triage.WontFix, mitigation: "Turn the netlink listener off."})
+		w.publishes(w.Product, true)
+		w.write()
+
+		type said struct{ category, details string }
+		for issue, want := range map[string][]said{
+			"CVE-2026-1001": {{"no_fix_planned", vex.NoFixPlanned}},
+			"CVE-2026-1002": {{"mitigation", "Turn the netlink listener off."},
+				{"no_fix_planned", vex.NoFixPlanned}},
+		} {
+			doc := w.csafAbout(w.Product, issue)
+			if doc == nil {
+				t.Fatalf("no CSAF document about %s", issue)
+			}
+			var got []said
+			for _, one := range doc.Vulnerabilities[0].Remediations {
+				if one.Details == "" {
+					t.Errorf("%s: a %s remediation has no details", issue, one.Category)
+				}
+				got = append(got, said{one.Category, one.Details})
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("%s: remediations %v, want %v", issue, got, want)
+			}
+		}
+
+		branchOrTag := w.openVEXAbout(w.Product, fixture.BranchName)
+		if branchOrTag == nil {
+			t.Fatal("no OpenVEX document about the branch")
+		}
+		want := map[string]string{
+			"CVE-2026-1001": vex.NoFixPlanned, "CVE-2026-1002": "Turn the netlink listener off.",
+		}
+		for _, statement := range branchOrTag.Statements {
+			if statement.Status != vex.Affected {
+				t.Errorf("%s is stated %s", statement.Vulnerability.Name, statement.Status)
+			}
+			if statement.ActionStatement != want[statement.Vulnerability.Name] {
+				t.Errorf("%s: action %q, want %q", statement.Vulnerability.Name,
+					statement.ActionStatement, want[statement.Vulnerability.Name])
+			}
+			delete(want, statement.Vulnerability.Name)
+		}
+		if len(want) != 0 {
+			t.Errorf("no OpenVEX statement about %v", want)
+		}
+	})
+}

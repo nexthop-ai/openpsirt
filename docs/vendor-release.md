@@ -113,6 +113,6 @@ findings stay work, because the flaw is in the release and the workaround is
 yours to apply. The findings list's "Build says" filter, set to "Affected",
 gathers them.
 
-A will-not-fix the vendor gave no workaround for is not in the VEX document,
-because the format requires an action on a statement that a flaw applies. It is
-open here, as an undecided finding.
+A will-not-fix the vendor gave no workaround for is stated affected, with an
+action saying that no fix is planned. The finding shows that sentence where a
+workaround would be.

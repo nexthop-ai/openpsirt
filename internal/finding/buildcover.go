@@ -136,7 +136,7 @@ type AffectedGroup struct {
 func CoveredInBuild(ctx context.Context, db bun.IDB, productID, buildID int64,
 	visible []access.Visibility, most int) ([]CoveredGroup, []OccurrenceCovered, error) {
 
-	read := decidedRead{state: `"de"."state" = 'approved'`, outcomes: coveringOutcomes(ForStatements)}
+	read := decidedRead{state: `"de"."state" = 'approved'`, outcomes: coveringOutcomes()}
 	sets, err := decidedOf(ctx, db, productID, buildID, visible, read)
 	if err != nil || sets == nil {
 		return nil, nil, err

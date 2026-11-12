@@ -234,23 +234,18 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 func factOf(issueID int64, issue string, aliases []string, component, purl, within,
 	outcome string, words finding.Stated) (Fact, error) {
 
-	fact := Fact{
+	stated, err := fieldsOf(outcome, words)
+	if err != nil {
+		return Fact{}, err
+	}
+	return Fact{
 		VulnerabilityID: issueID, Issue: issue, Aliases: aliases,
 		Component: component, Purl: purl, Within: within,
-		Status: statusOf(outcome), Since: words.ProposedAt.UTC(),
+		Status: stated.status, Justification: stated.justification,
+		Impact: stated.impact, Action: stated.action, Since: words.ProposedAt.UTC(),
 		Scope: triage.ScopeOf(triage.Outcome(outcome), triage.Justification(words.Justification),
 			triage.Scope(words.Scope)),
-	}
-	switch fact.Status {
-	case "":
-		return Fact{}, fmt.Errorf("outcome %q has no VEX status", outcome)
-	case NotAffected:
-		fact.Justification = words.Justification
-		fact.Impact = words.Mitigation
-	case Affected:
-		fact.Action = words.Mitigation
-	}
-	return fact, nil
+	}, nil
 }
 
 // before orders facts by issue, then by what they are about, then by where.
