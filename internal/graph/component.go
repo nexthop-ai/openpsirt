@@ -339,7 +339,8 @@ func (d Described) AsRoot() Described { return Described{Name: d.Name} }
 
 // Valid reports whether a described component can be stored.
 //
-// A name is the whole requirement. A version is not: the format only requires
+// A name is the whole requirement, and one an address can carry: not a dot
+// segment. A version is not required: the format only requires
 // a type and a name, so a component without one is ordinary output rather than
 // a broken file, and refusing it would throw away every other component in the
 // document alongside it.

@@ -112,7 +112,7 @@ distribution's tracker, and the package's page in its ecosystem.
 | One table, on the server; the interface reads its answer, including the package's page on the component read | A second table sent Ubuntu packages to Debian's tracker |
 | Kept apart from a report's references | Provenance is a different claim |
 | Nothing is fetched | They are addresses handed to a person (REQ-69) |
-| A name that is only dots is refused; everything else is escaped into its path segment (REQ-66) | The browser resolves `.` and `..` before sending |
+| A name of `.` or `..` is refused; everything else is escaped into its path segment (REQ-66) | The browser resolves `.` and `..` before sending |
 | An identifier matches an anchored scheme before it resolves | A minted identifier must not reach a public page about something else |
 | A package kind nothing here knows gets no link | A wrong link is followed before it is disbelieved |
 

@@ -49,6 +49,12 @@ export function dotSegment(value: string | number): boolean {
   return value === "." || value === "..";
 }
 
+// A value escaped as one path segment, or nothing where it is a dot segment,
+// which no escaping keeps.
+export function segment(value: string | number): string | undefined {
+  return dotSegment(value) ? undefined : encodeURIComponent(String(value));
+}
+
 // The address one route answers at, each placeholder filled and escaped for a
 // path segment. A placeholder left without a value is refused rather than sent
 // as its own name. A value that is a dot segment yields the front page, as
@@ -63,9 +69,9 @@ export function linkTo<P extends keyof paths & string>(
     if (!Object.hasOwn(values, name)) {
       throw new Error(`${path} needs a value for {${name}}`);
     }
-    const value = values[name] as string | number;
-    if (dotSegment(value)) climbs = true;
-    return encodeURIComponent(String(value));
+    const escaped = segment(values[name] as string | number);
+    if (escaped === undefined) climbs = true;
+    return escaped ?? "";
   });
   if (climbs) return "/";
   const query = encoded(given?.query);

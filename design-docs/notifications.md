@@ -105,7 +105,7 @@ builder per destination.
 | An address spelled by hand elsewhere in the server fails a test | |
 | Every builder is called with names holding every separator, and each result is matched against the interface's route table, query parameters included (`design-docs/interface.md` § The route table) | A builder added without a sample fails the same test |
 | Each part is escaped for where it lands: path segment or query value | A name holding a slash opens another screen |
-| A part of dots alone yields the front page; builders are also called with "." and "..", and the route check refuses a segment of dots | A browser resolves dot segments before sending, encoded or not |
+| A part of `.` or `..` yields the front page; builders are also called with both, and the route check refuses a dot segment | A browser resolves dot segments before sending, encoded or not |
 | A private notification's message carries the front page, from the same builders | `design-docs/notifications-delivery.md` § Outbound content |
 
 ## Mentions

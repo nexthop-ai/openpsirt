@@ -3,7 +3,7 @@
 
 import { matchPath } from "react-router-dom";
 import type { Body } from "../api/client";
-import { dotSegment } from "../api/links";
+import { segment } from "../api/links";
 import table from "./routes.json";
 
 // Every address this application answers, and every address into it the
@@ -65,9 +65,9 @@ function fill(
 ): string | undefined {
   let climbs = false;
   const filled = pattern.replace(/:(\w+)/g, (_, name: string) => {
-    const part = String(parts[name] ?? "");
-    if (dotSegment(part)) climbs = true;
-    return encodeURIComponent(part);
+    const escaped = segment(String(parts[name] ?? ""));
+    if (escaped === undefined) climbs = true;
+    return escaped ?? "";
   });
   return climbs ? undefined : filled;
 }

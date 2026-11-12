@@ -1,8 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, csrf, csrfCookie } from "./client";
+import { afterEach, describe, expect, it } from "vitest";
+import { api, csrf, csrfCookie, dotSegments } from "./client";
 
 // The `__Host-` prefix is the only thing stopping a sibling host under the
 // same registrable domain writing a cookie this deployment then reads. Two
@@ -101,20 +101,23 @@ describe("the application's client", () => {
 });
 
 describe("a request naming a dot segment", () => {
-  it("is never sent, because the browser would send it to the route above", async () => {
-    // Deleting a branch named ".." would ask to delete its product.
-    const sent = vi.spyOn(globalThis, "fetch");
-    try {
-      for (const branch_or_tag of [".", ".."]) {
-        await expect(
-          api.DELETE("/v1/products/{product}/branches-and-tags/{branch_or_tag}", {
-            params: { path: { product: "sonic", branch_or_tag } },
-          }),
-        ).rejects.toThrow("{branch_or_tag}");
-      }
-      expect(sent).not.toHaveBeenCalled();
-    } finally {
-      sent.mockRestore();
+  it("is answered as a refusal before it is sent", async () => {
+    // The browser would send it to the route above: deleting a branch named
+    // ".." would ask to delete its product.
+    const ask = (branch_or_tag: string) =>
+      dotSegments.onRequest?.({
+        request: new Request("http://psirt.example/v1/products/sonic"),
+        schemaPath: "/v1/products/{product}/branches-and-tags/{branch_or_tag}",
+        params: { path: { product: "sonic", branch_or_tag } },
+        options: {} as never,
+        id: "1",
+      });
+    for (const dots of [".", ".."]) {
+      const answered = await ask(dots);
+      expect(answered).toBeInstanceOf(Response);
+      expect((answered as Response).status).toBe(400);
+      expect(await (answered as Response).text()).toContain("{branch_or_tag}");
     }
+    expect(await ask("...")).toBeUndefined();
   });
 });

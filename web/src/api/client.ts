@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import createClient, { defaultPathSerializer, type Middleware } from "openapi-fetch";
+import createClient, { type Middleware } from "openapi-fetch";
 import { dotSegment } from "./links";
 import type { components, paths } from "./schema";
 
@@ -24,20 +24,27 @@ export const api = createClient<paths>({
   // ever sees the token. Sending credentials is therefore the whole of
   // authentication here.
   credentials: "same-origin",
-  pathSerializer: inPath,
 });
 
-// A request's path, refused where a value is a dot segment. The browser would
-// send it to the route above: deleting a branch named ".." asks to delete its
-// product.
-function inPath(pathname: string, values: Record<string, unknown>): string {
-  for (const [name, value] of Object.entries(values ?? {})) {
-    if ((typeof value === "string" || typeof value === "number") && dotSegment(value)) {
-      throw new Error(`{${name}} is "${String(value)}", which no address can carry`);
+// A request with a path value that is a dot segment is answered here, as a
+// refusal, and never sent: the browser would send it to the route above, so
+// deleting a branch named ".." would ask to delete its product. Answered
+// rather than thrown, so a caller reads it as it reads any refusal. Exported
+// so the rule can be pinned without a server.
+export const dotSegments: Middleware = {
+  onRequest({ params }) {
+    for (const [name, value] of Object.entries(params.path ?? {})) {
+      if ((typeof value === "string" || typeof value === "number") && dotSegment(value)) {
+        const detail = `{${name}} is "${String(value)}", which no address can carry`;
+        return new Response(JSON.stringify({ status: 400, title: "Bad Request", detail }), {
+          status: 400,
+          headers: { "Content-Type": "application/problem+json" },
+        });
+      }
     }
-  }
-  return defaultPathSerializer(pathname, values);
-}
+    return undefined;
+  },
+};
 
 // csrfCookie is the value a page has to echo on a write.
 //
@@ -101,4 +108,4 @@ export const csrf: Middleware = {
   },
 };
 
-api.use(csrf);
+api.use(dotSegments, csrf);

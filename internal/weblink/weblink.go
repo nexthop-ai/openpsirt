@@ -16,15 +16,16 @@
 // slash or a question mark otherwise becomes a second segment or a query, and
 // the link opens a screen about something else.
 //
-// A name of nothing but dots has no escaped form: a browser resolves "." and
-// ".." before the request is sent, percent-encoded or not, so the link would
-// climb to a different screen. An address naming one is the front page.
+// A name of "." or ".." has no escaped form: a browser resolves either before
+// the request is sent, percent-encoded or not, so the link would climb to a
+// different screen. An address naming one is the front page.
 package weblink
 
 import (
 	"net/url"
 	"strconv"
-	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Home is the front page, which a message about something undisclosed ends on
@@ -186,11 +187,11 @@ func build(product, branchOrTag, variant string) string {
 		"/variants/" + url.PathEscape(variant)
 }
 
-// climbs reports whether any name would be a path segment of nothing but
-// dots, which a browser resolves rather than sends.
+// climbs reports whether any name would be a dot segment, which a browser
+// resolves rather than sends.
 func climbs(names ...string) bool {
 	for _, name := range names {
-		if name != "" && strings.Trim(name, ".") == "" {
+		if typedname.DotSegment(name) {
 			return true
 		}
 	}

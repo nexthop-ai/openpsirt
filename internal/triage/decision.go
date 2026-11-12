@@ -432,6 +432,11 @@ type DecisionApproved struct {
 func (s *Store) ApproveDecision(ctx context.Context, subject access.Subject, decisionID int64,
 	batch string, except []int64, because string) (*DecisionApproved, error) {
 
+	// Undone by its name in the path, stored as written, so a dot segment
+	// could never be undone.
+	if typedname.DotSegment(batch) {
+		return nil, refusal.Errorf("a batch's name %q is a path segment a browser resolves rather than sends", batch)
+	}
 	if len(except) > 0 {
 		if strings.TrimSpace(because) == "" {
 			return nil, refusal.Errorf("say why those are set aside: rows returned with no reason " +
@@ -627,10 +632,6 @@ func (s *Store) intoReturned(ctx context.Context, subject access.Subject, decisi
 func (s *Store) agree(ctx context.Context, subject access.Subject, decision Decision, ids []int64,
 	batch string, now time.Time) error {
 
-	// Undone by its name in the path, so a dot segment could never be undone.
-	if err := typedname.Addressable("a batch's name", batch); err != nil {
-		return err
-	}
 	if err := s.secondPerson(ctx, decision.ID, subject.ID); err != nil {
 		return err
 	}
