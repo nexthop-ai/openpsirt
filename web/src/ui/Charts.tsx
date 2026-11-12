@@ -18,6 +18,7 @@ import {
 import type { Body } from "../api/client";
 import { BANDS as LADDER, BELOW_LOW, COLORS } from "./severities";
 import { type Step, began, outran, settled } from "./trend";
+import { FlowBars, FlowMark, labelled, roundTicks, scanLines } from "./flowchart";
 
 // The step a calendar trend is drawn in, the windows each is asked over, and
 // the words a heading carries. Daily shows a team fixing dozens a day; weekly
@@ -158,12 +159,7 @@ export function paceMarks(points: Point[], marks: PaceMark[], from: number): Pac
   const add = (step: number, line: string) => said.set(step, [...(said.get(step) ?? []), line]);
   for (const mark of marks) if (mark.step >= from) add(mark.step - from, mark.said);
   points.slice(from).forEach((p, i) => {
-    if ((p.first_scans ?? 0) > 0 || (p.baseline ?? 0) > 0) {
-      add(i, `${day(p.at)}: first scan: ${(p.baseline ?? 0).toLocaleString()}`);
-    }
-    if ((p.restored ?? 0) > 0) {
-      add(i, `${day(p.at)}: returned after a gap: ${(p.restored ?? 0).toLocaleString()}`);
-    }
+    for (const line of scanLines(day(p.at), p)) add(i, line);
   });
   return [...said.entries()]
     .sort(([a], [b]) => a - b)
@@ -207,7 +203,7 @@ export function Pace({
   const lo = Math.max(0, loOpen - pad),
     hi = hiOpen + pad;
   const y = (v: number) => T + topH - ((v - lo) / (hi - lo)) * topH;
-  const ticks = niceTicks(lo, hi, 3);
+  const ticks = roundTicks(lo, hi, 3);
   const said = tickWords(ticks);
 
   const zero = T + topH + gap + botH / 2;
@@ -236,11 +232,7 @@ export function Pace({
       ))}
       <polygon className="open-area" points={`${L},${T + topH} ${pts} ${W - R},${T + topH}`} />
       {marks.map((mark) => (
-        <g key={mark.step} className="mark">
-          <line x1={x(mark.step)} x2={x(mark.step)} y1={T} y2={T + topH} />
-          <path d={`M${x(mark.step) - 4},${T} h8 l-4,6 z`} />
-          <title>{mark.said}</title>
-        </g>
+        <FlowMark key={mark.step} x={x(mark.step)} top={T} height={topH} said={mark.said} />
       ))}
       <polyline className="open-line" points={pts} />
       <circle className="tip" cx={x(last)} cy={y(opens[last] ?? 0)} r={3.5} />
@@ -255,34 +247,35 @@ export function Pace({
       </text>
 
       <line className="zero" x1={L} x2={W - R} y1={zero} y2={zero} />
-      {points.map((p, i) => {
-        const cx = x(i);
-        const up = (news[i] ?? 0) * scale;
-        const back = (backs[i] ?? 0) * scale;
-        const down = (dones[i] ?? 0) * scale;
-        return (
-          <g key={p.at ?? i}>
-            <rect className="bar-new" x={cx - bw / 2} y={zero - up} width={bw} height={up} rx={1}>
-              <title>{`${day(p.at)}: ${news[i]} ${words.fresh}`}</title>
-            </rect>
-            <rect
-              className="bar-ret"
-              x={cx - bw / 2}
-              y={zero - up - back}
-              width={bw}
-              height={back}
-              rx={1}
-            >
-              <title>{`${day(p.at)}: ${backs[i]} ${words.back}`}</title>
-            </rect>
-            <rect className="bar-res" x={cx - bw / 2} y={zero} width={bw} height={down} rx={1}>
-              <title>{`${day(p.at)}: ${dones[i]} ${words.done}`}</title>
-            </rect>
-          </g>
-        );
-      })}
+      {points.map((p, i) => (
+        <FlowBars
+          key={p.at ?? i}
+          cx={x(i)}
+          width={bw}
+          zero={zero}
+          up={[
+            {
+              className: "bar-new",
+              height: (news[i] ?? 0) * scale,
+              said: `${day(p.at)}: ${news[i]} ${words.fresh}`,
+            },
+            {
+              className: "bar-ret",
+              height: (backs[i] ?? 0) * scale,
+              said: `${day(p.at)}: ${backs[i]} ${words.back}`,
+            },
+          ]}
+          down={[
+            {
+              className: "bar-res",
+              height: (dones[i] ?? 0) * scale,
+              said: `${day(p.at)}: ${dones[i]} ${words.done}`,
+            },
+          ]}
+        />
+      ))}
       {points.map((p, i) =>
-        i % every === 0 || i === last ? (
+        labelled(i, last, every) ? (
           <text
             key={p.at ?? i}
             className="axis"
@@ -321,7 +314,6 @@ export function PaceLegend() {
   );
 }
 
-// A handful of round values inside a range, for the upper band's grid.
 // The labels of a fitted axis: brief where that tells them apart, whole numbers
 // where two brief labels would read the same, as 8,271 and 8,290 both read 8.3k.
 export function tickWords(ticks: number[]): string[] {
@@ -329,16 +321,6 @@ export function tickWords(ticks: number[]): string[] {
   return new Set(brieflySaid).size === brieflySaid.length
     ? brieflySaid
     : ticks.map((v) => v.toLocaleString());
-}
-
-function niceTicks(lo: number, hi: number, want: number): number[] {
-  const span = Math.max(1, hi - lo);
-  const raw = span / want;
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? mag * 10;
-  const out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) out.push(v);
-  return out;
 }
 
 // What the chart shows, for a screen reader: open from where scanning began,

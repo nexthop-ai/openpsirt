@@ -58,18 +58,6 @@
   accent-color: var(--accent);
   cursor: pointer;
 }
-.qcard .why {
-  background: var(--raised);
-  border-radius: var(--radius);
-  padding: 9px 11px;
-  font-size: var(--step--1);
-}
-.qcard .why p {
-  margin: 0 0 7px;
-}
-.qcard .why p:last-child {
-  margin: 0;
-}
 .qmeta {
   display: flex;
   gap: 14px;

@@ -234,26 +234,10 @@
 .dgrid .v.mono {
   font-family: var(--mono);
 }
-.standing .why,
-.decision .why {
-  background: var(--raised);
-  border-radius: var(--radius);
-  padding: 10px 12px;
-  font-size: var(--step--1);
-  max-width: 78ch;
-}
 /* The decision page reads its reasoning; the finding screen toggles the same
    block against an editor and reserves that height. */
 .decision .why {
   min-height: 0;
-}
-.standing .why p,
-.decision .why p {
-  margin: 0 0 8px;
-}
-.standing .why p:last-child,
-.decision .why p:last-child {
-  margin: 0;
 }
 .standing .why pre {
   background: var(--surface);
@@ -316,16 +300,6 @@
   align-items: center;
   gap: var(--gap-tight);
   font-size: var(--step--1);
-}
-.prior .why {
-  background: var(--raised);
-  border-radius: var(--radius);
-  padding: 8px 10px;
-  font-size: var(--step--1);
-  max-width: 78ch;
-}
-.prior .why p {
-  margin: 0;
 }
 .prior .actions {
   margin-top: 8px;
