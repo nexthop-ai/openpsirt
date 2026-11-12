@@ -96,19 +96,29 @@ func TellMentioned(ctx context.Context, in Deps, subject access.Subject,
 	return dropped
 }
 
-// decisionTarget is what a decision's rows are about: the first row's product
-// and visibility, every other distinct pair beside it, and the issue where
-// every row names the same one.
+// decisionTarget is what a decision's rows are about: its most withheld row's
+// product, visibility and occurrence, every other distinct product and
+// visibility beside it, and the issue where every row names the same one.
+//
+// The notification is stored against the most withheld row's product, which is
+// the one its reader is narrowed by: a bulk decision can span products, and a
+// notice withheld as undisclosed work is read only where its product's
+// undisclosed work is.
 func decisionTarget(rows []triage.DecisionOccurrence) MentionTarget {
-	first := rows[0]
-	target := MentionTarget{
-		ProductID:       first.ProductID,
-		VulnerabilityID: first.VulnerabilityID,
-		Visibility:      first.Visibility,
-		About:           first.OccurrenceIdentity[:min(8, len(first.OccurrenceIdentity))],
-	}
-	seen := map[Reach]bool{{ProductID: first.ProductID, Visibility: first.Visibility}: true}
+	primary := rows[0]
 	for _, row := range rows[1:] {
+		if withheld(row.Visibility) > withheld(primary.Visibility) {
+			primary = row
+		}
+	}
+	target := MentionTarget{
+		ProductID:       primary.ProductID,
+		VulnerabilityID: primary.VulnerabilityID,
+		Visibility:      primary.Visibility,
+		About:           primary.OccurrenceIdentity[:min(8, len(primary.OccurrenceIdentity))],
+	}
+	seen := map[Reach]bool{{ProductID: primary.ProductID, Visibility: primary.Visibility}: true}
+	for _, row := range rows {
 		if row.VulnerabilityID != target.VulnerabilityID {
 			target.VulnerabilityID = 0
 		}
@@ -119,6 +129,19 @@ func decisionTarget(rows []triage.DecisionOccurrence) MentionTarget {
 		}
 	}
 	return target
+}
+
+// withheld ranks a visibility by how much a notice about it withholds.
+func withheld(visibility access.Visibility) int {
+	private, securityTesting := notify.Withholding([]access.Visibility{visibility})
+	rank := 0
+	if private {
+		rank++
+	}
+	if securityTesting {
+		rank++
+	}
+	return rank
 }
 
 // Mentioned tells whoever a piece of text named that it named them.
@@ -184,11 +207,12 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 	for _, reader := range readers {
 		byName[strings.ToLower(reader.Identity)] = reader.ID
 	}
-	private := about.Visibility != access.Public
-	securityTesting := about.Visibility == access.SecurityTesting
+	held := []access.Visibility{about.Visibility}
 	for _, reach := range about.Also {
-		private = private || reach.Visibility != access.Public
-		securityTesting = securityTesting || reach.Visibility == access.SecurityTesting
+		held = append(held, reach.Visibility)
+	}
+	private, securityTesting := notify.Withholding(held)
+	for _, reach := range about.Also {
 		also, err := access.NewStore(in.DB.DB).ReadersNamed(ctx, subject,
 			reach.ProductID, reach.Visibility, names)
 		if err != nil {

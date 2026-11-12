@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -137,11 +138,12 @@ func TestAMentionOnUndisclosedWorkReachesNobodyWhoMayNotSeeIt(t *testing.T) {
 	})
 }
 
-func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsStrictest(t *testing.T) {
-	// A bulk decision can cover a disclosed issue and an undisclosed one. A
-	// name in its text reaches only somebody who reads every row, and the
-	// notification is withheld as undisclosed work, whichever row was written
-	// first.
+func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsMostWithheld(t *testing.T) {
+	// A bulk decision can cover a disclosed issue in one product and an
+	// undisclosed one in another. A name in its text reaches only somebody who
+	// reads every row, the notification is withheld as undisclosed work
+	// whichever row was written first, and it is stored against the product
+	// whose undisclosed work it is, so the person told reads it.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		r.ScannedWithEvidence(t)
@@ -171,11 +173,32 @@ func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsStrictest(t *testing.
 		undisclosed.LiveKey = nil
 		undisclosed.VulnerabilityID = issue
 		undisclosed.Visibility = access.Private
+		// In the other product: a bulk decision reads across products.
+		theirs, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		undisclosed.ProductID = theirs.ID
 		undisclosed.OccurrenceIdentity = strings.Repeat("0", len(first.OccurrenceIdentity))
 		if _, err := r.DB.DB.NewInsert().Model(&undisclosed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
+		// The reader reads disclosed work in the first product and undisclosed
+		// work in the second, so they read both rows; the author reads both
+		// as well. The person reading undisclosed work in the first product
+		// alone reads only one row.
+		for _, who := range []string{"reader", "private-triage"} {
+			person, err := r.Rights.ByIdentity(ctx, who)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, role := range []access.Role{access.PublicRead, access.PrivateRead, access.PrivateTriage} {
+				if err := r.Rights.GrantRole(ctx, person.ID, theirs.ID, role); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
 		said := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/decisions/"+httpapitest.Itoa(decision)+"/comments",
 			`{"body":"@reader and @private, could you look at both?"}`)
@@ -196,7 +219,7 @@ func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsStrictest(t *testing.
 			Where(`"n"."kind" = ?`, "mentioned").Scan(ctx, &told); err != nil {
 			t.Fatal(err)
 		}
-		if len(told) != 1 || told[0].Identity != "private" {
+		if len(told) != 1 || told[0].Identity != "reader" {
 			t.Fatalf("the mention was written for %+v, want only the person reading both rows", told)
 		}
 		if !told[0].Private || told[0].SecurityTesting {
@@ -205,6 +228,23 @@ func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsStrictest(t *testing.
 		}
 		if told[0].VulnerabilityID != nil {
 			t.Errorf("a decision over two issues was told as about issue %d", *told[0].VulnerabilityID)
+		}
+		// Written is not read: the notice is stored against the product whose
+		// undisclosed work its reader reads, so it reaches them.
+		var theirsRead struct {
+			Items []struct {
+				Kind string `json:"kind"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "reader", "/v1/notifications", &theirsRead)
+		read := 0
+		for _, item := range theirsRead.Items {
+			if item.Kind == "mentioned" {
+				read++
+			}
+		}
+		if read != 1 {
+			t.Errorf("the person named reads the mention %d times, want once", read)
 		}
 	})
 }
