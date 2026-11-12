@@ -201,8 +201,11 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	// A start a stop signal ended is a clean stop, wherever it was. What the
 	// step it ended said about being stopped is logged rather than returned,
 	// so a supervisor stopping a starting process does not read a failure.
+	// Serving is past the start: a drain that overruns its grace after the
+	// signal is returned, so the exit code says so.
+	serving := false
 	defer func() {
-		if err != nil && stopping.Err() != nil {
+		if err != nil && !serving && stopping.Err() != nil {
 			logger.Info("stopped before the start completed", "interrupted", err)
 			err = nil
 		}
@@ -235,6 +238,7 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 		if err != nil {
 			return err
 		}
+		serving = true
 		return serveBeside(stopping, cfg, logger, server, beside.background)
 	}
 
@@ -277,6 +281,7 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	}
 	server.answer(handler)
 	logger.Info("serving")
+	serving = true
 	return serveBeside(stopping, cfg, logger, server, beside.background)
 }
 
