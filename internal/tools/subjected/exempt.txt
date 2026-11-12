@@ -1,6 +1,6 @@
 # Store methods and functions that query with no subject, each with the reason it
 # takes none. One per line: package.Type.Method or package.Function, the package
-# named by its directory under internal/, a space, and the reason.
+# named by its directory under internal/, spaces or tabs, and the reason.
 # design-docs/access-enforcement.md § Store methods with no subject holds the
 # kinds of reason there are.
 
