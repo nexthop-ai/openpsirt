@@ -555,10 +555,15 @@ func holdingOn(personColumn, product string, productArgs []any, enough []Role) (
 // same rule every query uses rather than spelled again — so "may read" cannot
 // come to mean two things.
 func rolesReading(productID int64, visibility Visibility) []Role {
+	return rolesWhere(productID, func(s Subject) bool { return s.Reads(visibility, productID) })
+}
+
+// rolesWhere is which roles, each held alone on the product, the rule answers
+// yes for.
+func rolesWhere(productID int64, rule func(Subject) bool) []Role {
 	var enough []Role
 	for _, role := range Roles() {
-		if NewPerson(0, "", false, map[int64][]Role{productID: {role}}, 0).
-			Reads(visibility, productID) {
+		if rule(NewPerson(0, "", false, map[int64][]Role{productID: {role}}, 0)) {
 			enough = append(enough, role)
 		}
 	}

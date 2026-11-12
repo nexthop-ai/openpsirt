@@ -51,11 +51,5 @@ func MayApproveWhere(personColumn, productColumn, visibilityColumn string) (stri
 // rolesTriaging is which roles are enough to triage at a visibility, asked of
 // the rule a signed-in subject is asked by.
 func rolesTriaging(visibility Visibility) []Role {
-	var enough []Role
-	for _, role := range Roles() {
-		if NewPerson(0, "", false, map[int64][]Role{0: {role}}, 0).Triages(visibility, 0) {
-			enough = append(enough, role)
-		}
-	}
-	return enough
+	return rolesWhere(0, func(s Subject) bool { return s.Triages(visibility, 0) })
 }

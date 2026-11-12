@@ -133,8 +133,9 @@ const measuredAtMost = 5000
 type Measuring struct {
 	// Products keeps decisions made in these products.
 	Products []int64
-	// People keeps decisions these people proposed — a team, resolved to
-	// its members by whoever asked.
+	// People keeps the work these people did — a team, resolved to its
+	// members by whoever asked: decisions they proposed, agreements they
+	// gave, and withdrawals they made, of anybody's decision.
 	//
 	// By the proposer for both waits, including the wait for a second person:
 	// a decision belongs to whoever argued it, which is the rule the record of
