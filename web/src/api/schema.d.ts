@@ -13788,7 +13788,10 @@ export interface components {
              * @description The decision that argued for it, where one did: its reasoning, its approval and its comments
              */
             decision_id?: number;
-            /** @description The moment the commitment was made, which is what this release has been waiting since */
+            /**
+             * Format: date-time
+             * @description The moment the commitment was made, which is what this release has been waiting since
+             */
             declared_at: string;
             /** @description The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;

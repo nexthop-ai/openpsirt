@@ -10539,6 +10539,7 @@ components:
           type: integer
         declared_at:
           description: The moment the commitment was made, which is what this release has been waiting since
+          format: date-time
           type: string
         fold:
           description: "The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"

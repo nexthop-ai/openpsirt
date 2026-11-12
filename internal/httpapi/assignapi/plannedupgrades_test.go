@@ -177,6 +177,11 @@ func TestThePlannedUpgradesReadTwoPackagesOfOneSource(t *testing.T) {
 			// a number as digits, a list joined by spaces, an absent field empty.
 			field := map[string]string{"decision": "decision_id"}
 			item := list.Items[0]
+			// A moment, as every other moment is written: two commitments made
+			// on one day are told apart by it.
+			if declared, _ := item["declared_at"].(string); !moment(declared) {
+				t.Errorf("declared_at reads %q, want a moment in RFC 3339", declared)
+			}
 			for at, column := range want {
 				key := column
 				if named, ok := field[column]; ok {
@@ -964,4 +969,10 @@ func TestANarrowedDecisionRecordsWhatThatNarrowingReaches(t *testing.T) {
 				"text holds it", got)
 		}
 	})
+}
+
+// moment is whether s is a moment written in RFC 3339.
+func moment(s string) bool {
+	_, err := time.Parse(time.RFC3339, s)
+	return err == nil
 }

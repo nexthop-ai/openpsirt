@@ -256,7 +256,7 @@ type PlannedBody struct {
 	Components  []string `json:"components"`
 	Issues      int      `json:"issues" doc:"Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"`
 	Occurrences int      `json:"occurrences" doc:"The number of findings those issues sit at"`
-	DeclaredAt  string   `json:"declared_at" doc:"The moment the commitment was made, which is what this release has been waiting since"`
+	DeclaredAt  string   `json:"declared_at" format:"date-time" doc:"The moment the commitment was made, which is what this release has been waiting since"`
 	// By, HeldBy and State are the promise, who is carrying it, and where
 	// it stands. The state is derived on every read from the scans and the
 	// date, and set by nobody.
@@ -392,7 +392,7 @@ func plannedBodies(planned []finding.Planned) []PlannedBody {
 			Fold: one.Fold, Upstream: one.Upstream, From: one.From, To: one.To,
 			Components: one.Components,
 			Issues:     one.Issues, Occurrences: one.Occurrences,
-			DeclaredAt: one.DeclaredAt.UTC().Format(time.DateOnly),
+			DeclaredAt: core.Stamp(one.DeclaredAt),
 			HeldBy:     one.HeldBy, HeldByName: core.LabelBeside(one.HeldByName, one.HeldBy),
 			State:      core.UpgradeState(one.State),
 			DecisionID: one.DecisionID,
