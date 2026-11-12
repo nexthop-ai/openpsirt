@@ -131,7 +131,7 @@ due commit, most urgent first.
 |---|---|
 | Every due commit looked up | Reached and ended, and the copy's size |
 | The repository could not be fetched or read | What stopped it in git's words; retried a day after the visit began |
-| The process was killed part way | That the visit did not finish, which a visit records as it begins; retried a day after it began, and no mark against the host. The report reads it as under way while a replica holds the lease |
+| The process was killed part way | That the visit did not finish, which a visit records as it begins; retried a day after it began, and no mark against the host. The report reads it as under way while a replica holds the lease, until the pass next chooses and ends it, which no visit is under way beside |
 | The lease was lost, or shutdown | Nothing; the repository is left as before the visit |
 | This deployment failed (database or lease) | Nothing, and logged. A dropped connection is not the repository's fault |
 
