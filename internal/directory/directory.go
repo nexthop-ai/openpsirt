@@ -156,8 +156,8 @@ type Written struct {
 	Documents int
 	Held      int
 	// Skipped is how many advisories were left out because their newest
-	// issued document could not be read back, each logged as the pass met
-	// it. No older revision is carried in its place, since revisions share a
+	// issued document that may travel could not be read back, each logged as
+	// the pass met it. No older revision is carried in its place, since revisions share a
 	// path.
 	Skipped int
 	// Unchanged says the pass found the directory already holding what it
@@ -218,8 +218,9 @@ func (w *Writer) report(ctx context.Context, written Written, err error) {
 // yet is a reader who has not heard of it, and the next line fixes it.
 func (w *Writer) Write(ctx context.Context) (Written, error) {
 	// Held across the whole pass, read and writes alike: taken for two cycles
-	// as the pass starts and asked for again before every file, so a pass
-	// longer than its lease stops rather than writes beside another replica.
+	// as the pass starts and asked for again before every document and before
+	// the listings, so a pass longer than its lease stops rather than writes
+	// beside another replica.
 	if mine, err := w.keep(ctx); err != nil || !mine {
 		return Written{Elsewhere: err == nil}, err
 	}
@@ -237,8 +238,8 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	// the pass. Issued bytes are kept for ever, and one that no longer reads
 	// would otherwise keep every advisory issued after it out of the
 	// directory for good. Failed only where nothing at all could be read:
-	// counted in advisories, since an unreadable newest revision leaves out
-	// its advisory and every revision before it.
+	// counted in advisories, since an unreadable newest revision that may
+	// travel leaves out its advisory and every revision before it.
 	published, held, unread := publishable(sent)
 	if len(unread) > 0 && len(published) == 0 && held == 0 {
 		return Written{}, fmt.Errorf("no published document could be read back: %w",
