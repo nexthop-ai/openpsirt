@@ -92,6 +92,9 @@ committed. The interface uses no private endpoint.
 | A table of words over a server word is keyed on the generated union | A word the server adds is a compile error until it has words |
 | A lint refuses a literal table in the screens keyed on any string, whole or partial; a table typed by an index signature is not caught. A table over an open set (a package kind, a keyboard key, this interface's own names) says why beside it | |
 | A read is declared once and asked through its hook | Two declarations miss each other's invalidations |
+| What an act moves is one named list of keys per subject (a decision, a report, an advisory, an incident, a change of holder), applied by one helper; an act moving two subjects applies both lists | A list restated at each act loses a key at one of them |
+| A change of holder moves the holdings and the held-work lists, whatever is handed: a finding, a code finding, a decision's work | Assignments is served from cache otherwise |
+| Withdrawing trust in an upstream moves the statements a component screen draws from it | They stop standing |
 | The catalog's products, branches and variants, one release's variants, where an issue sits, a decision's approvals and revisions, what sits around a component, and the outbound destinations each have one definition, keyed so a change reaches every screen showing them | |
 | A download or document link is built by one link builder over the generated paths: the path is a key of the document, each placeholder required, named as the path names it and escaped as a segment; a placeholder with no value is refused | The browser fetches these, not the client |
 

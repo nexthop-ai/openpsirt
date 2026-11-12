@@ -9,7 +9,12 @@
 // question, which is why they are one file: what does the record say, and how
 // did it come to say that.
 
-import { useAfterDecision, useDecisionApprovals, useDecisionRevisions } from "../api/decisions";
+import {
+  useAfterDecision,
+  useDecisionApprovals,
+  useDecisionComments,
+  useDecisionRevisions,
+} from "../api/decisions";
 import { happenedOf, stripeOf } from "../ui/stripe";
 import { FLOORS } from "../ui/severities";
 import { useState, type ReactNode } from "react";
@@ -322,13 +327,7 @@ export function Activity({
 }) {
   const approvals = useDecisionApprovals(decisionId);
   const revisions = useDecisionRevisions(decisionId);
-  const comments = useQuery({
-    queryKey: ["comments", decisionId],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: decisionId } } }),
-      ),
-  });
+  const comments = useDecisionComments(decisionId);
 
   const now: Event[] = [];
   now.push({
@@ -521,13 +520,7 @@ export function Comments({
   writes?: boolean;
 }) {
   const comment = useComment();
-  const comments = useQuery({
-    queryKey: ["comments", decisionId],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: decisionId } } }),
-      ),
-  });
+  const comments = useDecisionComments(decisionId);
 
   return (
     <div className={within ? "within" : "card"}>
