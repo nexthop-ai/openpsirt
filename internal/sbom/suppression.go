@@ -5,6 +5,7 @@ package sbom
 
 import (
 	"strings"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -81,6 +82,22 @@ type Suppression struct {
 	// nothing, which is worth seeing rather than silently discarding.
 	Targets []Target
 	Origin  Origin
+	// SaidAt is when the claim says it was made, where it says: an OpenVEX
+	// statement's timestamp. Nil where it states none.
+	SaidAt *time.Time
+}
+
+// stampOf reads a timestamp a document states, nil where it is empty or does
+// not parse. Read leniently, because a statement's time only orders it
+// against the publisher's other statements, and without one the upload order
+// does.
+func stampOf(value string) *time.Time {
+	at, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(value))
+	if err != nil {
+		return nil
+	}
+	at = at.UTC().Truncate(time.Microsecond)
+	return &at
 }
 
 // Target is what a claim points at, as a package identifier.

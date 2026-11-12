@@ -232,8 +232,9 @@ func StatementsV0120(engine database.Engine) map[string][]string {
 func StatementsV0130(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
-		"advisory_issue": advisoryIssueV0130(t),
-		"graph_node":     graphNodeV0130(t),
+		"advisory_issue":         advisoryIssueV0130(t),
+		"graph_node":             graphNodeV0130(t),
+		"received_vex_statement": receivedStatementV0130(t),
 	}
 }
 

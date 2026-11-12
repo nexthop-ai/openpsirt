@@ -91,6 +91,13 @@ type Statement struct {
 	UploadedBy int64      `bun:"uploaded_by,notnull"`
 	UploadedAt time.Time  `bun:"uploaded_at,notnull"`
 	Superseded *time.Time `bun:"superseded_at"`
+	// SaidAt is when the publisher made the statement: its own timestamp,
+	// else its document's, nil where neither states one. OvertakenBy is the
+	// newer statement of theirs about the same product and issue that set
+	// this one aside (REQ-31), nil for one in force or set aside by a
+	// revision of its own document.
+	SaidAt      *time.Time `bun:"said_at"`
+	OvertakenBy *int64     `bun:"overtaken_by"`
 	// DeclinedAt and DeclinedBy are when somebody here declined the
 	// statement, and who. A declined statement closes nothing and is offered
 	// to nobody, and stays readable.
@@ -118,6 +125,7 @@ func StatementOf(claim sbom.Suppression, at sbom.Target) Statement {
 		Status:        string(claim.Status),
 		Justification: claim.Justification,
 		Statement:     claim.Statement,
+		SaidAt:        claim.SaidAt,
 	}
 	switch {
 	case at.Within != nil:
@@ -189,6 +197,9 @@ type Supplied struct {
 	Publisher string
 	Document  string
 	Digest    string
+	// SaidAt is when the document says it was issued, which a statement
+	// stating no time of its own takes. Nil where it states none.
+	SaidAt *time.Time
 	// Arrived is how the document came to be recorded, which the record of
 	// uploads keeps beside the statements. Nil records the statements alone,
 	// which is how an upstream's documents are recorded.
@@ -340,6 +351,10 @@ func (from Supplied) valid() error {
 //
 // A claim the document repeats word for word keeps its row and stands in the
 // new document. Only a claim it no longer makes is set aside.
+//
+// Across documents, the publisher's newest statement about a product and an
+// issue is the one in force, and their older ones about it are set aside as
+// overtaken (newestStands).
 func (s *Store) RecordStatements(ctx context.Context, by access.Subject, productID int64,
 	from Supplied, said []Statement) (recorded, superseded int, err error) {
 
@@ -351,6 +366,15 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	replace := func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0
 		now := s.now().UTC().Truncate(time.Microsecond)
+
+		// Taken first, before anything is read: two documents from one
+		// publisher recorded at once would each read the other's statements
+		// as absent, and both newest statements would stand. An ordinary row
+		// update, so every engine takes the lock and the second waits.
+		if _, err := tx.NewUpdate().Table("product").Set(`"id" = "id"`).
+			Where(`"id" = ?`, productID).Exec(ctx); err != nil {
+			return fmt.Errorf("take the product: %w", err)
+		}
 
 		// A copy of its own on every attempt. The closure is re-run whole
 		// when a transaction is retried, and an attempt that folded, paired
@@ -369,6 +393,9 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			claims[i].WithinAbout = bound.HeadRunes(claims[i].WithinAbout, database.NameWidth)
 			claims[i].Justification = bound.HeadRunes(claims[i].Justification, database.NameWidth)
 			claims[i].Statement = WordsOf(claims[i].Statement)
+			if claims[i].SaidAt == nil {
+				claims[i].SaidAt = from.SaidAt
+			}
 		}
 
 		// The same bytes read the same way change nothing, so nothing is
@@ -385,7 +412,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Where(`"source" = ?`, from.Source).
 			Where(`"document_id" = ?`, identifier).
 			Where(`"digest" = ?`, from.Digest).
-			Where(`"superseded_at" IS NULL`).
+			Where(heldByItsDocument).
 			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("ask what is already held: %w", err)
@@ -410,21 +437,24 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var held []Statement
 		heldBy := tx.NewSelect().Model(&held).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification").
+				"within_about", "placement", "status", "justification", "said_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
 			Where(`"document_id" = ?`, identifier).
-			Where(`"superseded_at" IS NULL`)
+			Where(heldByItsDocument)
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
 		}
 		repeated, gone, fresh := pairRepeated(held, claims)
 
+		// A claim the document no longer makes is set aside by its revision,
+		// overtaken or not, and nothing brings it back.
 		err = database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Statement)(nil)).
-				Set(`"superseded_at" = ?`, now).
+				Set(`"superseded_at" = COALESCE("superseded_at", ?)`, now).
+				Set(`"overtaken_by" = NULL`).
 				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
@@ -440,6 +470,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 					Set(`"within" = ?`, nullable(placed.Within)).
 					Set(`"within_about" = ?`, nullable(placed.WithinAbout)).
 					Set(`"placement" = ?`, nullable(placed.Placement)).
+					Set(`"said_at" = ?`, placed.SaidAt()).
 					Set(`"document" = ?`, from.Document).
 					Set(`"digest" = ?`, from.Digest).
 					Set(`"restated_at" = ?`, now).
@@ -494,6 +525,19 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			}
 			recorded += len(batch)
 		}
+
+		touched := make([]Statement, 0, len(claims)+len(gone))
+		touched = append(touched, claims...)
+		for _, row := range held {
+			if _, set := slices.BinarySearch(gone, row.ID); set {
+				touched = append(touched, row)
+			}
+		}
+		overtaken, err := newestStands(ctx, tx, productID, publisher, from.Source, touched, now)
+		if err != nil {
+			return err
+		}
+		superseded += overtaken
 		return nil
 	}
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
@@ -729,6 +773,20 @@ func placementOf(one Statement) string {
 // repeated claim takes from the document repeating it.
 type placed struct {
 	WithinPurl, Within, WithinAbout, Placement string
+	// saidAt is when the document says the claim was made, in microseconds
+	// since the epoch, nought where it says nothing: a value, so the claims
+	// of one moment share one write.
+	saidAt int64
+}
+
+// SaidAt is when the document says the claim was made, nil where it says
+// nothing.
+func (p placed) SaidAt() *time.Time {
+	if p.saidAt == 0 {
+		return nil
+	}
+	at := time.UnixMicro(p.saidAt).UTC()
+	return &at
 }
 
 // pairRepeated pairs each claim a document makes with a standing row making
@@ -762,7 +820,10 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 
 	repeated := map[placed][]int64{}
 	keep := func(one Statement, row Statement) {
-		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}
+		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement, 0}
+		if one.SaidAt != nil {
+			at.saidAt = one.SaidAt.UnixMicro()
+		}
 		repeated[at] = append(repeated[at], row.ID)
 	}
 	// Exact repeats first, so a row recorded before its product was read

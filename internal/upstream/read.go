@@ -524,14 +524,14 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 	}
 	// A security advisory is listed beside the VEX documents and says
 	// nothing this reads, so it is recorded as read with nothing kept.
-	said, err := sbom.ReadSuppressions(bytes.NewReader(body), r.limits)
+	read, err := sbom.ReadStatements(bytes.NewReader(body), r.limits)
 	switch {
 	case errors.Is(err, sbom.ErrWrongProfile):
-		said = nil
+		read = sbom.Statements{}
 	case err != nil:
 		return false, unreadable{err: err}
 	}
-	statements := statementsOf(said, ours)
+	statements := statementsOf(read.Claims, ours)
 	sum := sha256.Sum256(body)
 	digest := hex.EncodeToString(sum[:])
 	moved := false
@@ -556,8 +556,10 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 				return err
 			}
 		}
+		from := supplied(up, tracking, one.address, digest)
+		from.SaidAt = read.SaidAt
 		if _, _, err := finding.NewStore(tx).RecordStatements(ctx, recordedAs(up), up.ProductID,
-			supplied(up, tracking, one.address, digest), statements); err != nil {
+			from, statements); err != nil {
 			return err
 		}
 		now := r.now().Truncate(time.Microsecond)

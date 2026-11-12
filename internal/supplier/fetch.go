@@ -759,6 +759,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one 
 				Source:     finding.FromAdvisory,
 				Identifier: advisory.Identifier,
 				Publisher:  advisory.Publisher,
+				SaidAt:     advisory.SaidAt,
 				// The address it was fetched from, where an upload records the
 				// name a client gave the file. Both answer "which document was
 				// this", and for a fetched one the address is the answer that

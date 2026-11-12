@@ -37,7 +37,7 @@ type statementParts struct {
 type StatementsTakenBody struct {
 	Publisher  string `json:"publisher" doc:"The publisher the statements were recorded under: the one the request names, else the one the document names"`
 	Recorded   int    `json:"recorded" doc:"Statements taken from it"`
-	Superseded int    `json:"superseded" doc:"Statements the earlier revision of this document made and this one does not, set aside rather than deleted"`
+	Superseded int    `json:"superseded" doc:"Statements set aside rather than deleted: those the earlier revision of this document made and this one does not, and the publisher's older statements about a product and issue this document states newer"`
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
@@ -185,6 +185,9 @@ func registerVexImport(api huma.API, in core.Deps) {
 			publisher = strings.TrimSpace(attach.Visible(said.Publisher))
 		}
 		from.Publisher = publisher
+		// What a statement stating no time of its own was made at, which
+		// orders it against the publisher's other documents.
+		from.SaidAt = said.SaidAt
 		// What a later upload replaces is a revision of the same document:
 		// the publisher and the document's own identifier. Held without
 		// characters that reorder or hide text, as the publisher is, and then

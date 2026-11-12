@@ -250,11 +250,13 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, productID 
 // forget removes an upstream and what has been read of it, and sets aside
 // every statement it made.
 func (s *Store) forget(ctx context.Context, tx bun.IDB, held *Upstream, now time.Time) error {
+	// Overtaken ones included, so nothing restores them.
 	if _, err := tx.NewUpdate().Model((*finding.Statement)(nil)).
-		Set(`"superseded_at" = ?`, now).
+		Set(`"superseded_at" = COALESCE("superseded_at", ?)`, now).
+		Set(`"overtaken_by" = NULL`).
 		Where(`"product_id" = ?`, held.ProductID).
 		Where(`"source" = ?`, finding.FromUpstream).
-		Where(`"superseded_at" IS NULL`).
+		Where(`("superseded_at" IS NULL OR "overtaken_by" IS NOT NULL)`).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("set aside what an upstream said: %w", err)
 	}

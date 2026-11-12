@@ -6,6 +6,7 @@ package sbom
 import (
 	"io"
 	"strings"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -47,7 +48,11 @@ type Statements struct {
 	// keep: an OpenVEX document's @id, a CSAF document's tracking id. Empty
 	// where it states none.
 	Identifier string
-	Claims     []Suppression
+	// SaidAt is when the document says it was issued: an OpenVEX document's
+	// timestamp, a CSAF document's current release date. Nil where it states
+	// none or one that does not parse.
+	SaidAt *time.Time
+	Claims []Suppression
 }
 
 // ReadStatements reads a VEX document as ReadSuppressions does, and keeps
@@ -76,13 +81,13 @@ func ReadStatements(r io.Reader, lim Limits) (Statements, error) {
 			return Statements{}, refusal.Errorf("reading suppressions: %w", err)
 		}
 		return Statements{Publisher: strings.TrimSpace(v.csaf.publisher),
-			Identifier: strings.TrimSpace(v.csaf.identifier), Claims: claims}, nil
+			Identifier: strings.TrimSpace(v.csaf.identifier), SaidAt: v.csaf.released, Claims: claims}, nil
 	}
 	if !strings.Contains(v.namespace, suppressionNamespace) {
 		return Statements{}, refusal.Errorf("suppressions are not in a format this reads: they say %q", trim(v.namespace))
 	}
 	return Statements{Publisher: strings.TrimSpace(v.author),
-		Identifier: strings.TrimSpace(v.identifier), Claims: v.claims}, nil
+		Identifier: strings.TrimSpace(v.identifier), SaidAt: v.issued, Claims: v.claims}, nil
 }
 
 type suppressions struct {
@@ -92,7 +97,9 @@ type suppressions struct {
 	// author is who the document says issued it, and identifier its @id.
 	author     string
 	identifier string
-	claims     []Suppression
+	// issued is the document's timestamp.
+	issued *time.Time
+	claims []Suppression
 	// named counts every identifier this document makes the reader hold: a
 	// product a claim points at, and an identifier an issue also goes by.
 	// Charged as each is read.
@@ -139,6 +146,11 @@ func (v *suppressions) read() error {
 			// since a build's own claims do not depend on it.
 			value, err := v.b.StringOrSkip()
 			v.author = value
+			return err
+		case "timestamp":
+			// Read leniently, as the author is.
+			value, err := v.b.StringOrSkip()
+			v.issued = stampOf(value)
 			return err
 		case "statements":
 			return v.b.Array(func() error {
@@ -201,6 +213,11 @@ func (v *suppressions) statement() (Suppression, error) {
 			return err
 		case "products":
 			return v.products(&claim)
+		case "timestamp":
+			// Read leniently, as the document's own is.
+			value, err := v.b.StringOrSkip()
+			claim.SaidAt = stampOf(value)
+			return err
 		default:
 			return v.b.Skip()
 		}

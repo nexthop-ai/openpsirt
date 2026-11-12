@@ -635,3 +635,76 @@ func TestAVexDocumentIsSupersededByItsRevisionAndNeverByItsFileName(t *testing.T
 		}
 	})
 }
+
+// A publisher's newest statement about a product and an issue is the one in
+// force, whichever of their documents carried it: a June "affected" in one
+// document overtakes a March "not affected" in another. Newer is the
+// statement's own time, else its document's, else the upload order, and a
+// revision withdrawing the newest restores the one it overtook.
+func TestThePublishersNewestStatementStandsAcrossDocuments(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		document := func(id, issued, status, statementAt string) string {
+			statements := `[]`
+			if status != "" {
+				at := ""
+				if statementAt != "" {
+					at = `"timestamp":"` + statementAt + `",`
+				}
+				statements = `[{` + at + `"vulnerability":{"name":"CVE-2026-9999"},"status":"` + status + `",
+				  "justification":"vulnerable_code_not_present",
+				  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0"}]}]`
+			}
+			return `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/` + id + `",
+				"author":"Example Distribution","timestamp":"` + issued + `","version":1,
+				"statements":` + statements + `}`
+		}
+		upload := func(name, body string) advisoryapi.StatementsTakenBody {
+			t.Helper()
+			got := r.VexedAs(t, "admin", "", name+".json", body)
+			if got.Code != http.StatusCreated {
+				t.Fatalf("uploading %s answered %d: %s", name, got.Code, got.Body.String())
+			}
+			var taken advisoryapi.StatementsTakenBody
+			if err := json.Unmarshal(got.Body.Bytes(), &taken); err != nil {
+				t.Fatal(err)
+			}
+			return taken
+		}
+		standing := func(after, want string) {
+			t.Helper()
+			said := r.WhatPublishersSay(t).Said
+			if len(said) != 1 || said[0].Status != want {
+				t.Errorf("after %s the publisher's statements in force are %+v, want %s alone", after, said, want)
+			}
+		}
+
+		upload("march", document("march", "2026-03-01T00:00:00Z", "not_affected", ""))
+		standing("the March document", "not_affected")
+		if june := upload("june", document("june", "2026-06-01T00:00:00Z", "affected", "")); june.Superseded != 1 {
+			t.Errorf("the June document set aside %d statements, want the March one", june.Superseded)
+		}
+		standing("the June document", "affected")
+
+		upload("june", document("june", "2026-06-02T00:00:00Z", "", ""))
+		standing("a revision of the June document withdrawing it", "not_affected")
+
+		upload("january", document("january", "2026-01-01T00:00:00Z", "affected", ""))
+		standing("an older document uploaded later", "not_affected")
+
+		upload("stamped", document("stamped", "2026-12-01T00:00:00Z", "affected", "2026-02-01T00:00:00Z"))
+		standing("a later document whose statement is dated before March", "not_affected")
+
+		// An overtaken statement its document repeats keeps its one row.
+		upload("january", document("january", "2026-01-01T00:00:00Z", "affected", ""))
+		var rows int
+		if err := r.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`COUNT(*)`).
+			Where(`"document_id" = ?`, "https://example.test/vex/january").Scan(t.Context(), &rows); err != nil {
+			t.Fatal(err)
+		}
+		if rows != 1 {
+			t.Errorf("the January document uploaded again holds %d rows, want its one", rows)
+		}
+		standing("the January document uploaded again", "not_affected")
+	})
+}
