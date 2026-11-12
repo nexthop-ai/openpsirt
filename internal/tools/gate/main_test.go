@@ -100,11 +100,37 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 			[]tier{api},
 		},
 		{
-			// A route file that also joins strings is both: the API document
+			// A route file that also holds a query is both: the API document
 			// is generated from it, and the query pattern matches it.
-			"go in the API package that also reads as a query",
-			write("internal/httpapi/both.go", "package httpapi\n\nfunc f() { strings.Join(nil, \"\") }\n"),
+			"go in the API package that also holds a query",
+			write("internal/httpapi/both.go", "package httpapi\n\nconst q = `SELECT 1 FROM t JOIN u`\n"),
 			[]tier{engines, api},
+		},
+		{
+			"go whose select statement and joined strings are no SQL",
+			write("lower.go", "package p\n\n// update the count\nfunc f() { select {}; _ = strings.Join(nil, \"\") }\n"),
+			[]tier{code},
+		},
+		{
+			// A predicate the builder takes holds no keyword.
+			"go building a predicate with the query builder",
+			write("predicate.go", "package p\n\nimport \"github.com/uptrace/bun\"\n\n"+
+				"func f(q *bun.SelectQuery) { q.Where(`\"kind\" IN (?)`, bun.List(k)) }\n"),
+			[]tier{engines},
+		},
+		{
+			"go querying through the standard database interface in lower case",
+			write("raw_sql.go", "package p\n\nimport \"database/sql\"\n\n"+
+				"func f(db *sql.DB) { db.Query(\"select 1\") }\n"),
+			[]tier{engines},
+		},
+		{
+			// A test of a query held in another file carries no SQL of its
+			// own; the harness running it on every engine is what says so.
+			"a test run through the shared harness",
+			write("delta_test.go", "package p\n\nimport fixtures \"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture\"\n\n"+
+				"func TestX(t *testing.T) { fixtures.Each(t) }\n"),
+			[]tier{engines},
 		},
 		{
 			"plain go",
@@ -371,4 +397,16 @@ func unchosenBy(prerequisites []string, tiers map[tier][]string) []string {
 		}
 	}
 	return out
+}
+
+func TestTheChangedPathsIncludeBothSidesOfARename(t *testing.T) {
+	out := []byte("R  new.go\x00old.go\x00?? added.md\x00 M x.go\x00ab\x00 M x.go\x00")
+	got := parseStatus(out)
+	want := []string{"added.md", "new.go", "old.go", "x.go"}
+	if !slices.Equal(got, want) {
+		t.Errorf("parsed %q, want %q: both sides of the rename, each path once, the short record skipped", got, want)
+	}
+	if got := parseStatus(nil); len(got) != 0 {
+		t.Errorf("nothing changed parsed as %q", got)
+	}
 }
