@@ -5,11 +5,121 @@ package analysis
 
 import (
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
+
+// figuresIn is every exported function in these Go sources that asks whether
+// a subject may count code findings: single is each one calling MayCount or a
+// scope's mayCount, across each one calling a scope's mayCount, which is the
+// form a scope across products is checked through.
+func figuresIn(sources map[string][]byte) (single, across []string, err error) {
+	fset := token.NewFileSet()
+	for name, source := range sources {
+		file, err := parser.ParseFile(fset, name, source, 0)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil || fn.Body == nil || !fn.Name.IsExported() {
+				continue
+			}
+			direct, scoped := false, false
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				switch callee := call.Fun.(type) {
+				case *ast.Ident:
+					direct = direct || callee.Name == "MayCount"
+				case *ast.SelectorExpr:
+					scoped = scoped || callee.Sel.Name == "mayCount"
+				}
+				return true
+			})
+			if direct || scoped {
+				single = append(single, fn.Name.Name)
+			}
+			if scoped {
+				across = append(across, fn.Name.Name)
+			}
+		}
+	}
+	slices.Sort(single)
+	slices.Sort(across)
+	return single, across, nil
+}
+
+// figures is every figure this package's source asks MayCount of.
+func figures(t *testing.T) (single, across []string) {
+	t.Helper()
+	names, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources := map[string][]byte{}
+	for _, name := range names {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		source, err := os.ReadFile(name) //nolint:gosec // this package's own source
+		if err != nil {
+			t.Fatal(err)
+		}
+		sources[name] = source
+	}
+	single, across, err = figuresIn(sources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(single) == 0 || len(across) == 0 {
+		t.Fatal("no figure asks whether it may count, so this checked nothing")
+	}
+	return single, across
+}
+
+// checkedAre fails for every figure the source holds and the test does not
+// ask, and every one the test asks that the source no longer holds.
+func checkedAre(t *testing.T, what string, found []string, asked map[string]func() error) {
+	t.Helper()
+	for _, name := range found {
+		if _, ok := asked[name]; !ok {
+			t.Errorf("%s asks whether it may count and is not asked here%s", name, what)
+		}
+	}
+	for name := range asked {
+		if !slices.Contains(found, name) {
+			t.Errorf("%s is asked here%s and no longer asks whether it may count", name, what)
+		}
+	}
+}
+
+func TestAFigureAskingWhetherItMayCountIsFound(t *testing.T) {
+	single, across, err := figuresIn(map[string][]byte{"a.go": []byte(`package analysis
+func Direct(s Subject) error { return MayCount(s, 1, "x") }
+func Scoped(scope Scope, s Subject) error { return scope.mayCount(s, "x") }
+func Plain() error { return nil }
+func unexported(s Subject) error { return MayCount(s, 1, "x") }
+`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(single, []string{"Direct", "Scoped"}) || !slices.Equal(across, []string{"Scoped"}) {
+		t.Errorf("found %v and %v across, want [Direct Scoped] and [Scoped]", single, across)
+	}
+}
 
 // Every security testing figure refuses a reader of the product who does not
 // read security testing material in it, in the data layer and before the
@@ -19,36 +129,62 @@ func TestEverySecurityTestingFigureRefusesAReaderOfDependencyWorkAlone(t *testin
 	reader := access.NewPerson(1, "reader", false, map[int64][]access.Role{7: {access.PublicRead, access.PrivateRead}}, 0)
 	scope := Scope{ProductID: 7}
 	now := time.Now()
-	for name, figure := range map[string]func() error{
-		"counts": func() error {
+	single, _ := figures(t)
+	asked := map[string]func() error{
+		"CodeFindingCountsOf": func() error {
 			_, err := CodeFindingCountsOf(t.Context(), nil, reader, scope)
 			return err
 		},
-		"trend": func() error {
+		"Trend": func() error {
 			_, err := Trend(t.Context(), nil, reader, scope, now, time.Hour, 1)
 			return err
 		},
-		"time to judge": func() error {
+		"TimeToJudge": func() error {
 			_, err := TimeToJudge(t.Context(), nil, reader, scope, now, now, now)
 			return err
 		},
-		"time to fix": func() error {
+		"TimeToFix": func() error {
 			_, err := TimeToFix(t.Context(), nil, reader, scope, now, now)
 			return err
 		},
-		"precision": func() error {
+		"PrecisionOf": func() error {
 			_, err := PrecisionOf(t.Context(), nil, reader, scope)
 			return err
 		},
-		"coverage": func() error {
+		"CoverageOf": func() error {
 			_, err := CoverageOf(t.Context(), nil, reader, scope, now, now, now)
 			return err
 		},
-		"by release": func() error {
+		"ByRelease": func() error {
 			_, err := ByRelease(t.Context(), nil, reader, scope, 1)
 			return err
 		},
-	} {
+		"CountsBySeries": func() error {
+			_, err := CountsBySeries(t.Context(), nil, reader, 7)
+			return err
+		},
+		"CountsOfComponent": func() error {
+			_, err := CountsOfComponent(t.Context(), nil, reader, scope)
+			return err
+		},
+		"OpenOn": func() error {
+			_, err := OpenOn(t.Context(), nil, reader, 7, 1, nil)
+			return err
+		},
+		// A match in a product the reader does not count in has no entry, and
+		// the rest of the answer stands.
+		"OpenOfMatches": func() error {
+			got, err := OpenOfMatches(t.Context(), nil, reader, []finding.SourceMatch{
+				{ProductID: 7, Folded: "zlib", Builds: []int64{1}},
+			})
+			if err == nil && len(got) == 0 {
+				return access.ErrDenied
+			}
+			return err
+		},
+	}
+	checkedAre(t, "", single, asked)
+	for name, figure := range asked {
 		if err := refusedOrReached(figure); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("%s answered %v to a reader of dependency work alone; want a refusal", name, err)
 		}
@@ -77,24 +213,27 @@ func TestEverySecurityTestingFigureAcrossProductsRefusesAProductNotReadAtSecurit
 	}, 0)
 	scope := Scope{Across: []int64{7, 8}}
 	now := time.Now()
-	for name, figure := range map[string]func() error{
-		"counts": func() error {
+	_, across := figures(t)
+	asked := map[string]func() error{
+		"CodeFindingCountsOf": func() error {
 			_, err := CodeFindingCountsOf(t.Context(), nil, reader, scope)
 			return err
 		},
-		"trend": func() error {
+		"Trend": func() error {
 			_, err := Trend(t.Context(), nil, reader, scope, now, time.Hour, 1)
 			return err
 		},
-		"time to judge": func() error {
+		"TimeToJudge": func() error {
 			_, err := TimeToJudge(t.Context(), nil, reader, scope, now, now, now)
 			return err
 		},
-		"coverage": func() error {
+		"CoverageOf": func() error {
 			_, err := CoverageOf(t.Context(), nil, reader, scope, now, now, now)
 			return err
 		},
-	} {
+	}
+	checkedAre(t, " across products", across, asked)
+	for name, figure := range asked {
 		if err := refusedOrReached(figure); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("%s across products answered %v with a product read for dependency work alone; want a refusal", name, err)
 		}
