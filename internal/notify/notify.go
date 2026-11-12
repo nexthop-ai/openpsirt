@@ -450,6 +450,13 @@ type Telling struct {
 // things that happened, and collapsing them would lose the second — which is
 // the one the person has not seen.
 func (s *Store) Tell(ctx context.Context, t Telling) error {
+	return tellIn(ctx, s.db, s.now(), t)
+}
+
+// tellIn is Tell against a handle the caller holds, so what a cleared
+// condition says is told in the transaction that clears it, under the same
+// checks.
+func tellIn(ctx context.Context, db bun.IDB, now time.Time, t Telling) error {
 	if t.PersonID == 0 || t.Kind == "" || t.Body == "" {
 		return refusal.New("a notification needs somebody, a kind and something to say")
 	}
@@ -462,7 +469,7 @@ func (s *Store) Tell(ctx context.Context, t Telling) error {
 	}
 	// Somebody who has left is told nothing. Their grants and assignments
 	// stay in place, so every caller's audience can still name them.
-	left, err := s.db.NewSelect().Model((*access.Account)(nil)).
+	left, err := db.NewSelect().Model((*access.Account)(nil)).
 		Where(`"id" = ?`, t.PersonID).
 		Where(`"deactivated_at" IS NOT NULL`).
 		Exists(ctx)
@@ -476,9 +483,9 @@ func (s *Store) Tell(ctx context.Context, t Telling) error {
 		PersonID: t.PersonID, Kind: t.Kind, Lifetime: Event,
 		Body: t.Body, Link: t.Link, Private: t.Private, SecurityTesting: t.SecurityTesting,
 		ProductID: t.ProductID, VulnerabilityID: t.VulnerabilityID,
-		Concerns: t.Concerns, Together: t.Together, CreatedAt: s.now(),
+		Concerns: t.Concerns, Together: t.Together, CreatedAt: now,
 	}
-	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
+	if _, err := db.NewInsert().Model(row).Exec(ctx); err != nil {
 		return fmt.Errorf("record what happened: %w", err)
 	}
 	return nil
@@ -622,11 +629,9 @@ func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
 				if said == nil {
 					continue
 				}
-				if _, err := tx.NewInsert().Model(&Notification{
-					PersonID: personID, Kind: said.Kind, Lifetime: Event,
-					Body: said.Body, Link: said.Link, ProductID: said.ProductID,
-					Together: said.Together, CreatedAt: now,
-				}).Exec(ctx); err != nil {
+				told := *said
+				told.PersonID = personID
+				if err := tellIn(ctx, tx, now, told); err != nil {
 					return fmt.Errorf("say what ended: %w", err)
 				}
 			}
