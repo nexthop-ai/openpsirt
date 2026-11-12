@@ -300,15 +300,20 @@ func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int6
 	}
 	parts := graph.PartsOfPurl(c.Purl)
 	ecosystem := graph.EcosystemOf(c.Purl)
-	id, name, err := carrying(ctx, db, buildID, Entering{Component: c.Name, Version: c.Version,
-		Ecosystem: ecosystem, Namespace: parts.Namespace})
-	if !errors.Is(err, ErrNoSuchComponent) {
-		return id, name, err
+	// Narrowest first; a name the row states no ecosystem or namespace for
+	// is asked once by version and once by name alone.
+	tries := []Entering{{Component: c.Name, Version: c.Version, Ecosystem: ecosystem, Namespace: parts.Namespace}}
+	if ecosystem != "" || parts.Namespace != "" {
+		tries = append(tries, Entering{Component: c.Name, Ecosystem: ecosystem, Namespace: parts.Namespace})
 	}
-	id, name, err = carrying(ctx, db, buildID, Entering{Component: c.Name, Ecosystem: ecosystem,
-		Namespace: parts.Namespace})
-	if errors.Is(err, ErrNoSuchComponent) {
-		id, name, err = carrying(ctx, db, buildID, Entering{Component: c.Name})
+	tries = append(tries, Entering{Component: c.Name})
+	var id int64
+	var name string
+	for _, try := range tries {
+		id, name, err = carrying(ctx, db, buildID, try)
+		if !errors.Is(err, ErrNoSuchComponent) {
+			break
+		}
 	}
 	var several *graph.Ambiguous
 	if errors.As(err, &several) {

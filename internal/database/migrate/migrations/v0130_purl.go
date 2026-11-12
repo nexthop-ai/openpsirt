@@ -22,8 +22,8 @@ const purlBatchV0130 = 5_000
 // purlCredentialsV0130 rewrites the package identifiers v0.12.0 stored as
 // v0.13.0 stores them: the slashes after the scheme dropped, and any
 // credential and query taken out of the addresses its qualifiers hold. Only a
-// row starting "pkg:/" or holding an address after its qualifiers start is
-// read, written plain or escaped, and only a row that changes is written, so
+// row holding qualifiers or starting "pkg:/" in any case is read, since an
+// address can be escaped in part, and only a row that changes is written, so
 // a start after one that stopped part way writes what the first missed.
 // Identity is read from neither part, so no identity moves.
 func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
@@ -40,8 +40,8 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 				purl string
 			}
 			rows, err := tx.QueryContext(ctx, `SELECT "id", "purl" FROM "`+table+`"
-				WHERE "id" > ? AND ("purl" LIKE ? OR LOWER("purl") LIKE ? OR "purl" LIKE ?) ORDER BY "id" LIMIT ?`,
-				after, "%?%://%", "%?%3a%2f%2f%", "pkg:/%", batch)
+				WHERE "id" > ? AND ("purl" LIKE ? OR LOWER("purl") LIKE ?) ORDER BY "id" LIMIT ?`,
+				after, "%?%", "pkg:/%", batch)
 			if err != nil {
 				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
@@ -86,8 +86,7 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 // told, and so are the pairs after an address whose query is written
 // unescaped, since they are that query.
 func purlWithoutCredentialV0130(purl string) string {
-	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.HasPrefix(rest, "/") &&
-		!strings.ContainsAny(scheme, "/?#") {
+	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.EqualFold(scheme, "pkg") {
 		purl = scheme + ":" + strings.TrimLeft(rest, "/")
 	}
 	body, qualifiers, found := strings.Cut(purl, "?")

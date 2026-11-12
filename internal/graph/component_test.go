@@ -826,8 +826,13 @@ func TestAQualifierAddressIsStoredWithoutItsCredentialOrQuery(t *testing.T) {
 			"pkg:generic/fw@1?download_url=https://example.com/fw.bin&arch=arm64"},
 		{"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin?X-Amz-Credential=A&X-Amz-Signature=SECRET",
 			"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin"},
+		{"pkg:golang/example.com/p@v1?vcs_url=git%2Bhttps%3A//oauth2:glpat-SECRET@gitlab.example.com/p.git",
+			"pkg:golang/example.com/p@v1?vcs_url=git%2Bhttps://gitlab.example.com/p.git"},
 		{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
 			"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"},
+		// Another scheme is not a package identifier, and its slashes are
+		// its own.
+		{"https://example.com/x", "https://example.com/x"},
 	} {
 		if got := graph.StatedPurl(c.stated); got != c.want {
 			t.Errorf("%s is stored as %s, want %s", c.stated, got, c.want)

@@ -223,7 +223,9 @@ func canonicalPurl(purl string) string {
 	if !found {
 		return decodedPath(purl)
 	}
-	rest = strings.TrimLeft(rest, "/")
+	if strings.EqualFold(scheme, "pkg") {
+		rest = strings.TrimLeft(rest, "/")
+	}
 	// The type is the first segment after the scheme, not the scheme itself,
 	// and it is the part the specification calls case-insensitive.
 	kind, path, split := strings.Cut(rest, "/")
@@ -252,8 +254,7 @@ func decodedPath(path string) string {
 // component.
 func statedPurl(purl string) string {
 	purl = strings.TrimSpace(purl)
-	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.HasPrefix(rest, "/") &&
-		!strings.ContainsAny(scheme, "/?#") {
+	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.EqualFold(scheme, "pkg") {
 		purl = scheme + ":" + strings.TrimLeft(rest, "/")
 	}
 	body, qualifiers, found := strings.Cut(purl, "?")
