@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useAfterHandBack } from "../api/intake";
 import { useMemo, useState } from "react";
 import { Holder, type Held } from "../ui/Holder";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -855,6 +856,7 @@ function Upgrade({
   covering: Build[];
 }) {
   const queries = useQueryClient();
+  const handedOver = useAfterHandBack();
   const landed = here.upgrades ?? [];
   const [to, setTo] = useState(landed[0]?.to ?? "");
   const [by, setBy] = useState("");
@@ -917,8 +919,7 @@ function Upgrade({
       setBecause("");
       setHolder(null);
       void queries.invalidateQueries({ queryKey: ["component"] });
-      void queries.invalidateQueries({ queryKey: ["holdings"] });
-      void queries.invalidateQueries({ queryKey: ["findings"] });
+      handedOver();
     },
   });
 

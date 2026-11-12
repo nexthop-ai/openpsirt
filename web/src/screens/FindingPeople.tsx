@@ -7,6 +7,7 @@
 // closing a recorded flaw by hand, the files attached to it and the words
 // people have marked it with.
 
+import { useAfterHandBack } from "../api/intake";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
@@ -221,6 +222,7 @@ export function Assignee({
   assignedByRule: string;
 }) {
   const queries = useQueryClient();
+  const handedOver = useAfterHandBack();
   const hand = useMutation({
     // A party, not a person: a team holds work exactly as somebody does , and
     // the picker offers both.
@@ -241,8 +243,7 @@ export function Assignee({
       ),
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: ["finding"] });
-      void queries.invalidateQueries({ queryKey: ["findings"] });
-      void queries.invalidateQueries({ queryKey: ["holdings"] });
+      handedOver();
     },
   });
 

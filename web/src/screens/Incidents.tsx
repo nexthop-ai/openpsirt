@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useAfterIncident } from "../api/incidents";
 import { useDeferredValue, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -250,15 +251,11 @@ function waiting(due: Due): string {
 // The tags named as carrying the fix, with what each one's latest scans say,
 // and the form for naming another.
 function Fixes({ incident }: { incident: Incident }) {
-  const queries = useQueryClient();
   const [naming, setNaming] = useState(false);
   const fixes = incident.fixes ?? [];
   const standing = fixes.filter((fix) => !fix.withdrawn_at);
   const withdrawn = fixes.filter((fix) => fix.withdrawn_at);
-  const done = () => {
-    void queries.invalidateQueries({ queryKey: ["incidents"] });
-    void queries.invalidateQueries({ queryKey: ["finding"] });
-  };
+  const done = useAfterIncident();
   const withdraw = useMutation({
     mutationFn: async (fix: number) =>
       unwrap(
@@ -433,7 +430,7 @@ function Tell({
   windows: Window[];
   onClose: () => void;
 }) {
-  const queries = useQueryClient();
+  const afterIncident = useAfterIncident();
   // Typed in UTC, as the card draws every moment, and defaulting to now: most
   // notices are recorded as they are sent.
   const [toldAt, setToldAt] = useState(() => typedNow());
@@ -463,8 +460,7 @@ function Tell({
       ),
     onSuccess: () => {
       onClose();
-      void queries.invalidateQueries({ queryKey: ["incidents"] });
-      void queries.invalidateQueries({ queryKey: ["finding"] });
+      afterIncident();
     },
   });
 
@@ -572,11 +568,12 @@ function Tell({
 // and retire. None ships.
 function Windows({ windows }: { windows: Window[] }) {
   const queries = useQueryClient();
+  const afterIncident = useAfterIncident();
   const [editing, setEditing] = useState<number | null>(null);
   const done = () => {
     setEditing(null);
     void queries.invalidateQueries({ queryKey: ["response-windows"] });
-    void queries.invalidateQueries({ queryKey: ["incidents"] });
+    afterIncident();
   };
   const retire = useMutation({
     mutationFn: async (id: number) =>
@@ -798,7 +795,7 @@ function Record({
   products: { product: string; name: string }[];
   onClose: () => void;
 }) {
-  const queries = useQueryClient();
+  const afterIncident = useAfterIncident();
   const [product, setProduct] = useState(products.length === 1 ? (products[0]?.product ?? "") : "");
   const [issue, setIssue] = useState("");
   const term = useDeferredValue(issue.trim());
@@ -835,10 +832,7 @@ function Record({
         product={product}
         vulnerability={issue}
         onClose={onClose}
-        done={() => {
-          void queries.invalidateQueries({ queryKey: ["incidents"] });
-          void queries.invalidateQueries({ queryKey: ["finding"] });
-        }}
+        done={afterIncident}
         pick={
           <div className="filters" style={{ marginBottom: 8 }}>
             <label className="field">

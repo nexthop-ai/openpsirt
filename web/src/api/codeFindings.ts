@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useAfterHandBack } from "./intake";
 import {
   queryOptions,
   useMutation,
@@ -278,7 +279,13 @@ export function useFixCodeFinding(build: Build, occurrence: string) {
 // A party, not a person: a team holds a code finding exactly as somebody does. Nobody
 // hands it back.
 export function useAssignCodeFinding(build: Build, occurrence: string) {
-  const after = useAfterCodeFinding();
+  const decided = useAfterCodeFinding();
+  // A change of holder moves the holdings and the lists of who holds what.
+  const held = useAfterHandBack();
+  const after = () => {
+    decided();
+    held();
+  };
   return useMutation({
     mutationFn: async (held: { kind: "person" | "team"; identity: string } | null) =>
       unwrap(
