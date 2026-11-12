@@ -29,23 +29,23 @@ const Lease = "patch.branches"
 // nothing.
 const betweenCycles = 5 * time.Minute
 
-// LookAgainAfter is how long a commit's branches stand before it is looked up
+// lookAgainAfter is how long a commit's branches stand before it is looked up
 // again.
 //
 // A week. The branches a backport sits on do not change; a commit on the
 // mainline is taken into each branch cut after it, which happens every few
 // months. Looking every commit up again daily would be ninety minutes of one
 // core a day for the kernel alone, spent mostly confirming what was known.
-const LookAgainAfter = 7 * 24 * time.Hour
+const lookAgainAfter = 7 * 24 * time.Hour
 
-// RetryAfter is how long a repository that could not be fetched is left
+// retryAfter is how long a repository that could not be fetched is left
 // before it is tried again. A host having a bad hour and a repository that
 // is gone look the same from here, and a day is short for the first and cheap
 // for the second.
-const RetryAfter = 24 * time.Hour
+const retryAfter = 24 * time.Hour
 
-// HostShare is how long the visits to one host's repositories may hold the
-// pass within RetryAfter before that host's repositories are planned after
+// hostShare is how long the visits to one host's repositories may hold the
+// pass within retryAfter before that host's repositories are planned after
 // every other host's.
 //
 // The links a pass follows come from the scanner's vulnerability data, whose
@@ -55,7 +55,7 @@ const RetryAfter = 24 * time.Hour
 // exempt by name: a host with many linked repositories over its share is
 // visited as often as the pass has nothing else due. One fetch's worth of
 // visit time a day.
-const HostShare = fetchBudget
+const hostShare = fetchBudget
 
 // Pass fetches the repositories patch links point into and records which
 // branches each linked commit is on.
@@ -68,8 +68,8 @@ type Pass struct {
 	// on is whether the deployment turned the lookups on, read once at
 	// startup from its configuration.
 	on bool
-	// Now is the clock, so a test can ask what happens a week from now.
-	Now func() time.Time
+	// now is the clock, so a test can ask what happens a week from now.
+	now func() time.Time
 
 	leases   *queue.Leases
 	replica  string
@@ -115,7 +115,7 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 		copies:   copies{root: options.Dir, quota: quota, now: time.Now, poll: 15 * time.Second},
 		excluded: options.Excluded,
 		on:       options.On,
-		Now:      time.Now,
+		now:      time.Now,
 		leases:   queue.NewLeases(db), replica: replica,
 	}
 	pass.copies.gone = pass.forget
@@ -173,7 +173,7 @@ func (p *Pass) cycle(ctx context.Context) int {
 		if !mine {
 			return visits
 		}
-		visited, err := p.Once(ctx)
+		visited, err := p.once(ctx)
 		if ctx.Err() != nil && p.leases != nil {
 			// Shutting down mid-visit. The lease is handed back so the
 			// replica that starts next carries on at once rather than
@@ -213,16 +213,16 @@ func (p *Pass) holding(ctx context.Context) (bool, error) {
 	return p.leases.Take(ctx, Lease, p.replica, max(queue.LeaseFor(p.interval), 30*time.Minute))
 }
 
-// Once records what patch links name, visits the one repository most worth
+// once records what patch links name, visits the one repository most worth
 // visiting, and answers which it was.
 //
 // The switch is read here as well as in Run: a guard beside the work cannot be
 // skipped by calling the work another way.
-func (p *Pass) Once(ctx context.Context) (string, error) {
+func (p *Pass) once(ctx context.Context) (string, error) {
 	if !p.on {
 		return "", nil
 	}
-	now := p.Now()
+	now := p.now()
 	commits, _, err := linked(ctx, p.db)
 	if err != nil {
 		return "", err
@@ -255,7 +255,7 @@ type candidate struct {
 	stale urgency
 	held  bool
 	// spent is how long visits to the repository's host held the pass within
-	// RetryAfter, and over says that is HostShare or more.
+	// retryAfter, and over says that is hostShare or more.
 	spent time.Duration
 	over  bool
 }
@@ -309,7 +309,7 @@ func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.
 // that has had the least goes first.
 //
 // A host waits out with its repository: where a repository on it failed within
-// RetryAfter and none on it was reached within RetryAfter, no repository on it
+// retryAfter and none on it was reached within retryAfter, no repository on it
 // is planned.
 //
 // held says whether a repository's copy is on the disk that counts. The pass
@@ -326,7 +326,7 @@ func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded 
 	if err := db.NewSelect().Model(&due).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr(`"looked_at" IS NULL`).
-				WhereOr(`"looked_at" < ?`, now.Add(-LookAgainAfter).UTC())
+				WhereOr(`"looked_at" < ?`, now.Add(-lookAgainAfter).UTC())
 		}).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the commits due a look: %w", err)
@@ -410,20 +410,20 @@ func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded 
 	}
 	for _, one := range out {
 		one.spent = spent[Commit{Repository: one.repository.URL}.Host()]
-		one.over = one.spent >= HostShare
+		one.over = one.spent >= hostShare
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].before(out[j]) })
 	return out, nil
 }
 
 // hostTime is how long visits to each host's repositories held the pass within
-// RetryAfter, keyed on the host in the address.
+// retryAfter, keyed on the host in the address.
 //
 // A repository records its last visit and no other, so a repository visited
 // twice within the window counts once. The links that claim the pass are many
 // repositories each visited once, which is what this counts.
 func hostTime(repositories []repositoryRow, now time.Time) map[string]time.Duration {
-	since := now.Add(-RetryAfter)
+	since := now.Add(-retryAfter)
 	out := map[string]time.Duration{}
 	for _, repository := range repositories {
 		began, ended := repository.FetchedAt, repository.EndedAt
@@ -466,14 +466,14 @@ func notYetRecorded(ctx context.Context, db bun.IDB, commits map[Commit]urgency,
 }
 
 // hostsDown is the hosts that wait out, keyed on the host in the address: one
-// of their repositories failed within RetryAfter, and none was reached within
+// of their repositories failed within retryAfter, and none was reached within
 // it.
 //
 // A repository that was reached says the host answers, so one repository that
 // is gone does not hold back every other on a host that serves many. A host
 // whose every visit fails costs the pass one failed visit a day.
 func hostsDown(repositories []repositoryRow, now time.Time) map[string]bool {
-	since := now.Add(-RetryAfter)
+	since := now.Add(-retryAfter)
 	failed, reached := map[string]bool{}, map[string]bool{}
 	for _, repository := range repositories {
 		host := Commit{Repository: repository.URL}.Host()
@@ -497,7 +497,7 @@ func hostsDown(repositories []repositoryRow, now time.Time) map[string]bool {
 // ago, which leaves it out of the plan until the day has passed.
 func waitingOut(repository repositoryRow, now time.Time) bool {
 	return repository.Failed != nil && *repository.Failed != "" && repository.FetchedAt != nil &&
-		repository.FetchedAt.After(now.Add(-RetryAfter))
+		repository.FetchedAt.After(now.Add(-retryAfter))
 }
 
 // before orders two candidates as plan describes.
@@ -577,7 +577,7 @@ func (p *Pass) visit(ctx context.Context, c candidate, commits map[Commit]urgenc
 	// finish never records, waits out a day like any failure rather than
 	// being chosen first again on restart and killing the process again.
 	if _, err := p.db.NewUpdate().Model((*repositoryRow)(nil)).
-		Set(`"fetched_at" = ?`, p.Now().UTC()).
+		Set(`"fetched_at" = ?`, p.now().UTC()).
 		Set(`"failed" = ?`, unfinished).
 		Where(`"id" = ?`, c.repository.ID).Exec(ctx); err != nil {
 		return fmt.Errorf("record that a visit began: %w", err)
@@ -698,7 +698,7 @@ func (p *Pass) record(ctx context.Context, id int64, found bool, branches []stri
 		return errors.New("recording a lookup needs a database handle")
 	}
 	return database.InTransaction(ctx, handle, func(ctx context.Context, tx bun.Tx) error {
-		now := p.Now().UTC()
+		now := p.now().UTC()
 		if _, err := tx.NewDelete().Model((*branchRow)(nil)).
 			Where(`"commit_id" = ?`, id).Exec(ctx); err != nil {
 			return fmt.Errorf("clear the branches a commit was on: %w", err)
@@ -734,9 +734,9 @@ func (p *Pass) finish(ctx context.Context, before repositoryRow, dir string, fai
 		// git quotes what the remote said, in bytes of the remote's choosing.
 		reason := bound.Text(failed.Error())
 		update = update.Set(`"failed" = ?`, bound.HeadRunes(reason, MostReason)).
-			Set(`"ended_at" = ?`, p.Now().UTC())
+			Set(`"ended_at" = ?`, p.now().UTC())
 	default:
-		now := p.Now().UTC()
+		now := p.now().UTC()
 		update = update.Set(`"failed" = NULL`).Set(`"reached_at" = ?`, now).Set(`"ended_at" = ?`, now)
 	}
 	if dir != "" {
