@@ -109,7 +109,7 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 // agreedSince is every row of a decision proposed since a moment that
 // somebody other than its proposer agreed to and has not taken back, beside
 // the agreement. The pairs and each product's total are counted over this one
-// selection, so a pair's share of its product cannot be over two.
+// selection, so a pair's share of its product cannot exceed the whole.
 func agreedSince(db bun.IDB, since time.Time) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).

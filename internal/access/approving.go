@@ -11,8 +11,9 @@ import "strings"
 // on the product or across every product.
 //
 // Built from MayApprove and the reading and triage rules, so a statement
-// asking who may still approve answers as a signed-in subject is answered. A test holds the two to one answer for every
-// role on every visibility, granted either way.
+// asking who may still approve answers as a signed-in subject is answered. A
+// test holds the two to one answer for every role on every visibility,
+// granted either way.
 //
 // The columns are written at the call site and never supplied by anybody: a
 // column name cannot be bound by a placeholder (REQ-66).
