@@ -346,6 +346,29 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 	return described, nil
 }
 
+// statedRow is what one node states for its component.
+type statedRow struct {
+	ComponentID     int64  `bun:"component_id"`
+	Purl            string `bun:"purl"`
+	CPE             string `bun:"cpe"`
+	UpstreamName    string `bun:"upstream_name"`
+	UpstreamVersion string `bun:"upstream_version"`
+}
+
+// statedColumns reads a statedRow from the nodes as "n".
+func statedColumns(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."component_id" AS "component_id"`).
+		ColumnExpr(`"n"."purl" AS "purl"`).
+		ColumnExpr(`"n"."cpe" AS "cpe"`).
+		ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
+		ColumnExpr(`"n"."upstream_version" AS "upstream_version"`)
+}
+
+func (r statedRow) described() Described {
+	return Described{Purl: r.Purl, CPE: r.CPE, UpstreamName: r.UpstreamName, UpstreamVersion: r.UpstreamVersion}
+}
+
 // Stated is what a build states for each of these components, as
 // CurrentComponents gives it to the scanner: the identifiers and the source
 // package from the build's latest node holding the component, open or closed,
@@ -361,20 +384,8 @@ func (s *Store) Stated(ctx context.Context, buildID int64, componentIDs []int64)
 		return out, nil
 	}
 	err := database.IDsInBatches(ctx, componentIDs, func(ctx context.Context, batch []int64) error {
-		var rows []struct {
-			ComponentID     int64  `bun:"component_id"`
-			Purl            string `bun:"purl"`
-			CPE             string `bun:"cpe"`
-			UpstreamName    string `bun:"upstream_name"`
-			UpstreamVersion string `bun:"upstream_version"`
-		}
-		err := s.db.NewSelect().
-			TableExpr(`"graph_node" AS "n"`).
-			ColumnExpr(`"n"."component_id" AS "component_id"`).
-			ColumnExpr(`"n"."purl" AS "purl"`).
-			ColumnExpr(`"n"."cpe" AS "cpe"`).
-			ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
-			ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
+		var rows []statedRow
+		err := statedColumns(s.db.NewSelect()).
 			Where(`"n"."build_id" = ?`, buildID).
 			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
 			OrderExpr(`"n"."opened_scan_id", "n"."id"`).
@@ -384,10 +395,7 @@ func (s *Store) Stated(ctx context.Context, buildID int64, componentIDs []int64)
 		}
 		// Ordered earliest first, so the latest node is the one left.
 		for _, row := range rows {
-			out[row.ComponentID] = Described{
-				Purl: row.Purl, CPE: row.CPE,
-				UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
-			}
+			out[row.ComponentID] = row.described()
 		}
 		return nil
 	})
@@ -426,20 +434,8 @@ func (s *Store) statedInProduct(ctx context.Context, buildID int64,
 		return nil, err
 	}
 	err = database.IDsInBatches(ctx, componentIDs, func(ctx context.Context, batch []int64) error {
-		var rows []struct {
-			ComponentID     int64  `bun:"component_id"`
-			Purl            string `bun:"purl"`
-			CPE             string `bun:"cpe"`
-			UpstreamName    string `bun:"upstream_name"`
-			UpstreamVersion string `bun:"upstream_version"`
-		}
-		err := s.db.NewSelect().
-			TableExpr(`"graph_node" AS "n"`).
-			ColumnExpr(`"n"."component_id" AS "component_id"`).
-			ColumnExpr(`"n"."purl" AS "purl"`).
-			ColumnExpr(`"n"."cpe" AS "cpe"`).
-			ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
-			ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
+		var rows []statedRow
+		err := statedColumns(s.db.NewSelect()).
 			// By build first, which the node index leads with: a product
 			// has a handful of builds and the node table holds every
 			// product's history.
@@ -458,10 +454,7 @@ func (s *Store) statedInProduct(ctx context.Context, buildID int64,
 			return err
 		}
 		for _, row := range rows {
-			out[row.ComponentID] = append(out[row.ComponentID], Described{
-				Purl: row.Purl, CPE: row.CPE,
-				UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
-			})
+			out[row.ComponentID] = append(out[row.ComponentID], row.described())
 		}
 		return nil
 	})
@@ -1178,8 +1171,11 @@ func childrenJoin(query *bun.SelectQuery, buildID int64, only []int64) *bun.Sele
 // where the child is the fourth column: every open edge in the build scanned
 // once per node, 7.28 s for 59,982 nodes against 45 ms on the index led by the
 // child.
+//
+// An edge from the node to itself pulls nothing in, as every walk reads it.
 const orphaned = `NOT EXISTS (SELECT 1 FROM "graph_edge" AS "pe"
-	WHERE "pe"."child_id" = "fn"."id" AND "pe"."closed_scan_id" IS NULL)`
+	WHERE "pe"."child_id" = "fn"."id" AND "pe"."closed_scan_id" IS NULL
+	  AND "pe"."parent_id" <> "pe"."child_id")`
 
 // topLevel reads what the root pulls in and what nothing pulls in, as one
 // list in one statement: the two are read with the same per-build counts, and

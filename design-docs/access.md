@@ -120,7 +120,7 @@ build root, with counts narrowed to match; descending a node is refused.
 |---|---|
 | The population is their own work and their teams', as an assignment carries it | A finding that became undisclosed after it was handed over drops out |
 | A node counts their work, merged by path | One library under two containers is two places |
-| Where they hold work on more components than the tree assembles, it says so | Its counts then fall short |
+| Where they hold work on more components than the tree assembles, it says so, and keeps those with the most issues, then by name, then by component | Its counts then fall short; a cut with ties left open keeps different components per engine and per request |
 | Drawn whole, never opened | Nothing lies under the chains |
 
 ## Subject kinds

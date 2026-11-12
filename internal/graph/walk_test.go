@@ -100,25 +100,10 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
+		f.report(t,
+			high("CVE-2026-1", lib), high("CVE-2026-2", lib), high("CVE-2026-3", a),
+		)
 		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		reported := func(id string, component graph.Described) finding.Reported {
-			return finding.Reported{
-				Issue:     finding.Named{Identifier: id, Severity: "high"},
-				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
-			}
-		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
-			reported("CVE-2026-1", lib), reported("CVE-2026-2", lib), reported("CVE-2026-3", a),
-		}); err != nil {
-			t.Fatal(err)
-		}
 
 		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
@@ -183,25 +168,9 @@ func TestAnIssueOnTwoComponentsBeneathOneCountsOnce(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		reported := func(id string, component graph.Described) finding.Reported {
-			return finding.Reported{
-				Issue:     finding.Named{Identifier: id, Severity: "high"},
-				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
-			}
-		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
-			reported("CVE-2026-1", one), reported("CVE-2026-1", two), reported("CVE-2026-2", two),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.report(t,
+			high("CVE-2026-1", one), high("CVE-2026-1", two), high("CVE-2026-2", two),
+		)
 
 		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
@@ -244,22 +213,12 @@ func TestAStepCountsWhatEachNeighborCarriesAndPullsIn(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
 		reported := func(id string, component graph.Described) finding.Reported {
 			return finding.Reported{Issue: finding.Named{Identifier: id, Severity: "high"}, Component: component}
 		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
+		f.report(t,
 			reported("CVE-2026-1", one), reported("CVE-2026-2", two), reported("CVE-2026-3", two),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 
 		above, below, err := f.store.Around(t.Context(), everyone(f), f.buildID, box.Name, graph.Choice{})
 		if err != nil {
@@ -337,26 +296,10 @@ func TestContainersAreOrderedByWhatIsInsideThem(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		reported := func(id string, component graph.Described) finding.Reported {
-			return finding.Reported{
-				Issue:     finding.Named{Identifier: id, Severity: "high"},
-				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
-			}
-		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
-			reported("CVE-2026-1", large), reported("CVE-2026-2", large),
-			reported("CVE-2026-3", small),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.report(t,
+			high("CVE-2026-1", large), high("CVE-2026-2", large),
+			high("CVE-2026-3", small),
+		)
 
 		_, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
@@ -397,28 +340,18 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
 		rated := func(id, band string) finding.Reported {
 			return finding.Reported{
 				Issue:     finding.Named{Identifier: id, Severity: band},
 				Component: lib,
 			}
 		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
+		f.report(t,
 			rated("CVE-2026-1", "critical"), rated("CVE-2026-2", "low"),
 			// Nobody rated this one, which is its own band rather than a row
 			// the split quietly drops.
 			rated("CVE-2026-3", ""),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 
 		root, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
@@ -488,20 +421,11 @@ func TestAProductsOwnRatingDrawsTheTreeTheUpgradeStripAndTheReleaseNote(t *testi
 		}); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(ctx, finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := findings.Apply(ctx, f.buildID, run.ID, []finding.Reported{{
+		f.report(t, finding.Reported{
 			Issue:     finding.Named{Identifier: "CVE-2026-9", Severity: "low"},
 			Component: lib, FixState: finding.FixedUpstream, FixedIn: "2.0",
-		}}); err != nil {
-			t.Fatal(err)
-		}
+		})
+		findings := finding.NewStore(f.db.DB)
 
 		who := everyone(f)
 		// Each of the three ratings for the issue, read the same way

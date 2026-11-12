@@ -31,26 +31,11 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
+		f.report(t,
+			high("CVE-2026-1", zlib), high("CVE-2026-2", zlib),
+			high("CVE-2026-3", curl), high("CVE-2026-4", openssl),
+		)
 		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		reported := func(id string, component graph.Described) finding.Reported {
-			return finding.Reported{
-				Issue:     finding.Named{Identifier: id, Severity: "high"},
-				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
-			}
-		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
-			reported("CVE-2026-1", zlib), reported("CVE-2026-2", zlib),
-			reported("CVE-2026-3", curl), reported("CVE-2026-4", openssl),
-		}); err != nil {
-			t.Fatal(err)
-		}
 
 		// party is who hands the work out, and who holds it. The
 		// holder reads nothing on the product at all, which is the
@@ -207,19 +192,8 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
+		f.report(t, finding.Reported{Issue: finding.Named{Identifier: "CVE-2026-9", Severity: "high"}, Component: zlib})
 		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
-			{Issue: finding.Named{Identifier: "CVE-2026-9", Severity: "high"}, Component: zlib},
-		}); err != nil {
-			t.Fatal(err)
-		}
 		const party = 79
 		boss := access.NewPerson(1, "boss", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicTriage, access.PrivateTriage, access.Assigner}}, 1)

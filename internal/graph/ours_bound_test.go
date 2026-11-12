@@ -57,17 +57,7 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(t.Context(), finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, reported); err != nil {
-			t.Fatal(err)
-		}
+		f.report(t, reported...)
 		const party = 81
 		holdEverything(t, f, party)
 		holder := access.NewPerson(2, "holder", false,
