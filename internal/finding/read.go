@@ -147,8 +147,9 @@ func componentRows(ctx context.Context, db bun.IDB, ids []int64) (map[int64]grap
 type statedBy struct {
 	// pair is keyed by build, then component.
 	pair map[[2]int64]graph.Component
-	// latest is the node opened last among the builds asked about, for a page
-	// whose rows span one product's builds and name none of them.
+	// latest is, among the builds asked about, an open node, else the node
+	// opened last, for a page whose rows span one product's builds and name
+	// none of them.
 	latest map[int64]graph.Component
 }
 
