@@ -153,9 +153,9 @@ func packaged(purl string) bool {
 
 // The two kinds of document a third party's judgment arrives in.
 //
-// They differ in what a later upload replaces, which is a property of the
-// document rather than of the claims inside it: a statement set is a
-// publisher's whole answer and an advisory is one announcement among hundreds.
+// Each kind is replaced only by a later upload of its own kind, and the two
+// never replace each other: a VEX document by its own revision, an advisory
+// by the advisory of its name.
 const (
 	// FromVex is a VEX document — OpenVEX or the CSAF VEX profile.
 	FromVex = "vex"
@@ -333,12 +333,10 @@ func (from Supplied) valid() error {
 // what it says is written — so "they changed their mind" is a fact the record
 // holds rather than one it silently loses.
 //
-// What it replaces is the document's own kind. A publisher's statement set is
-// their whole answer, so a later one replaces the one before it. One of their
-// advisories is one announcement among hundreds, so it replaces the advisory
-// of the same name and leaves the rest of what they have published standing —
-// and neither kind touches the other, because uploading a publisher's
-// statement set would otherwise set aside every advisory of theirs on record.
+// What it replaces is the earlier revision of the same document: the same
+// kind, publisher and identifier. A publisher issues many VEX documents and
+// many advisories, so a document replaces its own revision and leaves the rest
+// of what they have published standing, and neither kind touches the other.
 //
 // A claim the document repeats word for word keeps its row and stands in the
 // new document. Only a claim it no longer makes is set aside.
@@ -399,9 +397,10 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 		// What stands under this document's key, whatever bytes it arrived
 		// as: its publisher and its own identifier, so a supplier's document
-		// is replaced only by a later revision of itself (REQ-31). A claim the document repeats word for word keeps its row, brought
-		// up to date with the document it now stands in and where it places
-		// its supplier's product. Only a claim the document no longer makes is
+		// is replaced only by a later revision of itself (REQ-31). A claim
+		// the document repeats word for word keeps its row, brought up to
+		// date with the document it now stands in and where it places its
+		// supplier's product. Only a claim the document no longer makes is
 		// set aside, because a superseded claim is what tells everyone holding
 		// an approved decision that cited it that the publisher changed what
 		// they published — and repeated, they did not. A fetched advisory's

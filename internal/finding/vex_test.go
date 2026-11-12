@@ -236,8 +236,7 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 }
 
 func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T) {
-	// A publisher's statement set is their whole answer and is replaced as
-	// one. An advisory is one announcement among hundreds, so keyed on the
+	// An advisory is one announcement among hundreds, so keyed on the
 	// publisher alone every advisory of theirs on record would be set aside
 	// the moment the next one arrived — and the deployment would hold exactly
 	// the last document anybody uploaded.
