@@ -230,7 +230,7 @@ function anchor(node: Element) {
     // Nothing linked from here is ours. No referrer, and no handle back to
     // this window from whatever opens.
     node.setAttribute("rel", "noreferrer noopener nofollow");
-    node.setAttribute("build", "_blank");
+    node.setAttribute("target", "_blank");
   }
 }
 
@@ -319,7 +319,7 @@ function autolink(root: Element | DocumentFragment) {
       const link = document.createElement("a");
       link.setAttribute("href", hit.href);
       link.setAttribute("rel", "noreferrer noopener nofollow");
-      link.setAttribute("build", "_blank");
+      link.setAttribute("target", "_blank");
       link.textContent = hit.id;
       pieces.append(link);
       cursor = hit.end;
@@ -355,9 +355,11 @@ export function render(source: string): string {
     // document as well as set by the hook. What stops an author supplying
     // them is that raw markup is off at the parser (`html: false` above), so
     // no author-written attribute reaches the sanitizer at all — and that is
-    // the control to keep, not this list. These are here so the hook's own
-    // additions survive attribute sanitizing.
-    ADD_ATTR: ["rel", "build", "loading", "referrerpolicy"],
+    // the control to keep, not this list. These two are what the hook sets
+    // on an image before attribute sanitizing, so they have to survive it.
+    // `rel` and `target` are set on a link after sanitizing, so neither is
+    // listed: nothing judges them, and an author can supply neither.
+    ADD_ATTR: ["loading", "referrerpolicy"],
     ALLOW_DATA_ATTR: false,
     ALLOW_ARIA_ATTR: false,
     // Returned as nodes rather than as a string, so that the identifiers below
