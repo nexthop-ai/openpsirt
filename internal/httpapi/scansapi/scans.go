@@ -102,7 +102,7 @@ func registerScans(api huma.API, in core.Deps) {
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
 				in := core.Of(hc.Context(), in)
-				_, _, err := admitted(hc.Context(), in, hc.Param("product"), hc.Param("branch_or_tag"), hc.Param("variant"))
+				_, _, err := admitted(hc.Context(), in, hc.Param("product"), hc.Param("branch_or_tag"), hc.Param("variant"), sendsScans)
 				return err
 			},
 			Limit:   core.Fixed(core.MaxUpload(in.Limits)),
@@ -121,7 +121,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 
 	// Asked again, though the form was only read once it was asked: what a
 	// handler refuses is the second statement of what admission refused.
-	subject, named, err := admitted(ctx, in, input.Product, input.BranchOrTag, input.Variant)
+	subject, named, err := admitted(ctx, in, input.Product, input.BranchOrTag, input.Variant, sendsScans)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func refusedBeforeReading(in core.Deps) func(huma.Context, int, string) {
 		in := core.Of(hctx.Context(), in)
 		ctx := hctx.Context()
 		subject, named, err := admitted(ctx, in, hctx.Param("product"), hctx.Param("branch_or_tag"),
-			hctx.Param("variant"))
+			hctx.Param("variant"), sendsScans)
 		if err != nil {
 			return
 		}
@@ -475,13 +475,20 @@ func store(ctx context.Context, documents *ingest.Documents, scanID int64, kind 
 	return err
 }
 
+// sendsScans is whether a person may upload a scan to a product: where they
+// triage what a scan opens.
+func sendsScans(subject access.Subject, productID int64) bool {
+	return subject.TriagesIn(productID)
+}
+
 // admitted is the sender and the build an upload names, where the sender may
-// file against it, and the refusal otherwise.
+// file against it, and the refusal otherwise. personSends says whether a
+// person may send to a product, which differs by what the upload opens.
 //
 // Asked before the form is read as well as by the handler, so a sender with no
 // right to the build spools nothing.
-func admitted(ctx context.Context, in core.Deps, product, branchOrTag, variant string) (
-	access.Subject, *catalog.Named, error) {
+func admitted(ctx context.Context, in core.Deps, product, branchOrTag, variant string,
+	personSends func(access.Subject, int64) bool) (access.Subject, *catalog.Named, error) {
 
 	// The sender, before anything is read or written.
 	subject, err := core.Requester(ctx)
@@ -515,7 +522,7 @@ func admitted(ctx context.Context, in core.Deps, product, branchOrTag, variant s
 	// actually went wrong. Another product stays invisible to it either
 	// way.
 	//
-	// A person may send too, where they hold triage on the product:
+	// A person may send too, where they triage what the upload opens:
 	// somebody re-uploading a build by hand is doing triage work, not
 	// administration.
 	switch {
@@ -523,7 +530,7 @@ func admitted(ctx context.Context, in core.Deps, product, branchOrTag, variant s
 		if !subject.MaySend(named.ProductID, named.BranchOrTagID, named.VariantID) {
 			return access.Subject{}, nil, huma.Error403Forbidden("not authorized")
 		}
-	case !subject.TriagesIn(named.ProductID):
+	case !personSends(subject, named.ProductID):
 		return access.Subject{}, nil, huma.Error403Forbidden("not authorized")
 	}
 

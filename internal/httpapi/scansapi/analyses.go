@@ -386,12 +386,7 @@ func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, int, string) 
 func admittedAnalysis(ctx context.Context, in core.Deps, product, branchOrTag, variant string) (
 	access.Subject, *catalog.Named, error) {
 
-	subject, named, err := admitted(ctx, in, product, branchOrTag, variant)
-	if err != nil {
-		return access.Subject{}, nil, err
-	}
-	if subject.Kind != access.Pipeline && !subject.Triages(analysis.OpensAt, named.ProductID) {
-		return access.Subject{}, nil, huma.Error403Forbidden("not authorized")
-	}
-	return subject, named, nil
+	return admitted(ctx, in, product, branchOrTag, variant, func(subject access.Subject, productID int64) bool {
+		return subject.Triages(analysis.OpensAt, productID)
+	})
 }
