@@ -138,7 +138,8 @@ export function clearHere(reload: () => void): void {
 }
 
 // The answer a sign-out's status means. A refusal for want of any session is
-// signed out; 409 is the server saying a proxy signed this browser in.
+// signed out; 409 is the server saying a proxy signed this browser in. A 403 is
+// a write the forgery guard refused, over a session that still works.
 export function signedOutBy(status: number): SignOutAnswer {
   if ((status >= 200 && status < 300) || status === 400 || status === 401) return "ended";
   if (status === 409) return "at-the-proxy";

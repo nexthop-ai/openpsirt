@@ -204,6 +204,7 @@ stored hashed and the cookie is unreadable by script.
 | Requests carrying a key or a token are exempt | Nothing sends those automatically |
 | Safe methods are named as a list | A method nobody thought of is guarded |
 | Both origins are compared as a browser serializes them: scheme and host lower case, no default port | `https://psirt.example.com:443` is the origin `https://psirt.example.com`; compared as written, the deployment's own writes are refused |
+| A write the guard refuses answers 403 "not authorized"; a missing or unknown credential answers 401 in the same words | A browser reads 401 as signed out, and a refused sign-out leaves its session live |
 
 ## Sign-in return addresses
 

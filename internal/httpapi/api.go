@@ -309,7 +309,7 @@ func Build(ready Ready, in core.Deps) *Built {
 						"answers_to", strings.Join(origins(r, in.BaseURL), ", "),
 						"path", r.URL.Path)
 				}
-				refuse(w)
+				refuseForgery(w)
 				return
 			}
 
@@ -507,6 +507,14 @@ func unconfigured(next http.Handler) http.Handler {
 // outsider whether a name or a key is real.
 func refuse(w http.ResponseWriter) {
 	Problem(w, http.StatusUnauthorized, "not authorized")
+}
+
+// refuseForgery answers a write that no page of this deployment sent. 403, in
+// the same words as refuse: a browser holding a live session must not read the
+// refusal as the session having ended, or a refused sign-out shows the
+// signed-out page over a session that still works.
+func refuseForgery(w http.ResponseWriter) {
+	Problem(w, http.StatusForbidden, "not authorized")
 }
 
 // unavailable answers a request whose caller could not be looked up.
