@@ -17,10 +17,6 @@ func TestTheCatalogWasReadAndEveryNameItGaveIsUsable(t *testing.T) {
 	if got := weakness.Known(); got < 500 {
 		t.Fatalf("the catalog holds %d weaknesses, which is too few to have been read", got)
 	}
-	if weakness.Version == "" || weakness.Published == "" {
-		t.Errorf("the names do not say which catalog they came from: %q of %q",
-			weakness.Version, weakness.Published)
-	}
 }
 
 func TestEveryNameIsStatedUnderAnIdentifierTheStandardAccepts(t *testing.T) {

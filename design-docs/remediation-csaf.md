@@ -86,7 +86,8 @@ validator compares as a pair.
 | Never a screen's short names | "Buffer overflow" fails a validator where the catalog's full name passes |
 | One weakness, the one the data calls the root cause: a feed's primary, or the first a person recording a flaw names | |
 | An identifier the catalog does not assign states nothing | Categories and views share the shape, and a newer catalog outruns an older one |
-| The catalog version is recorded, never gated against what it publishes today | It is not pinned, so a drift check fails builds for no change here |
+| The catalog version and publication day are recorded in each generated file's header, never gated against what it publishes today | It is not pinned, so a drift check fails builds for no change here. Nothing serves them, so they are a comment |
+| A test regenerates each committed file from its own contents and compares the bytes | A generator change not run, or a hand edit to the header, format or order, fails it. An entry edited in the generator's own format passes; regenerating from the catalog replaces it |
 
 ## Product identification
 
