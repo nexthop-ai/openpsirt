@@ -22,10 +22,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"regexp"
 	"sort"
@@ -33,6 +31,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/tools/provenance"
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // entry is one file held in the tree, and what it may be kept under.
@@ -88,16 +87,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "vendored: ALLOWED_LICENSES is unset; run it through make")
 		os.Exit(2)
 	}
-	listed, err := exec.Command("git", "ls-files", "-z").Output()
+	tracked, err := walk.Tracked()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "vendored: listing the tree:", err)
+		fmt.Fprintln(os.Stderr, "vendored:", err)
 		os.Exit(2)
-	}
-	var tracked []string
-	for _, each := range bytes.Split(listed, []byte{0}) {
-		if len(each) > 0 {
-			tracked = append(tracked, string(each))
-		}
 	}
 	notice, err := os.ReadFile("NOTICE")
 	if err != nil {

@@ -265,6 +265,7 @@ directory and reads the interface.
 | The count is of what the caller kept, never what it was shown | |
 | Every gate prints how much it read | |
 | A skipped directory is matched by name at any depth | Nested dependency directories are covered |
+| A gate reading what is committed, the license-header and copied-file gates, lists the tree through the same reader: what git tracks, less the skipped directories | One place decides what the tree is |
 | A change to the reader takes the whole gate | It decides what every check reads |
 
 ## Static analysis
