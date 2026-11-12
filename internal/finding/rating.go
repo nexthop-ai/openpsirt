@@ -95,8 +95,8 @@ func ratingsOf(named Named) []CVSS {
 //
 // A re-scan of unchanged data writes nothing. A generation already held is
 // replaced only where the report's number is higher, and a new one is inserted
-// keeping whatever a concurrent writer put there first, which a retry then
-// reads and raises.
+// keeping whatever a concurrent writer put there first, then raised the same
+// way.
 func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) error {
 	if len(ratings) == 0 {
 		return nil
@@ -133,12 +133,8 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 	for _, generation := range generations {
 		rating := worst[generation]
 		if known[rating.Generation] {
-			if _, err := rating.setOn(v.db.NewUpdate().Model((*CVSS)(nil))).
-				Where(`"vulnerability_id" = ?`, id).
-				Where(`"generation" = ?`, rating.Generation).
-				Where(`"score_centi" < ?`, rating.ScoreCenti).
-				Exec(ctx); err != nil {
-				return fmt.Errorf("raise how the issue is rated: %w", err)
+			if err := v.raiseRating(ctx, id, rating); err != nil {
+				return err
 			}
 			continue
 		}
@@ -151,6 +147,25 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 	}
 	if err := database.InBatchesKeeping(ctx, v.db, missing); err != nil {
 		return fmt.Errorf("record how the issue is rated: %w", err)
+	}
+	// A row a concurrent writer inserted first was kept, so it is raised as a
+	// held one is.
+	for _, rating := range missing {
+		if err := v.raiseRating(ctx, id, rating); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// raiseRating replaces a generation's held rating where this one's number is higher.
+func (v *Vulnerabilities) raiseRating(ctx context.Context, id int64, rating CVSS) error {
+	if _, err := rating.setOn(v.db.NewUpdate().Model((*CVSS)(nil))).
+		Where(`"vulnerability_id" = ?`, id).
+		Where(`"generation" = ?`, rating.Generation).
+		Where(`"score_centi" < ?`, rating.ScoreCenti).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("raise how the issue is rated: %w", err)
 	}
 	return nil
 }

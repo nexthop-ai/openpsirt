@@ -188,3 +188,22 @@ func TestAProductNobodyMayReadAnswersNothingAtEveryScopeLevel(t *testing.T) {
 		}
 	})
 }
+
+func TestAnEdgeFromAComponentToItselfIsNoOccurrence(t *testing.T) {
+	// The walks read such an edge as pulling in nothing, so a finding sits
+	// where the component's other edges place it and nowhere else.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{swss, libnl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss},
+				{Parent: swss, Child: libnl},
+				{Parent: libnl, Child: libnl},
+			},
+		})
+		if applied, _ := f.reported(t, found("CVE-2026-1", libnl)); applied.Opened != 1 {
+			t.Errorf("opened %d findings, want the one under swss", applied.Opened)
+		}
+	})
+}

@@ -280,6 +280,9 @@ func occurrenceEdges(ctx context.Context, db bun.IDB, buildID, componentID int64
 		ColumnExpr(`"parent"."component_id" AS "parent_component_id"`).
 		ColumnExpr(`"parent"."is_root" AS "parent_is_root"`).
 		Where(`"e"."build_id" = ?`, buildID).
+		// An edge from a component to itself pulls in nothing, as the walks
+		// read it, so it places no occurrence.
+		Where(`"e"."parent_id" <> "e"."child_id"`).
 		Where(held, args...).
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if componentID == 0 {

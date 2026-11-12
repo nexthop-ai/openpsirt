@@ -322,12 +322,10 @@ func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int6
 	return id, name, err
 }
 
-// ErrSeveralLikeIt says a build added to a recorded flaw holds its
-// component's name as several components, none at the version, ecosystem and
-// namespace it was recorded against.
-var ErrSeveralLikeIt = refusal.New("that build holds more than one component by that name, " +
-	"none of them the one this flaw was recorded against, so which it affects cannot be told: " +
-	"record the flaw for that build on its own")
+// ErrSeveralLikeIt says a build added to a recorded flaw holds more than one
+// component the flaw's component could be.
+var ErrSeveralLikeIt = refusal.New("that build holds more than one component this flaw could be recorded " +
+	"against, so which it affects cannot be told: record the flaw for that build on its own")
 
 // openIn is the finding this flaw makes in a build that has just been added to
 // its set.

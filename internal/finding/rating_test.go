@@ -4,8 +4,10 @@
 package finding_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -218,6 +220,43 @@ func TestTwoRatingsOfOneGenerationInOneReportKeepTheWorstInEitherOrder(t *testin
 			if len(held) != 1 || held[0].ScoreCenti != higher.ScoreCenti || held[0].Source != higher.Source {
 				t.Errorf("listed %s first, the issue holds %+v, want the higher rating alone", order[0].Source, held)
 			}
+		}
+	})
+}
+
+func TestARatingAnotherWriterInsertedFirstIsRaisedToTheWorst(t *testing.T) {
+	// Two scans rate one new generation at once: the lower lands first, and
+	// the higher one's insert keeps it, so the higher is raised over it.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		const name = "CVE-2026-6301"
+		filed, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{{Identifier: name, Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		lower := finding.CVSS{VulnerabilityID: filed[name], Generation: 3, ScoreCenti: 500,
+			Vector: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N", Version: "3.1", Source: "ghsa"}
+		higher := finding.CVSS{Generation: 3, ScoreCenti: 980,
+			Vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", Version: "3.1", Source: "nvd"}
+		hooked, rival := dbtest.RivalAfterRead(t, db, "vulnerability_rating", "vulnerability_rating", 2*time.Second,
+			func() error {
+				_, err := db.DB.NewInsert().Model(&lower).Exec(context.Background())
+				return err
+			})
+		if _, err := finding.NewVulnerabilities(hooked).Intern(ctx, []finding.Named{{
+			Identifier: name, Severity: "high", Ratings: []finding.CVSS{higher},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival rating: %v", err)
+		}
+		held, err := finding.NewVulnerabilities(db.DB).Ratings(ctx, filed[name])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 1 || held[0].ScoreCenti != higher.ScoreCenti {
+			t.Errorf("the issue holds %+v, want the higher rating", held)
 		}
 	})
 }

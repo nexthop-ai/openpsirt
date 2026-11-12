@@ -836,6 +836,12 @@ func TestAQualifierAddressIsStoredWithoutItsCredentialOrQuery(t *testing.T) {
 			"pkg:golang/example.com/b@v1?arch=amd64"},
 		{"pkg:golang/example.com/s@v1?vcs_url=git%2Bhttps://github.com/s.git#sub/dir",
 			"pkg:golang/example.com/s@v1?vcs_url=git%2Bhttps://github.com/s.git#sub/dir"},
+		{"pkg:generic/q@1?download_url=https://b.example.com/q.bin%3FX-Amz-Credential=A&X-Amz-Signature=SECRET",
+			"pkg:generic/q@1?download_url=https://b.example.com/q.bin"},
+		{"pkg:golang/example.com/g@v1?vcs_url=git%2Bssh://git@github.com/org/g.git",
+			"pkg:golang/example.com/g@v1?vcs_url=git%2Bssh://git@github.com/org/g.git"},
+		{"pkg:golang/example.com/t@v1?vcs_url=git%2Bhttps://glpat-SECRET@gitlab.example.com/t.git",
+			"pkg:golang/example.com/t@v1?vcs_url=git%2Bhttps://gitlab.example.com/t.git"},
 		{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
 			"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"},
 		// Another scheme is not a package identifier, and its slashes are

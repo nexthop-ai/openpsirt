@@ -24,8 +24,9 @@ const purlBatchV0130 = 5_000
 // purlCredentialsV0130 rewrites the package identifiers v0.12.0 stored as
 // v0.13.0 stores them: the slashes after the scheme dropped, and any
 // credential and query taken out of the addresses its qualifiers hold. Only a
-// row holding qualifiers or starting "pkg:/" in any case is read, since an
-// address can be escaped in part, and only a row that changes is written, so
+// row starting "pkg:/" in any case, or holding a colon after its qualifiers
+// start, plain or escaped, is read: an address has one, and a distribution's
+// arch and distro qualifiers do not. Only a row that changes is written, so
 // a start after one that stopped part way writes what the first missed.
 // No identity is rewritten.
 func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
@@ -43,8 +44,8 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 				purl string
 			}
 			rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
-				WHERE "id" > ? AND ("`+column+`" LIKE ? OR LOWER("`+column+`") LIKE ?) ORDER BY "id" LIMIT ?`,
-				after, "%?%", "pkg:/%", batch)
+				WHERE "id" > ? AND ("`+column+`" LIKE ? OR LOWER("`+column+`") LIKE ? OR LOWER("`+column+`") LIKE ?)
+				ORDER BY "id" LIMIT ?`, after, "%?%:%", "%?%3a%", "pkg:/%", batch)
 			if err != nil {
 				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
@@ -120,16 +121,23 @@ func purlWithoutCredentialV0130(purl string) string {
 			continue
 		}
 		parsed, err := url.Parse(address)
-		switch {
-		case err != nil:
-		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery && parsed.Fragment == "":
+		if err != nil {
+			continue
+		}
+		_, password := parsed.User.Password()
+		user := parsed.User != nil && (password || !strings.Contains(strings.ToLower(parsed.Scheme), "ssh"))
+		queried := parsed.RawQuery != "" || parsed.ForceQuery
+		if !user && !queried && parsed.Fragment == "" {
 			kept = append(kept, pair)
-		default:
-			parsed.User, parsed.RawQuery, parsed.ForceQuery = nil, "", false
+		} else {
+			if user {
+				parsed.User = nil
+			}
+			parsed.RawQuery, parsed.ForceQuery = "", false
 			parsed.Fragment, parsed.RawFragment = "", ""
 			kept = append(kept, key+"="+qualifierEscapedV0130(parsed.String()))
 		}
-		if strings.Contains(value, "?") {
+		if strings.Contains(value, "?") || (queried && strings.Contains(value, "=")) {
 			break
 		}
 	}

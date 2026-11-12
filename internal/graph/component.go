@@ -284,19 +284,28 @@ func StoredPurl(purl string) string {
 			continue
 		}
 		parsed, err := url.Parse(address)
-		switch {
-		case err != nil:
+		if err != nil {
 			// Where its credential ends cannot be told, so it is not kept.
-		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery && parsed.Fragment == "":
+			continue
+		}
+		// A user with no password on an ssh address names the account the
+		// host serves, such as git; any other user may be a token.
+		_, password := parsed.User.Password()
+		user := parsed.User != nil && (password || !strings.Contains(strings.ToLower(parsed.Scheme), "ssh"))
+		queried := parsed.RawQuery != "" || parsed.ForceQuery
+		if !user && !queried && parsed.Fragment == "" {
 			kept = append(kept, pair)
-		default:
-			parsed.User, parsed.RawQuery, parsed.ForceQuery = nil, "", false
+		} else {
+			if user {
+				parsed.User = nil
+			}
+			parsed.RawQuery, parsed.ForceQuery = "", false
 			parsed.Fragment, parsed.RawFragment = "", ""
 			kept = append(kept, key+"="+qualifierEscaped(parsed.String()))
 		}
-		if strings.Contains(value, "?") {
-			// An address whose query is written unescaped carries the
-			// pairs after it as that query, so they are not kept.
+		if strings.Contains(value, "?") || (queried && strings.Contains(value, "=")) {
+			// An address whose query is written in part unescaped carries
+			// the pairs after it as that query, so they are not kept.
 			break
 		}
 	}
