@@ -80,7 +80,7 @@ func advisoryRefused(in core.Deps, err error, what string) error {
 // AdvisoryDocumentOutput is an advisory's generated document, and the
 // edition it was generated from.
 type AdvisoryDocumentOutput struct {
-	Edition int `header:"Advisory-Edition" doc:"The edition of the advisory the document was generated from, which agreeing to what it says names"`
+	Edition int `header:"Advisory-Edition" doc:"The edition the advisory pointed at before the document was generated, never newer than what it states"`
 	Body    *advisory.Document
 }
 
@@ -334,7 +334,9 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"that it was issued is a separate request, and what it keeps is a digest of " +
 			"what was generated, so that whether what you published is still what this " +
 			"would generate can be answered.\n\n" +
-			"The `Advisory-Edition` header names the edition the document was generated from.\n\n" +
+			"The `Advisory-Edition` header names the edition the advisory pointed at before " +
+			"the document was generated, never newer than what it states; agreeing names " +
+			"the oldest edition read, as the approval says.\n\n" +
 			"How far the document may travel is its distribution label, red while " +
 			"anything it covers is still held back. `tracking.status` says where the " +
 			"document is in its life. Reaching a disclosure date discloses nothing, so " +
@@ -433,11 +435,14 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Path:    "/v1/advisories/{advisory}/approval",
 		Summary: "Approve an advisory",
 		Description: "Records that you have read what this advisory says and agree to it.\n\n" +
-			"Send the `edition` the advisory reported when you read it. The agreement " +
-			"names that edition rather than the advisory, and answers 409 where the " +
-			"advisory has moved to another since: read it again and agree to what it " +
-			"says now. Retitling it, naming another flaw on it or taking one off opens a " +
-			"new edition and takes the agreement back, so what stands is always an " +
+			"Send the `edition` the advisory reported when you read it. Where you also " +
+			"read its releases or its document, send the oldest of the editions the three " +
+			"named: each names the edition the advisory pointed at before it was read, " +
+			"never newer than what it shows. The agreement names that edition rather than " +
+			"the advisory, and answers 409 where the advisory has moved to another since: " +
+			"read it again and agree to what it says now. Retitling it, naming another flaw " +
+			"on it or taking one off, and marking a release affected or clearing the mark, " +
+			"open a new edition and take the agreement back, so what stands is always an " +
 			"agreement to the document as it reads now.\n\n" +
 			"You may not agree to an advisory you started or whose current edition you " +
 			"wrote. Both answer 409, and there is no override, so a deployment with one " +

@@ -95,3 +95,12 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject, identifier
 	out, _, err := s.ReleasesAt(ctx, subject, identifier)
 	return out, err
 }
+
+// LandAfterRead has edit run once, between an advisory being read and what is
+// shown beside its edition being read.
+func (s *Store) LandAfterRead(edit func()) {
+	s.afterRead = func() {
+		s.afterRead = nil
+		edit()
+	}
+}

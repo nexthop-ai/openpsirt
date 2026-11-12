@@ -89,11 +89,15 @@ func (s *Store) ReleasesAt(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, 0, err
 	}
+	if s.afterRead != nil {
+		s.afterRead()
+	}
 	out, err := s.releasesOf(ctx, subject, row)
 	return out, edition, err
 }
 
-// releasesOf is Releases for an advisory already read.
+// releasesOf is what ReleasesAt reads about the releases of an advisory
+// already read.
 func (s *Store) releasesOf(ctx context.Context, subject access.Subject, row *Advisory) ([]Placed, error) {
 	out, err := placed(ctx, s.db, subject, row.ID)
 	if err != nil {

@@ -107,7 +107,13 @@ export function Advisory() {
       <Document advisory={advisory} covers={covers.length} read={document} />
       <Agreement
         advisory={advisory}
-        edition={shown(it?.edition, releases.data?.edition, document.data?.edition)}
+        edition={
+          // Nothing to agree to until the releases are read, and the document
+          // too unless it was refused: a mark nobody has seen is not agreed to.
+          covers.length > 0 && (releases.data === undefined || document.isPending)
+            ? 0
+            : shown(it?.edition, releases.data?.edition, document.data?.edition)
+        }
         agreed={agreed}
         by={it?.agreed_by ?? []}
       />

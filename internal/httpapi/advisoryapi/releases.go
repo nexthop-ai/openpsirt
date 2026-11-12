@@ -45,7 +45,7 @@ type ReleaseCoveringBody struct {
 // AdvisoryReleasesOutput is what an advisory states about each release, and
 // the edition that is.
 type AdvisoryReleasesOutput struct {
-	Edition int `header:"Advisory-Edition" doc:"The edition of the advisory these releases were read at, which agreeing to what they say names"`
+	Edition int `header:"Advisory-Edition" doc:"The edition the advisory pointed at before these releases were read, never newer than what they show"`
 	Body    struct {
 		Items []AdvisoryReleaseBody `json:"items"`
 		Total int                   `json:"total,omitempty"`
@@ -72,8 +72,9 @@ func registerReleases(api huma.API, in core.Deps) {
 			"it was made on is not flagged. " +
 			"`changed` is true where the status differs from what an agreement standing on " +
 			"what the advisory says now saw; the agreement stands.\n\n" +
-			"The `Advisory-Edition` header names the edition these were read at; agreeing " +
-			"to what they show names the oldest edition among this, the advisory and its document.\n\n" +
+			"The `Advisory-Edition` header names the edition the advisory pointed at before " +
+			"these were read, never newer than what they show; agreeing names the oldest " +
+			"edition read, as the approval says.\n\n" +
 			"An advisory covering a product you hold nothing on answers as one that does " +
 			"not exist.",
 		Tags: []string{"Findings"},

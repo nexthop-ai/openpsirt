@@ -179,7 +179,7 @@ export interface paths {
          * Approve an advisory
          * @description Records that you have read what this advisory says and agree to it.
          *
-         *     Send the `edition` the advisory reported when you read it. The agreement names that edition rather than the advisory, and answers 409 where the advisory has moved to another since: read it again and agree to what it says now. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
+         *     Send the `edition` the advisory reported when you read it. Where you also read its releases or its document, send the oldest of the editions the three named: each names the edition the advisory pointed at before it was read, never newer than what it shows. The agreement names that edition rather than the advisory, and answers 409 where the advisory has moved to another since: read it again and agree to what it says now. Retitling it, naming another flaw on it or taking one off, and marking a release affected or clearing the mark, open a new edition and take the agreement back, so what stands is always an agreement to the document as it reads now.
          *
          *     You may not agree to an advisory you started or whose current edition you wrote. Both answer 409, and there is no override, so a deployment with one person publishes no advisory.
          *
@@ -221,7 +221,7 @@ export interface paths {
          *
          *     The document is generated, not published. Nothing is sent anywhere. Recording that it was issued is a separate request, and what it keeps is a digest of what was generated, so that whether what you published is still what this would generate can be answered.
          *
-         *     The `Advisory-Edition` header names the edition the document was generated from.
+         *     The `Advisory-Edition` header names the edition the advisory pointed at before the document was generated, never newer than what it states; agreeing names the oldest edition read, as the approval says.
          *
          *     How far the document may travel is its distribution label, red while anything it covers is still held back. `tracking.status` says where the document is in its life. Reaching a disclosure date discloses nothing, so nothing here does either.
          *
@@ -369,7 +369,7 @@ export interface paths {
          *
          *     A release whose every open occurrence is covered by approved, live decisions with one outcome names the earliest of them, with the builds it was made on. `elsewhere` is true where that decision records the builds it was made on and none of them is of this release's variant. Another branch or tag of a variant it was made on is not flagged. `changed` is true where the status differs from what an agreement standing on what the advisory says now saw; the agreement stands.
          *
-         *     The `Advisory-Edition` header names the edition these were read at; agreeing to what they show names the oldest edition among this, the advisory and its document.
+         *     The `Advisory-Edition` header names the edition the advisory pointed at before these were read, never newer than what they show; agreeing names the oldest edition read, as the approval says.
          *
          *     An advisory covering a product you hold nothing on answers as one that does not exist.
          *

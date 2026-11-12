@@ -96,6 +96,19 @@ describe("one advisory", () => {
     ]);
   });
 
+  it("offers no agreement until the releases are read", async () => {
+    serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition: 4 } };
+      }
+      if (path === "/v1/advisories/{advisory}/releases") return { status: 500 };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    expect(button(mount.host(), "Agree to what it says").disabled).toBe(true);
+  });
+
   it("agrees to the oldest edition any panel was read at", async () => {
     serve((path) => {
       if (path === "/v1/advisories/{advisory}") {

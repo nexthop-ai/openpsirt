@@ -870,3 +870,47 @@ func TestMarkingAReleaseAgainKeepsWhoMarkedAndClearedItBefore(t *testing.T) {
 		}
 	})
 }
+
+// The releases and the document each name the edition the advisory pointed
+// at before they were read, so a mark landing between the two leaves the
+// number behind what is shown, which an agreement to it is refused for, never
+// ahead of it.
+func TestWhatIsShownBesideAnEditionIsNeverOlderThanIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		f.dismissed(t, f.master, identifier)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		elsewhere := advisory.NewStore(f.db.DB)
+		markLands := func(affected bool) func() {
+			return func() {
+				if err := elsewhere.MarkAffected(ctx, f.who, named, "sonic", identifier,
+					fixtures.BranchName, "broadcom", affected); err != nil {
+					t.Error(err)
+				}
+			}
+		}
+
+		before := readEdition(t, f.store, f.who, named)
+		f.store.LandAfterRead(markLands(true))
+		rows, edition, err := f.store.ReleasesAt(ctx, f.who, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if edition != before || len(rows) == 0 || !rows[0].Overridden {
+			t.Errorf("the releases named edition %d and read %+v, want edition %d beside the mark",
+				edition, rows, before)
+		}
+
+		before = readEdition(t, f.store, f.who, named)
+		f.store.LandAfterRead(markLands(false))
+		doc, edition, err := f.store.ForAdvisoryAt(ctx, f.who, issuer, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if edition != before || len(doc.Vulnerabilities[0].Status.KnownAffected) != 0 {
+			t.Errorf("the document named edition %d and stated %+v, want edition %d beside the cleared mark",
+				edition, doc.Vulnerabilities[0].Status, before)
+		}
+	})
+}

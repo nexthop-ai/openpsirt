@@ -80,6 +80,10 @@ type Store struct {
 	// this transaction's window, which one engine will not let another
 	// connection do.
 	beforeWrite func() error
+	// afterRead runs between an advisory being read and what is shown beside
+	// its edition being read. Set by a test that has an edit land there; nil
+	// everywhere else.
+	afterRead func()
 }
 
 // NewStore returns a store over db.
@@ -88,8 +92,8 @@ func NewStore(db *bun.DB) *Store {
 }
 
 // ForAdvisoryAt assembles the document for one advisory, with the edition the
-// advisory read pointed at as it was assembled, for a screen agreeing to what
-// it shows.
+// advisory pointed at before the document was assembled, for a screen agreeing
+// to what it shows: never newer than what the document states.
 //
 // One entry per issue the advisory covers, and one product branch per product
 // those issues are covered in. The standard carries vulnerabilities as an
@@ -128,6 +132,9 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
 		return nil, nil, err
+	}
+	if s.afterRead != nil {
+		s.afterRead()
 	}
 	held, err := s.covers(ctx, subject, row)
 	if err != nil {
