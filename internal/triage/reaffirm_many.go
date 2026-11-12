@@ -402,16 +402,21 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	// whole act with "a decision already stands here", which is false. Keyed on
 	// the issue the finding is held under, since rows filed under two names
 	// that merged lead to one finding.
-	done := map[string]bool{}
+	// Where two rows lead to one, an undisclosed one keeps it undisclosed,
+	// whichever is read first.
+	done := map[string]int{}
 	for _, row := range lapsed {
 		key := occurrenceKey(row.ProductID, row.VulnerabilityID, row.OccurrenceIdentity)
 		for _, at := range atVersions(row, where[key]) {
 			written := occurrenceKey(at.ProductID, at.VulnerabilityID, at.OccurrenceIdentity) +
 				"\x00" + at.ComponentUpstream + "\x00" + at.ConsumerUpstream
-			if done[written] {
+			if i, seen := done[written]; seen {
+				if i >= 0 && proposals[i].Occurrence.Visibility == access.Public {
+					proposals[i].Occurrence.Visibility = row.Visibility
+				}
 				continue
 			}
-			done[written] = true
+			done[written] = -1
 			if at.Kind == kind.Analysis {
 				codeFinding := fmt.Sprintf("%d\x00%s", at.ProductID, at.OccurrenceIdentity)
 				if !asked[codeFinding] {
@@ -432,6 +437,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 			// still holds; it is not an occasion to change who may see it.
 			at.Visibility = row.Visibility
 			occurrences[row.OccurrenceIdentity] = true
+			done[written] = len(proposals)
 			proposals = append(proposals, remade(*previous, at, reasoning, by,
 				severity[[2]int64{row.ProductID, row.VulnerabilityID}], full))
 		}
