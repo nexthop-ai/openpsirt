@@ -143,7 +143,7 @@ databases an earlier run migrated and the 246 s migrated every one.
 
 ## Seeded test starts
 
-Rules in `design-docs/build-tests.md` § Undoing a test. The triage API, finding,
+Rules in `design-docs/build-tests.md` § Reset between tests. The triage API, finding,
 API and findings API packages, one engine at a time, a workstation shared with
 other work, each binary's first test included:
 

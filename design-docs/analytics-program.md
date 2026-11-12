@@ -35,7 +35,7 @@ it. A component is its name, at any version.
 | A branch | Calendar time, in daily or weekly steps | Scanned nightly (REQ-54); a team fixing dozens a day sees it by the day |
 | Tagged releases | Release over release, oldest first, as bars | Frozen points; a line between them draws a path nothing traveled |
 
-### Counting by identity
+### Counts by identity
 
 Each issue at a component is one identity (REQ-54), derived from content
 (REQ-08), so one that leaves the open set and comes back is returned, and a
@@ -111,7 +111,7 @@ it as revised (`design-docs/findings-closure.md` § Build-declared claims).
 
 The backlog of one selection from a day 0, in daily steps, and where the recent
 pace takes it. Counted in the trend's unit, an issue at a component, with the
-trend's identity rules (§ Counting by identity).
+trend's identity rules (§ Counts by identity).
 
 | Term | Meaning |
 |---|---|

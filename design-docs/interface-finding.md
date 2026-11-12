@@ -57,7 +57,7 @@ The finding is the working screen before a decision and after it.
 | Starting an advisory mints one name, kept once it exists, and names the flaw once; a failed later step retries from where it stopped | A retry spends no second number |
 | What belongs to one finding is reset on walking to the next: the confirmation, the decision being extended, the rating form, the incident forms | The screen is not remounted on an address change |
 
-### What the build says
+### Build statements
 
 One entry per claim the build still makes covering an occurrence shown: whose it
 is (the build, or the publisher whose document named the build as its product),

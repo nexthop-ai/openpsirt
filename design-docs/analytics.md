@@ -63,7 +63,7 @@ then the grain is one row per product per day, the grain access is granted at.
 
 | Rule | Reason |
 |---|---|
-| A count over findings groups the occurrences on their own columns first, then joins the issue, its rating and the catalog's names | One issue sits at many occurrences: the backlog trend answers in 0.25 s against 1.58 s (`design-docs/analytics-measurements.md` § Grouping before the join) |
+| A count over findings groups the occurrences on their own columns first, then joins the issue, its rating and the catalog's names | One issue sits at many occurrences: the backlog trend answers in 0.25 s against 1.58 s (`design-docs/analytics-measurements.md` § Early grouping) |
 | Every narrowing applies before the grouping | Visibility, the selection and the minimum severity are conditions on an occurrence |
 | A DISTINCT over joined rows is not the reduction | The join still runs per occurrence, slower on PostgreSQL |
 
