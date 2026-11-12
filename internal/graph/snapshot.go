@@ -224,7 +224,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			id := ids[stored.Identity()]
 			if _, already := wanted[id]; !already {
 				wanted[id] = stated{
-					purl: strings.TrimSpace(stored.Purl), cpe: strings.TrimSpace(stored.CPE),
+					purl: statedPurl(stored.Purl), cpe: strings.TrimSpace(stored.CPE),
 					upstreamName:    strings.TrimSpace(stored.UpstreamName),
 					upstreamVersion: strings.TrimSpace(stored.UpstreamVersion),
 					repository:      statedRepository(stored.Repository),
@@ -248,7 +248,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 				continue
 			}
 			statedImages[nodeIDs[ids[image.Identity()]]] = statedImage{
-				version: strings.TrimSpace(d.Version), purl: strings.TrimSpace(d.Purl),
+				version: strings.TrimSpace(d.Version), purl: statedPurl(d.Purl),
 			}
 		}
 		applied.VersionsOpened, applied.VersionsClosed, err = reconcileImageVersions(ctx, tx,

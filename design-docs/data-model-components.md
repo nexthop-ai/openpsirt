@@ -26,9 +26,13 @@ hashed to a fixed width.
 | The two bases are hashed apart, each marked with which it is | A component named `pkg:npm/lodash` at `4.17.22` with no identifier is otherwise the real package's row |
 | No byte inside a name or a version moves anything across: a name is prefixed with its length | Joined by `@`, the name `a@b` at `c` is `a` at `b@c`, and JSON can spell any byte, a null included |
 | A package identifier is read for what it says: escapes decoded, the ecosystem lowercased, the qualifiers excluded | On a public switch image 8,374 described components named 7,858 packages, every collision one package described with and without qualifiers |
+| Slashes after the scheme are dropped | The specification has a parser ignore them, so `pkg://deb/debian/curl` is `pkg:deb/debian/curl` |
+| Each path segment is decoded on its own, and a slash or percent sign it decodes to stays escaped | `pkg:npm/a%2Fb`, the package `a/b`, is not `pkg:npm/a/b`, the package `b` in the namespace `a` |
+| An identifier stating no version keeps the version field in identity | It names the package, and every version of `pkg:generic/foo` is otherwise one component |
 | Architecture is among the qualifiers excluded | It is already the variant |
 | One reduction, the identifier specification's, for every ecosystem | Nothing here knows which producer wrote a document |
 | The row holds every text a producer states with surrounding space taken off: identifiers, name, version, source package and version, supplier and license | Identity already reads the name and version trimmed. MySQL and MariaDB ignore a trailing space in an equality and PostgreSQL, SQLite and the application do not, so an untrimmed version matches the decision keyed on it, trimmed, on two engines of four |
+| A package identifier is stored with the slashes after its scheme dropped, and a qualifier's address without its credential or query, on the row, the node and an image version | A pipeline writes `vcs_url` and `download_url` with a token in them, and the identifier reaches every reader of the component. A qualifier holding an address that does not parse is dropped, since where its credential ends cannot be told |
 
 ### Container images
 

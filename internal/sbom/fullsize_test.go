@@ -235,6 +235,7 @@ func TestIdentityIsReadTheSameWayWhateverEmittedIt(t *testing.T) {
 		{"a go module", "pkg:golang/github.com/gin-gonic/gin@v1.9.1?go-version=1.21", "pkg:golang/github.com/gin-gonic/gin@v1.9.1"},
 		{"a container image", "pkg:oci/alpine@sha256%3Aabc?repository_url=docker.io/library/alpine", "pkg:oci/alpine@sha256:abc"},
 		{"an ecosystem spelled in two cases", "pkg:NPM/lodash@4.17.21", "pkg:npm/lodash@4.17.21"},
+		{"slashes after the scheme", "pkg://deb/debian/curl@8.5.0", "pkg:deb/debian/curl@8.5.0"},
 	}
 	for _, c := range same {
 		if (graph.Described{Purl: c.one}).Identity() != (graph.Described{Purl: c.other}).Identity() {
@@ -252,11 +253,36 @@ func TestIdentityIsReadTheSameWayWhateverEmittedIt(t *testing.T) {
 		{"two namespaces", "pkg:npm/%40scope/pkg@1.0.0", "pkg:npm/%40other/pkg@1.0.0"},
 		{"two ecosystems", "pkg:npm/lodash@4.17.21", "pkg:pypi/lodash@4.17.21"},
 		{"a name that differs only in case", "pkg:pypi/Django@4.2.1", "pkg:pypi/django@4.2.1"},
+		{"an escaped slash in a name", "pkg:npm/a%2Fb@1.0.0", "pkg:npm/a/b@1.0.0"},
+		{"an escaped percent sign in a name", "pkg:npm/a%252Fb@1.0.0", "pkg:npm/a%2Fb@1.0.0"},
 	}
 	for _, c := range differ {
 		if (graph.Described{Purl: c.one}).Identity() == (graph.Described{Purl: c.other}).Identity() {
 			t.Errorf("%s: read as one component\n  %s\n  %s", c.what, c.one, c.other)
 		}
+	}
+}
+
+func TestAnIdentifierWithNoVersionKeepsTheVersionStatedBesideIt(t *testing.T) {
+	// An identifier stating no version names the package, so the version
+	// field is what says which one this is.
+	one := graph.Described{Name: "foo", Version: "1.0", Purl: "pkg:generic/foo"}
+	two := graph.Described{Name: "foo", Version: "2.0", Purl: "pkg:generic/foo"}
+	if one.Identity() == two.Identity() {
+		t.Error("two versions under an identifier with no version read as one component")
+	}
+	// One with a version already says which, and the field beside it is not
+	// read.
+	stated := graph.Described{Name: "foo", Version: "1.0", Purl: "pkg:generic/foo@1.0"}
+	other := graph.Described{Name: "foo", Version: "1.0-local", Purl: "pkg:generic/foo@1.0"}
+	if stated.Identity() != other.Identity() {
+		t.Error("an identifier stating its version read as two components")
+	}
+	// A scoped name begins with an "@" that is not a version.
+	scoped := graph.Described{Name: "core", Version: "7.0", Purl: "pkg:npm/%40babel/core"}
+	later := graph.Described{Name: "core", Version: "7.1", Purl: "pkg:npm/%40babel/core"}
+	if scoped.Identity() == later.Identity() {
+		t.Error("two versions of a scoped package with no version in its identifier read as one")
 	}
 }
 

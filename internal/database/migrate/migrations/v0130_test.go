@@ -143,3 +143,71 @@ func TestAV0120DatabaseResumesTheV0130UpgradeFromEveryStop(t *testing.T) {
 		})
 	}
 }
+
+// A v0.12.0 database's package identifiers lose the credential a qualifier's
+// address held, on the component, the node and the image version, and keep
+// every qualifier holding none.
+func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0120)
+		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+		exec := func(query string, args ...any) {
+			t.Helper()
+			if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+		}
+		id := func(query string) int64 {
+			t.Helper()
+			var out int64
+			if err := db.DB.NewRaw(query).Scan(ctx, &out); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+			return out
+		}
+		const (
+			leaky = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git&arch=amd64" //nolint:gosec // G101: the credential this upgrade takes out
+			clean = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git&arch=amd64"
+			kept  = "pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"
+		)
+		exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
+		product := id(`SELECT MAX("id") FROM "product"`)
+		exec(`INSERT INTO "branch_or_tag" ("product_id", "name", "display_name", "kind", "created_at")
+			VALUES (?, ?, ?, ?, ?)`, product, "main", "main", "branch", at)
+		line := id(`SELECT MAX("id") FROM "branch_or_tag"`)
+		exec(`INSERT INTO "variant" ("product_id", "name", "display_name", "customer_facing", "created_at")
+			VALUES (?, ?, ?, ?, ?)`, product, "image", "Image", true, at)
+		variant := id(`SELECT MAX("id") FROM "variant"`)
+		exec(`INSERT INTO "build" ("branch_or_tag_id", "variant_id", "created_at") VALUES (?, ?, ?)`,
+			line, variant, at)
+		build := id(`SELECT MAX("id") FROM "build"`)
+		exec(`INSERT INTO "scan" ("build_id", "content_hash", "built_at", "received_at", "parser_version",
+			"status", "components") VALUES (?, ?, ?, ?, ?, ?, ?)`, build, "hash", at, at, "test", "accepted", 2)
+		scan := id(`SELECT MAX("id") FROM "scan"`)
+		for _, purl := range []string{leaky, kept} {
+			exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
+				"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, purl[:20], purl, "x", "1", "x", purl[:20], at)
+			component := id(`SELECT MAX("id") FROM "component"`)
+			exec(`INSERT INTO "graph_node" ("build_id", "component_id", "is_root", "opened_scan_id", "purl")
+				VALUES (?, ?, ?, ?, ?)`, build, component, false, scan, purl)
+			node := id(`SELECT MAX("id") FROM "graph_node"`)
+			exec(`INSERT INTO "image_version" ("node_id", "version", "purl", "opened_scan_id")
+				VALUES (?, ?, ?, ?)`, node, "1", purl, scan)
+		}
+
+		dbtest.MigrateTo(t, db, v0130)
+
+		for _, table := range []string{"component", "graph_node", "image_version"} {
+			var got []string
+			if err := db.DB.NewRaw(`SELECT "purl" FROM "`+table+`" ORDER BY "id"`).Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 2 || got[0] != clean || got[1] != kept {
+				t.Errorf("%s holds %q after the upgrade, want %q and %q", table, got, clean, kept)
+			}
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}

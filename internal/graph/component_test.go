@@ -739,3 +739,77 @@ func TestANodeHoldingNoStatedNameIsRestatedOnlyWhereTheBuildDiffers(t *testing.T
 		}
 	})
 }
+
+// A qualifier naming an address keeps the address and loses any credential
+// in it, on the shared row and on the build's node, because both reach every
+// reader of the component.
+func TestAPackageIdentifierIsStoredWithoutACredentialInAQualifier(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		stated := graph.Described{
+			Purl: "pkg:golang/example.com/x@v1.2.0?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git" +
+				"&download_url=https://user:pass@example.com/x.zip&arch=amd64",
+			Name: "x", Version: "v1.2.0",
+		}
+		snap := graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{stated},
+			Dependencies: []graph.Dependency{{Parent: root, Child: stated}},
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		const want = "pkg:golang/example.com/x@v1.2.0?vcs_url=git%2Bhttps://gitlab.example.com/x.git" +
+			"&download_url=https://example.com/x.zip&arch=amd64"
+		held, err := f.store.CurrentComponents(ctx, f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 1 || held[0].Purl != want {
+			t.Errorf("the scanner is given %+v, want the identifier %s", held, want)
+		}
+		var row []string
+		if err := f.db.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`"c"."purl"`).
+			Where(`"c"."name" = ?`, "x").Scan(ctx, &row); err != nil {
+			t.Fatal(err)
+		}
+		if len(row) != 1 || row[0] != want {
+			t.Errorf("the component row holds %q, want %s", row, want)
+		}
+	})
+}
+
+// An identifier written with slashes after its scheme is stored as one
+// without, so a narrowing by its type reads it.
+func TestAPackageIdentifierIsStoredWithoutSlashesAfterItsScheme(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		slashed := graph.Described{Purl: "pkg://deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+		plain := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+		ids, err := graph.NewComponents(f.db.DB).Intern(ctx, []graph.Described{slashed})
+		if err != nil {
+			t.Fatal(err)
+		}
+		again, err := graph.NewComponents(f.db.DB).Intern(ctx, []graph.Described{plain})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ids[slashed.Identity()] != again[plain.Identity()] {
+			t.Errorf("two spellings of one identifier were stored as components %d and %d",
+				ids[slashed.Identity()], again[plain.Identity()])
+		}
+		snap := graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{slashed},
+			Dependencies: []graph.Dependency{{Parent: root, Child: slashed}},
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		id, err := graph.ComponentAsIn(ctx, f.db.DB, f.buildID, "curl", graph.Choice{Ecosystem: "deb"})
+		if err != nil || id != ids[slashed.Identity()] {
+			t.Errorf("chosen by its ecosystem the build answers component %d, %v; want %d",
+				id, err, ids[slashed.Identity()])
+		}
+	})
+}

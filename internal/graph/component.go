@@ -28,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // Component is a package at a version, shared across every product that ships
@@ -165,6 +166,14 @@ func (d Described) Identity() string {
 		basis = "name\x00" + strconv.Itoa(len(name)) + "\x00" + name + strings.TrimSpace(d.Version)
 	} else {
 		basis = "purl\x00" + basis
+		// An identifier stating no version names the package and not one
+		// version of it, so the version stated beside it is kept, or every
+		// version of the package is one component.
+		if _, stated := PackageOf(d.Purl); stated == "" {
+			if version := strings.TrimSpace(d.Version); version != "" {
+				basis += "\x00version\x00" + strconv.Itoa(len(version)) + "\x00" + version
+			}
+		}
 	}
 	sum := sha256.Sum256([]byte(basis))
 	return hex.EncodeToString(sum[:])
@@ -190,9 +199,14 @@ func (d Described) Identity() string {
 //
 // Escapes are decoded. The same version arrives as `2.3.2-2%2Bb1` and
 // `2.3.2-2+b1` from the two sources, which byte comparison calls two packages.
+// Each segment is decoded on its own, and a slash or percent sign it decodes
+// to is escaped again, so `pkg:npm/a%2Fb`, one package named "a/b", stays
+// apart from `pkg:npm/a/b`, the package "b" in the namespace "a".
 //
 // The type is lowercased, which the specification requires and which
-// nothing else here relies on.
+// nothing else here relies on. Slashes after the scheme are dropped, as the
+// specification has a parser do: `pkg://deb/debian/curl` is
+// `pkg:deb/debian/curl`.
 func canonicalPurl(purl string) string {
 	purl = strings.TrimSpace(purl)
 	if purl == "" {
@@ -207,15 +221,98 @@ func canonicalPurl(purl string) string {
 
 	scheme, rest, found := strings.Cut(purl, ":")
 	if !found {
-		return decoded(purl)
+		return decodedPath(purl)
 	}
+	rest = strings.TrimLeft(rest, "/")
 	// The type is the first segment after the scheme, not the scheme itself,
 	// and it is the part the specification calls case-insensitive.
 	kind, path, split := strings.Cut(rest, "/")
 	if !split {
-		return strings.ToLower(scheme) + ":" + decoded(rest)
+		return strings.ToLower(scheme) + ":" + decodedPath(rest)
 	}
-	return strings.ToLower(scheme) + ":" + strings.ToLower(kind) + "/" + decoded(path)
+	return strings.ToLower(scheme) + ":" + strings.ToLower(kind) + "/" + decodedPath(path)
+}
+
+// decodedPath is a path of segments, each decoded, with a separator or escape
+// character a segment decodes to escaped again.
+func decodedPath(path string) string {
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		segment = strings.ReplaceAll(decoded(segment), "%", "%25")
+		segments[i] = strings.ReplaceAll(segment, "/", "%2F")
+	}
+	return strings.Join(segments, "/")
+}
+
+// statedPurl is a package identifier as a row holds it: trimmed, with the
+// slashes after the scheme dropped, and with any credential taken out of a
+// qualifier's address. A qualifier such as `vcs_url` or `download_url` names
+// an address, a build pipeline can write it with a token in it, and the
+// identifier reaches every reader of the component.
+func statedPurl(purl string) string {
+	purl = strings.TrimSpace(purl)
+	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.HasPrefix(rest, "/") &&
+		!strings.ContainsAny(scheme, "/?#") {
+		purl = scheme + ":" + strings.TrimLeft(rest, "/")
+	}
+	body, qualifiers, found := strings.Cut(purl, "?")
+	if !found {
+		return purl
+	}
+	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
+	pairs := strings.Split(qualifiers, "&")
+	kept := pairs[:0]
+	for _, pair := range pairs {
+		key, value, found := strings.Cut(pair, "=")
+		if !found {
+			kept = append(kept, pair)
+			continue
+		}
+		address, err := url.PathUnescape(value)
+		if err != nil {
+			address = value
+		}
+		if !strings.Contains(address, "://") {
+			kept = append(kept, pair)
+			continue
+		}
+		parsed, err := url.Parse(address)
+		switch {
+		case err != nil:
+			// Where its credential ends cannot be told, so it is not kept.
+		case parsed.User == nil:
+			kept = append(kept, pair)
+		default:
+			if cleaned := sourcelink.WithoutCredential(address); cleaned != "" {
+				kept = append(kept, key+"="+qualifierEscaped(cleaned))
+			}
+		}
+	}
+	purl = body
+	if len(kept) > 0 {
+		purl += "?" + strings.Join(kept, "&")
+	}
+	if hasSubpath {
+		purl += "#" + subpath
+	}
+	return purl
+}
+
+// qualifierEscaped percent-encodes a qualifier's value, leaving the
+// characters an address is read by.
+func qualifierEscaped(value string) string {
+	var b strings.Builder
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9',
+			strings.IndexByte("-._~:/@", c) >= 0:
+			b.WriteByte(c)
+		default:
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+	}
+	return b.String()
 }
 
 // PackageOf splits a package identifier into the package it names and the
@@ -372,10 +469,11 @@ func NewComponents(db bun.IDB) *Components {
 // application compares bytes. A decision is keyed on the trimmed version, and
 // untrimmed, a component stated at "1.0 " matches it on two engines of four.
 func (d Described) trimmed() Described {
-	for _, field := range []*string{&d.Purl, &d.CPE, &d.Name, &d.Version, &d.UpstreamName,
+	for _, field := range []*string{&d.CPE, &d.Name, &d.Version, &d.UpstreamName,
 		&d.UpstreamVersion, &d.Supplier, &d.License} {
 		*field = strings.TrimSpace(*field)
 	}
+	d.Purl = statedPurl(d.Purl)
 	return d
 }
 
