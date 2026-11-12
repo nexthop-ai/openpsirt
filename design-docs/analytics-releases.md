@@ -25,6 +25,7 @@ Fixed, newly present and still present between any two builds of one product
 | Both builds are authorized | |
 | Public findings only unless asked; where the builds differ in what the reader may see, the narrower governs | It usually feeds a public document |
 | Ordered worst first, stably; never paged | |
+| The two builds are paired on the issue and the component row's name; an entry shows the name its build stated | Each build states its own name, so pairing on it lists one component as both fixed and newly present |
 | What left the affected list is two sets. Fixes: an upgrade, a carried patch, a declared patch, a component no longer shipped, a recorded flaw declared fixed. Not fixes: `superseded`, a record taken back, a closure nothing explains | |
 | An entry that left names the run that stopped reporting it, unless a person closed it | |
 | A fixed entry states why, and what it moved to: "upgraded, 3.7.0 → 3.9.0" | The pair is written at closure, before the old component leaves the inventory |

@@ -21,8 +21,13 @@ import (
 // Changed is one issue that differs between two builds.
 type Changed struct {
 	Vulnerability string `bun:"vulnerability"`
-	Component     string `bun:"component"`
-	Severity      string `bun:"severity"`
+	// Component is the name the build stated, which is what a reader sees.
+	// Named is the component row's name, which the two builds are paired on:
+	// each build states its own, so pairing on what either stated splits one
+	// component into a fix and a new arrival.
+	Component string `bun:"component"`
+	Named     string `bun:"named" json:"-"`
+	Severity  string `bun:"severity"`
 	// Because says why it went, for something that is no longer there. The
 	// four explanations are different sentences to whoever reads a release
 	// note: upgraded, patched, the component removed, and superseded — which
@@ -157,7 +162,8 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 			Join(rating.Here, productID).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
-			ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+			ColumnExpr(`"c"."name" AS "named"`).
+			ColumnExpr(`MIN(`+graph.NodeName("sn", "c")+`) AS "component"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
 			ColumnExpr(`MIN(COALESCE("f"."arrived_from", '')) AS "arrived_from"`).
@@ -171,7 +177,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 			ColumnExpr(`COALESCE("v"."advisory", '') AS "advisory"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			GroupExpr(`"v"."identifier", ` + graph.NodeName("sn", "c") + `, ` + rating.EffectiveExpr +
+			GroupExpr(`"v"."identifier", "c"."name", ` + rating.EffectiveExpr +
 				`, "f"."closed_because", "v"."exploited", "v"."advisory"`)
 		return q.Where(`"f"."closed_at" IS NULL`)
 	}
@@ -184,7 +190,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 		return nil, fmt.Errorf("read what the later build has: %w", err)
 	}
 
-	key := func(c Changed) string { return pairKey(c.Vulnerability, c.Component) }
+	key := func(c Changed) string { return pairKey(c.Vulnerability, c.Named) }
 	here := map[string]Changed{}
 	for _, c := range now {
 		here[key(c)] = c
@@ -295,12 +301,11 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
-			ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+			ColumnExpr(`"c"."name" AS "named"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" = ?`, access.Private).
 			Where(`"f"."closed_at" IS NULL`).
-			GroupExpr(`"v"."identifier", `+graph.NodeName("sn", "c")).
+			GroupExpr(`"v"."identifier", "c"."name"`).
 			Scan(ctx, &rows)
 		return rows, err
 	}
@@ -314,11 +319,11 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	}
 	here := make(map[string]bool, len(now))
 	for _, c := range now {
-		here[pairKey(c.Vulnerability, c.Component)] = true
+		here[pairKey(c.Vulnerability, c.Named)] = true
 	}
 	gone := make([]Changed, 0, len(was))
 	for _, c := range was {
-		if !here[pairKey(c.Vulnerability, c.Component)] {
+		if !here[pairKey(c.Vulnerability, c.Named)] {
 			gone = append(gone, c)
 		}
 	}
@@ -343,7 +348,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 		return 0, err
 	}
 	for i := range gone {
-		gone[i].Because = why[pairKey(gone[i].Vulnerability, gone[i].Component)].Because
+		gone[i].Because = why[pairKey(gone[i].Vulnerability, gone[i].Named)].Because
 	}
 	return len(onlyFixes(gone)), nil
 }
@@ -377,8 +382,8 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 	}
 	wanted := make(map[string]bool, len(fixed))
 	for _, c := range fixed {
-		wanted[pairKey(c.Vulnerability, c.Component)] = true
-		why[pairKey(c.Vulnerability, c.Component)] = Gone{Because: Unexplained}
+		wanted[pairKey(c.Vulnerability, c.Named)] = true
+		why[pairKey(c.Vulnerability, c.Named)] = Gone{Because: Unexplained}
 	}
 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
@@ -393,9 +398,9 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 				seenIssue[c.Vulnerability] = true
 				issues = append(issues, c.Vulnerability)
 			}
-			if !seenComponent[c.Component] {
-				seenComponent[c.Component] = true
-				components = append(components, c.Component)
+			if !seenComponent[c.Named] {
+				seenComponent[c.Named] = true
+				components = append(components, c.Named)
 			}
 		}
 
@@ -461,8 +466,8 @@ type Gone struct {
 	ClosedRun int64
 }
 
-// pairKey identifies an issue at a component by name, which is what a
-// comparison is drawn in: one line per issue in a component, whatever versions
+// pairKey identifies an issue at a component by the component row's name,
+// which is what a comparison is drawn in: one line per issue in a component, whatever versions
 // either side is at.
 //
 // One spelling, because the entries and the explanations for them are matched
@@ -511,8 +516,7 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
-		ColumnExpr(graph.NodeName("sn", "c") + ` AS "component"`).
+		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		// The soonest of them, which is the date a coordinator reads against.
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
@@ -525,7 +529,7 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"v"."identifier", ` + graph.NodeName("sn", "c"))
+		GroupExpr(`"v"."identifier", "c"."name"`)
 	if err := q.Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read how far this build has decided what it still has: %w", err)
 	}
@@ -577,8 +581,7 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(KeyMatches).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
-		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"cl"."id" AS "claim"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		// One value per group, because the group is one decision: which bytes an
@@ -588,7 +591,7 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"v"."identifier", `+graph.NodeName("sn", "c")+`, "cl"."id", "cl"."outcome"`).
+		GroupExpr(`"v"."identifier", "c"."name", "cl"."id", "cl"."outcome"`).
 		Scan(ctx, &said)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)
