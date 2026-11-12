@@ -3,14 +3,17 @@
 
 // Package dbtest runs a test against every database available to it.
 //
-// SQLite always runs, so the suite is useful with nothing installed. The
-// production engines run when the environment points at them, and are skipped
-// loudly otherwise — a skipped engine is reported rather than silently absent,
-// because a portability suite that quietly tests one engine is worse than none.
+// SQLite always runs where a test asks for it, so a test of every engine is
+// useful with nothing installed. The production engines run when the
+// environment points at them, and are skipped loudly otherwise — a skipped
+// engine is reported rather than silently absent, because a portability suite
+// that quietly tests one engine is worse than none. A test asking only for
+// servers fails where none is configured, since it tested nothing, unless
+// OPENPSIRT_TEST_ENGINES leaves the servers out, as make test does.
 //
 // The schema is built once, not once per test. On SQLite the first test
-// binary in a run migrates one file and keeps it in the temporary directory,
-// every other binary reads it, and each test copies it — a copy is
+// binary in a run migrates one file and keeps it in this user's cache
+// directory, every other binary reads it, and each test copies it — a copy is
 // milliseconds where a migration is most of a second. On the three servers
 // each binary leases a slot of the schema and the database the slot holds,
 // which is kept between binaries and between runs; see serverDatabase.
@@ -398,8 +401,10 @@ func Open(t *testing.T, url string) *database.DB {
 		// transaction holds, and the test hangs on it. That is the one engine
 		// on which the rule that a transaction reads only through itself
 		// fails loudly; with a pool the read answers from a second connection
-		// and nothing reports it.
+		// and nothing reports it. Recorded as the settings applied, so a test
+		// narrowing the pool for a while puts back one.
 		db.SetMaxOpenConns(1)
+		db.Pool.MaxOpen, db.Pool.MaxIdle = 1, 1
 	}
 	t.Cleanup(func() {
 		if err := db.Close(); err != nil {
@@ -731,7 +736,7 @@ func serverConnection(engine database.Engine, own string) (*database.DB, error) 
 		}
 		serverDBs[engine] = pool
 	}
-	return &database.DB{DB: bun.NewDB(pool.DB.DB, pool.Dialect()), Server: pool.Server}, nil
+	return &database.DB{DB: bun.NewDB(pool.DB.DB, pool.Dialect()), Server: pool.Server, Pool: pool.Pool}, nil
 }
 
 // ensureDatabase creates the database called name if it is not there, and
