@@ -17,7 +17,7 @@ import {
 import { Paged } from "../ui/Paged";
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { ChoiceCards } from "../ui/ChoiceCards";
-import { Editor } from "../ui/Editor";
+import { Editor, forget } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
@@ -42,6 +42,7 @@ export function RuleForm({
   const [disposition, setDisposition] = useState<Rulable | "">("");
   const [reasoning, setReasoning] = useState("");
   const [duplicateOf, setDuplicateOf] = useState("");
+  const draftKey = `ruling:${product}:${references.join(",")}`;
   // The issue once typing pauses, which is what the date a duplicate starts is
   // asked for: asked on every keystroke, each partial identifier is a lookup
   // that finds nothing.
@@ -110,7 +111,7 @@ export function RuleForm({
             value={reasoning}
             onChange={setReasoning}
             rows={4}
-            draftKey={`ruling:${product}:${references.join(",")}`}
+            draftKey={draftKey}
           />
         </div>
       )}
@@ -130,7 +131,10 @@ export function RuleForm({
                 ...(disposition === "duplicate" ? { duplicate_of: duplicateOf.trim() } : {}),
               },
               {
+                // Forgotten here, since clearing the disposition unmounts
+                // the editor before it can see the reason emptied.
                 onSuccess: () => {
+                  forget(draftKey);
                   setDisposition("");
                   setReasoning("");
                   setDuplicateOf("");

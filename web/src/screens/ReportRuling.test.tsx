@@ -4,7 +4,9 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RuleForm } from "./ReportRuling";
-import { mounted, screen, serve, settle } from "../test/mount";
+import { accept, mounted, screen, serve, settle } from "../test/mount";
+import { change, pick, press } from "../test/controls";
+import { belongTo } from "../app/drafts";
 
 const mount = mounted();
 
@@ -83,5 +85,29 @@ describe("ruling a report a duplicate", () => {
     serve(() => ({ data: {} }));
     await duplicateOf("CVE-2026-0001");
     expect(mount.host().textContent).not.toContain("disclosure date");
+  });
+});
+
+describe("a ruling accepted", () => {
+  it("forgets its reason, so the next ruling on the report opens empty", async () => {
+    window.localStorage.clear();
+    belongTo("ana");
+    try {
+      serve(() => ({ data: {} }));
+      accept(() => ({ data: {} }));
+      mount.render(screen(<RuleForm product="sonic" references={["sonic-R-2026-1"]} />));
+      await settle();
+      pick(mount.host(), "Not reproducible");
+      change(mount.host().querySelector("textarea"), "no crash on the named build");
+      const drafts = () =>
+        Object.keys(window.localStorage).filter((key) => key.includes(":ruling:sonic:"));
+      expect(drafts()).not.toEqual([]);
+      await press(mount.host(), "Submit");
+      await settle();
+      expect(drafts()).toEqual([]);
+    } finally {
+      belongTo(undefined);
+      window.localStorage.clear();
+    }
   });
 });

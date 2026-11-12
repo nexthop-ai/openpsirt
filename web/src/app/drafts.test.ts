@@ -143,6 +143,30 @@ describe("drafts", () => {
     expect(window.localStorage.getItem(key)).toBeNull();
   });
 
+  it("takes away a lapsed draft on a page load where nobody is signed in", () => {
+    belongTo("oidc:ana");
+    keep("revise:11", "about an undisclosed finding");
+    const key = theOnlyKey();
+    const held = JSON.parse(window.localStorage.getItem(key)!) as { text: string; at: number };
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ text: held.text, at: held.at - 48 * 3600 * 1000 }),
+    );
+
+    // The session lapsed, so the next load recognizes nobody.
+    belongTo(undefined);
+
+    expect(window.localStorage.getItem(key)).toBeNull();
+  });
+
+  it("keeps somebody's draft inside the window on a page load where nobody is signed in", () => {
+    belongTo("oidc:ana");
+    keep("revise:12", "still being written");
+    belongTo(undefined);
+    belongTo("oidc:ana");
+    expect(restore("revise:12")).toBe("still being written");
+  });
+
   it("keeps a draft of your own that is inside the window", () => {
     // The other direction, so the test above cannot pass by sweeping
     // everything.

@@ -16,7 +16,7 @@ import {
 } from "../api/codeFindings";
 import { decisionAt, codeFindingAt, codeFindingsAt, componentAt, type Build } from "../app/routes";
 import { ChoiceCards } from "../ui/ChoiceCards";
-import { Editor } from "../ui/Editor";
+import { Editor, forget } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
 import { Holder } from "../ui/Holder";
 import { Loading } from "../ui/Loading";
@@ -324,6 +324,7 @@ function DecideForm({ build, occurrence }: { build: Build; occurrence: string })
   const [reason, setReason] = useState<CodeFindingReason | "">("");
   const [reasoning, setReasoning] = useState("");
   const decide = useDecideCodeFinding(build, occurrence);
+  const draftKey = `code finding:${build.product}:${occurrence}`;
   const needsReason = outcome === "dismissed";
   const ready = outcome !== "" && (!needsReason || reason !== "") && reasoning.trim() !== "";
 
@@ -364,7 +365,7 @@ function DecideForm({ build, occurrence }: { build: Build; occurrence: string })
             value={reasoning}
             onChange={setReasoning}
             rows={4}
-            draftKey={`code finding:${build.product}:${occurrence}`}
+            draftKey={draftKey}
           />
         </div>
       )}
@@ -382,7 +383,10 @@ function DecideForm({ build, occurrence }: { build: Build; occurrence: string })
                 ...(needsReason && reason ? { reason } : {}),
               },
               {
+                // Forgotten here, since clearing the outcome unmounts the
+                // editor before it can see the reasoning emptied.
                 onSuccess: () => {
+                  forget(draftKey);
                   setOutcome("");
                   setReason("");
                   setReasoning("");
@@ -458,23 +462,26 @@ function FixForm({
 }) {
   const [because, setBecause] = useState("");
   const fix = useFixCodeFinding(build, occurrence);
+  const draftKey = `code-finding-fixed:${build.product}:${occurrence}`;
   return (
     <div style={{ marginTop: 10 }}>
       <p className="hint">Fixed in the build of the first run that did not see it.</p>
-      <Editor
-        label="Fixed by"
-        value={because}
-        onChange={setBecause}
-        rows={3}
-        draftKey={`code-finding-fixed:${build.product}:${occurrence}`}
-      />
+      <Editor label="Fixed by" value={because} onChange={setBecause} rows={3} draftKey={draftKey} />
       <button
         type="button"
         className="btn"
         style={{ marginTop: 8 }}
         disabled={because.trim() === "" || fix.isPending}
         onClick={() =>
-          fix.mutate({ because: because.trim(), fixedIn }, { onSuccess: () => setBecause("") })
+          fix.mutate(
+            { because: because.trim(), fixedIn },
+            {
+              onSuccess: () => {
+                forget(draftKey);
+                setBecause("");
+              },
+            },
+          )
         }
       >
         Close as fixed

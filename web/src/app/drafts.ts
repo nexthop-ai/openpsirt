@@ -62,10 +62,14 @@ let writer = "";
 // store is still there when somebody else does it: it records whose it is,
 // and a different person arriving clears it.
 //
-// Only once somebody is recognized. An empty identity is the page still
-// finding out who is here, and clearing then would clear on every load.
+// Ownership is settled only once somebody is recognized. An empty identity is
+// the page still finding out who is here, or nobody signed in, and clearing
+// somebody's drafts then would clear them on every load. Age is settled either
+// way: a browser nobody signs in on again is where a lapsed draft would
+// otherwise stay.
 export function belongTo(identity: string | undefined) {
   writer = identity ?? "";
+  sweep();
   if (!writer) return;
   const owner = encodeURIComponent(writer);
   try {
@@ -78,7 +82,6 @@ export function belongTo(identity: string | undefined) {
   } catch {
     // A browser that refuses storage holds no session state to clear.
   }
-  sweep();
 }
 
 // ownsSession reports whether the session state in this tab is the current
@@ -97,9 +100,10 @@ export function ownsSession(): boolean {
   }
 }
 
-// sweep drops every draft that is somebody else's or older than the window.
+// sweep drops every draft older than the window and, once somebody is
+// recognized, every draft that is somebody else's.
 //
-// Run when a session is recognized rather than on a timer: a page load is
+// Run when the session is settled rather than on a timer: a page load is
 // when the previous person's text is still there and the current person's is
 // about to be written.
 function sweep() {
@@ -108,7 +112,7 @@ function sweep() {
     const mine = PREFIX + encodeURIComponent(writer) + ":";
     const now = Date.now();
     for (const key of keysUnder(PREFIX)) {
-      if (!key.startsWith(mine)) {
+      if (writer && !key.startsWith(mine)) {
         going.push(key);
         continue;
       }
