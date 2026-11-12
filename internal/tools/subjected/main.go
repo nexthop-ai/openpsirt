@@ -8,8 +8,8 @@
 // A method with no subject is exactly what a leak looks like from the outside:
 // a route handing it a row identifier reads whatever the identifier names,
 // whoever asked. Every package under internal/ is read as parsed Go, except a
-// program and a test harness: a package that imports the testing package from
-// a directory whose path names it a test package, such as dbtest/fixture.
+// program and a test harness: a package that imports the testing package and
+// that no program under cmd/ links, such as dbtest/fixture.
 // A type is a store where one of its methods builds a query or calls a
 // function of its package that does. Its exported methods, and the package's
 // exported functions, that query and take no access.Subject fail the gate
@@ -42,6 +42,13 @@ import (
 // root is the tree read, and the prefix a name is given relative to.
 const root = "internal/"
 
+// programs is the tree holding the programs a deployment runs; what they
+// link is what a request can reach.
+const programs = "cmd/"
+
+// module is the import path prefix of the tree's own packages.
+const module = "github.com/nexthop-ai/openpsirt/"
+
 // building are the calls that start a query.
 var building = map[string]bool{
 	"NewSelect": true, "NewUpdate": true, "NewInsert": true, "NewDelete": true, "NewRaw": true,
@@ -65,7 +72,8 @@ func main() {
 	}
 	packages := map[string]map[string][]byte{}
 	if _, err := walk.Sources(".go", func(file string, body []byte) error {
-		if strings.HasPrefix(file, root) && !strings.HasSuffix(file, "_test.go") {
+		if (strings.HasPrefix(file, root) || strings.HasPrefix(file, programs)) &&
+			!strings.HasSuffix(file, "_test.go") {
 			dir := path.Dir(file)
 			if packages[dir] == nil {
 				packages[dir] = map[string][]byte{}
@@ -118,19 +126,28 @@ func main() {
 		"(%d examined, %d exempt)\n", examined, len(exempt))
 }
 
-// inTree is inSources over every package of the tree, keyed by directory and
-// then by path, and how many store methods and functions it examined. A
-// program and a package of test fixtures are not read: neither is reached by
-// a request.
+// inTree is inSources over every package under internal/, keyed by directory
+// and then by path, and how many store methods and functions it examined. The
+// packages under cmd/ are the programs, read only for what they link. A
+// program and a test harness are not read: neither is reached by a request.
 func inTree(packages map[string]map[string][]byte) ([]method, int, error) {
+	harnesses, err := harnessesOf(packages)
+	if err != nil {
+		return nil, 0, err
+	}
 	dirs := make([]string, 0, len(packages))
 	for dir := range packages {
-		dirs = append(dirs, dir)
+		if strings.HasPrefix(dir, root) {
+			dirs = append(dirs, dir)
+		}
 	}
 	sort.Strings(dirs)
 	var found []method
 	examined := 0
 	for _, dir := range dirs {
+		if harnesses[dir] {
+			continue
+		}
 		some, seen, err := inSources(strings.TrimPrefix(dir, root), packages[dir])
 		if err != nil {
 			return nil, 0, err
@@ -158,8 +175,8 @@ type declared struct {
 
 // inSources is every exported store method and function of one package that
 // queries with no subject, and how many it examined. The package is named by
-// its directory under internal/, its files keyed by path. A program and a
-// test harness answer nothing.
+// its directory under internal/, its files keyed by path. A program answers
+// nothing.
 func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 	fset := token.NewFileSet()
 	paths := make([]string, 0, len(sources))
@@ -173,7 +190,7 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 		if err != nil {
 			return nil, 0, fmt.Errorf("%s: %w", path, err)
 		}
-		if file.Name.Name == "main" || importsTesting(file) && harness(pkg) {
+		if file.Name.Name == "main" {
 			return nil, 0, nil
 		}
 		imported := importNames(file)
@@ -303,18 +320,56 @@ func callsQuerying(body *ast.BlockStmt, querying map[string]bool) bool {
 	return found
 }
 
-// harness reports whether a package's directory under internal/ names it a
-// test package: an element ending in "test", as dbtest and httpapitest do. A
-// package is skipped as a harness only when it also imports the testing
-// package, so neither a production file importing testing nor a directory
-// named like a harness is enough on its own to leave a package unread.
-func harness(pkg string) bool {
-	for _, element := range strings.Split(pkg, "/") {
-		if strings.HasSuffix(element, "test") {
-			return true
+// harnessesOf is the packages, by directory, that import the testing package
+// and that no program under cmd/ links. A directory's name says nothing: a
+// production package importing testing is still linked, so it is read, and a
+// package named like a harness that imports nothing of testing is read too.
+func harnessesOf(packages map[string]map[string][]byte) (map[string]bool, error) {
+	fset := token.NewFileSet()
+	imports := map[string][]string{}
+	testing := map[string]bool{}
+	for dir, sources := range packages {
+		for path, source := range sources {
+			file, err := parser.ParseFile(fset, path, source, parser.ImportsOnly)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", path, err)
+			}
+			if importsTesting(file) {
+				testing[dir] = true
+			}
+			for _, spec := range file.Imports {
+				if imported, ok := strings.CutPrefix(strings.Trim(spec.Path.Value, `"`), module); ok {
+					imports[dir] = append(imports[dir], imported)
+				}
+			}
 		}
 	}
-	return false
+	linked := map[string]bool{}
+	var pending []string
+	for dir := range packages {
+		if strings.HasPrefix(dir, programs) {
+			pending = append(pending, dir)
+		}
+	}
+	if len(pending) == 0 {
+		return nil, fmt.Errorf("no program was found under %s, so nothing tells a harness from a linked package", programs)
+	}
+	for len(pending) > 0 {
+		dir := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if linked[dir] {
+			continue
+		}
+		linked[dir] = true
+		pending = append(pending, imports[dir]...)
+	}
+	harnesses := map[string]bool{}
+	for dir := range testing {
+		if !linked[dir] {
+			harnesses[dir] = true
+		}
+	}
+	return harnesses, nil
 }
 
 // importsTesting reports whether a file imports the testing package, which no

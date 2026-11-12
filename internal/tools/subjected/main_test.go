@@ -192,10 +192,10 @@ func (s *Store) Read(ctx context.Context, subject Subject, id int64) error {
 
 func TestEveryPackageOfTheTreeIsReadButProgramsAndHarnesses(t *testing.T) {
 	// The packages are the tree's, never a list: a store added anywhere is
-	// read. A program and a test harness, known by importing the testing
-	// package from a directory named as a test package, are reached by no
-	// request, and a package is named by its directory under internal/. Either
-	// sign alone leaves a package read.
+	// read. A program and a test harness, a package importing testing that no
+	// program under cmd/ links, are reached by no request, and a package is
+	// named by its directory under internal/. A package importing testing that
+	// a program links, directly or through another package, is read.
 	store := func(pkg string) []byte {
 		return []byte("package " + pkg + `
 
@@ -205,7 +205,32 @@ func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
 `)
 	}
 	found, examined, err := inTree(map[string]map[string][]byte{
-		"internal/series":       {"internal/series/s.go": store("series")},
+		"cmd/openpsirt": {"cmd/openpsirt/main.go": []byte(`package main
+
+import (
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/series"
+	"github.com/nexthop-ai/openpsirt/internal/served"
+)
+`)},
+		"internal/series": {"internal/series/s.go": []byte(`package series
+
+import "github.com/nexthop-ai/openpsirt/internal/latest"
+
+func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
+	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+`)},
+		"internal/latest": {"internal/latest/l.go": []byte(`package latest
+
+import "testing"
+
+func Helped(t *testing.T) {}
+
+func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
+	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+`)},
 		"internal/httpapi/core": {"internal/httpapi/core/c.go": store("core")},
 		"internal/tools/gate":   {"internal/tools/gate/main.go": store("main")},
 		"internal/dbtest/fixture": {"internal/dbtest/fixture/f.go": []byte(`package fixture
@@ -233,8 +258,8 @@ func Benchmarked(b *testing.B) {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 5 {
-		t.Errorf("%d store methods were examined, want the five in packages a request reaches", examined)
+	if examined != 6 {
+		t.Errorf("%d store methods were examined, want the six outside programs and harnesses", examined)
 	}
 	reported := map[string]bool{}
 	for _, one := range found {
@@ -248,6 +273,7 @@ func Benchmarked(b *testing.B) {}
 		"attest.Store.Unnarrowed":         true,
 		"served.Store.Unnarrowed":         true,
 		"kerneltest.Store.Unnarrowed":     true,
+		"latest.Store.Unnarrowed":         true,
 	} {
 		if reported[name] != want {
 			t.Errorf("%s reported = %v, want %v (reported %v)", name, reported[name], want, reported)
@@ -265,5 +291,15 @@ func TestAnExemptionNamesItsReason(t *testing.T) {
 	}
 	if exempt["finding.Store.Apply"] != "A background pass." {
 		t.Errorf("the exemption reads %v", exempt)
+	}
+}
+
+func TestATreeWithNoProgramIsRefused(t *testing.T) {
+	// With no program, every package importing testing would read as a
+	// harness, so the tree is refused rather than read.
+	if _, _, err := inTree(map[string]map[string][]byte{
+		"internal/series": {"internal/series/s.go": []byte("package series\n\nimport \"testing\"\n\nfunc Helped(t *testing.T) {}\n")},
+	}); err == nil {
+		t.Error("a tree with no program under cmd/ was read")
 	}
 }
