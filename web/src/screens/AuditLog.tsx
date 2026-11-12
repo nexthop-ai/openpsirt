@@ -477,6 +477,12 @@ function Administered() {
     // An administrator's or an auditor's screen; anybody else is refused and
     // the section is simply absent for them.
     retry: false,
+    // Show more keeps the rows in hand while the longer page is read; any
+    // other change of question draws the loading line instead.
+    placeholderData: (previous, query) =>
+      query?.queryKey.slice(0, 4).join("|") === ["administered", sent.from, sent.to, kind].join("|")
+        ? previous
+        : undefined,
   });
   const rows = changes.data?.items ?? [];
   // Absent for somebody who is not an administrator, which is the refusal this
@@ -488,6 +494,14 @@ function Administered() {
       <div style={{ marginTop: 24 }}>
         <h3>Change history</h3>
         <Failed error={changes.error} what="The change history could not be read." />
+      </div>
+    );
+  }
+  if (changes.isPending) {
+    return (
+      <div style={{ marginTop: 24 }}>
+        <h3>Change history</h3>
+        <Loading />
       </div>
     );
   }

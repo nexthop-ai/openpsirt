@@ -7,6 +7,7 @@ import { AuditLog, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./
 import { classesOf } from "../ui/outcomes";
 import { PUBLISHED } from "../test/outcomes";
 import { screen, serve, settle, mounted } from "../test/mount";
+import { api } from "../api/client";
 import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
@@ -56,6 +57,85 @@ describe("the change history on the audit log", () => {
     expect(Math.max(...asked)).toBe(CHANGES_MOST);
     expect(more()).toBeUndefined();
     expect(mount.host().textContent).not.toContain("could not be read");
+  });
+});
+
+describe("the change history while it is read", () => {
+  it("says nothing about an empty kind until the answer arrives", async () => {
+    const pending = new Promise<never>(() => {});
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const answered = vi.mocked(api.GET).getMockImplementation() as unknown as (
+      path: string,
+      init: unknown,
+    ) => unknown;
+    vi.mocked(api.GET).mockImplementation(((path: string, init: unknown) =>
+      path === "/v1/administration/changes" ? pending : answered(path, init)) as never);
+    mount.render(screen(<AuditLog />, "/audit-log?change=role"));
+    await settle();
+    expect(mount.host().textContent).toContain("Change history");
+    expect(mount.host().textContent).not.toContain("No changes of that kind");
+  });
+});
+
+describe("the change history shown longer", () => {
+  it("keeps the rows in hand while the longer page is read", async () => {
+    const page = Array.from({ length: 50 }, (_, i) => ({
+      at: "2026-10-01T00:00:00Z",
+      kind: "role",
+      about: `grant ${i}`,
+      by: "ana",
+    }));
+    let asked = 0;
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const answered = vi.mocked(api.GET).getMockImplementation() as unknown as (
+      path: string,
+      init: unknown,
+    ) => unknown;
+    vi.mocked(api.GET).mockImplementation(((path: string, init: unknown) => {
+      if (path !== "/v1/administration/changes") return answered(path, init);
+      asked++;
+      return asked === 1
+        ? Promise.resolve({
+            data: { items: page, total: 120 },
+            response: new Response(null, { status: 200 }),
+          })
+        : new Promise(() => {});
+    }) as never);
+    mount.render(screen(<AuditLog />, "/audit-log"));
+    await settle();
+    const more = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Show more",
+    );
+    await act(async () => more?.click());
+    await settle();
+    expect(asked).toBe(2);
+    expect(mount.host().textContent).toContain("grant 49");
   });
 });
 

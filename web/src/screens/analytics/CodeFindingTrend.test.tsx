@@ -98,6 +98,21 @@ describe("code findings over time", () => {
     expect(mount.host().querySelectorAll(".chart .mark").length).toBe(1);
   });
 
+  it("names its table's steps as days by default", async () => {
+    await drawn(true);
+    expect(text()).toContain("Day by day");
+    expect(
+      [...mount.host().querySelectorAll("thead th")].map((each) => each.textContent),
+    ).toContain("Day");
+    expect(text()).not.toContain("Week ending");
+  });
+
+  it("names its table's steps as weeks once weekly is picked", async () => {
+    await drawn(true, "/analytics/code-findings-over-time?step=week");
+    expect(text()).toContain("Week by week");
+    expect(text()).toContain("Week ending");
+  });
+
   it("names a version a run did not state", async () => {
     await drawn(true, undefined, {
       ...ANSWER,

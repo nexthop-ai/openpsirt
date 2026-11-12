@@ -50,6 +50,7 @@ role on.
 | A reader of no finding in any product, an auditor most often, is shown the change history alone, with one line saying they read no findings, where the decision record holds nothing for them | A record of zero decisions reads as nothing decided |
 | The decision record is asked of every reader, one of no finding included, and drawn wherever it answers with a decision | A case collaborator reads no product and is served their own case's decisions |
 | The change history sits below over its period, narrowed to one kind (roles, keys and tokens, settings), the kind in the address and the file | The question an access review asks |
+| While the change history is read for a new narrowing it says it is reading, never that nothing matched; the last page stays drawn only while the next asks the same narrowing | An empty table before the answer reads as nothing changed |
 
 ## Settings
 
