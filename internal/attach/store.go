@@ -402,9 +402,9 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 // unrecorded removes the bytes of an upload whose transaction failed.
 //
 // The row is what the sweep can see, so a failure leaves bytes nothing knows
-// about. Removed now rather than left for a reaper with no record to work
-// from, and where that removal fails too, the key is logged, because it is
-// then the only thing that can find them. On a context of its own, because the
+// about. The bytes are removed at once, because no record is left for a sweep
+// to find them by, and where that removal fails too, the key is logged,
+// because it is then the only thing that can find them. On a context of its own, because the
 // request's is often why the record failed: a client that went away.
 //
 // A failure answered during the commit does not say the commit failed, so the

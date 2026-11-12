@@ -114,8 +114,8 @@ const minSalt = 32
 // one that is not.
 func CheckSalt(salt []byte) error {
 	if len(salt) < minSalt {
-		return fmt.Errorf("the salt is %d bytes; write at least %d random bytes, for example with openssl rand -hex %d",
-			len(salt), minSalt, minSalt)
+		return fmt.Errorf("the salt is %d bytes; write at least %d, such as the output of openssl rand -hex 32",
+			len(salt), minSalt)
 	}
 	return nil
 }
