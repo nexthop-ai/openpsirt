@@ -27,7 +27,9 @@ async function drawn(start: string[] = [], failing = false) {
       ? failing
         ? { status: 503 }
         : { data: { items: [{ id: "CWE-125", name: "Out-of-bounds Read" }] } }
-      : undefined,
+      : path === "/v1/session/me"
+        ? { data: { identity: "ana", kind: "person", reach: [], outcomes: [], most_weaknesses: 3 } }
+        : undefined,
   );
   mount.render(screen(<Host start={start} />));
   await settle();
@@ -58,13 +60,12 @@ describe("the kinds of flaw a finding names", () => {
     expect(mount.host().textContent).toContain("type CWE- and a number");
   });
 
-  it("stops at the most a finding may carry", async () => {
-    const many = Array.from({ length: 16 }, (_, i) => `CWE-${i + 1}`);
-    await drawn(many);
+  it("stops at the most the server says a finding may carry", async () => {
+    await drawn(["CWE-1", "CWE-2", "CWE-3"]);
     change(field(), "CWE-999");
     enter();
-    expect(held()?.split("|")).toHaveLength(16);
-    expect(mount.host().textContent).toContain("16 at most.");
+    expect(held()?.split("|")).toHaveLength(3);
+    expect(mount.host().textContent).toContain("3 at most.");
   });
 
   it("names a chosen identifier, and removes it when pressed", async () => {
