@@ -30,10 +30,12 @@ type Limits struct {
 	MaxSnippet int
 	MaxDepth   int
 	MaxRuns    int
-	// MaxResults is per run, and MaxRules per run across every component.
+	// MaxResults is per run, and MaxRules per run across every component and
+	// per rule for its message strings and its tags.
 	MaxResults int
 	MaxRules   int
-	// MaxLocations is per result, its own and related locations together.
+	// MaxLocations is per result, its own and related locations together,
+	// and per result for its fingerprints and per message for its arguments.
 	MaxLocations int
 	// MaxSteps is per result, across every flow it states.
 	MaxSteps int
@@ -164,7 +166,9 @@ func (u *Upload) Read(r io.Reader) (Log, error) {
 	switch {
 	case errors.Is(err, docread.ErrTooLarge) && part:
 		return Log{}, over(partBytes, int(u.lim.MaxPart))
-	case errors.Is(err, docread.ErrTooLarge) && left < u.lim.MaxBytes, err == nil && u.bytes > u.lim.MaxBytes:
+	// Past the document's own bound, what bound it was what was left of the
+	// upload's.
+	case errors.Is(err, docread.ErrTooLarge), err == nil && u.bytes > u.lim.MaxBytes:
 		return Log{}, over(uploadBytes, int(u.lim.MaxBytes))
 	case err != nil:
 		return Log{}, b.Refused("reading SARIF", err)
@@ -390,10 +394,9 @@ func chained(bases map[string]ArtifactLocation, most int) error {
 
 // settle fills in what each result named by reference.
 func (rd *reader) settle(run *Run, waiting []pending) error {
-	byID := map[string][]int{}
+	byID := namesOf(run.Tool.Rules)
 	byComponent := map[int][]int{}
 	for j, rule := range run.Tool.Rules {
-		byID[rule.ID] = append(byID[rule.ID], j)
 		byComponent[rule.component] = append(byComponent[rule.component], j)
 	}
 	for i := range run.Results {
@@ -422,29 +425,86 @@ func (rd *reader) settle(run *Run, waiting []pending) error {
 	return nil
 }
 
+// ruleNames is a run's rule identifiers as a tree of their components
+// between slashes, each node holding the positions of the rules whose
+// identifier ends there. Looking an identifier's prefixes up whole hashes the
+// identifier once per slash, which one long identifier of many components
+// makes cost its length squared; walking the tree reads it once.
+type ruleNames struct {
+	next  map[ruleStep]int
+	ended map[int][]int
+}
+
+// ruleStep is one component read from a node.
+type ruleStep struct {
+	from      int
+	component string
+}
+
+func namesOf(rules []Rule) ruleNames {
+	n := ruleNames{next: map[ruleStep]int{}, ended: map[int][]int{}}
+	for j, rule := range rules {
+		if rule.ID == "" {
+			continue
+		}
+		at, rest := 0, rule.ID
+		for {
+			component, more, found := strings.Cut(rest, "/")
+			step := ruleStep{at, component}
+			to, ok := n.next[step]
+			if !ok {
+				to = len(n.next) + 1
+				n.next[step] = to
+			}
+			at = to
+			if !found {
+				break
+			}
+			rest = more
+		}
+		n.ended[at] = append(n.ended[at], j)
+	}
+	return n
+}
+
 // ruleOf is the rule a result cites. Its identifier is looked for first,
 // whole and then by its leading components, within the component the result
 // names where it names one. A position is
 // read only where the result states no identifier, and only within the
 // component it names: the driver, where it names none.
-func ruleOf(rules []Rule, byID map[string][]int, byComponent map[int][]int, id string, p pending) *Rule {
+func ruleOf(rules []Rule, byID ruleNames, byComponent map[int][]int, id string, p pending) *Rule {
 	component := 0
 	if p.ruleComponent != nil {
 		component = *p.ruleComponent + 1
 	}
 	// A hierarchical identifier names a rule by its leading components:
-	// "CA5350/md5" is reported under the rule "CA5350".
-	for cut := id; cut != ""; {
-		for _, j := range byID[cut] {
-			if p.ruleComponent == nil || rules[j].component == component {
-				return &rules[j]
+	// "CA5350/md5" is reported under the rule "CA5350". The longest prefix
+	// naming a rule wins; a prefix is the whole identifier or ends before a
+	// slash past its first byte.
+	var found *Rule
+	node, rest, read := 0, id, 0
+	for id != "" {
+		c, more, slash := strings.Cut(rest, "/")
+		to, ok := byID.next[ruleStep{node, c}]
+		if !ok {
+			break
+		}
+		node, read = to, read+len(c)
+		if read > 0 {
+			for _, j := range byID.ended[node] {
+				if p.ruleComponent == nil || rules[j].component == component {
+					found = &rules[j]
+					break
+				}
 			}
 		}
-		i := strings.LastIndexByte(cut, '/')
-		if i <= 0 {
-			return nil
+		if !slash {
+			break
 		}
-		cut = cut[:i]
+		rest, read = more, read+1
+	}
+	if found != nil || id != "" {
+		return found
 	}
 	if p.ruleIndex == nil {
 		return nil
@@ -544,8 +604,11 @@ func (rd *reader) rule(discarded *Discarded) (Rule, error) {
 			rule.messages = map[string]string{}
 			return rd.b.Object(func(id string) error {
 				s, err := rd.message(discarded, nil)
-				if err != nil || len(rule.messages) == rd.lim.MaxRules {
+				if err != nil {
 					return err
+				}
+				if len(rule.messages) == rd.lim.MaxRules {
+					return over("message strings on a rule", rd.lim.MaxRules)
 				}
 				rule.messages[id] = s
 				return rd.hold()
@@ -565,8 +628,11 @@ func (rd *reader) rule(discarded *Discarded) (Rule, error) {
 				case "tags":
 					return rd.b.Array(func() error {
 						s, err := rd.b.Str()
-						if err != nil || len(rule.Tags) == rd.lim.MaxRules {
+						if err != nil {
 							return err
+						}
+						if len(rule.Tags) == rd.lim.MaxRules {
+							return over("tags on a rule", rd.lim.MaxRules)
 						}
 						rule.Tags = append(rule.Tags, rd.text(s))
 						return rd.hold()
@@ -624,8 +690,11 @@ func (rd *reader) message(discarded *Discarded, p *pending) (string, error) {
 		case "arguments":
 			return rd.b.Array(func() error {
 				s, err := rd.b.Str()
-				if err != nil || p == nil || len(p.arguments) == rd.lim.MaxLocations {
+				if err != nil || p == nil {
 					return err
+				}
+				if len(p.arguments) == rd.lim.MaxLocations {
+					return over("arguments to a message", rd.lim.MaxLocations)
 				}
 				p.arguments = append(p.arguments, rd.text(s))
 				return rd.hold()
@@ -750,8 +819,11 @@ func (rd *reader) result(discarded *Discarded) (Result, pending, error) {
 			}
 			return rd.b.Object(func(scheme string) error {
 				s, err := rd.b.Str()
-				if err != nil || len(res.Fingerprints) == rd.lim.MaxLocations {
+				if err != nil {
 					return err
+				}
+				if len(res.Fingerprints) == rd.lim.MaxLocations {
+					return over("fingerprints on a result", rd.lim.MaxLocations)
 				}
 				res.Fingerprints[bound.Head(scheme, docread.MostQuoted)] = rd.text(s)
 				return rd.hold()

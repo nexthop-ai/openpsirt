@@ -5,9 +5,11 @@ package sarif
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -207,7 +209,16 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 		"depth": {run(`,"results":[{"properties":{"a":` + strings.Repeat("[", 40) + strings.Repeat("]", 40) + `}}]`),
 			func(*Limits) {}, "deeper than"},
 		"size": {run(`,"results":[` + many(`{"ruleId":"x"}`, 100) + `]`),
-			func(l *Limits) { l.MaxBytes = 200 }, "larger than the configured limit"},
+			func(l *Limits) { l.MaxBytes = 200 }, "more " + uploadBytes + " than the configured limit of 200"},
+		"message strings": {`{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"messageStrings":` +
+			`{"a":{"text":"x"},"b":{"text":"y"}}}]}}}]}`,
+			func(l *Limits) { l.MaxRules = 1 }, "message strings on a rule"},
+		"tags": {`{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"properties":{"tags":["a","b"]}}]}}}]}`,
+			func(l *Limits) { l.MaxRules = 1 }, "tags on a rule"},
+		"arguments": {run(`,"results":[{"message":{"text":"{0}","arguments":["a","b"]}}]`),
+			func(l *Limits) { l.MaxLocations = 1 }, "arguments to a message"},
+		"fingerprints": {run(`,"results":[{"partialFingerprints":{"a":"1","b":"2"}}]`),
+			func(l *Limits) { l.MaxLocations = 1 }, "fingerprints on a result"},
 		"held": {run(`,"results":[{"locations":[` + location + `]},{}]`),
 			func(l *Limits) { l.MaxHeld = 3 }, "other entries across the upload's documents"},
 	} {
@@ -829,4 +840,48 @@ func TestTheBoundsLeftUnsetFollowTheUploadsBound(t *testing.T) {
 		t.Errorf("a document bound of 1 MiB left the upload as sent at %d and one document as sent at %d; want 1 GiB and 1 MiB",
 			part.MaxCompressed, part.MaxPartCompressed)
 	}
+}
+
+// finishesSoon fails unless fn returns within a time linear work takes many
+// times over and work squared in its input never does.
+func finishesSoon(t *testing.T, what string, fn func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		fn()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("%s did not finish: its work grows faster than its input", what)
+	}
+}
+
+func TestFillingOpeningBracesAloneReadsEachOnce(t *testing.T) {
+	text := strings.Repeat("{", 4<<20)
+	finishesSoon(t, "filling a text of opening braces", func() {
+		if got := fill(text, []string{"x"}, len(text)); got != text {
+			t.Errorf("filled %d bytes; want the text unchanged", len(got))
+		}
+	})
+}
+
+func TestARuleIsFoundByAnIdentifierOfManyComponentsReadingItOnce(t *testing.T) {
+	// Enough rules that a lookup hashes its key: a small map compares
+	// lengths instead.
+	rules := []Rule{{ID: "a"}, {ID: "b/c"}}
+	for i := range 64 {
+		rules = append(rules, Rule{ID: fmt.Sprintf("other-%d", i)})
+	}
+	byID := namesOf(rules)
+	long := strings.Repeat("a/", 1<<20) + "a"
+	finishesSoon(t, "finding the rule of a long identifier", func() {
+		if got := ruleOf(rules, byID, nil, long, pending{}); got == nil || got.ID != "a" {
+			t.Errorf("the rule is %+v; want a, by the identifier's first component", got)
+		}
+		if got := ruleOf(rules, byID, nil, "b/"+long, pending{}); got != nil {
+			t.Errorf("the rule is %+v; want none, since b names no rule", got)
+		}
+	})
 }

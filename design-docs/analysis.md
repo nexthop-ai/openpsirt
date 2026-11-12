@@ -79,6 +79,9 @@ and entries are bounded across the upload as memory: placed results take about
 | Runs | Per document |
 | Results, rules, repositories, named starting points | Per run |
 | Locations, related locations, flow steps | Per result |
+| Message strings, tags | Per rule, at the rules bound |
+| Arguments | Per message, at the locations bound |
+| Fingerprints | Per result, at the locations bound |
 | Starting-point chains | Per path; a loop refuses the document |
 | Property members | Per bag, every bag read or walked past, nested included |
 | Text | Per message or description, cut past it, placeholders included |
@@ -88,6 +91,8 @@ and entries are bounded across the upload as memory: placed results take about
 | Rule | Reason |
 |---|---|
 | Bytes as sent default to bytes decompressed, and one document may take the whole upload's bounds | Merged per-unit documents do |
+| A count past its bound refuses the document; only text is cut | A cut list loses what follows silently: a weakness tag, or the argument a placeholder names |
+| Placeholders are filled, and a rule found by its identifier's leading components, in time linear in the text | Both come from the document, so work growing with the square of a text is the document's to choose |
 | Defaults far exceed real producers: nesting 64 against 14, a bag 256 against 9, 1,000 places against 4, 10,000 flow steps against 12 (`design-docs/analysis-measurements.md` § Producer output) | Richer output is not refused |
 
 ## Run contents

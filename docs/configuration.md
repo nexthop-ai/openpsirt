@@ -1267,8 +1267,8 @@ decompressed bound first.
 | `OPENPSIRT_ANALYSIS_MAX_DOCUMENTS` | `analysis.max_documents` | How many documents one upload may carry. clang writes one per translation unit, so a tool's per-unit documents are merged into one before they are sent | 16 |
 | `OPENPSIRT_ANALYSIS_MAX_RUNS` | `analysis.max_runs` | How many runs one document may hold | 16 |
 | `OPENPSIRT_ANALYSIS_MAX_RESULTS` | `analysis.max_results` | How many results one run may hold | 100,000 |
-| `OPENPSIRT_ANALYSIS_MAX_RULES` | `analysis.max_rules` | How many rules one run may describe | 10,000 |
-| `OPENPSIRT_ANALYSIS_MAX_LOCATIONS` | `analysis.max_locations` | How many locations and related locations one result may name | 1,000 |
+| `OPENPSIRT_ANALYSIS_MAX_RULES` | `analysis.max_rules` | How many rules one run may describe, and how many message strings and tags one rule may carry | 10,000 |
+| `OPENPSIRT_ANALYSIS_MAX_LOCATIONS` | `analysis.max_locations` | How many locations and related locations one result may name, and how many fingerprints and message arguments it may carry | 1,000 |
 | `OPENPSIRT_ANALYSIS_MAX_STEPS` | `analysis.max_steps` | How many path steps one result may take, across every flow it states | 10,000 |
 | `OPENPSIRT_ANALYSIS_MAX_MODULES` | `analysis.max_modules` | How many repositories one run may say its checkout holds | 1,000 |
 | `OPENPSIRT_ANALYSIS_MAX_BASES` | `analysis.max_bases` | How many named starting points for paths one run may declare | 1,000 |
