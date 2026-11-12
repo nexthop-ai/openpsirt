@@ -29,7 +29,7 @@ type RepositoryHost struct {
 
 // RepositoryPath is what a product says about the code under a path prefix.
 type RepositoryPath struct {
-	Prefix   string `json:"prefix" doc:"A path from the top of the checkout. Empty is the whole product"`
+	Prefix   string `json:"prefix" maxLength:"4096" doc:"A path from the top of the checkout. Empty is the whole product"`
 	Remote   string `json:"remote,omitempty" doc:"The repository the code under the prefix is, where an upload names none. Sent with branch"`
 	Branch   string `json:"branch,omitempty" doc:"The branch links into that repository open on. Such links are approximate"`
 	Snippets *bool  `json:"snippets,omitempty" doc:"Whether source snippets under the prefix are kept. Absent takes the nearest prefix that states it, and no prefix stating it keeps them. False at the empty prefix turns them off for the product"`

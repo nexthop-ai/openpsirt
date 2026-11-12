@@ -10965,6 +10965,7 @@ components:
           type: string
         prefix:
           description: A path from the top of the checkout
+          maxLength: 4096
           type: string
         reason:
           description: Why the code findings it covers are dismissed
@@ -12458,6 +12459,7 @@ components:
           type: boolean
         prefix:
           description: A path from the top of the checkout. Empty is the whole product
+          maxLength: 4096
           type: string
         remote:
           description: The repository the code under the prefix is, where an upload names none. Sent with branch

@@ -88,7 +88,7 @@ them.
 | It names a rule, a path or both, and one reason with reasoning | |
 | A rule with no path is refused, at proposal and approval, where it finds memory safety or injection (`design-docs/analysis-queue.md` § Weakness families) or no run recorded it; one approved before stops dismissing at once | Those are judged one at a time; a whole checker goes where it fights a convention, measures style or cannot model the code |
 | A path is a prefix from the checkout top, no edge slashes, compared exactly | `src` holds `src/a.c`, not `src2/a.c`; SQLite's LIKE ignores case |
-| A path leaving the checkout or with an empty segment is refused | |
+| A path leaving the checkout, with an empty segment, or longer than 4,096 bytes is refused, at the API and where it is stored | The longest path a Linux file system takes; the path is stored, trailed and compared with every code finding |
 | Its words never change; rewording is retiring and proposing | Approval is of what was read (REQ-28) |
 | Approval records the open code findings covered as its size; one shown none counts as one | |
 | The growth factor is `triage.suppression-rule-growth`, two by default (REQ-27) | |

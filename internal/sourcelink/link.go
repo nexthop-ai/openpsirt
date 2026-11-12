@@ -80,6 +80,11 @@ func (c Config) File(modules []Module, path string, start, end int) Link {
 		link.Unlinked = NotAPath
 		return link
 	}
+	revision, ok := escapedRevision(at.revision)
+	if !ok {
+		link.Unlinked = NotAPath
+		return link
+	}
 	t := host.fileTemplate()
 	if start <= 0 {
 		t, _, _ = strings.Cut(t, "#")
@@ -88,7 +93,7 @@ func (c Config) File(modules []Module, path string, start, end int) Link {
 		end = start
 	}
 	address := strings.NewReplacer(
-		"{repo}", repo, "{commit}", escapedRevision(at.revision), "{path}", within,
+		"{repo}", repo, "{commit}", revision, "{path}", within,
 		"{start}", strconv.Itoa(start), "{end}", strconv.Itoa(end),
 	).Replace(t)
 	if !on(address, host.Web) {
@@ -117,7 +122,7 @@ func (c Config) Compare(before, after []Module, path string) (address string, un
 	if !commit.MatchString(from.revision) || !commit.MatchString(to.revision) {
 		return "", false
 	}
-	if strings.EqualFold(from.revision, to.revision) {
+	if sameCommit(from.revision, to.revision) {
 		return "", !from.patched && !to.patched
 	}
 	host, repo, ok := c.repository(from.remote)
@@ -139,12 +144,7 @@ func (c Config) Compare(before, after []Module, path string) (address string, un
 // run's repository with the longest prefix holding it, or the top of the
 // checkout's commit where none does. Empty where that is not a commit.
 func CommitOf(modules []Module, top, path string) string {
-	inner := -1
-	for i, m := range modules {
-		if under(path, m.Path) && (inner < 0 || len(m.Path) > len(modules[inner].Path)) {
-			inner = i
-		}
-	}
+	inner := innermost(modules, path)
 	revision := top
 	if inner >= 0 {
 		revision = modules[inner].Revision
@@ -158,26 +158,56 @@ func CommitOf(modules []Module, top, path string) string {
 // Snippets is whether source under a path is kept: the setting of the
 // longest prefix that states one, and kept where none does.
 func (c Config) Snippets(path string) bool {
-	best, keep := -1, true
-	for _, p := range c.Paths {
-		if p.Snippets != nil && under(path, p.Prefix) && len(p.Prefix) > best {
-			best, keep = len(p.Prefix), *p.Snippets
-		}
-	}
-	return keep
+	return c.stated(path, func(p Path) *bool { return p.Snippets }, true)
 }
 
 // DisclosesSnippets is whether the snippets under a path of a code finding included in
 // its flaw's disclosure are disclosed with its flaw: the setting of the longest prefix that
 // states one, and off where none does.
 func (c Config) DisclosesSnippets(path string) bool {
-	best, disclose := -1, false
-	for _, p := range c.Paths {
-		if p.DisclosedSnippets != nil && under(path, p.Prefix) && len(p.Prefix) > best {
-			best, disclose = len(p.Prefix), *p.DisclosedSnippets
+	return c.stated(path, func(p Path) *bool { return p.DisclosedSnippets }, false)
+}
+
+// stated is a setting of the longest path prefix holding a path that states
+// it, and otherwise where none does.
+func (c Config) stated(path string, setting func(Path) *bool, otherwise bool) bool {
+	best := longest(len(c.Paths), path, func(i int) (string, bool) {
+		return c.Paths[i].Prefix, setting(c.Paths[i]) != nil
+	})
+	if best < 0 {
+		return otherwise
+	}
+	return *setting(c.Paths[best])
+}
+
+// longest is the position of the longest of n prefixes holding a path, the
+// first where two are as long, or -1 where none does. prefix is the i-th
+// prefix, and false where it is not to be considered.
+func longest(n int, path string, prefix func(i int) (string, bool)) int {
+	best, length := -1, -1
+	for i := range n {
+		if p, ok := prefix(i); ok && under(path, p) && len(p) > length {
+			best, length = i, len(p)
 		}
 	}
-	return disclose
+	return best
+}
+
+// innermost is the position of the run's repository with the longest path
+// holding a path, or -1 where none does.
+func innermost(modules []Module, path string) int {
+	return longest(len(modules), path, func(i int) (string, bool) { return modules[i].Path, true })
+}
+
+// sameCommit is whether two revisions name one commit, one written in full
+// and the other abbreviated included: git reads an abbreviation as the commit
+// it begins.
+func sameCommit(a, b string) bool {
+	a, b = strings.ToLower(a), strings.ToLower(b)
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	return strings.HasPrefix(b, a)
 }
 
 // located is the repository a path is in, and where in it.
@@ -192,31 +222,24 @@ type located struct {
 
 // locate is the repository holding a path: the run's repository with the
 // longest prefix, its remote read against the repository holding it where it
-// is relative, or else the repository the product names for the path.
+// is relative, or else the repository the product names for the path. A run's
+// repository with no remote that can be read names none, so the product's
+// answers for it.
 func (c Config) locate(modules []Module, path string) (located, bool) {
-	inner := -1
-	for i, m := range modules {
-		if under(path, m.Path) && (inner < 0 || len(m.Path) > len(modules[inner].Path)) {
-			inner = i
-		}
-	}
-	if inner >= 0 {
+	if inner := innermost(modules, path); inner >= 0 {
 		m := modules[inner]
 		remote := m.Remote
 		if relative(remote) {
 			remote = resolve(parentRemote(modules, inner), remote)
 		}
-		return located{
-			module: m.Path, remote: remote, revision: m.Revision,
-			within: strings.TrimPrefix(strings.TrimPrefix(path, m.Path), "/"), patched: m.Changed,
-		}, remote != ""
-	}
-	best := -1
-	for i, p := range c.Paths {
-		if p.Remote != "" && under(path, p.Prefix) && (best < 0 || len(p.Prefix) > len(c.Paths[best].Prefix)) {
-			best = i
+		if remote != "" {
+			return located{
+				module: m.Path, remote: remote, revision: m.Revision,
+				within: strings.TrimPrefix(strings.TrimPrefix(path, m.Path), "/"), patched: m.Changed,
+			}, true
 		}
 	}
+	best := longest(len(c.Paths), path, func(i int) (string, bool) { return c.Paths[i].Prefix, c.Paths[i].Remote != "" })
 	if best < 0 {
 		return located{}, false
 	}
@@ -230,13 +253,9 @@ func (c Config) locate(modules []Module, path string) (located, bool) {
 // parentRemote is the remote of the repository holding module i, itself
 // read against its own parent where it too is relative.
 func parentRemote(modules []Module, i int) string {
-	parent := -1
-	for j, m := range modules {
-		if j != i && m.Path != modules[i].Path && under(modules[i].Path, m.Path) &&
-			(parent < 0 || len(m.Path) > len(modules[parent].Path)) {
-			parent = j
-		}
-	}
+	parent := longest(len(modules), modules[i].Path, func(j int) (string, bool) {
+		return modules[j].Path, j != i && modules[j].Path != modules[i].Path
+	})
 	if parent < 0 {
 		return ""
 	}
@@ -320,13 +339,11 @@ func escapedPath(p string) (string, bool) {
 
 // escapedRevision is a commit, or a branch with each segment escaped. A
 // branch is the product's own statement and may hold a slash, which a host
-// reads as part of the branch.
-func escapedRevision(r string) string {
-	segments := strings.Split(r, "/")
-	for i, s := range segments {
-		segments[i] = url.PathEscape(s)
-	}
-	return strings.Join(segments, "/")
+// reads as part of the branch. It is refused where a segment is empty or
+// climbs, as a path is: a browser resolves the dot segments and leaves the
+// repository.
+func escapedRevision(r string) (string, bool) {
+	return escapedPath(r)
 }
 
 // on is whether an address opens over https on the host a web address

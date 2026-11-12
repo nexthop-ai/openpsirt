@@ -154,6 +154,9 @@ func (c *Config) Valid() error {
 	prefixes := map[string]bool{}
 	for i := range c.Paths {
 		p := &c.Paths[i]
+		if len(p.Prefix) > MostPathBytes {
+			return refusal.Errorf("path %d is longer than %d bytes", i+1, MostPathBytes)
+		}
 		prefix, ok := CleanPath(p.Prefix)
 		if !ok {
 			return refusal.Errorf("path %d, %q, is not a path within a checkout", i+1, p.Prefix)
@@ -172,7 +175,7 @@ func (c *Config) Valid() error {
 		case p.Remote == "" && p.Snippets == nil && p.DisclosedSnippets == nil:
 			return refusal.Errorf("path %q says nothing: name a repository, whether snippets are kept, "+
 				"or whether they are disclosed", prefix)
-		case strings.ContainsAny(p.Branch, " \t\n?#\\"):
+		case strings.ContainsAny(p.Branch, " \t\n?#\\"), p.Branch != "" && steps(p.Branch):
 			return refusal.Errorf("path %q: %q is not a branch name", prefix, p.Branch)
 		}
 		p.PrefixIdentity = identity(prefix)
@@ -225,6 +228,22 @@ func template(t string, allowed []string) error {
 	}
 	return nil
 }
+
+// steps is whether a segment of a slash-separated name is empty, "." or "..":
+// git refuses such a branch name, and in a link a browser resolves them and
+// leaves the repository.
+func steps(name string) bool {
+	for _, segment := range strings.Split(name, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+// MostPathBytes is the longest path within a checkout that is stored: the
+// longest path a Linux file system takes.
+const MostPathBytes = 4096
 
 // CleanPath is a path within a checkout with no leading or trailing slash,
 // refused where a segment is empty or climbs out.

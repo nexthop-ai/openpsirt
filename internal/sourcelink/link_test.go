@@ -143,6 +143,68 @@ func TestAPathNoUploadNamesLinksApproximatelyToTheBranchAProductNames(t *testing
 	}
 }
 
+func TestARunRepositoryWithNoRemoteLeavesTheProductsBranchToLink(t *testing.T) {
+	c := hosted(t)
+	c.Paths = []Path{{Prefix: "src/sonic-swss", Remote: "https://github.com/sonic-net/sonic-swss", Branch: "release/202605"}}
+	if err := c.Valid(); err != nil {
+		t.Fatal(err)
+	}
+	for name, modules := range map[string][]Module{
+		"no remote":                   {{Path: "", Revision: top}},
+		"a relative remote unread":    {{Path: "", Remote: "../sonic-swss.git", Revision: top}},
+		"an inner one with no remote": {checkout[0], {Path: "src/sonic-swss", Revision: top}},
+	} {
+		got := c.File(modules, "src/sonic-swss/orchagent/orch.cpp", 12, 12)
+		want := "https://github.com/sonic-net/sonic-swss/blob/release/202605/orchagent/orch.cpp#L12-L12"
+		if got.URL != want || !got.Approximate {
+			t.Errorf("%s: linked %+v; want %s, approximate", name, got, want)
+		}
+	}
+}
+
+func TestOneCommitWrittenAbbreviatedAndInFullIsUnchanged(t *testing.T) {
+	c := hosted(t)
+	after := append([]Module(nil), checkout...)
+	after[3].Revision = strings.ToUpper(sai[:7])
+	if address, unchanged := c.Compare(checkout, after, "src/sonic-frr/frr/bgpd/a.c"); address != "" || !unchanged {
+		t.Errorf("compared %q, unchanged %v; want the one commit said so", address, unchanged)
+	}
+	after[3].Revision = "fedcba0"
+	if address, unchanged := c.Compare(checkout, after, "src/sonic-frr/frr/bgpd/a.c"); address == "" || unchanged {
+		t.Errorf("compared %q, unchanged %v; want two commits compared", address, unchanged)
+	}
+}
+
+func TestAStoredBranchThatClimbsLinksNowhere(t *testing.T) {
+	c := hosted(t)
+	c.Paths = []Path{{Prefix: "src/x", Remote: "https://github.com/sonic-net/sonic-swss", Branch: "../../../other/repo/blob/main"}}
+	if got := c.File(nil, "src/x/a.c", 1, 1); got.URL != "" || got.Unlinked != NotAPath {
+		t.Errorf("linked %+v; want it unlinked as leaving the repository", got)
+	}
+}
+
+func TestTheNearestPrefixStatingItDecidesWhetherSnippetsAreDisclosed(t *testing.T) {
+	yes, no := true, false
+	c := Config{Paths: []Path{
+		{Prefix: "src", DisclosedSnippets: &yes},
+		{Prefix: "src/private", DisclosedSnippets: &no},
+		{Prefix: "src/private/named", Remote: "https://github.com/a/b", Branch: "main"},
+	}}
+	if err := c.Valid(); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]bool{
+		"README":                false,
+		"src/a.c":               true,
+		"src/private/named/x.c": false,
+		"src/privateer/a.c":     true,
+	} {
+		if got := c.DisclosesSnippets(path); got != want {
+			t.Errorf("%s discloses snippets %v; want %v", path, got, want)
+		}
+	}
+}
+
 func TestTwoBuildsOfOneRepositoryCompareTheirCommits(t *testing.T) {
 	c := hosted(t)
 	after := append([]Module(nil), checkout...)
@@ -206,20 +268,23 @@ func TestTheNearestPrefixStatingItDecidesWhetherSnippetsAreKept(t *testing.T) {
 func TestAConfigurationThatCannotBeUsedIsRefusedNamingTheEntry(t *testing.T) {
 	yes := true
 	for name, c := range map[string]Config{
-		"plain http":       {Hosts: []Host{{Remote: "github.com", Web: "http://github.com", Style: GitHub}}},
-		"a credential":     {Hosts: []Host{{Remote: "github.com", Web: "https://u:p@github.com", Style: GitHub}}}, //nolint:gosec // G101: a placeholder credential the check refuses
-		"no remote":        {Hosts: []Host{{Web: "https://github.com", Style: GitHub}}},
-		"twice":            {Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: GitHub}, {Remote: "GitHub.com/", Web: "https://github.com", Style: GitHub}}},
-		"unknown style":    {Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: "svn"}}},
-		"another host":     {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "https://evil.example/{path}"}}},
-		"a placeholder":    {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{secret}"}}},
-		"a compare one":    {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{path}", CompareTemplate: "{repo}/{path}"}}},
-		"climbing":         {Paths: []Path{{Prefix: "src/../..", Snippets: &yes}}},
-		"half a repo":      {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b"}}},
-		"nothing said":     {Paths: []Path{{Prefix: "src"}}},
-		"not a repository": {Paths: []Path{{Prefix: "src", Remote: "github.com", Branch: "main"}}},
-		"not a branch":     {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "a b"}}},
-		"a path twice":     {Paths: []Path{{Prefix: "src", Snippets: &yes}, {Prefix: "/src/", Snippets: &yes}}},
+		"plain http":        {Hosts: []Host{{Remote: "github.com", Web: "http://github.com", Style: GitHub}}},
+		"a credential":      {Hosts: []Host{{Remote: "github.com", Web: "https://u:p@github.com", Style: GitHub}}}, //nolint:gosec // G101: a placeholder credential the check refuses
+		"no remote":         {Hosts: []Host{{Web: "https://github.com", Style: GitHub}}},
+		"twice":             {Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: GitHub}, {Remote: "GitHub.com/", Web: "https://github.com", Style: GitHub}}},
+		"unknown style":     {Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: "svn"}}},
+		"another host":      {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "https://evil.example/{path}"}}},
+		"a placeholder":     {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{secret}"}}},
+		"a compare one":     {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{path}", CompareTemplate: "{repo}/{path}"}}},
+		"climbing":          {Paths: []Path{{Prefix: "src/../..", Snippets: &yes}}},
+		"half a repo":       {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b"}}},
+		"nothing said":      {Paths: []Path{{Prefix: "src"}}},
+		"not a repository":  {Paths: []Path{{Prefix: "src", Remote: "github.com", Branch: "main"}}},
+		"not a branch":      {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "a b"}}},
+		"a climbing branch": {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "../x"}}},
+		"an empty segment":  {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "a//b"}}},
+		"a long path":       {Paths: []Path{{Prefix: strings.Repeat("a", MostPathBytes+1), Snippets: &yes}}},
+		"a path twice":      {Paths: []Path{{Prefix: "src", Snippets: &yes}, {Prefix: "/src/", Snippets: &yes}}},
 	} {
 		if err := c.Valid(); err == nil {
 			t.Errorf("%s: accepted", name)
