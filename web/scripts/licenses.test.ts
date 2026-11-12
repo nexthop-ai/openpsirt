@@ -113,6 +113,7 @@ describe("the verdict over a lockfile", () => {
     "node_modules/kept": { license: "MIT" },
     "node_modules/copyleft": { license: "GPL-3.0-only" },
     "node_modules/tool": { license: "GPL-3.0-only", dev: true },
+    "node_modules/optional": { license: "GPL-3.0-only", devOptional: true },
     "node_modules/@fonts/serif": { license: "OFL-1.1" },
   };
   const verdict = () =>
@@ -122,13 +123,15 @@ describe("the verdict over a lockfile", () => {
       checked: number;
     };
 
-  it("refuses a shipped package outside the allowlist", () => {
-    expect(verdict().refused).toEqual(["copyleft is GPL-3.0-only"]);
+  // A package marked devOptional is an optional dependency of a shipped one
+  // as well as a development dependency, and ships.
+  it("refuses a shipped package outside the allowlist, an optional one of a shipped package included", () => {
+    expect(verdict().refused).toEqual(["copyleft is GPL-3.0-only", "optional is GPL-3.0-only"]);
   });
 
   it("admits a package by exception and leaves a development one alone", () => {
     expect(verdict().excepted).toEqual(["@fonts/serif (OFL-1.1)"]);
-    expect(verdict().checked).toBe(3);
+    expect(verdict().checked).toBe(4);
   });
 });
 
