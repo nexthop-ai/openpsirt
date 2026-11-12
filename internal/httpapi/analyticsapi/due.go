@@ -14,7 +14,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -25,20 +24,16 @@ type LateBody struct {
 	Exploited     bool   `json:"exploited,omitempty"`
 	Component     string `json:"component"`
 	Version       string `json:"version,omitempty" doc:"The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved"`
-	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace     string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Product       string `json:"product" doc:"The product, by the name that addresses it"`
+	core.PackageKindBody
+	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName     string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	BranchOrTag     string `json:"branch_or_tag"`
-	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant         string `json:"variant"`
-	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
-	Occurrences     int    `json:"occurrences" doc:"The number of occurrences in that build this sits at"`
-	AssignedTo      string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
-	AssignedName    string `json:"assigned_to_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Due             string `json:"due" doc:"The date it is due"`
-	DaysLeft        int    `json:"days_left" doc:"Negative once it is overdue"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	core.BuildNamesBody
+	Occurrences  int    `json:"occurrences" doc:"The number of occurrences in that build this sits at"`
+	AssignedTo   string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
+	AssignedName string `json:"assigned_to_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	Due          string `json:"due" doc:"The date it is due"`
+	DaysLeft     int    `json:"days_left" doc:"Negative once it is overdue"`
 }
 
 func registerDue(api huma.API, in core.Deps) {
@@ -117,13 +112,14 @@ func lateBodies(ctx context.Context, db bun.IDB, rows []finding.Late, now time.T
 		body := LateBody{
 			Vulnerability: row.Vulnerability, Severity: row.Severity,
 			Exploited: row.Exploited, Component: row.Component, Version: row.Version,
-			Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-			Product: row.Product, ProductName: row.ProductName,
-			BranchOrTag: row.BranchOrTag, Variant: row.Variant,
-			BranchOrTagName: row.BranchOrTagName,
-			VariantName:     row.VariantName,
-			Occurrences:     row.Occurrences,
-			Due:             row.Due.UTC().Format(time.DateOnly),
+			PackageKindBody: core.PackageKindOf(row.Purl),
+			Product:         row.Product, ProductName: row.ProductName,
+			BuildNamesBody: core.BuildNamesBody{
+				BranchOrTag: row.BranchOrTag, BranchOrTagName: row.BranchOrTagName,
+				Variant: row.Variant, VariantName: row.VariantName,
+			},
+			Occurrences: row.Occurrences,
+			Due:         row.Due.UTC().Format(time.DateOnly),
 			// Rounded down, not toward zero. Truncation reports something
 			// twelve hours overdue as having zero days left, which reads as
 			// due today rather than as late.

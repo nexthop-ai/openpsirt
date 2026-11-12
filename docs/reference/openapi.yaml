@@ -1806,13 +1806,13 @@ components:
           description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
       required:
-        - branch_or_tag
-        - variant
         - critical
         - high
         - medium
         - low
         - total
+        - branch_or_tag
+        - variant
       type: object
     BuildName:
       additionalProperties: false
@@ -5921,13 +5921,13 @@ components:
           type: string
       required:
         - product
-        - branch_or_tag
-        - variant
         - vulnerability
         - component
         - version
         - occurrences
         - decided
+        - branch_or_tag
+        - variant
       type: object
     FindingsOutputBody:
       additionalProperties: false
@@ -7398,11 +7398,11 @@ components:
         - vulnerability
         - component
         - product
-        - branch_or_tag
-        - variant
         - occurrences
         - due
         - days_left
+        - branch_or_tag
+        - variant
       type: object
     LinkBody:
       additionalProperties: false
@@ -8694,9 +8694,9 @@ components:
           description: The version that build ships under this name — pass it as ?version= when applying a decision there
           type: string
       required:
+        - occurrences
         - branch_or_tag
         - variant
-        - occurrences
       type: object
     MeasuredBody:
       additionalProperties: false

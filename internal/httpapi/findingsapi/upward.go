@@ -19,12 +19,11 @@ import (
 type UpwardBody struct {
 	Component string `json:"component"`
 	Version   string `json:"version"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Depth     int    `json:"depth" doc:"The depth below the build's root, so the tree is drawn by indenting"`
-	Findings  int    `json:"findings" doc:"Your own open issues on this component itself"`
-	Beneath   int    `json:"beneath" doc:"Your own open issues at or under it along these chains. Never how much the build holds there"`
-	Placed    bool   `json:"placed" doc:"False for a component whose every way up is longer than the tree is drawn. Those sit at the end with no chain. A component nothing pulls in is placed directly under the root"`
+	core.PackageKindBody
+	Depth    int  `json:"depth" doc:"The depth below the build's root, so the tree is drawn by indenting"`
+	Findings int  `json:"findings" doc:"Your own open issues on this component itself"`
+	Beneath  int  `json:"beneath" doc:"Your own open issues at or under it along these chains. Never how much the build holds there"`
+	Placed   bool `json:"placed" doc:"False for a component whose every way up is longer than the tree is drawn. Those sit at the end with no chain. A component nothing pulls in is placed directly under the root"`
 }
 
 // OursOutput is the tree, seen upward.
@@ -103,8 +102,8 @@ func registerUpward(api huma.API, in core.Deps) {
 			for _, row := range rows {
 				out.Body.Items = append(out.Body.Items, UpwardBody{
 					Component: row.Component, Version: row.Version, Depth: row.Depth,
-					Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-					Findings: row.Findings, Beneath: row.Beneath, Placed: row.Placed,
+					PackageKindBody: core.PackageKindOf(row.Purl),
+					Findings:        row.Findings, Beneath: row.Beneath, Placed: row.Placed,
 				})
 			}
 			return out, nil

@@ -17,7 +17,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
@@ -25,12 +24,11 @@ import (
 // DisposedBody is one known vulnerability in a build and what was decided
 // about it, including nothing.
 type DisposedBody struct {
-	Vulnerability string                    `json:"vulnerability"`
-	Severity      string                    `json:"severity,omitempty"`
-	Component     string                    `json:"component"`
-	Version       string                    `json:"version,omitempty"`
-	Ecosystem     string                    `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace     string                    `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
+	Vulnerability string `json:"vulnerability"`
+	Severity      string `json:"severity,omitempty"`
+	Component     string `json:"component"`
+	Version       string `json:"version,omitempty"`
+	core.PackageKindBody
 	Occurrence    string                    `json:"occurrence" doc:"The occurrence in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
 	Consumer      string                    `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 	State         core.Standing             `json:"state" doc:"The decision state. undecided is a row nobody has decided anything about"`
@@ -361,9 +359,9 @@ func disposedBody(ctx context.Context, in core.Deps, row finding.Disposed) Dispo
 	body := DisposedBody{
 		Vulnerability: row.Vulnerability, Severity: row.Severity,
 		Component: row.Component, Version: row.Version, Occurrence: row.Occurrence,
-		Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-		Consumer: row.Consumer,
-		State:    core.Standing(row.State), Outcome: core.VulnerabilityOutcome(row.Outcome),
+		PackageKindBody: core.PackageKindOf(row.Purl),
+		Consumer:        row.Consumer,
+		State:           core.Standing(row.State), Outcome: core.VulnerabilityOutcome(row.Outcome),
 		Justification: core.Justification(row.Justification),
 		ProposedBy:    row.ProposedBy, ApprovedBy: row.ApprovedBy,
 		AgreementCarried: row.AgreementCarried,

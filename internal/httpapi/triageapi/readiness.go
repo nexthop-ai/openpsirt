@@ -16,10 +16,7 @@ import (
 
 // BuildCountsBody is what one build holds now, by severity band.
 type BuildCountsBody struct {
-	BranchOrTag     string `json:"branch_or_tag"`
-	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant         string `json:"variant"`
-	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	core.BuildNamesBody
 	// Kind says whether this is a branch or a tag. The comparison only means
 	// something for a branch, and a screen asks before drawing the panel at
 	// all rather than drawing one that explains why it is empty.
@@ -66,9 +63,8 @@ type BlockingBody struct {
 	// so one issue at three versions of one component is three rows here.
 	// Without it they arrive identical: four rows reading "CVE-2026-46595
 	// golang.org/x/crypto", differing only in a count the panel does not draw.
-	Version     string                 `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
-	Ecosystem   string                 `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace   string                 `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
+	Version string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
+	core.PackageKindBody
 	Severity    string                 `json:"severity,omitempty"`
 	Exploited   bool                   `json:"exploited,omitempty"`
 	Occurrences int                    `json:"occurrences" doc:"The number of occurrences of the build it sits at"`
@@ -168,8 +164,9 @@ func registerReadiness(api huma.API, in core.Deps) {
 		for _, group := range groups {
 			one := BlockingBody{
 				Vulnerability: group.Vulnerability, Component: group.Component,
-				Version: group.Version, Ecosystem: group.Ecosystem, Namespace: group.Namespace,
-				Severity: group.Severity, Exploited: group.Exploited,
+				Version:         group.Version,
+				PackageKindBody: core.PackageKindBody{Ecosystem: group.Ecosystem, Namespace: group.Namespace},
+				Severity:        group.Severity, Exploited: group.Exploited,
 				Occurrences: group.Occurrences, State: core.StandingUnsettled(group.State),
 			}
 			if group.DueAt != nil {
@@ -183,9 +180,11 @@ func registerReadiness(api huma.API, in core.Deps) {
 
 func buildCounts(s finding.Standing) BuildCountsBody {
 	body := BuildCountsBody{
-		BranchOrTag: s.BranchOrTag, Variant: s.Variant, Kind: core.LineKind(s.Kind), Total: s.Total,
-		BranchOrTagName: s.BranchOrTagName,
-		VariantName:     s.VariantName,
+		BuildNamesBody: core.BuildNamesBody{
+			BranchOrTag: s.BranchOrTag, BranchOrTagName: s.BranchOrTagName,
+			Variant: s.Variant, VariantName: s.VariantName,
+		},
+		Kind: core.LineKind(s.Kind), Total: s.Total,
 	}
 	body.Critical, body.High, body.Medium, body.Low = core.BandCounts(s.ByBand)
 	body.LastScannedAt = core.StampAt(s.LastScanned)
