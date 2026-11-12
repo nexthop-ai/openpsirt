@@ -45,7 +45,8 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 			"assign it to a team, which is a queue rather than a holding: it stays unheld until " +
 			"somebody takes it.\n\n" +
 			"A report is undisclosed, so a person is given one only where they read " +
-			"undisclosed work in the product, and a team only where one member does. A judged " +
+			"undisclosed work in the product, and a team only where one member does; anybody " +
+			"else is refused with 422. A judged " +
 			"report is refused with 409: its work goes on as the issue it became, or ended " +
 			"with its ruling.\n\n" +
 			"The person given it is told, where that is not you.",

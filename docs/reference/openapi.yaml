@@ -23564,7 +23564,7 @@ paths:
 
         Send `person` as an empty string to hand it back to nobody. Send `team` instead to assign it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
 
-        A person is given a code finding only where they may read it at its visibility, and a team only where one member may. A code finding every release of which is past its end of life is refused with 409, and so is a code finding recorded as a flaw: assign the flaw instead.
+        A person is given a code finding only where they hold a role in the product, have not been deactivated, and may read it at its visibility, and a team only where one member may; anybody else is refused with 422. A code finding every release of which is past its end of life is refused with 409, and so is a code finding recorded as a flaw: assign the flaw instead.
 
         A code finding seen on a build it was not open on when it was assigned starts unassigned there.
 
@@ -28736,7 +28736,7 @@ paths:
 
         Not bounded, unlike a bulk decision: this one covers as many occurrences as the component has open findings in the releases named.
 
-        Saying who carries it is part of the act, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a decision one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
+        Saying who carries it is part of the act, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a decision one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not. A person is given it only where they hold a role in the product, have not been deactivated, and may read every visibility it holds; anybody else is refused with 422.
 
         Requires: public-triage or private-triage or security-testing-triage on the product
       operationId: plan-upgrade
@@ -34025,7 +34025,7 @@ paths:
 
         Send `person` as an empty string to hand it back to nobody. Send `team` instead to assign it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
 
-        A report is undisclosed, so a person is given one only where they read undisclosed work in the product, and a team only where one member does. A judged report is refused with 409: its work goes on as the issue it became, or ended with its ruling.
+        A report is undisclosed, so a person is given one only where they read undisclosed work in the product, and a team only where one member does; anybody else is refused with 422. A judged report is refused with 409: its work goes on as the issue it became, or ended with its ruling.
 
         The person given it is told, where that is not you.
 

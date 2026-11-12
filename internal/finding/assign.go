@@ -587,26 +587,20 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 		return ErrRecipientHoldsNothing
 	}
 	rights := access.NewStore(tx)
-	asked := map[int64]bool{}
+	asked := map[int64][]access.Visibility{}
 	for _, one := range held {
-		if !asked[one.ProductID] {
-			asked[one.ProductID] = true
-			holds, err := rights.HoldsAnythingIn(ctx, people[0], one.ProductID)
-			if err != nil {
+		holds, ok := asked[one.ProductID]
+		if !ok {
+			var err error
+			if holds, err = rights.PersonHolds(ctx, people[0], one.ProductID); err != nil {
 				return err
 			}
-			if !holds {
-				return ErrRecipientHoldsNothing
-			}
+			asked[one.ProductID] = holds
 		}
-		if one.Visibility == access.Public {
-			continue
+		if len(holds) == 0 {
+			return ErrRecipientHoldsNothing
 		}
-		reads, err := rights.PersonReads(ctx, people[0], one.ProductID, one.Visibility)
-		if err != nil {
-			return err
-		}
-		if !reads {
+		if !slices.Contains(holds, one.Visibility) {
 			return ErrRecipientMayNotRead
 		}
 	}

@@ -302,13 +302,13 @@ func MapGroups(ctx context.Context, db bun.IDB, mappings []access.Mapping,
 		}
 		store := NewStore(db)
 		for _, mapping := range mapped.Removed {
-			if err := store.RecordByConfiguration(ctx, Role, mappingAbout(mapping),
+			if err := store.RecordByConfiguration(ctx, Role, mapping.String(),
 				Said(mapping.Grants, true), nil); err != nil {
 				return err
 			}
 		}
 		for _, mapping := range mapped.Added {
-			if err := store.RecordByConfiguration(ctx, Role, mappingAbout(mapping),
+			if err := store.RecordByConfiguration(ctx, Role, mapping.String(),
 				nil, Said(mapping.Grants, true)); err != nil {
 				return err
 			}
@@ -369,18 +369,6 @@ func OnProduct(name, product string) string { return name + onProduct + product 
 // OnEveryProduct is what a change made across every product is recorded
 // about, in the per-product shape so About reads it with the rest.
 func OnEveryProduct(name string) string { return OnProduct(name, "every product") }
-
-// mappingAbout is what a change to one group mapping is recorded about,
-// built through OnProduct like every other per-product row.
-func mappingAbout(m access.Mapping) string {
-	if m.Product != "" {
-		return OnProduct(m.Group, m.Product)
-	}
-	if _, over := m.Over(); over {
-		return m.String()
-	}
-	return OnEveryProduct(m.Group)
-}
 
 // InCase is what a change to who is on one undisclosed case is recorded about:
 // the product, the issue and the person. The column is sized for three maximal

@@ -419,6 +419,28 @@ func (s *Store) WhoHolds(ctx context.Context, parties []int64) (map[int64]Held, 
 	return held, nil
 }
 
+// PersonHolds is the visibilities somebody may hold work at in a product: none
+// where they hold no role there or have left, and otherwise public and each
+// other visibility they read. Assigning, handing over and handing back all
+// ask it, so the work one admits is the work the others keep.
+func (s *Store) PersonHolds(ctx context.Context, personID, productID int64) ([]Visibility, error) {
+	holds, err := s.HoldsAnythingIn(ctx, personID, productID)
+	if err != nil || !holds {
+		return nil, err
+	}
+	kept := []Visibility{Public}
+	for _, v := range []Visibility{Private, SecurityTesting} {
+		reads, err := s.PersonReads(ctx, personID, productID, v)
+		if err != nil {
+			return nil, err
+		}
+		if reads {
+			kept = append(kept, v)
+		}
+	}
+	return kept, nil
+}
+
 // PersonReads reports whether one person may read a finding of this visibility
 // in this product.
 //

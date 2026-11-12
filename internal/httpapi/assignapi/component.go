@@ -267,7 +267,9 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 			"both impossible. A team is a perfectly good holder — moving a package is work a " +
 			"queue tracks rather than a decision one person makes — and it stays unheld until " +
 			"somebody on it takes it. The handover is product-wide like every other, because " +
-			"the promise is per build and who is carrying the work is not.",
+			"the promise is per build and who is carrying the work is not. A person is given " +
+			"it only where they hold a role in the product, have not been deactivated, and may " +
+			"read every visibility it holds; anybody else is refused with 422.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`

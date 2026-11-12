@@ -588,3 +588,20 @@ func TestAPersonsHistoryHoldsNoGroupMappingNamedAsThem(t *testing.T) {
 		}
 	})
 }
+
+// A group mapping is recorded about in the form every other per-product row
+// takes, which a person's history reads back by the product it names.
+func TestAMappingIsRecordedAboutAsAnyPerProductRowIs(t *testing.T) {
+	for _, c := range []struct {
+		mapping access.Mapping
+		want    string
+	}{
+		{access.Mapping{Group: "kernel", Grants: string(access.PublicTriage), Product: "sonic"},
+			trail.OnProduct("kernel", "sonic")},
+		{access.Mapping{Group: "kernel", Grants: string(access.PublicTriage)}, trail.OnEveryProduct("kernel")},
+	} {
+		if got := c.mapping.String(); got != c.want {
+			t.Errorf("a mapping is recorded about as %q, want %q", got, c.want)
+		}
+	}
+}

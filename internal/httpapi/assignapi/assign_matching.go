@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -62,20 +63,16 @@ func recipient(err error, otherwise func(error) error) error {
 // disclosure.
 func personAdmits(person *access.Account, productID int64) finding.Admits {
 	return func(ctx context.Context, db bun.IDB, withheld []access.Visibility) error {
-		rights := access.NewStore(db)
-		holds, err := rights.HoldsAnythingIn(ctx, person.ID, productID)
+		holds, err := access.NewStore(db).PersonHolds(ctx, person.ID, productID)
 		if err != nil {
 			return err
 		}
-		if !holds {
+		if len(holds) == 0 {
 			return errRecipient{huma.Error422UnprocessableEntity(
 				"they hold no role in this product, so the work would sit with somebody who cannot open it")}
 		}
 		for _, v := range withheld {
-			reads, err := rights.PersonReads(ctx, person.ID, productID, v)
-			if err != nil {
-				return err
-			}
+			reads := slices.Contains(holds, v)
 			if !reads && v == access.SecurityTesting {
 				return errRecipient{huma.Error422UnprocessableEntity(
 					"some of this is at security testing visibility and they may not read security testing work here, " +

@@ -32,8 +32,9 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 			"Send `person` as an empty string to hand it back to nobody. Send `team` instead to " +
 			"assign it to a team, which is a queue rather than a holding: it stays unheld until " +
 			"somebody takes it.\n\n" +
-			"A person is given a code finding only where they may read it at its visibility, and a team " +
-			"only where one member may. A code finding every release of which is past its end of life " +
+			"A person is given a code finding only where they hold a role in the product, have not " +
+			"been deactivated, and may read it at its visibility, and a team only where one member " +
+			"may; anybody else is refused with 422. A code finding every release of which is past its end of life " +
 			"is refused with 409, and so is a code finding recorded as a flaw: assign the flaw " +
 			"instead.\n\n" +
 			"A code finding seen on a build it was not open on when it was assigned starts unassigned there.",
