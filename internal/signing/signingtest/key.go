@@ -15,8 +15,8 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
-// Made is the moment Key's keys are created at when a test names none, so two
-// keys made by one test differ only by their key material.
+// Made is a creation time tests share, so two keys made at it differ only by
+// their key material.
 var Made = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // Key is an armored, unprotected private signing key created at the moment
