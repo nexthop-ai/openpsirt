@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -340,6 +341,108 @@ func TestARiseLapsesADecisionUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t
 		if state := f.stateOf(t, decisions["moved-away"]); state != triage.Approved {
 			t.Errorf("a decision whose finding is another issue's is %q after a rise, and it covers nothing",
 				state)
+		}
+	})
+}
+
+func TestADecisionUnderAMergedNameIsReaffirmedAtTheFindingsOfTheIssueItIsReadAs(t *testing.T) {
+	// A decision made under a name that later merged into another stays
+	// filed under the first, and its findings are held under the second. A
+	// rise lapses it there, and re-affirming it re-makes it at those findings,
+	// under the issue that stands, rather than finding nothing open.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		filed := f.secondIssue(t)
+		in := f.build(t, f.product, "reaffirm-merged")
+		row := f.finds(t, in, f.component(t, "lib-merged", "1.2.3"), "merged", access.Public)
+		f.holdUnder(t, row, filed)
+		at := f.at()
+		at.VulnerabilityID, at.OccurrenceIdentity, at.ConsumerUpstream = filed, "merged", ""
+		judged := f.judged(t, at, 300)
+		if err := agreeTo(ctx, f.store, f.reviewer, judged.DecisionID, ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
+			Where(`"id" = ?`, filed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.holdUnder(t, row, f.issue)
+		f.rateIssue(t, 980)
+		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: in.build}); err != nil {
+			t.Fatal(err)
+		}
+		if state := f.stateOf(t, judged.ID); state != triage.LapsedState {
+			t.Fatalf("the decision under the merged name is %q after a rise; want it lapsed", state)
+		}
+
+		made, err := f.store.ReaffirmDecision(ctx, f.triager, triage.ReaffirmingDecision{
+			PreviousDecisionID: judged.DecisionID,
+			Reasoning:          "Still nothing an attacker sends reaches the parser.", By: f.proposer,
+			Bounds: triage.DefaultBounds(),
+		})
+		if err != nil {
+			t.Fatalf("re-affirming a decision under a merged name: %v", err)
+		}
+		if len(made.DecisionOccurrences) != 1 {
+			t.Fatalf("re-affirming wrote %d rows; want the one at the open finding", len(made.DecisionOccurrences))
+		}
+		var remade triage.DecisionOccurrence
+		if err := f.db.DB.NewSelect().Model(&remade).
+			Where(`"de"."id" = ?`, made.DecisionOccurrences[0]).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if remade.VulnerabilityID != f.issue || remade.OccurrenceIdentity != "merged" {
+			t.Errorf("the re-made row is filed under issue %d at %q; want the issue that stands, %d, at the same occurrence",
+				remade.VulnerabilityID, remade.OccurrenceIdentity, f.issue)
+		}
+	})
+}
+
+func TestSeveritiesAreReadPerProductAndAsTheIssueStandsFor(t *testing.T) {
+	// The severity a re-affirmation measures a rise against, read for many
+	// pairs at once: each product's own rating of the issue over the
+	// published one, a merged name read as the issue it stands for, and the
+	// published rating where a product holds none.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "elsewhere", "Elsewhere")
+		if err != nil {
+			t.Fatal(err)
+		}
+		merged := f.secondIssue(t)
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
+			Where(`"id" = ?`, merged).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.rateIssue(t, 500)
+		if _, err := f.db.DB.NewInsert().Model(&finding.IssueRating{
+			VulnerabilityID: f.issue, ProductID: f.product, Severity: "critical",
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var published string
+		if err := f.db.DB.NewSelect().Table("vulnerability").Column("severity").
+			Where(`"id" = ?`, f.issue).Scan(ctx, &published); err != nil {
+			t.Fatal(err)
+		}
+		here := finding.Rating{Published: published, Assessed: "critical", ScoreCenti: 500}.Score()
+		there := finding.Rating{Published: published, ScoreCenti: 500}.Score()
+		if here == there {
+			t.Fatalf("the product's rating scores %d as the published one does, so nothing tells them apart", here)
+		}
+
+		got, err := f.store.SeveritiesOf(ctx, [][2]int64{
+			{f.product, f.issue}, {other.ID, f.issue}, {f.product, merged},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for key, want := range map[[2]int64]int{
+			{f.product, f.issue}: here, {other.ID, f.issue}: there, {f.product, merged}: here,
+		} {
+			if got[key] != want {
+				t.Errorf("product %d, issue %d scores %d; want %d", key[0], key[1], got[key], want)
+			}
 		}
 	})
 }

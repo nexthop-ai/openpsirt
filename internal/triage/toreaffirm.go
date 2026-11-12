@@ -125,20 +125,20 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 	if err != nil {
 		return nil, 0, err
 	}
-	severity := map[[2]int64]int{}
+	keys := make([][2]int64, 0, len(lapsedRows))
+	for _, row := range lapsedRows {
+		keys = append(keys, [2]int64{row.ProductID, row.VulnerabilityID})
+	}
+	severity, err := s.severitiesOf(ctx, keys)
+	if err != nil {
+		return nil, 0, err
+	}
 	for _, row := range lapsedRows {
 		entry := gathered[row.DecisionID]
 		if moved[row.ID] {
 			entry.CodeMoved = true
 		}
 		key := [2]int64{row.ProductID, row.VulnerabilityID}
-		if _, asked := severity[key]; !asked {
-			now, err := s.severityOf(ctx, row.ProductID, row.VulnerabilityID)
-			if err != nil {
-				return nil, 0, err
-			}
-			severity[key] = now
-		}
 		if !entry.RatedWorse && turnsOnSeverity(entry.Decision) &&
 			ratedWorse(row.SeverityCenti, severity[key]) {
 			entry.RatedWorse = true

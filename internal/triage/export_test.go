@@ -27,3 +27,9 @@ func (b Bounds) Counted(issues, occurrences int, review bool) error {
 func (s *Store) ProposersOfAll(ctx context.Context, ids []int64, chunk int) ([]ForPerson, error) {
 	return s.proposersOfAll(ctx, ids, chunk)
 }
+
+// SeveritiesOf is severitiesOf, for the test that the batched read answers
+// each pair as its own product rates its issue.
+func (s *Store) SeveritiesOf(ctx context.Context, keys [][2]int64) (map[[2]int64]int, error) {
+	return s.severitiesOf(ctx, keys)
+}

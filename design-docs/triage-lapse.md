@@ -121,6 +121,8 @@ was made at.
 | The carried agreement is one row, effective on all rows together | |
 | A row replaced by a later decision of another made at its occurrence after it stopped standing is not re-made; an earlier sibling at another version replaces nothing, nor do rows of one decision | The later one is what the occurrence last said |
 | A row whose versions are still open is re-made at them alone | It lapsed for a rating, its code unmoved |
+| A row filed under an issue that merged into another is re-made at the findings the other holds, filed under it | A merge moves the findings and leaves the decision filed where it was made |
+| The rating in force is read for every row together, one statement per product | 2,000 issues read 1.74 s one at a time on PostgreSQL and 11 ms together; 461 ms and 7 ms on MySQL |
 
 Lapsed decisions are reached by the findings list's `lapsed` state and the
 queue's To reaffirm tab, the reader's own. Neither lists nor offers a decision
