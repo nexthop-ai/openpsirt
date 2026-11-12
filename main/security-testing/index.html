@@ -1222,13 +1222,13 @@ Windows, on amd64 and arm64, each beside a CycloneDX inventory of its binary,
 </table>
 <p>An archive holds one directory, named as the archive is, with the program,
 <code>LICENSE</code> and <code>NOTICE</code> in it.</p>
-<pre><code class="language-bash">base=https://github.com/nexthop-ai/openpsirt/releases/download/v0.11.0
-client=openpsirt-upload_0.11.0_linux_amd64
+<pre><code class="language-bash">base=https://github.com/nexthop-ai/openpsirt/releases/download/v0.12.0
+client=openpsirt-upload_0.12.0_linux_amd64
 curl -fsSL -O &quot;$base/$client.tar.gz&quot; -O &quot;$base/SHA256SUMS&quot; -O &quot;$base/SHA256SUMS.cosign.bundle&quot;
 cosign verify-blob \
   --bundle SHA256SUMS.cosign.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity https://github.com/nexthop-ai/openpsirt/.github/workflows/release.yml@refs/tags/v0.11.0 \
+  --certificate-identity https://github.com/nexthop-ai/openpsirt/.github/workflows/release.yml@refs/tags/v0.12.0 \
   SHA256SUMS
 grep &quot; $client.tar.gz\$&quot; SHA256SUMS | shasum -a 256 -c
 tar -xzf &quot;$client.tar.gz&quot;
@@ -1487,8 +1487,8 @@ lines. <code>OPENPSIRT_KEY</code> is held in the CI system's secret store.</p>
     env:
       OPENPSIRT_URL: ${{ vars.OPENPSIRT_URL }}
       OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
-      BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v0.11.0
-      CLIENT: openpsirt-upload_0.11.0_${{ matrix.client }}
+      BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v0.12.0
+      CLIENT: openpsirt-upload_0.12.0_${{ matrix.client }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -1533,7 +1533,7 @@ all three runners.</p>
 runners are chosen by tag; the Windows runner runs PowerShell and takes no
 <code>image</code>.</p>
 <pre><code class="language-yaml">variables:
-  BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v0.11.0
+  BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v0.12.0
 
 .unix: &amp;unix
   - curl -fsSL -O &quot;$BASE/$CLIENT.tar.gz&quot; -O &quot;$BASE/SHA256SUMS&quot;
@@ -1550,18 +1550,18 @@ runners are chosen by tag; the Windows runner runs PowerShell and takes no
 
 analysis-linux:
   image: python:3
-  variables: {CLIENT: &quot;openpsirt-upload_0.11.0_linux_amd64&quot;, VARIANT: linux}
+  variables: {CLIENT: &quot;openpsirt-upload_0.12.0_linux_amd64&quot;, VARIANT: linux}
   script: *unix
 
 analysis-macos:
   tags: [saas-macos-medium-m1]
   image: macos-26-xcode-26
-  variables: {CLIENT: &quot;openpsirt-upload_0.11.0_darwin_arm64&quot;, VARIANT: macos}
+  variables: {CLIENT: &quot;openpsirt-upload_0.12.0_darwin_arm64&quot;, VARIANT: macos}
   script: *unix
 
 analysis-windows:
   tags: [saas-windows-medium-amd64]
-  variables: {CLIENT: &quot;openpsirt-upload_0.11.0_windows_amd64&quot;, VARIANT: windows}
+  variables: {CLIENT: &quot;openpsirt-upload_0.12.0_windows_amd64&quot;, VARIANT: windows}
   script:
     - |
       Invoke-WebRequest &quot;$env:BASE/$env:CLIENT.zip&quot; -OutFile &quot;$env:CLIENT.zip&quot;
@@ -1591,7 +1591,7 @@ variant:</p>
   environment {
     OPENPSIRT_URL = 'https://openpsirt.example.com'
     OPENPSIRT_KEY = credentials('openpsirt-key')
-    BASE = 'https://github.com/nexthop-ai/openpsirt/releases/download/v0.11.0'
+    BASE = 'https://github.com/nexthop-ai/openpsirt/releases/download/v0.12.0'
   }
   stages {
     stage('Analysis') {
@@ -1608,7 +1608,7 @@ variant:</p>
             steps {
               script {
                 def client = [linux: 'linux_amd64', macos: 'darwin_arm64', windows: 'windows_amd64'][env.VARIANT]
-                withEnv([&quot;CLIENT=openpsirt-upload_0.11.0_${client}&quot;]) {
+                withEnv([&quot;CLIENT=openpsirt-upload_0.12.0_${client}&quot;]) {
                   if (isUnix()) {
                     sh '''
                       curl -fsSL -O &quot;$BASE/$CLIENT.tar.gz&quot; -O &quot;$BASE/SHA256SUMS&quot;
@@ -1681,8 +1681,8 @@ pool:
   vmImage: $(image)
 
 variables:
-  BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v0.11.0
-  CLIENT: openpsirt-upload_0.11.0_$(client)
+  BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v0.12.0
+  CLIENT: openpsirt-upload_0.12.0_$(client)
 
 steps:
   - checkout: self
