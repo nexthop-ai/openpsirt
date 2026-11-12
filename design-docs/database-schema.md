@@ -25,7 +25,8 @@ Satisfies REQ-71.
 | Pair | Reported |
 |---|---|
 | A narrower index leading a wider one | Yes |
-| A narrower unique index leading a wider one that is not unique | No: dropping it loses the rule it enforces |
+| A narrower unique index leading a wider one | No: uniqueness of `(a, b)` admits two rows sharing `a`, so dropping it loses the rule it enforces |
+| A unique index on the same columns as another unique one | Yes |
 | Either index partial | No: it holds only the rows a condition admits |
 | A column that is an expression | Read as a column no other index's column equals |
 
