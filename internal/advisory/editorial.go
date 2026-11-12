@@ -336,7 +336,7 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 	})
 	switch {
 	case errors.Is(err, ErrSamePerson), errors.Is(err, ErrAlreadyAgreed),
-		errors.Is(err, ErrNothingToSay):
+		errors.Is(err, ErrNothingToSay), errors.Is(err, ErrEditionMoved):
 		return nil, err
 	case err != nil:
 		return nil, fmt.Errorf("agree to an advisory: %w", err)

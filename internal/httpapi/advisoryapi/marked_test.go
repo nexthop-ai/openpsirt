@@ -6,8 +6,10 @@ package advisoryapi_test
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -93,8 +95,12 @@ func TestAnAdvisoryIsListedByWhatItCoversAndAgreedToBySomebodyElse(t *testing.T)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			approval, read), http.StatusConflict)
 		// An edition other than the one it says now was not what was read.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
-			approval, `{"edition":99}`), http.StatusConflict)
+		moved := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
+			approval, `{"edition":99}`)
+		httpapitest.RefusedWith(t, moved, http.StatusConflict)
+		if !strings.Contains(moved.Body.String(), `"detail":"`+advisory.ErrEditionMoved.Error()+`"`) {
+			t.Errorf("an edition moved is refused in words other than its own: %s", moved.Body.String())
+		}
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
 			approval, read); got.Code != http.StatusCreated {
 			t.Fatalf("somebody else agreeing answered %d: %s", got.Code, got.Body.String())

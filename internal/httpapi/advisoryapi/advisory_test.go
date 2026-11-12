@@ -314,14 +314,16 @@ func TestAProductYouCannotSeeAnswersLikeOneNobodyDeclared(t *testing.T) {
 		// a write against a name, which is the shape that turns a lookup
 		// into a directory of what exists.
 		for _, at := range []string{"", "/document", "/issuance", "/approval"} {
-			method := http.MethodGet
+			method, body := http.MethodGet, ""
 			if at == "/approval" {
-				method = http.MethodPost
+				// A body that passes validation, or both are refused before
+				// the name is looked up and the pair compares nothing.
+				method, body = http.MethodPost, `{"edition":1}`
 			}
 			unseeable := httpapitest.AsPerson(t, r, "outsider", method,
-				"/v1/advisories/"+named+at, "")
+				"/v1/advisories/"+named+at, body)
 			nonexistent := httpapitest.AsPerson(t, r, "outsider", method,
-				"/v1/advisories/EXNET-1999-0001"+at, "")
+				"/v1/advisories/EXNET-1999-0001"+at, body)
 			if unseeable.Code != nonexistent.Code ||
 				unseeable.Body.String() != nonexistent.Body.String() {
 				t.Errorf("GET %s: an advisory they may not see answers %d %s and one "+
