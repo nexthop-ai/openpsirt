@@ -332,6 +332,17 @@ describe("the home page", () => {
     const spy = await home(DEVELOPER);
     expect(panels()).toContain("Lapsed decisions");
     expect(asked(spy)).not.toContain("/v1/products/{product}/findings");
+    expect(text()).toContain("Nothing has lapsed.");
+  });
+
+  it("marks the sent-back figure a floor where the page of decisions was cut", async () => {
+    serving(DEVELOPER, { "/v1/my-decisions": { items: [{ happened: "approved" }], total: 250 } });
+    mount.render(screen(<Home who={DEVELOPER} />, "/products/sonic", "/products/:product"));
+    await settle();
+    const tile = Array.from(mount.host().querySelectorAll(".kpi")).find((each) =>
+      each.textContent?.startsWith("Sent back to you"),
+    );
+    expect(tile?.querySelector(".n")?.textContent).toBe("0+");
   });
 
   it("draws no lapsed decisions where the reader reads neither family", async () => {
