@@ -75,6 +75,12 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 			t.Fatal(err)
 		}
 
+		// Called by what it is shown as in the sentence, and linked by name.
+		if _, err := db.DB.NewUpdate().Table("product").Set(`"display_name" = ?`, "SONiC Enterprise").
+			Where(`"id" = ?`, product.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
 		watch := notify.NewWatch(db.DB, quiet)
 		if _, _, err := watch.Once(ctx); err != nil {
 			t.Fatal(err)
@@ -100,7 +106,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		if len(told) != 1 {
 			t.Fatalf("somebody who may approve was told %d things, want 1", len(told))
 		}
-		if !strings.Contains(told[0].Body, "calling 2 vulnerability reports rejected") {
+		if !strings.Contains(told[0].Body, "A ruling in SONiC Enterprise calling 2 vulnerability reports rejected") {
 			t.Errorf("the alert reads %q", told[0].Body)
 		}
 		if told[0].Link != "/products/sonic/vulnerability-reports?waiting=1" {

@@ -130,6 +130,7 @@ database.InBatchesKeeping Not varying by reader: an engine helper inserting rows
 database.InBatchesUnkeyed Not varying by reader: an engine helper inserting rows its caller already chose, reading no identifiers back.
 database.NamesByID Not varying by reader: an engine helper reading one name column for identifiers its caller already holds.
 database.Retire Not varying by reader: an engine helper marking one row retired that its caller already chose and authorized.
+database.RetireOne Not varying by reader: an engine helper retiring the one row in use its caller already chose and authorized.
 finding.Acknowledgements A helper over a narrowed read: the first message on each report, for reports the caller already read with a subject.
 finding.AffectedInBuild A helper over a narrowed read: it reads only at the visibilities its caller passes, which the public VEX document works out for its reader.
 finding.AnyUndisclosed Not varying by reader: whether any occurrence of an issue in a product is undisclosed, which sets an advisory's distribution label. The advisory authorized the product first.

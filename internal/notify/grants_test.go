@@ -221,6 +221,26 @@ func TestADecisionWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	})
 }
 
+// A notice names a product by what it is shown as.
+func TestADecisionWaitingNamesTheProductAsItIsShown(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		s := aSplit(t, w)
+		proposer := s.person(t, "proposer", access.PublicTriage, access.PrivateTriage)
+		triager := s.person(t, "triager", access.PublicTriage, access.PrivateTriage)
+		if _, err := db.DB.NewUpdate().Table("product").Set(`"display_name" = ?`, "SONiC Enterprise").
+			Where(`"id" = ?`, w.Product.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		s.decision(t, proposer, 1, 0, func(*triage.Decision) {}, func(*triage.DecisionOccurrence) {})
+		sweep(t, db)
+		bodies := openFor(t, db, triager, notify.DecisionWaiting)
+		if len(bodies) != 1 || !strings.HasPrefix(bodies[0], "A decision in SONiC Enterprise ") {
+			t.Errorf("the triager was told %q, want the product by its shown name", bodies)
+		}
+	})
+}
+
 func TestADecisionAboutACodeFindingIsToldToItsSecurityTestingAudienceAlone(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB

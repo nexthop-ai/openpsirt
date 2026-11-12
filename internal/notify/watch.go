@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -36,11 +37,10 @@ const betweenSweeps = 15 * time.Minute
 // Watch derives the conditions that are true and tells the people who should
 // know.
 //
-// Operational alerts are their own category: they are about the tool's own
-// health rather than about anybody's work, they are not an explicit human
-// action so they are never immediate mail, and a digest that is off by default
-// would carry them to nobody. They go to administrators, who are the people
-// who can act on them.
+// Operational alerts are their own category (REQ-49): each goes to somebody
+// who may read what it names. Mail carries one as it happens only where its
+// kind is something a person must act on (REQ-47); the rest reach mail through
+// the digest, and chat carries every kind as it happens.
 //
 // Everything here is a condition rather than an event. A build that stopped
 // being scanned is true until it is scanned again, and then it is not — which
@@ -95,6 +95,7 @@ func (w *sweep) tellAdministrators(ctx context.Context, admins []int64) (opened,
 	// report that nobody opens unless it has something to say, asked as a
 	// condition — see health.go for why that is not the same as mailing the
 	// report.
+	var derivations []derivation
 	for _, each := range []struct {
 		kind Kind
 		of   func(context.Context) ([]Holds, error)
@@ -107,33 +108,64 @@ func (w *sweep) tellAdministrators(ctx context.Context, admins []int64) (opened,
 		{PairsConcentrated, w.pairsConcentrated, "which pairs agree to most of a product's work"},
 		{SupplierSilent, w.suppliersSilent, "which suppliers have stopped answering"},
 	} {
-		// Derived only where somebody will hear it. With no administrator
-		// the lists are empty, which clears whatever was being said.
-		var holding []Holds
-		if len(admins) > 0 {
-			if holding, err = each.of(ctx); err != nil {
-				return opened, cleared, err
+		derivations = append(derivations, derivation{each.kind, func(ctx context.Context) (map[int64][]Holds, error) {
+			// Derived only where somebody will hear it. With no
+			// administrator the lists are empty, which clears whatever was
+			// being said.
+			var holding []Holds
+			if len(admins) > 0 {
+				var err error
+				if holding, err = each.of(ctx); err != nil {
+					return nil, err
+				}
 			}
-		}
-		out, err := w.everybody(ctx, each.kind)
+			out, err := w.everybody(ctx, each.kind)
+			if err != nil {
+				return nil, err
+			}
+			for _, admin := range admins {
+				// An administrator with nothing to hear and nothing being
+				// said to them is left alone: there is nothing to reconcile.
+				if _, told := out[admin]; told || len(holding) > 0 {
+					out[admin] = holding
+				}
+			}
+			return out, nil
+		}, each.what})
+	}
+	opened, cleared, err = w.derive(ctx, derivations)
+	o, c, upErr := w.upstreams(ctx, admins)
+	return opened + o, cleared + c, errors.Join(err, upErr)
+}
+
+// derivation is one kind of condition and how to work out who holds it.
+type derivation struct {
+	kind Kind
+	of   func(context.Context) (map[int64][]Holds, error)
+	what string
+}
+
+// derive works out and reconciles each kind in turn.
+//
+// A kind that fails is reported and left as it stands, and the next kind is
+// still worked out: one persistent failure would otherwise silence every
+// alert after it. The failing kind is not reconciled, because an empty list
+// clears what is still true.
+func (w *Watch) derive(ctx context.Context, list []derivation) (opened, cleared int, err error) {
+	var errs []error
+	for _, each := range list {
+		holding, err := each.of(ctx)
 		if err != nil {
-			return opened, cleared, err
+			errs = append(errs, fmt.Errorf("work out %s: %w", each.what, err))
+			continue
 		}
-		for _, admin := range admins {
-			// An administrator with nothing to hear and nothing being said
-			// to them is left alone: there is nothing to reconcile.
-			if _, told := out[admin]; told || len(holding) > 0 {
-				out[admin] = holding
-			}
-		}
-		o, c, err := w.tell(ctx, each.kind, out, each.what)
+		o, c, err := w.tell(ctx, each.kind, holding, each.what)
 		opened, cleared = opened+o, cleared+c
 		if err != nil {
-			return opened, cleared, err
+			errs = append(errs, err)
 		}
 	}
-	o, c, err := w.upstreams(ctx, admins)
-	return opened + o, cleared + c, err
+	return opened, cleared, errors.Join(errs...)
 }
 
 // upstreams tells administrators which upstreams cannot be read, and tells
@@ -163,14 +195,15 @@ func (w *sweep) upstreams(ctx context.Context, admins []int64) (opened, cleared 
 		return &Telling{Kind: UpstreamRecovered, Body: again.Body, Link: again.Link,
 			ProductID: again.ProductID, Together: "upstream-recovered " + row.About}
 	}
+	var errs []error
 	for person, told := range out {
 		o, c, err := NewStore(w.db).ReconcileTelling(ctx, person, UpstreamFailing, told, ended)
 		if err != nil {
-			return opened, cleared, fmt.Errorf("tell %d which upstreams cannot be read: %w", person, err)
+			errs = append(errs, fmt.Errorf("tell %d which upstreams cannot be read: %w", person, err))
 		}
 		opened, cleared = opened+o, cleared+c
 	}
-	return opened, cleared, nil
+	return opened, cleared, errors.Join(errs...)
 }
 
 // sweep is one pass over every condition, with everybody and what they hold
@@ -184,22 +217,28 @@ type sweep struct {
 	reach map[int64]map[int64]acts
 	// shelved is the incident shelf once a kind has read it.
 	shelved *[]incident.Entry
+	// members is each team's members once a kind has read them.
+	members map[int64][]int64
 }
 
 // tell makes what each person is told of one kind exactly what they are
 // handed, and sums what that opened and cleared.
+//
+// One person's failure is reported and the rest are still told.
 func (w *Watch) tell(ctx context.Context, kind Kind, holding map[int64][]Holds,
 	what string) (opened, cleared int, err error) {
 
+	var errs []error
 	for person, told := range holding {
 		o, c, err := NewStore(w.db).Reconcile(ctx, person, kind, told)
 		if err != nil {
-			return opened, cleared, fmt.Errorf("tell %d %s: %w", person, what, err)
+			errs = append(errs, fmt.Errorf("tell %d %s: %w", person, what, err))
+			continue
 		}
 		opened += o
 		cleared += c
 	}
-	return opened, cleared, nil
+	return opened, cleared, errors.Join(errs...)
 }
 
 // fanOut hands a condition about a product to everybody who may act on it
@@ -226,11 +265,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 
 	// Run with no administrator too, so the last one to be demoted has what
 	// they were told cleared.
-	o, c, err := s.tellAdministrators(ctx, admins)
-	opened, cleared = opened+o, cleared+c
-	if err != nil {
-		return opened, cleared, err
-	}
+	opened, cleared, adminErr := s.tellAdministrators(ctx, admins)
 
 	// Each is per person, because each names something about a product or a
 	// finding, so who hears it follows who may read it. Reconcile makes
@@ -239,11 +274,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 	// — an administrator who is also holding an embargo has to be handed both
 	// halves at once or the second call would clear the first. And each kind
 	// is reconciled on its own, so a person holding two of them keeps both.
-	for _, each := range []struct {
-		kind Kind
-		of   func(context.Context) (map[int64][]Holds, error)
-		what string
-	}{
+	o, c, err := w.derive(ctx, []derivation{
 		// An embargo whose date has arrived is not a fact about the tool's
 		// health, so it is not the same list to the same people:
 		// administrators hear about all of them, and whoever holds one hears
@@ -281,18 +312,8 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		// A suppression rule covering more than was agreed to.
 		{SuppressionRuleOutgrown, s.rulesOutgrown, "which suppression rules have outgrown their approval"},
 		{SuppressionRuleWaiting, s.rulesWaiting, "which suppression rules are waiting on a second person"},
-	} {
-		holding, err := each.of(ctx)
-		if err != nil {
-			return opened, cleared, err
-		}
-		o, c, err := w.tell(ctx, each.kind, holding, each.what)
-		opened, cleared = opened+o, cleared+c
-		if err != nil {
-			return opened, cleared, err
-		}
-	}
-	return opened, cleared, nil
+	})
+	return opened + o, cleared + c, errors.Join(adminErr, err)
 }
 
 // criticalOnReleases is every critical or actively-exploited issue open and

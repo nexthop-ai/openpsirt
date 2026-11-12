@@ -638,7 +638,9 @@ refused over a connection the server would not secure with STARTTLS.
 | `OPENPSIRT_MAIL_PASSWORD` | `mail.password` | Password for that username. Sent only after STARTTLS | unset |
 
 Who gets what is not configuration: each person chooses in their own settings,
-and the daily digest is off until somebody asks for it. A message about a
+and the daily digest is off until somebody asks for it. Mail carries a notice as
+it happens only where somebody must act on it, such as work assigned to them or
+a decision waiting on them; every other notice reaches mail in the digest. A message about a
 finding nobody has announced carries no detail — only that there is something,
 and a link.
 

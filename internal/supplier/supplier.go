@@ -335,26 +335,17 @@ func (s *Store) Retire(ctx context.Context, subject access.Subject, productID in
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		retired = nil
 		row := new(Feed)
-		err := tx.NewSelect().Model(row).
+		at := s.now().UTC().Truncate(time.Microsecond)
+		took, err := database.RetireOne(ctx, tx, tx.NewSelect().Model(row).
 			Where(`"product_id" = ?`, productID).
-			Where(`"name" = ?`, typedname.Matching(name)).
-			Where(`"retired_at" IS NULL`).
-			Limit(1).Scan(ctx)
+			Where(`"name" = ?`, typedname.Matching(name)),
+			(*Feed)(nil), func() int64 { return row.ID }, at)
+		if err != nil {
+			return fmt.Errorf("stop fetching from that supplier: %w", err)
+		}
 		// A source believed retired that was not goes on fetching, which is a
 		// request leaving this deployment that somebody thought they had
 		// stopped.
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("no supplier is fetched from under the name %q: %w",
-				name, access.ErrNothingMatched)
-		}
-		if err != nil {
-			return fmt.Errorf("stop fetching from that supplier: %w", err)
-		}
-		at := s.now().UTC().Truncate(time.Microsecond)
-		took, err := database.Retire(ctx, tx, (*Feed)(nil), row.ID, at)
-		if err != nil {
-			return fmt.Errorf("stop fetching from that supplier: %w", err)
-		}
 		if !took {
 			return fmt.Errorf("no supplier is fetched from under the name %q: %w",
 				name, access.ErrNothingMatched)

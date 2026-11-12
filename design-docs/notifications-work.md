@@ -143,6 +143,7 @@ It carries only what nothing else told the reader:
 | Work that became yours without a message | Assigned to yourself, when nothing could send, or before you had an address |
 | Findings nobody owns | For whoever asks |
 | Vulnerability reports in your teams' queues | A count, never a name; a rule placing a report in a queue tells nobody |
+| Notices mail does not carry as they happen | Every kind but those `design-docs/notifications-delivery.md` § Mail lists, unread and still true, created since the last digest or all of them for a first one |
 
 Both switches are off by default and derive from no role.
 
@@ -154,6 +155,7 @@ Both switches are off by default and derive from no role.
 | An empty digest is not sent, and the clock moves | A daily "nothing" stops people opening it |
 | A digest that cannot be assembled moves the clock | It is tried tomorrow and crowds out no reader |
 | A first digest reports nothing under "nobody owns" | There is no "since" |
+| A notice is one line: its kind's subject and its words; one about undisclosed work is counted, naming nothing | REQ-48 |
 | "Nobody owns" is about the assignee alone, proposals and pending approvals included | 8,400 rows against 7,471 on one real build; the screen narrows its own list instead |
 | One message is bounded and says how many of how many it lists | |
 | Disclosed findings are named with issue, component and build; undisclosed are counts by severity, known exploited and unowned, naming nothing, the product included | The aggregate protects the path, not the recipients (REQ-48) |

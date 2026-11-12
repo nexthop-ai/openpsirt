@@ -274,61 +274,16 @@ func (w *sweep) lastRefused(ctx context.Context, build analysisBuild,
 // agreement no longer matches what it covers. It clears when the rule is
 // approved again at its size, retired, or covers less.
 func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
-	var products []struct {
-		ID    int64  `bun:"id"`
-		Name  string `bun:"name"`
-		Shown string `bun:"display_name"`
-	}
-	if err := w.db.NewSelect().
-		TableExpr(`"product" AS "p"`).
-		ColumnExpr(`"p"."id", "p"."name", "p"."display_name"`).
-		Where(`"p"."retired_at" IS NULL`).
-		Where(`EXISTS (SELECT 1 FROM "suppression_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
-			`AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL)`).
-		Scan(ctx, &products); err != nil {
-		return nil, fmt.Errorf("read which products hold suppression rules: %w", err)
-	}
-	out, err := w.everybody(ctx, SuppressionRuleOutgrown)
-	if err != nil {
-		return nil, err
-	}
-	// Counted as the deployment rather than as anybody in it: the count is
-	// the rule's size, and who hears it is decided below by who may approve.
-	everything := access.Everything("the watch")
-	for _, product := range products {
-		rules, err := analysis.SuppressionRules(ctx, w.db, everything, product.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, rule := range rules {
+	return w.suppressionRules(ctx, SuppressionRuleOutgrown,
+		`"lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL`, nil,
+		func(rule analysis.SuppressionRule, product ruleProduct) (string, bool) {
 			if rule.State != analysis.SuppressionRuleOutgrown || rule.ApprovedCovering == nil {
-				continue
+				return "", false
 			}
-			named := rule.Rule
-			if rule.Prefix != "" {
-				named += " under " + rule.Prefix
-			}
-			productID := product.ID
-			holds := Holds{
-				About: identify("suppression-rule-outgrown", strconv.FormatInt(rule.ID, 10)),
-				Body: fmt.Sprintf("A suppression rule in %s dismissing %s covers %d code findings, and was approved "+
-					"over %d. It keeps dismissing them until somebody approves it again.",
-					product.Shown, named, rule.Covering, *rule.ApprovedCovering),
-				Link:            weblink.SuppressionRules(product.Name),
-				Private:         true,
-				SecurityTesting: true,
-				ProductID:       &productID,
-			}
-			for personID, per := range w.reach {
-				// Approved again by somebody other than its proposer.
-				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{securityTesting: 1}) {
-					continue
-				}
-				out[personID] = append(out[personID], holds)
-			}
-		}
-	}
-	return out, nil
+			return fmt.Sprintf("A suppression rule in %s dismissing %s covers %d code findings, and was approved "+
+				"over %d. It keeps dismissing them until somebody approves it again.",
+				product.Shown, ruleScope(rule), rule.Covering, *rule.ApprovedCovering), true
+		})
 }
 
 // rulesWaiting is every suppression rule that nobody has approved, past
@@ -344,26 +299,50 @@ func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 		return nil, fmt.Errorf("read how long a suppression rule may wait: %w", err)
 	}
 	since := time.Now().UTC().Add(-after)
-	var products []struct {
-		ID    int64  `bun:"id"`
-		Name  string `bun:"name"`
-		Shown string `bun:"display_name"`
-	}
+	return w.suppressionRules(ctx, SuppressionRuleWaiting,
+		`"lr"."approved_at" IS NULL AND "lr"."retired_at" IS NULL AND "lr"."proposed_at" <= ?`, []any{since},
+		func(rule analysis.SuppressionRule, product ruleProduct) (string, bool) {
+			if rule.State != analysis.RuleProposed || rule.ProposedAt.After(since) {
+				return "", false
+			}
+			return fmt.Sprintf("A suppression rule in %s dismissing %s is waiting for a second person. "+
+				"It dismisses nothing until somebody approves it.", product.Shown, ruleScope(rule)), true
+		})
+}
+
+// ruleProduct is a product holding suppression rules, by name and as shown.
+type ruleProduct struct {
+	ID    int64  `bun:"id"`
+	Name  string `bun:"name"`
+	Shown string `bun:"shown"`
+}
+
+// suppressionRules hands one kind of notice about suppression rules to whoever
+// may approve each rule: somebody other than its proposer, approving security
+// testing work in its product.
+//
+// The products read are those holding a live rule matching holding, and said
+// words each rule worth a notice.
+func (w *sweep) suppressionRules(ctx context.Context, notice Kind, holding string, args []any,
+	said func(analysis.SuppressionRule, ruleProduct) (string, bool)) (map[int64][]Holds, error) {
+
+	var products []ruleProduct
 	if err := w.db.NewSelect().
 		TableExpr(`"product" AS "p"`).
-		ColumnExpr(`"p"."id", "p"."name", "p"."display_name"`).
+		ColumnExpr(`"p"."id", "p"."name"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "shown"`).
 		Where(`"p"."retired_at" IS NULL`).
-		Where(`EXISTS (SELECT 1 FROM "suppression_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
-			`AND "lr"."approved_at" IS NULL AND "lr"."retired_at" IS NULL AND "lr"."proposed_at" <= ?)`, since).
+		Where(`EXISTS (SELECT 1 FROM "suppression_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" AND `+
+			holding+`)`, args...).
 		Scan(ctx, &products); err != nil {
-		return nil, fmt.Errorf("read which products hold suppression rules waiting on a second person: %w", err)
+		return nil, fmt.Errorf("read which products hold suppression rules: %w", err)
 	}
-	out, err := w.everybody(ctx, SuppressionRuleWaiting)
+	out, err := w.everybody(ctx, notice)
 	if err != nil {
 		return nil, err
 	}
-	// Read as the deployment, as rulesOutgrown reads them: who hears it is
-	// decided below by who may approve.
+	// Read as the deployment rather than as anybody in it: the count is the
+	// rule's size, and who hears it is decided below by who may approve.
 	everything := access.Everything("the watch")
 	for _, product := range products {
 		rules, err := analysis.SuppressionRules(ctx, w.db, everything, product.ID)
@@ -371,28 +350,20 @@ func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 			return nil, err
 		}
 		for _, rule := range rules {
-			if rule.State != analysis.RuleProposed || rule.ProposedAt.After(since) {
+			body, ok := said(rule, product)
+			if !ok {
 				continue
-			}
-			named := rule.Rule
-			switch {
-			case named == "":
-				named = "every code finding under " + rule.Prefix
-			case rule.Prefix != "":
-				named += " under " + rule.Prefix
 			}
 			productID := product.ID
 			holds := Holds{
-				About: identify("suppression-rule-waiting", strconv.FormatInt(rule.ID, 10)),
-				Body: fmt.Sprintf("A suppression rule in %s dismissing %s is waiting for a second person. "+
-					"It dismisses nothing until somebody approves it.", product.Shown, named),
+				About:           identify(string(notice), strconv.FormatInt(rule.ID, 10)),
+				Body:            body,
 				Link:            weblink.SuppressionRules(product.Name),
 				Private:         true,
 				SecurityTesting: true,
 				ProductID:       &productID,
 			}
 			for personID, per := range w.reach {
-				// Approved by somebody other than its proposer.
 				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{securityTesting: 1}) {
 					continue
 				}
@@ -401,4 +372,17 @@ func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 		}
 	}
 	return out, nil
+}
+
+// ruleScope is what a suppression rule dismisses, in words: its rule, under
+// its path prefix where it has one, or every code finding under the prefix
+// where it names no rule.
+func ruleScope(rule analysis.SuppressionRule) string {
+	switch {
+	case rule.Rule == "":
+		return "every code finding under " + rule.Prefix
+	case rule.Prefix != "":
+		return rule.Rule + " under " + rule.Prefix
+	}
+	return rule.Rule
 }

@@ -78,6 +78,13 @@ func TestSomebodyWhoHasLeftIsToldNothing(t *testing.T) {
 			t.Errorf("the administrator still here holds %d notifications, want 1", n)
 		}
 
+		// Work for the one still here, which mail carries as it happens.
+		if err := store.Tell(ctx, notify.Telling{
+			PersonID: staying.ID, Kind: notify.Assigned, Body: "work for them",
+		}); err != nil {
+			t.Fatal(err)
+		}
+
 		sender := &recorder{}
 		post := notify.NewPost(db.DB, sender, "https://psirt.example", discard(), "test")
 		if _, _, err := post.Once(ctx); err != nil {

@@ -33,6 +33,7 @@ A message about an undisclosed finding says that there is something, and links
 | A sweep reconciles everybody it has told, not only who it should tell | Somebody never handed a list is never reconciled |
 | Who it has told is read per kind, by one call for every condition, through an index on kind, open and person | Every other index leads with the person; the index takes a steady sweep over 152,859 conditions from 5.0 s to 4.3 s (`design-docs/notifications-measurements.md` § Sweep index) |
 | A sweep with no administrator recorded still derives everything not addressed to administrators alone | |
+| A kind whose working out fails, or a person whose reconciling fails, is reported and left as it stands, and the sweep goes on | One lasting failure would silence every later kind; reconciling an empty list clears what is still true |
 | Nobody who has left is in any audience: sweeps start from people still here, an event for a departed person records nothing, and the mail, digest and direct-chat sweeps skip them in the query, covering rows opened before they left | Their grants stay on purpose |
 | A failure to tell is logged, never returned | An error invites a retry doing the act twice |
 | Several processes sweep, and a duplicate is the answer already being there | The chart ships two replicas; aborting tells nobody after the failure |
@@ -47,11 +48,32 @@ A message about an undisclosed finding says that there is something, and links
 
 A channel behind one interface, so what may be said is decided once (REQ-46).
 Mail carries the text as its plain-text part, and is immediate only for what a
-person must act on (REQ-47).
+person must act on (REQ-47). These kinds are mailed as they happen; every other
+kind reaches mail in the digest alone (`design-docs/notifications-work.md`
+§ The digest):
+
+| Kind | Asks of its reader |
+|---|---|
+| `assigned` | Work to pick up |
+| `mentioned` | An answer to a note |
+| `sent-back` | More on a decision |
+| `decision-waiting` | A second person's agreement |
+| `sent-back-waiting` | The revision an approver asked for |
+| `deferral-ending` | A deferral re-made or let go |
+| `approval-withdrawn` | Agreement to the changed words |
+| `approval-undone` | A decision taken up again |
+| `decision-lapsed` | The finding handed back |
+| `critical-on-release` | A decision on a shipped critical |
+| `disclosure-due` | An embargo answered |
+| `response-window-near` | A notice before the window ends |
+| `response-window-passed` | A notice the window was owed |
+| `unanswered-report` | An answer to a reporter |
+| `report-message` | An answer to a reporter writing back |
 
 | Rule | Reason |
 |---|---|
-| The unsent notifications are the work list, sent and marked | Mail configured a week late finds the week waiting |
+| The unsent notifications of those kinds are the work list, sent and marked | Mail configured a week late finds the week waiting |
+| Every other kind stays unsent, and the digest reads it from the area | A notice is mailed once, by one path |
 | A condition the application withdrew is not carried | Nothing reconciles it |
 | A server and a sender are configured together or not at all, refused at startup, logging which arrived | Half reads as no mail configured |
 | Tried five times, then left unsent and readable | |

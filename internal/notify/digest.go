@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
@@ -18,10 +20,10 @@ import (
 
 // Digest is what one person is told daily, assembled but not yet carried.
 //
-// Two lists and a count, which is the whole of the digest carrying what
-// nothing else told you to counts for what is undisclosed: work that became
-// theirs without a message, findings nobody owns where they asked for them,
-// and — for anything nobody has announced — numbers rather than names.
+// What nothing else told them by mail: work that became theirs without a
+// message, findings nobody owns where they asked for them, the notices mail
+// does not carry as they happen, and — for anything nobody has announced —
+// numbers rather than names.
 type Digest struct {
 	// Mine is work assigned to them that produced no message of its own.
 	Mine []Item
@@ -42,7 +44,25 @@ type Digest struct {
 	// teams' queues. A rule placing one there tells nobody, so this is where
 	// it is mentioned, and it is a number: a report is undisclosed.
 	QueuedReports int
+	// Told is what the notification area holds for them, unread and still
+	// true, of the kinds mail carries in the digest alone: since the last
+	// digest, or all of it for a first one. Named where it is disclosed.
+	Told []Told
+	// ToldWithheld counts those of them about undisclosed work, which name
+	// nothing, and ToldTotal is how many there are in all.
+	ToldWithheld int
+	ToldTotal    int
 }
+
+// Told is one notification a digest carries, in the words the area holds.
+type Told struct {
+	Subject string
+	Text    string
+}
+
+// mostOfATold bounds the words one notification takes in a digest, which
+// carries each as one line.
+const mostOfATold = 300
 
 // Item is one piece of work, as a digest names it.
 type Item struct {
@@ -72,7 +92,8 @@ type Withheld struct {
 // is how somebody learns to stop opening the daily message, and then the ones
 // that say something go unread with it.
 func (d Digest) Empty() bool {
-	return len(d.Mine) == 0 && len(d.Unowned) == 0 && d.Withheld.Count == 0 && d.QueuedReports == 0
+	return len(d.Mine) == 0 && len(d.Unowned) == 0 && d.Withheld.Count == 0 && d.QueuedReports == 0 &&
+		len(d.Told) == 0 && d.ToldWithheld == 0
 }
 
 // Message renders the digest for a channel.
@@ -106,6 +127,21 @@ func (d Digest) Message(baseURL string) Message {
 		}
 		fmt.Fprintf(&text, "%s in your teams' queues, not named here because reports are undisclosed.\n",
 			count(d.QueuedReports, "vulnerability report waits", "vulnerability reports wait"))
+	}
+	if len(d.Told) > 0 || d.ToldWithheld > 0 {
+		if text.Len() > 0 {
+			text.WriteString("\n")
+		}
+		fmt.Fprintf(&text, "%s in your notifications:\n\n",
+			count(len(d.Told)+d.ToldWithheld, "notice", "notices"))
+		for _, told := range d.Told {
+			fmt.Fprintf(&text, "  %s: %s\n", told.Subject, told.Text)
+		}
+		if d.ToldWithheld > 0 {
+			fmt.Fprintf(&text, "  %s about undisclosed work, not named here.\n",
+				count(d.ToldWithheld, "notice", "notices"))
+		}
+		text.WriteString(more(len(d.Told)+d.ToldWithheld, d.ToldTotal))
 	}
 	if where := link(baseURL, weblink.Home()); where != "" {
 		text.WriteString("\n" + where + "\n")
@@ -275,7 +311,63 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 			digest.takeUnowned(row)
 		}
 	}
+
+	// What the area told them that mail did not carry as it happened.
+	told, total, err := NewStore(db).inDigest(ctx, subject, person.DigestSentAt, most)
+	if err != nil {
+		return digest, err
+	}
+	digest.ToldTotal = total
+	for _, row := range told {
+		if row.Private {
+			digest.ToldWithheld++
+			continue
+		}
+		line := called[row.Kind]
+		if line == "" {
+			line = generalSubject
+		}
+		digest.Told = append(digest.Told, Told{
+			Subject: line,
+			Text:    bound.HeadRunes(strings.Join(strings.Fields(row.Body), " "), mostOfATold),
+		})
+	}
 	return digest, nil
+}
+
+// inDigest is what one person's area holds, unread and still true, of the
+// kinds mail does not carry as they happen, created after since where there is
+// one, oldest first, and how many there are.
+//
+// Narrowed by what they may read now, like the area itself (REQ-42 and
+// REQ-43), and the count goes through the same conditions as the list.
+func (s *Store) inDigest(ctx context.Context, subject access.Subject, since *time.Time,
+	most int) ([]Notification, int, error) {
+
+	if subject.Kind != access.Person || subject.ID == 0 {
+		return nil, 0, nil
+	}
+	theirs := func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.Where(`"person_id" = ?`, subject.ID).
+			Where(`"kind" NOT IN (?)`, bun.List(immediate)).
+			Where(`"read_at" IS NULL`).
+			Where(`"cleared_at" IS NULL`)
+		if since != nil {
+			q = q.Where(`"created_at" > ?`, *since)
+		}
+		return readable(q, subject)
+	}
+	total, err := theirs(s.db.NewSelect().Model((*Notification)(nil))).Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count what the digest carries: %w", err)
+	}
+	var rows []Notification
+	if err := theirs(s.db.NewSelect().Model(&rows)).
+		Order("created_at ASC", "id ASC").
+		Limit(int64(most)).Scan(ctx); err != nil {
+		return nil, 0, fmt.Errorf("read what the digest carries: %w", err)
+	}
+	return rows, int(total), nil
 }
 
 // take adds a piece of the reader's own work, named or counted.

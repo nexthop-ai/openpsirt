@@ -5,6 +5,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -77,4 +79,24 @@ func Retire(ctx context.Context, db bun.IDB, model any, id int64, at time.Time,
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// RetireOne retires the one row in use that find selects, and reports whether
+// there was one and this write retired it.
+//
+// find carries the row's model and what names it; RetireOne adds that the row
+// is in use, reads it, and retires it by the identifier id reads off the row.
+// No such row and one retired by somebody else between the read and the write
+// both answer false, since to the caller each is nothing matching the name.
+func RetireOne(ctx context.Context, db bun.IDB, find *bun.SelectQuery, model any,
+	id func() int64, at time.Time) (bool, error) {
+
+	err := find.Where(`"retired_at" IS NULL`).Limit(1).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return Retire(ctx, db, model, id(), at)
 }
