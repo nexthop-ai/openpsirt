@@ -25,7 +25,7 @@ import { Count, known } from "../ui/Count";
 import { Failed } from "../ui/Failed";
 import { HeldLine } from "../ui/HeldLine";
 import { on } from "../ui/when";
-import { DependencyFigures } from "./HomeDependencies";
+import { AllProducts, DependencyFigures } from "./HomeDependencies";
 import {
   SecurityTestingFigures,
   codeProducts,
@@ -193,12 +193,7 @@ function WorkFigures({ who, counting }: { who: Who; counting: string }) {
   const attacked = (shelf.data?.items ?? []).filter(
     (record) => record.standing && (!at.product || record.product === at.product),
   ).length;
-  // The same figure without the scope. Nothing where no scope is
-  // selected, because the two would be one number said twice.
-  function everywhere(n: number | undefined): React.ReactNode {
-    if (!widely || n === undefined) return null;
-    return <span className="d">{n.toLocaleString()} all products</span>;
-  }
+  const everywhere = (n: number | undefined) => <AllProducts n={n} scoped={widely} />;
 
   return (
     <div className="kpis">
@@ -246,10 +241,13 @@ function WorkFigures({ who, counting }: { who: Who; counting: string }) {
         onClick={() => navigate(reviewQueueAt({ mine: true }))}
       >
         <span className="l">Sent back to you</span>
-        <span className="n">
-          <Count of={became}>
-            {() => `${sentBack.toLocaleString()}${backCut && sentBack > 0 ? "+" : ""}`}
-          </Count>
+        {/* Counted over the newest page of decisions, so where the page was
+            cut the figure is a floor, zero included. */}
+        <span
+          className="n"
+          title={backCut ? `Counted over your newest ${BACK_LIMIT} decisions` : undefined}
+        >
+          <Count of={became}>{() => `${sentBack.toLocaleString()}${backCut ? "+" : ""}`}</Count>
         </span>
         <span className="d">decisions an approver returned</span>
       </button>
@@ -672,6 +670,10 @@ function Lapsed({ findings }: { findings: boolean }) {
   // lapsed" over a failed read is a confident zero on the busiest screen there
   // is.
   const unread = stopped.isError || lapsed.isError || expired.isError;
+  // The reads the panel's figures wait on. The lapsed findings are asked only
+  // of a reader who counts dependency findings, and a read never asked never
+  // arrives.
+  const reads = findings ? [stopped, lapsed, expired] : [stopped, expired];
 
   return (
     <div className="panel">
@@ -690,9 +692,7 @@ function Lapsed({ findings }: { findings: boolean }) {
           )}
         </span>
         <span className={!unread && stoppedTotal > 0 ? "tally urgent" : "tally"}>
-          <Count of={findings ? [stopped, lapsed, expired] : [stopped, expired]}>
-            {() => stoppedTotal.toLocaleString()}
-          </Count>
+          <Count of={reads}>{() => stoppedTotal.toLocaleString()}</Count>
         </span>
       </header>
       {unread && (
@@ -729,9 +729,7 @@ function Lapsed({ findings }: { findings: boolean }) {
           <span>The date they were put off until has passed.</span>
         </div>
       )}
-      {known([stopped, lapsed, expired]) && stoppedTotal === 0 && (
-        <p className="reading">Nothing has lapsed.</p>
-      )}
+      {known(reads) && stoppedTotal === 0 && <p className="reading">Nothing has lapsed.</p>}
       <footer>
         {/* A lapsed decision is its author's to re-affirm, and this is where the
             reader's own are. */}
