@@ -30,7 +30,7 @@ this here".
 | A component reached by several parents is one node with several edges | Routes derive from edges |
 | A node holds the name and version its build stated, and the scanner, every screen, list, export and notification read them from it (REQ-08) | The component row is shared across products and holds what the first one stated, so another product's pipeline key would otherwise decide what a build is scanned at and shown with |
 | A node holds its stated name folded as the component's is, indexed with its build | A typed name is looked up within one build or one product's builds |
-| A node holding no name or version reads the row's, and the build's next scan writes the row's into it before comparing | A node written before the node held them is restated only where the build differs |
+| A node holding no name or version reads the row's, and the build's next inventory writes the row's into it before comparing, finding such nodes by their empty fold through the build's name index | A node written before the node held them is restated only where the build differs; an inventory with none to fill reads no node |
 | The root, the product itself, is a flagged node excluded from identity and expiry (REQ-08) | Its version changes every build and its name per variant; upward walks stop at the flag |
 | A scan naming no root is filed against the build it was sent for | |
 | The root flag is reconciled every scan | Promoting or demoting a root otherwise leaves two flags or none |

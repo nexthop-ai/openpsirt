@@ -699,7 +699,7 @@ func TestANodeHoldingNoStatedNameIsRestatedOnlyWhereTheBuildDiffers(t *testing.T
 			t.Fatal(err)
 		}
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"graph_node"`).
-			Set(`"name" = NULL`).Set(`"version" = NULL`).
+			Set(`"name" = NULL`).Set(`"version" = NULL`).Set(`"name_folded" = NULL`).
 			Where(`"build_id" = ?`, f.buildID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

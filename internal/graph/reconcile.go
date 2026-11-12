@@ -26,14 +26,16 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	// statement for the build: compared bare, every one of them reads as
 	// restated, and a real image is hundreds of thousands of statements.
 	// The comparison below then restates only those the build states
-	// differently.
+	// differently. Found by the fold, which the build's name index holds,
+	// and never left empty, so a build is searched once and not on every
+	// scan.
 	if _, err := tx.NewUpdate().TableExpr(`"graph_node"`).
 		Set(`"name" = (SELECT "c"."name" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
 		Set(`"version" = (SELECT "c"."version" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
-		Set(`"name_folded" = (SELECT "c"."name_folded" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
+		Set(`"name_folded" = COALESCE((SELECT "c"."name_folded" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id"), '')`).
 		Where(`"build_id" = ?`, buildID).
 		Where(`"closed_scan_id" IS NULL`).
-		Where(`"name" IS NULL`).
+		Where(`"name_folded" IS NULL`).
 		Exec(ctx); err != nil {
 		return nil, 0, 0, fmt.Errorf("give older nodes the name and version they read: %w", err)
 	}
