@@ -86,6 +86,7 @@ covered then is recovered from when each flaw was named and taken off.
 | Agreeing names the edition its giver read, and is refused where the advisory says another now | An edit landing just before would be agreed to unread |
 | An advisory read names the edition its row pointed at, never one read after its title and covers; refused, the screen reads it again | A number newer than the words shown would be agreed to unread |
 | Retitling, naming or removing a flaw, and marking a release affected or clearing the mark each open an edition; asking for a mark already standing opens nothing | Each changes what the document says |
+| A cleared mark keeps its record, and marking the release again writes another; a release is marked once among the marks standing | Who marked and cleared it each time stays answerable |
 | An agreement records what each release stood at when given | A decision approved or lapsing later moves a status and the agreement stands; the screen says "changed since approval" against it, and difference from what went out is asked of the settled digest |
 | Opening an edition takes back every agreement on the one replaced | The record keeps which edition was agreed |
 | Every change to what an advisory says, agreeing, taking agreement back, and recording that it went out need a triage role on every product it covers | It is one document about all of them |

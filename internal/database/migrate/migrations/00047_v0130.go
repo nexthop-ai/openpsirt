@@ -29,6 +29,9 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //
 //   - An issue an advisory covers is one row per stretch it was covered for,
 //     unique among the stretches still open, where it was one row revived.
+//   - A release an advisory marks affected is one row per stretch it was
+//     marked for, unique among the stretches still open, where it was one row
+//     revived.
 //   - A graph node holds the name and version its build stated for the
 //     component, which the shared component row holds as the first report of
 //     it stated them.
@@ -37,7 +40,8 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //     publisher's statements about one subject stands.
 func upgradeV0130(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{advisoryCoverLiveV0130,
-		graphNodeStatedV0130, receivedStatementTimedV0130, receivedStatementNewestV0130} {
+		advisoryOverrideLiveV0130, graphNodeStatedV0130, receivedStatementTimedV0130,
+		receivedStatementNewestV0130} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

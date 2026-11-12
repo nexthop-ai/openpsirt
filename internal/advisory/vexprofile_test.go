@@ -835,3 +835,38 @@ func TestAMarkAndAnAgreementFollowAnIssueThatMergedIntoAnother(t *testing.T) {
 		}
 	})
 }
+
+// Marking a release affected again after clearing it writes a mark of its
+// own: who marked it the first time and who cleared it stay on the record.
+func TestMarkingAReleaseAgainKeepsWhoMarkedAndClearedItBefore(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		f.dismissed(t, f.master, identifier)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		for _, affected := range []bool{true, false, true} {
+			if err := f.store.MarkAffected(ctx, f.who, named, "sonic", identifier,
+				fixtures.BranchName, "broadcom", affected); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var marks []advisory.Override
+		if err := f.db.DB.NewSelect().Model(&marks).
+			Join(`JOIN "advisory" AS "ad" ON "ad"."id" = "ao"."advisory_id"`).
+			Where(`"ad"."identifier" = ?`, named).
+			OrderExpr(`"ao"."id"`).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(marks) != 2 {
+			t.Fatalf("marking, clearing and marking again left %d marks, want 2: %+v", len(marks), marks)
+		}
+		first, second := marks[0], marks[1]
+		if first.RemovedAt == nil || first.RemovedBy == nil || *first.RemovedBy != f.who.ID ||
+			first.SetBy != f.who.ID || first.Live != nil {
+			t.Errorf("the first mark lost who set and cleared it: %+v", first)
+		}
+		if second.RemovedAt != nil || second.Live == nil || !*second.Live || second.SetAt.Before(first.SetAt) {
+			t.Errorf("the second mark does not stand on its own: %+v", second)
+		}
+	})
+}
