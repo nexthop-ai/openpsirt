@@ -33,7 +33,7 @@ func TestAnAddressResolvesToWhatItsChainEndsAt(t *testing.T) {
 		{"the root's other name", "a.c", "%SRCROOT%", FromRoot, "a.c", true},
 		{"a chain to the root's undefined name", "bgpd/a.c", "FRR", FromRoot, "src/sonic-frr/bgpd/a.c", true},
 		{"no starting point", "a.c", "", FromWork, "a.c", true},
-		{"a starting point relative to nothing", "a.c", "WORK", Absolute, "", false},
+		{"a starting point relative to where the tool ran", "a.c", "WORK", FromWork, "out/a.c", true},
 		{"a name defined with no address", "a.c", "EMPTY", Absolute, "", false},
 		{"a chain to another undefined name", "a.c", "ELSEWHR", Absolute, "", false},
 		{"a chain that loops", "a.c", "LOOP", Absolute, "", false},

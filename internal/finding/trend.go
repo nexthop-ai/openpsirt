@@ -31,7 +31,7 @@ const (
 // TrendWindow refuses a trend's window out of range: a step of nothing or
 // longer than MostTrendStep, or steps outside 1 to MostTrendSteps. The edge
 // bounds what a request may ask, so a window past it is a fault in the caller,
-// answered as one rather than replaced by a default.
+// answered as a fault.
 func TrendWindow(step time.Duration, steps int) error {
 	if steps < 1 || steps > MostTrendSteps || step <= 0 || step > MostTrendStep {
 		return fmt.Errorf("a trend over %d steps of %s: out of range", steps, step)

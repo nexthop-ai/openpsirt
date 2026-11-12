@@ -46,9 +46,9 @@ type Defined func(name string) (uri, base string, ok bool)
 // Resolve resolves an address through its chain of named starting points. It
 // is an absolute path, or a relative path with what it is relative to: the
 // source root, where the chain ends at the root's undefined name, or where
-// the tool ran, where the address itself has no name. A starting point whose
-// own address is relative to nothing is undefined; the source root's name so
-// defined is read as the undefined root. It is false where the chain ends at
+// the tool ran, where the chain ends at no name. The source root's name
+// defined relative to where the tool ran is read as the undefined root. It is
+// false where the chain ends at
 // any other undefined name, an address has a scheme other than file, or the
 // chain passes through more than most starting points.
 func Resolve(uri, base string, defined Defined, most int) (string, Start, bool) {
@@ -67,11 +67,6 @@ func resolve(uri, base string, defined Defined, most, depth int) (string, Start,
 		return "", Absolute, false
 	}
 	if base == "" {
-		// A starting point's own address is absolute or names another: one
-		// relative to nothing anchors nothing.
-		if depth > 0 {
-			return "", Absolute, false
-		}
 		return rel, FromWork, true
 	}
 	next, nextBase, ok := defined(base)
@@ -82,18 +77,28 @@ func resolve(uri, base string, defined Defined, most, depth int) (string, Start,
 		return "", Absolute, false
 	}
 	prefix, start, ok := resolve(next, nextBase, defined, most, depth+1)
+	// The source root's name defined where nothing anchors it, or defined
+	// relative to where the tool ran, is read as left undefined: the top of
+	// the checkout is where the root's name places.
+	if IsRoot(base) && (!ok || start == FromWork) {
+		return rel, FromRoot, true
+	}
 	if !ok {
-		// The source root's name defined where nothing anchors it is read
-		// as left undefined.
-		if IsRoot(base) {
-			return rel, FromRoot, true
-		}
 		return "", Absolute, false
 	}
-	if prefix == "" {
-		return rel, start, true
+	return Join(prefix, rel), start, true
+}
+
+// Join is a relative path under a directory, the directory itself where the
+// path is empty.
+func Join(dir, rel string) string {
+	if rel == "" {
+		return dir
 	}
-	return strings.TrimSuffix(prefix, "/") + "/" + rel, start, true
+	if dir == "" {
+		return rel
+	}
+	return strings.TrimSuffix(dir, "/") + "/" + rel
 }
 
 // AbsolutePath is an address's absolute path, where it is one: a file URI's

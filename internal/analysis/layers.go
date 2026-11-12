@@ -31,6 +31,9 @@ type candidate struct {
 	lineKey     string
 	line        int
 	spot
+	// told is whether its key is held twice, by two results or by two
+	// occurrences, so its spot was read and tells it from the others.
+	told bool
 	// absent is whether the last comparable run did not see it.
 	absent bool
 }
@@ -162,7 +165,12 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 		// they are told apart by column and message first, so each keeps the
 		// code finding it was paired with whatever order a run lists them in.
 		if layer.on == onKey {
-			shared := candidatesHeldTwice(candidates, results)
+			shared := map[string]bool{}
+			for _, c := range candidates {
+				if c.told {
+					shared[c.key] = true
+				}
+			}
 			at := map[spotKey][]int{}
 			for _, c := range order {
 				if k := candidates[c].key; !takenC[c] && shared[k] {

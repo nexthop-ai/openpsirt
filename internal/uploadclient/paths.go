@@ -160,19 +160,11 @@ func (p *placer) absolute(uri, base string, bases map[string]obj) (string, bool)
 	}
 	switch start {
 	case uribase.FromRoot:
-		at = under(p.root, at)
+		at = uribase.Join(p.root, at)
 	case uribase.FromWork:
-		at = under(p.work, at)
+		at = uribase.Join(p.work, at)
 	}
 	return cleanAbs(at), true
-}
-
-// under is a relative path under an absolute directory.
-func under(dir, rel string) string {
-	if rel == "" {
-		return dir
-	}
-	return strings.TrimSuffix(dir, "/") + "/" + rel
 }
 
 // cleanAbs is an absolute path with its dot steps resolved.

@@ -203,6 +203,7 @@ func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting, resul
 	}
 	for i := range out {
 		out[i].message = messages[out[i].findingID]
+		out[i].told = shared[out[i].key]
 	}
 	return out, nil
 }

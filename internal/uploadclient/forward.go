@@ -234,18 +234,20 @@ type moves struct {
 }
 
 // renumber rewrites the positions a result's rule cites to the merged run's:
-// the rule's position and its extension's. A rule the merge keeps no position
-// for loses its position and keeps its identifier. A notification's rule and
-// descriptor are not forwarded, and a relationship's target and a result's
-// taxa may name a taxonomy by position instead, which nothing here reads, so
-// they are left as written.
+// the rule's position and its extension's, the extension named by position,
+// GUID or name. A rule the merge keeps no position for loses its position and
+// keeps its identifier. A notification's rule and descriptor are not
+// forwarded, and a relationship's target and a result's taxa may name a
+// taxonomy by position instead, which nothing here reads, so they are left as
+// written.
 func renumber(run obj, m moves) {
+	extensions := objects(child(run, "tool"), "extensions")
 	at := func(ref obj) {
 		if ref == nil {
 			return
 		}
 		component := child(ref, "toolComponent")
-		c, named := num(component, "index")
+		c, named := extensionOf(component, extensions)
 		byRule := m.driverRules
 		if named {
 			byRule = m.rules[c]
@@ -257,7 +259,7 @@ func renumber(run obj, m moves) {
 				delete(ref, "index")
 			}
 		}
-		if named {
+		if _, byIndex := num(component, "index"); named && byIndex {
 			if to, ok := m.components[c]; ok {
 				component["index"] = to
 			}

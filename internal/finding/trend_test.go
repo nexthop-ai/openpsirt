@@ -135,7 +135,7 @@ func TestATrendCountsNothingFromOutsideTheRangeItDraws(t *testing.T) {
 
 func TestATrendWithNoStepIsRefused(t *testing.T) {
 	// A step of nothing draws one instant however many times; the edge never
-	// asks for one, so the store refuses it rather than drawing another.
+	// asks for one, so the store refuses it.
 	each(t, func(t *testing.T, f *fixture) {
 		if _, err := f.store.Trend(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
 			time.Time{}, 0, 4, finding.Within{}); err == nil {
