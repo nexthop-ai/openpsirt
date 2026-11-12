@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mayOf, signedOutBy, signOut } from "./session";
+import { clearHere, mayOf, signedOutBy, signOut } from "./session";
 import type { Who } from "./session";
 import { belongTo, keep, restore } from "./drafts";
 
@@ -87,6 +87,15 @@ describe("signing out", () => {
     );
     expect(went).not.toHaveBeenCalled();
     expect(restore("revise:4")).toBe("");
+  });
+
+  it("clears drafts before the full load that clears memory, for a reader the proxy signed in", () => {
+    keep("revise:5", "text nobody outside should ever see");
+    let clearedFirst = false;
+    clearHere(() => {
+      clearedFirst = restore("revise:5") === "";
+    });
+    expect(clearedFirst, "the draft was still there when the page reloaded").toBe(true);
   });
 
   it("reads a refusal for want of any session as signed out", () => {

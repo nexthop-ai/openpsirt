@@ -23,7 +23,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/typedname"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
@@ -407,7 +406,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	// record's own addresses go through as well.
 	related := make([]string, 0, len(match.RelatedVulnerabilities))
 	for _, other := range match.RelatedVulnerabilities {
-		if other.ID != "" && other.ID != match.Vulnerability.ID && !addressless(other.ID) {
+		if other.ID != "" && other.ID != match.Vulnerability.ID {
 			aliases = append(aliases, other.ID)
 		}
 		related = append(related, other.URLs...)
@@ -422,20 +421,9 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	}
 	epss := firstEPSS(match.Vulnerability.EPSS)
 	named, primary := weaknesses(match.Vulnerability.CWEs)
-	// Every address about an issue carries its name as a path segment, and a
-	// browser resolves "." and ".." away. Such a name is no name: the issue
-	// goes by its first other, and one with none has no identifier, which
-	// interning refuses.
-	identifier := match.Vulnerability.ID
-	if addressless(identifier) {
-		identifier = ""
-		if len(aliases) > 0 {
-			identifier, aliases = aliases[0], aliases[1:]
-		}
-	}
 	return &finding.Reported{
-		Issue: finding.Named{
-			Identifier:           identifier,
+		Issue: finding.Addressed(finding.Named{
+			Identifier:           match.Vulnerability.ID,
 			Aliases:              aliases,
 			Severity:             strings.ToLower(match.Vulnerability.Severity),
 			Description:          strings.TrimSpace(match.Vulnerability.Description),
@@ -454,7 +442,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 			Ratings:              ratings,
 			Weaknesses:           named,
 			PrimaryWeakness:      primary,
-		},
+		}),
 		Component: graph.Described{
 			Name: match.Artifact.Name, Version: match.Artifact.Version,
 			Purl: match.Artifact.Purl,
@@ -960,9 +948,4 @@ func deciding(details []matchDetail) (finding.Matched, *matchDetail) {
 		}
 	}
 	return finding.ByIdentifier, nil
-}
-
-// addressless reports whether an issue name is a dot segment once stored.
-func addressless(name string) bool {
-	return typedname.DotSegment(finding.Normalize(name))
 }

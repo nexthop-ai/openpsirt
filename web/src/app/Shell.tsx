@@ -28,7 +28,7 @@ import {
 import { asAsked, listQuery } from "../screens/list";
 import { unownedAt, useUnowned, type Unowned } from "../screens/unowned";
 import { folded, fold } from "./rail";
-import { forgetHere, signedOutBy, signOut, type SignOutAnswer } from "./session";
+import { clearHere, signedOutBy, signOut, type SignOutAnswer } from "./session";
 import { counted, heldLine, holding, readsUndisclosed } from "./families";
 import { Scope } from "./Scope";
 import { codeTrendAt } from "../screens/codeTrend";
@@ -822,7 +822,6 @@ function Me({ who }: { who: Who }) {
   // the page and offers it again.
   const [leaving, setLeaving] = useState(false);
   const [stuck, setStuck] = useState<Exclude<SignOutAnswer, "ended"> | null>(null);
-  const [cleared, setCleared] = useState(false);
   // Said by the answer about the reader, or learned from a refused sign-out
   // where that answer predates it.
   const atTheProxy = who.by_proxy || stuck === "at-the-proxy";
@@ -924,7 +923,7 @@ function Me({ who }: { who: Who }) {
               role={stuck === "at-the-proxy" ? "alert" : undefined}
               style={{ margin: "4px 10px" }}
             >
-              Your proxy signed you in. Sign out there.
+              Your proxy signed you in as {who.identity}. Sign out there.
             </p>
           )}
           {atTheProxy && (
@@ -932,13 +931,9 @@ function Me({ who }: { who: Who }) {
               type="button"
               className="opt"
               role="menuitem"
-              disabled={cleared}
-              onClick={() => {
-                forgetHere();
-                setCleared(true);
-              }}
+              onClick={() => clearHere(() => window.location.reload())}
             >
-              {cleared ? "Cleared" : "Clear this browser"}
+              Clear this browser
               <span className="tag">drafts and screen state</span>
             </button>
           )}

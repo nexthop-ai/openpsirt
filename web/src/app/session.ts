@@ -122,11 +122,19 @@ export async function signOut(
 export type SignOutAnswer = "ended" | "at-the-proxy" | "not-ended";
 
 // What a sign-out clears before it asks the server: every draft, and what the
-// tab remembers. Offered alone to a reader the proxy signed in, who signs out
-// at the proxy and would otherwise leave both behind on a shared machine.
-export function forgetHere(): void {
+// tab remembers.
+function forgetHere(): void {
   forgetAll();
   forgetSession();
+}
+
+// Clearing this browser for a reader the proxy signed in, who signs out at the
+// proxy and would otherwise leave drafts and tab state behind on a shared
+// machine. A full load follows, as it does a sign-out, so nothing held in
+// memory writes a draft back or stays on screen.
+export function clearHere(reload: () => void): void {
+  forgetHere();
+  reload();
 }
 
 // The answer a sign-out's status means. A refusal for want of any session is

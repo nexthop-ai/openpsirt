@@ -358,8 +358,8 @@ export function render(source: string): string {
     // document as well as set by the hook. What stops an author supplying
     // them is that raw markup is off at the parser (`html: false` above), so
     // no author-written attribute reaches the sanitizer at all — and that is
-    // the control to keep, not this list. These two are what the hook sets
-    // on an image before attribute sanitizing, so they have to survive it.
+    // the control to keep, not this list. Listed is what the hook sets on
+    // an image before attribute sanitizing, which has to survive it.
     // `rel` and `target` are set on a link after sanitizing, so neither is
     // listed: nothing judges them, and an author can supply neither.
     ADD_ATTR: ["loading", "referrerpolicy"],

@@ -25,17 +25,15 @@ func TestALongIdentifierOutsideASCIIStaysStorableAfterItIsCut(t *testing.T) {
 
 func TestAnIssueNameThatIsADotSegmentIsNoName(t *testing.T) {
 	// Every address about an issue carries its name as a path segment, and a
-	// browser resolves "." and ".." away before sending.
-	named, names, err := prepared(Named{Identifier: "..", Aliases: []string{".", "GHSA-2222-3333-4444"}})
-	if err != nil {
-		t.Fatal(err)
+	// browser resolves "." and ".." away.
+	named := Addressed(Named{Identifier: "..", Aliases: []string{".", "GHSA-2222-3333-4444"}})
+	if named.Identifier != "GHSA-2222-3333-4444" || len(named.Aliases) != 0 {
+		t.Errorf("the issue goes by %q, also %q", named.Identifier, named.Aliases)
 	}
-	if got := preferred(named); got != "GHSA-2222-3333-4444" {
-		t.Errorf("the issue is filed under %q", got)
+	if got := Addressed(Named{Identifier: "..", Aliases: []string{"."}}); got.Identifier != "" {
+		t.Errorf("an issue named only by dot segments goes by %q", got.Identifier)
 	}
-	if len(names) != 1 || names[0] != "GHSA-2222-3333-4444" {
-		t.Errorf("the issue goes by %q, want only the name an address can carry", names)
-	}
+	// Interning refuses what has no name left, wherever the report came from.
 	if _, _, err := prepared(Named{Identifier: "..", Aliases: []string{"."}}); err == nil {
 		t.Error("an issue named only by dot segments was kept")
 	}

@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from "vitest";
 import { Shell } from "./Shell";
 import { answer, location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Who } from "./session";
-import { belongTo, keep, restore } from "./drafts";
 
 const mount = mounted();
 
@@ -87,23 +86,9 @@ describe("signing out", () => {
     const buttons = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);
     expect(buttons.some((text) => text?.startsWith("Sign out"))).toBe(false);
     expect(mount.host().textContent).toContain("Sign out there");
+    expect(mount.host().textContent).toContain(who.identity);
+    expect(buttons.some((text) => text?.startsWith("Clear this browser"))).toBe(true);
     expect(sent()).toHaveLength(0);
-  });
-
-  it("clears what this browser holds for a reader the proxy signed in", async () => {
-    // They sign out at the proxy, which knows nothing of drafts here.
-    serve(() => ({ data: { items: [], total: 0 } }));
-    belongTo("ana");
-    keep("revise:9", "half a justification about something embargoed");
-    mount.render(screen(<Shell who={{ ...who, by_proxy: true }}>{null}</Shell>, "/start"));
-    await settle();
-    const you = mount.host().querySelector<HTMLButtonElement>('button[aria-label="You"]');
-    await act(async () => you?.click());
-    const clear = Array.from(mount.host().querySelectorAll("button")).find((b) =>
-      b.textContent?.startsWith("Clear this browser"),
-    );
-    await act(async () => clear?.click());
-    expect(restore("revise:9")).toBe("");
   });
 
   it("says to sign out at the proxy where the proxy signed the reader in", async () => {
