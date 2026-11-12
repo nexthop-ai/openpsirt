@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"net/url"
 	"reflect"
 	"strings"
@@ -169,5 +170,33 @@ func TestALoopbackEngineIsReachedOrRefusedInWords(t *testing.T) {
 	if host, _, err := reachEngine(context.Background(), other, fakeDocker(nil, "ps --filter")); err != nil ||
 		host != "host.docker.internal:5432" {
 		t.Errorf("another host: %q, %v", host, err)
+	}
+}
+
+func TestAGetThatFailsOrAnswers5xxIsAFault(t *testing.T) {
+	faults, answered, err := classifyGets([]getResult{
+		{path: "/v1/a", status: 200},
+		{path: "/v1/b", status: 404},
+		{path: "/v1/c", status: 500, body: []byte("boom")},
+		{path: "/v1/d", err: errors.New("reset")},
+	}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if answered != 1 || len(faults) != 2 || !strings.Contains(faults[0], "/v1/c") || !strings.Contains(faults[1], "/v1/d") {
+		t.Errorf("answered %d, faults %v; want 1 answered and /v1/c, /v1/d reported", answered, faults)
+	}
+}
+
+func TestASweepOfRefusalsAloneCheckedNothing(t *testing.T) {
+	if _, _, err := classifyGets([]getResult{{path: "/v1/a", status: 403}, {path: "/v1/b", status: 404}}, io.Discard); err == nil {
+		t.Error("a sweep no GET answered 2xx passed")
+	}
+}
+
+func TestASweepWithASuccessAndARefusalIsClean(t *testing.T) {
+	faults, _, err := classifyGets([]getResult{{path: "/v1/a", status: 200}, {path: "/v1/b", status: 404}}, io.Discard)
+	if err != nil || len(faults) != 0 {
+		t.Errorf("faults %v, err %v; want neither", faults, err)
 	}
 }

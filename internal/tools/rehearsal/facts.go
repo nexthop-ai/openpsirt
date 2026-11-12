@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"slices"
 )
 
@@ -131,4 +132,25 @@ func CompareTotals(what string, before, after Totals) []string {
 		}
 	}
 	return faults
+}
+
+// Tally counts each table through ask. A table in required that cannot be
+// counted is an error naming it, because an uncounted table reads as absent
+// and Compare passes a table emptied by the upgrade it never saw held. Any
+// other table that cannot be counted is one the side does not hold, and is
+// left out of the answer.
+func Tally(tables []string, required map[string]bool, ask func(table string) (int64, error), log io.Writer) (Counts, error) {
+	counts := Counts{}
+	for _, table := range tables {
+		n, err := ask(table)
+		if err != nil {
+			if required[table] {
+				return nil, fmt.Errorf("count %s: %w", table, err)
+			}
+			_, _ = fmt.Fprintf(log, "count %s: %v\n", table, err)
+			continue
+		}
+		counts[table] = n
+	}
+	return counts, nil
 }
