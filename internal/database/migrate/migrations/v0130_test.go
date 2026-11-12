@@ -323,20 +323,32 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
 			}
 			return string(encoded)
 		}
-		exec(`INSERT INTO "published_document" ("product_id", "kind", "subject", "path", "path_digest",
-			"tracking_id", "title", "version", "first_at", "current_at", "statuses", "settled", "document")
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			product, "csaf-vex", "CVE-2026-1", "p/cve-2026-1.json", "digest", "tracking", "title", 1, at, at,
-			"affected", "settled", body(raw, slashed))
+		// More than one read's worth, so a document past the first is reached.
+		documents := migrations.PublishedBatchV0130 + 1
+		for i := range documents {
+			subject := fmt.Sprintf("CVE-2026-%d", i)
+			exec(`INSERT INTO "published_document" ("product_id", "kind", "subject", "path", "path_digest",
+				"tracking_id", "title", "version", "first_at", "current_at", "statuses", "settled", "document")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				product, "csaf-vex", subject, "p/"+subject+".json", "digest-"+subject, "tracking", "title", 1,
+				at, at, "affected", "settled", body(raw, slashed))
+		}
 
 		dbtest.MigrateTo(t, db, v0130)
 
-		var got string
-		if err := db.DB.NewRaw(`SELECT "document" FROM "published_document"`).Scan(ctx, &got); err != nil {
+		var got []string
+		if err := db.DB.NewRaw(`SELECT "document" FROM "published_document" ORDER BY "id"`).
+			Scan(ctx, &got); err != nil {
 			t.Fatal(err)
 		}
-		if want := body(clean, "pkg:deb/debian/curl@8.5.0"); got != want {
-			t.Errorf("the published document holds\n%s\nafter the upgrade, want\n%s", got, want)
+		if len(got) != documents {
+			t.Fatalf("%d documents are published after the upgrade, want %d", len(got), documents)
+		}
+		want := body(clean, "pkg:deb/debian/curl@8.5.0")
+		for i, document := range got {
+			if document != want {
+				t.Errorf("published document %d holds\n%s\nafter the upgrade, want\n%s", i, document, want)
+			}
 		}
 		leaveAtLatest(t, ctx, db)
 	})

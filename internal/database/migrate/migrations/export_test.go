@@ -362,3 +362,7 @@ func StopV0130AfterEndedByColumn(ctx context.Context, db *database.DB) error {
 			add: []added{{column: "ended_by"}}})
 	})
 }
+
+// PublishedBatchV0130 is how many published documents one read of the
+// v0.13.0 upgrade takes.
+const PublishedBatchV0130 = publishedBatchV0130

@@ -23,6 +23,11 @@ var purlColumnsV0130 = [][2]string{
 // purlBatchV0130 is how many rows one read of the credential step takes.
 const purlBatchV0130 = 5_000
 
+// publishedBatchV0130 is how many published documents one read takes. A
+// document is a whole body, which can run to megabytes, and a page of them is
+// held until it is written.
+const publishedBatchV0130 = 50
+
 // purlCredentialsV0130 rewrites the package identifiers v0.12.0 stored as
 // v0.13.0 stores them: the slashes after the scheme dropped, and any
 // credential and query taken out of the addresses its qualifiers hold. Only a
@@ -38,7 +43,7 @@ func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
 	if err != nil {
 		return err
 	}
-	if err := publishedPurlsV0130(ctx, tx, cleaned, purlBatchV0130); err != nil {
+	if err := publishedPurlsV0130(ctx, tx, cleaned, publishedBatchV0130); err != nil {
 		return err
 	}
 	return remoteCredentialsV0130(ctx, tx, purlBatchV0130)
