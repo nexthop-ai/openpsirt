@@ -23,9 +23,11 @@ func decisionOccurrenceV0130(t *columnTypes) []string {
 		`-- Who withdrew this row. Null while it stands, where it lapsed, and
 			-- on every row withdrawn before v0.13.0 recorded it.
 			"ended_by"                   `+t.refNull+` NULL,`)
-	statements[0] = strings.Replace(statements[0],
-		`CONSTRAINT "decision_occurrence_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id")`,
-		`CONSTRAINT "decision_occurrence_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id"),
+	const proposer = `CONSTRAINT "decision_occurrence_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id")`
+	if !strings.Contains(statements[0], proposer) {
+		panic("the declaration being extended has no proposer key")
+	}
+	statements[0] = strings.Replace(statements[0], proposer, proposer+`,
 			CONSTRAINT "decision_occurrence_ender_fk" FOREIGN KEY ("ended_by") REFERENCES "person"("id")`, 1)
 	return statements
 }
