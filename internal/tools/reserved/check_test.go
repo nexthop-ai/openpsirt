@@ -74,6 +74,24 @@ func TestEveryPassReportsWhatItIsFor(t *testing.T) {
 			"package x\nfunc q() { db.Where(\"id IN (SELECT 1 FROM \" + \"finding)\") }\n", []string{"finding"},
 		},
 		{
+			"an invented name standing alone in an ordering", "internal/x/x.go",
+			"package x\nfunc q() { db.ColumnExpr(`COUNT(*) AS \"used\"`).OrderExpr(\"used DESC\") }\n",
+			[]string{"used"},
+		},
+		{
+			"an invented name standing alone in a statement", "internal/x/x.go",
+			"package x\nfunc q() { db.NewRaw(`SELECT COUNT(*) AS \"used\" FROM \"finding\" ORDER BY used DESC`) }\n",
+			[]string{"used"},
+		},
+		{
+			"an invented name quoted in an ordering", "internal/x/x.go",
+			"package x\nfunc q() { db.ColumnExpr(`COUNT(*) AS \"used\"`).OrderExpr(`\"used\" DESC`) }\n", nil,
+		},
+		{
+			"a formatting verb beside an invented name", "internal/x/x.go",
+			"package x\nfunc q() { db.ColumnExpr(`1 AS \"s\"`).Where(fmt.Sprintf(`\"s\".\"id\" = 1 AND %[1]s`, x)) }\n", nil,
+		},
+		{
 			"a bare table inside one piece, reported once", "internal/x/x.go",
 			"package x\nfunc q() { db.Where(\"id IN (SELECT 1 FROM finding)\") }\n", []string{"finding"},
 		},

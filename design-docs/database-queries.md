@@ -46,7 +46,8 @@ refused by MySQL alone.
 | What is a column | A declared name in lower case, since keywords are in capitals. A word before a parenthesis is a function. Arguments after a builder method's SQL are values |
 | Which literals are statements | Any literal containing `FROM "` or `JOIN "`, wherever it is held. Every table is quoted, so prose never carries the marker |
 | A qualified column outside a statement | An alias, a dot and a declared column, all lower case, in any literal of running code |
-| A name invented with `AS` | Read as a declared column wherever a reference qualifies it, in any file |
+| A name invented with `AS` | Read as a declared column wherever a reference qualifies it, in any file, and where it stands alone in running code's statement or builder method's SQL argument, as an ordering by an alias writes it |
+| What is not a name | A word a placeholder mark or a formatting verb opens, such as `%s` or `%[2]s` |
 | A table a query names | Read in every literal outside the migrations, against the tables the migrations made. A literal that is only a table name is read where a method naming a table is called |
 | A clause assembled in a variable | Every literal the function puts in a variable, read where it is handed over, once |
 | Tests | Held to it; the checker's own fixtures are its input and exempt |
