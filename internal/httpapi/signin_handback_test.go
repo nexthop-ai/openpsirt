@@ -15,22 +15,29 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
+// mapPlatformAndSecurity maps the group platform to public reading of the
+// harness's product and the group security to undisclosed triage of it.
+func mapPlatformAndSecurity(t *testing.T, r *signInReach) {
+	t.Helper()
+	var product string
+	if err := r.db.DB.NewSelect().Table("product").Column("name").
+		Where(`"id" = ?`, r.product).Scan(t.Context(), &product); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.rights.ApplyMappings(t.Context(), []access.Mapping{
+		{Group: "platform", Grants: string(access.PublicRead), Product: product},
+		{Group: "security", Grants: string(access.PrivateTriage), Product: product},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // A group-bound sign-in whose groups no longer grant undisclosed reading hands
 // back the reports the person held, inside the sign-in's own write.
 func TestASignInThatTakesUndisclosedReadingAwayHandsBackTheReportsHeld(t *testing.T) {
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		ctx := t.Context()
-		var product string
-		if err := r.db.DB.NewSelect().Table("product").Column("name").
-			Where(`"id" = ?`, r.product).Scan(ctx, &product); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := r.rights.ApplyMappings(ctx, []access.Mapping{
-			{Group: "platform", Grants: string(access.PublicRead), Product: product},
-			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		mapPlatformAndSecurity(t, r)
 		if err := r.rights.SwitchTo(ctx, access.GroupBound); err != nil {
 			t.Fatal(err)
 		}
@@ -87,17 +94,7 @@ func TestASignInThatTakesUndisclosedReadingAwayHandsBackTheReportsHeld(t *testin
 func TestATrustedHeaderSignInThatTakesUndisclosedReadingAwayHandsBackTheReportsHeld(t *testing.T) {
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		ctx := t.Context()
-		var product string
-		if err := r.db.DB.NewSelect().Table("product").Column("name").
-			Where(`"id" = ?`, r.product).Scan(ctx, &product); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := r.rights.ApplyMappings(ctx, []access.Mapping{
-			{Group: "platform", Grants: string(access.PublicRead), Product: product},
-			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		mapPlatformAndSecurity(t, r)
 		sources, err := access.ParseSources("192.0.2.1")
 		if err != nil {
 			t.Fatal(err)

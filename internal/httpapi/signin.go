@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -128,8 +129,15 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	}
 
 	held, err := pendingFrom(r.Context(), in, r)
-	if err != nil {
+	if errors.Is(err, errNoSignIn) {
 		refuseSignIn(w, in)
+		return
+	}
+	// Anything else is the key this deployment signs with, which could not be
+	// read or is malformed: a fault, logged, because answered as "not
+	// authorized" an outage reads as every browser turned away.
+	if err != nil {
+		wentWrongHere(w, in, "a sign-in in progress could not be read", err)
 		return
 	}
 	pending := held.Pending
@@ -311,7 +319,7 @@ func fillEmail(r *http.Request, in core.Deps, rights *access.Store,
 func pendingFrom(ctx context.Context, in core.Deps, r *http.Request) (inProgress, error) {
 	cookie, err := r.Cookie(access.CookieName(pendingCookie, in.PlainHTTP))
 	if err != nil || cookie.Value == "" {
-		return inProgress{}, errors.New("no sign-in is in progress")
+		return inProgress{}, errNoSignIn
 	}
 	raw, err := openPending(ctx, in, cookie.Value)
 	if err != nil {
@@ -319,16 +327,16 @@ func pendingFrom(ctx context.Context, in core.Deps, r *http.Request) (inProgress
 	}
 	var held inProgress
 	if err := json.Unmarshal(raw, &held); err != nil {
-		return inProgress{}, err
+		return inProgress{}, fmt.Errorf("%w: %w", errNoSignIn, err)
 	}
 	if held.Pending.State == "" || held.Pending.Verifier == "" {
-		return inProgress{}, errors.New("the sign-in in progress is incomplete")
+		return inProgress{}, fmt.Errorf("%w: the sign-in in progress is incomplete", errNoSignIn)
 	}
 	// The same window the cookie was given, enforced where it can be: a value
 	// with no time in it is one sealed before this was checked at all, and it
 	// is refused rather than read as fresh.
 	if held.Minted.IsZero() || time.Since(held.Minted) > pendingLife {
-		return inProgress{}, errors.New("the sign-in in progress has expired")
+		return inProgress{}, fmt.Errorf("%w: the sign-in in progress has expired", errNoSignIn)
 	}
 	// Checked again on the way out as well as on the way in. The cookie is the
 	// browser's, so somebody may edit it — and while a person redirecting
@@ -357,18 +365,23 @@ func sealPending(ctx context.Context, in core.Deps, payload []byte) (string, err
 		base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
+// errNoSignIn is every way a browser's own value fails to be a sign-in this
+// deployment started: missing, unsigned, forged, unreadable, incomplete or
+// expired. Each is refused; an error without it is a fault reading the key.
+var errNoSignIn = errors.New("no sign-in is in progress")
+
 func openPending(ctx context.Context, in core.Deps, value string) ([]byte, error) {
 	body, signature, found := strings.Cut(value, ".")
 	if !found {
-		return nil, errors.New("the sign-in in progress is not signed")
+		return nil, fmt.Errorf("%w: the sign-in in progress is not signed", errNoSignIn)
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errNoSignIn, err)
 	}
 	given, err := base64.RawURLEncoding.DecodeString(signature)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errNoSignIn, err)
 	}
 	key, err := signingKey(ctx, in)
 	if err != nil {
@@ -378,7 +391,7 @@ func openPending(ctx context.Context, in core.Deps, value string) ([]byte, error
 	mac.Write(payload)
 	// Constant time, like every other secret comparison here.
 	if !hmac.Equal(mac.Sum(nil), given) {
-		return nil, errors.New("the sign-in in progress was not started here")
+		return nil, fmt.Errorf("%w: the sign-in in progress was not started here", errNoSignIn)
 	}
 	return payload, nil
 }
