@@ -69,7 +69,7 @@ key, so first seen on two builds at once it is one occurrence.
 | Rule | Reason |
 |---|---|
 | An occurrence is carried to one result of a run at most, and never one open on the build already | Two code findings open at one occurrence on one build would be answered by one decision |
-| Results of one run sharing a whole key open one occurrence each: the first at the key's, each later one at the key's with an ordinal, ordered by column then message | The key holds no column and no digits, so two flaws on one line share it; the first keeps the occurrence it always had |
+| Results of one run sharing a whole key open one occurrence each: the first at the key's, each later one at the key's with an ordinal, ordered by column then message | The key holds no column and no digits, so two flaws on one line share it; the first keeps the key's own occurrence |
 | An occurrence derived for a result that is open on the build already, under a key that has since moved, takes the next ordinal | |
 | Where a whole key is held twice, by two results of a run or by two code findings of the series, an occurrence carried on it last seen at a result's column with its message goes to that result first | As on the build; only those keys' messages are read, since a key's code findings span the series' builds |
 

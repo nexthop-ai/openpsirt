@@ -172,8 +172,8 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 	// Where a key is held twice, by two results or by two occurrences of the
 	// series, a hit at the result's column saying what it says is taken first,
 	// so each keeps its occurrence whatever order a run lists them in; the rest
-	// take what is left. An occurrence is where its newest code finding was
-	// seen, so one message is read for each, never one per build.
+	// take what is left. An occurrence is read at its most recently created
+	// code finding, so one message is read for each, never one per build.
 	holders := map[string]map[string]bool{}
 	for k, hits := range byKey {
 		for _, h := range hits {

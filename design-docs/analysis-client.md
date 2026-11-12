@@ -64,7 +64,7 @@ undefined, so the deployment places it (`design-docs/analysis-source.md`
 
 | Rule | Reason |
 |---|---|
-| Absolute, `file://`, relative and defined-starting-point paths are resolved, chains followed to sixteen steps | |
+| Absolute, `file://`, relative and defined-starting-point paths are resolved, chains followed through each starting point the run names once at most | The client reads its own build's output, so the run's starting points bound a chain; one longer is a loop |
 | A path with no starting point is relative to the client's directory | The client runs where the analyzer ran |
 | Drive letters and paths on a drive compare ignoring case | Windows |
 | Case is taken from the checkout's index, except where two indexed paths differ only by case | Case-insensitive systems write what was asked |

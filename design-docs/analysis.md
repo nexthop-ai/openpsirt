@@ -110,7 +110,7 @@ and entries are bounded across the upload as memory: placed results take about
 | `baselineState` `absent` drops the result as `absent` | It could never be found again |
 | Paths resolve through named starting points and place against the source root | Paths arrive absolute, as `file://`, relative, or under undefined starting points |
 | A path with no starting point is relative to the first invocation's working directory where that is in the checkout, else the top; one under the source root's own undefined name, directly or through a chain of starting points, is relative to the top | cppcheck run from a subdirectory |
-| The deployment and the upload client resolve a chain of starting points with one resolver | A document uploaded directly places as the client would have placed it |
+| The deployment and the upload client resolve a chain of starting points with one resolver | A document uploaded directly places as the client would have placed it, where its chains are within the deployment's chain bound |
 | A starting point whose own address names no starting point is relative to where the tool ran; the source root's name defined so is the undefined root | Tools write an output directory so; the top is where the root's name places |
 | A path outside the checkout drops its result, counted | |
 | A result repeating another on rule, path, line, column and message is dropped, counted | clang repeats a header per unit |
