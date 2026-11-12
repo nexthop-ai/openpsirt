@@ -385,9 +385,10 @@ func (s *server) document(ctx context.Context, v *view, path string) (*file, err
 // holding the signature of an unchanged document is told so, without the key
 // being used again, and one holding a signature by a key replaced or re-signed
 // is sent the new one, since a signature dated before the key's newest
-// self-signature is refused by a reader's tooling. Undated because a replacement key may have become valid
-// before the document was released, and a date that does not move with the
-// key would confirm the old signature to a reader asking by date.
+// self-signature is refused by a reader's tooling. Undated because a
+// replacement key may have become valid before the document was released, and
+// a date that does not move with the key would confirm the old signature to a
+// reader asking by date.
 func (s *server) signature(document *file, asked string) (*file, error) {
 	if s.Signer == nil {
 		return nil, publish.ErrNotPublished
