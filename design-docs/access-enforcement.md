@@ -50,6 +50,7 @@ included.
 | The refusal sits in the store read as well as at the edge, and the zero subject counts as a non-person | A handler check is the one somebody forgets |
 | A non-person is refused; a person holding nothing gets an empty list | Both checks stay, and the layers agree |
 | A read is narrowed to the products somebody holds anything on, and within those to the visibilities read in each, as one call; nothing calls the visibility half bare | Where a product is already pinned, a named pairing states that the first half was done |
+| A test asks every read the API offers, as a reader of disclosed work alone, over undisclosed work of every kind a read joins beside its findings, and fails on any word of it in an answer (REQ-42, REQ-43) | A secondary read skipping the narrowing its findings take is invisible to a test of one route |
 
 | Read | Answer to a subject that reads nothing there |
 |---|---|
