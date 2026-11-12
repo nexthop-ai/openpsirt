@@ -1033,7 +1033,9 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, buildID,
 			Join(`JOIN "graph_node" AS "fn" ON "fn"."id" = "e"."`+far+`"`).
 			Where(`"e"."build_id" = ?`, buildID).
 			Where(`"nn"."component_id" = ?`, componentID).
-			Where(`"e"."closed_scan_id" IS NULL`)
+			Where(`"e"."closed_scan_id" IS NULL`).
+			// A node is never its own neighbor, as every walk reads it.
+			Where(`"e"."parent_id" <> "e"."child_id"`)
 	}
 	// The neighbors first, so what is counted against each is counted for
 	// them alone. Counted for the whole build and joined, the step above the
@@ -1158,7 +1160,8 @@ func childrenJoin(query *bun.SelectQuery, buildID int64, only []int64) *bun.Sele
 		Join(`LEFT JOIN (SELECT "dp"."component_id" AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON "dp"."id" = "d"."parent_id"
-			WHERE "d"."build_id" = ? AND "d"."closed_scan_id" IS NULL`+within+`
+			WHERE "d"."build_id" = ? AND "d"."closed_scan_id" IS NULL
+			  AND "d"."parent_id" <> "d"."child_id"`+within+`
 			GROUP BY "dp"."component_id") AS "kids" ON "kids"."cid" = "c"."id"`, args...).
 		ColumnExpr(`COALESCE("kids"."n", 0) AS "children"`)
 }
@@ -1197,7 +1200,8 @@ func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
 			return q.Where(orphaned).
 				WhereOr(`EXISTS (SELECT 1 FROM "graph_edge" AS "re"
 					JOIN "graph_node" AS "rn" ON "rn"."id" = "re"."parent_id"
-					WHERE "re"."child_id" = "fn"."id" AND "re"."closed_scan_id" IS NULL AND "rn"."is_root" = ?)`, true)
+					WHERE "re"."child_id" = "fn"."id" AND "re"."closed_scan_id" IS NULL
+					  AND "re"."parent_id" <> "re"."child_id" AND "rn"."is_root" = ?)`, true)
 		}).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -1450,6 +1454,7 @@ func (s *Store) DeclaredScopes(ctx context.Context, buildID int64,
 		Where(`"e"."build_id" = ?`, buildID).
 		Where(`"e"."closed_scan_id" IS NULL`).
 		Where(`"e"."kind" <> ?`, "").
+		Where(`"e"."parent_id" <> "e"."child_id"`).
 		Where(`"child"."component_id" IN (?)`, bun.List(componentIDs)).
 		// The earliest scan first, and within one scan the words in byte
 		// order, so the word kept below is the same on every engine and every

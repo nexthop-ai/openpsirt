@@ -29,14 +29,14 @@ const (
 	SeriesParts Table = "series_document_chunk"
 )
 
-// PartSize is how much of a document one row holds.
+// partSize is how much of a document one row holds.
 //
 // Two engines cap how large a single statement may be, the cap is server
 // configuration rather than anything a client can discover, and the lowest
 // default in circulation is sixteen megabytes. A bounded row stays far inside
 // every default and lets a document be read as a stream rather than held
 // whole.
-const PartSize = 512 << 10
+const partSize = 512 << 10
 
 // ErrReleased ends a document's stream when the document was let go while it
 // was read.
@@ -62,7 +62,7 @@ func Write(ctx context.Context, db bun.IDB, table Table, documentID int64,
 	r io.Reader) (size int64, hash string, err error) {
 
 	digest := sha256.New()
-	buf := make([]byte, PartSize)
+	buf := make([]byte, partSize)
 	for seq := 0; ; seq++ {
 		n, err := io.ReadFull(r, buf)
 		if n > 0 {

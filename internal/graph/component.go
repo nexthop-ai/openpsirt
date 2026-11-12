@@ -280,6 +280,9 @@ func StoredPurl(purl string) string {
 		}
 		addressLast = strings.Contains(address, "://")
 		if !addressLast {
+			if host, held := withoutPassword(address); held {
+				pair = key + "=" + qualifierEscaped(host)
+			}
 			kept = append(kept, pair)
 			continue
 		}
@@ -319,6 +322,22 @@ func StoredPurl(purl string) string {
 		purl += "#" + subpath
 	}
 	return purl
+}
+
+// withoutPassword is an address written without a scheme, such as a
+// `repository_url`, with the user and password written before its host taken
+// out, and whether it held one. A user with no password is kept: it is the
+// account an scp-style address such as `git@host:path` names.
+func withoutPassword(address string) (string, bool) {
+	end := strings.IndexAny(address, "/?#")
+	if end < 0 {
+		end = len(address)
+	}
+	at := strings.LastIndex(address[:end], "@")
+	if at <= 0 || at == end-1 || !strings.Contains(address[:at], ":") {
+		return "", false
+	}
+	return address[at+1:], true
 }
 
 // qualifierEscaped percent-encodes a qualifier's value, leaving the

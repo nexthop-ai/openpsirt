@@ -126,7 +126,7 @@ versions, hashed. Under the root the component's name stands alone.
 |---|---|
 | A component and its consumer, never the chain from the top | On a real switch image chains give 134,509 occurrences and 49,170 for the worst component; component and consumer give 27,366, the edge count, and 63 |
 | Nothing is lost | The worst component's 48 direct consumers include its containers, one step from the route |
-| A component is never its own consumer: an edge from it to itself places no occurrence | The walks read such an edge as pulling in nothing, and a finding under itself is one the tree never shows |
+| A component is never its own consumer: an edge from it to itself places no occurrence, adds nothing to its count of what it pulls in, makes it no neighbor of itself and declares no scope | The walks read such an edge as pulling in nothing, and the tree, its counts and a scope filter agree with them |
 | A finding of the analysis kind has an occurrence minted from its series and the result's match key, carried by matching | `design-docs/analysis-matching.md` § Carrying |
 | It carries no build and no product | A decision travels between builds (REQ-25), so every list correlating decisions requires a product |
 

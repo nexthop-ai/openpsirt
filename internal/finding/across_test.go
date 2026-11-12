@@ -207,3 +207,27 @@ func TestAnEdgeFromAComponentToItselfIsNoOccurrence(t *testing.T) {
 		}
 	})
 }
+
+func TestAScopeOnAnEdgeToItselfDeclaresNothing(t *testing.T) {
+	// The one occurrence sits under swss, whose edge states no scope, so a
+	// list kept to a scope holds nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{swss, libnl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss},
+				{Parent: swss, Child: libnl},
+				{Parent: libnl, Child: libnl, Kind: "test"},
+			},
+		})
+		f.reported(t, found("CVE-2026-1", libnl))
+		who := f.admin(t, access.PublicRead, access.PrivateRead)
+		if all, _ := f.listed(t, who, finding.Filter{}); all != 1 {
+			t.Fatalf("the list holds %d, want the one finding, so this checked nothing", all)
+		}
+		if here, across := f.listed(t, who, finding.Filter{DeclaredAs: []string{"test"}}); here != 0 || across != 0 {
+			t.Errorf("kept to the test scope, the list holds %d here and %d across, want none", here, across)
+		}
+	})
+}

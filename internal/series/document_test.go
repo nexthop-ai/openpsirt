@@ -33,10 +33,15 @@ func TestARunDocumentLetGoWhileItIsReadEndsShortWithAnError(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		body := bytes.Repeat([]byte("x"), 2*chunked.PartSize+1)
+		body := bytes.Repeat([]byte("x"), 3<<20)
 		doc, err := store.Write(ctx, run.ID, 0, bytes.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
+		}
+		parts, err := db.DB.NewSelect().Table(string(chunked.SeriesParts)).
+			Where(`"document_id" = ?`, doc.ID).Count(ctx)
+		if err != nil || parts < 2 {
+			t.Fatalf("the document is held in %d parts (%v), so this checked nothing", parts, err)
 		}
 		whole, err := io.ReadAll(store.Open(ctx, doc))
 		if err != nil || !bytes.Equal(whole, body) {

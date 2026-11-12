@@ -709,6 +709,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 				ColumnExpr(`"gch"."component_id"`).
 				Where(`"ge"."build_id" = "f"."build_id"`).
 				Where(`"ge"."closed_scan_id" IS NULL`).
+				Where(`"ge"."parent_id" <> "ge"."child_id"`).
 				Where(`"ge"."kind" IN (?)`, bun.List(words)))
 	}
 	// The component holding it. An occurrence records the one that pulls it in,

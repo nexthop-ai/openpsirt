@@ -85,7 +85,7 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 
 // purlWithoutCredentialV0130 is a package identifier as v0.13.0 stores one:
 // the slashes after its scheme dropped, and any credential and query taken
-// out of each qualifier holding an address. A qualifier holding an address
+// out of each qualifier holding an address, with or without a scheme. A qualifier holding an address
 // that does not parse is dropped, since where its credential ends cannot be
 // told, and so are a pair whose escapes do not decode, the pairs after an
 // address whose query is written unescaped, since they are that query, and a
@@ -117,6 +117,9 @@ func purlWithoutCredentialV0130(purl string) string {
 		}
 		addressLast = strings.Contains(address, "://")
 		if !addressLast {
+			if host, held := withoutPasswordV0130(address); held {
+				pair = key + "=" + qualifierEscapedV0130(host)
+			}
 			kept = append(kept, pair)
 			continue
 		}
@@ -149,6 +152,21 @@ func purlWithoutCredentialV0130(purl string) string {
 		purl += "#" + subpath
 	}
 	return purl
+}
+
+// withoutPasswordV0130 is an address written without a scheme with the user
+// and password written before its host taken out, and whether it held one. A
+// user with no password is kept, as an scp-style address names one.
+func withoutPasswordV0130(address string) (string, bool) {
+	end := strings.IndexAny(address, "/?#")
+	if end < 0 {
+		end = len(address)
+	}
+	at := strings.LastIndex(address[:end], "@")
+	if at <= 0 || at == end-1 || !strings.Contains(address[:at], ":") {
+		return "", false
+	}
+	return address[at+1:], true
 }
 
 // qualifierEscapedV0130 percent-encodes a qualifier's value, leaving the
