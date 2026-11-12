@@ -234,19 +234,19 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		// However the description failed — not found, refused, a TLS fault,
 		// a timeout — nothing is withdrawn. What the upstream said stands
 		// until a read that succeeds says otherwise.
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, up.KeyOffered, err, false)
+		return took, r.record(ctx, up, up.Listings, up.KeyOffered, err, false)
 	}
 	if offered, _ := keyIn(meta); offered != up.Fingerprint {
 		recorded := offered
 		if recorded == "" {
 			recorded = NoKey
 		}
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, recorded, describe(offered, up.Fingerprint), false)
+		return took, r.record(ctx, up, up.Listings, recorded, describe(offered, up.Fingerprint), false)
 	}
 	var keyring openpgp.EntityList
 	if up.PublicKey != "" {
 		if keyring, _, err = keyringOf(up.PublicKey); err != nil {
-			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
+			return took, r.record(ctx, up, up.Listings, "", err, false)
 		}
 	}
 
@@ -263,10 +263,10 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	case errors.As(err, new(local)):
 		return took, r.failedHere(ctx, up, err)
 	case err != nil:
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
+		return took, r.record(ctx, up, up.Listings, "", err, false)
 	}
 	if !moved {
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", unreadEntries(skipped), false)
+		return took, r.record(ctx, up, up.Listings, "", unreadEntries(skipped), false)
 	}
 
 	var documents []Document
@@ -317,7 +317,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		case errors.As(err, new(local)):
 			return took, r.failedHere(ctx, up, err)
 		case err != nil:
-			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
+			return took, r.record(ctx, up, up.Listings, "", err, false)
 		}
 		took.Documents++
 		took.Moved = took.Moved || changed
@@ -335,7 +335,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		if err := r.withdraw(ctx, up, address); errors.As(err, new(local)) {
 			return took, r.failedHere(ctx, up, err)
 		} else if err != nil {
-			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
+			return took, r.record(ctx, up, up.Listings, "", err, false)
 		}
 		took.Withdrawn++
 		took.Moved = true
@@ -355,7 +355,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		failed = refusal.Errorf("%d of what the upstream lists could not be taken; the last: %v",
 			len(refused), refused[len(refused)-1])
 	}
-	return took, NewStore(r.db).reached(ctx, up, listings, "", failed, took.Filled)
+	return took, r.record(ctx, up, listings, "", failed, took.Filled)
 }
 
 // unreadEntries is what entries naming no document this can read stopped, or
@@ -656,22 +656,34 @@ type local struct{ err error }
 func (l local) Error() string { return l.err.Error() }
 func (l local) Unwrap() error { return l.err }
 
+// record writes how a read of an upstream went, once the lease is asked for
+// again and answers mine: one step can outlast the lease, and the replica that
+// took it records what it reads. A lease lost records nothing and reports
+// nothing; one that cannot be asked for records nothing and reports why.
+func (r *Reader) record(ctx context.Context, up Upstream, listings, offered string, failed error,
+	due bool) error {
+	if r.keep != nil {
+		mine, err := r.keep(ctx)
+		if err != nil {
+			return local{err}
+		}
+		if !mine {
+			return nil
+		}
+	}
+	return NewStore(r.db).reached(ctx, up, listings, offered, failed, due)
+}
+
 // failedHere records a failure of this deployment against an upstream in fixed
 // words, since a database's own text is never shown, and leaves the upstream
 // due, so one that repeats shows on the upstream rather than in the log alone.
 // What was read and the key offered stay as they were. A pass cut short by
-// shutdown records none, and so does one this replica cannot show still holds
-// the lease, since the replica holding it records what it reads.
+// shutdown records none.
 func (r *Reader) failedHere(ctx context.Context, up Upstream, err error) error {
 	if ctx.Err() != nil {
 		return err
 	}
-	if r.keep != nil {
-		if mine, asked := r.keep(ctx); asked != nil || !mine {
-			return err
-		}
-	}
-	if marked := NewStore(r.db).reached(ctx, up, up.Listings, up.KeyOffered, errFailedHere, true); marked != nil {
+	if marked := r.record(ctx, up, up.Listings, up.KeyOffered, errFailedHere, true); marked != nil {
 		return errors.Join(err, marked)
 	}
 	return err

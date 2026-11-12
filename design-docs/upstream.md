@@ -67,7 +67,7 @@ copy of the upstream ordinarily sits.
 | Listings one description names | 32, or the read is refused before any is fetched |
 | Entries every listing of one upstream names | 200,000 between them, or the read is refused |
 | Documents per pass per upstream | 200; a pass taking that many leaves the upstream due |
-| The lease | Asked for again before every listing and every document; a pass that lost it stops, leaves the upstream due, withdraws nothing and records nothing, since the replica holding it records what it reads |
+| The lease | Asked for again before every listing and every document; a pass that lost it stops, leaves the upstream due, withdraws nothing and records nothing. It is asked once more before anything is recorded, since one step can outlast it, and the replica holding it records what it reads |
 
 ## Reading
 
@@ -86,7 +86,7 @@ reaches out, settled by a lease.
 | A document | Compared against the digest served beside it, and its signature where a key is trusted. One failing either is not taken, and the next pass reads the listings whole |
 | An entry that cannot be read | Counted beside its listing's validator, so an answer that nothing moved records it again and never clears it |
 | A document refused again | Each replica remembers what it refused at the moment its listing named, and tries those after every other entry, so refusals at the head of a listing never fill a pass |
-| An address that comes to hold another document | What the document it held said is set aside, unless another listed address still holds that document |
+| An address that comes to hold another document | What the document it held said is set aside, unless another address recorded for the upstream still holds it, until a complete read withdraws that address |
 | Its name | The tracking identifier it names itself by; its next revision replaces its statements |
 | A security advisory | Read, recorded as read, nothing kept |
 

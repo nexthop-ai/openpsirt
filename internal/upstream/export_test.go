@@ -15,3 +15,9 @@ func ListingAtMost(r *Reader, n int) { r.listed = n }
 
 // Keeping has a reader ask keep for the lease, as a pass does.
 func Keeping(r *Reader, keep func(context.Context) (bool, error)) { r.keep = keep }
+
+// Record has a reader record a read of up that failed with failed, as a pass
+// closes one.
+func Record(ctx context.Context, r *Reader, up Upstream, failed error) error {
+	return r.record(ctx, up, up.Listings, up.KeyOffered, failed, false)
+}

@@ -302,3 +302,38 @@ func TestAFailureHereWithoutTheLeaseRecordsNothing(t *testing.T) {
 		}
 	})
 }
+
+// A read is recorded only once the lease is asked for again and answers mine,
+// since one step can outlast it and the replica that took it records what it
+// reads.
+func TestAReadIsRecordedOnlyWhileTheLeaseIsHeld(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		store := upstream.NewStore(w.DB.DB)
+		up, err := store.For(t.Context(), w.admin, w.fork.ID)
+		if err != nil || up == nil {
+			t.Fatalf("the fork trusts no upstream: %v", err)
+		}
+		held := false
+		upstream.Keeping(w.reader, func(context.Context) (bool, error) { return held, nil })
+		failed := errors.New("that listing could not be read")
+		if err := upstream.Record(t.Context(), w.reader, *up, failed); err != nil {
+			t.Fatal(err)
+		}
+		if after, err := store.For(t.Context(), w.admin, w.fork.ID); err != nil {
+			t.Fatal(err)
+		} else if after.FetchedAt != nil || after.Failed != "" {
+			t.Error("a read was recorded by a replica that lost the lease")
+		}
+		held = true
+		if err := upstream.Record(t.Context(), w.reader, *up, failed); err != nil {
+			t.Fatal(err)
+		}
+		if after, err := store.For(t.Context(), w.admin, w.fork.ID); err != nil {
+			t.Fatal(err)
+		} else if after.FetchedAt == nil || after.Failed != failed.Error() {
+			t.Error("a read was not recorded by the replica holding the lease")
+		}
+	})
+}
