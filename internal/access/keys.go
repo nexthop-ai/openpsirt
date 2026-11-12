@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 	"github.com/uptrace/bun"
 )
 
@@ -67,6 +68,9 @@ func (s *Store) NewKey(ctx context.Context, name string, scope Scope) (*Key, str
 	name = KeyName(name)
 	if name == "" {
 		return nil, "", ErrNoKeyName
+	}
+	if err := typedname.Addressable("a key's name", name); err != nil {
+		return nil, "", err
 	}
 	raw := make([]byte, secretBytes)
 	if _, err := rand.Read(raw); err != nil {

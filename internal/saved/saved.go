@@ -182,6 +182,9 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 	if matched == "" {
 		return nil, refusal.Errorf("a saved filter needs a name")
 	}
+	if err := typedname.Addressable("a saved filter's name", name); err != nil {
+		return nil, err
+	}
 	prepares.Outcome = strings.TrimSpace(prepares.Outcome)
 	prepares.Justification = strings.TrimSpace(prepares.Justification)
 	prepares.Reasoning = strings.TrimSpace(prepares.Reasoning)

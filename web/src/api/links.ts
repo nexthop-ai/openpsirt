@@ -40,20 +40,34 @@ function encoded(query: Asked | undefined): string {
   return out.toString();
 }
 
+// Whether a value is a dot segment once it is a path segment.
+//
+// A browser resolves "." and ".." before the request is sent, percent-encoded
+// or not, so no escaping reaches the thing named and the address lands on the
+// one above it.
+export function dotSegment(value: string | number): boolean {
+  return value === "." || value === "..";
+}
+
 // The address one route answers at, each placeholder filled and escaped for a
 // path segment. A placeholder left without a value is refused rather than sent
-// as its own name.
+// as its own name. A value that is a dot segment yields the front page, as
+// the server's notification links do: anywhere else is a different page.
 export function linkTo<P extends keyof paths & string>(
   path: P,
   ...[given]: [Placeholders<P>] extends [never] ? [Filled<never>?] : [Filled<Placeholders<P>>]
 ): string {
   const values: Record<string, string | number> = given?.path ?? {};
+  let climbs = false;
   const filled = path.replace(/\{([^}]+)\}/g, (_, name: string) => {
     if (!Object.hasOwn(values, name)) {
       throw new Error(`${path} needs a value for {${name}}`);
     }
-    return encodeURIComponent(String(values[name]));
+    const value = values[name] as string | number;
+    if (dotSegment(value)) climbs = true;
+    return encodeURIComponent(String(value));
   });
+  if (climbs) return "/";
   const query = encoded(given?.query);
   return query ? filled + "?" + query : filled;
 }

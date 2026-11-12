@@ -242,6 +242,9 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	if typed == "" || address == "" {
 		return nil, refusal.Errorf("a supplier needs a name and an address")
 	}
+	if err := typedname.Addressable("a supplier's name", typed); err != nil {
+		return nil, err
+	}
 	if utf8.RuneCountInString(typed) > MostName {
 		return nil, refusal.Errorf("that name is longer than the %d characters this records",
 			MostName)

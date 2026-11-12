@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -1093,3 +1094,18 @@ func (h *beforeHoldingBack) BeforeQuery(ctx context.Context, e *bun.QueryEvent) 
 }
 
 func (h *beforeHoldingBack) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+func TestABatchNamedAsADotSegmentIsRefused(t *testing.T) {
+	// A batch is undone by its name in the path, which a browser resolves
+	// away when it is "." or "..".
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		recorded := f.decisionsMany(t, f.occurrences("under-a"))
+		for _, batch := range []string{".", ".."} {
+			if _, err := f.store.ApproveDecision(ctx, f.reviewer, recorded[0].DecisionID, batch,
+				nil, ""); !refusal.In(err) {
+				t.Errorf("a batch named %q answered %v, want a refusal", batch, err)
+			}
+		}
+	})
+}

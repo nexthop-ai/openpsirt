@@ -387,6 +387,12 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 			// second account for somebody already here.
 			return nil, err
 		default:
+			// A name nobody could open the page of, or remove from a
+			// team without the request reaching the team itself. Refused
+			// the way every unknown arrival is, saying nothing of why.
+			if typedname.DotSegment(who.handle()) {
+				return nil, ErrDenied
+			}
 			person = &Account{
 				Identity: who.handle(), DisplayName: who.DisplayName,
 				CreatedAt: s.now().Truncate(time.Microsecond),

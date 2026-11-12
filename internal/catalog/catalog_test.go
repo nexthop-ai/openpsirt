@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 
 	"github.com/uptrace/bun"
 )
@@ -243,6 +244,38 @@ func TestBadNamesAreRejected(t *testing.T) {
 		}
 	})
 }
+
+func TestANameABrowserResolvesAsADotSegmentIsRefusedAtEveryLevel(t *testing.T) {
+	// A browser resolves "." and ".." before sending, so a branch named ".."
+	// could never be opened and deleting it would ask to delete its product.
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, branchOrTag, variant := declared(t, ctx, s)
+		for _, name := range []string{".", ".."} {
+			for what, err := range map[string]error{
+				"product declared":       second(s.DeclareProduct(ctx, name, "")),
+				"branch or tag declared": second(s.DeclareBranchOrTag(ctx, product.ID, name, catalog.Branch, nil)),
+				"variant declared":       second(s.DeclareVariant(ctx, product.ID, name, true)),
+				"product renamed":        s.RenameProduct(ctx, product.ID, name),
+				"branch or tag renamed":  s.RenameBranchOrTag(ctx, product.ID, branchOrTag.ID, name),
+				"variant renamed":        s.RenameVariant(ctx, product.ID, variant.ID, name),
+			} {
+				if !refusal.In(err) || !strings.Contains(err.Error(), "path segment") {
+					t.Errorf("a %s as %q answered %v, want a refusal", what, name, err)
+				}
+			}
+		}
+		// Dots inside a name, or more of them, are an ordinary segment.
+		for _, name := range []string{"...", "release-2.4", ".hidden"} {
+			if _, err := s.DeclareBranchOrTag(ctx, product.ID, name, catalog.Branch, nil); err != nil {
+				t.Errorf("a branch named %q was refused: %v", name, err)
+			}
+		}
+	})
+}
+
+// second is the error of a call that also returns a value.
+func second[T any](_ T, err error) error { return err }
 
 func TestBranchOrTagKindIsChecked(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {

@@ -28,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Component is a package at a version, shared across every product that ships
@@ -350,7 +351,9 @@ func (d Described) Valid() error {
 	if strings.TrimSpace(d.Name) == "" {
 		return refusal.Errorf("component has no name")
 	}
-	return nil
+	// Every address about a component carries its name as a path segment, so
+	// one named "." or ".." could never be opened.
+	return typedname.Addressable("component name", d.Name)
 }
 
 // Components reads and writes the shared component catalog.

@@ -9,6 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // The words people put on findings.
@@ -307,6 +308,27 @@ func TestAPackageJoiningAFoldLaterCarriesItsLabel(t *testing.T) {
 		}
 		if len(rows[0].Labels) != 1 || rows[0].Labels[0] != "vendor" {
 			t.Errorf("the package that joined the fold is listed as marked %q", rows[0].Labels)
+		}
+	})
+}
+
+// A label is the last segment of the address that removes it, which a
+// browser resolves away when it is "." or "..".
+func TestALabelThatIsADotSegmentIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.someoneElse(t, access.PublicTriage)
+		issue := f.issueID(t, "CVE-2026-1")
+		component := f.componentID(t, libnl.Name)
+		for _, label := range []string{".", ".."} {
+			if err := f.store.LabelIt(t.Context(), who, f.productID, issue, component, label); !refusal.In(err) {
+				t.Errorf("a label %q answered %v, want a refusal", label, err)
+			}
 		}
 	})
 }

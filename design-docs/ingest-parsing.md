@@ -81,6 +81,7 @@ changed.
 | Half a format declaration | |
 | A file and a component sharing an identifier | It invents a dependency |
 | A component with no name | It cannot be tracked |
+| A component named `.` or `..` | No address reaches it (`design-docs/data-model.md` § Dot segments) |
 | Two components sharing an identifier | |
 | An unreadable build time | It orders scans |
 | Past any bound | |

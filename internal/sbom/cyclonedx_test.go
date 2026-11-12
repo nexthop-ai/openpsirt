@@ -369,6 +369,17 @@ func TestAComponentWithoutANameIsRefused(t *testing.T) {
 	}
 }
 
+func TestAComponentNamedAsADotSegmentIsRefused(t *testing.T) {
+	// Every address about a component carries its name as a path segment, and
+	// a browser resolves "." and ".." away before sending.
+	for _, name := range []string{".", ".."} {
+		why := refuses(t, strings.Replace(minimal, `"name": "libc", `, `"name": "`+name+`", `, 1))
+		if !strings.Contains(why, "path segment") {
+			t.Errorf("a component named %q was refused for another reason: %s", name, why)
+		}
+	}
+}
+
 func TestAComponentUnderNothingIsOrdinary(t *testing.T) {
 	// A producer emits the edges it can derive and records what it could not.
 	// Refusing the file would reject a legitimate scan.

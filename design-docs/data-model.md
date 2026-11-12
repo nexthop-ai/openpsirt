@@ -183,6 +183,24 @@ unscanned.
 | The producer's spelling names the one spelled that way | Links are built from the stored name, so a link reaches its component |
 | A clash in capitals alone, at one version, ecosystem and namespace, is reached only by its own spelling | The choices tell components apart by those three |
 
+### Dot segments
+
+A name that is a path segment of its own addresses is never `.` or `..`. A
+browser resolves either before sending, percent-encoded or not, so the thing
+could never be opened and a write about it reaches the address above: deleting
+a branch named `..` would delete its product.
+
+| Name | Treatment |
+|---|---|
+| A product, branch or tag, or variant, declared or renamed | Refused |
+| A key, token, saved filter, team, label, supplier, outbound destination or approval batch | Refused |
+| A person recorded by an administrator or by configuration | Refused |
+| A person a group mapping would record at sign-in | Refused as any unknown arrival is, saying nothing of why |
+| A component in an inventory | The inventory is refused (`design-docs/ingest-parsing.md` § Tolerated and refused) |
+| An issue name in scanner output | No name: the issue goes by its others, and one with none is refused |
+| A display name | Accepted; it is never a path segment |
+| More dots, or dots within a name | Accepted; a browser sends them as written |
+
 ## Engine differences
 
 Only column declarations differ; everything queried is portable.

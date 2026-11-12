@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, csrf, csrfCookie } from "./client";
 
 // The `__Host-` prefix is the only thing stopping a sibling host under the
@@ -97,5 +97,24 @@ describe("the application's client", () => {
       },
     } as never);
     expect(seen?.headers.get("X-CSRF-Token")).toBe("ours");
+  });
+});
+
+describe("a request naming a dot segment", () => {
+  it("is never sent, because the browser would send it to the route above", async () => {
+    // Deleting a branch named ".." would ask to delete its product.
+    const sent = vi.spyOn(globalThis, "fetch");
+    try {
+      for (const branch_or_tag of [".", ".."]) {
+        await expect(
+          api.DELETE("/v1/products/{product}/branches-and-tags/{branch_or_tag}", {
+            params: { path: { product: "sonic", branch_or_tag } },
+          }),
+        ).rejects.toThrow("{branch_or_tag}");
+      }
+      expect(sent).not.toHaveBeenCalled();
+    } finally {
+      sent.mockRestore();
+    }
   });
 });

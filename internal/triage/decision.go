@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Decision is one proposer's action: what an approver reads and agrees to.
@@ -626,6 +627,10 @@ func (s *Store) intoReturned(ctx context.Context, subject access.Subject, decisi
 func (s *Store) agree(ctx context.Context, subject access.Subject, decision Decision, ids []int64,
 	batch string, now time.Time) error {
 
+	// Undone by its name in the path, so a dot segment could never be undone.
+	if err := typedname.Addressable("a batch's name", batch); err != nil {
+		return err
+	}
 	if err := s.secondPerson(ctx, decision.ID, subject.ID); err != nil {
 		return err
 	}

@@ -70,6 +70,9 @@ func (s *Store) LabelIt(ctx context.Context, subject access.Subject, productID,
 	if folded == "" {
 		return refusal.Errorf("a label has to say something")
 	}
+	if err := typedname.Addressable("a label", typed); err != nil {
+		return err
+	}
 	held, err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID)
 	if err != nil {
 		return err

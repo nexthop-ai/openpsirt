@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // A destination's name is typed, so it is matched without regard to capitals
@@ -64,6 +65,28 @@ func TestADestinationNameIsMatchedWhateverItsCapitals(t *testing.T) {
 		}
 		if got := listed(); len(got) != 1 || got[0] != "ops-Pager" {
 			t.Errorf("taken up again and listed as %q, want the new spelling", got)
+		}
+	})
+}
+
+// A destination's name is a segment of the address that retires it, which a
+// browser resolves away when it is "." or "..".
+func TestADestinationNamedAsADotSegmentIsRefused(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		admin := asks(t, db, who)
+		for _, name := range []string{".", ".."} {
+			_, err := notify.NewStore(db.DB).AddDestination(ctx, admin, notify.Destination{
+				Name: name, Kind: notify.Everything, URL: "https://hooks.example/x",
+				Secret: "a-shared-secret-long-enough",
+			}, nil)
+			if !refusal.In(err) {
+				t.Errorf("a destination named %q answered %v, want a refusal", name, err)
+			}
 		}
 	})
 }

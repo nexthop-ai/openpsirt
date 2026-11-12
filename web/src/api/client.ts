@@ -1,7 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import createClient, { type Middleware } from "openapi-fetch";
+import createClient, { defaultPathSerializer, type Middleware } from "openapi-fetch";
+import { dotSegment } from "./links";
 import type { components, paths } from "./schema";
 
 // A response shape, by the name the OpenAPI document gives it.
@@ -23,7 +24,20 @@ export const api = createClient<paths>({
   // ever sees the token. Sending credentials is therefore the whole of
   // authentication here.
   credentials: "same-origin",
+  pathSerializer: inPath,
 });
+
+// A request's path, refused where a value is a dot segment. The browser would
+// send it to the route above: deleting a branch named ".." asks to delete its
+// product.
+function inPath(pathname: string, values: Record<string, unknown>): string {
+  for (const [name, value] of Object.entries(values ?? {})) {
+    if ((typeof value === "string" || typeof value === "number") && dotSegment(value)) {
+      throw new Error(`{${name}} is "${String(value)}", which no address can carry`);
+    }
+  }
+  return defaultPathSerializer(pathname, values);
+}
 
 // csrfCookie is the value a page has to echo on a write.
 //

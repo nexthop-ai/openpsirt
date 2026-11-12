@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
 )
 
@@ -389,6 +390,23 @@ func TestTwoNewFiltersAtOnceStopAtTheLimit(t *testing.T) {
 		}
 		if total != 2 {
 			t.Errorf("the person keeps %d filters against a limit of 2", total)
+		}
+	})
+}
+
+// Its name is the last segment of its own address, which a browser resolves
+// away when it is "." or "..".
+func TestASavedFilterNamedAsADotSegmentIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{".", ".."} {
+			if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID, name,
+				"component=linux", saved.Filter{}, 0); !refusal.In(err) {
+				t.Errorf("a filter named %q answered %v, want a refusal", name, err)
+			}
 		}
 	})
 }
