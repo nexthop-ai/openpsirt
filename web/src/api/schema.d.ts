@@ -16740,6 +16740,11 @@ export interface components {
              * @enum {string}
              */
             kind: "person";
+            /**
+             * Format: int64
+             * @description The number of weaknesses one recorded flaw states at most. A screen picking them stops at it
+             */
+            most_weaknesses?: number;
             /** @description The display name, where one is recorded */
             name: string;
             /** @description Every triage outcome, in the order the vocabulary lists them, with what each claims */

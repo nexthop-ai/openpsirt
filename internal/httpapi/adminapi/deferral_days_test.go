@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -68,6 +69,21 @@ func TestTheSessionPublishesTheLimitsInForce(t *testing.T) {
 		httpapitest.Read(t, r, "triager", "/v1/session/me", &me)
 		if want := (limits{DeferralDays: 10, BulkCap: 7}); me != want {
 			t.Errorf("with both set the session publishes %+v, want %+v", me, want)
+		}
+	})
+}
+
+// The weaknesses one flaw states are bounded where a screen picks them by the
+// bound the server refuses past.
+func TestTheSessionPublishesTheMostWeaknessesAFlawStates(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		var me struct {
+			MostWeaknesses int `json:"most_weaknesses"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/session/me", &me)
+		if me.MostWeaknesses != finding.MostWeaknesses {
+			t.Errorf("the session publishes %d weaknesses at most, want %d",
+				me.MostWeaknesses, finding.MostWeaknesses)
 		}
 	})
 }

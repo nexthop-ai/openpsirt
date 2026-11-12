@@ -15490,6 +15490,10 @@ components:
           enum:
             - person
           type: string
+        most_weaknesses:
+          description: The number of weaknesses one recorded flaw states at most. A screen picking them stops at it
+          format: int64
+          type: integer
         name:
           description: The display name, where one is recorded
           type: string

@@ -113,6 +113,10 @@ type WhoBody struct {
 	// screen recording one states the date it will get, and a fixed number
 	// there contradicts the setting the server dates it by.
 	DiscloseAfter string `json:"disclose_after,omitempty" doc:"The time an undisclosed flaw reported from outside has before its disclosure date, as a duration such as 2160h0m0s"`
+	// MostWeaknesses is how many weaknesses one recorded flaw states. A
+	// screen picking them stops there, rather than sending a record the
+	// server refuses whole.
+	MostWeaknesses int `json:"most_weaknesses,omitempty" doc:"The number of weaknesses one recorded flaw states at most. A screen picking them stops at it"`
 	// Outcomes is the same for everybody and is answered here because every
 	// screen that records or reads a decision needs it before it draws.
 	Outcomes []OutcomeBody `json:"outcomes" doc:"Every triage outcome, in the order the vocabulary lists them, with what each claims"`
@@ -141,7 +145,8 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		body := WhoBody{
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{}, Outcomes: outcomeBodies(),
-			ByProxy: access.FromBrowserWithoutSession(access.SessionFrom(ctx)),
+			ByProxy:        access.FromBrowserWithoutSession(access.SessionFrom(ctx)),
+			MostWeaknesses: finding.MostWeaknesses,
 		}
 		// Each of these fails the answer rather than being left out. Omitted, a
 		// limit reads to the interface as no limit at all.
