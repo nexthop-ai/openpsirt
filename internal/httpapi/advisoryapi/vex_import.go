@@ -186,9 +186,10 @@ func registerVexImport(api huma.API, in core.Deps) {
 		}
 		from.Publisher = publisher
 		// What a later upload replaces is a revision of the same document:
-		// the publisher and the document's own identifier. Matched exactly,
-		// because it is read out of the document every time.
-		from.Identifier = strings.TrimSpace(said.Identifier)
+		// the publisher and the document's own identifier. Held without
+		// characters that reorder or hide text, as the publisher is, and then
+		// matched exactly, because it is read out of the document every time.
+		from.Identifier = strings.TrimSpace(attach.Visible(said.Identifier))
 		if utf8.RuneCountInString(from.Identifier) > finding.MostDocumentName {
 			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"the document's identifier is longer than the %d characters this records",

@@ -435,6 +435,39 @@ func TestWhoPublishedItIsHeldWithoutCharactersThatReorderText(t *testing.T) {
 	})
 }
 
+func TestADocumentsIdentifierIsHeldWithoutCharactersThatReorderText(t *testing.T) {
+	// The identifier is what a revision is matched by. One differing from
+	// another only by a right-to-left override reads the same on every
+	// screen, and is the same document.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		named := func(id, issue string) string {
+			return `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"` + id + `",
+				"author":"acme","timestamp":"2026-09-01T00:00:00Z","version":1,
+				"statements":[{"vulnerability":{"name":"` + issue + `"},"status":"not_affected",
+				  "justification":"vulnerable_code_not_present",
+				  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}`
+		}
+		if got := r.VexedAs(t, "admin", "", "vex.json",
+			named("https://example.test/vex/1", "CVE-2026-9998")); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		got := r.VexedAs(t, "admin", "", "vex.json",
+			named("https://example.test/vex\u202e/1", "CVE-2026-9997"))
+		if got.Code != http.StatusCreated {
+			t.Fatalf("uploading the revision answered %d: %s", got.Code, got.Body.String())
+		}
+		var taken advisoryapi.StatementsTakenBody
+		if err := json.Unmarshal(got.Body.Bytes(), &taken); err != nil {
+			t.Fatal(err)
+		}
+		if taken.Superseded != 1 {
+			t.Errorf("a revision whose identifier differs by an override set aside %d statements, want 1",
+				taken.Superseded)
+		}
+	})
+}
+
 func TestADocumentCutOffPartwayIsRefusedAsMalformed(t *testing.T) {
 	// A document ending inside a string is the sender's to fix, and the
 	// parser's to report in words.
