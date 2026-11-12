@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useAfterHandBack } from "../api/intake";
+import { useAfterDecision } from "../api/decisions";
 import { useMemo, useState } from "react";
 import { Holder, type Held } from "../ui/Holder";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -857,6 +858,8 @@ function Upgrade({
 }) {
   const queries = useQueryClient();
   const handedOver = useAfterHandBack();
+  // A scheduled upgrade is a decision as well as a change of holder.
+  const decided = useAfterDecision();
   const landed = here.upgrades ?? [];
   const [to, setTo] = useState(landed[0]?.to ?? "");
   const [by, setBy] = useState("");
@@ -920,6 +923,7 @@ function Upgrade({
       setHolder(null);
       void queries.invalidateQueries({ queryKey: ["component"] });
       handedOver();
+      decided();
     },
   });
 
