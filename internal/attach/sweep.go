@@ -65,7 +65,7 @@ func (k *Keeper) Run(ctx context.Context, interval time.Duration) {
 		// Logged and carried on, like every other background pass here: a
 		// sweep that cannot run is not a reason to stop serving, and what it
 		// failed to collect is still there on the next one.
-		// A pass the stop ended is a stop, not a failure.
+		// A pass the stop ended logs nothing.
 		switch gone, err := k.store.Sweep(ctx, k.after); {
 		case err != nil && ctx.Err() == nil:
 			k.logger.ErrorContext(ctx, "removing uploads nothing refers to", "error", err)

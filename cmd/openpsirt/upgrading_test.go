@@ -356,8 +356,8 @@ func TestARequestThatOverrunsTheGraceAfterASignalFailsTheExit(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	// A request whose headers never end keeps its connection active, and the
-	// drain waits on it until the grace runs out.
+	// A connection whose request headers have not ended is waited on by the
+	// drain for its first five seconds, which the grace runs out well inside.
 	conn, err := net.Dial("tcp", s.addr)
 	if err != nil {
 		t.Fatal(err)
