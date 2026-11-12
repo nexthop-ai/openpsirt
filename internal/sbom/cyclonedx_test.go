@@ -397,6 +397,31 @@ func TestARootNamedAsADotSegmentIsFiledUnderTheBuildsName(t *testing.T) {
 	}
 }
 
+func TestASourcePackageNamedAsADotSegmentIsNoSource(t *testing.T) {
+	// A source package is addressed by its name as a path segment, which a
+	// browser resolves away when it is "." or "..".
+	for _, dots := range []string{".", ".."} {
+		doc := read(t, strings.Replace(minimal, `"purl": "pkg:deb/debian/libc6@2.41"`,
+			`"purl": "pkg:deb/debian/libc6@2.41?upstream=`+dots+`%402.41"`, 1))
+		for _, c := range doc.Components {
+			if c.UpstreamName != "" || c.UpstreamVersion != "" {
+				t.Errorf("a source named %q is kept as %q at %q", dots, c.UpstreamName, c.UpstreamVersion)
+			}
+		}
+		for _, d := range doc.Dependencies {
+			if d.Child.UpstreamName != "" {
+				t.Errorf("an edge carries the source %q", d.Child.UpstreamName)
+			}
+		}
+	}
+	// An ordinary source beside a root named "." is kept.
+	doc := read(t, strings.Replace(strings.Replace(minimal, `"name": "product"`, `"name": "."`, 1),
+		`"purl": "pkg:deb/debian/libc6@2.41"`, `"purl": "pkg:deb/debian/libc6@2.41?upstream=libc"`, 1))
+	if doc.Components[0].UpstreamName != "libc" {
+		t.Errorf("an ordinary source was lost: %q", doc.Components[0].UpstreamName)
+	}
+}
+
 func TestAComponentUnderNothingIsOrdinary(t *testing.T) {
 	// A producer emits the edges it can derive and records what it could not.
 	// Refusing the file would reject a legitimate scan.

@@ -444,6 +444,15 @@ func (c *reader) finish() (*Document, error) {
 	c.resolveUpstream()
 	c.spdx3Licensing()
 	rootIdentity := c.doc.Root.Identity()
+	// A source package is addressed by its name as a path segment too, so a
+	// source named "." or ".." is no source: from a package identifier, a
+	// pedigree, or a root of that name copied as an ancestor. Before the
+	// edges, which carry these descriptions.
+	for i := range c.described {
+		if typedname.DotSegment(c.described[i].UpstreamName) {
+			c.described[i].UpstreamName, c.described[i].UpstreamVersion = "", ""
+		}
+	}
 
 	c.doc.Components = make([]graph.Described, 0, len(c.described))
 	for _, described := range c.described {
