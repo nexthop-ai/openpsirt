@@ -6553,7 +6553,7 @@ export interface paths {
          *
          *     What a document adds over what the scanner already reports is the reasoning. The status is in the fix state already.
          *
-         *     Uploading again from the same publisher sets aside what they said before rather than deleting it, so what an approval was granted on the strength of stays readable. The publisher is the `publisher` parameter, else the one the document names: an OpenVEX author or a CSAF publisher name. A document naming none is refused unless the parameter names one.
+         *     Uploading a later revision of the same document sets aside what the earlier one said rather than deleting it, so what an approval was granted on the strength of stays readable. Another document from the same publisher sets aside nothing. A document is its publisher and its own identifier: an OpenVEX `@id` or a CSAF tracking id. The publisher is the `publisher` parameter, else the one the document names: an OpenVEX author or a CSAF publisher name. A document naming none is refused unless the parameter names one.
          *
          *     OpenVEX and CSAF-VEX both read. The two say the same thing in different shapes — one puts the status on a statement, the other in which list a product identifier appears in — and both become the same claim here, because what a publisher is saying does not depend on which file they wrote it in. Which of the two a document is decides itself; anything else is refused with a sentence rather than half-read.
          *
@@ -10628,7 +10628,7 @@ export interface components {
             document: string;
             /** @description The supplier whose feed fetched it. Absent where somebody uploaded it */
             fetched_by?: string;
-            /** @description The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of */
+            /** @description The name the publisher gave the document. Absent for a VEX document stating none */
             identifier?: string;
             /** @description The publisher its statements are recorded under, as it is matched: the one the upload named, else the one the document names. Empty where it was turned away before that was read */
             publisher: string;

@@ -43,7 +43,11 @@ type Statements struct {
 	// Publisher is who the document says issued it: an OpenVEX document's
 	// author, a CSAF document's publisher name. Empty where it names nobody.
 	Publisher string
-	Claims    []Suppression
+	// Identifier is the document's own name for itself, which its revisions
+	// keep: an OpenVEX document's @id, a CSAF document's tracking id. Empty
+	// where it states none.
+	Identifier string
+	Claims     []Suppression
 }
 
 // ReadStatements reads a VEX document as ReadSuppressions does, and keeps
@@ -71,21 +75,24 @@ func ReadStatements(r io.Reader, lim Limits) (Statements, error) {
 		if err != nil {
 			return Statements{}, refusal.Errorf("reading suppressions: %w", err)
 		}
-		return Statements{Publisher: strings.TrimSpace(v.csaf.publisher), Claims: claims}, nil
+		return Statements{Publisher: strings.TrimSpace(v.csaf.publisher),
+			Identifier: strings.TrimSpace(v.csaf.identifier), Claims: claims}, nil
 	}
 	if !strings.Contains(v.namespace, suppressionNamespace) {
 		return Statements{}, refusal.Errorf("suppressions are not in a format this reads: they say %q", trim(v.namespace))
 	}
-	return Statements{Publisher: strings.TrimSpace(v.author), Claims: v.claims}, nil
+	return Statements{Publisher: strings.TrimSpace(v.author),
+		Identifier: strings.TrimSpace(v.identifier), Claims: v.claims}, nil
 }
 
 type suppressions struct {
 	b         *docread.JSON
 	lim       Limits
 	namespace string
-	// author is who the document says issued it.
-	author string
-	claims []Suppression
+	// author is who the document says issued it, and identifier its @id.
+	author     string
+	identifier string
+	claims     []Suppression
 	// named counts every identifier this document makes the reader hold: a
 	// product a claim points at, and an identifier an issue also goes by.
 	// Charged as each is read.
@@ -121,6 +128,12 @@ func (v *suppressions) read() error {
 			}
 			v.namespace = value
 			return nil
+		case "@id":
+			// A string in the format. Any other shape reads as none, since a
+			// build's own claims do not depend on it.
+			value, err := v.b.StringOrSkip()
+			v.identifier = value
+			return err
 		case "author":
 			// A string in the format. Any other shape reads as no author,
 			// since a build's own claims do not depend on it.

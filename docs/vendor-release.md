@@ -60,9 +60,11 @@ A VEX document the vendor revises after the release is uploaded by an
 administrator, on its own. A statement naming the build's root is the build's
 claim whichever way it arrived, and the next scan applies it.
 
-A later document from the same publisher sets aside what the earlier one said,
-across the whole product. So each release and each variant is uploaded under a
-publisher name of its own, or one release's revision sets aside another's.
+A later revision of a document, from the same publisher with the same OpenVEX
+`@id`, sets aside what the earlier one said, across the whole product. Another
+document from that publisher stands beside it. A document with no `@id` is
+replaced by the publisher's next one with none, so give each release and each
+variant an `@id` of its own.
 
 A statement naming a root that two builds of the product share, such as two
 variants of one release, is evidence rather than either build's claim. Send

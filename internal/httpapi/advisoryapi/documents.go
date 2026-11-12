@@ -22,7 +22,7 @@ type DocumentUploadBody struct {
 	Status         core.UploadStatus `json:"status" doc:"Completed where its statements were recorded, refused where it was turned away"`
 	Reason         string            `json:"reason,omitempty" doc:"Why it was turned away, as the sender was told"`
 	Publisher      string            `json:"publisher" doc:"The publisher its statements are recorded under, as it is matched: the one the upload named, else the one the document names. Empty where it was turned away before that was read"`
-	Identifier     string            `json:"identifier,omitempty" doc:"The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of"`
+	Identifier     string            `json:"identifier,omitempty" doc:"The name the publisher gave the document. Absent for a VEX document stating none"`
 	Document       string            `json:"document" doc:"The file name it was uploaded as, or the address a supplier feed fetched it from"`
 	Digest         string            `json:"digest,omitempty" doc:"SHA-256 of what arrived. Absent where it was turned away before it was read whole"`
 	UploadedBy     string            `json:"uploaded_by,omitempty" doc:"Who uploaded it: a person by sign-in identity, or an API key by name. Absent where a feed fetched it"`

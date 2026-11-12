@@ -488,11 +488,15 @@ func TestADocumentPastTheByteLimitIsRefusedAsTooLarge(t *testing.T) {
 // file it arrived as. A revision under a new file name sets aside what the
 // publisher no longer says; another publisher's file of the same name sets
 // aside nothing of theirs; a document naming nobody is refused.
-func TestAVexDocumentIsSupersededByItsPublisherAndNeverByItsFileName(t *testing.T) {
+// A VEX document is replaced by a later revision of itself, its publisher and
+// its own identifier, and never by its file name or by another document from
+// the same publisher.
+func TestAVexDocumentIsSupersededByItsRevisionAndNeverByItsFileName(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
+		document := "https://example.test/vex/1"
 		by := func(author, issue string) string {
-			return `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
+			return `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"` + document + `",
 				"author":` + author + `,"timestamp":"2026-09-01T00:00:00Z","version":1,
 				"statements":[{"vulnerability":{"name":"` + issue + `"},"status":"not_affected",
 				  "justification":"vulnerable_code_not_present",
@@ -519,6 +523,13 @@ func TestAVexDocumentIsSupersededByItsPublisherAndNeverByItsFileName(t *testing.
 			t.Errorf("a revision under a new file name set aside %d statements, want 1",
 				revised.Superseded)
 		}
+		document = "https://example.test/vex/2"
+		another := taken(r.VexedAs(t, "admin", "", "debian-vex-2.json", by(`"Debian"`, "CVE-2026-9996")))
+		if another.Superseded != 0 {
+			t.Errorf("another document from the same publisher set aside %d statements, want none",
+				another.Superseded)
+		}
+		document = "https://example.test/vex/1"
 		other := taken(r.VexedAs(t, "admin", "", "debian-vex-2.json", by(`"Ubuntu"`, "CVE-2026-9997")))
 		if other.Publisher != "Ubuntu" || other.Superseded != 0 {
 			t.Errorf("another publisher's file of the same name answered %+v, want nothing set aside",
@@ -533,6 +544,25 @@ func TestAVexDocumentIsSupersededByItsPublisherAndNeverByItsFileName(t *testing.
 		}
 		if named := r.VexedAs(t, "admin", "Debian", "vex.json", by(`null`, "CVE-2026-9997")); named.Code != http.StatusCreated {
 			t.Errorf("a publisher the request names answered %d: %s", named.Code, named.Body.String())
+		}
+
+		// What an older release filed under a file name carries no
+		// identifier, and a document stating none and saying nothing,
+		// uploaded under that name, sets it aside.
+		unnamed := func(issue string) string {
+			statements := `[]`
+			if issue != "" {
+				statements = `[{"vulnerability":{"name":"` + issue + `"},"status":"not_affected",
+				  "justification":"vulnerable_code_not_present",
+				  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]`
+			}
+			return `{"@context":"https://openvex.dev/ns/v0.2.0","author":"Debian",
+				"timestamp":"2026-09-01T00:00:00Z","version":1,"statements":` + statements + `}`
+		}
+		taken(r.VexedAs(t, "admin", "old-vex.json", "old-vex.json", unnamed("CVE-2026-9995")))
+		if cleared := taken(r.VexedAs(t, "admin", "old-vex.json", "empty.json", unnamed(""))); cleared.Superseded != 1 {
+			t.Errorf("an empty document stating no identifier set aside %d statements, want 1",
+				cleared.Superseded)
 		}
 	})
 }

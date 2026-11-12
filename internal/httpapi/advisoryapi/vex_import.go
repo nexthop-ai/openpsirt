@@ -106,11 +106,13 @@ func registerVexImport(api huma.API, in core.Deps) {
 			"prefill.\n\n" +
 			"What a document adds over what the scanner already reports is the " +
 			"reasoning. The status is in the fix state already.\n\n" +
-			"Uploading again from the same publisher sets aside what they said before rather " +
-			"than deleting it, so what an approval was granted on the strength of stays " +
-			"readable. The publisher is the `publisher` parameter, else the one the document " +
-			"names: an OpenVEX author or a CSAF publisher name. A document naming none is " +
-			"refused unless the parameter names one.\n\n" +
+			"Uploading a later revision of the same document sets aside what the earlier one " +
+			"said rather than deleting it, so what an approval was granted on the strength of " +
+			"stays readable. Another document from the same publisher sets aside nothing. A " +
+			"document is its publisher and its own identifier: an OpenVEX `@id` or a CSAF " +
+			"tracking id. The publisher is the `publisher` parameter, else the one the " +
+			"document names: an OpenVEX author or a CSAF publisher name. A document naming none " +
+			"is refused unless the parameter names one.\n\n" +
 			"OpenVEX and CSAF-VEX both read. The two say the same thing in different " +
 			"shapes — one puts the status on a statement, the other in which list a product " +
 			"identifier appears in — and both become the same claim here, because what a " +
@@ -183,6 +185,17 @@ func registerVexImport(api huma.API, in core.Deps) {
 			publisher = strings.TrimSpace(attach.Visible(said.Publisher))
 		}
 		from.Publisher = publisher
+		// What a later upload replaces is a revision of the same document:
+		// the publisher and the document's own identifier. Matched exactly,
+		// because it is read out of the document every time.
+		from.Identifier = strings.TrimSpace(said.Identifier)
+		if utf8.RuneCountInString(from.Identifier) > finding.MostDocumentName {
+			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
+				"the document's identifier is longer than the %d characters this records",
+				finding.MostDocumentName))
+			turnedAway(ctx, in, by, product.ID, from, refused)
+			return nil, refused
+		}
 		if publisher == "" {
 			refused := huma.Error422UnprocessableEntity(
 				"the document names no publisher; name it with ?publisher=")

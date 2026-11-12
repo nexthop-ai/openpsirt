@@ -374,8 +374,9 @@ func TestAnAdvisoryWithNoNameOfItsOwnIsRefusedByTheStore(t *testing.T) {
 		}{
 			{"an advisory carrying no name", finding.Supplied{
 				Source: finding.FromAdvisory, Publisher: "Example"}},
-			{"a statement set carrying one", finding.Supplied{
-				Source: finding.FromVex, Identifier: "EXSA-2026:1", Publisher: "Example"}},
+			{"a VEX document's identifier longer than the column", finding.Supplied{
+				Source: finding.FromVex, Publisher: "Example",
+				Identifier: strings.Repeat("x", finding.MostDocumentName+1)}},
 			{"a document of no kind", finding.Supplied{Publisher: "Example"}},
 			{"a document naming nobody", finding.Supplied{Source: finding.FromVex}},
 			{"an advisory name longer than the column", finding.Supplied{

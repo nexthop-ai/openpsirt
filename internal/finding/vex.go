@@ -173,9 +173,10 @@ const (
 // being worked out beside them, so that no caller can record an advisory under
 // a statement set's key.
 type Supplied struct {
-	// Source is FromVex or FromAdvisory, and Identifier the name the publisher
-	// gave the document. An advisory carries one and a statement set does not:
-	// a publisher issues one statement set and hundreds of advisories.
+	// Source is FromVex, FromAdvisory or FromUpstream, and Identifier the name
+	// the publisher gave the document. An advisory carries one; a VEX
+	// document carries one where it states one, and one stating none is
+	// replaced by the publisher's next document stating none.
 	//
 	// The identifier is matched exactly rather than folded. It is an identity
 	// a provider hands over, read out of the document every time, so two
@@ -296,9 +297,9 @@ func (s Statement) PrefillsFor(version string) (outcome string, offers bool) {
 func (from Supplied) valid() error {
 	switch from.Source {
 	case FromVex:
-		if from.Identifier != "" {
-			return refusal.Errorf("a statement set is a publisher's whole answer and is " +
-				"replaced as one, so it is not identified by a document name")
+		if utf8.RuneCountInString(from.Identifier) > MostDocumentName {
+			return refusal.Errorf("the name the publisher gave it is longer than the %d "+
+				"characters this records", MostDocumentName)
 		}
 	case FromAdvisory, FromUpstream:
 		if strings.TrimSpace(from.Identifier) == "" {
@@ -397,7 +398,8 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			return nil
 		}
 		// What stands under this document's key, whatever bytes it arrived
-		// as. A claim the document repeats word for word keeps its row, brought
+		// as: its publisher and its own identifier, so a supplier's document
+		// is replaced only by a later revision of itself (REQ-31). A claim the document repeats word for word keeps its row, brought
 		// up to date with the document it now stands in and where it places
 		// its supplier's product. Only a claim the document no longer makes is
 		// set aside, because a superseded claim is what tells everyone holding
@@ -414,10 +416,8 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
+			Where(`"document_id" = ?`, identifier).
 			Where(`"superseded_at" IS NULL`)
-		if from.Source != FromVex {
-			heldBy = heldBy.Where(`"document_id" = ?`, identifier)
-		}
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
 		}
