@@ -104,6 +104,7 @@ findings, each where the reader may read it.
 | Rule | Reason |
 |---|---|
 | Only what stands with nobody agreeing has to be empty | |
+| An outcome is one that hides risk, of a vulnerability or a code finding, and the published vocabulary names both kinds | A code finding's dismissal is a dismissal |
 | A pair raises a condition only where its share of a product's agreements passes a threshold among at least a set number of people who may approve, both settings a product may override | `design-docs/notifications-alerts.md` § Concentrated approval pairs (REQ-49) |
 | A pair's share is of every decision a standing agreement covers, counted apart from the list | A list cut at its limit does not raise its pairs' shares |
 | Dated by proposal | |

@@ -149,10 +149,11 @@ func OutcomesInBulk() []Outcome {
 }
 
 // OutcomesThatHideRisk are the outcomes that take something out of the working
-// queue, which is what needing a second person turns on.
+// queue, which is what needing a second person turns on: of a vulnerability
+// and of a code finding alike.
 func OutcomesThatHideRisk() []Outcome {
-	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
-	for _, each := range VulnerabilityOutcomes() {
+	kept := make([]Outcome, 0, len(Outcomes()))
+	for _, each := range Outcomes() {
 		if each.HidesRisk() {
 			kept = append(kept, each)
 		}

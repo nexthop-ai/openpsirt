@@ -16221,7 +16221,7 @@ export interface components {
              */
             decisions: number;
             /** @enum {string} */
-            outcome: "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security";
             /**
              * Format: int64
              * @description The number of occurrences those acts cover

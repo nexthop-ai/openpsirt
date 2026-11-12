@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/triageapi"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // A deferral short enough to stand on nobody's say-so but the proposer's,
@@ -263,6 +265,44 @@ func TestAConfirmedCodeFindingIsNoExceptionToTheSecondPersonRule(t *testing.T) {
 		decideCodeFinding(t, r, occurrence, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
 		if got := scrutiny(t, r, "security-testing-reviewer", ""); len(got.Alone) != 0 {
 			t.Errorf("a confirmed code finding is reported as standing alone: %+v", got.Alone)
+		}
+	})
+}
+
+func TestACodeFindingDismissalStandingAloneIsReportedInAPublishedOutcome(t *testing.T) {
+	// A code finding's dismissal hides risk as a vulnerability's does, so it
+	// is what the report exists to surface when nobody else stands behind it,
+	// and it is reported in a word the published vocabulary holds.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		decided := decideCodeFinding(t, r, occurrence,
+			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
+		}
+		// The one agreement standing is its proposer's own, which nothing
+		// here records and an imported record can hold.
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"decision_approval"`).
+			Set(`"approved_by" = (SELECT "de"."proposed_by" FROM "decision_occurrence" AS "de"`+
+				` WHERE "de"."decision_id" = ? LIMIT 1)`, decided.DecisionID).
+			Where(`"decision_id" = ?`, decided.DecisionID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		out := scrutiny(t, r, "security-testing-reviewer", "")
+		var dismissed *triageapi.UnagreedBody
+		for i := range out.Alone {
+			if out.Alone[i].Outcome == "dismissed" {
+				dismissed = &out.Alone[i]
+			}
+		}
+		if dismissed == nil {
+			t.Fatalf("what stands alone is %+v; want the code finding's dismissal", out.Alone)
+		}
+		if !slices.Contains(triage.OutcomesThatHideRisk(), triage.Outcome(dismissed.Outcome)) {
+			t.Errorf("the report says %q, which the published outcomes that hide risk %v do not hold",
+				dismissed.Outcome, triage.OutcomesThatHideRisk())
 		}
 	})
 }
