@@ -3,7 +3,11 @@
 
 package main
 
-import "testing"
+import (
+	"go/parser"
+	"go/token"
+	"testing"
+)
 
 func TestAStoreMethodQueryingWithNoSubjectIsReported(t *testing.T) {
 	source := []byte(`package finding
@@ -145,6 +149,28 @@ func (c *chunks) Read(ctx context.Context) error {
 	}
 }
 
+func TestAnImportIsKnownByTheNamesItsPathSuggests(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "i.go", `package x
+
+import (
+	"strings"
+	"gopkg.in/yaml.v3"
+	"github.com/jackc/pgx/v5"
+	"github.com/example/go-difflib"
+	named "example.com/other"
+)
+`, parser.ImportsOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := importNames(file)
+	for _, want := range []string{"strings", "yaml", "pgx", "difflib", "named"} {
+		if !names[want] {
+			t.Errorf("an import is not known as %s: %v", want, names)
+		}
+	}
+}
+
 func TestASubjectIsNamedAsTheAccessPackageSpellsIt(t *testing.T) {
 	// Inside access the type is Subject; anywhere else a type of that name
 	// is some other package's own.
@@ -166,8 +192,9 @@ func (s *Store) Read(ctx context.Context, subject Subject, id int64) error {
 
 func TestEveryPackageOfTheTreeIsReadButProgramsAndFixtures(t *testing.T) {
 	// The packages are the tree's, never a list: a store added anywhere is
-	// read. A program and a package of test fixtures are reached by no
-	// request, and a package is named by its directory under internal/.
+	// read. A program and a package of test fixtures, known by importing the
+	// testing package and never by its name, are reached by no request, and a
+	// package is named by its directory under internal/.
 	store := func(pkg string) []byte {
 		return []byte("package " + pkg + `
 
@@ -177,26 +204,37 @@ func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
 `)
 	}
 	found, examined, err := inTree(map[string]map[string][]byte{
-		"internal/series":          {"internal/series/s.go": store("series")},
-		"internal/httpapi/core":    {"internal/httpapi/core/c.go": store("core")},
-		"internal/tools/gate":      {"internal/tools/gate/main.go": store("main")},
-		"internal/dbtest/fixture2": {"internal/dbtest/fixture2/f.go": store("fixturetest")},
+		"internal/series":       {"internal/series/s.go": store("series")},
+		"internal/httpapi/core": {"internal/httpapi/core/c.go": store("core")},
+		"internal/tools/gate":   {"internal/tools/gate/main.go": store("main")},
+		"internal/dbtest/fixture": {"internal/dbtest/fixture/f.go": []byte(`package fixture
+
+import "testing"
+
+func Seeded(t *testing.T) {}
+
+func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
+	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+`)},
+		"internal/attest": {"internal/attest/a.go": store("attest")},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 2 {
-		t.Errorf("%d store methods were examined, want the two in packages a request reaches", examined)
+	if examined != 3 {
+		t.Errorf("%d store methods were examined, want the three in packages a request reaches", examined)
 	}
 	reported := map[string]bool{}
 	for _, one := range found {
 		reported[one.name] = true
 	}
 	for name, want := range map[string]bool{
-		"series.Store.Unnarrowed":          true,
-		"httpapi/core.Store.Unnarrowed":    true,
-		"tools/gate.Store.Unnarrowed":      false,
-		"dbtest/fixture2.Store.Unnarrowed": false,
+		"series.Store.Unnarrowed":         true,
+		"httpapi/core.Store.Unnarrowed":   true,
+		"tools/gate.Store.Unnarrowed":     false,
+		"dbtest/fixture.Store.Unnarrowed": false,
+		"attest.Store.Unnarrowed":         true,
 	} {
 		if reported[name] != want {
 			t.Errorf("%s reported = %v, want %v (reported %v)", name, reported[name], want, reported)

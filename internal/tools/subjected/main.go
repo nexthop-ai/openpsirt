@@ -8,10 +8,11 @@
 // A method with no subject is exactly what a leak looks like from the outside:
 // a route handing it a row identifier reads whatever the identifier names,
 // whoever asked. Every package under internal/ is read as parsed Go, except a
-// program and a package of test fixtures. A type is a store where one of its
-// methods builds a query or calls a function of its package that does. Its exported methods, and the package's exported
-// functions, that query and take no access.Subject fail the gate unless named
-// in exempt.txt with the reason they take none.
+// program and a package of test fixtures, which imports the testing package.
+// A type is a store where one of its methods builds a query or calls a
+// function of its package that does. Its exported methods, and the package's
+// exported functions, that query and take no access.Subject fail the gate
+// unless named in exempt.txt with the reason they take none.
 //
 // A declaration queries when it builds a query or calls a function or method
 // of its own package that queries, followed to a fixed point. A call is
@@ -171,7 +172,7 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 		if err != nil {
 			return nil, 0, fmt.Errorf("%s: %w", path, err)
 		}
-		if name := file.Name.Name; name == "main" || strings.HasSuffix(name, "test") {
+		if file.Name.Name == "main" || importsTesting(file) {
 			return nil, 0, nil
 		}
 		imported := importNames(file)
@@ -301,9 +302,23 @@ func callsQuerying(body *ast.BlockStmt, querying map[string]bool) bool {
 	return found
 }
 
-// importNames is the names a file refers to its imported packages by: the
-// name given, or the last element of the path. A version suffix such as /v2
-// is not a name, so the element before it is taken.
+// importsTesting reports whether a file imports the testing package, which no
+// code a request reaches does: it is how a package of test fixtures is known.
+func importsTesting(file *ast.File) bool {
+	for _, spec := range file.Imports {
+		if strings.Trim(spec.Path.Value, `"`) == "testing" {
+			return true
+		}
+	}
+	return false
+}
+
+// importNames is the names a file may refer to its imported packages by: the
+// name given, or what the last element of the path suggests. A package's
+// declared name is not in its path, so the likely spellings are all taken: the
+// element as written, without a version suffix such as .v3 or /v2, and without
+// a go- prefix or the part before a last hyphen. A name too many costs nothing
+// but a call missed; a name too few makes another package's call this one's.
 func importNames(file *ast.File) map[string]bool {
 	names := map[string]bool{}
 	for _, spec := range file.Imports {
@@ -313,12 +328,25 @@ func importNames(file *ast.File) map[string]bool {
 		}
 		elements := strings.Split(strings.Trim(spec.Path.Value, `"`), "/")
 		last := elements[len(elements)-1]
-		if len(elements) > 1 && len(last) > 1 && last[0] == 'v' && strings.Trim(last[1:], "0123456789") == "" {
+		if len(elements) > 1 && isVersion(last) {
 			last = elements[len(elements)-2]
 		}
+		if dot := strings.LastIndex(last, "."); dot > 0 && isVersion(last[dot+1:]) {
+			last = last[:dot]
+		}
 		names[last] = true
+		names[strings.TrimPrefix(last, "go-")] = true
+		if dash := strings.LastIndex(last, "-"); dash >= 0 {
+			names[last[dash+1:]] = true
+		}
+		names[strings.ReplaceAll(last, "-", "")] = true
 	}
 	return names
+}
+
+// isVersion reports whether a path element is a major version such as v2.
+func isVersion(element string) bool {
+	return len(element) > 1 && element[0] == 'v' && strings.Trim(element[1:], "0123456789") == ""
 }
 
 // receiverOf is the name of the type a method is declared on.
