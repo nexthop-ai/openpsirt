@@ -595,7 +595,7 @@ func TestASaltKeysTheFingerprintAndRemovesTheToolsOwn(t *testing.T) {
 func TestAShortSaltIsRefused(t *testing.T) {
 	root := sources(t)
 	_, _, err := build(t.Context(), fakeGit(sourceFiles, "0123abcd"),
-		Options{Root: root, Work: root, Series: "clang-sa/default", Salt: []byte(strings.Repeat("s", MinSalt-1))},
+		Options{Root: root, Work: root, Series: "clang-sa/default", Salt: []byte(strings.Repeat("s", minSalt-1))},
 		[]Input{fixture(t, "clang18-a.plist")})
 	if err == nil || !strings.Contains(err.Error(), "31 bytes") {
 		t.Errorf("a salt of 31 bytes answered %v", err)
