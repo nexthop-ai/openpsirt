@@ -61,7 +61,8 @@ func advisoryRefused(in core.Deps, err error, what string) error {
 		errors.Is(err, advisory.ErrEditionMoved):
 		// The state the advisory is in refuses this, rather than the request
 		// being malformed. What a caller does about it is an act somewhere
-		// else — a second person agreeing, or the flaw being disclosed.
+		// else, a second person agreeing or the flaw being disclosed, or, for
+		// an edition moved, reading the advisory again.
 		return huma.Error409Conflict(err.Error())
 	case errors.Is(err, advisory.ErrNoSuchAdvisory):
 		return huma.Error404NotFound(advisory.ErrNoSuchAdvisory.Error())
@@ -187,7 +188,9 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be read")
 		}
-		where, err := store.Where(ctx, subject, input.Advisory)
+		// The edition the row read names, so the number shown is never
+		// newer than the title and covers shown beside it.
+		where, err := store.StandingOf(ctx, subject, row)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be read")
 		}

@@ -357,8 +357,8 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 // on publishing, either waits for the turn-off and matches nothing, or commits
 // first and has its document withdrawn by it. A fresh value, because MySQL and
 // MariaDB skip a write that changes nothing and a cluster certifies only rows
-// written. A setting narrowed since generation writes nothing either; the next
-// pass generates under the setting in force.
+// written. A statuses setting changed since generation writes nothing either;
+// the next pass generates under the setting in force.
 func stillPublishing(ctx context.Context, tx bun.IDB, productID int64, statuses string) (bool, error) {
 	result, err := tx.NewUpdate().Model((*catalog.Product)(nil)).
 		Set(`"taken_by" = ?`, rand.Text()).

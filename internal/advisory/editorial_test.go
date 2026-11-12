@@ -676,6 +676,32 @@ func TestTwoEditsAtOnceTakeTheNextTwoNumbers(t *testing.T) {
 	})
 }
 
+// The standing of an advisory already read names the edition that read
+// pointed at, so an edit committing after it leaves the number behind the
+// words shown, never ahead of them.
+func TestTheStandingOfAReadNamesTheEditionItRead(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		row, _, err := f.store.Covers(ctx, f.approver, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read := readEdition(t, f.store, f.approver, named)
+		if _, _, err := f.store.Retitle(ctx, f.who, named, "Retitled after it was read"); err != nil {
+			t.Fatal(err)
+		}
+		standing, err := f.store.StandingOf(ctx, f.approver, row)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if standing.Edition != read {
+			t.Errorf("the standing of a read names edition %d, want %d, the one read", standing.Edition, read)
+		}
+	})
+}
+
 // An agreement names the edition its giver read. A retitle landing between the
 // reading and the agreement leaves that edition behind, and the agreement is
 // refused rather than given to words the person never saw.

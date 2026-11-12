@@ -96,6 +96,27 @@ describe("one advisory", () => {
     ]);
   });
 
+  it("reads the advisory again when its edition moved, and agrees to the new one", async () => {
+    let edition = 3;
+    serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const posted = answer("POST", () => {
+      edition = 4;
+      return posted().length === 1 ? { status: 409 } : { data: {} };
+    });
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    expect(posted().map(bodyOf)).toEqual([{ edition: 3 }, { edition: 4 }]);
+  });
+
   it("takes off the flaw on the row pressed", async () => {
     serving({ title: "", covers: [covered], agreed: 1, status: "draft" });
     const removed = answer("DELETE", () => ({ data: {} }));

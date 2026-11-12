@@ -105,7 +105,12 @@ export function Advisory() {
       <Says advisory={advisory} title={it?.title ?? ""} covers={covers} />
       {covers.length > 0 && <Releases advisory={advisory} read={releases} />}
       <Document advisory={advisory} covers={covers.length} read={document} />
-      <Agreement advisory={advisory} edition={it?.edition ?? 0} agreed={agreed} by={it?.agreed_by ?? []} />
+      <Agreement
+        advisory={advisory}
+        edition={it?.edition ?? 0}
+        agreed={agreed}
+        by={it?.agreed_by ?? []}
+      />
       <Issued advisory={advisory} read={issuances} agreed={agreed} changed={it?.changed} />
     </>
   );

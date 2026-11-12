@@ -94,7 +94,7 @@ describe("an act on an advisory, once it lands", () => {
       mount.host,
       "POST",
       useAgree,
-      { advisory },
+      { advisory, edition: 1 },
       422,
     );
     expect(invalidated).toEqual([]);

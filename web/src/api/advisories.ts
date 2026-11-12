@@ -3,7 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
-import { unwrap } from "./queries";
+import { statusOf, unwrap } from "./queries";
 
 // An advisory as the screens read and change it: the list, the one, what it
 // covers, and what has gone out.
@@ -209,6 +209,11 @@ export function useAgree() {
         }),
       ),
     onSuccess: done,
+    // Refused for an edition moved, the screen reads the advisory again, so
+    // the next press names the edition it then shows.
+    onError: (error) => {
+      if (statusOf(error) === 409) done();
+    },
   });
 }
 

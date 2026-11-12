@@ -414,6 +414,16 @@ func (s *Store) Where(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
+	return s.StandingOf(ctx, subject, row)
+}
+
+// StandingOf is Where for an advisory already read, naming the edition that
+// read pointed at. A screen showing what it read names that edition, so an
+// edit committing after the read leaves the number behind the words, which an
+// agreement to it is refused for, never ahead of them.
+//
+// row is one byName answered, through Covers, which has already narrowed it.
+func (s *Store) StandingOf(ctx context.Context, subject access.Subject, row *Advisory) (*Standing, error) {
 	agreed, err := s.agreed(ctx, row)
 	if err != nil {
 		return nil, err
