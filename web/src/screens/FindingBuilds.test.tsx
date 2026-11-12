@@ -17,14 +17,17 @@ const releases = [
 ];
 
 // The issue as the server answers it: the rows on this page, and how many
-// there are in all.
+// there are in all. Asked about sonic alone, it answers sonic's rows; asked
+// about every product, it counts a thousand more rows elsewhere.
 function serving(held: { branch_or_tag: string; variant: string }[], total: number) {
-  serve((path) => {
+  serve((path, init) => {
     if (path === "/v1/products/{product}/releases") return { data: { items: releases } };
     if (path === "/v1/issues/{issue}") {
-      return {
-        data: { items: held.map((each) => ({ ...each, product: "sonic" })), total },
-      };
+      const asked = (init as { params: { query?: { product?: string } } }).params.query;
+      const items = held.map((each) => ({ ...each, product: "sonic" }));
+      return asked?.product === "sonic"
+        ? { data: { items, total } }
+        : { data: { items, total: total + 1000 } };
     }
     return undefined;
   });
@@ -45,6 +48,13 @@ describe("correcting which builds a flaw affects", () => {
     expect(mount.host().querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(() => button(mount.host(), "Set which builds it affects")).toThrow();
     expect(sent()).toHaveLength(0);
+  });
+
+  it("edits one product's builds however many rows other products hold", async () => {
+    serving([{ branch_or_tag: "master", variant: "broadcom" }], 1);
+    await opened();
+    expect(mount.host().textContent).not.toContain("more builds than this screen can set");
+    expect(mount.host().querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
   });
 
   it("sends the whole set it holds, with the build added", async () => {

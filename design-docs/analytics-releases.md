@@ -119,6 +119,7 @@ carrying it, what was decided about each and the argument.
 | Everything not checked at submission is escaped; a reasoning is written as typed | |
 | Bounded, saying when it is a page and, over a page, how many decision occurrences stand and how many are recorded | |
 | The issue screen's product count is taken before the limit, over what the reader may see | |
+| Where one issue sits can be asked of one product, which narrows the rows, the total and the product count to it; a product the reader may not see is refused as one that does not exist | The affected-builds editor needs one product's answer whole |
 
 ## Limits
 

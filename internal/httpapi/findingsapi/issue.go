@@ -89,12 +89,21 @@ func registerIssue(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
+		Product       string `query:"product" doc:"Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 		Limit         int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
 	}) (*IssueOutput, error) {
 		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
+		}
+		var productID int64
+		if input.Product != "" {
+			product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			productID = product.ID
 		}
 		out := &IssueOutput{}
 		out.Body.Vulnerability = input.Vulnerability
@@ -123,7 +132,7 @@ func registerIssue(api huma.API, in core.Deps) {
 			return out, nil
 		}
 		store := finding.NewStore(in.DB.DB)
-		rows, total, products, err := store.Everywhere(ctx, subject, id, input.Limit)
+		rows, total, products, err := store.Everywhere(ctx, subject, id, productID, input.Limit)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "where this issue sits could not be read", err)
 		}
