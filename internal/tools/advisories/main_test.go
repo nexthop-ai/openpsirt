@@ -246,3 +246,26 @@ func TestTheLockfileIsReadByPlace(t *testing.T) {
 		t.Errorf("read %v; the root entry is the project itself and not a package", held)
 	}
 }
+
+func TestAnNpmAdvisoryWithNoAddressIsNamedByItsNumber(t *testing.T) {
+	report := `{"auditReportVersion":2,"vulnerabilities":{"p":{"via":[
+	  {"source":101,"name":"p","title":"a","url":"","severity":"moderate"},
+	  {"source":202,"name":"p","title":"b","severity":"high"}],"nodes":["node_modules/p"]}}}`
+	found, err := npmFindings([]byte(report), map[string]string{"node_modules/p": "1.0.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The base held the first; the second is a different advisory.
+	introduced, _ := split(found[1:], npmAffectedBefore(found[:1]))
+	if got := ids(introduced); got != "npm-202@node_modules/p" {
+		t.Errorf("introduced %q; two advisories with no address read as one", got)
+	}
+}
+
+func TestAnNpmAdvisoryNamedByNothingIsRefused(t *testing.T) {
+	report := `{"auditReportVersion":2,"vulnerabilities":{"p":{"via":[
+	  {"name":"p","title":"a","severity":"high"}],"nodes":["node_modules/p"]}}}`
+	if _, err := npmFindings([]byte(report), nil); err == nil {
+		t.Error("an advisory with neither an address nor a number was read")
+	}
+}
