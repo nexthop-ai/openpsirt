@@ -220,8 +220,9 @@ const keyHeader = "Authorization"
 // cookie, which the browser attaches without anybody asking, so a
 // state-changing request needs the same forgery guard a session gets. There is
 // no session row to hold an echoed value, so this session carries none and
-// nothing can match it — a deployment on that path answers such requests only
-// when it is told which origins it serves.
+// nothing can match it. A state-changing request on that path is judged by
+// its Origin or Referer alone, against the configured base address or, with
+// none, the request's own Host (httpapi.sameOrigin).
 var viaBrowser = &Session{}
 
 // FromBrowserWithoutSession reports whether this is such an arrival.
