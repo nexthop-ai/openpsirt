@@ -105,8 +105,16 @@ func Build(ctx context.Context, opts Options, inputs []Input) ([]Run, Report, er
 	return build(ctx, runGit, opts, inputs)
 }
 
+// MinSalt is the fewest bytes a salt may hold. A run names its salt by an
+// unkeyed digest anybody reading the run sees, so a short salt is guessed
+// offline from that digest, and then every short line it keys.
+const MinSalt = 32
+
 func build(ctx context.Context, run git, opts Options, inputs []Input) ([]Run, Report, error) {
 	report := Report{Removed: map[string]int{}}
+	if opts.Salt != nil && len(opts.Salt) < MinSalt {
+		return nil, report, fmt.Errorf("the salt is %d bytes; it takes at least %d random bytes", len(opts.Salt), MinSalt)
+	}
 	if opts.Series == "" && len(opts.SeriesOf) == 0 {
 		return nil, report, errors.New("a run needs a series: the analysis it is, the same for every build")
 	}

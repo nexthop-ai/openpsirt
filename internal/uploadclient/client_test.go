@@ -575,7 +575,7 @@ func TestADateLessRunNamesItsSeriesInItsProperties(t *testing.T) {
 func TestASaltKeysTheFingerprintAndRemovesTheToolsOwn(t *testing.T) {
 	root := sources(t)
 	plain, _ := built(t, Options{Root: root, Work: root}, fixture(t, "clang18-a.plist"))
-	salted, _ := built(t, Options{Root: root, Work: root, Salt: []byte("pipeline secret")}, fixture(t, "clang18-a.plist"))
+	salted, _ := built(t, Options{Root: root, Work: root, Salt: []byte("a pipeline secret of 32 bytes!!!")}, fixture(t, "clang18-a.plist"))
 	p := child(resultAt(t, plain, "unix.Malloc", "a.c", 7), "partialFingerprints")
 	s := child(resultAt(t, salted, "unix.Malloc", "a.c", 7), "partialFingerprints")
 	if str(p, schemeContext) == "" || str(s, schemeContext) == "" || str(p, schemeContext) == str(s, schemeContext) {
@@ -584,8 +584,20 @@ func TestASaltKeysTheFingerprintAndRemovesTheToolsOwn(t *testing.T) {
 	if _, ok := s[schemeClang]; ok || len(s) != 1 {
 		t.Errorf("salted fingerprints %v; want the client's alone", s)
 	}
-	// The first eight bytes of SHA-256 over "pipeline secret".
-	if got := str(child(salted, "properties"), propSalt); got != "86ecf09cedb47c2b" {
+	// The first eight bytes of SHA-256 over the salt.
+	if got := str(child(salted, "properties"), propSalt); got != "cea122b221203b37" {
 		t.Errorf("salt named %q", got)
+	}
+}
+
+// A salt shorter than the floor is refused: its published digest is an
+// offline test of guesses at it.
+func TestAShortSaltIsRefused(t *testing.T) {
+	root := sources(t)
+	_, _, err := build(t.Context(), fakeGit(sourceFiles, "0123abcd"),
+		Options{Root: root, Work: root, Series: "clang-sa/default", Salt: []byte(strings.Repeat("s", MinSalt-1))},
+		[]Input{fixture(t, "clang18-a.plist")})
+	if err == nil || !strings.Contains(err.Error(), "31 bytes") {
+		t.Errorf("a salt of 31 bytes answered %v", err)
 	}
 }
