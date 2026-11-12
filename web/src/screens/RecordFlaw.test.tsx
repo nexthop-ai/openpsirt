@@ -6,6 +6,7 @@ import { belongTo } from "../app/drafts";
 import { RecordFlaw, unpicked } from "./RecordFlaw";
 import { change, pick, press, tick } from "../test/controls";
 import { accept, mounted, screen, serve, settle, type Sent } from "../test/mount";
+import { api } from "../api/client";
 
 const mount = mounted();
 
@@ -77,6 +78,55 @@ describe("recording a flaw", () => {
       summary: "The socket answers before anyone signs in.",
       found_here: true,
     });
+  });
+
+  it("forgets the description once the flaw is recorded, so the next one opens empty", async () => {
+    const sent = serving({ may_hide: true, triages_public: true });
+    await fillIn();
+    const drafts = () =>
+      Object.keys(window.localStorage).filter((key) => key.endsWith(":record:sonic"));
+    expect(drafts()).not.toEqual([]);
+    await press(mount.host(), "Record flaw, undisclosed");
+    await settle();
+    expect(sent()).not.toEqual([]);
+    expect(drafts()).toEqual([]);
+  });
+
+  it("forgets a version picked for a component once the builds change", async () => {
+    serving({ may_hide: true, triages_public: true });
+    const sent = vi.spyOn(api, "POST").mockImplementation((async (_path: string, init: unknown) => {
+      const body = (init as { body: { version?: string } }).body;
+      if (body.version === undefined && (init as { body: { component?: string } }).body.component) {
+        return {
+          error: {
+            detail: "more than one component is named openssl",
+            errors: [
+              { location: "component", message: "1.1.1" },
+              { location: "component", message: "3.0.2" },
+            ],
+          },
+          response: new Response(null, { status: 409 }),
+        };
+      }
+      return {
+        data: { identifier: "OPENPSIRT-2026-1" },
+        response: new Response(null, { status: 201 }),
+      };
+    }) as never);
+    await fillIn();
+    change(mount.host().querySelector<HTMLInputElement>("#rec-component"), "openssl");
+    await press(mount.host(), "Record flaw, undisclosed");
+    await settle();
+    await press(mount.host(), "1.1.1");
+    expect(mount.host().textContent).toContain("Recording against 1.1.1");
+    tick(mount.host(), "master");
+    tick(mount.host(), "master");
+    await settle();
+    expect(mount.host().textContent).not.toContain("Recording against");
+    await press(mount.host(), "Record flaw, undisclosed");
+    await settle();
+    const last = sent.mock.calls.at(-1) as unknown as Sent;
+    expect((last[1] as { body: Record<string, unknown> }).body).not.toHaveProperty("version");
   });
 
   it("records it public only once somebody picks public", async () => {
