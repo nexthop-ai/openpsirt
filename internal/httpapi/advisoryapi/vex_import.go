@@ -37,7 +37,7 @@ type statementParts struct {
 type StatementsTakenBody struct {
 	Publisher  string `json:"publisher" doc:"The publisher the statements were recorded under: the one the request names, else the one the document names"`
 	Recorded   int    `json:"recorded" doc:"Statements taken from it"`
-	Superseded int    `json:"superseded" doc:"This publisher's previous statements, set aside rather than deleted"`
+	Superseded int    `json:"superseded" doc:"Statements the earlier revision of this document made and this one does not, set aside rather than deleted"`
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 

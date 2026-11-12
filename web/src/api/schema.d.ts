@@ -15911,7 +15911,7 @@ export interface components {
             recorded: number;
             /**
              * Format: int64
-             * @description This publisher's previous statements, set aside rather than deleted
+             * @description Statements the earlier revision of this document made and this one does not, set aside rather than deleted
              */
             superseded: number;
         };

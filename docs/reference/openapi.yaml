@@ -14070,7 +14070,7 @@ components:
           format: int64
           type: integer
         superseded:
-          description: This publisher's previous statements, set aside rather than deleted
+          description: Statements the earlier revision of this document made and this one does not, set aside rather than deleted
           format: int64
           type: integer
       required:
