@@ -31,6 +31,20 @@ func (o *Other) Elsewhere(ctx context.Context) error {
 	return o.db.NewSelect().Scan(ctx)
 }
 
+func (w *Watcher) Pass(ctx context.Context) error {
+	return w.store.Unnarrowed(ctx, 1)
+}
+
+func Function(ctx context.Context, db bun.IDB, id int64) error {
+	return read(ctx, db, id)
+}
+
+func FunctionNarrowed(ctx context.Context, db bun.IDB, subject access.Subject, id int64) error {
+	return read(ctx, db, id)
+}
+
+func FunctionPure(a int) int { return twice(a) }
+
 func (s *Store) Through(ctx context.Context, id int64) error {
 	return s.helper(ctx, id)
 }
@@ -51,8 +65,9 @@ func twice(a int) int { return a * 2 }
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 6 {
-		t.Errorf("%d store methods were examined, want the six exported ones", examined)
+	if examined != 9 {
+		t.Errorf("%d store methods and functions were examined, want the seven exported store methods "+
+			"and the two exported functions that query", examined)
 	}
 	reported := map[string]bool{}
 	for _, one := range found {
@@ -64,12 +79,122 @@ func twice(a int) int { return a * 2 }
 		"finding.Vulnerabilities.Raw": true,
 		"finding.Store.Arithmetic":    false,
 		"finding.Store.unexported":    false,
-		"finding.Other.Elsewhere":     false,
+		"finding.Other.Elsewhere":     true,
+		"finding.Watcher.Pass":        false,
+		"finding.Function":            true,
+		"finding.FunctionNarrowed":    false,
+		"finding.FunctionPure":        false,
+		"finding.read":                false,
 		"finding.Store.Through":       true,
 		"finding.Store.Pure":          false,
 	} {
 		if reported[name] != want {
 			t.Errorf("%s reported = %v, want %v", name, reported[name], want)
+		}
+	}
+}
+
+func TestACallIntoAnotherPackageIsNotTakenForOneOfThisPackages(t *testing.T) {
+	// strings.Replace is not this package's Replace, whatever that does, and
+	// a method of an unexported type is reached through this package alone.
+	source := []byte(`package sourcelink
+
+import (
+	"strings"
+
+	text "example.com/typed/v2"
+)
+
+func (s *Store) Replace(ctx context.Context, id int64) error {
+	return s.db.NewUpdate().Where("id = ?", id).Scan(ctx)
+}
+
+func Normalize(remote string) string { return strings.Replace(remote, ":", "/", 1) }
+
+func Fold(typed string) string { return text.Replace(typed) }
+
+func Local(ctx context.Context, s *Store) error { return s.Replace(ctx, 1) }
+
+func (c *chunks) Read(ctx context.Context) error {
+	return c.db.NewSelect().Scan(ctx)
+}
+`)
+	found, _, err := inSource("sourcelink", "r.go", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reported := map[string]bool{}
+	for _, one := range found {
+		reported[one.name] = true
+	}
+	for name, want := range map[string]bool{
+		"sourcelink.Store.Replace": true,
+		"sourcelink.Local":         true,
+		"sourcelink.Normalize":     false,
+		"sourcelink.Fold":          false,
+		"sourcelink.chunks.Read":   false,
+	} {
+		if reported[name] != want {
+			t.Errorf("%s reported = %v, want %v", name, reported[name], want)
+		}
+	}
+}
+
+func TestASubjectIsNamedAsTheAccessPackageSpellsIt(t *testing.T) {
+	// Inside access the type is Subject; anywhere else a type of that name
+	// is some other package's own.
+	source := func(pkg string) []byte {
+		return []byte("package " + pkg + `
+
+func (s *Store) Read(ctx context.Context, subject Subject, id int64) error {
+	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+`)
+	}
+	if found, _, err := inSource("access", "a.go", source("access")); err != nil || len(found) != 0 {
+		t.Errorf("a method of access taking a Subject was reported: %v %v", found, err)
+	}
+	if found, _, err := inSource("elsewhere", "e.go", source("elsewhere")); err != nil || len(found) != 1 {
+		t.Errorf("a method taking another package's Subject was reported %v %v, want it reported", found, err)
+	}
+}
+
+func TestEveryPackageOfTheTreeIsReadButProgramsAndFixtures(t *testing.T) {
+	// The packages are the tree's, never a list: a store added anywhere is
+	// read. A program and a package of test fixtures are reached by no
+	// request, and a package is named by its directory under internal/.
+	store := func(pkg string) []byte {
+		return []byte("package " + pkg + `
+
+func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
+	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+`)
+	}
+	found, examined, err := inTree(map[string]map[string][]byte{
+		"internal/series":          {"internal/series/s.go": store("series")},
+		"internal/httpapi/core":    {"internal/httpapi/core/c.go": store("core")},
+		"internal/tools/gate":      {"internal/tools/gate/main.go": store("main")},
+		"internal/dbtest/fixture2": {"internal/dbtest/fixture2/f.go": store("fixturetest")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if examined != 2 {
+		t.Errorf("%d store methods were examined, want the two in packages a request reaches", examined)
+	}
+	reported := map[string]bool{}
+	for _, one := range found {
+		reported[one.name] = true
+	}
+	for name, want := range map[string]bool{
+		"series.Store.Unnarrowed":          true,
+		"httpapi/core.Store.Unnarrowed":    true,
+		"tools/gate.Store.Unnarrowed":      false,
+		"dbtest/fixture2.Store.Unnarrowed": false,
+	} {
+		if reported[name] != want {
+			t.Errorf("%s reported = %v, want %v (reported %v)", name, reported[name], want, reported)
 		}
 	}
 }

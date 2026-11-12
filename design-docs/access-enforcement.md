@@ -59,21 +59,27 @@ included.
 
 ## Store methods with no subject
 
-A store method takes no subject only for one of three reasons:
+A store method or function takes no subject only for one of these reasons:
 
-1. A background pass answering to nobody.
-2. A private helper reading rows a narrowed query already selected.
-3. A question whose answer does not vary by who asks, such as whether a finding is suppressed.
+| Reason | Example |
+|---|---|
+| A background pass answering to nobody | Applying a scan; the sweeps |
+| A helper over rows a narrowed read already selected or authorized | The labels on a finding its detail read |
+| A question whose answer does not vary by who asks | Whether a finding is suppressed; a setting |
+| Establishing who is asking, or what they hold, as sign-in or authorized administration | Sessions, keys, grants, teams |
+| A person's own record, keyed by them | Their saved views |
 
-The exported methods of the finding, triage and graph stores that query without
-a subject are named, with their reason, in a list `make subjected` holds them to
+Every package under `internal/` is read, but a program and a package of test
+fixtures. A store is a type one of whose methods builds a query. Its exported
+methods, and the package's exported functions, that query without a subject
+are named, with their reason, in a list `make subjected` holds them to
 (`design-docs/build.md` § Make targets). Querying through a helper of the same
 package counts as querying.
 
 | Read | Rule |
 |---|---|
 | What an assignment rule would catch; the words in use on a product | Take a subject, since both read findings product-wide |
-| A product's assignment rules, the response windows and the products each is limited to, an upload's receipt and kept documents | The store decides what the subject reaches: the rules for whoever triages the product, a window narrowed to products the reader may know exist, the builds a key may upload to. The sweeps applying rules and watching windows read as the deployment |
+| A product's assignment rules, the response windows and the products each is limited to, an upload's receipt, refusals and kept documents | The store decides what the subject reaches: the rules for whoever triages the product, a window narrowed to products the reader may know exist, the builds a key may upload to, an analyzer's refusals for whoever reads its receipts. The sweeps applying rules and watching windows read as the deployment |
 | The administration trail | Refuses a subject holding neither administration nor the audit permission, the deployment itself excepted. A refusal, since an empty page claims nobody changed anything |
 | Whether somebody may read; whether they may triage | One question each, asked in one place on the subject |
 | Whether any row of a group is undisclosed | The private rows counted and compared with zero |

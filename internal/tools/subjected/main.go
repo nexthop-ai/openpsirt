@@ -1,23 +1,24 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Command subjected reports a store method that queries the database with no
-// subject to narrow what it reads.
+// Command subjected reports a store read or write that queries the database
+// with no subject to narrow what it reaches.
 //
 // Visibility is enforced in the data layer, and every query carries a subject.
 // A method with no subject is exactly what a leak looks like from the outside:
 // a route handing it a row identifier reads whatever the identifier names,
-// whoever asked. The exported methods of the stores holding findings,
-// decisions, issues and inventories are read as parsed Go, and one that builds
-// a query and takes no access.Subject fails the gate unless it is named in
-// exempt.txt with the reason it takes none.
+// whoever asked. Every package under internal/ is read as parsed Go, except a
+// program and a package of test fixtures. A type is a store where one of its
+// methods builds a query. Its exported methods, and the package's exported
+// functions, that query and take no access.Subject fail the gate unless named
+// in exempt.txt with the reason they take none.
 //
-// A method queries when it builds a query or calls a function or method of its
-// own package that queries, followed to a fixed point. A call is matched by
-// name, so a method name shared by two receivers counts as either. What it
-// does not see is a query reached through another package, or a subject taken
-// and then not applied. It asks whether the subject arrives at all, which is
-// the half of the rule a gate can check.
+// A declaration queries when it builds a query or calls a function or method
+// of its own package that queries, followed to a fixed point. A call is
+// matched by name, so a method name shared by two receivers counts as either.
+// What it does not see is a query reached through another package, or a
+// subject taken and then not applied. It asks whether the subject arrives at
+// all, which is the half of the rule a gate can check.
 package main
 
 import (
@@ -29,16 +30,15 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
-// packages are the stores read: what they hold is what visibility is about.
-var packages = []string{"internal/finding", "internal/triage", "internal/graph"}
-
-// receivers are the types whose exported methods are store reads.
-var receivers = map[string]bool{"Store": true, "Vulnerabilities": true}
+// root is the tree read, and the prefix a name is given relative to.
+const root = "internal/"
 
 // building are the calls that start a query.
 var building = map[string]bool{
@@ -48,9 +48,10 @@ var building = map[string]bool{
 //go:embed exempt.txt
 var exemptList []byte
 
-// method is one exported store method that queries with no subject.
+// method is one exported store method or function that queries with no
+// subject.
 type method struct {
-	name string // as package.Type.Method
+	name string // as package.Type.Method, or package.Function
 	at   string
 }
 
@@ -60,19 +61,27 @@ func main() {
 		fmt.Fprintln(os.Stderr, "subjected:", err)
 		os.Exit(1)
 	}
-	var found []method
-	examined := 0
-	for _, dir := range packages {
-		some, seen, err := inPackage(dir)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "subjected:", err)
-			os.Exit(1)
+	packages := map[string]map[string][]byte{}
+	if _, err := walk.Sources(".go", func(file string, body []byte) error {
+		if strings.HasPrefix(file, root) && !strings.HasSuffix(file, "_test.go") {
+			dir := path.Dir(file)
+			if packages[dir] == nil {
+				packages[dir] = map[string][]byte{}
+			}
+			packages[dir][file] = body
 		}
-		found = append(found, some...)
-		examined += seen
+		return nil
+	}); err != nil {
+		fmt.Fprintln(os.Stderr, "subjected:", err)
+		os.Exit(1)
+	}
+	found, examined, err := inTree(packages)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "subjected:", err)
+		os.Exit(1)
 	}
 	if examined == 0 {
-		fmt.Fprintln(os.Stderr, "subjected: no store method was found, so this checked nothing")
+		fmt.Fprintln(os.Stderr, "subjected: no store method or function was found, so this checked nothing")
 		os.Exit(1)
 	}
 	failed := false
@@ -81,7 +90,7 @@ func main() {
 		named[one.name] = true
 		if _, ok := exempt[one.name]; !ok {
 			if !failed {
-				fmt.Fprintln(os.Stderr, "these store methods query with no subject to narrow by, "+
+				fmt.Fprintln(os.Stderr, "these store methods and functions query with no subject to narrow by, "+
 					"and are not named in internal/tools/subjected/exempt.txt:")
 			}
 			failed = true
@@ -103,34 +112,34 @@ func main() {
 	if failed {
 		os.Exit(1)
 	}
-	fmt.Printf("every store method that queries takes a subject or says why not "+
-		"(%d methods examined, %d exempt)\n", examined, len(exempt))
+	fmt.Printf("every store method and function that queries takes a subject or says why not "+
+		"(%d examined, %d exempt)\n", examined, len(exempt))
 }
 
-// inPackage is every exported store method in one directory that queries with
-// no subject, and how many store methods it examined.
-func inPackage(dir string) ([]method, int, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, 0, err
+// inTree is inSources over every package of the tree, keyed by directory and
+// then by path, and how many store methods and functions it examined. A
+// program and a package of test fixtures are not read: neither is reached by
+// a request.
+func inTree(packages map[string]map[string][]byte) ([]method, int, error) {
+	dirs := make([]string, 0, len(packages))
+	for dir := range packages {
+		dirs = append(dirs, dir)
 	}
-	sources := map[string][]byte{}
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		path := filepath.Join(dir, name)
-		source, err := os.ReadFile(path) //nolint:gosec // G304: this repository's own source
+	sort.Strings(dirs)
+	var found []method
+	examined := 0
+	for _, dir := range dirs {
+		some, seen, err := inSources(strings.TrimPrefix(dir, root), packages[dir])
 		if err != nil {
 			return nil, 0, err
 		}
-		sources[path] = source
+		found = append(found, some...)
+		examined += seen
 	}
-	return inSources(filepath.Base(dir), sources)
+	return found, examined, nil
 }
 
-// inSource is inPackage for one file.
+// inSource is inSources for one file.
 func inSource(pkg, path string, source []byte) ([]method, int, error) {
 	return inSources(pkg, map[string][]byte{path: source})
 }
@@ -140,9 +149,15 @@ func inSource(pkg, path string, source []byte) ([]method, int, error) {
 type declared struct {
 	fn   *ast.FuncDecl
 	path string
+	// imported is the names its file imports packages under, so a call
+	// into another package is never taken for one of this package's own.
+	imported map[string]bool
 }
 
-// inSources is inPackage over the files of one package, keyed by path.
+// inSources is every exported store method and function of one package that
+// queries with no subject, and how many it examined. The package is named by
+// its directory under internal/, its files keyed by path. A program and a
+// package of test fixtures answer nothing.
 func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 	fset := token.NewFileSet()
 	paths := make([]string, 0, len(sources))
@@ -156,31 +171,50 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 		if err != nil {
 			return nil, 0, fmt.Errorf("%s: %w", path, err)
 		}
+		if name := file.Name.Name; name == "main" || strings.HasSuffix(name, "test") {
+			return nil, 0, nil
+		}
+		imported := importNames(file)
 		for _, decl := range file.Decls {
 			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
-				all = append(all, declared{fn: fn, path: path})
+				all = append(all, declared{fn: fn, path: path, imported: imported})
 			}
 		}
 	}
 	querying := queryingNames(all)
+	// A store is a type one of whose methods builds a query itself.
+	stores := map[string]bool{}
+	for _, one := range all {
+		if one.fn.Recv != nil && builds(one.fn.Body) {
+			stores[receiverOf(one.fn)] = true
+		}
+	}
 
 	var found []method
 	examined := 0
 	for _, one := range all {
 		fn := one.fn
-		if fn.Recv == nil || !fn.Name.IsExported() {
+		if !fn.Name.IsExported() {
 			continue
 		}
-		receiver := receiverOf(fn)
-		if !receivers[receiver] {
+		name := pkg + "." + fn.Name.Name
+		if fn.Recv != nil {
+			// A method of an unexported type is reached through this
+			// package alone, which is what is read here.
+			receiver := receiverOf(fn)
+			if !stores[receiver] || !ast.IsExported(receiver) {
+				continue
+			}
+			name = pkg + "." + receiver + "." + fn.Name.Name
+		} else if !querying[nameOf(fn)] {
 			continue
 		}
 		examined++
-		if takesSubject(fn) || !querying[nameOf(fn)] {
+		if takesSubject(pkg, fn) || !querying[nameOf(fn)] {
 			continue
 		}
 		found = append(found, method{
-			name: pkg + "." + receiver + "." + fn.Name.Name,
+			name: name,
 			at:   fmt.Sprintf("%s:%d", one.path, fset.Position(fn.Pos()).Line),
 		})
 	}
@@ -206,7 +240,7 @@ func queryingNames(all []declared) map[string]bool {
 		if builds(one.fn.Body) {
 			querying[name] = true
 		}
-		calls[name] = append(calls[name], calledBy(one.fn.Body)...)
+		calls[name] = append(calls[name], calledBy(one.fn.Body, one.imported)...)
 	}
 	for changed := true; changed; {
 		changed = false
@@ -226,7 +260,9 @@ func queryingNames(all []declared) map[string]bool {
 }
 
 // calledBy is every name a body calls, in the form nameOf gives a declaration.
-func calledBy(body *ast.BlockStmt) []string {
+// A call through an imported package's name is another package's, and left
+// out.
+func calledBy(body *ast.BlockStmt, imported map[string]bool) []string {
 	var called []string
 	ast.Inspect(body, func(node ast.Node) bool {
 		call, ok := node.(*ast.CallExpr)
@@ -237,11 +273,34 @@ func calledBy(body *ast.BlockStmt) []string {
 		case *ast.Ident:
 			called = append(called, fun.Name)
 		case *ast.SelectorExpr:
+			if pkg, ok := fun.X.(*ast.Ident); ok && imported[pkg.Name] {
+				return true
+			}
 			called = append(called, "."+fun.Sel.Name)
 		}
 		return true
 	})
 	return called
+}
+
+// importNames is the names a file refers to its imported packages by: the
+// name given, or the last element of the path. A version suffix such as /v2
+// is not a name, so the element before it is taken.
+func importNames(file *ast.File) map[string]bool {
+	names := map[string]bool{}
+	for _, spec := range file.Imports {
+		if spec.Name != nil {
+			names[spec.Name.Name] = true
+			continue
+		}
+		elements := strings.Split(strings.Trim(spec.Path.Value, `"`), "/")
+		last := elements[len(elements)-1]
+		if len(elements) > 1 && len(last) > 1 && last[0] == 'v' && strings.Trim(last[1:], "0123456789") == "" {
+			last = elements[len(elements)-2]
+		}
+		names[last] = true
+	}
+	return names
 }
 
 // receiverOf is the name of the type a method is declared on.
@@ -257,11 +316,17 @@ func receiverOf(fn *ast.FuncDecl) string {
 	return ""
 }
 
-// takesSubject reports whether a method takes an access.Subject.
-func takesSubject(fn *ast.FuncDecl) bool {
+// takesSubject reports whether a declaration takes an access.Subject, spelled
+// Subject inside the access package itself.
+func takesSubject(pkg string, fn *ast.FuncDecl) bool {
 	for _, param := range fn.Type.Params.List {
-		if selector, ok := param.Type.(*ast.SelectorExpr); ok && selector.Sel.Name == "Subject" {
-			if pkg, ok := selector.X.(*ast.Ident); ok && pkg.Name == "access" {
+		switch t := param.Type.(type) {
+		case *ast.SelectorExpr:
+			if pkg, ok := t.X.(*ast.Ident); ok && pkg.Name == "access" && t.Sel.Name == "Subject" {
+				return true
+			}
+		case *ast.Ident:
+			if pkg == "access" && t.Name == "Subject" {
 				return true
 			}
 		}

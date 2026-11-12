@@ -1,44 +1,329 @@
-# Store methods that query with no subject, each with the reason it takes none.
-# One per line: package.Type.Method, a space, and the reason. design-docs/access
-# § Store methods with no subject holds the three kinds of reason there are.
+# Store methods and functions that query with no subject, each with the reason it
+# takes none. One per line: package.Type.Method or package.Function, the package
+# named by its directory under internal/, a space, and the reason.
+# design-docs/access-enforcement.md § Store methods with no subject holds the
+# kinds of reason there are.
 
+access.Store.AddToCase Who is asking: it brings a person into one case. Its route requires reading undisclosed work in the product.
+access.Store.AddToCodeFinding Who is asking: it grants a person one code finding. Its route authorizes the caller as a security testing reader of the product and resolves the finding first.
+access.Store.AddToTeam Who is asking: it puts a person on a team. Its routes require administration.
+access.Store.AdmitByGroups Who is asking: it signs somebody in against the groups a provider reports, before any subject exists.
+access.Store.AllTokens Who is asking: everybody's tokens. Its route requires administration.
+access.Store.AnyMemberReads Who is asking: whether one member of a team may read findings of these visibilities in a product, asked by an assignment write or sweep.
+access.Store.ApplyMappings A background pass: startup makes the mappings in force what configuration states.
+access.Store.BoundProviders A background pass: startup checks which providers have bound identifiers against the one configured.
+access.Store.ByIdentity Not varying by reader: resolving a sign-in identity to a person. Every route decides whether the caller may act before it answers about them.
+access.Store.CanAdminister A background pass: startup checks that somebody could administer the deployment.
+access.Store.CaseRows Who is asking: who brought each person into one case, and when. Its route refuses a caller who does not read undisclosed work in the product.
+access.Store.CasesOf Who is asking: the cases a person is on, read while their subject is built.
+access.Store.Claim Who is asking: it authorizes a username to sign in before the person arrives.
+access.Store.CodeFindingRows Who is asking: the standing grants on one code finding. Its route authorizes the caller as a security testing reader of the product and resolves the finding first.
+access.Store.CodeFindingsOf Who is asking: the code findings a person is granted, read while their subject is built.
+access.Store.CountTeams Not varying by reader: how many teams a term matches, beside the listing.
+access.Store.Deactivate Who is asking: it records that a person has left. Its route requires administration.
+access.Store.DeclareTeam Who is asking: it declares a team. Its route requires administration.
+access.Store.EndSession A person's own record: it ends the signed-in session the request arrived on.
+access.Store.EndSessionsFor Who is asking: it signs a person out everywhere. Its routes require administration.
+access.Store.Ensure Who is asking: it records a person granted access, from startup or administration.
+access.Store.EstateGrants Who is asking: what one person holds across every product. Its routes require reading the deployment's records.
+access.Store.EveryEstateGrant Who is asking: what everybody holds across every product. Its route requires reading the deployment's records.
+access.Store.EveryIdentity Who is asking: how every person signs in. Its route requires reading the deployment's records.
+access.Store.GrantEstateRole Who is asking: it grants a role across every product. Its route requires administration.
+access.Store.GrantRole Who is asking: it grants a role on a product. Its route requires administration.
+access.Store.Grants Who is asking: what one person holds. Its routes require reading the deployment's records.
+access.Store.HoldsAnythingIn Who is asking: whether a person still holds a role on a product, asked inside the write that withdrew one.
+access.Store.Identities Who is asking: the ways one person signs in. Its route requires reading the deployment's records.
+access.Store.Keys Who is asking: the pipeline keys, without their secrets. Its routes require administration.
+access.Store.Mappings Who is asking: the group-to-role mappings in force. Its route requires reading the deployment's records.
+access.Store.MapsProduct Who is asking: whether a group mapping names a product. The product rename route asks it after authorizing administration.
+access.Store.MatchProvider Who is asking: it finds who a sign-in provider describes, before any subject exists.
+access.Store.MatchProxy Who is asking: it finds who a trusted proxy asserts, before any subject exists.
+access.Store.MembersOf Who is asking: who is on a team. Membership routes work, and is read by the team listing, a measurement narrowed to a team, and the watches deciding who hears of work.
+access.Store.NameBootstrapAdmins A background pass: startup grants administration to the identities configuration names.
+access.Store.NewKey Who is asking: it mints a pipeline key. Its route requires administration.
+access.Store.NewToken A person's own record: it mints a token for the signed-in person.
+access.Store.OnCase Who is asking: who is on one case. Its route refuses a caller who does not read undisclosed work in the product.
+access.Store.People Who is asking: everybody and what they hold. Its routes require reading the deployment's records or administration.
+access.Store.PeopleReaching A background pass: the watches work out from grants who may hear of a change.
+access.Store.PersonReads Who is asking: whether one person may read a finding of a visibility in a product, asked by an assignment write the caller was authorized for.
+access.Store.PurgeExpiredSessions A background pass: the watch clears sessions that have run out.
+access.Store.Reactivate Who is asking: it records that a person is back. Its route requires administration.
+access.Store.RemoveFromCase Who is asking: it withdraws a person's grant on one case. Its route requires reading undisclosed work in the product.
+access.Store.RemoveFromCodeFinding Who is asking: it withdraws a person's grant on one code finding. Its route, or the disclosure write, authorizes the code finding first.
+access.Store.RemoveFromTeam Who is asking: it takes a person off a team. Its route requires administration.
+access.Store.Resolve Who is asking: it turns an identity into the subject it stands for.
+access.Store.ResolveKey Who is asking: it turns a presented pipeline key into its subject, before any subject exists.
+access.Store.ResolveSession Who is asking: it turns a session token into its subject, before any subject exists.
+access.Store.ResolveToken Who is asking: it turns a presented personal token into its subject, before any subject exists.
+access.Store.Restate Who is asking: it records a person and answers what was stored before. Its route requires administration.
+access.Store.RetireTeam Who is asking: it takes a team out of use. Its route requires administration.
+access.Store.Revoke Who is asking: it revokes a pipeline key. Its route requires administration.
+access.Store.RevokeToken Who is asking: it withdraws a token, the signed-in person's own or one an administrator names.
+access.Store.SetDigest A person's own record: it records what the signed-in person asked to be sent.
+access.Store.SetDisplayName Who is asking: it records the label shown for a person. Its route requires administration.
+access.Store.SetEmail Who is asking: it records where to reach a person, from their own sign-in or from administration.
+access.Store.StartSession Who is asking: it records a session for a person sign-in already admitted.
+access.Store.SwitchTo A background pass: startup changes where roles come from for the whole deployment.
+access.Store.TeamByName Not varying by reader: resolving a team name to its team. A team holds work and grants nothing, and is not product data.
+access.Store.Teams Not varying by reader: the teams in use, by name. A team holds work and grants nothing, and is listed whole.
+access.Store.TeamsByID Not varying by reader: the names of teams a row already points at.
+access.Store.TeamsOf Who is asking: the teams a person is on, read while their subject is built or to name the holders of their work.
+access.Store.TokenByName Who is asking: it finds a token by name, the signed-in person's own or one an administrator names.
+access.Store.Tokens A person's own record: the signed-in person's own tokens.
+access.Store.UnbindIdentifier Who is asking: it clears the provider identifier pinned to a person. Its route requires administration.
+access.Store.WhoHolds Not varying by reader: the names of the people and teams holding rows the caller already read under its own authorization.
+access.Store.Withdraw Who is asking: it withdraws a role on a product. Its route requires administration.
+access.Store.WithdrawEstateRole Who is asking: it withdraws a role held across every product. Its route requires administration.
+advisory.AnyIssuedForBranchOrTag Not varying by reader: whether any advisory names a release. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+advisory.AnyIssuedForProduct Not varying by reader: whether any advisory names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+analysis.CodeFindingName A helper over a narrowed read: it names a flaw record the collaborator grant already read for the caller with a subject, inside the same transaction.
+attach.Attached A helper over a narrowed read: it marks the uploads that text refers to as attached, after the caller stored that text under its own authorization.
+attach.Store.Sweep A background pass: the attachment sweep removes uploads no stored text ever referred to.
+catalog.Store.BranchOrTagByName Not varying by reader: resolving a release name inside a product the route resolved for the caller.
+catalog.Store.BranchesAndTagsByID Not varying by reader: the names of releases a pipeline key already points at. Its route requires administration.
+catalog.Store.BranchesAndTagsEndingBy Not varying by reader: which releases will be out of support by a date, read by the catalog beside its own narrowed answer.
+catalog.Store.BranchesAndTagsPastEndOfLife Not varying by reader: which releases are out of support by a date, a fact of the catalog every narrowed read and sweep excludes alike.
+catalog.Store.BuildFor Not varying by reader: the build for a release and variant, recorded on first use after the upload route authorized the sender.
+catalog.Store.BuildMoves A background pass: applying a scan reads whether the build's release can change.
+catalog.Store.DeclareBranchOrTag Who is asking: it declares a release, reached through the administration route that ensures one.
+catalog.Store.DeclareProduct Who is asking: it declares a product, reached through the administration route that ensures one.
+catalog.Store.DeclareVariant Who is asking: it declares a variant, reached through the administration route that ensures one.
+catalog.Store.Describe Not varying by reader: the names a build is known by, for a build the caller was authorized for or a pass already reading it.
+catalog.Store.EndOfLifeForBuild A background pass: applying a scan reads the end of life in force for the build.
+catalog.Store.EnsureBranchOrTag Who is asking: it declares a release or confirms one. Its route requires administration.
+catalog.Store.EnsureProduct Who is asking: it declares a product or confirms one. Its route requires administration.
+catalog.Store.EnsureVariant Who is asking: it declares a variant or confirms one. Its route requires administration.
+catalog.Store.EveryProduct Not varying by reader: every product, retired ones included, to name the products grants already point at. Its route requires reading the deployment's records.
+catalog.Store.ExistingBuild Not varying by reader: the build for a release and variant already resolved. Its routes decide whether the caller may reach the product before answering.
+catalog.Store.FillInParent Who is asking: it records which branch a tag was cut from. Its routes require administration.
+catalog.Store.Locate Not varying by reader: resolving the names an upload or read states. Its routes decide whether the caller may reach the product before answering.
+catalog.Store.MinimumSeverities Not varying by reader: each product's own minimum severity, keyed by product for rows the caller already read.
+catalog.Store.MinimumSeverityOf Not varying by reader: one product's minimum severity, read for a product the caller was authorized for.
+catalog.Store.ProductByID Not varying by reader: the name of a product a row the caller already read points at.
+catalog.Store.ProductByName Not varying by reader: resolving a product name to its product. Every route asks whether the caller reaches it and answers an unreachable one as undeclared.
+catalog.Store.ProductOf Not varying by reader: which product a build belongs to, asked so the caller's reach can be checked against it.
+catalog.Store.Publishes Not varying by reader: which products an administrator chose to publish, keyed by product for rows the caller already read.
+catalog.Store.Publishing Not varying by reader: which products publish their documents, the deployment's configuration that builds the subject published documents are read as.
+catalog.Store.RenameBranchOrTag Who is asking: it corrects a release's name. Its route requires administration.
+catalog.Store.RenameProduct Who is asking: it corrects a product's name. Its route requires administration.
+catalog.Store.RenameVariant Who is asking: it corrects a variant's name. Its route requires administration.
+catalog.Store.Resolve Not varying by reader: resolving the names a scan states to its build, recording the build on first use.
+catalog.Store.SetBranchOrTagEndOfLife Who is asking: it records when a release goes out of support. Its route requires administration.
+catalog.Store.SetMinimumSeverity Who is asking: it records a product's minimum severity. Its route requires administration.
+catalog.Store.SetPairThresholds Who is asking: it records a product's own pair thresholds. Its route requires administration.
+catalog.Store.SetProductDisplayName Who is asking: it corrects the name a product shows. Its route requires administration.
+catalog.Store.SetProductEndOfLife Who is asking: it records when a product goes out of support. Its route requires administration.
+catalog.Store.SetPublishes Who is asking: it records whether a product publishes its documents. Its route requires administration.
+catalog.Store.SetReleasedOn Who is asking: it records when a release went out. Its route requires administration.
+catalog.Store.SetVariantCustomerFacing Who is asking: it records whether a variant ships to customers. Its route requires administration.
+catalog.Store.TagBranchesAndTags A background pass: the deadline sweep reads which releases cannot change.
+catalog.Store.VariantByName Not varying by reader: resolving a variant name inside a product the route resolved for the caller.
+catalog.Store.VariantsByID Not varying by reader: the names of variants a pipeline key already points at. Its route requires administration.
+currency.Refresher.Once A background pass: one cycle of the currency refresher.
+currency.Refresher.Run A background pass: the currency refresher asks package indexes about components on a schedule.
+currency.RootOwners Not varying by reader: the names the deployment's own roots are published under. The unanswered list classifies against them and answers only the names its reader may see.
+database.AnalyzeEveryTable A background pass: startup and the migrations refresh the engine's table statistics.
+database.InBatches Not varying by reader: an engine helper inserting rows its caller already chose.
+database.InBatchesKeeping Not varying by reader: an engine helper inserting rows its caller already chose, keeping any already there.
+database.InBatchesUnkeyed Not varying by reader: an engine helper inserting rows its caller already chose, reading no identifiers back.
+database.NamesByID Not varying by reader: an engine helper reading one name column for identifiers its caller already holds.
+database.Retire Not varying by reader: an engine helper marking one row retired that its caller already chose and authorized.
+finding.Acknowledgements A helper over a narrowed read: the first message on each report, for reports the caller already read with a subject.
+finding.AffectedInBuild A helper over a narrowed read: it reads only at the visibilities its caller passes, which the public VEX document works out for its reader.
+finding.AnyUndisclosed Not varying by reader: whether any occurrence of an issue in a product is undisclosed, which sets an advisory's distribution label. The advisory authorized the product first.
+finding.Arrived A background pass: it queues an assignment sweep for a product when scans, analyzer runs or recorded findings place new work.
+finding.CodeFindingEnded Not varying by reader: whether every release a code finding was seen in is past its end of life. Its callers read the code finding with a subject first.
+finding.CodeFindingFlaw.Unlink A helper over a narrowed read: undoing a flaw record deletes the record the caller read and authorized inside its own transaction.
+finding.CodeFindingFlawAt A helper over a narrowed read: the flaw record at an occurrence, read inside the analysis transactions after their own authorization. Routes use CodeFindingFlawFor and CodeFindingFlawManaged, which take a subject.
+finding.CoveredInBuild A helper over a narrowed read: it reads only at the visibilities its caller passes, which the VEX documents work out for their reader.
+finding.Describing A background pass: an analyzer run marks the flaw records it describes before writing their source.
+finding.FoldsNamed A helper over a narrowed read: it resolves a component name to its folds within builds the caller already resolved with a subject.
+finding.HandBack Who is asking: it hands back work when a sign-in or a change of role mode takes reading away from its holder.
+finding.InTheFold Not varying by reader: the components one component folds together with, a fact of the graph. Read inside reads and writes that authorized the build.
+finding.Incident A helper over a narrowed read: whether an issue stands as an incident in a product, asked inside writes and queue reads that authorized the product.
+finding.IncidentChanged A helper over a narrowed read: it records an incident starting or ending inside the caller's authorized write.
+finding.IssuesOf Not varying by reader: which issue each identifier is read as after merges. The triage writes ask it of issues they already authorized.
+finding.LastScanned A background pass: when a scan last reached an inventory, asked by the redating pass and by the scanner checking a replaced inventory.
+finding.MergesInto Not varying by reader: the merges into one issue. The issue route asks it only once the reader sees the issue somewhere, and withholds it where the record is out of reach.
+finding.MinimumSeverityFor Not varying by reader: the minimum severity a product states, or the deployment's.
+finding.OneFoldNamed A helper over a narrowed read: the writing form of FoldsNamed, over builds the assignment and occurrence writes resolved with a subject.
+finding.RatingIn A helper over a narrowed read: what one product rates one issue, for the finding detail after it authorized the finding.
+finding.RatingsIn A helper over a narrowed read: what products rate issues, for rows the caller already read with a subject.
+finding.ReachedByName A helper over a narrowed read: which builds reach a component name, over builds its callers already resolved for a subject or a queued scope.
+finding.RecordClaimsWithin A background pass: ingest records what a build claims about its own patches, in the transaction that applies its graph.
+finding.RecordedElsewhere Not varying by reader: whether another product recorded an issue, asked when a product publishes about it, since a published document is read by everybody.
+finding.RecordedVector A helper over a narrowed read: the advisory reads the vector a product recorded for an issue after authorizing the product.
+finding.Redate A background pass: the issue date pass and a merge redate what checks matched once an issue's publication date is known.
+finding.Reranked A background pass: a scan re-ranks the findings of issues whose exploitation signal moved, inside its own transaction.
+finding.RevisionCounts A helper over a narrowed read: how often each report was edited, for reports the caller already read with a subject.
+finding.SetCodeFindingVisibility A helper over a narrowed read: disclosing a flaw moves the code findings it covers to public, inside the disclosure's own transaction.
+finding.StatedBy A helper over a narrowed read: the published statements for occurrences the VEX and advisory documents already selected at their reader's visibilities.
+finding.StatedPurls A helper over a narrowed read: the package identifiers stated for components whose findings the caller already selected at the visibilities it may read.
 finding.Store.Apply A background pass: it records what a scanner run found, for the deployment.
-finding.Store.CheckReplaced A background pass: it records what a replaced inventory held that no scan saw.
-finding.Store.Undated A background pass: it files the issues a check reports so their dates can be asked.
-finding.Store.Begin A background pass: it records that a scanner run started.
-finding.Store.Finish A background pass: it records how a scanner run ended.
-finding.Store.LastRecordsVersion A background pass: the scanner asks which CVE record snapshot a build last read.
-finding.Store.Recompute A background pass: it rewrites deadlines and urgency when the policy moves.
-finding.Store.ComponentName Not varying by reader: what one component is called, for an answer about a row the caller already wrote or was authorized for.
-finding.Store.LabelsOn A helper over a narrowed read: the finding detail reads it after authorizing the finding.
-finding.Store.RulingsOf A helper over a narrowed read: the reports were read under their own authorization, and this reads their rulings.
-finding.Store.Unacknowledged A background pass: the stale watch reads every unanswered report and decides who hears of each.
 finding.Store.ApplyRules A background pass: the assignment sweep places a product's open findings by its rules.
-finding.Store.HandBackUnread A background pass: it hands back, inside a write that took reading away, the work that write left with a holder who no longer reads it.
+finding.Store.Begin A background pass: it records that a scanner run started.
 finding.Store.Builds Not varying by reader: which builds a scope names. The scope's product was resolved for the caller first.
 finding.Store.BuildsForWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
+finding.Store.CheckReplaced A background pass: it records what a replaced inventory held that no scan saw.
+finding.Store.ComponentName Not varying by reader: what one component is called, for an answer about a row the caller already wrote or was authorized for.
+finding.Store.Finish A background pass: it records how a scanner run ended.
+finding.Store.HandBackUnread A background pass: it hands back, inside a write that took reading away, the work that write left with a holder who no longer reads it.
+finding.Store.LabelsOn A helper over a narrowed read: the finding detail reads it after authorizing the finding.
+finding.Store.LastRecordsVersion A background pass: the scanner asks which CVE record snapshot a build last read.
+finding.Store.Recompute A background pass: it rewrites deadlines and urgency when the policy moves.
 finding.Store.RetiredWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
-finding.Vulnerabilities.Intern A background pass: it files the issues a scan or an authorized recording names.
-finding.Vulnerabilities.Rule A background pass: it files the rules an analyzer run names.
+finding.Store.RulingsOf A helper over a narrowed read: the reports were read under their own authorization, and this reads their rulings.
+finding.Store.Unacknowledged A background pass: the stale watch reads every unanswered report and decides who hears of each.
+finding.Store.Undated A background pass: it files the issues a check reports so their dates can be asked.
+finding.StripDisclosedCodeFindings A background pass: an analyzer run strips the source it kept beside code findings whose flaw is disclosed.
+finding.Sweeper.CatchUp A background pass: the daily catch-up queues a sweep for every product with assignment rules.
+finding.Sweeper.CatchUpOnce A background pass: one run of the daily catch-up.
+finding.Sweeper.Once A background pass: it claims one queued sweep and places a batch of it.
+finding.Sweeper.Run A background pass: the assignment sweeper claims queued sweeps until none is waiting.
 finding.Vulnerabilities.ByName Not varying by reader: resolving a name to an issue. Every route asks who may be told of it before answering.
-finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
-finding.Vulnerabilities.Ratings Not varying by reader: the ratings held for an issue. Read beside a finding the caller was authorized for.
 finding.Vulnerabilities.DatesOf Not varying by reader: when an issue was published, as OSV states. Read beside the issue after the caller was told of it.
-triage.Store.NoteVisibility Not varying by reader: how disclosed a note is, which the caller then asks of its own reader.
-triage.Store.DeferredSoFar A helper over a narrowed read: the second-person rule asks it of a place the write already authorized.
-triage.Store.NeedsApproval A helper over a narrowed read: the second-person rule asks it of a proposal the write already authorized.
-triage.Store.Applying Not varying by reader: whether a decision stands at a place. Its route resolves the place for the caller first.
-triage.Store.Undecided A helper over a narrowed read: it keeps the places a caller already resolved that nothing stands at.
-triage.Store.Lapse A background pass: it lapses decisions whose versions moved.
-triage.Store.LapseRatedWorse A background pass: it lapses claims whose issue was rated worse.
-triage.Store.PeopleNamed Not varying by reader: who an identifier is, for a record already read under its own authorization.
-triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
-triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
-graph.Store.CurrentComponents A background pass: the scanner is fed a build's components from here.
+finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
+finding.Vulnerabilities.Intern A background pass: it files the issues a scan or an authorized recording names.
+finding.Vulnerabilities.Ratings Not varying by reader: the ratings held for an issue. Read beside a finding the caller was authorized for.
+finding.Vulnerabilities.Rule A background pass: it files the rules an analyzer run names.
+graph.ApplyWithin A background pass: ingest applies an inventory's graph to a build.
+graph.ComponentAsIn Not varying by reader: resolving a component name inside a build its callers already resolved for the subject, within their own transaction.
+graph.Components.Intern A background pass: ingest files the components a graph names, shared by every product that ships them.
+graph.IsRoot Not varying by reader: whether a component is a build's root, for a scope its caller already resolved.
+graph.Reaching Not varying by reader: every component at or beneath each start in a build, for the grouped list after it read the groups with a subject.
+graph.Replaced Not varying by reader: which components of a build replaced others by name, for a build its caller already resolved.
+graph.ReplacedWithin Not varying by reader: the replaced components beneath a start in a build its caller already resolved.
+graph.RootAmong Not varying by reader: whether a walk starts from a build's root, for a build its caller already resolved.
+graph.RootsOf Not varying by reader: the roots of builds its callers already resolved for the subject.
+graph.StatedImages A helper over a narrowed read: the image versions a build states, for claims about a build the caller already authorized.
+graph.StatedVersions A helper over a narrowed read: the versions builds state for images, for the across-builds read after it narrowed the builds with a subject.
+graph.Store.ComponentAs Not varying by reader: resolving a component name inside a build the route resolved for the caller first.
 graph.Store.ComponentsAt A background pass: the scanner reads what a build held at a scan, to check a replaced inventory.
-graph.Store.Stated A background pass: applying a scan matches the build's claims against what the build states for its components.
+graph.Store.ComponentsOf Not varying by reader: resolving a package identifier to its components inside a build the route resolved for the caller first.
+graph.Store.CurrentComponents A background pass: the scanner is fed a build's components from here.
 graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail reads it after authorizing the finding.
 graph.Store.Moved A background pass: the inventory watch reads what one scan changed before deciding who hears of it.
 graph.Store.Movements A helper over a narrowed read: the trend works out the uploads behind returns it read with the reader's subject, and the inventory watch reaches it through Moved.
-graph.Store.ComponentAs Not varying by reader: resolving a component name inside a build the route resolved for the caller first.
-graph.Store.ComponentsOf Not varying by reader: resolving a package identifier to its components inside a build the route resolved for the caller first.
+graph.Store.Stated A background pass: applying a scan matches the build's claims against what the build states for its components.
+graph.Within Not varying by reader: a walk of one build's graph, built as a subquery its caller narrows.
+graph.WithinAnd Not varying by reader: a walk of one build's graph with named components beside it, built as a subquery the finding reads narrow with a subject.
+graph.WithinAny Not varying by reader: a walk of one build's graph, built as a subquery that the finding reads narrow with a subject.
+ingest.Documents.Discard A background pass: the ingest reader lets a scan's contents go once it has read them.
+ingest.Documents.Held A helper over a narrowed read: the kept document route reads it after the store authorized the scan for the caller.
+ingest.Documents.List A background pass: the ingest reader lists the documents of the scan it claimed.
+ingest.Documents.Remove A helper over a narrowed read: an upload sent again replaces the documents stored against its scan, inside the upload route's own transaction.
+ingest.Documents.Sent A helper over a narrowed read: what each upload arrived with, for uploads the receipts list and the register already read with a subject.
+ingest.Documents.Write A helper over a narrowed read: the upload route stores a scan's documents on a build it authorized the key for, inside its own transaction.
+ingest.Reader.Once A background pass: the ingest reader claims one scan and reads it.
+ingest.Reader.Run A background pass: the ingest reader drains the queue of uploaded scans.
+ingest.Store.ByID A background pass: the ingest reader reads back the scan it claimed from the queue.
+ingest.Store.Decide A helper over a narrowed read: whether to accept an arriving upload, for a build the upload route authorized the key for.
+ingest.Store.Made A background pass: the ingest reader records what it made of a scan, in the transaction that applies it.
+ingest.Store.MarkFailed A background pass: the ingest reader records that a scan could not be read.
+ingest.Store.Newest A helper over a narrowed read: the newest upload to a build, for the register after it read the build's findings with a subject.
+ingest.Store.Record A helper over a narrowed read: the upload route records a scan on a build it authorized the key for, inside its own transaction.
+ingest.Store.Replaced A background pass: the scanner reads one replaced inventory before checking it.
+issuedate.Pass.Once A background pass: one slice of the issue date pass.
+issuedate.Pass.Run A background pass: the issue date pass asks when issues were published, on a schedule.
+notify.AnalysisDrops A background pass: the analyzer worker tells who needs to hear when a run stops detecting much of a build at once.
+notify.Assemble A background pass: the digest post assembles one person's digest, narrowing every read by that person's own subject.
+notify.Lapses A background pass: the scanner and the analyzer tell the people whose decisions lapsed.
+notify.Movements A background pass: the ingest reader tells who needs to hear what an upload changed.
+notify.Post.Digests A background pass: the mail sweep sends each person's digest, assembled with that person's own subject.
+notify.Post.Once A background pass: one cycle of the mail sweep.
+notify.Post.Run A background pass: the mail sweep sends notifications and digests on a schedule.
+notify.Signal.Once A background pass: one cycle of the outbound signal sweep.
+notify.Signal.Run A background pass: the outbound signal sweep delivers webhooks on a schedule.
+notify.Store.Reconcile A background pass: the watch reconciles a person's standing conditions against what is being said.
+notify.Store.ReconcileTelling A background pass: the watch reconciles a person's standing conditions and tells them of one that ended.
+notify.Store.Tell A helper over a narrowed read: it records a notification for an act its route already authorized, addressed to the people the route names.
+notify.Superseded A background pass: the scanner tells who needs to hear that a report was superseded.
+notify.Talk.Once A background pass: one cycle of the chat sweep.
+notify.Talk.Run A background pass: the chat sweep sends notifications to chat platforms on a schedule.
+notify.TellCodeFindingTriagers A helper over a narrowed read: it tells the product's security testing triagers of an act on a code finding the route already authorized.
+notify.TellReport A helper over a narrowed read: it tells whoever watches a report of an act on it the route already authorized.
+notify.ToldAbout A background pass: the digest asks which of a person's held items that person was already told about.
+notify.Watch.DataInForce Not varying by reader: what the scans run against and when it last moved, for a screen only an administrator reaches.
+notify.Watch.Once A background pass: the watch derives every condition for the people it reaches and reconciles each.
+notify.Watch.Run A background pass: the watch derives standing conditions on a schedule.
+patchbranch.Labels Not varying by reader: what is known of commits named by links on findings the caller already read with a subject.
+patchbranch.Pass.Once A background pass: one visit of the patch branch pass.
+patchbranch.Pass.Run A background pass: the patch branch pass looks up the commits patch links name, on a schedule.
+patchbranch.Progress Not varying by reader: how far the patch branch lookups have got, for a screen only an administrator reaches.
+publish.AnyPublishedForBranchOrTag Not varying by reader: whether any served document names a release. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+publish.AnyPublishedForProduct Not varying by reader: whether any served document names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+publish.AnyPublishedForVariant Not varying by reader: whether any served document names a variant. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+publish.FoldsLike Not varying by reader: which other product publishes at the same paths, asked by catalog changes only an administrator makes.
+publish.Store.WithdrawProduct Who is asking: an administrator turning publishing off for a product withdraws its documents, on a route only an administrator reaches.
+queue.Leases.Await A background pass: a replica waits its turn to rewrite deadlines after a policy change.
+queue.Leases.Handback A background pass: a replica hands back a lease as a pass ends.
+queue.Leases.Release A background pass: a replica hands back a lease it holds.
+queue.Leases.Take A background pass: a replica takes a lease so one of them carries a pass.
+queue.Leases.TakeLapsed A background pass: a replica takes a lease left to lapse, so its expiry records when the work is next due.
+queue.Queue.Add A background pass: it queues a job for the workers.
+queue.Queue.AddTx Not varying by reader: it queues a job for the workers inside the transaction that made its work, which its caller already authorized.
+queue.Queue.Bury A background pass: the undertaker fails jobs whose worker died.
+queue.Queue.Claim A background pass: a worker claims a job.
+queue.Queue.Depth Not varying by reader: how many jobs of a kind wait, which bounds uploads and shows on a screen only an administrator reaches.
+queue.Queue.Fail A background pass: a worker records a job failed.
+queue.Queue.Holding A background pass: a worker keeps its hold on a job while the work runs.
+queue.Queue.Postpone A background pass: a worker puts a job back to wait.
+queue.Queue.Renew A background pass: a worker renews its hold on a job.
+queue.Queue.Settle A background pass: a worker records how a job ended.
+queue.Queue.Succeed A background pass: a worker records a job done.
+saved.Store.ForgetFilter A person's own record: it removes a filter the signed-in person saved, keyed by their id.
+saved.Store.SaveFilterPreparing A person's own record: it saves a filter for the signed-in person, keyed by their id.
+saved.Store.SavedFilters A person's own record: the filters the signed-in person saved, keyed by their id.
+scanner.Schedule.Once A background pass: one cycle of the re-scan schedule.
+scanner.Schedule.Run A background pass: the schedule queues re-scans on a timer.
+series.Store.ByID A helper over a narrowed read: one analyzer run, read by the worker applying it and by the evidence read after it authorized the code finding.
+series.Store.Discard A background pass: the analyzer worker lets a run's documents go once the run ends.
+series.Store.Documents A background pass: the analyzer worker reads the documents of the run it claimed.
+series.Store.LastPrinted A background pass: the analyzer worker compares a run's fingerprints with the last run that reported anything.
+series.Store.LastPrintedOn A background pass: the analyzer worker compares a run's fingerprints with the last run on another build.
+series.Store.Mark A background pass: the analyzer worker records how a run was applied.
+series.Store.Missed A background pass: the analyzer worker records the first comparable run that missed a finding.
+series.Store.ModulesOf A helper over a narrowed read: the repositories a run checked out, for the evidence read after it authorized the code finding.
+series.Store.Previous A background pass: the analyzer worker reads the run before the one it applies.
+series.Store.Receive A helper over a narrowed read: the analyzer upload route records a run on a build it authorized the key for.
+series.Store.Refused Not varying by reader: it notes why an analyzer upload was turned away, for a build the upload route resolved for the key.
+series.Store.Saw A background pass: the analyzer worker records which findings a run saw.
+series.Store.SeriesOf A background pass: the analyzer worker reads the series of the run it applies.
+series.Store.Sightings A background pass: the analyzer worker reads what a series already reported against a build.
+series.Store.Take A background pass: the analyzer worker takes a series so one run of it applies at a time.
+series.Store.Write A helper over a narrowed read: the analyzer upload route holds a run's documents on a build it authorized the key for, inside its own transaction.
+setting.Store.Change Who is asking: an administrator changing a setting, on a route only an administrator reaches, and startup recording the role mode.
+setting.Store.Count Not varying by reader: a deployment setting read as a count.
+setting.Store.Days Not varying by reader: a deployment setting read as whole days.
+setting.Store.Duration Not varying by reader: a deployment setting read as a duration.
+setting.Store.FormerNames A background pass: startup reports settings still held under a former name.
+setting.Store.Get Not varying by reader: a deployment setting.
+setting.Store.SetIfAbsent Not varying by reader: the deployment's sign-in key, minted once by whichever process asks first.
+setting.Store.Switch Not varying by reader: whether a deployment switch is on.
+sourcelink.Store.Config Not varying by reader: what a product says about its repositories, read after the caller authorized the code finding or on a screen only an administrator reaches.
+sourcelink.Store.Replace Who is asking: an administrator stating a product's repositories, on a route only an administrator reaches.
+supplier.Store.CaughtUp A background pass: the supplier pass records how far it read a source.
+supplier.Store.Reached A background pass: the supplier pass records an attempt to read a source.
+supplier.Store.Standing A background pass: the supplier pass asks whether a source still stands, inside the transaction that records what it said.
+trail.MapGroups Who is asking: startup maps directory groups to roles and hands back work the change takes away.
+trail.NameAdministrators Who is asking: startup names the administrators its configuration lists.
+trail.Store.RecordByConfiguration A background pass: startup records a change its configuration made, in the transaction that makes it.
+trail.Store.RecordByMerge A background pass: it records what merging two issues changed, inside the merge's transaction.
+triage.LapseCodeFindings A background pass: an analyzer run lapses the decisions on code findings it paired, inside the transaction recording the pairing.
+triage.Restamp A helper over a narrowed read: it moves the stamp of a decision the caller's write already authorized, inside its transaction.
+triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
+triage.Store.Applying Not varying by reader: whether a decision stands at a place. Its route resolves the place for the caller first.
+triage.Store.DeferredSoFar A helper over a narrowed read: the second-person rule asks it of a place the write already authorized.
+triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
+triage.Store.Lapse A background pass: it lapses decisions whose versions moved.
+triage.Store.LapseRatedWorse A background pass: it lapses claims whose issue was rated worse.
+triage.Store.NeedsApproval A helper over a narrowed read: the second-person rule asks it of a proposal the write already authorized.
+triage.Store.NoteVisibility Not varying by reader: how disclosed a note is, which the caller then asks of its own reader.
+triage.Store.PeopleNamed Not varying by reader: who an identifier is, for a record already read under its own authorization.
+triage.Store.Undecided A helper over a narrowed read: it keeps the places a caller already resolved that nothing stands at.
+triage.TrailAbout A helper over a narrowed read: it names an exploitation record for the trail, inside a write that authorized the product.
+upstream.Again A background pass: it queues a product's builds to be scanned again, from the upstream pass and inside upstream changes only an administrator makes.
+upstream.Reader.From A background pass: the upstream pass reads one upstream and records what it read.
+vex.AnyIssuedForBranchOrTag Not varying by reader: whether any VEX document names a release. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+vex.AnyIssuedForProduct Not varying by reader: whether any VEX document names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
+vex.AnyIssuedForVariant Not varying by reader: whether any VEX document names a variant. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.

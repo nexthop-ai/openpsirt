@@ -134,7 +134,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make negatives` | A 404 built from or detailed with an error's text, in any spelling the parsed Go allows: the error's method, a value named like an error, or a name bound earlier in the declaration |
 | `make granted` | A function reaching one grant table reaches the other, through the table name, a model's struct tag, a type built from the model, or a package-level name's value. Exempt functions are named with reasons; an exemption matching nothing fails |
 | `make narrowed` | A build resolved for a case-only participant is read with a subject or refused first. Bound resolutions and values derived from them are followed; inline uses are not |
-| `make subjected` | An exported finding, triage or graph store method that queries without a subject, unless exempt with a reason. Queries are followed within the package by name; another package's are not seen |
+| `make subjected` | An exported store method or package function under `internal/` that queries without a subject, unless exempt with a reason. A store is a type with a method building a query; programs and test fixture packages are not read. Queries are followed within the package by name; another package's are not seen |
 | `make attached` | A doc comment describing a different declaration |
 | `make confined` | Engine-specific code outside its two allowed places |
 | `make readable` | Source files a text tool will not read |
