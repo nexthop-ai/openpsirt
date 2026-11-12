@@ -179,7 +179,7 @@ export interface paths {
          * Approve an advisory
          * @description Records that you have read what this advisory says and agree to it.
          *
-         *     The agreement names the edition it was given against rather than the advisory. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
+         *     Send the `edition` the advisory reported when you read it. The agreement names that edition rather than the advisory, and answers 409 where the advisory has moved to another since: read it again and agree to what it says now. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
          *
          *     You may not agree to an advisory you started or whose current edition you wrote. Both answer 409, and there is no override, so a deployment with one person publishes no advisory.
          *
@@ -7920,6 +7920,11 @@ export interface components {
             /** @description Whether the document generated now says something different from the last one that went out */
             changed?: boolean;
             covers: components["schemas"]["CoveredBody"][] | null;
+            /**
+             * Format: int64
+             * @description The edition the advisory says now, counting from one. Agreeing to it names this edition
+             */
+            edition?: number;
             minted_at: string;
             /**
              * @description Where the document is in its life. Final where somebody agrees to what it says now, interim where it has gone out and nobody does, draft before either
@@ -8328,6 +8333,19 @@ export interface components {
             revision_id: number;
             /** @description The moment this approval was taken back, if it was */
             withdrawn_at?: string;
+        };
+        "Approve-advisoryRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Approve-advisoryRequest.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The edition of the advisory that was read, as reading it reports
+             */
+            edition: number;
         };
         AroundBody: {
             /**
@@ -17101,7 +17119,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Approve-advisoryRequest"];
+            };
+        };
         responses: {
             /** @description Created */
             201: {

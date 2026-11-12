@@ -366,10 +366,21 @@ type becameRow struct {
 func AgreedTo(t *testing.T, r *Reach, at string) {
 	t.Helper()
 	if got := AsPerson(t, r, "private-dispatcher", http.MethodPost,
-		at+"/approval", ""); got.Code != http.StatusCreated {
+		at+"/approval", AgreeingTo(t, r, "private-dispatcher", at)); got.Code != http.StatusCreated {
 		t.Fatalf("agreeing to the advisory at %s answered %d: %s",
 			at, got.Code, got.Body.String())
 	}
+}
+
+// AgreeingTo is the body agreeing to the advisory at the address given takes:
+// the edition it says now, as the person named reads it.
+func AgreeingTo(t *testing.T, r *Reach, who, at string) string {
+	t.Helper()
+	var read struct {
+		Edition int `json:"edition"`
+	}
+	Read(t, r, who, at, &read)
+	return fmt.Sprintf(`{"edition":%d}`, read.Edition)
 }
 
 // Reported records a vulnerability report saying this and returns its

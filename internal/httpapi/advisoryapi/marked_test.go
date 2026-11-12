@@ -72,10 +72,14 @@ func TestAnAdvisoryIsListedByWhatItCoversAndAgreedToBySomebodyElse(t *testing.T)
 		}
 
 		approval := "/v1/advisories/" + named + "/approval"
+		read := httpapitest.AgreeingTo(t, r, "private-dispatcher", "/v1/advisories/"+named)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			approval, ""), http.StatusConflict)
+			approval, read), http.StatusConflict)
+		// An edition other than the one it says now was not what was read.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
+			approval, `{"edition":99}`), http.StatusConflict)
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
-			approval, ""); got.Code != http.StatusCreated {
+			approval, read); got.Code != http.StatusCreated {
 			t.Fatalf("somebody else agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete,

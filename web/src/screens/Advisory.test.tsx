@@ -81,6 +81,21 @@ describe("one advisory", () => {
     ]);
   });
 
+  it("agrees to the edition the screen shows", async () => {
+    serving({ title: "", covers: [covered], agreed: 0, status: "draft", edition: 3 });
+    const posted = answer("POST", () => ({ data: {} }));
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    expect(posted()).toEqual([
+      [
+        "/v1/advisories/{advisory}/approval",
+        { params: { path: { advisory: "SONIC-2026-1" } }, body: { edition: 3 } },
+      ],
+    ]);
+  });
+
   it("takes off the flaw on the row pressed", async () => {
     serving({ title: "", covers: [covered], agreed: 1, status: "draft" });
     const removed = answer("DELETE", () => ({ data: {} }));

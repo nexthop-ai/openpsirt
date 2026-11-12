@@ -105,7 +105,7 @@ export function Advisory() {
       <Says advisory={advisory} title={it?.title ?? ""} covers={covers} />
       {covers.length > 0 && <Releases advisory={advisory} read={releases} />}
       <Document advisory={advisory} covers={covers.length} read={document} />
-      <Agreement advisory={advisory} agreed={agreed} by={it?.agreed_by ?? []} />
+      <Agreement advisory={advisory} edition={it?.edition ?? 0} agreed={agreed} by={it?.agreed_by ?? []} />
       <Issued advisory={advisory} read={issuances} agreed={agreed} changed={it?.changed} />
     </>
   );
@@ -443,13 +443,16 @@ function Document({
   );
 }
 
-// Who agrees to what it says now.
+// Who agrees to what it says now. Agreeing names the edition this screen
+// shows, so one somebody opened since is refused rather than agreed to unread.
 function Agreement({
   advisory,
+  edition,
   agreed,
   by,
 }: {
   advisory: string;
+  edition: number;
   agreed: number;
   by: { person: string; agreed_at: string }[];
 }) {
@@ -468,8 +471,8 @@ function Agreement({
           type="button"
           className="btn"
           title="Not the person who started it, and not whoever wrote what it says now. There is no override"
-          disabled={agree.isPending}
-          onClick={() => agree.mutate({ advisory })}
+          disabled={agree.isPending || edition === 0}
+          onClick={() => agree.mutate({ advisory, edition })}
         >
           {agree.isPending ? "Agreeing…" : "Agree to what it says"}
         </button>

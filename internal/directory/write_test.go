@@ -374,7 +374,7 @@ func TestAPassWithEverythingHeldBackWritesNothing(t *testing.T) {
 			fixtures.ProductName, identifier); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Approve(t.Context(), f.agrees, named); err != nil {
+		if _, err := f.store.Approve(t.Context(), f.agrees, named, readEdition(t, f.store, f.who, named)); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Issued(t.Context(), f.who, issuer, named, "Published."); err != nil {
@@ -621,7 +621,7 @@ func (f *fixture) issuedAs(t *testing.T, who publisher.Named, title string) stri
 		fixtures.ProductName, identifier); err != nil {
 		t.Fatalf("naming the flaw on the advisory: %v", err)
 	}
-	if _, err := f.store.Approve(t.Context(), f.agrees, named); err != nil {
+	if _, err := f.store.Approve(t.Context(), f.agrees, named, readEdition(t, f.store, f.who, named)); err != nil {
 		t.Fatalf("agreeing to the advisory: %v", err)
 	}
 	if _, err := f.store.Issued(t.Context(), f.who, who, named,
@@ -815,4 +815,15 @@ func TestOneReplicaWritesTheDirectoryAtATime(t *testing.T) {
 			t.Errorf("handed the lease, the second replica wrote %+v: %v", written, err)
 		}
 	})
+}
+
+// readEdition is the edition an advisory says now, as somebody reading it is
+// told, which is what agreeing to it names.
+func readEdition(t *testing.T, store *advisory.Store, reader access.Subject, named string) int {
+	t.Helper()
+	where, err := store.Where(t.Context(), reader, named)
+	if err != nil {
+		t.Fatalf("reading %s: %v", named, err)
+	}
+	return where.Edition
 }

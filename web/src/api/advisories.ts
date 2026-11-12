@@ -195,12 +195,18 @@ export function useTakeAFlawOff() {
 // rule — neither the person who started it nor the author of the edition
 // standing — and it is enforced there against the record rather than here
 // against what a page happens to know, which is a count and not a name.
+//
+// It names the edition the screen showed, so an edit landing since is refused
+// rather than agreed to unread.
 export function useAgree() {
   const done = useAfterAdvisory();
   return useMutation({
-    mutationFn: async ({ advisory }: { advisory: string }) =>
+    mutationFn: async ({ advisory, edition }: { advisory: string; edition: number }) =>
       unwrap(
-        await api.POST("/v1/advisories/{advisory}/approval", { params: { path: { advisory } } }),
+        await api.POST("/v1/advisories/{advisory}/approval", {
+          params: { path: { advisory } },
+          body: { edition },
+        }),
       ),
     onSuccess: done,
   });

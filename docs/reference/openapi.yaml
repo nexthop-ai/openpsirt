@@ -258,6 +258,10 @@ components:
           type:
             - array
             - "null"
+        edition:
+          description: The edition the advisory says now, counting from one. Agreeing to it names this edition
+          format: int64
+          type: integer
         minted_at:
           type: string
         status:
@@ -906,6 +910,24 @@ components:
         - revision_id
         - approved_by
         - approved_at
+      type: object
+    Approve-advisoryRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Approve-advisoryRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        edition:
+          description: The edition of the advisory that was read, as reading it reports
+          format: int64
+          minimum: 1
+          type: integer
+      required:
+        - edition
       type: object
     AroundBody:
       additionalProperties: false
@@ -16143,7 +16165,7 @@ paths:
       description: |-
         Records that you have read what this advisory says and agree to it.
 
-        The agreement names the edition it was given against rather than the advisory. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
+        Send the `edition` the advisory reported when you read it. The agreement names that edition rather than the advisory, and answers 409 where the advisory has moved to another since: read it again and agree to what it says now. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
 
         You may not agree to an advisory you started or whose current edition you wrote. Both answer 409, and there is no override, so a deployment with one person publishes no advisory.
 
@@ -16157,6 +16179,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Approve-advisoryRequest"
+        required: true
       responses:
         "201":
           content:

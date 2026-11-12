@@ -333,7 +333,7 @@ func TestAnIssuanceAgreedToWhileBeingBuiltIsStoredAsFinal(t *testing.T) {
 		identifier := f.recorded(t, f.master)
 		named := f.covering(t, [2]string{"sonic", identifier})
 		advisory.Between(f.store, func() {
-			if _, err := advisory.NewStore(f.db.DB).Approve(t.Context(), f.approver, named); err != nil {
+			if _, err := advisory.NewStore(f.db.DB).Approve(t.Context(), f.approver, named, readEdition(t, advisory.NewStore(f.db.DB), f.who, named)); err != nil {
 				t.Fatalf("agreeing in between: %v", err)
 			}
 		})

@@ -70,7 +70,7 @@ type fixture struct {
 // an issuance asks for.
 func (f *fixture) agreed(t *testing.T, named string) {
 	t.Helper()
-	if _, err := f.store.Approve(t.Context(), f.approver, named); err != nil {
+	if _, err := f.store.Approve(t.Context(), f.approver, named, readEdition(t, f.store, f.who, named)); err != nil {
 		t.Fatalf("agreeing to %s: %v", named, err)
 	}
 }
@@ -1239,4 +1239,15 @@ func TestANameShapedLikeACVEIsNotStatedAsOne(t *testing.T) {
 			t.Errorf("the name shaped like a CVE is not among the issue's names: %+v", one.IDs)
 		}
 	})
+}
+
+// readEdition is the edition an advisory says now, as somebody reading it is
+// told, which is what agreeing to it names.
+func readEdition(t *testing.T, store *advisory.Store, reader access.Subject, named string) int {
+	t.Helper()
+	where, err := store.Where(t.Context(), reader, named)
+	if err != nil {
+		t.Fatalf("reading %s: %v", named, err)
+	}
+	return where.Edition
 }
