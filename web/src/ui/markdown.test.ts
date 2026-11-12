@@ -129,6 +129,15 @@ describe("the renderer", () => {
     expect(out).not.toContain('target="_blank"');
   });
 
+  it("opens an absolute link to this deployment in place", () => {
+    const ours = `${window.location.origin}/findings/CVE-2026-1000`;
+    const host = document.createElement("div");
+    host.innerHTML = render(`See [the other one](${ours}).`);
+    const link = host.querySelector("a[href]");
+    expect(link?.getAttribute("href")).toBe(ours);
+    expect(link?.getAttribute("target")).toBeNull();
+  });
+
   it("does not mistake a protocol-relative address for one of ours", () => {
     // `//somewhere.else/x` has no scheme and is not relative to this
     // deployment: a browser resolves it against the page's protocol and

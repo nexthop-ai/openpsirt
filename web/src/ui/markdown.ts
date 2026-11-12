@@ -226,9 +226,10 @@ function anchor(node: Element) {
       return;
     }
     node.removeAttribute("href");
-  } else {
-    // Nothing linked from here is ours. No referrer, and no handle back to
-    // this window from whatever opens.
+  } else if (!sameDeployment(href)) {
+    // Somewhere else. No referrer, and no handle back to this window from
+    // whatever opens. An absolute link to this deployment is a page of ours
+    // and opens in place, as a relative one does.
     node.setAttribute("rel", "noreferrer noopener nofollow");
     node.setAttribute("target", "_blank");
   }
