@@ -40,6 +40,7 @@ is a copy.
 | An empty directory is not written | It would have to state when it was last updated |
 | A store of its own | Every file is public, and every attachment is authorized first (REQ-70) |
 | The store is a type of the writing package, and a test checks nothing in the application reaches that package | Handed the storage beneath, a handler could serve the files |
+| The program composing the server holds the store only to carry it from where it is opened to the writer, which a test reads from the program's source | The program imports the writing package to build the writer, so the import check cannot list it |
 | The address is required, `https`, refused at startup otherwise | Every self address is built from it, and the standard requires `https` |
 
 ## The files
