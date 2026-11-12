@@ -118,7 +118,7 @@ is and `design-docs/remediation-advisories.md` § Editions and agreement who may
 | No filters, selection or bulk acts; the review step is a person reading text | Single or low double digits a year, each the company speaking |
 | Panels are compose, review, approve, publish, in that order | The order acts happen |
 | What is left before it can go out is said once at the top: naming no flaw first, then nobody agreeing | An advisory covering nothing generates no document |
-| A control is disabled only on a fact the server answered: taking back an agreement and recording an issuance where nobody agrees. Agreeing is offered to whoever reaches the screen | Who may agree depends on who wrote the standing edition, which the screen is not told |
+| A control is disabled only on a fact the server answered: taking back an agreement, recording an issuance where nobody agrees, and agreeing until the releases are read and the document is read or refused (`design-docs/remediation-advisories.md` § Editions and agreement). Agreeing is otherwise offered to whoever reaches the screen | Who may agree depends on who wrote the standing edition, which the screen is not told |
 | Who agrees is named, with when | |
 | Whether it changed since it went out is said above what went out, compared on the settled digest: an alert where changed, a line where not, absent where the server has no answer | |
 | A control's refusal is the server's sentence: agreeing as its starter, naming a scanned flaw | |
