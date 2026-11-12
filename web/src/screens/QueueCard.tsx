@@ -67,6 +67,7 @@ export function Dated({
   const [because, setBecause] = useState("");
   const [moved, setMoved] = useState(false);
   const after = useAfterDecision();
+  const draftKey = `repromise:${decision.key}`;
   // The queue is read again only once the confirmation is put away. The
   // promise leaves this list when its date moves, and the card carrying the
   // answer would leave with it.
@@ -78,7 +79,11 @@ export function Dated({
           body: { ...(upgrade ? { to: to.trim() } : {}), by, reasoning: because },
         }),
       ),
+    // Forgotten here, since closing the form unmounts the editor before it
+    // can see the reason emptied.
     onSuccess: () => {
+      forget(draftKey);
+      setBecause("");
       setMoving(false);
       setMoved(true);
       after();
@@ -165,7 +170,7 @@ export function Dated({
           <Editor
             value={because}
             onChange={setBecause}
-            draftKey={`repromise:${decision.key}`}
+            draftKey={draftKey}
             rows={3}
             label="Reason for the change"
             placeholder="Why the date or the version is moving."

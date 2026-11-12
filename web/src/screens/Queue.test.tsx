@@ -6,8 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Queue } from "./Queue";
 import { stillPicked } from "./useQueueApproval";
 import { Product } from "./Product";
-import { accept, screen, serve, settle, mounted } from "../test/mount";
+import { accept, answer, screen, serve, settle, mounted } from "../test/mount";
 import { readingDependencies } from "../test/reach";
+import { change, press } from "../test/controls";
+import { belongTo } from "../app/drafts";
 
 const mount = mounted();
 
@@ -189,6 +191,44 @@ describe("the review queue by reason", () => {
       "/v1/review-queue.csv?reason=missed-fix-date",
       "/v1/review-queue.json?reason=missed-fix-date",
     ]);
+  });
+});
+
+describe("a missed promise moved", () => {
+  it("forgets the reason for the change once it is accepted", async () => {
+    window.localStorage.clear();
+    belongTo("ana");
+    try {
+      const promise = {
+        ...waiting(7),
+        decision_occurrence: {
+          id: 70,
+          outcome: "will-not-fix",
+          committed_to: "2026-09-01",
+          reasoning: "moving",
+        },
+      };
+      serve((path, init) =>
+        path === "/v1/review-queue" && reasonOf(init) === "missed-fix-date"
+          ? { data: { items: [promise], total: 1 } }
+          : { data: { items: [], total: 0 } },
+      );
+      answer("PUT", () => ({ data: {} }));
+      mount.render(screen(<Queue />, "/review-queue?reason=missed-fix-date"));
+      await settle();
+      await press(mount.host(), "Change the date");
+      change(mount.host().querySelector<HTMLInputElement>('input[type="date"]'), "2026-12-01");
+      change(mount.host().querySelector("textarea"), "the vendor slipped a month");
+      const drafts = () =>
+        Object.keys(window.localStorage).filter((key) => key.includes(":repromise:"));
+      expect(drafts()).not.toEqual([]);
+      await press(mount.host(), "Change the promise");
+      await settle();
+      expect(drafts()).toEqual([]);
+    } finally {
+      belongTo(undefined);
+      window.localStorage.clear();
+    }
   });
 });
 

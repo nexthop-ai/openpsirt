@@ -6,10 +6,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodeFinding } from "./CodeFinding";
 import { accept, answer, mounted, screen, serve, settle } from "../test/mount";
 import { change, pick, press, type Init } from "../test/controls";
+import { belongTo } from "../app/drafts";
 
 const mount = mounted();
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  belongTo(undefined);
+  window.localStorage.clear();
+});
+
+// The drafts this browser holds, by key.
+const drafts = () =>
+  Object.keys(window.localStorage).filter((key) => key.startsWith("openpsirt.draft."));
 
 const AT = "/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc";
 const PATTERN =
@@ -201,6 +210,19 @@ describe("a code finding", () => {
       reason: "false_positive",
       reasoning: "checked a line above",
     });
+  });
+
+  it("forgets the reasoning once the decision is accepted, so the next form opens empty", async () => {
+    belongTo("ana");
+    await drawn(true);
+    accept(() => ({ status: 201, data: { outcome: "dismissed", reasoning: "x" } }));
+    pick(mount.host(), "Dismissed");
+    change(mount.host().querySelector<HTMLSelectElement>("#code-finding-reason"), "false_positive");
+    change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "checked a line above");
+    expect(drafts()).not.toEqual([]);
+    await press(mount.host(), "Propose");
+    await settle();
+    expect(drafts()).toEqual([]);
   });
 
   it("is kept as it stands once every release it was seen in is past its end of life", async () => {
