@@ -190,11 +190,12 @@ func (s *Store) Read(ctx context.Context, subject Subject, id int64) error {
 	}
 }
 
-func TestEveryPackageOfTheTreeIsReadButProgramsAndFixtures(t *testing.T) {
+func TestEveryPackageOfTheTreeIsReadButProgramsAndHarnesses(t *testing.T) {
 	// The packages are the tree's, never a list: a store added anywhere is
-	// read. A program and a package of test fixtures, known by importing the
-	// testing package and never by its name, are reached by no request, and a
-	// package is named by its directory under internal/.
+	// read. A program and a test harness, known by importing the testing
+	// package from a directory named as a test package, are reached by no
+	// request, and a package is named by its directory under internal/. Either
+	// sign alone leaves a package read.
 	store := func(pkg string) []byte {
 		return []byte("package " + pkg + `
 
@@ -218,12 +219,22 @@ func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
 }
 `)},
 		"internal/attest": {"internal/attest/a.go": store("attest")},
+		"internal/served": {
+			"internal/served/a.go": store("served"),
+			"internal/served/b.go": []byte(`package served
+
+import "testing"
+
+func Benchmarked(b *testing.B) {}
+`),
+		},
+		"internal/kerneltest": {"internal/kerneltest/k.go": store("kerneltest")},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 3 {
-		t.Errorf("%d store methods were examined, want the three in packages a request reaches", examined)
+	if examined != 5 {
+		t.Errorf("%d store methods were examined, want the five in packages a request reaches", examined)
 	}
 	reported := map[string]bool{}
 	for _, one := range found {
@@ -235,6 +246,8 @@ func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
 		"tools/gate.Store.Unnarrowed":     false,
 		"dbtest/fixture.Store.Unnarrowed": false,
 		"attest.Store.Unnarrowed":         true,
+		"served.Store.Unnarrowed":         true,
+		"kerneltest.Store.Unnarrowed":     true,
 	} {
 		if reported[name] != want {
 			t.Errorf("%s reported = %v, want %v (reported %v)", name, reported[name], want, reported)

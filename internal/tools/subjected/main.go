@@ -8,7 +8,8 @@
 // A method with no subject is exactly what a leak looks like from the outside:
 // a route handing it a row identifier reads whatever the identifier names,
 // whoever asked. Every package under internal/ is read as parsed Go, except a
-// program and a package of test fixtures, which imports the testing package.
+// program and a test harness: a package that imports the testing package from
+// a directory whose path names it a test package, such as dbtest/fixture.
 // A type is a store where one of its methods builds a query or calls a
 // function of its package that does. Its exported methods, and the package's
 // exported functions, that query and take no access.Subject fail the gate
@@ -158,7 +159,7 @@ type declared struct {
 // inSources is every exported store method and function of one package that
 // queries with no subject, and how many it examined. The package is named by
 // its directory under internal/, its files keyed by path. A program and a
-// package of test fixtures answer nothing.
+// test harness answer nothing.
 func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 	fset := token.NewFileSet()
 	paths := make([]string, 0, len(sources))
@@ -172,7 +173,7 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 		if err != nil {
 			return nil, 0, fmt.Errorf("%s: %w", path, err)
 		}
-		if file.Name.Name == "main" || importsTesting(file) {
+		if file.Name.Name == "main" || importsTesting(file) && harness(pkg) {
 			return nil, 0, nil
 		}
 		imported := importNames(file)
@@ -302,8 +303,22 @@ func callsQuerying(body *ast.BlockStmt, querying map[string]bool) bool {
 	return found
 }
 
+// harness reports whether a package's directory under internal/ names it a
+// test package: an element ending in "test", as dbtest and httpapitest do. A
+// package is skipped as a harness only when it also imports the testing
+// package, so neither a production file importing testing nor a directory
+// named like a harness is enough on its own to leave a package unread.
+func harness(pkg string) bool {
+	for _, element := range strings.Split(pkg, "/") {
+		if strings.HasSuffix(element, "test") {
+			return true
+		}
+	}
+	return false
+}
+
 // importsTesting reports whether a file imports the testing package, which no
-// code a request reaches does: it is how a package of test fixtures is known.
+// code a request reaches does.
 func importsTesting(file *ast.File) bool {
 	for _, spec := range file.Imports {
 		if strings.Trim(spec.Path.Value, `"`) == "testing" {

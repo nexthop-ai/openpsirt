@@ -70,8 +70,9 @@ A store method or function takes no subject only for one of these reasons:
 | Establishing who is asking, or what they hold, as sign-in or authorized administration | Sessions, keys, grants, teams |
 | A person's own record, keyed by them | Their saved views |
 
-Every package under `internal/` is read, but a program and a package of test
-fixtures. A store is a type one of whose methods builds a query or calls a
+Every package under `internal/` is read, but a program and a test harness. A
+harness both imports the testing package and sits in a directory whose name
+ends in `test`; either sign alone leaves a package read. A store is a type one of whose methods builds a query or calls a
 function of its package that does. Its exported methods, and the package's
 exported functions, that query without a subject are named, with their
 reason, in a list `make subjected` holds them to (`design-docs/build.md`
