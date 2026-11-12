@@ -159,6 +159,10 @@ connected to the database, and then applies the schema. Until it serves:
 A second process started while one applies the schema waits for it, answers
 the same way, and logs about once a minute which process holds the migration
 lock. Where the holder stops part way, the waiter applies the schema itself.
+The lock is the server's own, so any account on a MySQL or MariaDB server,
+or any role allowed to connect to the PostgreSQL database, can take it and
+hold every start behind it. The waiter's log line names that connection; end
+it to let the start go on.
 
 A check on `/readyz` that ends the process ends a long migration part way, and
 the next process starts it again from the beginning. An AWS Application Load
