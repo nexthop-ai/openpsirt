@@ -274,13 +274,14 @@ func assessmentPage(decisions []finding.Assessment, total int, would map[int64]f
 
 	items := make([]AssessmentBody, 0, len(decisions))
 	for _, decision := range decisions {
+		waiting := decision.State == finding.AssessmentProposed && decision.NeedsApproval
+		consequence, known := would[decision.ID]
+		if waiting && !known {
+			total--
+			continue
+		}
 		body := bodyOf(decision)
-		if decision.State == finding.AssessmentProposed && decision.NeedsApproval {
-			consequence, known := would[decision.ID]
-			if !known {
-				total--
-				continue
-			}
+		if waiting {
 			body.Open, body.OffTheList = consequence.Findings, consequence.OffTheList
 		}
 		items = append(items, body)
