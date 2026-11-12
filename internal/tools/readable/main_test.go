@@ -40,43 +40,33 @@ func TestWhatCountsAsAnUnreadableByte(t *testing.T) {
 }
 
 func TestWhichFilesAreReadAsText(t *testing.T) {
-	// By extension, because sniffing the content is the thing that was fooled.
-	// Both directions: a source file that stopped being read is a file this
-	// gate no longer looks at, and a binary that started being read is a gate
-	// that fails on every build output.
+	// Everything but a named binary kind. Both directions: a text file left
+	// unread is a file this gate no longer looks at, and a binary read is a
+	// gate that fails on every build output.
 	for _, c := range []struct {
 		path string
 		want bool
 	}{
 		{"internal/access/store.go", true},
 		{"web/src/app/App.tsx", true},
-		{"web/scripts/tokens.mjs", true},
-		{"web/src/styles/tokens.css", true},
 		{"design-docs/access.md", true},
-		{"deploy/helm/openpsirt/values.yaml", true},
-		{"go.mod", true},
-		{"go.sum", true},
 		{"Makefile", true},
 		{"Dockerfile", true},
-		{"Makefile.demo", true},
-		{"mk/gates.mk", true},
-		{"deploy/helm/openpsirt/templates/_helpers.tpl", true},
-		{"docs/hooks/release.py", true},
-		{"docs/requirements.in", true},
-		{"assets/logo.svg", true},
-		{".gitignore", true},
-		{"web/.prettierignore", true},
-		{".dockerignore", true},
-		{"Makefiles", false},
-		{"internal/access/STORE.GO", true},
-		{"web/public/logo.png", false},
-		{"dist/openpsirt", false},
-		{"assets/font.woff2", false},
 		{"LICENSE", true},
-		{"NOTICE", true},
-		{"LICENSES", false},
+		{"internal/sarif/testdata/run.sarif", true},
+		{"internal/sbom/testdata/image.cdx.xml", true},
+		{"internal/tools/clangcheckers/testdata/leak.c", true},
+		{"internal/tools/clangcheckers/testdata/leak.h", true},
+		{"internal/uploadclient/testdata/app.plist", true},
+		{".gitattributes", true},
+		{"internal/webui/dist/.gitkeep", true},
+		{"a kind nobody has written yet.new", true},
+		{"web/public/logo.png", false},
+		{"assets/font.woff2", false},
+		{"internal/cverecord/testdata/records.json.xz", false},
+		{"ASSETS/LOGO.PNG", false},
 	} {
-		if got := text(c.path); got != c.want {
+		if got := !binary(c.path); got != c.want {
 			t.Errorf("%s read as text = %v, want %v", c.path, got, c.want)
 		}
 	}
