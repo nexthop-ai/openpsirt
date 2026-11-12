@@ -4,13 +4,17 @@
 package httpapi_test
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -86,9 +90,7 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 		t.Fatal(err)
 	}
 
-	// Identifiers the routes take as numbers are tried over the first few,
-	// which is where a test database numbers what was seeded.
-	numbers := []string{"1", "2", "3", "4", "5", "6"}
+	numbers := seededNumbers(t, r)
 
 	return undisclosedSeed{
 		marks: []string{
@@ -106,6 +108,48 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 			"{ruling}": numbers, "{note}": numbers,
 		},
 	}
+}
+
+// seededNumbers is the identifiers a route taking a number is tried with: the
+// first few of every table holding rows. An engine's sequences go on counting
+// across the tests sharing a database, so the seeded rows are found where they
+// are rather than assumed to start at one.
+func seededNumbers(t *testing.T, r *httpapitest.Reach) []string {
+	t.Helper()
+	ctx := t.Context()
+	seen := map[int64]bool{}
+	for _, table := range dbtest.Tables() {
+		rows, err := r.DB.QueryContext(ctx, `SELECT * FROM "`+table+`" WHERE 1 = 0`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		columns, err := rows.Columns()
+		_ = rows.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(columns, "id") {
+			continue
+		}
+		var least sql.NullInt64
+		if err := r.DB.QueryRowContext(ctx, `SELECT MIN("id") FROM "`+table+`"`).Scan(&least); err != nil {
+			t.Fatal(err)
+		}
+		for n := range int64(6) {
+			if least.Valid {
+				seen[least.Int64+n] = true
+			}
+		}
+	}
+	if len(seen) == 0 {
+		t.Fatal("no table holds a row, so no route taking a number is asked")
+	}
+	numbers := make([]string, 0, len(seen))
+	for n := range seen {
+		numbers = append(numbers, strconv.FormatInt(n, 10))
+	}
+	sort.Strings(numbers)
+	return numbers
 }
 
 // filledEvery is a templated path with each parameter tried with each of its
@@ -135,9 +179,10 @@ func filledEvery(path string, fill map[string][]string) []string {
 }
 
 func TestNothingUndisclosedReachesAPublicReader(t *testing.T) {
-	// Every read the API offers, asked by somebody who reads only disclosed
-	// work in the product, over undisclosed work of every kind a secondary
-	// read reaches: no answer carries a word of it. A read that narrows its
+	// Every read path the API offers, asked by somebody who reads only
+	// disclosed work in the product, over undisclosed work of every kind a
+	// secondary read reaches: no answer carries a word of it, a refusal
+	// included. Query parameters are left at their defaults. A read that narrows its
 	// findings and joins another table without the same narrowing fails here
 	// whichever route it is behind.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -157,10 +202,9 @@ func TestNothingUndisclosedReachesAPublicReader(t *testing.T) {
 			asked++
 			for _, path := range paths {
 				got := r.Body(t, "reader", http.MethodGet, path)
-				if got.Code != http.StatusOK {
-					continue
+				if got.Code == http.StatusOK {
+					answered++
 				}
-				answered++
 				for _, mark := range seed.marks {
 					// A path naming the mark is answered with the name it
 					// asked about, as a name nothing holds is.
