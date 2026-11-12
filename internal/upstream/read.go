@@ -309,9 +309,12 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		changed, err := r.document(ctx, client, up, one, keyring)
 		var refusedDoc unreadable
 		switch {
-		case errors.As(err, &refusedDoc), errors.Is(err, outward.ErrRefused):
+		case errors.As(err, &refusedDoc),
+			errors.Is(err, outward.ErrRefused) && !errors.Is(err, outward.ErrInside):
 			// A redirect is refused like an entry on another host: the same
 			// way every time, so the read goes on past it.
+			// A host resolving inside this network is what its name answers
+			// today, so it fails the read instead.
 			took.Refused++
 			refusedNow[one.address] = one.at
 			refused = append(refused, fmt.Errorf("%s: %w", one.address, err))

@@ -12,8 +12,9 @@ import (
 //
 // Several cycles, so a replica that is briefly slow does not lose the work to
 // another and then take it back; at least a minute, so a very short interval
-// in a test does not make a lease that has lapsed by the time it is read. What
-// keeps it across a long pass is a Renewal, never this number.
+// in a test does not make a lease that has lapsed by the time it is read. A
+// pass that can outlast it takes the lease again as it runs, through a Renewal
+// or before each step; one that does not is held for this alone.
 func LeaseFor(interval time.Duration) time.Duration {
 	return max(5*interval, time.Minute)
 }
