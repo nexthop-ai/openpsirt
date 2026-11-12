@@ -51,9 +51,10 @@ func spotOf(column *int, message string) spot {
 	return s
 }
 
-// of is whether a result is at the spot.
-func (s spot) of(k Keyed) bool {
-	return s.column == k.StartColumn && s.message == k.Message
+// spotKey is a key and a spot within it.
+type spotKey struct {
+	key string
+	spot
 }
 
 // sharedKeys is the keys more than one result holds.
@@ -134,28 +135,40 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 				waiting[k] = append(waiting[k], c)
 			}
 		}
-		// Results sharing a key are told apart by column and message first,
-		// so each keeps the code finding it was paired with whatever order a
-		// run lists them in.
+		// Where a key is held twice, by two results or by two code findings,
+		// they are told apart by column and message first, so each keeps the
+		// code finding it was paired with whatever order a run lists them in.
 		if layer.on == onKey {
 			shared := sharedKeys(results)
+			at := map[spotKey][]int{}
+			for k, cs := range waiting {
+				if len(cs) > 1 {
+					shared[k] = true
+				}
+			}
+			for _, c := range order {
+				if k := candidates[c].key; !takenC[c] && shared[k] {
+					at[spotKey{k, candidates[c].spot}] = append(at[spotKey{k, candidates[c].spot}], c)
+				}
+			}
 			for r, res := range results {
-				ws := waiting[res.Key]
 				if takenR[r] || !shared[res.Key] {
 					continue
 				}
-				for j, c := range ws {
-					if candidates[c].of(res) {
-						waiting[res.Key] = append(ws[:j:j], ws[j+1:]...)
-						takenC[c], takenR[r] = true, true
-						out = append(out, pairing{result: r, candidate: c, on: layer.on})
-						break
-					}
+				sk := spotKey{res.Key, spot{res.StartColumn, res.Message}}
+				if cs := at[sk]; len(cs) > 0 {
+					c := cs[0]
+					at[sk] = cs[1:]
+					takenC[c], takenR[r] = true, true
+					out = append(out, pairing{result: r, candidate: c, on: layer.on})
 				}
 			}
 		}
 		for r, res := range results {
 			k := layer.ofR(res)
+			for len(waiting[k]) > 0 && takenC[waiting[k][0]] {
+				waiting[k] = waiting[k][1:]
+			}
 			if takenR[r] || k == "" || len(waiting[k]) == 0 {
 				continue
 			}

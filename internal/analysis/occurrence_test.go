@@ -155,3 +155,39 @@ func TestResultsSharingAKeyKeepTheirOccurrencesListedInAnotherOrder(t *testing.T
 		}
 	})
 }
+
+func TestALoneResultUnderAKeyHeldTwiceKeepsItsOwnOccurrence(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Build.ID)
+		now := time.Now().UTC()
+		both := documentOf([]interface{ json() string }{columned{inSWSS, 5}, columned{inSWSS, 30}}, 10, "")
+		later := documentOf([]interface{ json() string }{columned{inSWSS, 30}}, 10, "")
+		if _, status := w.send(t, w.Build.ID, now.Add(-3*time.Hour), both); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		first := w.occurrenceByColumn(t, w.Build.ID)
+		if len(first) != 2 {
+			t.Fatalf("the two results opened at %v; want two occurrences", first)
+		}
+		// On another build of the series, the one result takes its own.
+		other := w.BuildFor(w.Branch, w.Internal)
+		w.inventory(t, other.ID)
+		if _, status := w.send(t, other.ID, now.Add(-2*time.Hour), later); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		if got := w.occurrenceByColumn(t, other.ID); got[30] != first[30] {
+			t.Errorf("on another build the result at column 30 is at %s; want its own, %s", got[30], first[30])
+		}
+		// Seen again alone on its build, it keeps its own code finding there.
+		if _, status := w.send(t, w.Build.ID, now.Add(-time.Hour), later); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		columns := map[string]int{}
+		for column, occurrence := range w.occurrenceByColumn(t, w.Build.ID) {
+			columns[occurrence] = column
+		}
+		if columns[first[5]] != 5 {
+			t.Errorf("seen again alone, the result at column 30 was recorded on the code finding at column 5")
+		}
+	})
+}

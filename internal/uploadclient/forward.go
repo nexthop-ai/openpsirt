@@ -224,26 +224,28 @@ func plainMessage(m obj) int {
 	return 1
 }
 
-// renumber rewrites every position of an extension a run's tree cites, in a
-// result's rule, a notification's rule or descriptor, or a rule's
-// relationship, to the merged list's.
-func renumber(v any, moved map[int]int) {
-	switch t := v.(type) {
-	case obj:
-		for k, x := range t {
-			if c, ok := x.(obj); ok && k == "toolComponent" {
-				if i, ok := num(c, "index"); ok {
-					if to, ok := moved[i]; ok {
-						c["index"] = to
-					}
-				}
-				continue
+// renumber rewrites the extension positions a run cites to the merged list's:
+// a result's rule, and a notification's rule and descriptor. A relationship's
+// target and a result's taxa may name a taxonomy by position instead, which
+// nothing here reads, so they are left as written.
+func renumber(run obj, moved map[int]int) {
+	at := func(ref obj) {
+		component := child(ref, "toolComponent")
+		if i, ok := num(component, "index"); ok {
+			if to, ok := moved[i]; ok {
+				component["index"] = to
 			}
-			renumber(x, moved)
 		}
-	case list:
-		for _, x := range t {
-			renumber(x, moved)
+	}
+	for _, res := range objects(run, "results") {
+		at(child(res, "rule"))
+	}
+	for _, inv := range objects(run, "invocations") {
+		for _, key := range []string{"toolExecutionNotifications", "toolConfigurationNotifications"} {
+			for _, n := range objects(inv, key) {
+				at(child(n, "associatedRule"))
+				at(child(n, "descriptor"))
+			}
 		}
 	}
 }
@@ -278,7 +280,7 @@ func merge(runs []obj) obj {
 		}
 		moved := map[int]int{}
 		for i, ext := range objects(tool, "extensions") {
-			key := str(ext, "name") + "\x00" + str(ext, "guid") + "\x00" + str(ext, "version")
+			key := str(ext, "name") + "\x00" + strings.ToLower(str(ext, "guid")) + "\x00" + str(ext, "version")
 			at, ok := extensionAt[key]
 			if !ok || key == "\x00\x00" {
 				at = len(extensions)

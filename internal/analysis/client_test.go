@@ -360,17 +360,16 @@ func TestAResultNamingItsExtensionByGUIDKeepsThatExtensionsRule(t *testing.T) {
 	}
 }
 
-func TestEveryExtensionPositionARunCitesFollowsTheMerge(t *testing.T) {
-	pack := `{"name":"pack","rules":[{"id":"Z","relationships":[{"target":{"id":"Z","toolComponent":{"index":0}}}]}]}`
-	packSecond := `{"name":"pack","rules":[{"id":"W","relationships":[{"target":{"id":"W","toolComponent":{"index":1}}}]}]}`
+func TestANotificationsExtensionFollowsTheMerge(t *testing.T) {
+	pack := `{"name":"pack","rules":[{"id":"Z"}]}`
 	other := `{"name":"other","rules":[{"id":"Y"}]}`
 	first := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + pack +
 		`]},"results":[]}]}`
 	// The second document lists the pack second, and cites it there from a
-	// rule's relationship and from a notification.
-	second := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + other + "," +
-		packSecond + `]},"results":[],"invocations":[{"executionSuccessful":true,` +
-		`"toolExecutionNotifications":[{"message":{"text":"n"},"associatedRule":{"id":"W","toolComponent":{"index":1}}}]}]}]}`
+	// notification.
+	second := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + other + "," + pack +
+		`]},"results":[],"invocations":[{"executionSuccessful":true,"toolExecutionNotifications":[` +
+		`{"message":{"text":"n"},"associatedRule":{"id":"Z","toolComponent":{"index":1}}}]}]}]}`
 	doc := forwardedOne(t, []uploadclient.Input{
 		{Name: "a.sarif", Data: []byte(first)}, {Name: "b.sarif", Data: []byte(second)},
 	})
@@ -378,15 +377,7 @@ func TestEveryExtensionPositionARunCitesFollowsTheMerge(t *testing.T) {
 		Runs []struct {
 			Tool struct {
 				Extensions []struct {
-					Name  string `json:"name"`
-					Rules []struct {
-						ID            string `json:"id"`
-						Relationships []struct {
-							Target struct {
-								ToolComponent struct{ Index int } `json:"toolComponent"`
-							} `json:"target"`
-						} `json:"relationships"`
-					} `json:"rules"`
+					Name string `json:"name"`
 				} `json:"extensions"`
 			} `json:"tool"`
 			Invocations []struct {
@@ -402,29 +393,38 @@ func TestEveryExtensionPositionARunCitesFollowsTheMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 	run := got.Runs[0]
-	at := -1
-	for i, e := range run.Tool.Extensions {
-		if e.Name == "pack" {
-			at = i
-		}
-	}
-	if at < 0 {
-		t.Fatal("the merged run lists no pack")
-	}
-	for _, r := range run.Tool.Extensions[at].Rules {
-		for _, rel := range r.Relationships {
-			if rel.Target.ToolComponent.Index != at {
-				t.Errorf("rule %s relates to extension %d; want the pack, %d", r.ID, rel.Target.ToolComponent.Index, at)
+	var cited []string
+	for _, inv := range run.Invocations {
+		for _, n := range inv.Notifications {
+			if i := n.Rule.ToolComponent.Index; i >= 0 && i < len(run.Tool.Extensions) {
+				cited = append(cited, run.Tool.Extensions[i].Name)
 			}
 		}
 	}
-	var cited []int
-	for _, inv := range run.Invocations {
-		for _, n := range inv.Notifications {
-			cited = append(cited, n.Rule.ToolComponent.Index)
-		}
+	if len(cited) != 1 || cited[0] != "pack" {
+		t.Errorf("the notification cites %v; want the pack", cited)
 	}
-	if len(cited) != 1 || cited[0] != at {
-		t.Errorf("the notification cites extensions %v; want the pack, %d", cited, at)
+}
+
+func TestOneExtensionWrittenWithItsGUIDInTwoCasesMergesOnce(t *testing.T) {
+	lower := `{"name":"pack","guid":"abcdef00-1111-1111-1111-111111111111","rules":[{"id":"X"}]}`
+	upper := `{"name":"pack","guid":"ABCDEF00-1111-1111-1111-111111111111","rules":[{"id":"Z"}]}`
+	run := func(ext string) []byte {
+		return []byte(`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + ext +
+			`]},"results":[]}]}`)
+	}
+	doc := forwardedOne(t, []uploadclient.Input{{Name: "a.sarif", Data: run(lower)}, {Name: "b.sarif", Data: run(upper)}})
+	var got struct {
+		Runs []struct {
+			Tool struct {
+				Extensions []json.RawMessage `json:"extensions"`
+			} `json:"tool"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(doc, &got); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(got.Runs[0].Tool.Extensions); n != 1 {
+		t.Errorf("%d extensions; want the one pack", n)
 	}
 }

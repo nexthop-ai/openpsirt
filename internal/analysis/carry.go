@@ -169,32 +169,50 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 	for _, c := range out {
 		used[c.occurrence] = true
 	}
-	// Where results share a key, a hit at the result's column saying what it
-	// says is taken first, so they keep their occurrences whatever order a run
-	// lists them in; the rest take what is left. Only those hits' messages are
-	// read, since a key's hits span every build of the series.
+	// Where a key is held twice, by two results or by two code findings of the
+	// series, a hit at the result's column saying what it says is taken first,
+	// so each keeps its occurrence whatever order a run lists them in; the rest
+	// take what is left. Only those keys' messages are read, since a key's
+	// hits span every build of the series.
 	shared := sharedKeys(fresh)
+	for k, hits := range byKey {
+		if len(hits) > 1 {
+			shared[k] = true
+		}
+	}
 	messages, err := messagesOf(ctx, db, byKey, shared)
 	if err != nil {
 		return err
 	}
-	for _, exact := range []bool{true, false} {
-		for i, k := range fresh {
-			if _, done := out[i]; done || exact && !shared[k.Key] {
+	at := map[spotKey][]keyHit{}
+	for k := range shared {
+		for _, h := range byKey[k] {
+			sk := spotKey{k, spotOf(h.Column, messages[h.ID])}
+			at[sk] = append(at[sk], h)
+		}
+	}
+	take := func(i int, hits []keyHit) {
+		for _, h := range hits {
+			if used[h.Occurrence] {
 				continue
 			}
-			for _, h := range byKey[k.Key] {
-				if used[h.Occurrence] || exact && !spotOf(h.Column, messages[h.ID]).of(k) {
-					continue
-				}
-				c := carried{occurrence: h.Occurrence, on: onKey, from: fromSeries}
-				if h.BuildID == buildID && h.ClosedAt != nil {
-					c.from = fromReopened
-				}
-				used[h.Occurrence] = true
-				out[i] = c
-				break
+			c := carried{occurrence: h.Occurrence, on: onKey, from: fromSeries}
+			if h.BuildID == buildID && h.ClosedAt != nil {
+				c.from = fromReopened
 			}
+			used[h.Occurrence] = true
+			out[i] = c
+			return
+		}
+	}
+	for i, k := range fresh {
+		if _, done := out[i]; !done && shared[k.Key] {
+			take(i, at[spotKey{k.Key, spot{k.StartColumn, k.Message}}])
+		}
+	}
+	for i, k := range fresh {
+		if _, done := out[i]; !done {
+			take(i, byKey[k.Key])
 		}
 	}
 	return nil
