@@ -71,6 +71,10 @@ const SaidText = "is not a recognized reason"
 // is published just the same.
 func Faults(t testing.TB, mapped map[string]error, withheld ...string) {
 	t.Helper()
+	if len(mapped) == 0 {
+		t.Fatal("no mapper was asked, so this checked nothing")
+		return
+	}
 	for name, answer := range mapped {
 		var status huma.StatusError
 		if !errors.As(answer, &status) || status.GetStatus() != 500 {
@@ -167,8 +171,8 @@ func DeclaredIn(dir fs.FS) ([]string, error) {
 }
 
 // CoversEveryMapper fails where a mapper declared in the source of the
-// package under test is neither checked nor exempt, or where one checked is
-// no longer declared.
+// package under test is neither checked nor exempt, or where one checked or
+// exempt is no longer declared.
 func CoversEveryMapper(t *testing.T, mapped map[string]error, exempt map[string]string) {
 	t.Helper()
 	declared, err := DeclaredIn(os.DirFS("."))
@@ -178,22 +182,33 @@ func CoversEveryMapper(t *testing.T, mapped map[string]error, exempt map[string]
 	if len(declared) == 0 {
 		t.Fatal("no refusal mapper was found in the source, so this checked nothing")
 	}
+	for _, complaint := range Uncovered(declared, mapped, exempt) {
+		t.Error(complaint)
+	}
+}
+
+// Uncovered is every disagreement between the mappers declared and the ones
+// checked or exempt, in both directions, sorted.
+func Uncovered(declared []string, mapped map[string]error, exempt map[string]string) []string {
+	var complaints []string
 	for _, name := range declared {
 		if _, ok := exempt[name]; ok {
 			continue
 		}
 		if _, ok := mapped[name]; !ok {
-			t.Errorf("%s maps an error to an answer and is not passed a lost connection here", name)
+			complaints = append(complaints, name+" maps an error to an answer and is not passed a lost connection here")
 		}
 	}
 	for name := range mapped {
 		if !slices.Contains(declared, name) {
-			t.Errorf("%s is checked here and no longer declared in the source", name)
+			complaints = append(complaints, name+" is checked here and no longer declared in the source")
 		}
 	}
 	for name := range exempt {
 		if !slices.Contains(declared, name) {
-			t.Errorf("%s is exempt here and no longer declared in the source", name)
+			complaints = append(complaints, name+" is exempt here and no longer declared in the source")
 		}
 	}
+	sort.Strings(complaints)
+	return complaints
 }
