@@ -53,7 +53,10 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
-		ColumnExpr(shownComponent + ` AS "component"`).
+		// One stated name per alert: a group is the component row's name,
+		// which identifies the alert, and two builds' names for it are one
+		// group.
+		ColumnExpr(`MIN(` + shownComponent + `) AS "component"`).
 		ColumnExpr(`"c"."name" AS "named"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		// The product and the issue as identifiers too: what a message says is

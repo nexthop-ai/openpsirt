@@ -343,7 +343,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 				WhereOr(rating.BandExpr+" = ?", "critical")
 		}).
 		Where("NOT "+standing, args...).
-		GroupExpr(`"p"."name", "st"."name", "va"."name", "c"."name", `+shownComponent+`, "v"."identifier", "st"."product_id", "v"."id"`).
+		GroupExpr(`"p"."name", "st"."name", "va"."name", "c"."name", "v"."identifier", "st"."product_id", "v"."id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is critical on a release: %w", err)
