@@ -82,7 +82,7 @@ need, such as an identifier or a secret shown once.
 | Engine | The seed runs | A later test gets |
 |---|---|---|
 | SQLite | Once per binary, into the template | A copy of the template |
-| The three servers | Once per binary, in its first test, after emptying | The rows the seed wrote, read back after it ran. What the test before changed is undone, in one transaction (§ Undoing a test) |
+| The three servers | Once per binary, in its first test, after emptying | The rows the seed wrote, read back after it ran. What the test before changed is undone, in one transaction (§ Reset between tests) |
 
 | Rule | Reason |
 |---|---|
@@ -115,7 +115,7 @@ other test.
 | The API authorization tests | Their products and people are the matrix |
 | A migration test | It seeds the older schema it migrates from |
 
-### Undoing a test
+### Reset between tests
 
 A later test on a server starts by undoing what the test before it did to the
 kept rows, in one transaction. Emptying the seeded tables costs most of a start

@@ -52,7 +52,7 @@ An upload passes both, each set by the deployment.
 | A share above the whole and a count at or below zero are refused | Nothing reaches them, while the screen reports them as applying |
 | The shipped numbers are a starting point | Nightly movement depends on what a build is built from |
 | An empty inventory's share stops nothing; the floor still applies | |
-| The backlog trend's returns after a gap are judged by the thresholds in force when it is read, past uploads included (`design-docs/analytics-program.md` § Counting by identity) | One rule for one event, worked out when asked; a change re-reads the history, as a severity rated again does |
+| The backlog trend's returns after a gap are judged by the thresholds in force when it is read, past uploads included (`design-docs/analytics-program.md` § Counts by identity) | One rule for one event, worked out when asked; a change re-reads the history, as a severity rated again does |
 
 ## Analyzer alerts
 
