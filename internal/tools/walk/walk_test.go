@@ -5,6 +5,7 @@ package walk
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -185,5 +186,23 @@ func TestAPathCarriesNoLeadingDotSlash(t *testing.T) {
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestATrackedFileUnderASkippedDirectoryIsLeftOut(t *testing.T) {
+	listed := []byte("go.mod\x00internal/webui/dist/.gitkeep\x00web/node_modules/x/a.js\x00internal/dist.go\x00\x00")
+	got := trackedIn(listed, Skipped())
+	if want := []string{"go.mod", "internal/dist.go"}; !slices.Equal(got, want) {
+		t.Errorf("tracked %v, want %v", got, want)
+	}
+}
+
+func TestATrackedListingOfNothingRefuses(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if out, err := exec.Command("git", "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	if _, err := Tracked(); err == nil {
+		t.Error("a checkout tracking nothing read as one with nothing wrong")
 	}
 }

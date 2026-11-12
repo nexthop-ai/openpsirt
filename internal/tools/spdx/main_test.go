@@ -4,6 +4,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -109,5 +111,29 @@ func TestOnlySourceIsHeld(t *testing.T) {
 		if got := covered(file); got != want {
 			t.Errorf("%s held to a header: %v, want %v", file, got, want)
 		}
+	}
+}
+
+func TestFixingWritesNothingThroughASymbolicLink(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "profile")
+	if err := os.WriteFile(outside, []byte("echo outside\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("run.sh", []byte("echo inside\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, "linked.sh"); err != nil {
+		t.Fatal(err)
+	}
+	faults, examined, written := check([]string{"run.sh", "linked.sh"}, true)
+	if len(faults) != 0 || examined != 1 || written != 1 {
+		t.Errorf("faults %v, examined %d, written %d; want the regular file alone stamped", faults, examined, written)
+	}
+	if body, _ := os.ReadFile(outside); string(body) != "echo outside\n" {
+		t.Errorf("the file a link points to was rewritten:\n%s", body)
+	}
+	if body, _ := os.ReadFile("run.sh"); !strings.Contains(string(body), "SPDX-License-Identifier") {
+		t.Errorf("the regular file was not stamped:\n%s", body)
 	}
 }

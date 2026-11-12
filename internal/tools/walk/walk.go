@@ -18,9 +18,11 @@
 package walk
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -94,6 +96,36 @@ func Paths(extra []string, visit func(path string) (bool, error)) (int, error) {
 		return 0, err
 	}
 	return kept, sawSomething(kept, "files")
+}
+
+// Tracked is every file git tracks in the working directory's checkout,
+// less those under a skipped directory, for a gate that reads what is
+// committed rather than what is on disk.
+func Tracked() ([]string, error) {
+	listed, err := exec.Command("git", "ls-files", "-z").Output()
+	if err != nil {
+		return nil, fmt.Errorf("listing the tree: %w", err)
+	}
+	tracked := trackedIn(listed, Skipped())
+	return tracked, sawSomething(len(tracked), "tracked files")
+}
+
+// trackedIn reads git's NUL-separated listing, dropping an empty entry and
+// a path with a directory named in skip.
+func trackedIn(listed []byte, skip []string) []string {
+	var tracked []string
+	for _, each := range bytes.Split(listed, []byte{0}) {
+		path := string(each)
+		if path == "" {
+			continue
+		}
+		dirs := strings.Split(path, "/")
+		if slices.ContainsFunc(dirs[:len(dirs)-1], func(dir string) bool { return slices.Contains(skip, dir) }) {
+			continue
+		}
+		tracked = append(tracked, path)
+	}
+	return tracked
 }
 
 func each(extra []string, visit func(path string) error) error {

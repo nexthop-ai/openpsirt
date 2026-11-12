@@ -175,6 +175,7 @@ and an SPDX identifier; `make spdx-fix` writes missing ones.
 | A file with somebody else's work joins their license from the copied-files list | The two gates agree |
 | Fixtures and files a third-party tool writes whole carry none; this project's generators write it | |
 | A wrong header is reported, never rewritten | |
+| A tracked symbolic link is neither read nor written | Either follows the link to wherever it points, which can be outside the checkout |
 | No year; the dated notice is in `NOTICE` | |
 
 ## Action pinning
