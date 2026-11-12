@@ -53,6 +53,11 @@ func newStreamSlots(db *database.DB) streamSlots {
 	return make(streamSlots, n)
 }
 
+// ExportsBusy is what an export that reads as it writes says about the slots
+// it waits for, in its published description.
+const ExportsBusy = "Answers 503 with `Retry-After` when the deployment is already writing as many " +
+	"files as it takes at once; ask again after that many seconds."
+
 // take claims a slot, or refuses with a time to ask again. The release is
 // called once the stream has finished writing.
 func (s streamSlots) take() (func(), error) {

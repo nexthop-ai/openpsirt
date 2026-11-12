@@ -150,7 +150,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 			"and the builds that hold it.\n\n" +
 			"Takes the same selection and the same filters as the screen, from the same " +
 			"struct. The builds an upgrade is held in are one cell, separated by spaces, because " +
-			"a spreadsheet has no second dimension.",
+			"a spreadsheet has no second dimension.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`

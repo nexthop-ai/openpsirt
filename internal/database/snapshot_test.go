@@ -63,21 +63,25 @@ func TestASnapshotReadsWhatWasCommittedWhenItFirstRead(t *testing.T) {
 	})
 }
 
-// TestASnapshotOutlastsPostgreSQLsBoundOnAnIdleTransaction pins a snapshot
-// against a server that ends a session idle inside a transaction: a file
-// written slowly between two pages still reads its second page. The pool is
-// narrowed to one connection, so the snapshot runs on the session given the
-// bound.
-func TestASnapshotOutlastsPostgreSQLsBoundOnAnIdleTransaction(t *testing.T) {
+// TestASnapshotOutlastsPostgreSQLsBoundsOnATransaction pins a snapshot
+// against a server that ends a session idle inside a transaction, or a
+// transaction past a length: a file written slowly between two pages still
+// reads its second page. The pool is narrowed to one connection, so the
+// snapshot runs on the session given the bounds.
+func TestASnapshotOutlastsPostgreSQLsBoundsOnATransaction(t *testing.T) {
 	dbtest.Only(t, database.Postgres, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		db.SetMaxOpenConns(1)
 		t.Cleanup(func() { db.SetMaxOpenConns(db.Pool.MaxOpen) })
-		if _, err := db.ExecContext(ctx, `SET idle_in_transaction_session_timeout = '100ms'`); err != nil {
+		// The bound on a transaction's length is PostgreSQL 17's, and is set
+		// where the server has it.
+		if _, err := db.ExecContext(ctx, `SELECT set_config("name", '100ms', false) FROM "pg_settings"
+			WHERE "name" IN ('idle_in_transaction_session_timeout', 'transaction_timeout')`); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() {
-			_, _ = db.ExecContext(context.WithoutCancel(ctx), `RESET idle_in_transaction_session_timeout`)
+			_, _ = db.ExecContext(context.WithoutCancel(ctx), `SELECT set_config("name", '0', false) FROM "pg_settings"
+				WHERE "name" IN ('idle_in_transaction_session_timeout', 'transaction_timeout')`)
 		})
 		err := database.Snapshot(ctx, db, func(ctx context.Context, view bun.IDB) error {
 			var n int
@@ -88,7 +92,7 @@ func TestASnapshotOutlastsPostgreSQLsBoundOnAnIdleTransaction(t *testing.T) {
 			return view.NewRaw(`SELECT 2`).Scan(ctx, &n)
 		})
 		if err != nil {
-			t.Fatalf("a snapshot idle past the server's bound failed: %v", err)
+			t.Fatalf("a snapshot held past the server's bounds failed: %v", err)
 		}
 	})
 }

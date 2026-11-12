@@ -28,7 +28,7 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 		Summary: "Export the outcomes of your own decisions",
 		Description: "What `GET /v1/my-decisions` lists, as a file: every decision you proposed, " +
 			"newest first, with what became of each and who did it, rather than one page.\n\n" +
-			"Narrowed to what you may still read.",
+			"Narrowed to what you may still read.\n\n" + core.ExportsBusy,
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`

@@ -346,3 +346,17 @@ runs shared the servers.
 | Without a snapshot it stays under 300 | The same writer for three minutes: at most 265 on MySQL and 271 on MariaDB |
 | A read inside the snapshot slows as rows it reads gain versions | A scan of the 10,000 updated rows went from 25 ms to about 0.7 to 0.9 s on MySQL, 14 ms to about 0.5 s on MariaDB |
 | On PostgreSQL vacuum keeps every row version that died while the snapshot was open, until it ends | Vacuum removes nothing the oldest open snapshot can still see; not measured here |
+
+A product's findings file read as the export reads it, 200 groups a page,
+by `TestMeasureAFindingsFileReadInOneSnapshot`: 12,000 issue-at-component
+groups over two builds of 34 consumers, above the 7,374 a real switch image
+carried. One engine at a time, no writer beside it.
+
+| Engine | In one snapshot | One statement a page | Slowest page in the snapshot |
+|---|---|---|---|
+| SQLite | 15.9 s | 16.0 s | 423 ms |
+| PostgreSQL 16 | 14.7 s | 9.6 s | 403 ms |
+| MySQL 8.4 | 44.3 s | 44.2 s | 1.59 s |
+| MariaDB 11.4 | 36.8 s | 36.8 s | 848 ms |
+
+The slowest engine reads the file in under a tenth of the ten-minute ceiling.

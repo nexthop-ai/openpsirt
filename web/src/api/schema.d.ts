@@ -47,6 +47,8 @@ export interface paths {
          *
          *     Takes the kind and the period the list takes. Asked for no period it writes everything this deployment holds.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: administrator, or the audit permission over this deployment's own records
          */
         get: operations["export-administrative-changes"];
@@ -663,6 +665,8 @@ export interface paths {
          *
          *     Takes every filter the audit list takes, including the period.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-audit"];
@@ -928,6 +932,8 @@ export interface paths {
          * @description The code finding list across products as a file: every row the same filters would list, not one page of them, in the same order, each naming its product.
          *
          *     Read with your own visibility, as it is written. No row carries source text. Takes every filter the list across products takes.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only the products where you read security testing work.
          */
@@ -1667,6 +1673,8 @@ export interface paths {
          *
          *     Takes every filter the cross-product list takes. `beneath` and `differs` are not offered here, for the reason that list gives.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-findings-anywhere"];
@@ -2068,6 +2076,8 @@ export interface paths {
          * @description What `GET /v1/my-decisions` lists, as a file: every decision you proposed, newest first, with what became of each and who did it, rather than one page.
          *
          *     Narrowed to what you may still read.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -3907,6 +3917,8 @@ export interface paths {
          * Export the disposition register
          * @description The register as a file. Read with your own visibility as it streams, like every other export here.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-disposition-register"];
@@ -4501,6 +4513,8 @@ export interface paths {
          *
          *     With no `state` it is the queue, and the file says so. Takes every filter the code finding list takes.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-code-findings"];
@@ -4863,6 +4877,8 @@ export interface paths {
          *
          *     Takes every filter the findings list takes.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-findings"];
@@ -4948,6 +4964,8 @@ export interface paths {
          *     This is the shape a release meeting argues over: where the weight is rather than what is wrong. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58, which is a one-line answer here and invisible in a list of issues.
          *
          *     Takes the same filters as the by-component list, and the line this deployment triages at is stated in the file.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -5680,6 +5698,8 @@ export interface paths {
          * @description The same list as a file: one row per upstream upgrade, with what it closes and the builds that hold it.
          *
          *     Takes the same selection and the same filters as the screen, from the same struct. The builds an upgrade is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -6831,6 +6851,8 @@ export interface paths {
          *
          *     Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, and holds the same decisions.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-review-queue"];
@@ -6932,6 +6954,8 @@ export interface paths {
          *     The same list the screen reads, under the same rule — a deadline that has been answered is not on it, because a dismissal takes a finding off the clock and a deferral replaces the deadline with its own date. What is left is time passing with nothing said.
          *
          *     `days_left` is negative once something is overdue.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */

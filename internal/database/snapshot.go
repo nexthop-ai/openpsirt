@@ -33,10 +33,10 @@ import (
 // begins, so a snapshot never holds a writer up; in WAL mode its first read
 // fixes what it sees.
 //
-// It sits idle between statements while fn writes what it read, so on
-// PostgreSQL a server's bound on a session idle inside a transaction would end
-// it partway through. That bound is lifted for the snapshot alone, and fn's
-// context bounds it instead.
+// It sits idle between statements while fn writes what it read, and lasts as
+// long as the file, so on PostgreSQL a server's bound on a session idle inside
+// a transaction, or on a transaction's length, would end it partway through.
+// Both are lifted for the snapshot alone, and fn's context bounds it instead.
 func Snapshot(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) error) error {
 	if tx, inside := db.(bun.Tx); inside {
 		// Already inside a transaction, which is a view of its own.
@@ -51,9 +51,13 @@ func Snapshot(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB)
 		return fmt.Errorf("begin a snapshot: %w", err)
 	}
 	if handle.Dialect().Name() == dialect.PG {
-		if _, err := tx.ExecContext(ctx, `SET LOCAL idle_in_transaction_session_timeout = 0`); err != nil {
+		// Both bounds the server holds, read from its settings: PostgreSQL 17
+		// added the second, and a name an older server does not know is
+		// refused rather than ignored.
+		if _, err := tx.ExecContext(ctx, `SELECT set_config("name", '0', true) FROM "pg_settings"
+			WHERE "name" IN ('idle_in_transaction_session_timeout', 'transaction_timeout')`); err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("lift the idle bound on a snapshot: %w", err)
+			return fmt.Errorf("lift the time bounds on a snapshot: %w", err)
 		}
 	}
 	err = fn(ctx, tx)

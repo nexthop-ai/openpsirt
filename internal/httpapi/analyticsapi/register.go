@@ -241,7 +241,7 @@ func registerRegister(api huma.API, in core.Deps) {
 		Path:    path + ".{format}",
 		Summary: "Export the disposition register",
 		Description: "The register as a file. Read with your own visibility as it streams, " +
-			"like every other export here.",
+			"like every other export here.\n\n" + core.ExportsBusy,
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`

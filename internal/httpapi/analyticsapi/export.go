@@ -57,7 +57,7 @@ func registerExport(api huma.API, in core.Deps) {
 			"order holds no code finding, and says so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, " +
 			"and `on=branch` with `support=in-support`, which is what the list reads when " +
 			"neither is asked.\n\n" +
-			"Takes every filter the findings list takes.",
+			"Takes every filter the findings list takes.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
@@ -128,7 +128,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			"product name, as the product export writes them. The columns and the rule about " +
 			"filters are the product export's.\n\n" +
 			"Takes every filter the cross-product list takes. `beneath` and `differs` are " +
-			"not offered here, for the reason that list gives.",
+			"not offered here, for the reason that list gives.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`

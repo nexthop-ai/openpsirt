@@ -293,7 +293,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			"page of them, in the same order.\n\n" +
 			"Read with your own visibility, as it is written. No row carries source text.\n\n" +
 			"With no `state` it is the queue, and the file says so. Takes every filter the code finding " +
-			"list takes.",
+			"list takes.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		CodeFindingsAsked
@@ -410,7 +410,7 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 		Description: "The code finding list across products as a file: every row the same filters would list, " +
 			"not one page of them, in the same order, each naming its product.\n\n" +
 			"Read with your own visibility, as it is written. No row carries source text. Takes every filter " +
-			"the list across products takes.",
+			"the list across products takes.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only the products where you read security testing work."), func(ctx context.Context, input *struct {
 		CodeFindingsAcrossAsked

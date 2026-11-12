@@ -62,7 +62,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 			"answered is not on it, because a dismissal takes a finding off the clock and a " +
 			"deferral replaces the deadline with its own date. What is left is time passing " +
 			"with nothing said.\n\n" +
-			"`days_left` is negative once something is overdue.",
+			"`days_left` is negative once something is overdue.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
@@ -267,7 +267,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 			"Read with your own visibility, as it streams. Nothing about a report is " +
 			"exempt from the rules the screens follow — a file showing more than the screen " +
 			"that summarizes it would be a way around them.\n\n" +
-			"Takes every filter the audit list takes, including the period.",
+			"Takes every filter the audit list takes, including the period.\n\n" + core.ExportsBusy,
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Auditing
@@ -281,6 +281,11 @@ func registerAuditExport(api huma.API, in core.Deps) {
 		filter, since, until, err := input.narrow(ctx, in, subject)
 		if err != nil {
 			return nil, err
+		}
+		// An open end is the moment the file was asked for, as the
+		// administrative changes file takes it, so the file says one.
+		if until.IsZero() {
+			until = time.Now().UTC()
 		}
 		// What was asked for, printed on the file. A sheet headed "the record
 		// of decisions" over a narrowed population is a sheet nobody can
@@ -362,7 +367,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 			"One row per decision, the way the screen counts them — one proposer's action, " +
 			"however many occurrences it reaches — with how much it covers and how old it is.\n\n" +
 			"Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, " +
-			"and holds the same decisions.",
+			"and holds the same decisions.\n\n" + core.ExportsBusy,
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format  string `path:"format" enum:"csv,json"`
@@ -457,7 +462,7 @@ func registerComponentExport(api huma.API, in core.Deps) {
 			"of 6,822 findings rows and the next largest contributor carried 58, which is a " +
 			"one-line answer here and invisible in a list of issues.\n\n" +
 			"Takes the same filters as the by-component list, and the line this deployment " +
-			"triages at is stated in the file.",
+			"triages at is stated in the file.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
@@ -517,7 +522,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 			"before and after. An absent value is not an empty one: `unset` says nobody had " +
 			"set it, and `cleared` that the change removed it.\n\n" +
 			"Takes the kind and the period the list takes. Asked for no period it writes " +
-			"everything this deployment holds.",
+			"everything this deployment holds.\n\n" + core.ExportsBusy,
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, input *struct {
 		Format string         `path:"format" enum:"csv,json"`
