@@ -14527,7 +14527,7 @@ export interface components {
             severity?: "critical" | "high" | "medium" | "low" | "negligible" | "none";
             /** @description The flaw, in your own words */
             summary: string;
-            /** @description A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
+            /** @description A CVSS 3.0, 3.1 or 4.0 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
             vector?: string;
             /** @description The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
@@ -14571,7 +14571,7 @@ export interface components {
             severity?: "critical" | "high" | "medium" | "low" | "negligible" | "none";
             /** @description The flaw, in your own words */
             summary: string;
-            /** @description A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
+            /** @description A CVSS 3.0, 3.1 or 4.0 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
             vector?: string;
             /** @description The version, where the build holds that name at several */
             version?: string;
