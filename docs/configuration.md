@@ -1656,19 +1656,21 @@ v0.10.2 named `reaffirm-claim`.
 | `openpsirt-upload` refuses a plain `http` address that is not this machine. v0.12.0 sent the key over it unencrypted | Use the `https` address. Inside a network you trust, give `--allow-http` |
 | `openpsirt-upload write` names each analyzer's file with the analyzer's name in lower-case letters, digits, `.`, `_` and `-`, every other character a `-` and no `.` at either end. v0.12.0 wrote the name as the analyzer gave it | Look for the new name where a script picks the file up by its name |
 | The Helm chart salts the checksum that rolls the pods when a chart-held secret changes, and keeps the salt in the Secret `<fullname>-rollout-salt`, where `<fullname>` is the name the chart's resources share: `fullnameOverride` where set, otherwise the release name followed by `-` and the chart name (`nameOverride` where set) unless the release name holds it, cut to 63 characters. The first upgrade rolls the pods once | Where the chart is rendered with no cluster, `helm template` or Argo CD, set `rolloutSalt` to a long random value, or the pods roll on every render |
-| A VEX document uploaded without `publisher` is filed under the publisher it names: an OpenVEX author or a CSAF publisher name. One naming neither is refused with 422. v0.12.0 filed it under its file name | Clear what v0.12.0 filed under a file name, as [VEX statements under a file name](#vex-statements-under-a-file-name) says. Left alone, those statements stay in force beside the ones later uploads file under the document's own publisher |
-| A VEX document replaces only an earlier revision of itself: the same publisher and the same OpenVEX `@id` or CSAF tracking identifier. v0.12.0 replaced every earlier document from that publisher | Nothing. Another document from the same publisher stays in force beside it |
+| A VEX document uploaded without `publisher` is filed under the publisher it names: an OpenVEX author or a CSAF publisher name. One naming neither is refused with 422. v0.12.0 filed it under its file name | Clear what v0.12.0 filed under a file name, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, those statements stay in force beside the ones later uploads file under the document's own publisher |
+| A VEX document replaces only an earlier revision of itself: the same publisher and the same OpenVEX `@id` or CSAF tracking identifier. v0.12.0 replaced every earlier document from that publisher | Clear what v0.12.0 recorded under each publisher, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, a revision stating an identifier replaces none of it, and what v0.12.0 recorded stays in force beside the revision |
 | A build's components are shown, searched and given to the scanner by the name and version that build stated. v0.12.0 used those of whichever build described the package first, in any product | Nothing. A build shows its own once its inventory is sent again; until then it keeps the names and versions v0.12.0 showed |
 
-#### VEX statements under a file name
+#### VEX statements from v0.12.0
 
-The statements v0.12.0 filed under a file name cannot be moved to their real
-publisher, because the document they came from is not kept. For each VEX
-document uploaded to v0.12.0 without `publisher`:
+Every VEX statement v0.12.0 recorded carries no document identifier, so a
+later document stating an OpenVEX `@id` or a CSAF tracking identifier replaces
+none of them. Those filed under a file name also carry no real publisher. The
+document they came from is not kept, so neither can be filled in. For each
+publisher name v0.12.0's statements show, a file name or a real publisher, and
+before uploading anything new under that name:
 
-1. Upload an empty document with `publisher` set to the name the statements
-   show as their publisher, which is the file name the document was uploaded
-   as. It sets aside every statement filed under that name:
+1. Upload an empty document stating no identifier, with `publisher` set to that
+   name. It sets aside every statement v0.12.0 recorded under it:
 
    ```bash
    echo '{"@context":"https://openvex.dev/ns/v0.2.0","author":"cleared",
@@ -1678,8 +1680,8 @@ document uploaded to v0.12.0 without `publisher`:
      -H "Origin: $OPENPSIRT" -F "statements=@empty.json"
    ```
 
-2. Upload the document again without `publisher`, or with the name of its real
-   publisher.
+2. Upload the publisher's current documents again, without `publisher` or with
+   the name of the real publisher.
 
 The answer to the first step says how many statements it set aside. A set-aside
 statement stays readable beside any approval granted on it.
