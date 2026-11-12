@@ -132,10 +132,11 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	}
 
 	// Discovery and the key fetches that follow it are pinned to the issuer's
-	// host, refuse redirects, and refuse to connect inside this network.
+	// host and port, refuse redirects, and refuse to connect inside this
+	// network.
 	guarded := cfg.client
 	if guarded == nil {
-		guarded = outward.Guarded(issuer.Hostname())
+		guarded = outward.Guarded(issuer.Host)
 	}
 	ctx = oidc.ClientContext(ctx, guarded)
 	// Asked as the operator wrote it, and asked again as the provider
@@ -186,10 +187,12 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		if err != nil {
 			return nil, fmt.Errorf("the %q provider named an unreadable %s endpoint", cfg.Name, what)
 		}
-		if !strings.EqualFold(named.Hostname(), issuer.Hostname()) {
+		// The port as well as the name: another port on the issuer's host
+		// is another service.
+		if outward.Authority(named.Host) != outward.Authority(issuer.Host) {
 			return nil, fmt.Errorf(
 				"the %q provider names its %s endpoint on %s rather than on its own host %s",
-				cfg.Name, what, named.Hostname(), issuer.Hostname())
+				cfg.Name, what, named.Host, issuer.Host)
 		}
 		if named.Scheme != "https" {
 			return nil, fmt.Errorf("the %q provider names a %s endpoint that is not https", cfg.Name, what)

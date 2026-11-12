@@ -78,18 +78,39 @@ func Guarded(hosts ...string) *http.Client {
 // redirect, and the refusal to connect inside this network. The dialer keeps
 // the interactive budget whatever the whole call is given, because how long a
 // connection takes to establish does not scale with what is being fetched.
+//
+// A host is a name, with its port where it is not the https port. A request
+// reaches a host on the port it names and no other, since a document naming
+// another port on a permitted host is asking for a different service.
 func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 	allowed := make(map[string]bool, len(hosts))
 	for _, host := range hosts {
-		allowed[strings.ToLower(host)] = true
+		allowed[Authority(host)] = true
 	}
 	return client(within, Reachable, func(to *url.URL) error {
-		host := to.Hostname()
-		if !allowed[strings.ToLower(host)] {
-			return fmt.Errorf("%w a request to %s: not a configured provider host", ErrRefused, host)
+		if !allowed[Authority(to.Host)] {
+			return fmt.Errorf("%w a request to %s: not a configured provider host", ErrRefused, to.Host)
 		}
 		return nil
 	})
+}
+
+// Authority is a host and port as one https service is named: lower case,
+// without a trailing dot, and without the port where it is the https one.
+// Two authorities name one service where they are equal.
+func Authority(hostport string) string {
+	host, port := hostport, ""
+	if h, p, err := net.SplitHostPort(hostport); err == nil {
+		host, port = h, p
+	}
+	host = strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")
+	if port == "" || port == HTTPSPort {
+		if strings.Contains(host, ":") {
+			return "[" + host + "]"
+		}
+		return host
+	}
+	return net.JoinHostPort(host, port)
 }
 
 // Open returns an HTTP client for addresses a publisher's own document names,

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -243,6 +244,27 @@ func TestAProviderNamingItsEndpointsElsewhereIsRefusedAtStartup(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "somewhere.else.example") {
 			t.Errorf("the refusal for the %s endpoint does not say where: %v", c.what, err)
+		}
+	}
+}
+
+// An endpoint on another port of the issuer's host is another service, and
+// is refused as one on another host is.
+func TestAProviderNamingAnEndpointOnAnotherPortIsRefusedAtStartup(t *testing.T) {
+	for _, field := range []string{"authorization_endpoint", "token_endpoint", "jwks_uri"} {
+		p := standing(t)
+		host, port, err := net.SplitHostPort(strings.TrimPrefix(p.URL, "https://"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		other := "8443"
+		if port == other {
+			other = "9443"
+		}
+		p.document = map[string]any{field: "https://" + net.JoinHostPort(host, other) + "/x"}
+		_, err = p.adapter(t, OIDCConfig{})
+		if err == nil || !strings.Contains(err.Error(), "rather than on its own host") {
+			t.Errorf("a provider naming its %s on port %s answered %v, want it refused", field, other, err)
 		}
 	}
 }

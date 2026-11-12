@@ -47,8 +47,9 @@ a forge that issues no identity token and publishes no discovery document.
 ## Outbound provider fetches
 
 Every fetch out of this process uses one client. For discovery, the key fetches,
-the code exchange and forge calls it talks to the configured host alone, follows
-no redirect, and connects to no address inside this network.
+the code exchange and forge calls it talks to the configured host alone, on its
+configured port, follows no redirect, and connects to no address inside this
+network.
 
 An address inside this network is loopback, private, link-local, multicast or
 unspecified, or carrier-grade translation, "this network", benchmarking,
@@ -59,7 +60,8 @@ excluded networks alike.
 
 | Rule | Reason |
 |---|---|
-| The endpoints a provider publishes are checked against the issuer's host when the adapter is built; a misdirecting provider stops the process | A document from the right host can name another |
+| The endpoints a provider publishes are checked against the issuer's host and port when the adapter is built; a misdirecting provider stops the process | A document from the right host can name another, or another port on it |
+| A host and port compare in lower case, without a trailing dot, the https port the same as none | |
 | The address check runs after the name resolves and before the connection is made | A separate resolution can answer differently |
 | Every refusal the client makes is told apart from a host that did not answer, and an internal or excluded address apart again | |
 | The exchange re-resolves the issuer's name on every sign-in, under every control | It carries the client secret and the code |
