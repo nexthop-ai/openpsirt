@@ -23,12 +23,12 @@ func TestAGroupedDecisionReadsItsOccurrencesInTheTransactionItWritesIn(t *testin
 		also.OccurrenceIdentity = "another-place-of-libfoo"
 		asked := 0
 		decided, err := f.store.ProposeGrouped(ctx, f.triager, first,
-			func(_ context.Context, db bun.IDB) ([]triage.Occurrence, error) {
+			func(_ context.Context, db bun.IDB) (triage.Occurrence, []triage.Occurrence, error) {
 				asked++
 				if _, ok := db.(bun.Tx); !ok {
 					t.Errorf("the occurrences were read through %T, outside the transaction that writes", db)
 				}
-				return []triage.Occurrence{also}, nil
+				return first.Occurrence, []triage.Occurrence{also}, nil
 			})
 		if err != nil {
 			t.Fatal(err)

@@ -268,3 +268,23 @@ func TestACodeFindingFileReadsEndOfLifeAtItsMoment(t *testing.T) {
 		}
 	})
 }
+
+func TestADecisionAboutAFixedCodeFindingIsRefused(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		codeFinding := codeFindingsAtMaster + occurrence
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.CodeFindingRun(false))
+		body := httpapitest.FixedBody(t, r, codeFinding, "the bounds check landed")
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFinding+"/fixed", body); got.Code != http.StatusOK {
+			t.Fatalf("closing the code finding answered %d: %s", got.Code, got.Body)
+		}
+		got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, fmt.Sprintf(codeFindingDecisionAt, occurrence),
+			`{"outcome":"confirmed","reasoning":"the pointer is never freed"}`)
+		if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), "fixed") {
+			t.Errorf("a decision about a fixed code finding answered %d: %s; want 409 for the fix", got.Code, got.Body)
+		}
+		if n := decisionsAt(t, r, occurrence); n != 0 {
+			t.Errorf("%d decision rows were written at the fixed code finding; want none", n)
+		}
+	})
+}

@@ -42,7 +42,8 @@ it covers the code finding on every branch, tag and variant (REQ-25).
 | A code finding takes these outcomes alone, a vulnerability none | One asks whether it is real; the other how a known issue applies |
 | A dismissal states one of the four reasons | |
 | Approval needs `approver` and `security-testing-read` on the product, never the author | |
-| A fixed code finding takes no decision | It reopens when seen |
+| A fixed code finding takes no decision, refused with 409 | It reopens when seen |
+| The code finding, whether it is fixed, and the code findings the decision also answers are read inside the transaction writing it | A statement that it is fixed landing first is seen, and a retry reads again |
 | A probable pairing lapses a dismissal or not-security decision, re-affirmed as any lapsed decision (`design-docs/triage-lapse.md` § Re-affirmation); a confirmation stands | The pairing guesses it is the same result |
 | The lapse is written with the pairing | |
 | Decisions are read through the Decisions consumer (`design-docs/kinds.md` § Consumers) | The review queue and approval include them; the findings lists do not |
