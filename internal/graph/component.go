@@ -28,7 +28,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
-	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // Component is a package at a version, shared across every product that ships
@@ -246,13 +245,13 @@ func decodedPath(path string) string {
 	return strings.Join(segments, "/")
 }
 
-// statedPurl is a package identifier as a row holds it: trimmed, with the
-// slashes after the scheme dropped, and with any credential and query taken
-// out of a qualifier's address. A qualifier such as `vcs_url` or
+// StoredPurl is a package identifier as a row holds it: trimmed, with the
+// slashes after the scheme dropped, and with any credential, query and
+// fragment taken out of a qualifier's address. A qualifier such as `vcs_url` or
 // `download_url` names an address, a build pipeline can write it with a token
-// in its user or its query, and the identifier reaches every reader of the
+// in its user, its query or its fragment, and the identifier reaches every reader of the
 // component.
-func statedPurl(purl string) string {
+func StoredPurl(purl string) string {
 	purl = strings.TrimSpace(purl)
 	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.EqualFold(scheme, "pkg") {
 		purl = scheme + ":" + strings.TrimLeft(rest, "/")
@@ -282,12 +281,12 @@ func statedPurl(purl string) string {
 		switch {
 		case err != nil:
 			// Where its credential ends cannot be told, so it is not kept.
-		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery:
+		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery && parsed.Fragment == "":
 			kept = append(kept, pair)
 		default:
-			if cleaned := sourcelink.WithoutCredential(address); cleaned != "" {
-				kept = append(kept, key+"="+qualifierEscaped(cleaned))
-			}
+			parsed.User, parsed.RawQuery, parsed.ForceQuery = nil, "", false
+			parsed.Fragment, parsed.RawFragment = "", ""
+			kept = append(kept, key+"="+qualifierEscaped(parsed.String()))
 		}
 		if strings.Contains(value, "?") {
 			// An address whose query is written unescaped carries the
@@ -480,7 +479,7 @@ func (d Described) trimmed() Described {
 		&d.UpstreamVersion, &d.Supplier, &d.License} {
 		*field = strings.TrimSpace(*field)
 	}
-	d.Purl = statedPurl(d.Purl)
+	d.Purl = StoredPurl(d.Purl)
 	return d
 }
 

@@ -418,8 +418,10 @@ func (r *Reader) readScan(ctx context.Context, scanID int64) (*Result, error) {
 	// copy of the inventory does not carry. It is empty where the document
 	// declared nothing, because a reader sets the root and says it declared one
 	// in the same breath — and equally where it declared a root and gave it no
-	// package identifier, which is the same answer for the same reason.
-	rootIdentifier := doc.Root.Purl
+	// package identifier, which is the same answer for the same reason. It is
+	// stored as the root's node holds it, without a credential, since the
+	// published documents name the build by it.
+	rootIdentifier := graph.StoredPurl(doc.Root.Purl)
 
 	// The three writes are one act. Applied separately, a graph stored beside
 	// claims that were not recorded reads as a build that has withdrawn every

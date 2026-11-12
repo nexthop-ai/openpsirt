@@ -256,21 +256,21 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 // transaction that places it: zero where the rule or its team is retired,
 // since work placed there is work nothing picks up.
 func liveParty(ctx context.Context, tx bun.IDB, ruleID int64) (int64, error) {
-	var party []int64
-	if err := tx.NewSelect().
-		TableExpr(`"assignment_rule" AS "ar"`).
-		Join(`JOIN "team" AS "tm" ON "tm"."id" = "ar"."team_id"`).
-		ColumnExpr(`"tm"."party_id"`).
-		Where(`"ar"."id" = ?`, ruleID).
-		Where(`"ar"."retired_at" IS NULL`).
-		Where(`"tm"."retired_at" IS NULL`).
-		Scan(ctx, &party); err != nil {
-		return 0, fmt.Errorf("read which team that rule places work with: %w", err)
+	var rules []AssignmentRule
+	if err := tx.NewSelect().Model(&rules).
+		Where(`"id" = ?`, ruleID).
+		Where(`"retired_at" IS NULL`).
+		Scan(ctx); err != nil {
+		return 0, fmt.Errorf("read whether that rule is live: %w", err)
 	}
-	if len(party) == 0 {
+	if len(rules) == 0 {
 		return 0, nil
 	}
-	return party[0], nil
+	parties, err := (&Store{db: tx}).partiesOf(ctx, rules)
+	if err != nil {
+		return 0, err
+	}
+	return parties[rules[0].TeamID], nil
 }
 
 // applyOne is one rule's share of a batch, decided and written in one

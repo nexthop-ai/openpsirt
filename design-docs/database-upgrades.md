@@ -250,7 +250,7 @@ a stopped upgrade run again finds done.
 
 | Table | Rewritten |
 |---|---|
-| `component`, `graph_node`, `image_version` | A package identifier is rewritten as v0.13.0 stores it (`design-docs/data-model-components.md` § Component identity): the slashes after its scheme dropped, and a qualifier's address kept without its credential or query. Read and written in Go, 5,000 rows a read in order of identifier, only rows holding qualifiers or starting `pkg:/` in any case, since an address can be escaped in part; a row already in that form is left alone, so a second start writes only what the first missed. No identity moves, since qualifiers are outside it |
+| `component`, `graph_node`, `image_version`, the scan's root identifier | A package identifier is rewritten as v0.13.0 stores it (`design-docs/data-model-components.md` § Component identity): the slashes after its scheme dropped, and a qualifier's address kept without its credential, query or fragment. Read and written in Go, 5,000 rows a read in order of identifier, only rows holding qualifiers or starting `pkg:/` in any case, since an address can be escaped in part; a row already in that form is left alone, so a second start writes only what the first missed. No identity moves, since qualifiers are outside it |
 
 | Upgrade note | Detail |
 |---|---|
@@ -270,7 +270,7 @@ a stopped upgrade run again finds done.
 | A v0.12.0 database holding a received statement, and two advisories from one publisher about one subject | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it, the older advisory's set aside as overtaken by the newer's |
 | The same stopped after the time, on the servers | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database stopped after the withdrawer's column, on the servers | Upgraded the same, the key added and the column kept |
-| A v0.12.0 database holding identifiers with a credential in an address, escaped and plain, a token in an address's query, slashes after the scheme, and one already clean, on a component, a node and an image version | Each rewritten as v0.13.0 stores it, the other qualifiers kept, the clean one unchanged |
+| A v0.12.0 database holding identifiers with a credential in an address, escaped and plain, a token in an address's query, slashes after the scheme, and one already clean, on a component, a node, an image version and a scan's root identifier | Each rewritten as v0.13.0 stores it, the other qualifiers kept, the clean one unchanged |
 
 ## Limits
 

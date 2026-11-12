@@ -180,6 +180,8 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 				"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin"},
 			{"pkg:golang/example.com/p@v1?vcs_url=git%2Bhttps%3A//oauth2:glpat-SECRET@gitlab.example.com/p.git",
 				"pkg:golang/example.com/p@v1?vcs_url=git%2Bhttps://gitlab.example.com/p.git"},
+			{"pkg:generic/frag@1?download_url=https%3A%2F%2Fexample.com%2Ff.bin%23access_token%3DSECRET",
+				"pkg:generic/frag@1?download_url=https://example.com/f.bin"},
 			{"pkg://deb/debian/curl@8.5.0", "pkg:deb/debian/curl@8.5.0"},
 			{"PKG://deb/debian/wget@1.21", "PKG:deb/debian/wget@1.21"},
 			{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
@@ -209,13 +211,20 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 			node := id(`SELECT MAX("id") FROM "graph_node"`)
 			exec(`INSERT INTO "image_version" ("node_id", "version", "purl", "opened_scan_id")
 				VALUES (?, ?, ?, ?)`, node, "1", purl, scan)
+			exec(`INSERT INTO "scan" ("build_id", "content_hash", "built_at", "received_at", "parser_version",
+				"status", "components", "root_identifier") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				build, key, at, at, "test", "accepted", 1, purl)
 		}
 
 		dbtest.MigrateTo(t, db, v0130)
 
-		for _, table := range []string{"component", "graph_node", "image_version"} {
+		for _, at := range [][2]string{
+			{"component", "purl"}, {"graph_node", "purl"}, {"image_version", "purl"}, {"scan", "root_identifier"},
+		} {
+			table := at[0]
 			var got []string
-			if err := db.DB.NewRaw(`SELECT "purl" FROM "`+table+`" ORDER BY "id"`).Scan(ctx, &got); err != nil {
+			if err := db.DB.NewRaw(`SELECT "`+at[1]+`" FROM "`+table+`" WHERE "`+at[1]+
+				`" IS NOT NULL ORDER BY "id"`).Scan(ctx, &got); err != nil {
 				t.Fatal(err)
 			}
 			if len(got) != len(cases) {

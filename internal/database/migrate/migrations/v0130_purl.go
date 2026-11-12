@@ -12,9 +12,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// purlTablesV0130 is each table holding a package identifier as a build
-// stated it.
-var purlTablesV0130 = []string{"component", "graph_node", "image_version"}
+// purlColumnsV0130 is each table and column holding a package identifier as a
+// build stated it.
+var purlColumnsV0130 = [][2]string{
+	{"component", "purl"}, {"graph_node", "purl"}, {"image_version", "purl"}, {"scan", "root_identifier"},
+}
 
 // purlBatchV0130 is how many rows one read of the credential step takes.
 const purlBatchV0130 = 5_000
@@ -33,14 +35,15 @@ func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
 // purlCredentialsInBatchesV0130 cleans as purlCredentialsV0130 does, reading
 // batch rows at a time.
 func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) error {
-	for _, table := range purlTablesV0130 {
+	for _, at := range purlColumnsV0130 {
+		table, column := at[0], at[1]
 		for after := int64(0); ; {
 			type held struct {
 				id   int64
 				purl string
 			}
-			rows, err := tx.QueryContext(ctx, `SELECT "id", "purl" FROM "`+table+`"
-				WHERE "id" > ? AND ("purl" LIKE ? OR LOWER("purl") LIKE ?) ORDER BY "id" LIMIT ?`,
+			rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
+				WHERE "id" > ? AND ("`+column+`" LIKE ? OR LOWER("`+column+`") LIKE ?) ORDER BY "id" LIMIT ?`,
 				after, "%?%", "pkg:/%", batch)
 			if err != nil {
 				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
@@ -66,7 +69,7 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
 			for _, row := range found {
-				if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "purl" = ? WHERE "id" = ?`,
+				if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "`+column+`" = ? WHERE "id" = ?`,
 					row.purl, row.id); err != nil {
 					return fmt.Errorf("clean the package identifier of %s %d: %w", table, row.id, err)
 				}
@@ -113,10 +116,11 @@ func purlWithoutCredentialV0130(purl string) string {
 		parsed, err := url.Parse(address)
 		switch {
 		case err != nil:
-		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery:
+		case parsed.User == nil && parsed.RawQuery == "" && !parsed.ForceQuery && parsed.Fragment == "":
 			kept = append(kept, pair)
 		default:
 			parsed.User, parsed.RawQuery, parsed.ForceQuery = nil, "", false
+			parsed.Fragment, parsed.RawFragment = "", ""
 			kept = append(kept, key+"="+qualifierEscapedV0130(parsed.String()))
 		}
 		if strings.Contains(value, "?") {

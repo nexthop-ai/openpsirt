@@ -134,9 +134,10 @@ func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID 
 //
 // Closed occurrences count. An occurrence that closed while undisclosed still
 // carries a record — comments, decisions, who did what — and disclosing the
-// issue is disclosing that record too (REQ-40). The end is read from the open
-// occurrences, which are the ones a movement reads and moves, and from the
-// closed ones only where nothing is open; it is nil where none carries a date.
+// issue is disclosing that record too (REQ-40). The end is the latest date an
+// open occurrence carries, since the open ones are what a movement reads and
+// moves, and the latest a closed one carries only where nothing is open; it is
+// nil where none of those carries a date.
 func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (*time.Time, error) {
 	var held struct {
 		Occurrences int        `bun:"places"`
@@ -148,9 +149,8 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "places")).
 		ColumnExpr(`COUNT(CASE WHEN "f"."visibility" = ? THEN 1 END) AS "public"`, access.Public).
-		// The open ones decide whenever one is held, undated included: an
-		// open occurrence with no date beside a closed one dated is an issue
-		// with no date.
+		// The open ones decide whenever one is held: open occurrences with no
+		// date beside a closed one dated are an issue with no date.
 		ColumnExpr(`CASE WHEN COUNT(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN 1 END) > 0 `+
 			`THEN MAX(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN "f"."disclose_at" END) `+
 			`ELSE MAX(CASE WHEN "f"."visibility" = ? THEN "f"."disclose_at" END) END AS "ends"`,
