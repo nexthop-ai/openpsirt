@@ -65,18 +65,26 @@ func boundedRefusals(file *ast.File, name string) []string {
 	return out
 }
 
-// ordered reports a status found below 400, or ordered either way against a
-// refusal's status by name. Whatever holds the status — a recorder's Code, or
-// a plain int a helper returned — nothing but a status is compared with these.
+// ordered reports a status found below 400, a status found at or above 200 (the
+// success range's floor, so a test failing only inside it passes a fault), or
+// ordered either way against a refusal's status by name. Whatever holds the
+// status — a recorder's Code, or a plain int a helper returned — nothing but a
+// status is compared with these.
 func ordered(compared *ast.BinaryExpr) bool {
 	switch compared.Op {
 	case token.LSS, token.LEQ, token.GTR, token.GEQ:
 	default:
 		return false
 	}
-	if bound, ok := compared.Y.(*ast.BasicLit); ok && bound.Value == "400" &&
-		(compared.Op == token.LSS || compared.Op == token.LEQ) {
-		return true
+	if bound, ok := compared.Y.(*ast.BasicLit); ok {
+		switch {
+		case bound.Value == "400" && (compared.Op == token.LSS || compared.Op == token.LEQ):
+			return true
+		case bound.Value == "200" && (compared.Op == token.GEQ || compared.Op == token.GTR):
+			// The floor of the success range. A status below 300 alone is
+			// how a helper decides whether to read a success's body.
+			return true
+		}
 	}
 	return refusalStatuses[statusNamed(compared.X)] || refusalStatuses[statusNamed(compared.Y)]
 }
@@ -177,6 +185,8 @@ func success() { if got.Code >= http.StatusMultipleChoices { t.Fatal() } }
 func anythingButSuccess() { if got.Code == http.StatusOK { t.Errorf("let through") } }
 func successExpected() { if got.Code != http.StatusOK { t.Errorf("refused") } }
 func decoding() { if got.Code == http.StatusCreated { if err := decode(); err != nil { t.Fatal(err) } } }
+func successRange() { if got >= 200 && got < 300 { fail() } }
+func notASuccess() { if got < 200 || got >= 300 { t.Fatal() } }
 `
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "x_test.go", source, 0)
@@ -185,7 +195,7 @@ func decoding() { if got.Code == http.StatusCreated { if err := decode(); err !=
 	}
 	got := strings.Join(boundedRefusals(file, "x_test.go"), ",")
 	if want := "x_test.go:bounded,x_test.go:bothSides,x_test.go:bareInt,x_test.go:named," +
-		"x_test.go:namedBelow,x_test.go:anythingButSuccess"; got != want {
+		"x_test.go:namedBelow,x_test.go:anythingButSuccess,x_test.go:successRange"; got != want {
 		t.Errorf("reported %q, want %q", got, want)
 	}
 }
