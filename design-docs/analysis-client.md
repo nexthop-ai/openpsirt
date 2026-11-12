@@ -46,6 +46,7 @@ openpsirt-upload write --series [TOOL=]NAME... --output FILE OUTPUT...
 |---|---|
 | A native format is read where one exists | clang's SARIF lacks hash, path and function |
 | clang's plain `plist` is not to be sent | It drops cross-file diagnostics |
+| A property list whose dictionary key has no value, or that holds nothing, is refused | A key with no value never ends the containers around it, so the files listed after it are read or the list is refused |
 | HTML reports and output directories are refused | They carry source |
 | One tool's outputs merge into one run: rules by identifier, results and invocations concatenated, unit counts added | |
 | Several tools are one upload each; `write` names each file by tool before the extension; one refused does not stop the rest | A series is one tool |

@@ -8,7 +8,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 )
@@ -299,10 +298,19 @@ func parsePlist(data []byte) (any, error) {
 			if start.Name.Local != "plist" {
 				return nil, fmt.Errorf("the document is <%s>, not a property list", start.Name.Local)
 			}
-			return plistValue(dec, 0)
+			v, err := plistValue(dec, 0)
+			if errors.Is(err, errClosed) {
+				return nil, errors.New("the property list holds nothing")
+			}
+			return v, err
 		}
 	}
 }
+
+// errClosed is what plistValue answers where the container it reads in ends
+// instead. End of input is io.EOF, and stays distinct from it: a container
+// left open is a document cut short.
+var errClosed = errors.New("container closed")
 
 // plistDepth bounds how deeply a property list may nest. clang's nests five
 // deep.
@@ -321,7 +329,7 @@ func plistValue(dec *xml.Decoder, depth int) (any, error) {
 		case xml.StartElement:
 			return plistElement(dec, t, depth)
 		case xml.EndElement:
-			return nil, io.EOF
+			return nil, errClosed
 		}
 	}
 }
@@ -336,6 +344,9 @@ func plistElement(dec *xml.Decoder, start xml.StartElement, depth int) (any, err
 				return out, err
 			}
 			v, err := plistValue(dec, depth+1)
+			if errors.Is(err, errClosed) {
+				return nil, fmt.Errorf("the key %q has no value", key)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -345,7 +356,7 @@ func plistElement(dec *xml.Decoder, start xml.StartElement, depth int) (any, err
 		out := []any{}
 		for {
 			v, err := plistValue(dec, depth+1)
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, errClosed) {
 				return out, nil
 			}
 			if err != nil {
