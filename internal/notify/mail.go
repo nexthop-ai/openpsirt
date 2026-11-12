@@ -129,12 +129,11 @@ func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 		secured = true
 	}
 	if !secured && m.username != "" {
-		return refusal.New("the mail server offered no STARTTLS, and a password " +
-			"sent in the clear is a password given away")
+		return fmt.Errorf("%w, and a password sent in the clear is a password given away", ErrUnsecured)
 	}
 	if !secured && !m.plaintext {
-		return refusal.New("the mail server offered no STARTTLS, and OPENPSIRT_MAIL_ALLOW_PLAINTEXT " +
-			"is not set to send mail across the network in the clear")
+		return fmt.Errorf("%w, and OPENPSIRT_MAIL_ALLOW_PLAINTEXT is not set to send mail across "+
+			"the network in the clear", ErrUnsecured)
 	}
 	if m.username != "" {
 		if err := client.Auth(smtp.PlainAuth("", m.username, m.password, host)); err != nil {
@@ -191,6 +190,11 @@ func headers(from, to string, at time.Time, id string, m Message) []byte {
 }
 
 // messageID is a new message's identifier: random, at the domain of the
+// ErrUnsecured says the mail server offered no STARTTLS where one is required.
+// It is this deployment's configuration, never the message, so a send refused
+// this way leaves the message waiting for the configuration to change.
+var ErrUnsecured = refusal.New("the mail server offered no STARTTLS")
+
 // address it is sent as.
 func messageID(from string) (string, error) {
 	var random [16]byte

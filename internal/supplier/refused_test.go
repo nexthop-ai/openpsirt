@@ -251,7 +251,8 @@ func TestADocumentAnsweredWithNothingToReadIsSteppedOver(t *testing.T) {
 }
 
 // A failure of this deployment during a pass, its lease here, is not the
-// publisher failing: nothing is recorded against the supplier and it stays due.
+// publisher failing: it is recorded as this deployment's, and the supplier
+// stays due.
 func TestAFailureHereIsNotRecordedAgainstTheSupplier(t *testing.T) {
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
@@ -270,7 +271,8 @@ func TestAFailureHereIsNotRecordedAgainstTheSupplier(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(rows) != 1 || rows[0].Failed != "" || rows[0].FetchedAt != nil {
+		if len(rows) != 1 || rows[0].FetchedAt != nil ||
+			!strings.HasPrefix(rows[0].Failed, "this deployment failed, not the publisher") {
 			t.Errorf("a failure here was recorded against the supplier: %+v", rows)
 		}
 	})

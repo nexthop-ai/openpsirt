@@ -5,6 +5,7 @@ package notify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -189,6 +190,13 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 	for _, row := range rows {
 		message := Compose(row.Notification, p.baseURL)
 		sendErr := p.channel.Send(ctx, row.Email, message)
+		if errors.Is(sendErr, ErrUnsecured) {
+			// Every message would be refused alike, and none of it is the
+			// message's fault: nothing is counted against them.
+			p.logger.Error("mail is refused until the server offers STARTTLS or plain mail is accepted",
+				"channel", p.channel.Name(), "error", sendErr)
+			return sent, failed + 1, nil
+		}
 		if sendErr != nil {
 			failed++
 			// Counted rather than recorded as a failure: the row is still
@@ -288,7 +296,15 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 			// The stamp still moves. Otherwise a quiet week means the next
 			// digest reports the whole week as new, and "since the last
 			// digest" stops meaning what it says.
-			if err := p.channel.Send(ctx, person.Email, digest.Message(p.baseURL)); err != nil {
+			err := p.channel.Send(ctx, person.Email, digest.Message(p.baseURL))
+			if errors.Is(err, ErrUnsecured) {
+				// The configuration refused it, so the stamp stays and the
+				// digest goes once the configuration changes.
+				p.logger.Error("digests are refused until the server offers STARTTLS or plain mail is accepted",
+					"channel", p.channel.Name(), "error", err)
+				return sent, nil
+			}
+			if err != nil {
 				p.logger.Warn("could not send a digest",
 					"channel", p.channel.Name(), "person", person.Identity, "error", err)
 				// The stamp still moves. A mailbox that refuses is retried

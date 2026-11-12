@@ -4,6 +4,7 @@
 package notify_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -134,6 +135,35 @@ func TestADigestCarriesTheNoticesMailLeftToIt(t *testing.T) {
 			if strings.Contains(text, absent) {
 				t.Errorf("the digest carries %q:\n%s", absent, text)
 			}
+		}
+	})
+}
+
+// A mail server refused for offering no STARTTLS refuses every message alike,
+// and none of it is a message's fault: nothing is counted against them, so they
+// go once the configuration changes.
+func TestMailRefusedForItsServerWaitsForTheConfiguration(t *testing.T) {
+	eachWithDB(t, func(t *testing.T, db *database.DB, s *notify.Store, me, _ access.Subject) {
+		ctx := t.Context()
+		if err := access.NewStore(db.DB).SetEmail(ctx, me.ID, "ana@example", access.Recorded); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Tell(ctx, notify.Telling{
+			PersonID: me.ID, Kind: notify.Assigned, Body: "CVE-2026-1 in libfoo", Link: "/findings/1",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		refused := &recorder{fail: fmt.Errorf("%w, and plain mail is not accepted", notify.ErrUnsecured)}
+		for range 10 {
+			if _, _, err := notify.NewPost(db.DB, refused, "https://psirt.example", discard(), "test").
+				Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		sender := &recorder{}
+		if sent, _, err := notify.NewPost(db.DB, sender, "https://psirt.example", discard(), "test").
+			Once(ctx); err != nil || sent != 1 {
+			t.Errorf("once the server is accepted, %d sent: %v; want the waiting message", sent, err)
 		}
 	})
 }

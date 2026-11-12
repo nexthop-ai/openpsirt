@@ -72,7 +72,7 @@ moving forward only.
 | An unreadable document is stepped over: any answer but 200 other than those holding the mark, too large, malformed, or an address the client refuses (redirect, excluded host, non-https port) | It would stop the supplier for ever |
 | An unreachable publisher holds the mark, including a name resolving inward or into an excluded network | |
 | A rate limit, request timeout, "too early" or server error holds the mark | Each asks to be asked again |
-| A failure of this deployment during a pass, its database or its lease, moves the mark as far as the pass read and leaves the supplier due, with nothing recorded against it | It says nothing about the publisher |
+| A failure of this deployment during a pass, its database or its lease, moves the mark as far as the pass read and leaves the supplier due, recorded as this deployment's failure, not the publisher's; when the last attempt was made does not move | It says nothing about the publisher, and one repeating at the same document still shows |
 | A document answered "not authorized" or "forbidden" is stepped over and recorded failed with address and answer; last success does not move | A bot filter would otherwise lose advisories silently |
 | An address that cannot be made a request is stepped over | |
 

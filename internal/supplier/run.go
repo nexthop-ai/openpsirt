@@ -214,10 +214,15 @@ func (p *Pass) from(ctx context.Context, feed Feed) (Taken, error) {
 			took.Barred, took.BarredBy)
 	}
 	// A failure of this deployment says nothing about the publisher: the mark
-	// moves as far as the pass read, the supplier stays due, and the error is
-	// logged, never recorded as what the publisher did.
+	// moves as far as the pass read and the supplier stays due. It is recorded
+	// as this deployment's, so one that repeats at the same document shows on
+	// the supplier rather than in the log alone.
 	if errors.As(err, new(local)) {
-		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark, barred); marked != nil {
+		ours := refusal.Errorf("this deployment failed, not the publisher: %v", err)
+		if barred != nil {
+			ours = refusal.Errorf("%v; %v", ours, barred)
+		}
+		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark, ours); marked != nil {
 			p.logger.Error("recording how far a supplier was read",
 				"supplier", feed.Display, "error", marked)
 		}

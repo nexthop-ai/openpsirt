@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // betweenBurials is how often work abandoned by its worker is looked for.
@@ -59,7 +60,11 @@ func (u *Undertaker) Once(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 	if err := u.queue.CheckClock(ctx); err != nil && u.logger != nil {
-		u.logger.ErrorContext(ctx, "this replica's clock disagrees with the database's", "error", err)
+		message := "this replica's clock disagrees with the database's"
+		if !refusal.In(err) {
+			message = "could not compare this replica's clock with the database's"
+		}
+		u.logger.ErrorContext(ctx, message, "error", err)
 	}
 	// One replica carries, the rest skip. The work may be skipped rather than
 	// waited for: what it finds is still there next cycle.
