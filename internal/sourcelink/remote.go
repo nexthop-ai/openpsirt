@@ -110,21 +110,20 @@ func Schemed(address string) bool {
 // there, and an `@` after it, is a password holding a slash or a path holding
 // an `@`; the two cannot be told apart, so it cannot be read.
 func WithoutPassword(address string) (string, bool) {
-	head := address
-	if end := strings.IndexAny(head, "?#"); end >= 0 {
-		head = head[:end]
-	}
-	host := head
+	// Read to the first slash and no shorter: a password may hold a question
+	// mark or a fragment mark, and cutting there first hides the "@" that
+	// ends it.
+	host := address
 	if end := strings.IndexByte(host, '/'); end >= 0 {
 		host = host[:end]
 	}
 	if at := strings.LastIndex(host, "@"); at >= 0 {
-		if at > 0 && at < len(host)-1 && strings.Contains(host[:at], ":") {
+		if at > 0 && strings.Contains(host[:at], ":") {
 			return address[at+1:], true
 		}
 		return address, true
 	}
-	if strings.Contains(host, ":") && strings.Contains(head[len(host):], "@") {
+	if strings.Contains(host, ":") && strings.Contains(address[len(host):], "@") {
 		return "", false
 	}
 	return address, true
