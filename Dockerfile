@@ -361,7 +361,9 @@ LABEL org.opencontainers.image.title="OpenPSIRT" \
       org.opencontainers.image.vendor="Nexthop Systems Inc." \
       org.opencontainers.image.licenses="Apache-2.0"
 
-USER openpsirt
+# By number: a pod asking only for runAsNonRoot is refused an image whose user
+# is a name, since the kubelet cannot tell a name is not root.
+USER 65532:65532
 EXPOSE 8080
 
 # Liveness. Readiness depends on the database and belongs to the orchestrator,

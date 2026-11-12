@@ -28,7 +28,7 @@ toolchain, the result run on Alpine.
 | Part | Detail |
 |---|---|
 | Size | ~40 MB |
-| User | Non-root, no login shell, no home directory |
+| User | Non-root, named by number as the chart runs it, no login shell, no home directory |
 | Extras | The vulnerability scanner; git, for patch-link branches; root certificates; timezone data |
 | Healthcheck | Liveness only; readiness needs the database and belongs to the orchestrator |
 
@@ -37,6 +37,7 @@ toolchain, the result run on Alpine.
 | The interface is built inside the image | The Go build embeds a git-ignored directory and an API-only binary is a supported build, so a clean checkout, as CI builds, would ship no interface silently. Docker is then the image's only requirement |
 | The binary is static, CGO off | Part of why the pure-Go SQLite driver was chosen |
 | The base is Alpine | An operator debugging a deployment wants a shell |
+| The user and group are numbers, the ones the chart runs as | A kubelet refuses a pod asking only for runAsNonRoot when the image names its user, since a name could be root |
 
 ## Base version
 
