@@ -225,6 +225,8 @@ One instance migrates at a time (REQ-72).
 |---|---|
 | SQLite's lock is taken outside the database | It cannot take one inside, and it migrates on its one connection |
 | The file lock is the operating system's advisory lock, never a lock file written by hand | The kernel drops it however a process ends. A platform without it refuses |
+| The lock file is opened only as a regular file with one name, never through a symbolic or hard link | The holder truncates it and writes its name into it, so a planted link would clobber the file it points at |
+| A waiter reads the holder's name through the file it opened and checked, never through the path again | The path can name something else by then, and the name reaches the log |
 | SQLite's pool is narrowed to one connection while migrating, and restored after | Foreign keys are turned off on a connection before the transaction opens, which on a wider pool lands elsewhere. A release's upgrade holds one connection throughout, because a pool of one still recycles one past its lifetime. A dangling reference at commit refuses the upgrade |
 | The advisory lock is taken on a pinned connection | A session lock released through the pool can land on another connection, and fails to release silently |
 | The release result is read | PostgreSQL and the MySQL-protocol servers report "you did not hold this" as a value |
