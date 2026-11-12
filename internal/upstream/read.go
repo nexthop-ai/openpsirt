@@ -218,8 +218,10 @@ func NewReader(db bun.IDB, limits sbom.Limits, roots *x509.CertPool) *Reader {
 }
 
 // From reads one upstream: its description, its listings, and every document
-// listed that moved since it was last read. What it read is recorded however
-// the read went.
+// listed that moved since it was last read. How the read went is recorded
+// while this replica holds the lease; a read that lost it, or was cut short by
+// shutdown, records nothing, since the replica holding the lease records what
+// it reads.
 func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	var took Read
 	address, err := Address(up.URL)
