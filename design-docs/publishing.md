@@ -90,6 +90,7 @@ directory reads them by: the newest revision whose label lets it travel
 |---|---|
 | Read as anybody at all: every issue covered, now and when it went out, at a disclosed occurrence in a product the reader reads | Anybody at all reads only publishing products, so an advisory covering one that does not is not served |
 | A revision labeled RED is never served, whatever followed it | |
+| An advisory whose stored bytes no longer read is left out and logged once per process | The surface takes no credential, so a line per request is one anybody multiplies |
 | An advisory generated where the deployment and every product it covers publish, and are in use, states this surface's address; otherwise the directory's where one is written, else none | Issued bytes never change, so earlier advisories keep the address they went out with |
 
 ## Statements and statuses

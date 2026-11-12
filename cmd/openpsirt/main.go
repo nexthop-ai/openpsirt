@@ -688,7 +688,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// directory, which is ordinary.
 	writer := directory.New(db.DB, published, publishesAs(cfg), directory.Config{
 		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror,
-	}, logger)
+	}, name, logger)
 	// A store configured and nothing written to it. The address is refused
 	// where it is read if a store is configured without one, so what is left
 	// is the publisher, which is configured elsewhere and is what every

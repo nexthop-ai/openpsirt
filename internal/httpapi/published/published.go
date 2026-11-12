@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -82,6 +83,11 @@ func Handler(c Config) http.Handler {
 type server struct {
 	Config
 	limits *limiter
+	// unread is every stored advisory this process has reported it could not
+	// read back, so each is logged once rather than once per request. The
+	// surface takes no credential, so a per-request log line is one anybody
+	// can multiply.
+	unread sync.Map
 }
 
 // serve answers one request.
@@ -244,7 +250,9 @@ func (s *server) travelling(ctx context.Context, v *view) error {
 	}
 	travels, _, unread := advisory.Travelling(sent)
 	for _, one := range unread {
-		s.Logger.ErrorContext(ctx, "a published advisory could not be read back", "error", one)
+		if _, said := s.unread.LoadOrStore(one.Error(), true); !said {
+			s.Logger.ErrorContext(ctx, "a published advisory could not be read back", "error", one)
+		}
 	}
 	for _, one := range travels {
 		v.advisories[one.Path] = one

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 const served = "https://psirt.example.test/.well-known/csaf/"
@@ -452,7 +454,7 @@ func TestNoAddressAndNoStoreIsNoWriter(t *testing.T) {
 			{"no publisher", directory.Published(f.files), anonymous},
 		} {
 			if writer := directory.New(f.db, one.store, one.who,
-				directory.Config{}, f.logger); writer != nil {
+				directory.Config{}, "test", f.logger); writer != nil {
 				t.Errorf("%s: a writer was started anyway", one.what)
 			}
 		}
@@ -511,8 +513,14 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // writer is one writer over the fixture's store.
 func (f *fixture) writer(t *testing.T) *directory.Writer {
 	t.Helper()
+	return f.writerOn(t, "test")
+}
+
+// writerOn is one writer over the fixture's store, on the replica named.
+func (f *fixture) writerOn(t *testing.T, replica string) *directory.Writer {
+	t.Helper()
 	writer := directory.New(f.db, directory.Published(f.files), issuer,
-		directory.Config{List: true, Mirror: false}, f.logger)
+		directory.Config{List: true, Mirror: false}, replica, f.logger)
 	if writer == nil {
 		t.Fatal("no writer was started")
 	}
@@ -753,6 +761,58 @@ func TestADocumentThatNoLongerReadsDoesNotStopTheDirectory(t *testing.T) {
 		if written.Documents != 1 || written.Skipped != 1 {
 			t.Errorf("a pass past one unreadable document reported %+v, want the newer "+
 				"advisory written and one skipped", written)
+		}
+	})
+}
+
+// One advisory whose newest revision no longer reads, beside an older one that
+// does, is a pass that read nothing usable: the unreadable revision leaves out
+// its advisory, so the pass fails rather than reporting that it wrote.
+func TestAPassReadingNoAdvisoryFailsHoweverManyRevisionsEachHas(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		named := f.issued(t, "A flaw in the recovery console")
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, "Published again."); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.NewUpdate().Table("advisory_issuance").
+			Set(`"document" = ?`, "not a document any longer").
+			Where(`"ordinal" = ?`, 2).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if written, err := f.writer(t).Write(ctx); err == nil {
+			t.Errorf("a pass that could read no advisory reported %+v", written)
+		}
+	})
+}
+
+// One replica writes the directory at a time. A second asking while the first
+// holds the lease writes nothing, and writes once the first hands it back.
+func TestOneReplicaWritesTheDirectoryAtATime(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.issued(t, "A flaw in the recovery console")
+		if written, err := f.writerOn(t, "one").Write(ctx); err != nil || written.Documents != 1 {
+			t.Fatalf("the first replica wrote %+v: %v", written, err)
+		}
+		before := f.every(t)
+		f.issued(t, "A second flaw")
+		other := f.writerOn(t, "two")
+		written, err := other.Write(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !written.Elsewhere || written.Documents != 0 {
+			t.Errorf("a second replica wrote %+v while the first held the lease", written)
+		}
+		if got := f.every(t); !slices.Equal(got, before) {
+			t.Errorf("a second replica wrote %v while the first held the lease, over %v", got, before)
+		}
+		if err := queue.NewLeases(f.db).Release(ctx, directory.Lease, "one"); err != nil {
+			t.Fatal(err)
+		}
+		if written, err := other.Write(ctx); err != nil || written.Documents != 2 {
+			t.Errorf("handed the lease, the second replica wrote %+v: %v", written, err)
 		}
 	})
 }

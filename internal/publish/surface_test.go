@@ -621,3 +621,32 @@ func TestTheSurfaceReadsOnlyTheProductsThatPublishNow(t *testing.T) {
 		}
 	})
 }
+
+// An advisory whose stored document no longer reads is logged once by the
+// surface, however many requests reach the lists or miss in the folder: the
+// surface takes no credential, so a line per request is one anybody can
+// multiply.
+func TestAnUnreadableAdvisoryIsLoggedOnceNotPerRequest(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"advisory_issuance"`).
+			Set(`"document" = ?`, "not a document any longer").
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var logged bytes.Buffer
+		s := &surface{t: t, h: published.Handler(published.Config{
+			DB: w.DB.DB, Who: who, Base: base, Rate: 1000, List: true,
+			Logger: slog.New(slog.NewTextHandler(&logged, nil)),
+		})}
+		for range 3 {
+			for _, path := range []string{publish.IndexPath, publish.FeedPath,
+				publish.DirectoryPath + "2026/nothing-here.json"} {
+				s.get(http.MethodGet, path, nil)
+			}
+		}
+		if n := strings.Count(logged.String(), "could not be read back"); n != 1 {
+			t.Errorf("an unreadable advisory was logged %d times, want once: %s", n, logged.String())
+		}
+	})
+}

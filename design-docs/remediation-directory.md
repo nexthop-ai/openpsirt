@@ -3,7 +3,7 @@
 Every advisory that has gone out, written as the CSAF provider directory into a
 store an operator configured for their own web server.
 
-Satisfies REQ-39, REQ-70.
+Satisfies REQ-03, REQ-39, REQ-70.
 
 Nothing here answers a request, and nothing in the application reaches the
 package that writes it. Where the deployment also serves its documents
@@ -34,7 +34,8 @@ is a copy.
 | Held back is counted per advisory | Per revision overcounts |
 | A pass with nothing that may travel logs how many it held back, once per change of the count | An all-embargoed directory is otherwise silently empty |
 | A document that no longer reads back is skipped, counted and logged each pass; its advisory leaves the directory, with no older revision in its place | Issued bytes outlive their shape below 1.0; revisions share a path, so an older one would overwrite one already out |
-| A pass fails only where nothing it was given could be read | |
+| A pass fails only where no advisory it was given could be read, counted in advisories | An unreadable newest revision leaves out its advisory and every revision before it |
+| One replica writes (REQ-03), under a lease held across the pass and taken for two cycles of it, handed back at shutdown | Revisions share a path, so a replica with an older read writes its revision over a newer one |
 | The files are readable by whoever serves them | Another user serves them |
 | An empty directory is not written | It would have to state when it was last updated |
 | A store of its own | Every file is public, and every attachment is authorized first (REQ-70) |
