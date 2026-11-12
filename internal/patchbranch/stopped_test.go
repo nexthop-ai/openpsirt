@@ -37,7 +37,7 @@ while :; do sleep 0.01; done
 			time.Sleep(5 * time.Millisecond)
 		}
 	}()
-	err := git{path: program, transport: "file"}.run(ctx, time.Minute, dir, "", nil, nil,
+	err := git{path: program, transport: "file"}.run(ctx, time.Minute, dir, "", false, nil, nil,
 		"commit-graph", "write")
 	if err == nil {
 		t.Fatal("a git that was stopped reported success")

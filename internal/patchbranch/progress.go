@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // State is where one repository stands.
@@ -190,14 +191,21 @@ func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]Rep
 		one.Worst = severityOf(worst)
 	}
 
+	// A visit under way records itself as unfinished, and is one while a
+	// replica holds the lease.
+	visiting, err := queue.Held(ctx, db, Lease, now)
+	if err != nil {
+		return nil, Totals{}, err
+	}
 	out := make([]RepositoryProgress, 0, len(byURL))
 	for _, one := range byURL {
 		if one.Commits == 0 {
 			continue
 		}
-		one.State = stateOf(*one, excluded)
+		one.State = stateOf(*one, excluded, visiting)
 		switch one.State {
 		case Working:
+			one.Reason = ""
 			one.Step = Fetching
 			if one.VisitLooked > 0 {
 				one.Step = LookingUp
@@ -264,10 +272,12 @@ func severityOf(how urgency) string {
 }
 
 // stateOf reads where a repository stands from what its row records.
-func stateOf(one RepositoryProgress, excluded outward.Excluded) State {
+func stateOf(one RepositoryProgress, excluded outward.Excluded, visiting bool) State {
 	switch {
 	case excluded.Host(Commit{Repository: one.URL}.Host()):
 		return Refused
+	case one.Reason == unfinished && visiting:
+		return Working
 	case one.Reason != "":
 		return Failed
 	case one.FetchedAt != nil && (one.ReachedAt == nil || one.ReachedAt.Before(*one.FetchedAt)):

@@ -113,6 +113,14 @@ func (c copies) ensure(ctx context.Context, g git, repository string) (string, e
 	if err := c.prepare(); err != nil {
 		return "", err
 	}
+	// A directory without HEAD is no copy, and the new one could never be
+	// renamed over it.
+	if _, err := os.Lstat(dir); err == nil {
+		if err := os.RemoveAll(dir); err != nil {
+			return "", fmt.Errorf("remove an unfinished copy: %w", err)
+		}
+		c.forgotten([]string{filepath.Base(dir)})
+	}
 	making := dir + partial
 	err := c.watched(ctx, making, true, func(ctx context.Context) error {
 		// Named relative to the directory git runs in, which is the root, so

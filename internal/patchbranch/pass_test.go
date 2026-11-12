@@ -589,7 +589,7 @@ func TestGitIsGivenNoConfigurationOrCredentialsOfTheProcess(t *testing.T) {
 	}
 
 	said := map[string]bool{}
-	settings := patchbranch.Settings("")
+	settings := patchbranch.Settings("", false)
 	for i := 0; i+1 < len(settings); i += 2 {
 		if settings[i] == "-c" {
 			said[settings[i+1]] = true
@@ -600,6 +600,25 @@ func TestGitIsGivenNoConfigurationOrCredentialsOfTheProcess(t *testing.T) {
 		if !said[each] {
 			t.Errorf("git runs without %q", each)
 		}
+	}
+}
+
+// Only a git that reaches the host is allowed its transport, so one reading a
+// copy has no way to fetch an object the copy lacks, whatever its version.
+func TestOnlyAGitReachingTheHostMayUseItsTransport(t *testing.T) {
+	allowed := func(settings []string) bool {
+		for _, each := range settings {
+			if each == "protocol.https.allow=always" {
+				return true
+			}
+		}
+		return false
+	}
+	if allowed(patchbranch.Settings("", false)) {
+		t.Error("a git reading a copy is allowed to reach the host")
+	}
+	if !allowed(patchbranch.Settings("http://127.0.0.1:1", true)) {
+		t.Error("a git reaching the host is not allowed its transport")
 	}
 }
 

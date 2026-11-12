@@ -103,6 +103,10 @@ var cgitSites = map[string]cgitSite{
 // gitlab.freedesktop.org, where a repository's path is not always its old one.
 // Only addresses checked to clone are listed; any other link to a retired site
 // is read as written and fails with its reason.
+// caseless is the hosts that serve a repository under any capitalization of
+// its path, so one fix linked in two spellings is one repository.
+var caseless = map[string]bool{"github.com": true, "gitlab.com": true}
+
 var moved = map[string]string{
 	"https://cgit.freedesktop.org/drm/drm-misc.git": "https://gitlab.freedesktop.org/drm/misc/kernel.git",
 }
@@ -190,7 +194,11 @@ func at(host string, path []string, hash string) (Commit, bool) {
 			return Commit{}, false
 		}
 	}
-	repository := "https://" + host + "/" + strings.Join(path, "/")
+	written := strings.Join(path, "/")
+	if caseless[host] {
+		written = strings.ToLower(written)
+	}
+	repository := "https://" + host + "/" + written
 	if !strings.HasSuffix(repository, ".git") {
 		repository += ".git"
 	}

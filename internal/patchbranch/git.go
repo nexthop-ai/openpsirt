@@ -100,10 +100,13 @@ func (g git) environment(home string) []string {
 // server. Measured writing the commit graph for the kernel's stable tree,
 // two million commits: 1.7 GB at git's defaults, 0.6 GB with these, 29
 // seconds against 35.
-func (g git) settings(proxy string) []string {
+//
+// Only an invocation that reaches the host is allowed its transport. Every
+// other one is allowed none, so a git that ignores the instruction not to
+// fetch a missing object on demand still has no way to.
+func (g git) settings(proxy string, network bool) []string {
 	out := []string{
 		"-c", "protocol.allow=never",
-		"-c", "protocol." + g.transport + ".allow=always",
 		"-c", "http.followRedirects=false",
 		"-c", "http.lowSpeedLimit=" + fmt.Sprint(slowest),
 		"-c", "http.lowSpeedTime=" + fmt.Sprint(int(stalled.Seconds())),
@@ -119,21 +122,25 @@ func (g git) settings(proxy string) []string {
 		"-c", "fetch.writeCommitGraph=false",
 		"-c", "core.hooksPath=" + os.DevNull,
 	}
+	if network {
+		out = append(out, "-c", "protocol."+g.transport+".allow=always")
+	}
 	if proxy != "" {
 		out = append(out, "-c", "http.proxy="+proxy)
 	}
 	return out
 }
 
-// run runs git with the settings above, writing what it prints to stdout.
-func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, stdin []byte, stdout io.Writer, args ...string) error {
+// run runs git with the settings above, writing what it prints to stdout. A
+// run that reaches the repository's host says so with network.
+func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, network bool, stdin []byte, stdout io.Writer, args ...string) error {
 	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	program := g.path
 	if program == "" {
 		program = "git"
 	}
-	command := exec.CommandContext(ctx, program, append(g.settings(proxy), args...)...) //nolint:gosec // G204: every argument is built here from a validated address, a hash or a constant
+	command := exec.CommandContext(ctx, program, append(g.settings(proxy, network), args...)...) //nolint:gosec // G204: every argument is built here from a validated address, a hash or a constant
 	command.Dir = dir
 	command.Env = g.environment(dir)
 	if stdin != nil {
@@ -181,7 +188,7 @@ func (g git) reaching(ctx context.Context, repository, dir string, args ...strin
 		defer door.close()
 		proxy = door.address()
 	}
-	err := g.run(ctx, fetchBudget, dir, proxy, nil, nil, args...)
+	err := g.run(ctx, fetchBudget, dir, proxy, true, nil, nil, args...)
 	if err != nil && door != nil {
 		// The proxy's reason is the useful half. Git reports only that the
 		// proxy said no.
@@ -222,7 +229,7 @@ func (g git) fetch(ctx context.Context, repository, dir string) error {
 // Measured on the kernel's stable tree: 28 seconds a commit without it, 0.22
 // with it, and 22 seconds and 116 MB to write.
 func (g git) graph(ctx context.Context, dir string) error {
-	return g.run(ctx, fetchBudget, dir, "", nil, nil, "commit-graph", "write", "--reachable")
+	return g.run(ctx, fetchBudget, dir, "", false, nil, nil, "commit-graph", "write", "--reachable")
 }
 
 // resolve answers the full name of each hash that names a commit in the copy.
@@ -236,7 +243,7 @@ func (g git) resolve(ctx context.Context, dir string, hashes []string) (map[stri
 	}
 	// One line per hash asked, so what comes back is bounded by the question.
 	var out bytes.Buffer
-	if err := g.run(ctx, lookupBudget, dir, "", in.Bytes(), &out,
+	if err := g.run(ctx, lookupBudget, dir, "", false, in.Bytes(), &out,
 		"cat-file", "--batch-check=%(objectname) %(objecttype)"); err != nil {
 		return nil, err
 	}
@@ -264,7 +271,7 @@ func (g git) resolve(ctx context.Context, dir string, hashes []string) (map[stri
 // nothing but that repository (REQ-69).
 func (g git) branches(ctx context.Context, dir, commit string) ([]string, int, error) {
 	var out branchLines
-	if err := g.run(ctx, lookupBudget, dir, "", nil, &out,
+	if err := g.run(ctx, lookupBudget, dir, "", false, nil, &out,
 		"for-each-ref", "--contains", commit, "--format=%(refname:strip=2)", "refs/heads/"); err != nil {
 		return nil, 0, err
 	}

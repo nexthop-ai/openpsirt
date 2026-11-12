@@ -185,6 +185,20 @@ func (l *Leases) Release(ctx context.Context, name, holder string) error {
 	})
 }
 
+// Held reports whether anybody holds a lease at now: a replica that took it
+// and has neither handed it back nor let it lapse.
+func Held(ctx context.Context, db bun.IDB, name string, now time.Time) (bool, error) {
+	held, err := db.NewSelect().Model((*Lease)(nil)).
+		Where(`"name" = ?`, name).
+		Where(`"held_by" IS NOT NULL`).
+		Where(`"held_until" > ?`, now.UTC().Truncate(time.Microsecond)).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether the lease on %s is held: %w", name, err)
+	}
+	return held, nil
+}
+
 // handbackWait bounds handing a lease back on the way out. It is one write
 // against a server that was answering a moment ago.
 const handbackWait = 10 * time.Second
