@@ -23,6 +23,10 @@ import { useWho } from "../app/session";
 import { counted as familyCounted, holding } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
 import { AnalysisRuns, Documents } from "./UploadLists";
+import { Paged } from "../ui/Paged";
+
+// A page of receipts. Every upload past it is reached through the pager.
+const PAGE = 50;
 
 // How often a page holding an unsettled upload is asked for again.
 const UNSETTLED = 15_000;
@@ -86,7 +90,7 @@ export function Uploads() {
         <p>
           {product} · {branchOrTag} · {variant}
         </p>
-        <span style={{ marginLeft: "auto" }}>
+        <span style={{ marginLeft: "auto" }} className="noprint">
           <button type="button" className="btn" onClick={() => setUploading(true)}>
             <Icon name="upload" size={14} /> Upload inventory
           </button>
@@ -146,14 +150,18 @@ function SBOMs({ build }: { build: Build }) {
   // reader: a reader who does not read them here would see a zero on every row.
   const dependencies = holding(useWho().data, "dependency", product);
   const changes = familyCounted(dependencies);
+  const [offset, setOffset] = useState(0);
   const scans = useQuery({
-    queryKey: ["scans", product, branchOrTag, variant],
+    queryKey: ["scans", product, branchOrTag, variant, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(
           "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms",
           {
-            params: { path: { product, branch_or_tag: branchOrTag, variant } },
+            params: {
+              path: { product, branch_or_tag: branchOrTag, variant },
+              query: { limit: PAGE, offset },
+            },
           },
         ),
       ),
@@ -187,6 +195,7 @@ function SBOMs({ build }: { build: Build }) {
   if (scans.isError) return <Failed error={scans.error} what="The SBOMs could not be read." />;
 
   const items = scans.data?.items ?? [];
+  const total = scans.data?.total ?? items.length;
   const measured = scans.data?.measured_against;
 
   return (
@@ -231,7 +240,7 @@ function SBOMs({ build }: { build: Build }) {
 
       {items.length > 0 && <HeldLine at={dependencies} />}
 
-      {items.length === 0 ? (
+      {total === 0 ? (
         <Empty
           title="Nothing has been uploaded here."
           detail="A build pipeline uploads an inventory, or somebody does from the button above, and what became of it appears here."
@@ -363,6 +372,7 @@ function SBOMs({ build }: { build: Build }) {
           </table>
         </Wide>
       )}
+      <Paged shown={items.length} total={total} offset={offset} limit={PAGE} onGo={setOffset} />
 
       {measured && (
         <div className="card" style={{ marginTop: 16 }}>

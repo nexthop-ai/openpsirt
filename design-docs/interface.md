@@ -158,6 +158,7 @@ one it is a wrong answer.
 | A page is asked on a timer only while something on it moves: Uploads' receipts every 15 s while an upload is being read or scanned | A settled answer costs the server the same each time, per open screen |
 | A refusal is an answer; a fault is not. 403 and 404 draw a quiet not-yours card; anything else is said | |
 | A count from a page is not a count: the server's total is the figure; where it only caps, the list says the cap was reached | |
+| A page at or past the end of its list says it holds nothing and of how many; Previous goes to the last page holding rows | A bulk act shrinks the list under the page somebody is on |
 | A set read under a cap is never written back whole; the affected-build editor refuses to edit rather than editing part | The server closes everything absent from the list sent |
 | A printed sheet prints only once every figure has arrived | It stamps the moment it was taken |
 | A failed identity read is not "signed out" | With one provider the sign-in screen forwards straight to it |
