@@ -28,9 +28,9 @@ func TestTheUpgradingAnswerCarriesTheBrowserHeaders(t *testing.T) {
 	}
 }
 
-// While the schema is applied, the API answers in the refusal shape however
-// its path is spelled: capitals and dot segments reach the API, as they do
-// once the router answers, and a client parsing JSON reads the refusal.
+// While the schema is applied, a path the interface would refuse as the API's,
+// capitals and dot segments included, answers in the refusal shape, so a
+// client parsing JSON reads it.
 func TestTheUpgradingAnswerKnowsTheAPIHoweverItIsSpelled(t *testing.T) {
 	h := Upgrading()
 	for _, path := range []string{"/v1/version", "/V1/version", "/x/../v1/version", "/v1"} {

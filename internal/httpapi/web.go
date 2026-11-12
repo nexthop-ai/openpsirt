@@ -39,9 +39,8 @@ func reserved(path string) bool {
 }
 
 // apiPath reports whether a path is the API's, compared without regard to
-// capitals. Every answer that tells the API from the page asks this; a caller
-// holding a path with dot segments cleans it first, as the interface's
-// handler does.
+// capitals. Every answer that tells the API from the page asks this. Dot
+// segments are the caller's to clean, where the path it holds may carry them.
 func apiPath(p string) bool {
 	p = strings.ToLower(p)
 	return p == "/v1" || strings.HasPrefix(p, "/v1/")

@@ -442,7 +442,8 @@ const uploadLock = "attachment uploads"
 // cleanupWait bounds a removal that runs on a context of its own so that it
 // finishes past a stop or a caller going away: an upload's bytes whose record
 // failed, the collection pass's claim and its bytes, and a redacted file's
-// bytes.
+// bytes. One still running when the shutdown grace ends fails the exit, which
+// is true, and cutting it short would leave bytes nothing names.
 const cleanupWait = 30 * time.Second
 
 // roomIn refuses an upload the deployment has no space for.
