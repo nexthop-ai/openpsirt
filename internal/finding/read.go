@@ -52,21 +52,34 @@ func readableIn(ctx context.Context, db bun.IDB, subject access.Subject,
 //
 // The published rating only. What a product says instead belongs to the
 // product, so it is read alongside by whoever knows which product is being
-// asked about and put on the copy the row shows (RatedIn). A description a
-// flaw recorded out of the subject's reach wrote is left out.
+// asked about and put on the copy the row shows (RatedIn).
 func issuesNamed(ctx context.Context, db bun.IDB, subject access.Subject,
 	ids []int64) (map[int64]Vulnerability, error) {
+	// The description too, for the one line the row shows of it. One lookup
+	// for the page either way, and the row is already being read for the
+	// identifier beside it.
+	return IssuesFor(ctx, db, subject, ids, "id", "identifier", "severity", "description")
+}
+
+// IssuesFor reads these issue rows, by identifier, as this subject may be told
+// them: a description a flaw recorded out of the subject's reach wrote is left
+// out (WithholdRecorded). Every column is read where none is named.
+//
+// The one read of issue rows by identifier for a reader, so what is withheld
+// from one surface showing an issue row is withheld from every one.
+func IssuesFor(ctx context.Context, db bun.IDB, subject access.Subject, ids []int64,
+	columns ...string) (map[int64]Vulnerability, error) {
+
 	held := map[int64]Vulnerability{}
 	if len(ids) == 0 {
 		return held, nil
 	}
 	var issues []Vulnerability
-	if err := db.NewSelect().Model(&issues).
-		// The description too, for the one line the row shows of it. One
-		// lookup for the page either way, and the row is already being read
-		// for the identifier beside it.
-		Column("id", "identifier", "severity", "description").
-		Where(`"id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
+	q := db.NewSelect().Model(&issues).Where(`"id" IN (?)`, bun.List(ids))
+	if len(columns) > 0 {
+		q = q.Column(columns...)
+	}
+	if err := q.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}
 	withheld, err := RecordedOutOfReach(ctx, db, subject, ids)

@@ -446,3 +446,47 @@ func TestARecordedNameFindsNothingForAReaderItIsWithheldFrom(t *testing.T) {
 		}
 	})
 }
+
+func TestAnIssueReadForAReaderOmitsTheSummaryAFlawOutOfReachWrote(t *testing.T) {
+	// A recorded flaw writes its summary onto the issue row every product
+	// shares. Every surface reading issue rows for somebody reads them through
+	// IssuesFor, so the summary reaches the recording product's readers and
+	// nobody else, whichever columns are asked for.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.store.Clock(minting)
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		const summary = "The management socket accepts a request nobody authenticated."
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "critical", Summary: summary,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := access.NewPerson(2, "elsewhere", false,
+			map[int64][]access.Role{f.productID + 1000: {access.PublicRead, access.PrivateRead}}, 0)
+		recorder := f.planner(t, access.PublicRead, access.PrivateRead)
+		for _, columns := range [][]string{nil, {"id", "identifier", "description"}} {
+			held, err := finding.IssuesFor(ctx, f.db.DB, elsewhere, []int64{issue}, columns...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := held[issue]; got.Identifier != identifier || got.Description != "" {
+				t.Errorf("reading columns %v, a reader of another product was told %q, %q: want the identifier and no summary",
+					columns, got.Identifier, got.Description)
+			}
+			held, err = finding.IssuesFor(ctx, f.db.DB, recorder, []int64{issue}, columns...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := held[issue]; got.Description != summary {
+				t.Errorf("reading columns %v, the recording product was told %q: want its summary", columns, got.Description)
+			}
+		}
+	})
+}
