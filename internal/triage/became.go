@@ -46,7 +46,8 @@ const (
 	SentBackFor WhatHappened = "sent-back"
 	// AgreedTo is a second person having agreed, and it standing.
 	AgreedTo WhatHappened = "approved"
-	// TakenBack is the proposer having withdrawn it themselves.
+	// TakenBack is somebody who may argue it having withdrawn it: its
+	// proposer or another triager on the product.
 	TakenBack WhatHappened = "withdrawn"
 	// MovedUnder is the code having changed, so the decision stopped applying.
 	MovedUnder WhatHappened = "lapsed"
@@ -255,7 +256,7 @@ func became(rows []DecisionOccurrence, agreed map[int64][]Approval) (WhatHappene
 			}
 		case Withdrawn:
 			withdrawn++
-			at(row.EndedAt, row.ProposedBy)
+			at(row.EndedAt, orZero(row.EndedBy))
 		case LapsedState:
 			lapsed++
 			at(row.EndedAt, 0)

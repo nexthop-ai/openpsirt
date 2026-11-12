@@ -1110,3 +1110,28 @@ func TestABatchNamedAsADotSegmentIsRefused(t *testing.T) {
 		}
 	})
 }
+
+func TestAWithdrawalIsReportedAsTheWithdrawersAct(t *testing.T) {
+	// Any triager on the product may take a decision back, so what became
+	// of a decision names whoever did, and its proposer learns somebody else
+	// withdrew it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		claimed := f.decisions(t, f.at())
+		other := f.privateTriager(t, "other-triager", "Other Triager")
+		if _, err := f.store.Withdraw(ctx, other, claimed.DecisionID); err != nil {
+			t.Fatal(err)
+		}
+		page, _, err := f.store.Became(ctx, f.triager, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page) != 1 {
+			t.Fatalf("the page holds %d decisions, want the one", len(page))
+		}
+		if page[0].Happened != triage.TakenBack || page[0].By != other.ID {
+			t.Errorf("the decision reads as %q by %d; want %q by the triager who withdrew it, %d",
+				page[0].Happened, page[0].By, triage.TakenBack, other.ID)
+		}
+	})
+}

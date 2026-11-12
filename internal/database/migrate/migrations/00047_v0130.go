@@ -38,10 +38,11 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //   - A received VEX statement holds when its publisher made it and which
 //     newer statement of theirs set it aside, and only the newest of a
 //     publisher's statements about one subject stands.
+//   - A decision occurrence records who withdrew it, where somebody did.
 func upgradeV0130(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{advisoryCoverLiveV0130,
 		advisoryOverrideLiveV0130, graphNodeStatedV0130, receivedStatementTimedV0130,
-		receivedStatementNewestV0130} {
+		receivedStatementNewestV0130, decisionEndedByV0130} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

@@ -77,6 +77,9 @@ type DecisionOccurrence struct {
 	// EndedAt is when this stopped applying — withdrawn, or lapsed because
 	// the code moved. Null while it is live.
 	EndedAt *time.Time `bun:"ended_at"`
+	// EndedBy is who withdrew it. Null while it is live, and where it lapsed,
+	// which is nobody's act.
+	EndedBy *int64 `bun:"ended_by"`
 	// LiveKey is what this row decides about, while its decision is still
 	// live. Null once it is withdrawn or has lapsed, which is what lets a
 	// fresh decision be made at an occurrence a dead one used to cover.

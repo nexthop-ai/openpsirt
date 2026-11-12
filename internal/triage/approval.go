@@ -178,8 +178,10 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, decisionID i
 			// queue forever, which is the failure that makes sending back
 			// unusable.
 			Set(`"sent_back_at" = ?`, nil).
-			// Live again, so it has no moment it stopped applying.
+			// Live again, so it has no moment it stopped applying and
+			// nobody who stopped it.
 			Set(`"ended_at" = ?`, nil).
+			Set(`"ended_by" = ?`, nil).
 			Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
 			// Another decision has taken the occurrence since this one ended. The
 			// unique index is the only thing that can say so, for the reason
@@ -244,6 +246,9 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 		if _, err := tx.NewUpdate().Model((*DecisionOccurrence)(nil)).
 			Set(`"state" = ?`, Withdrawn).
 			Set(`"ended_at" = ?`, now).
+			// Whoever withdrew it, who need not be its proposer: anybody who
+			// may argue a decision may take it back.
+			Set(`"ended_by" = ?`, subject.ID).
 			// Released, so the occurrences are open to a fresh decision. A withdrawn
 			// decision is history, and history must not stop anybody deciding.
 			Set(`"live_key" = ?`, nil).

@@ -238,6 +238,7 @@ newest, by upload order, which a stopped upgrade run again finds done.
 |---|---|
 | `advisory_issue` | A mark held while the issue is on the advisory: true on every row not taken off, null on the rest; and the issue unique on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § The advisory) |
 | `advisory_override` | A mark held while the release is marked affected: true on every row not cleared, null on the rest; and the release marked once on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § Editions and agreement) |
+| `decision_occurrence` | Who withdrew the row, null on every row v0.12.0 holds, and its key to the person (`design-docs/triage-approval.md` § Approval) |
 | `graph_node` | The name and the version the build stated, the name's fold and the stated source's fold, all empty, and an index of each build's nodes by each fold (`design-docs/data-model-graph.md` § The dependency graph) |
 | `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX); the older of two standing about one subject, such as two supplier advisories, set aside as overtaken by the newer |
 
@@ -261,6 +262,7 @@ newest, by upload order, which a stopped upgrade run again finds done.
 | The same stopped after the name, or after every node column and before the index, on the servers | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a received statement, and two advisories from one publisher about one subject | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it, the older advisory's set aside as overtaken by the newer's |
 | The same stopped after the time, on the servers | Upgraded the same, nothing already made replaced |
+| A v0.12.0 database stopped after the withdrawer's column, on the servers | Upgraded the same, the key added and the column kept |
 
 ## Limits
 
