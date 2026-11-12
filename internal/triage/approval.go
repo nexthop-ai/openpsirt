@@ -214,16 +214,11 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 	// with every agreement marked withdrawn — which is the state the whole
 	// approval record exists to make impossible.
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		decision, rows, err := within.writableRows(ctx, subject, decisionID, mayDecideOn)
+		decision, _, err := within.writableRows(ctx, subject, decisionID, mayDecideOn)
 		if err != nil {
 			return err
 		}
 		reopened = nil
-		for _, row := range rows {
-			if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-				return ErrNotTheirs
-			}
-		}
 		if decision.Outcome == Dismissed || decision.Outcome == NotSecurity {
 			if err := tx.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 				ColumnExpr(`DISTINCT "de"."product_id" AS "product_id", "de"."occurrence_identity" AS "occurrence_identity"`).
