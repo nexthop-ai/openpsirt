@@ -282,7 +282,15 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// one. An approval is a fact about a moment, so it is right that this
 	// stands — and it is still the first thing an auditor asks after a
 	// reorganization.
-	mayStillApprove, stillArgs := access.MayApproveWhere(`"ap"."approved_by"`, `"de"."product_id"`, `"de"."visibility"`)
+	// Asked of each standing row of the decision the reader may read, at that
+	// row's visibility; a decision with any row they could not agree to now is
+	// listed, with every row the agreement covers counted.
+	mayStillApprove, stillArgs := access.MayApproveWhere(`"ap"."approved_by"`, `"dl"."product_id"`, `"dl"."visibility"`)
+	lost := readableBy(s.db.NewSelect().ColumnExpr("1").
+		TableExpr(`"decision_occurrence" AS "dl"`).
+		Where(`"dl"."decision_id" = "de"."decision_id"`).
+		Where(finding.InForceOn("dl")).
+		Where(`NOT `+mayStillApprove, stillArgs...), subject, "dl")
 	var lapsed []struct {
 		DecisionID int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
@@ -310,7 +318,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// agreed could agree today, asked by the rule a signed-in approver is
 		// asked by. A grant made inactive by a change of mode grants nothing
 		// while it sits there, so it is not a right somebody still holds.
-		Where(`NOT `+mayStillApprove, stillArgs...).
+		Where(`EXISTS (?)`, lost).
 		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(int64(room))).Scan(ctx, &lapsed)

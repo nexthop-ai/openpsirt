@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/triageapi"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -242,6 +243,40 @@ func TestATriagerWhoMayStillApproveIsNotListed(t *testing.T) {
 			if row.DecisionID == decision {
 				t.Errorf("an approval by a triager who still triages there is listed as lost: %+v", row)
 			}
+		}
+	})
+}
+
+func TestAnAgreementLostOnOneRowCountsEveryRowItCovers(t *testing.T) {
+	// The right is asked of each row at its own visibility, and the
+	// decision is listed with every row the agreement covers: the reach of
+	// the agreement is what an auditor weighs.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		decision, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
+		var row triage.DecisionOccurrence
+		if err := r.DB.DB.NewSelect().Model(&row).Where(`"de"."id" = ?`, ids[0]).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if row.Visibility != access.Public {
+			t.Fatalf("the decision is %s; this needs a disclosed one beside an undisclosed row", row.Visibility)
+		}
+		// An undisclosed row of the same decision, which the approver, who
+		// reads disclosed work alone, could not agree to now.
+		hidden := row
+		hidden.ID, hidden.LiveKey, hidden.OccurrenceIdentity, hidden.Visibility = 0, nil, "elsewhere", access.Private
+		if _, err := r.DB.DB.NewInsert().Model(&hidden).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var listed []triageapi.LapsedApprovalBody
+		for _, one := range scrutiny(t, r, "private-triage", "").Lapsed {
+			if one.DecisionID == decision {
+				listed = append(listed, one)
+			}
+		}
+		if len(listed) != 1 || listed[0].Rows != len(ids)+1 {
+			t.Errorf("the agreement is listed as %+v; want it once, covering %d rows", listed, len(ids)+1)
 		}
 	})
 }
