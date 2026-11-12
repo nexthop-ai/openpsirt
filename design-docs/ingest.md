@@ -161,8 +161,8 @@ describe in one transaction (REQ-06).
 
 | Hazard | Guard |
 |---|---|
-| A scan read after a newer one applied | Recorded as overtaken, never failed, and not applied (REQ-06) |
-| A job run again after its apply committed | The build already shows the scan, so the read changes nothing and the scan stays applied; checked before its documents are looked for, since a branch's are gone |
+| A scan read after a newer one applied | Recorded as overtaken and not applied (REQ-06). A read failing because the newer one let go of its documents is overtaken too; any other failure, a refusal of what was sent included, is recorded against the scan |
+| A job run again after its apply committed | The build already shows the scan, so the read changes nothing and the scan stays applied; checked before its documents are looked for, since a branch's are gone. A branch's documents, and those of the scans it passed, are released then if the first attempt stopped before releasing them |
 | Which is newer | The later build time, then the later arrival; a re-send at one build time with new judgments whose first read failed is applied on retry |
 | Scans out of identifier order | Intervals are stamped with scan identifiers, so scans apply in identifier order; a lower one than last applied is overtaken, a re-sent failure gets a new identifier, and a job waiting on a replaced scan is set aside |
 | A newer scan arrives during a parse | Asked again after the build row is taken, as well as before |

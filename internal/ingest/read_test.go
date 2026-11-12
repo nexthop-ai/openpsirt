@@ -1085,6 +1085,35 @@ func TestAScanReadAgainAfterItWasAppliedStandsApplied(t *testing.T) {
 	})
 }
 
+// A worker stopping after a branch scan's apply commits leaves what the scan
+// and the scans it passed sent. The attempt that finds the scan applied lets
+// go of both.
+func TestABranchScanReadAgainAfterItWasAppliedLetsGoOfWhatItPassed(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		now := time.Now().UTC()
+		passed := f.store(t, f.branch, now.Add(-2*time.Hour), aSmallerInventory)
+		scanID := f.store(t, f.branch, now.Add(-time.Hour), anInventory)
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"build"`).Set(`"last_scan_id" = ?`, scanID).
+			Where(`"id" = ?`, f.branch).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.queue.Add(ctx, queue.Parse, strconv.FormatInt(scanID, 10)); err != nil {
+			t.Fatal(err)
+		}
+		result, err := f.reader.Once(ctx)
+		if err != nil || result == nil || !result.AlreadyApplied {
+			t.Fatalf("read %+v %v, want scan %d answered as already applied", result, err, scanID)
+		}
+		if held := f.held(t, passed); held != 0 {
+			t.Errorf("a scan the applied one passed still holds %d documents", held)
+		}
+		if held := f.held(t, scanID); held != 0 {
+			t.Errorf("the applied scan still holds %d documents", held)
+		}
+	})
+}
+
 // A branch scan whose last attempt failed is read by nothing again: a re-send
 // of the same bytes writes them anew.
 func TestABranchScanThatFailedForGoodLetsGoOfWhatItSent(t *testing.T) {
@@ -1224,6 +1253,9 @@ type overtaking struct {
 	scan, newer int64
 	build       int64
 	done        bool
+	// keep leaves the scan's documents where they are, as a newer scan whose
+	// apply has not yet let go of them does.
+	keep bool
 }
 
 func (o *overtaking) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context { return ctx }
@@ -1237,8 +1269,10 @@ func (o *overtaking) AfterQuery(ctx context.Context, e *bun.QueryEvent) {
 		return
 	}
 	o.done = true
-	if err := ingest.NewDocuments(o.db.DB).Discard(ctx, o.scan); err != nil {
-		panic(err)
+	if !o.keep {
+		if err := ingest.NewDocuments(o.db.DB).Discard(ctx, o.scan); err != nil {
+			panic(err)
+		}
 	}
 	if _, err := o.db.DB.NewUpdate().TableExpr(`"build"`).Set(`"last_scan_id" = ?`, o.newer).
 		Where(`"id" = ?`, o.build).Exec(ctx); err != nil {
@@ -1277,6 +1311,40 @@ func TestABranchScanOvertakenWhileItIsReadIsSetAside(t *testing.T) {
 		}
 		if scan.Status == ingest.Failed {
 			t.Errorf("a scan overtaken while it was read is recorded as failed")
+		}
+	})
+}
+
+// A scan whose inventory is refused is told so on its receipt, though a newer
+// scan applied while it was read: the refusal is the sender's to act on, and
+// nothing of it was let go.
+func TestARefusedScanOvertakenWhileItIsReadIsStillRefused(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		now := time.Now().UTC()
+		unreadable := `{"bomFormat": "CycloneDX", "specVersion": "1.6", "components": [{"version": "1"}]}`
+		scanID := f.accept(t, f.branch, now.Add(-2*time.Hour), unreadable)
+		newer := f.store(t, f.branch, now.Add(-time.Hour), aSmallerInventory)
+		hook := &overtaking{db: f.db, scan: scanID, newer: newer, build: f.branch, keep: true}
+		reader := ingest.NewReader(dbtest.Hooked(f.db, hook), f.queue, sbom.Limits{},
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
+		if _, err := f.db.DB.NewUpdate().Model((*ingest.Scan)(nil)).
+			Set(`"status" = ?`, ingest.Failed).Where(`"id" = ?`, newer).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		result, err := reader.Once(ctx)
+		if !hook.done {
+			t.Fatal("the read never listed the scan's documents, so this proves nothing")
+		}
+		if !refusal.In(err) {
+			t.Fatalf("read %+v %v, want the inventory refused", result, err)
+		}
+		scan, err := ingest.NewStore(f.db.DB).ByID(ctx, scanID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if scan.Status != ingest.Failed {
+			t.Errorf("a refused scan a newer one overtook is recorded as %q, want failed", scan.Status)
 		}
 	})
 }

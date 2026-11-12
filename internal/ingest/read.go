@@ -232,8 +232,14 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		return result, nil
 	}
 	// A newer scan applied while this one was read lets go of what this one
-	// sent, so the read fails part way. The scan is overtaken, which is what
-	// it is recorded as, never failed.
+	// sent, so the read fails part way, and the scan is recorded as
+	// overtaken. Any other failure is the scan's own: a refusal of what the
+	// sender sent is told on its receipt whether or not a newer scan has
+	// since applied.
+	var sentLetGo letGoError
+	if !errors.Is(err, ErrReleased) && !errors.As(err, &sentLetGo) {
+		return nil, err
+	}
 	if scan, found := NewStore(r.db.DB).ByID(ctx, scanID); found == nil {
 		if last, read := lastApplied(ctx, r.db.DB, scan.BuildID); read == nil && last > scanID {
 			return &Result{ScanID: scanID, Superseded: true}, nil
@@ -241,6 +247,17 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	}
 	return nil, err
 }
+
+// letGoError refuses a scan whose documents were let go before it was read.
+type letGoError struct{ scanID int64 }
+
+func (e letGoError) Error() string {
+	return fmt.Sprintf("what scan %d sent was let go after its last attempt failed; "+
+		"send the inventory again", e.scanID)
+}
+
+// Refused marks it as the sender's to act on.
+func (letGoError) Refused() {}
 
 // readScan reads one scan and applies it.
 func (r *Reader) readScan(ctx context.Context, scanID int64) (*Result, error) {
@@ -270,7 +287,11 @@ func (r *Reader) readScan(ctx context.Context, scanID int64) (*Result, error) {
 		return nil, err
 	}
 	if last >= scanID {
-		r.letGo(ctx, build.Moves, scan.BuildID, scanID)
+		if last == scanID {
+			r.letGoThrough(ctx, build.Moves, scan.BuildID, scanID)
+		} else {
+			r.letGo(ctx, build.Moves, scan.BuildID, scanID)
+		}
 		return &Result{ScanID: scanID, Superseded: last > scanID, AlreadyApplied: last == scanID}, nil
 	}
 
@@ -305,8 +326,7 @@ func (r *Reader) readScan(ctx context.Context, scanID int64) (*Result, error) {
 	}
 	if inventory == nil {
 		if sent, err := documents.Sent(ctx, []int64{scanID}); err == nil && len(sent[scanID]) > 0 {
-			return nil, refusal.Errorf("what scan %d sent was let go after its last attempt failed; "+
-				"send the inventory again", scanID)
+			return nil, letGoError{scanID: scanID}
 		}
 		return nil, fmt.Errorf("scan %d has no inventory to read", scanID)
 	}
@@ -508,15 +528,24 @@ func (r *Reader) readScan(ctx context.Context, scanID int64) (*Result, error) {
 	// scan is applied, and reported as failed it would be marked so and the
 	// scan it overtook read again over it. The documents are then kept, which
 	// costs storage and changes no answer, and the log line is what says so.
-	if build.Moves {
-		passed, err := documents.heldBefore(ctx, scan.BuildID, scanID)
-		if err != nil {
-			r.logger.Error("could not read which passed scans still hold documents",
-				"scan", scanID, "build", scan.BuildID, "error", err)
-		}
-		r.letGo(ctx, build.Moves, scan.BuildID, append(passed, scanID)...)
-	}
+	r.letGoThrough(ctx, build.Moves, scan.BuildID, scanID)
 	return result, nil
+}
+
+// letGoThrough releases what a branch scan the build shows sent, and what
+// every scan it passed sent. A worker stopping after the apply commits leaves
+// both held, so the attempt that finds the scan already applied releases them
+// too.
+func (r *Reader) letGoThrough(ctx context.Context, moves bool, buildID, scanID int64) {
+	if !moves {
+		return
+	}
+	passed, err := NewDocuments(r.db.DB).heldBefore(ctx, buildID, scanID)
+	if err != nil {
+		r.logger.Error("could not read which passed scans still hold documents",
+			"scan", scanID, "build", buildID, "error", err)
+	}
+	r.letGo(ctx, moves, buildID, append(passed, scanID)...)
 }
 
 // lastApplied returns the scan the build last applied, or zero.
