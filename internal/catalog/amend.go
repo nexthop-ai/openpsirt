@@ -193,6 +193,11 @@ func (s *Store) renameRow(ctx context.Context, r renaming, name string) error {
 		q = q.Where(`"product_id" = ?`, *r.product)
 	}
 	res, err := q.Exec(ctx)
+	if database.IsDuplicate(err) {
+		// Taken between the check and the write, by a rename or declaration
+		// at the same moment.
+		return fmt.Errorf("%s %q: %w", r.what, name, ErrExists)
+	}
 	if err != nil {
 		return fmt.Errorf("rename %s %d: %w", r.what, r.id, err)
 	}

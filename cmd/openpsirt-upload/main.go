@@ -201,9 +201,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		if salt = []byte(strings.TrimSpace(string(salt))); len(salt) == 0 {
 			return fmt.Errorf("%s holds no salt", saltFile)
 		}
-		if len(salt) < uploadclient.MinSalt {
-			return fmt.Errorf("the salt in %s is %d bytes; write at least %d random bytes, for example with openssl rand -hex %d",
-				saltFile, len(salt), uploadclient.MinSalt, uploadclient.MinSalt)
+		if err := uploadclient.CheckSalt(salt); err != nil {
+			return fmt.Errorf("%s: %w", saltFile, err)
 		}
 		opts.Salt = salt
 	}

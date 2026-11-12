@@ -110,10 +110,22 @@ func Build(ctx context.Context, opts Options, inputs []Input) ([]Run, Report, er
 // offline from that digest, and then every short line it keys.
 const MinSalt = 32
 
+// CheckSalt refuses a salt too short to key a fingerprint, saying how to make
+// one that is not.
+func CheckSalt(salt []byte) error {
+	if len(salt) < MinSalt {
+		return fmt.Errorf("the salt is %d bytes; write at least %d random bytes, for example with openssl rand -hex %d",
+			len(salt), MinSalt, MinSalt)
+	}
+	return nil
+}
+
 func build(ctx context.Context, run git, opts Options, inputs []Input) ([]Run, Report, error) {
 	report := Report{Removed: map[string]int{}}
-	if opts.Salt != nil && len(opts.Salt) < MinSalt {
-		return nil, report, fmt.Errorf("the salt is %d bytes; it takes at least %d random bytes", len(opts.Salt), MinSalt)
+	if opts.Salt != nil {
+		if err := CheckSalt(opts.Salt); err != nil {
+			return nil, report, err
+		}
 	}
 	if opts.Series == "" && len(opts.SeriesOf) == 0 {
 		return nil, report, errors.New("a run needs a series: the analysis it is, the same for every build")

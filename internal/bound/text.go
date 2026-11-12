@@ -18,7 +18,8 @@ func Text(s string) string {
 	if strings.IndexByte(s, 0) < 0 && !hasInvalid(s) {
 		return s
 	}
-	return strings.ReplaceAll(strings.ToValidUTF8(s, "�"), "\x00", "")
+	// NULs first, so one between two invalid bytes does not split their run.
+	return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), "�")
 }
 
 func hasInvalid(s string) bool { return strings.ToValidUTF8(s, "") != s }
