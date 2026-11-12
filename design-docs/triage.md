@@ -85,6 +85,7 @@ in, because the scan reports it at every revision.
 |---|---|
 | It requires the package version the fix arrived in | It asserts a fact that hides risk |
 | The version is never compared with what ships | That needs an ordering per ecosystem |
+| It, and the version an upgrade moves to, is at most 191 characters, refused past that | Each is copied to every decision carried forward and printed in every document naming it |
 | It expires on the upstream version, never the packaging revision | A later revision still carries the patch |
 | Published, it is fixed | |
 | It is apart from not applicable, as the exchange format keeps them | The code is present and was affected |

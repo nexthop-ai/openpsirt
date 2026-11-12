@@ -825,6 +825,17 @@ func (p Proposal) valid(now time.Time) error {
 	if p.Outcome == UpgradeNeeded && strings.TrimSpace(p.UpgradeTo) == "" {
 		return refusal.New("an upgrade needs the version it moves to")
 	}
+	// Bounded like the versions a row is keyed on, because each is copied to
+	// every decision carried forward and printed in every document naming it.
+	for _, typed := range []struct{ what, version string }{
+		{"version the fix arrived in", p.FixedVersion},
+		{"version the upgrade moves to", p.UpgradeTo},
+	} {
+		// Counted as sent, as the published bound counts it.
+		if n := utf8.RuneCountInString(typed.version); n > versionLimit {
+			return refusal.Errorf("the %s is %d characters, and a version is at most %d", typed.what, n, versionLimit)
+		}
+	}
 	return nil
 }
 

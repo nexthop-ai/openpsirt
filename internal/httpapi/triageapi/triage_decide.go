@@ -70,7 +70,7 @@ type FindingDecisionBody struct {
 	// whoever packages the component. Offered here because the outcome is
 	// offered here: an enum listing an outcome whose evidence the body
 	// cannot carry refuses every request that picks it.
-	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other"`
+	FixedVersion string `json:"fixed_version,omitempty" maxLength:"191" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other"`
 	Reasoning    string `json:"reasoning" minLength:"1" doc:"The reasoning"`
 	// Occurrences is the deliberate narrowing. Absent means every occurrence,
 	// which is the default naming the occurrences covered asks for.

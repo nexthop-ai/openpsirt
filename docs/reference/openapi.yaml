@@ -3929,6 +3929,7 @@ components:
           type: string
         fixed_version:
           description: Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the decision has to hold for all of them
+          maxLength: 191
           type: string
         justification:
           description: Required when it does not apply
@@ -4292,6 +4293,7 @@ components:
           type: string
         fixed_version:
           description: The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other. Recorded and never compared against the version shipping
+          maxLength: 191
           type: string
         from_statement:
           description: A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the decision rests on
@@ -4376,6 +4378,7 @@ components:
           type: string
         upgrade_to:
           description: The version an upgrade moves to. Carried on an upgrade-needed decision, which is recorded from a component rather than from one finding
+          maxLength: 191
           type: string
         versions:
           description: The number of versions of the component here. More than one needs care
@@ -5790,6 +5793,7 @@ components:
           type: integer
         fixed_version:
           description: The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other
+          maxLength: 191
           type: string
         from_statement:
           description: A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the decision rests on
