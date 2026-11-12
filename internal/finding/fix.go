@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -362,19 +363,33 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 			folds = append(folds, row.FoldKey)
 		}
 	}
+	// One bulk decision stands behind many commitments, so each list is
+	// read once per value, a batch at a time.
+	slices.Sort(decisions)
+	decisions = slices.Compact(decisions)
+	slices.Sort(folds)
+	folds = slices.Compact(folds)
 	withheld := map[int64]bool{}
 	if len(decisions) > 0 {
-		var covered []struct {
+		type cover struct {
 			DecisionID      int64             `bun:"decision_id"`
 			ProductID       int64             `bun:"product_id"`
 			VulnerabilityID int64             `bun:"vulnerability_id"`
 			Visibility      access.Visibility `bun:"visibility"`
 		}
-		if err := s.db.NewSelect().
-			TableExpr(`"decision_occurrence" AS "de"`).
-			ColumnExpr(`DISTINCT "de"."decision_id", "de"."product_id", "de"."vulnerability_id", "de"."visibility"`).
-			Where(`"de"."decision_id" IN (?)`, bun.List(decisions)).
-			Scan(ctx, &covered); err != nil {
+		var covered []cover
+		if err := database.IDsInBatches(ctx, decisions, func(ctx context.Context, batch []int64) error {
+			var some []cover
+			if err := s.db.NewSelect().
+				TableExpr(`"decision_occurrence" AS "de"`).
+				ColumnExpr(`DISTINCT "de"."decision_id", "de"."product_id", "de"."vulnerability_id", "de"."visibility"`).
+				Where(`"de"."decision_id" IN (?)`, bun.List(batch)).
+				Scan(ctx, &some); err != nil {
+				return err
+			}
+			covered = append(covered, some...)
+			return nil
+		}); err != nil {
 			return nil, fmt.Errorf("read what the commitments' decisions cover: %w", err)
 		}
 		// A decision covering nothing is one reading it answers as absent.
@@ -391,9 +406,9 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 		}
 	}
 	seen := map[string]bool{}
-	if len(folds) > 0 {
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	for start := 0; start < len(folds); start += database.BatchSize {
 		var held []string
-		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 		if err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -401,7 +416,7 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 			Where(kinds, kindArgs...).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			Where(FoldedOn+" IN (?)", bun.List(folds)).
+			Where(FoldedOn+" IN (?)", bun.List(folds[start:min(start+database.BatchSize, len(folds))])).
 			Scan(ctx, &held); err != nil {
 			return nil, fmt.Errorf("read which commitments are about readable work: %w", err)
 		}
