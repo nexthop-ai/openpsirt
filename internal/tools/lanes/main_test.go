@@ -54,7 +54,7 @@ func TestAListingWithNoTestBinaryOrNoDatabaseIsRefused(t *testing.T) {
 // program reads, and each must be picked. A picked package is one of the
 // module's, so the server pass names nothing the race pass does not.
 func TestEveryPackageImportingADatabaseRunsInTheServerPass(t *testing.T) {
-	out, err := exec.Command("go", "list", "-test", "-f", listed, "../../../...").Output()
+	out, err := exec.Command(goCommand(), "list", "-test", "-f", listed, "../../../...").Output()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestEveryPackageImportingADatabaseRunsInTheServerPass(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	direct, err := exec.Command("go", "list", "-f",
+	direct, err := exec.Command(goCommand(), "list", "-f",
 		"{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}\t{{join .Imports \" \"}} {{join .TestImports \" \"}} {{join .XTestImports \" \"}}\n{{end}}",
 		"../../../...").Output()
 	if err != nil {

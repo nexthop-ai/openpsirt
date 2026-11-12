@@ -37,18 +37,23 @@ const sqlPackage = "database/sql"
 // is the one whose path ends in ".test" and carries no variant suffix.
 const listed = "{{.ImportPath}}\t{{join .Deps \" \"}}"
 
+// goCommand is the go command make passes in GO, or go from the path where
+// none is passed.
+func goCommand() string {
+	if command := os.Getenv("GO"); command != "" {
+		return command
+	}
+	return "go"
+}
+
 func main() {
 	packages := os.Args[1:]
 	if len(packages) == 0 {
 		fmt.Fprintln(os.Stderr, "lanes: no packages named, so there is nothing to divide")
 		os.Exit(1)
 	}
-	goCommand := os.Getenv("GO")
-	if goCommand == "" {
-		goCommand = "go"
-	}
 	var stderr bytes.Buffer
-	cmd := exec.Command(goCommand, append([]string{"list", "-test", "-f", listed}, packages...)...) //nolint:gosec // G204: the go command over this module's packages
+	cmd := exec.Command(goCommand(), append([]string{"list", "-test", "-f", listed}, packages...)...) //nolint:gosec // G204: the go command over this module's packages
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
