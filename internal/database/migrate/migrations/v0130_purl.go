@@ -27,7 +27,7 @@ const purlBatchV0130 = 5_000
 // row holding qualifiers or starting "pkg:/" in any case is read, since an
 // address can be escaped in part, and only a row that changes is written, so
 // a start after one that stopped part way writes what the first missed.
-// Identity is read from neither part, so no identity moves.
+// No identity is rewritten.
 func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
 	return purlCredentialsInBatchesV0130(ctx, tx, purlBatchV0130)
 }
@@ -86,8 +86,10 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 // the slashes after its scheme dropped, and any credential and query taken
 // out of each qualifier holding an address. A qualifier holding an address
 // that does not parse is dropped, since where its credential ends cannot be
-// told, and so are the pairs after an address whose query is written
-// unescaped, since they are that query.
+// told, and so are a pair whose escapes do not decode, the pairs after an
+// address whose query is written unescaped, since they are that query, and a
+// subpath holding a value after an address, since it is that address's
+// fragment.
 func purlWithoutCredentialV0130(purl string) string {
 	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.EqualFold(scheme, "pkg") {
 		purl = scheme + ":" + strings.TrimLeft(rest, "/")
@@ -99,17 +101,21 @@ func purlWithoutCredentialV0130(purl string) string {
 	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
+	addressLast := false
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
 		if !found {
+			addressLast = false
 			kept = append(kept, pair)
 			continue
 		}
 		address, err := url.PathUnescape(value)
 		if err != nil {
-			address = value
+			addressLast = false
+			continue
 		}
-		if !strings.Contains(address, "://") {
+		addressLast = strings.Contains(address, "://")
+		if !addressLast {
 			kept = append(kept, pair)
 			continue
 		}
@@ -131,7 +137,7 @@ func purlWithoutCredentialV0130(purl string) string {
 	if len(kept) > 0 {
 		purl += "?" + strings.Join(kept, "&")
 	}
-	if hasSubpath {
+	if hasSubpath && (!addressLast || !strings.Contains(subpath, "=")) {
 		purl += "#" + subpath
 	}
 	return purl

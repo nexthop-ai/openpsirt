@@ -300,8 +300,8 @@ func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int6
 	}
 	parts := graph.PartsOfPurl(c.Purl)
 	ecosystem := graph.EcosystemOf(c.Purl)
-	// Narrowest first; a name the row states no ecosystem or namespace for
-	// is asked once by version and once by name alone.
+	// Narrowest first: the row's version, ecosystem and namespace, then its
+	// ecosystem and namespace where it states either, then the name alone.
 	tries := []Entering{{Component: c.Name, Version: c.Version, Ecosystem: ecosystem, Namespace: parts.Namespace}}
 	if ecosystem != "" || parts.Namespace != "" {
 		tries = append(tries, Entering{Component: c.Name, Ecosystem: ecosystem, Namespace: parts.Namespace})

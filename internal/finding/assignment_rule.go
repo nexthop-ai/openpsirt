@@ -544,7 +544,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		return Catches{}, nil
 	}
 
-	// Read once for the four counts below, which ask them alike.
+	// Read once for the counts below, which ask them alike.
 	ended, err := catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, s.now().UTC())
 	if err != nil {
 		return Catches{}, err

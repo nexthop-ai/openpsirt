@@ -263,17 +263,23 @@ func StoredPurl(purl string) string {
 	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
+	addressLast := false
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
 		if !found {
+			addressLast = false
 			kept = append(kept, pair)
 			continue
 		}
 		address, err := url.PathUnescape(value)
 		if err != nil {
-			address = value
+			// An escape that does not decode hides where an address and its
+			// credential end, so the pair is not kept.
+			addressLast = false
+			continue
 		}
-		if !strings.Contains(address, "://") {
+		addressLast = strings.Contains(address, "://")
+		if !addressLast {
 			kept = append(kept, pair)
 			continue
 		}
@@ -298,7 +304,9 @@ func StoredPurl(purl string) string {
 	if len(kept) > 0 {
 		purl += "?" + strings.Join(kept, "&")
 	}
-	if hasSubpath {
+	// A subpath after an address holding a value is that address's fragment,
+	// written unescaped, and is not kept.
+	if hasSubpath && (!addressLast || !strings.Contains(subpath, "=")) {
 		purl += "#" + subpath
 	}
 	return purl

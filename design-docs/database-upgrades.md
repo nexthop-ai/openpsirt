@@ -250,7 +250,7 @@ a stopped upgrade run again finds done.
 
 | Table | Rewritten |
 |---|---|
-| `component`, `graph_node`, `image_version`, the scan's root identifier | A package identifier is rewritten as v0.13.0 stores it (`design-docs/data-model-components.md` § Component identity): the slashes after its scheme dropped, and a qualifier's address kept without its credential, query or fragment. Read and written in Go, 5,000 rows a read in order of identifier, only rows holding qualifiers or starting `pkg:/` in any case, since an address can be escaped in part; a row already in that form is left alone, so a second start writes only what the first missed. No identity moves, since qualifiers are outside it |
+| `component`, `graph_node`, `image_version`, the scan's root identifier | A package identifier is rewritten as v0.13.0 stores it (`design-docs/data-model-components.md` § Component identity): the slashes after its scheme dropped, and a qualifier's address kept without its credential, query or fragment. Read and written in Go, 5,000 rows a read in order of identifier, only rows holding qualifiers or starting `pkg:/` in any case, since an address can be escaped in part; a row already in that form is left alone, so a second start writes only what the first missed. The upgrade moves no identity; the upgrade note says which components are identified anew |
 
 | Upgrade note | Detail |
 |---|---|
