@@ -3,11 +3,7 @@
 
 package access
 
-import (
-	"strings"
-
-	"github.com/uptrace/bun"
-)
+import "strings"
 
 // MayApproveWhere is the condition that the person in personColumn may agree
 // today to a decision about the product productColumn names, at the
@@ -27,17 +23,17 @@ func MayApproveWhere(personColumn, productColumn, visibilityColumn string) (stri
 		var either []string
 		var eitherArgs []any
 		if MayApprove(v, true, true, false) {
-			held, heldArgs := holdingOn(personColumn, productColumn, []Role{Approver})
+			held, heldArgs := holdingOn(personColumn, productColumn, nil, []Role{Approver})
 			either, eitherArgs = append(either, held), append(eitherArgs, heldArgs...)
 		}
 		if MayApprove(v, false, true, true) {
-			held, heldArgs := holdingOn(personColumn, productColumn, rolesTriaging(v))
+			held, heldArgs := holdingOn(personColumn, productColumn, nil, rolesTriaging(v))
 			either, eitherArgs = append(either, held), append(eitherArgs, heldArgs...)
 		}
 		if len(either) == 0 {
 			continue
 		}
-		reads, readArgs := holdingOn(personColumn, productColumn, rolesReading(0, v))
+		reads, readArgs := holdingOn(personColumn, productColumn, nil, rolesReading(0, v))
 		parts = append(parts, `(`+visibilityColumn+` = ? AND `+reads+` AND (`+strings.Join(either, " OR ")+`))`)
 		args = append(args, string(v))
 		args = append(args, readArgs...)
@@ -49,20 +45,6 @@ func MayApproveWhere(personColumn, productColumn, visibilityColumn string) (stri
 	// A deactivated account keeps its grant rows and is refused at sign-in.
 	return `(EXISTS (SELECT 1 FROM "person" AS "pa" WHERE "pa"."id" = ` + personColumn +
 		` AND "pa"."deactivated_at" IS NULL) AND (` + strings.Join(parts, " OR ") + `))`, args
-}
-
-// holdingOn is the condition that the person in personColumn holds one of
-// these roles on the product productColumn names, granted there or across every
-// product, in force: holdingAny with the product a column of the caller's
-// query rather than a bound value.
-func holdingOn(personColumn, productColumn string, enough []Role) (string, []any) {
-	return `(EXISTS (SELECT 1 FROM "role_grant" AS "g"
-			WHERE "g"."person_id" = ` + personColumn + ` AND "g"."active" = ?
-			  AND "g"."product_id" = ` + productColumn + ` AND "g"."role" IN (?))
-		OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
-			WHERE "ga"."person_id" = ` + personColumn + ` AND "ga"."active" = ?
-			  AND "ga"."role" IN (?)))`,
-		[]any{true, bun.List(enough), true, bun.List(enough)}
 }
 
 // rolesTriaging is which roles are enough to triage at a visibility, asked of

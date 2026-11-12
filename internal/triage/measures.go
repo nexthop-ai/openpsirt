@@ -97,7 +97,7 @@ type Spread struct {
 type Worked struct {
 	Person string
 	// Proposed is decisions they made, Approved ones they agreed to, and
-	// Withdrawn ones they took back. There is no send-back count here: the
+	// Withdrawn ones they withdrew, whoever proposed them. There is no send-back count here: the
 	// record holds that a decision was sent back and not by whom.
 	Proposed  int
 	Approved  int

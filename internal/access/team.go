@@ -528,17 +528,27 @@ func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
 // about everybody who may be mentioned. It is written at the call site and
 // never supplied by anybody: a column name cannot be bound by a placeholder,
 // and the only safe source for one is the code (REQ-66).
-//
-// Two EXISTS rather than a union, because that is the shape all four engines
-// take: a union inside an EXISTS is a syntax error on SQLite.
 func holdingAny(q *bun.SelectQuery, person string, enough []Role, productID int64) *bun.SelectQuery {
-	return q.Where(`EXISTS (SELECT 1 FROM "role_grant" AS "g"
-			WHERE "g"."person_id" = `+person+` AND "g"."active" = ?
-			  AND "g"."product_id" = ? AND "g"."role" IN (?))
+	held, args := holdingOn(person, `?`, []any{productID}, enough)
+	return q.Where(held, args...)
+}
+
+// holdingOn is the condition that the person in personColumn holds one of
+// these roles on the product, granted there or across every product, in force.
+// The product is an expression: a column of the caller's query, or a
+// placeholder productArgs binds.
+//
+// Two EXISTS rather than a union, because a union inside an EXISTS is a syntax
+// error on SQLite.
+func holdingOn(personColumn, product string, productArgs []any, enough []Role) (string, []any) {
+	args := append([]any{true}, productArgs...)
+	args = append(args, bun.List(enough), true, bun.List(enough))
+	return `(EXISTS (SELECT 1 FROM "role_grant" AS "g"
+			WHERE "g"."person_id" = ` + personColumn + ` AND "g"."active" = ?
+			  AND "g"."product_id" = ` + product + ` AND "g"."role" IN (?))
 		OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
-			WHERE "ga"."person_id" = `+person+` AND "ga"."active" = ?
-			  AND "ga"."role" IN (?))`,
-		true, productID, bun.List(enough), true, bun.List(enough))
+			WHERE "ga"."person_id" = ` + personColumn + ` AND "ga"."active" = ?
+			  AND "ga"."role" IN (?)))`, args
 }
 
 // rolesReading is which roles are enough to read at a visibility, asked of the
