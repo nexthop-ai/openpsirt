@@ -484,3 +484,12 @@ func TestSeveritiesAreReadPerProductAndAsTheIssueStandsFor(t *testing.T) {
 		}
 	})
 }
+
+func TestASeverityForAnIssueWithNoRecordIsAnError(t *testing.T) {
+	// A zero reads as unrated, which would let a rise through unescalated.
+	each(t, func(t *testing.T, f *fixture) {
+		if _, err := f.store.SeveritiesOf(t.Context(), [][2]int64{{f.product, f.issue + 1000}}); err == nil {
+			t.Error("an issue nothing records was given a severity")
+		}
+	})
+}

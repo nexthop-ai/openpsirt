@@ -248,7 +248,8 @@ func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64
 // severitiesOf is severityOf for each of these product and issue pairs, keyed
 // by the pair. A product's rating is joined per product, so it is one
 // statement per product and batch of issues rather than one per pair. An
-// issue no row names scores zero, as an unrated one does.
+// issue no row names is an error, since a zero would read as unrated and
+// let a rise through unescalated.
 func (s *Store) severitiesOf(ctx context.Context, keys [][2]int64) (map[[2]int64]int, error) {
 	out := make(map[[2]int64]int, len(keys))
 	issuesIn := map[int64][]int64{}
@@ -279,6 +280,9 @@ func (s *Store) severitiesOf(ctx context.Context, keys [][2]int64) (map[[2]int64
 				ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
 				Where(`"sv"."id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
 				return err
+			}
+			if len(rows) != len(batch) {
+				return fmt.Errorf("%d of %d issues have no record", len(batch)-len(rows), len(batch))
 			}
 			for _, row := range rows {
 				out[[2]int64{productID, row.ID}] = finding.Rating{
