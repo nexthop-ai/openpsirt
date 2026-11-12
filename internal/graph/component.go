@@ -278,26 +278,26 @@ func StoredPurl(purl string) string {
 		address, err := url.PathUnescape(value)
 		if err != nil {
 			// An escape that does not decode hides where an address and its
-			// credential end, so the pair is not kept, and neither is a query
-			// written after it.
-			if queryUnescaped(value) {
-				break
-			}
-			continue
+			// credential end. Neither the pair nor any after it is kept: a
+			// credential holding a raw "&" goes on into the pairs after it.
+			break
 		}
 		if !sourcelink.Schemed(address) {
 			// An address written without a scheme loses a password before
 			// its host and anything from its query on.
 			bare, readable := sourcelink.WithoutPassword(address)
-			if readable {
-				if at := strings.IndexAny(bare, "?#"); at >= 0 {
-					bare = bare[:at]
-				}
-				if bare != address {
-					pair = key + "=" + qualifierEscaped(bare)
-				}
-				kept = append(kept, pair)
+			if !readable {
+				// Where its credential ends cannot be told; it and the pairs
+				// after it, which may hold the rest, are not kept.
+				break
 			}
+			if at := strings.IndexAny(bare, "?#"); at >= 0 {
+				bare = bare[:at]
+			}
+			if bare != address {
+				pair = key + "=" + qualifierEscaped(bare)
+			}
+			kept = append(kept, pair)
 			if queryUnescaped(value) {
 				break
 			}
@@ -305,12 +305,9 @@ func StoredPurl(purl string) string {
 		}
 		parsed, err := url.Parse(address)
 		if err != nil {
-			// Where its credential ends cannot be told, so it is not kept,
-			// and neither is a query written after it.
-			if queryUnescaped(value) {
-				break
-			}
-			continue
+			// Where its credential ends cannot be told; it and the pairs
+			// after it, which may hold the rest, are not kept.
+			break
 		}
 		// A user with no password on an ssh address names the account the
 		// host serves, such as git; any other user may be a token.

@@ -256,22 +256,20 @@ func purlWithoutCredentialV0130(purl string) string {
 		}
 		address, err := url.PathUnescape(value)
 		if err != nil {
-			if queryUnescapedV0130(value) {
-				break
-			}
-			continue
+			break
 		}
 		if !schemedV0130(address) {
 			bare, readable := withoutPasswordV0130(address)
-			if readable {
-				if at := strings.IndexAny(bare, "?#"); at >= 0 {
-					bare = bare[:at]
-				}
-				if bare != address {
-					pair = key + "=" + qualifierEscapedV0130(bare)
-				}
-				kept = append(kept, pair)
+			if !readable {
+				break
 			}
+			if at := strings.IndexAny(bare, "?#"); at >= 0 {
+				bare = bare[:at]
+			}
+			if bare != address {
+				pair = key + "=" + qualifierEscapedV0130(bare)
+			}
+			kept = append(kept, pair)
 			if queryUnescapedV0130(value) {
 				break
 			}
@@ -279,10 +277,7 @@ func purlWithoutCredentialV0130(purl string) string {
 		}
 		parsed, err := url.Parse(address)
 		if err != nil {
-			if queryUnescapedV0130(value) {
-				break
-			}
-			continue
+			break
 		}
 		_, password := parsed.User.Password()
 		user := parsed.User != nil && (password || !strings.Contains(strings.ToLower(parsed.Scheme), "ssh"))
