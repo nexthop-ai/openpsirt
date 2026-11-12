@@ -197,7 +197,7 @@ token of a person named `..` would revoke the caller's own token of that name.
 | A person recorded by an administrator or by configuration | Refused |
 | A person a group mapping would record at sign-in | Refused as any unknown arrival is, saying nothing of why |
 | A component in an inventory, other than its root | The inventory is refused (`design-docs/ingest-parsing.md` § Tolerated and refused) |
-| An inventory's root | Accepted; it is the build, addressed by the build's own names, and a producer scanning the current directory names it `.` |
+| An inventory's root | Filed under the product's name, as a root the document does not name is; a producer scanning the current directory names it `.` |
 | An issue name in scanner output | No name: the issue goes by its others, and one with none is refused |
 | A display name | Accepted; it is never a path segment |
 | More dots, or dots within a name | Accepted; a browser sends them as written |

@@ -390,7 +390,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 			// A name nobody could open the page of, or remove from a
 			// team without the request reaching the team itself. Refused
 			// the way every unknown arrival is, saying nothing of why.
-			if typedname.DotSegment(who.handle()) {
+			if typedname.Addressable("an identity", who.handle()) != nil {
 				return nil, ErrDenied
 			}
 			person = &Account{

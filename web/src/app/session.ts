@@ -103,8 +103,7 @@ export async function signOut(
   end: () => Promise<SignOutAnswer>,
   go: (where: string) => void,
 ): Promise<SignOutAnswer> {
-  forgetAll();
-  forgetSession();
+  forgetHere();
   let answer: SignOutAnswer;
   try {
     answer = await end();
@@ -120,7 +119,15 @@ export async function signOut(
 // What a sign-out's answer means for this browser: nobody is signed in on it
 // any more, the proxy in front of the deployment holds the sign-in, or the
 // session is still live.
-type SignOutAnswer = "ended" | "at-the-proxy" | "not-ended";
+export type SignOutAnswer = "ended" | "at-the-proxy" | "not-ended";
+
+// What a sign-out clears before it asks the server: every draft, and what the
+// tab remembers. Offered alone to a reader the proxy signed in, who signs out
+// at the proxy and would otherwise leave both behind on a shared machine.
+export function forgetHere(): void {
+  forgetAll();
+  forgetSession();
+}
 
 // The answer a sign-out's status means. A refusal for want of any session is
 // signed out; 409 is the server saying a proxy signed this browser in.

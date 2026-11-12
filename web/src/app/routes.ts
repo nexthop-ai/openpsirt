@@ -3,7 +3,7 @@
 
 import { matchPath } from "react-router-dom";
 import type { Body } from "../api/client";
-import { segment } from "../api/links";
+import { filledIn } from "../api/links";
 import table from "./routes.json";
 
 // Every address this application answers, and every address into it the
@@ -63,13 +63,7 @@ function fill(
   pattern: string,
   parts: Record<string, string | number | undefined>,
 ): string | undefined {
-  let climbs = false;
-  const filled = pattern.replace(/:(\w+)/g, (_, name: string) => {
-    const escaped = segment(String(parts[name] ?? ""));
-    if (escaped === undefined) climbs = true;
-    return escaped ?? "";
-  });
-  return climbs ? undefined : filled;
+  return filledIn(pattern, /:(\w+)/g, (name) => String(parts[name] ?? ""));
 }
 
 // An address naming a dot segment is the front page, as the server's

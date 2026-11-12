@@ -451,10 +451,9 @@ func (c *reader) finish() (*Document, error) {
 			continue
 		}
 		// Every address about a component carries its name as a path
-		// segment, and a browser resolves "." and ".." away. The root is
-		// exempt: it is the build, addressed by the build's own names, and a
-		// producer scanning the current directory names it ".".
-		if err := typedname.Addressable("component name", described.Name); err != nil {
+		// segment, stored as written, and a browser resolves "." and ".."
+		// away. The root is exempt: a snapshot names it after the build.
+		if err := typedname.Unclimbing("component name", described.Name); err != nil {
 			return nil, refusal.Errorf("%w, so it cannot be tracked", err)
 		}
 		c.doc.Components = append(c.doc.Components, described)

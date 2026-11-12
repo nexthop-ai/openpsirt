@@ -380,12 +380,20 @@ func TestAComponentNamedAsADotSegmentIsRefused(t *testing.T) {
 	}
 }
 
-func TestARootNamedAsADotSegmentIsOrdinary(t *testing.T) {
-	// A producer scanning the current directory names the root ".". The root
-	// is the build, addressed by the build's own names.
+func TestARootNamedAsADotSegmentIsFiledUnderTheBuildsName(t *testing.T) {
+	// A producer scanning the current directory names the root ".". A finding
+	// on the build itself is addressed by the root's name, so the root and
+	// every edge to it take the build's.
 	doc := read(t, strings.Replace(minimal, `"name": "product"`, `"name": "."`, 1))
-	if doc.Root.Name != "." || len(doc.Components) == 0 {
-		t.Errorf("read the root as %q beside %d components", doc.Root.Name, len(doc.Components))
+	snap := doc.Snapshot(graph.Described{Name: "sonic"})
+	if snap.Root.Name != "sonic" || snap.Root.Version != "1.0" {
+		t.Errorf("the root is %q at %q", snap.Root.Name, snap.Root.Version)
+	}
+	if len(snap.Dependencies) != 1 || snap.Dependencies[0].Parent.Identity() != snap.Root.Identity() {
+		t.Errorf("the edges no longer start at the root: %+v", snap.Dependencies)
+	}
+	if doc.Dependencies[0].Parent.Name != "." {
+		t.Error("taking a snapshot rewrote the document it was taken from")
 	}
 }
 
