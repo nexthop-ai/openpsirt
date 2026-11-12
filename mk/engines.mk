@@ -73,7 +73,8 @@ ifneq ($(ENGINES_MISSING),)
 endif
 	@every=$$($(GO) run ./internal/tools/engines) || exit 1; \
 	  servers=$$($(GO) run ./internal/tools/engines servers) || exit 1; \
-	  [ -n "$$every" ] && [ -n "$$servers" ] \
+	  partial=$$($(GO) run ./internal/tools/engines partial) || exit 1; \
+	  [ -n "$$every" ] && [ -n "$$servers" ] && [ -n "$$partial" ] \
 	    || { echo "the engine list came back empty, so these greps check nothing"; exit 1; }; \
 	  out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
 	  $(GO) test $(ENGINES_TEST) ./internal/schema/ -count=1 -v -run TestMigrationsApplyOnEveryEngine \
@@ -97,7 +98,7 @@ endif
 	  $(GO) test $(ENGINES_TEST) ./internal/database/migrate/migrations/ -count=1 -v \
 	    -run TestAMigrationThatFailedPartWayThroughCanBeRunAgain \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in mysql mariadb; do \
+	  for engine in $$partial; do \
 	    grep -q "PASS: TestAMigrationThatFailedPartWayThroughCanBeRunAgain/$$engine" "$$out" \
 	      || { echo "a half-applied migration was not run again on $$engine"; exit 1; }; \
 	  done

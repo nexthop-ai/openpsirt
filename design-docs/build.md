@@ -144,7 +144,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make pins-check` | Versions pinned in two files agree |
 | `make go-version` | The image's Go release, which every workflow installs |
 | `make check` | Everything above except `make build`. Needs npm |
-| `make check-engines` | All four engines ran as claimed, and the reserved-word list matches them |
+| `make check-engines` | All four engines ran as claimed, and the reserved-word list matches them. Which engines each test must have reached is read from the application's enumeration of engines, never a list in the makefile |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the engines |
 | `make weakness-names` | Rewrites weakness names and primary parents from the catalog. In no gate, since the catalog is unpinned |
 | `make cppcheck-weaknesses` | Rewrites cppcheck's check-to-weakness table from `cppcheck --errorlist`. In no gate; `CPPCHECK` names the binary |
