@@ -218,6 +218,8 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | No make on Windows: the Linux step prints the packages and Go release for `go test` | |
 | A skipped job satisfies the merge check | Queue entries and pull requests compare against their own base |
 | `Merge Status`, a job in the `PR` workflow, is the one check the ruleset requires; it waits for every other check to pass or be skipped | |
+| `Merge Status` then requires every job of the `CI` workflow with no condition, read from the workflow, to exist on the commit with its latest run passed | The wait passes an empty set, so a run that never registered its checks would merge ungated. A list kept by hand misses the next gating job |
+| `Merge Status` fails when it finds no such job, or when one has no fixed name: a matrix, or an expression in its name | A check without a fixed name cannot be looked up |
 | `Release` runs on a tag (`design-docs/packaging-release.md` § The release procedure) | |
 | Every gating workflow declares `merge_group:` | Without it a queue entry gets no check, which looks unstarted |
 | `Dependabot` runs on pull requests alone, skipped on any Dependabot did not open or push (`design-docs/build-dependencies.md` § Action pinning) | It queues; it gates nothing |
