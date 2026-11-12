@@ -60,7 +60,7 @@ func TestOpenTellsMySQLFromMariaDB(t *testing.T) {
 		switch db.Server.Engine {
 		case database.MySQL, database.MariaDB:
 			raw := db.Server.Raw
-			isMaria := containsFold(raw, "mariadb")
+			isMaria := strings.Contains(strings.ToLower(raw), "mariadb")
 			if isMaria && db.Server.Engine != database.MariaDB {
 				t.Errorf("server says MariaDB (%q) but was identified as %s", raw, db.Server.Engine)
 			}
@@ -84,25 +84,6 @@ func TestSimpleQueryRunsEverywhere(t *testing.T) {
 			t.Errorf("SELECT 1 returned %d", got)
 		}
 	})
-}
-
-func containsFold(haystack, needle string) bool {
-	lower := func(s string) string {
-		b := []byte(s)
-		for i := range b {
-			if b[i] >= 'A' && b[i] <= 'Z' {
-				b[i] += 'a' - 'A'
-			}
-		}
-		return string(b)
-	}
-	h, n := lower(haystack), lower(needle)
-	for i := 0; i+len(n) <= len(h); i++ {
-		if h[i:i+len(n)] == n {
-			return true
-		}
-	}
-	return false
 }
 
 // SQLite is opened in write-ahead-log mode with NORMAL syncing, and a URL
@@ -331,6 +312,10 @@ func TestARequiredTransportIsImposedOnEveryConnection(t *testing.T) {
 		{"mariadb://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=1", "", true, "", ""},
 		{"mysql://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=false", "", true, "tls=true", ""},
 		{"mysql://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=true", "", false, "allowFallbackToPlaintext=true", ""},
+		// The driver's password is not escaped and its database starts at the
+		// last slash, so a password holding ")/" and "?" hides nothing.
+		{"mysql://u:a%29%2F%3Fb@db/openpsirt?tls=true&allowFallbackToPlaintext=true", "", true, "", ""},
+		{"mysql://u:a%29%2F%3Fb@db/openpsirt?tls=preferred", "", true, "tls=skip-verify", "tls=preferred"},
 		{"mysql://u:p@db/openpsirt", "", false, "tls=preferred", ""},
 	} {
 		target, err := database.ParseURL(c.url)
