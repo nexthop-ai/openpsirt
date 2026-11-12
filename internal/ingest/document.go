@@ -240,6 +240,23 @@ func (d *Documents) Discard(ctx context.Context, scanID int64) error {
 	})
 }
 
+// heldBefore returns the scans of a build older than scanID whose documents
+// are still held.
+func (d *Documents) heldBefore(ctx context.Context, buildID, scanID int64) ([]int64, error) {
+	var ids []int64
+	if err := d.db.NewSelect().
+		TableExpr(`"scan_document" AS "sd"`).
+		ColumnExpr(`DISTINCT "sd"."scan_id"`).
+		Join(`JOIN "scan" AS "sc" ON "sc"."id" = "sd"."scan_id"`).
+		Where(`"sc"."build_id" = ?`, buildID).
+		Where(`"sd"."scan_id" < ?`, scanID).
+		Where(`"sd"."discarded_at" IS NULL`).
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read which older scans still hold documents: %w", err)
+	}
+	return ids, nil
+}
+
 // ErrReleased ends a document's stream when the document was let go while it
 // was read.
 //

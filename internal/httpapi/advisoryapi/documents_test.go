@@ -145,8 +145,9 @@ func TestAnUploadTurnedAwayAnywhereItCanBeIsListedAsRefused(t *testing.T) {
 			t.Fatalf("a request past the bound answered %d: %s", got.Code, got.Body.String())
 		}
 		// Refused once it was read, under a publisher too long to record:
-		// the file name, where the request names none.
-		if got := r.VexedAs(t, "admin", "", strings.Repeat("p", 200)+".json", said); got.Code != http.StatusUnprocessableEntity {
+		// the document's author, where the request names none.
+		if got := r.VexedAs(t, "admin", "", "statements.json", strings.Replace(said,
+			`"Example Distribution"`, `"`+strings.Repeat("p", 200)+`"`, 1)); got.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("a publisher too long answered %d: %s", got.Code, got.Body.String())
 		}
 		// Somebody who may not upload is refused before anything is

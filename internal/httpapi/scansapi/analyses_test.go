@@ -279,3 +279,35 @@ func TestAPersonSendsAnAnalyzerRunWhereTheyTriageSecurityTesting(t *testing.T) {
 		}
 	})
 }
+
+// An analyzer run turned away by a full backlog is told when to send again,
+// and the refusal is recorded against its series as any other is.
+func TestAnAnalyzerUploadAgainstAFullBacklogIsRecordedAndToldWhenToRetry(t *testing.T) {
+	opts := queue.DefaultOptions()
+	opts.MaxBacklog = 1
+	httpapitest.IngestOn(t, dbtest.Two, opts, func(t *testing.T, f *httpapitest.IngestFixture) {
+		if _, err := f.Queue.Add(t.Context(), queue.Analyze, "somebody else's run"); err != nil {
+			t.Fatal(err)
+		}
+		body, kind := httpapitest.Form(t,
+			httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: clangRun},
+			httpapitest.Part{Field: "series", Content: "nightly"})
+		req := httptest.NewRequest(http.MethodPost, analyses(f), body)
+		req.Header.Set("Content-Type", kind)
+		rec := httptest.NewRecorder()
+		f.Handler.ServeHTTP(rec, f.Sending(req))
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("an analyzer run against a full backlog answered %d: %s", rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("Retry-After") == "" {
+			t.Error("an analyzer run turned away by a full backlog is not told when to send again")
+		}
+		held, err := f.DB.DB.NewSelect().TableExpr(`"series_refusal"`).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held != 1 {
+			t.Errorf("%d refusals recorded for an analyzer run a full backlog turned away, want 1", held)
+		}
+	})
+}

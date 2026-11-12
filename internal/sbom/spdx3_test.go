@@ -356,18 +356,11 @@ func TestTheThirdVersionChargesTheSameBounds(t *testing.T) {
 	t.Run("one relationship reaching many elements", func(t *testing.T) {
 		// The edge bound is charged per element reached rather than per
 		// relationship, because one relationship states a list.
-		var b strings.Builder
-		b.WriteString(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [` +
-			`{"spdxId": "urn:r", "type": "Relationship", "from": "urn:x", "relationshipType": "contains", "to": [`)
-		for i := range 20 {
-			if i > 0 {
-				b.WriteString(",")
-			}
-			b.WriteString(`"urn:to"`)
-		}
-		b.WriteString(`]}]}`)
+		doc := repeated(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [`+
+			`{"spdxId": "urn:r", "type": "Relationship", "from": "urn:x", "relationshipType": "contains", "to": [`,
+			`"urn:to"`, 20, `]}]}`)
 
-		_, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxEdges: 5})
+		_, err := sbom.Read(strings.NewReader(doc), sbom.Limits{MaxEdges: 5})
 		if err == nil {
 			t.Fatal("twenty ends passed a bound of five")
 		} else if !strings.Contains(err.Error(), "dependency limit") {
@@ -582,18 +575,11 @@ func TestWhatTheThirdVersionSaysItIsAboutIsBounded(t *testing.T) {
 	// One graph entry is charged one component on the way in, and without a
 	// per-element charge that entry carries an array as long as the byte bound
 	// allows — in the synchronous upload request.
-	var b strings.Builder
-	b.WriteString(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [` +
-		`{"spdxId": "urn:d", "type": "SpdxDocument", "rootElement": [`)
-	for i := range 50 {
-		if i > 0 {
-			b.WriteString(",")
-		}
-		b.WriteString(`"urn:a"`)
-	}
-	b.WriteString(`]}]}`)
+	doc := repeated(`{"@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld", "@graph": [`+
+		`{"spdxId": "urn:d", "type": "SpdxDocument", "rootElement": [`,
+		`"urn:a"`, 50, `]}]}`)
 
-	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10}); err == nil {
+	if _, err := sbom.Read(strings.NewReader(doc), sbom.Limits{MaxComponents: 10}); err == nil {
 		t.Fatal("fifty references passed a bound of ten")
 	} else if !strings.Contains(err.Error(), "component limit") {
 		t.Errorf("refused with %q", err)

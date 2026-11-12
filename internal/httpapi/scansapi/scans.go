@@ -23,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
@@ -94,7 +95,8 @@ func registerScans(api huma.API, in core.Deps) {
 			"accepted for processing, not that they were valid. Poll `GET .../sboms` to find out " +
 			"whether they parsed and what the scan found.\n\n" +
 			"Answers 503 with `Retry-After` when the deployment is already reading as many " +
-			"uploads as it takes at once; send again after that many seconds.",
+			"uploads as it takes at once, or when as many scans as it holds are waiting to be " +
+			"read; send again after that many seconds.",
 		Tags: []string{"Ingest"},
 		// A scan file is somebody else's output arriving over a link we do not
 		// control, and this is the first place it can be stopped.
@@ -142,8 +144,10 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 			BuildID: build.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
 		}, input.Product)
 	}
-	refuse := func(refused huma.StatusError) error {
-		note(refused.Error(), nil, nil)
+	refuse := func(refused error) error {
+		if turnedAway(refused) {
+			note(refused.Error(), nil, nil)
+		}
 		return refused
 	}
 
@@ -164,57 +168,16 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 			sent, limits.MaxDocuments)))
 	}
 
-	// A retired product, release or variant takes no scan. It is the other
-	// half of retiring one: the lists stop offering it and this stops a
-	// pipeline still configured for it filing against it anyway. The refusal
-	// says what to do, because what has to change is a build script somebody
-	// maintains.
-	//
-	// After authorization, so that a sender who may not file against this
-	// product cannot learn from the refusal that the name exists at all.
-	//
-	// The outermost first: a product retired with its releases still in use is
-	// answered about the product, which is the thing somebody has to bring
-	// back. Spelled back as the sender sent it, because what they have to go
-	// and change is their own configuration.
-	var retired string
-	switch {
-	case named.ProductRetired:
-		retired = fmt.Sprintf("product %q", input.Product)
-	case named.BranchOrTagRetired:
-		retired = fmt.Sprintf("release %q of %q", input.BranchOrTag, input.Product)
-	case named.VariantRetired:
-		retired = fmt.Sprintf("variant %q of %q", input.Variant, input.Product)
+	if err := retiredRefusal(named, input.Product, input.BranchOrTag, input.Variant, "scan"); err != nil {
+		return nil, refuse(err)
 	}
-	if retired != "" {
-		return nil, refuse(huma.NewError(http.StatusConflict, fmt.Sprintf(
-			"%s is retired and takes no scan; declare it again to bring it back", retired)))
-	}
-
-	// Refusing before storing. Deciding costs a query; deciding afterwards
-	// costs however long it takes to store tens of megabytes we then throw
-	// away, on a deployment already behind on its work. It happens after
-	// authorization so that how far behind we are is not something an
-	// unauthorized sender can measure.
-	depth, err := in.Queue.Depth(ctx, queue.Parse)
-	if err != nil {
-		return nil, core.WentWrong(in.Logger, "cannot tell how much work is waiting", err)
-	}
-	// The limit in force, not the one this binary was built with. Refusing
-	// against the built-in number makes the effective limit the smaller of the
-	// two, so raising the setting changes nothing for the producer the setting
-	// exists for.
-	limit, err := in.Queue.Backlog(ctx)
-	if err != nil {
-		return nil, core.WentWrong(in.Logger, "cannot tell how much work may wait", err)
-	}
-	if depth >= limit {
-		return nil, refuse(huma.NewError(http.StatusServiceUnavailable,
-			fmt.Sprintf("%d scans are already waiting to be read; try again shortly", depth)))
+	if err := backlogged(ctx, in, queue.Parse, "scans", "read"); err != nil {
+		return nil, refuse(err)
 	}
 
 	header, contentHash, inventoryHash, err := describe(parts, in.Limits)
-	if err != nil {
+	switch {
+	case refusal.In(err):
 		// The reason recorded is what was wrong with the upload, which the
 		// producer is handed among the errors: the answer's own detail is
 		// the same sentence for every unreadable upload, and a report reading
@@ -222,6 +185,10 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		refused := huma.Error422UnprocessableEntity("the upload could not be read", err)
 		note("the upload could not be read: "+err.Error(), nil, nil)
 		return nil, refused
+	case err != nil:
+		// The spooled form failed to read, which is this server's fault and
+		// names a path on it: a fault, never the sender's document refused.
+		return nil, core.WentWrong(in.Logger, "the upload could not be read", err)
 	}
 
 	// A document that does not say when it was built is ordered by when it
@@ -302,7 +269,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 
 	switch {
 	case errors.Is(err, queue.ErrBacklogFull):
-		return nil, refuse(huma.NewError(http.StatusServiceUnavailable, err.Error()))
+		return nil, refuse(busy(err.Error()))
 	case errors.Is(err, ingest.ErrRejected):
 		// Recorded here, because nothing else records it. Without this a
 		// refused upload leaves no server-side trace: the producer is told and
@@ -436,7 +403,7 @@ func describe(parts *uploadParts, limits sbom.Limits) (sbom.Header, string, stri
 // megabytes buys nothing.
 func readInventory(file huma.FormFile, limits sbom.Limits) (sbom.Header, string, error) {
 	if !file.IsSet {
-		return sbom.Header{}, "", fmt.Errorf("no inventory was sent")
+		return sbom.Header{}, "", refusal.New("no inventory was sent")
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return sbom.Header{}, "", err

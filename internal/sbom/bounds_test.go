@@ -182,3 +182,9 @@ func TestARelationshipWithNoEndKeepsItsCharge(t *testing.T) {
 		t.Errorf("the refusal does not name the limit it hit: %v", err)
 	}
 }
+
+// repeated is a document of n copies of element, comma separated, between
+// prefix and suffix: the shape every bounded array is tested with.
+func repeated(prefix, element string, n int, suffix string) string {
+	return prefix + strings.Repeat(element+",", n-1) + element + suffix
+}

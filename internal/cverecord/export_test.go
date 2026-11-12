@@ -18,15 +18,19 @@ type Bounds struct {
 	Record        uint64
 	Inner         int64
 	Archive       int64
+	Directory     int64
+	RecordBytes   uint64
 }
 
 // LowerBounds lowers the bounds named for the rest of the test.
 func LowerBounds(t testing.TB, b Bounds) {
 	t.Helper()
-	was := Bounds{mostRecords, longestLine, mostSnapshotBytes, mostMembers, largestRecord, largestInner, largestArchive}
+	was := Bounds{mostRecords, longestLine, mostSnapshotBytes, mostMembers, largestRecord, largestInner,
+		largestArchive, largestDirectory, largestRecords}
 	set := func(b Bounds) {
 		mostRecords, longestLine, mostSnapshotBytes = b.Records, b.Line, b.SnapshotBytes
 		mostMembers, largestRecord, largestInner, largestArchive = b.Members, b.Record, b.Inner, b.Archive
+		largestDirectory, largestRecords = b.Directory, b.RecordBytes
 	}
 	next := was
 	if b.Records != 0 {
@@ -49,6 +53,12 @@ func LowerBounds(t testing.TB, b Bounds) {
 	}
 	if b.Archive != 0 {
 		next.Archive = b.Archive
+	}
+	if b.Directory != 0 {
+		next.Directory = b.Directory
+	}
+	if b.RecordBytes != 0 {
+		next.RecordBytes = b.RecordBytes
 	}
 	set(next)
 	t.Cleanup(func() { set(was) })

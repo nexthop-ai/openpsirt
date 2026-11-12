@@ -30,8 +30,17 @@ var (
 	// 2026-10-07. Counted from the archive's directory before the archive is
 	// opened, because opening it holds an entry in memory for every member.
 	mostMembers = 4_000_000
-	// largestRecord bounds one record's JSON. The largest on 2026-10-07 is a
-	// few hundred kilobytes.
+	// largestDirectory bounds the bytes of the archive's directory, which
+	// opening it holds: 44,333,424 for 425,189 members on 2026-11-12, about
+	// 104 a member, so the headroom of mostMembers.
+	largestDirectory int64 = 512 << 20
+	// largestRecords bounds the bytes every record in the archive states it
+	// inflates to, summed, which is what reading them decompresses:
+	// 3,550,142,419 for 424,534 records on 2026-11-12, so about nine times
+	// that.
+	largestRecords uint64 = 32 << 30
+	// largestRecord bounds one record's JSON. The largest on 2026-11-12 is
+	// 2,402,038 bytes.
 	largestRecord uint64 = 16 << 20
 	// largestInner bounds the archive inside the published one, which is
 	// written to disk before it is read: 688 MB on 2026-10-07.
@@ -50,19 +59,19 @@ var (
 // The moment returned is the newest any record read was updated, withdrawn
 // and rejected ones included, which is what the snapshot describes.
 //
-// A record that cannot be read is left out and named among what is returned
-// as skipped. Left out, it narrows nothing, which is the conservative outcome;
+// A record that cannot be read is left out and counted among what is
+// returned as skipped. Left out, it narrows nothing, which is the conservative outcome;
 // failing the whole archive on it keeps the last snapshot for as long as that
 // record stands, and that snapshot goes on closing findings on what records
 // said before they changed. The archive fails only where no record in it could
 // be read.
-func FromArchive(archive, scratch string) ([]Record, time.Time, []error, error) {
+func FromArchive(archive, scratch string) ([]Record, time.Time, Skipped, error) {
 	if err := countMembers(archive); err != nil {
-		return nil, time.Time{}, nil, fmt.Errorf("open the CVE List archive: %w", err)
+		return nil, time.Time{}, Skipped{}, fmt.Errorf("open the CVE List archive: %w", err)
 	}
 	outer, err := zip.OpenReader(archive)
 	if err != nil {
-		return nil, time.Time{}, nil, fmt.Errorf("open the CVE List archive: %w", err)
+		return nil, time.Time{}, Skipped{}, fmt.Errorf("open the CVE List archive: %w", err)
 	}
 	defer func() { _ = outer.Close() }()
 
@@ -72,15 +81,15 @@ func FromArchive(archive, scratch string) ([]Record, time.Time, []error, error) 
 		}
 		inner, err := unpack(member, scratch)
 		if err != nil {
-			return nil, time.Time{}, nil, err
+			return nil, time.Time{}, Skipped{}, err
 		}
 		defer func() { _ = os.Remove(inner) }()
 		if err := countMembers(inner); err != nil {
-			return nil, time.Time{}, nil, fmt.Errorf("open the archive inside the CVE List archive: %w", err)
+			return nil, time.Time{}, Skipped{}, fmt.Errorf("open the archive inside the CVE List archive: %w", err)
 		}
 		held, err := zip.OpenReader(inner)
 		if err != nil {
-			return nil, time.Time{}, nil,
+			return nil, time.Time{}, Skipped{},
 				fmt.Errorf("open the archive inside the CVE List archive: %w", err)
 		}
 		defer func() { _ = held.Close() }()
@@ -183,28 +192,65 @@ func (s *stamp) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
+// Skipped is how many records a read of an archive left out because they
+// could not be read, and why the first of them could not. Only the first is
+// kept, because an archive states as many unreadable members as it holds.
+type Skipped struct {
+	Count int
+	First error
+}
+
+// skip counts one more record left out.
+func (s *Skipped) skip(err error) {
+	if s.Count == 0 {
+		s.First = err
+	}
+	s.Count++
+}
+
+// isRecord is whether an archive member is a record's file, by its name.
+func isRecord(member *zip.File) bool {
+	name := path.Base(member.Name)
+	return strings.HasPrefix(name, "CVE-") && strings.HasSuffix(name, ".json")
+}
+
 // records reads every record file among an archive's members and keeps those
-// that can narrow a match, in identifier order, naming each record it could
+// that can narrow a match, in identifier order, counting each record it could
 // not read.
-func records(members []*zip.File) ([]Record, time.Time, []error, error) {
+//
+// What the records state they inflate to is summed and bounded before any is
+// read. A member inflating past what it states fails to read, so the sum
+// bounds what reading them decompresses.
+func records(members []*zip.File) ([]Record, time.Time, Skipped, error) {
 	if len(members) > mostMembers {
-		return nil, time.Time{}, nil,
+		return nil, time.Time{}, Skipped{},
 			tooLarge(fmt.Sprintf("the CVE List archive holds more than %d files", mostMembers))
+	}
+	var stated uint64
+	for _, member := range members {
+		if !isRecord(member) {
+			continue
+		}
+		stated += member.UncompressedSize64
+		if stated > largestRecords || stated < member.UncompressedSize64 {
+			return nil, time.Time{}, Skipped{},
+				tooLarge(fmt.Sprintf("the CVE List archive's records are larger than %d bytes", largestRecords))
+		}
 	}
 	var kept []Record
 	var count sized
 	var taken time.Time
-	var skipped []error
+	var skipped Skipped
 	read := 0
 	for _, member := range members {
-		name := path.Base(member.Name)
-		if !strings.HasPrefix(name, "CVE-") || !strings.HasSuffix(name, ".json") {
+		if !isRecord(member) {
 			continue
 		}
+		name := path.Base(member.Name)
 		read++
 		record, updated, keep, err := readRecord(member)
 		if err != nil {
-			skipped = append(skipped, fmt.Errorf("read %s from the CVE List archive: %w", name, err))
+			skipped.skip(fmt.Errorf("read %s from the CVE List archive: %w", trimmed(name), err))
 			continue
 		}
 		// Every record read, kept or not and withdrawn or not: a record
@@ -218,20 +264,20 @@ func records(members []*zip.File) ([]Record, time.Time, []error, error) {
 			// memory is bounded by what a snapshot holds.
 			line, err := json.Marshal(&record)
 			if err != nil {
-				return nil, time.Time{}, nil, fmt.Errorf("read %s from the CVE List archive: %w", name, err)
+				return nil, time.Time{}, Skipped{}, fmt.Errorf("read %s from the CVE List archive: %w", trimmed(name), err)
 			}
 			if err := count.add(record.ID, len(line)+1); err != nil {
-				return nil, time.Time{}, nil, err
+				return nil, time.Time{}, Skipped{}, err
 			}
 			kept = append(kept, record)
 		}
 	}
 	if read == 0 {
-		return nil, time.Time{}, nil, errors.New("the CVE List archive holds no records")
+		return nil, time.Time{}, Skipped{}, errors.New("the CVE List archive holds no records")
 	}
-	if len(skipped) == read {
-		return nil, time.Time{}, nil, fmt.Errorf("no record in the CVE List archive could be "+
-			"read, the first: %w", skipped[0])
+	if skipped.Count == read {
+		return nil, time.Time{}, Skipped{}, fmt.Errorf("no record in the CVE List archive could be "+
+			"read, the first: %w", skipped.First)
 	}
 	sort.Slice(kept, func(i, j int) bool { return kept[i].ID < kept[j].ID })
 	return kept, taken, skipped, nil

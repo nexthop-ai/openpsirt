@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
 
@@ -97,6 +98,9 @@ func TestAReportPastTheLimitFailsTheRun(t *testing.T) {
 	if !strings.Contains(err.Error(), "report limit") {
 		t.Errorf("the failure does not name the limit it hit: %v", err)
 	}
+	if !refusal.In(err) {
+		t.Errorf("the limit the report hit is not stated for the producer: %v", err)
+	}
 }
 
 func TestAReportInsideTheLimitIsRead(t *testing.T) {
@@ -137,6 +141,10 @@ func TestAFailedScannersLastWordsAreItsReason(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "the database is out of date") {
 		t.Errorf("the failure does not carry the scanner's last words: %v", err)
+	}
+	// Published on the producer's receipt, which publishes only a refusal.
+	if !refusal.In(err) {
+		t.Errorf("the scanner's last words are not stated for the producer: %v", err)
 	}
 }
 

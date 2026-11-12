@@ -49,12 +49,12 @@ offending text, so an interface can point at it.
 | Rule | Reason |
 |---|---|
 | A message is published only when it is a refusal: every caller-facing sentence a store, the catalog or the document parser writes is typed as one, and a sentinel stays matched through it | An error type a caller reads fields of, such as a fault in writing, a name reaching several components, references a ruling could not find, or a missing reason, declares itself one. Everything else is logged with its cause |
-| An error's text is publishable when it is a refusal carrying nothing an engine or driver put in it, one test wherever asked | A failed scan run's receipt asks only the second half, since the scanner's words tell a producer why |
+| An error's text is publishable when it is a refusal carrying nothing an engine or driver put in it, one test wherever asked, a failed scan run's receipt included | |
 | The harness each route package runs over its mappers fails a fault body carrying any detail of its cause, its error list included | |
 | A connection not made or cut short is read from the network's and each driver's own error | |
 | The document parser states a file ending inside a value in its own words; a read failing beneath the parser is a fault | The driver's cut-connection error would hide a truncated upload, which the sender fixes |
 | A failed upload's receipt carries the refusal's sentence, or a fixed sentence otherwise, a job that died first included | |
-| A failed scan run's receipt carries the scanner's own words, or a fixed sentence where the database or its driver failed | |
+| A failed scan run's receipt carries the scanner's own words, which the scanner adapter states as a refusal, or a fixed sentence for any other cause | A database, file system or network error names a statement, a path or an endpoint |
 | An act that committed is answered as done; a later read naming things in the answer is logged where it fails, its names left blank | A fault answer would get the act repeated, and an append-only notice held twice |
 | A 404 is never built from an error's text, and a gate checks it | A driver error would reach a caller as "that product does not exist" with host, port and driver |
 | The catalog's not-declared error is the one exception, composed from the supplied names and fixed words, once the sentinel matched | A refused pipeline must know which of product, branch and variant |

@@ -4,9 +4,11 @@
 package finding_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // A run's own account of itself, and the cost of reading it back.
@@ -520,9 +523,10 @@ func TestARunThatWarnsWhileSucceedingKeepsWhatItSaid(t *testing.T) {
 }
 
 // A run's failure is served on the receipt to the key that sent the scan. The
-// scanner's own words are what tell a producer why; a failure the database or
-// its driver raised carries the address a connection dialed, and is kept as
-// fixed words.
+// scanner's own words, stated as a refusal, are what tell a producer why;
+// anything else, a failure the database or its driver raised or a file the
+// server could not write, carries an address or a path, and is kept as fixed
+// words.
 func TestARunsFailureKeepsTheScannersWordsAndHidesTheDatabases(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		lost := fmt.Errorf("apply what the scanner found: %w", &net.OpError{
@@ -533,9 +537,13 @@ func TestARunsFailureKeepsTheScannersWordsAndHidesTheDatabases(t *testing.T) {
 			cause error
 			want  string
 		}{
-			{errors.New("grype exited 1: the vulnerability database is out of date"),
+			{refusal.New("grype exited 1: the vulnerability database is out of date"),
 				"grype exited 1: the vulnerability database is out of date"},
 			{lost, finding.UnstatedFailure},
+			{fmt.Errorf("write the inventory: %w", &os.PathError{Op: "open",
+				Path: "/var/lib/openpsirt/scan-41/inventory.json", Err: errors.New("no space left on device")}),
+				finding.UnstatedFailure},
+			{context.DeadlineExceeded, finding.UnstatedFailure},
 		} {
 			run := f.run(t)
 			if err := f.store.Finish(t.Context(), run, "0.118.0", "2026-09-04", "",

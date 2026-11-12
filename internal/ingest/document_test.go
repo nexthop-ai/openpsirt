@@ -174,8 +174,8 @@ func TestDiscardingLetsGoOfTheContentsAndKeepsTheRecord(t *testing.T) {
 		if kept.DiscardedAt == nil {
 			t.Errorf("the record does not say the contents were let go")
 		}
-		// Discarding what is already gone is not an error: the retention sweep
-		// and a re-run of it must agree.
+		// Discarding what is already gone is not an error: a scan's own read
+		// and the read of a newer scan that passed it can both reach it.
 		if err := docs.Discard(ctx, rec.ID); err != nil {
 			t.Errorf("discarding twice: %v", err)
 		}

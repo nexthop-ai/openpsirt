@@ -37,12 +37,14 @@ const (
 )
 
 // countMembers refuses an archive whose central directory holds more than
+// mostMembers entries or more than largestDirectory bytes, or states more than
 // mostMembers entries, before anything opens it.
 //
-// The count is the entries walked, never the count the directory end states:
-// a reader of the format walks entries until one does not begin as an entry
-// does, and compares the stated count only in its low sixteen bits, so the
-// stated count is no bound on what opening an archive reads. The walk starts
+// The entries walked are counted and their bytes summed, because a reader of
+// the format walks entries until one does not begin as an entry does, compares
+// the stated count only in its low sixteen bits, and holds every entry's name,
+// extra field and comment. The stated count is bounded as well, because a
+// reader sizes the list it walks into from it before walking. The walk starts
 // where a reader starts, and holds one entry's fixed part at a time.
 //
 // An archive this cannot find a directory in is left to the reader opening it
@@ -57,12 +59,16 @@ func countMembers(path string) error {
 	if err != nil {
 		return err
 	}
-	start, found, err := directoryStart(f, info.Size())
+	start, stated, found, err := directoryStart(f, info.Size())
 	if err != nil || !found {
 		return err
 	}
+	if stated > uint64(mostMembers) { //nolint:gosec // G115: a positive bound
+		return tooLarge(fmt.Sprintf("the archive says it holds more than %d files", mostMembers))
+	}
 	r := bufio.NewReader(io.NewSectionReader(f, start, info.Size()-start))
 	fixed := make([]byte, entryLen)
+	var held int64
 	for walked := 0; ; walked++ {
 		if _, err := io.ReadFull(r, fixed); err != nil {
 			return nil
@@ -75,21 +81,25 @@ func countMembers(path string) error {
 		}
 		skip := int64(binary.LittleEndian.Uint16(fixed[28:])) +
 			int64(binary.LittleEndian.Uint16(fixed[30:])) + int64(binary.LittleEndian.Uint16(fixed[32:]))
+		held += entryLen + skip
+		if held > largestDirectory {
+			return tooLarge(fmt.Sprintf("the archive's directory is larger than %d bytes", largestDirectory))
+		}
 		if _, err := r.Discard(int(skip)); err != nil {
 			return nil
 		}
 	}
 }
 
-// directoryStart finds where an archive's central directory begins, the way a
-// reader of the format does: from the directory end, through the zip64 record
-// where the directory end defers to one, offset by whatever precedes the
-// archive proper.
-func directoryStart(f io.ReaderAt, size int64) (int64, bool, error) {
+// directoryStart finds where an archive's central directory begins, and how
+// many entries it says it holds, the way a reader of the format does: from the
+// directory end, through the zip64 record where the directory end defers to
+// one, offset by whatever precedes the archive proper.
+func directoryStart(f io.ReaderAt, size int64) (int64, uint64, bool, error) {
 	tail := min(size, endSearched)
 	block := make([]byte, tail)
 	if _, err := f.ReadAt(block, size-tail); err != nil && !errors.Is(err, io.EOF) {
-		return 0, false, err
+		return 0, 0, false, err
 	}
 	at := -1
 	for i := len(block) - directoryEndLen; i >= 0; i-- {
@@ -104,7 +114,7 @@ func directoryStart(f io.ReaderAt, size int64) (int64, bool, error) {
 		break
 	}
 	if at < 0 {
-		return 0, false, nil
+		return 0, 0, false, nil
 	}
 	end := block[at:]
 	endOffset := size - tail + int64(at)
@@ -117,13 +127,14 @@ func directoryStart(f io.ReaderAt, size int64) (int64, bool, error) {
 			record := make([]byte, directory64EndLen)
 			if _, err := f.ReadAt(record, at); err == nil && bytes.Equal(record[:4], directory64End) {
 				endOffset = at
+				records = binary.LittleEndian.Uint64(record[32:])
 				dirSize = binary.LittleEndian.Uint64(record[40:])
 				dirOffset = binary.LittleEndian.Uint64(record[48:])
 			}
 		}
 	}
 	if dirOffset > math.MaxInt64 || dirSize > math.MaxInt64 {
-		return 0, false, nil
+		return 0, 0, false, nil
 	}
 	// The base is worked out as a reader works it out, wrapping where it
 	// wraps, so the directory found is the one a reader walks: a directory
@@ -132,14 +143,14 @@ func directoryStart(f io.ReaderAt, size int64) (int64, bool, error) {
 	offset := int64(dirOffset)                  //nolint:gosec // G115: at most the largest int64, checked above
 	base := endOffset - int64(dirSize) - offset //nolint:gosec // G115: at most the largest int64, checked above
 	if o := base + offset; o < 0 || o >= size {
-		return 0, false, nil
+		return 0, 0, false, nil
 	}
 	if base > 0 && entryAt(f, offset, size) {
 		// Data before the archive moves every offset in it, unless a whole
 		// entry is found where the directory end says without moving it.
 		base = 0
 	}
-	return base + offset, true, nil
+	return base + offset, records, true, nil
 }
 
 // zip64End reads the zip64 locator just before a directory end and names

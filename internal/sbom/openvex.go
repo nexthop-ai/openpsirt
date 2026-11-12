@@ -34,41 +34,58 @@ const suppressionNamespace = "openvex.dev/ns"
 // it to two conforming shapes is what keeps the hostile-input surface to two
 // parsers rather than one per distribution's own format.
 func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
+	read, err := ReadStatements(r, lim)
+	return read.Claims, err
+}
+
+// Statements is a VEX document read whole: who issued it and what it claims.
+type Statements struct {
+	// Publisher is who the document says issued it: an OpenVEX document's
+	// author, a CSAF document's publisher name. Empty where it names nobody.
+	Publisher string
+	Claims    []Suppression
+}
+
+// ReadStatements reads a VEX document as ReadSuppressions does, and keeps
+// who the document says issued it.
+func ReadStatements(r io.Reader, lim Limits) (Statements, error) {
 	lim = lim.OrDefault()
 	b := docread.NewJSON(r, lim.MaxBytes, lim.MaxDepth)
 	v := &suppressions{b: b, lim: lim}
 	if err := v.read(); err != nil {
-		return nil, b.Refused("reading suppressions", err)
+		return Statements{}, b.Refused("reading suppressions", err)
 	}
 	if err := b.End(); err != nil {
-		return nil, refusal.Errorf("reading suppressions: %w", err)
+		return Statements{}, b.Refused("reading suppressions", err)
 	}
 	// A document that fired both vocabularies is not either of them. Read as
 	// one, the other's statements would be dropped without a word while the
 	// upload reports success. The inventory side refuses the same and says
 	// why.
 	if v.csaf != nil && len(v.claims) > 0 {
-		return nil, refusal.Errorf("suppressions state both OpenVEX and CSAF-VEX, " +
+		return Statements{}, refusal.Errorf("suppressions state both OpenVEX and CSAF-VEX, " +
 			"so which format the document is cannot be settled")
 	}
 	if v.csaf != nil {
 		claims, err := v.csaf.finish()
 		if err != nil {
-			return nil, refusal.Errorf("reading suppressions: %w", err)
+			return Statements{}, refusal.Errorf("reading suppressions: %w", err)
 		}
-		return claims, nil
+		return Statements{Publisher: strings.TrimSpace(v.csaf.publisher), Claims: claims}, nil
 	}
 	if !strings.Contains(v.namespace, suppressionNamespace) {
-		return nil, refusal.Errorf("suppressions are not in a format this reads: they say %q", trim(v.namespace))
+		return Statements{}, refusal.Errorf("suppressions are not in a format this reads: they say %q", trim(v.namespace))
 	}
-	return v.claims, nil
+	return Statements{Publisher: strings.TrimSpace(v.author), Claims: v.claims}, nil
 }
 
 type suppressions struct {
 	b         *docread.JSON
 	lim       Limits
 	namespace string
-	claims    []Suppression
+	// author is who the document says issued it.
+	author string
+	claims []Suppression
 	// named counts every identifier this document makes the reader hold: a
 	// product a claim points at, and an identifier an issue also goes by.
 	// Charged as each is read.
@@ -104,6 +121,12 @@ func (v *suppressions) read() error {
 			}
 			v.namespace = value
 			return nil
+		case "author":
+			// A string in the format. Any other shape reads as no author,
+			// since a build's own claims do not depend on it.
+			value, err := v.b.StringOrSkip()
+			v.author = value
+			return err
 		case "statements":
 			return v.b.Array(func() error {
 				// Compared before the element is read, so that the claim past
@@ -136,8 +159,15 @@ func (v *suppressions) asCSAF(key string) error {
 }
 
 // statement reads one claim.
+//
+// The words kept are the ones the format attaches to the status: an impact
+// statement argues that something is not affected, and an action statement
+// says what to do about something that is. A statement carrying both keeps the
+// one its status takes, whichever the producer wrote first, and a statement
+// carrying only the other keeps that.
 func (v *suppressions) statement() (Suppression, error) {
 	claim := Suppression{Origin: FromStatement}
+	var impact, action string
 	err := v.b.Object(func(key string) error {
 		switch key {
 		case "vulnerability":
@@ -148,11 +178,13 @@ func (v *suppressions) statement() (Suppression, error) {
 			value, err := v.b.Str()
 			claim.Justification = value
 			return err
-		case "impact_statement", "action_statement":
+		case "impact_statement":
 			value, err := v.b.Str()
-			if claim.Statement == "" {
-				claim.Statement = value
-			}
+			impact = value
+			return err
+		case "action_statement":
+			value, err := v.b.Str()
+			action = value
 			return err
 		case "products":
 			return v.products(&claim)
@@ -162,6 +194,14 @@ func (v *suppressions) statement() (Suppression, error) {
 	})
 	if err != nil {
 		return Suppression{}, err
+	}
+	own, other := impact, action
+	if claim.Status == Affected {
+		own, other = action, impact
+	}
+	claim.Statement = own
+	if own == "" {
+		claim.Statement = other
 	}
 	if claim.Vulnerability == "" {
 		return Suppression{}, refusal.Errorf("a claim names no vulnerability, so there is nothing it could be about")
@@ -239,7 +279,7 @@ func (v *suppressions) products(claim *Suppression) error {
 					return err
 				}
 				stated = true
-				if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(one.Purl)), "pkg:") {
+				if !isPurl(one.Purl) {
 					return nil
 				}
 				if err := v.name(); err != nil {
@@ -282,13 +322,19 @@ func (v *suppressions) products(claim *Suppression) error {
 // product reads one product or subcomponent: its identifier, written as a
 // string or as an object carrying it, and the subcomponents where the caller
 // reads them.
+//
+// An object names itself twice, by an `@id` that may be any IRI and by the
+// package identifier it lists among its identifiers. The first of the two that
+// is a package identifier is the one kept, whichever key the producer wrote
+// first, because only a package identifier points at a component.
 func (v *suppressions) product(subcomponents func() error) (Target, error) {
 	var target Target
+	var iri, purl string
 	id, err := v.b.StringOrObject(func(key string) error {
 		switch {
 		case key == "@id":
 			value, err := v.b.Str()
-			target.Purl = value
+			iri = value
 			return err
 		case key == "identifiers":
 			return v.b.Object(func(kind string) error {
@@ -296,9 +342,7 @@ func (v *suppressions) product(subcomponents func() error) (Target, error) {
 					return v.b.Skip()
 				}
 				value, err := v.b.Str()
-				if target.Purl == "" {
-					target.Purl = value
-				}
+				purl = value
 				return err
 			})
 		case key == "subcomponents" && subcomponents != nil:
@@ -307,10 +351,24 @@ func (v *suppressions) product(subcomponents func() error) (Target, error) {
 			return v.b.Skip()
 		}
 	})
-	if target.Purl == "" {
-		target.Purl = id
+	for _, named := range []string{purl, iri, id} {
+		if isPurl(named) {
+			target.Purl = named
+			return target, err
+		}
+	}
+	for _, named := range []string{iri, purl, id} {
+		if named != "" {
+			target.Purl = named
+			break
+		}
 	}
 	return target, err
+}
+
+// isPurl is whether an identifier is a package identifier.
+func isPurl(named string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(named)), "pkg:")
 }
 
 // into reads one string into a status.

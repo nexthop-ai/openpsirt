@@ -366,6 +366,24 @@ func (c *reader) claim() error {
 	return nil
 }
 
+// derive records that the element from was derived from ancestor, where the
+// document has not already stated what it was derived from: only the first
+// ancestor supplies upstream identity.
+//
+// Charged against the claim bound rather than the edge one: this is not an
+// edge, and an unbounded array of them is the same hazard under a different
+// name.
+func (c *reader) derive(from, ancestor string) error {
+	if err := c.claim(); err != nil {
+		return err
+	}
+	if _, stated := c.upstream[from]; !stated {
+		c.upstream[from] = ancestor
+		c.upstreamOrder = append(c.upstreamOrder, from)
+	}
+	return nil
+}
+
 // licensesPerComponent is how many license entries a document may state for
 // each component the component bound allows. A real component states one to
 // three, and a real switch image averages under one.

@@ -93,15 +93,19 @@ func (s *Schedule) Once(ctx context.Context) (int, error) {
 		// case on every replica but one.
 		return 0, err
 	}
-	asked, err := s.rescans(ctx)
-	if err != nil {
-		return asked, err
+	return s.both(ctx, s.rescans, s.owedChecks)
+}
+
+// both asks for re-scans and for owed checks, each whether or not the other
+// failed, because the two share nothing: a re-scan pass that cannot read its
+// setting is no reason to leave a replaced inventory unchecked.
+func (s *Schedule) both(ctx context.Context, rescans, checks func(context.Context) (int, error)) (int, error) {
+	asked, scanErr := rescans(ctx)
+	owed, checkErr := checks(ctx)
+	if owed > 0 {
+		s.logger.Info("asked for replaced inventories to be checked", "inventories", owed)
 	}
-	checks, err := s.owedChecks(ctx)
-	if checks > 0 {
-		s.logger.Info("asked for replaced inventories to be checked", "inventories", checks)
-	}
-	return asked, err
+	return asked, errors.Join(scanErr, checkErr)
 }
 
 // rescans asks for every build due a scan.

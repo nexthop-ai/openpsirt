@@ -78,10 +78,13 @@ one claim shape.
 | A CSAF product identifier resolves through its tree once the document closes; an undefined one is dropped, and a claim left with none is refused | |
 | A composite identifier resolves through its relationship to the package, keeping the related product, for all five categories | The product places a statement in a build; one distribution VEX document composes all 1,669 of its identifiers |
 | An OpenVEX product with subcomponents is kept beside each | |
+| An OpenVEX product or subcomponent is named by the first package identifier among its listed `purl` and its `@id`, and by its `@id` where neither is one | Only a package identifier points at a component; key order is the producer's |
+| An OpenVEX statement keeps the impact statement where not affected and the action statement where affected, the other where its own is absent | The format attaches each to one status; key order is the producer's |
 | A CSAF advisory is refused here and read in § Supplier advisories | |
 | The build's suppression reader reads these | One parser bounds the hostile-input surface (REQ-66) |
 | A document is digested as it streams, and past the size bound refused for size before any parse error | |
-| Publisher and advisory names are held without control or format characters, from request, filename or document | A right-to-left override reads reversed beside evidence |
+| A VEX document's publisher is the one the request names, else the one the document names: an OpenVEX author, a CSAF publisher name. One naming neither is refused | Supersession is keyed on who issued a document (REQ-08); a file name collides between publishers and changes between revisions |
+| Publisher and advisory names are held without control or format characters, from request or document | A right-to-left override reads reversed beside evidence |
 | Re-uploading from one publisher sets aside what they no longer say, never deleting; each statement keeps its digest | Approvals stay readable |
 | The same bytes again write nothing where they read as what stands, and replace it where the reader now derives differently | |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is `frr` |

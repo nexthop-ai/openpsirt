@@ -2987,6 +2987,8 @@ export interface paths {
          *
          *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else. A result at an http or https address is dropped and counted as `web-address`; an upload whose every result is at one, a web scanner's, is refused.
          *
+         *     Answers 503 with `Retry-After` when as many analyzer runs as the deployment holds are waiting to be applied; send again after that many seconds.
+         *
          *     Requires: security-testing-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
          */
         post: operations["upload-analysis"];
@@ -3969,7 +3971,7 @@ export interface paths {
          *
          *     Returns 202 before the documents are parsed. A success here means they were accepted for processing, not that they were valid. Poll `GET .../sboms` to find out whether they parsed and what the scan found.
          *
-         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
+         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once, or when as many scans as it holds are waiting to be read; send again after that many seconds.
          *
          *     Requires: public-triage or private-triage or security-testing-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
          */
@@ -6551,7 +6553,7 @@ export interface paths {
          *
          *     What a document adds over what the scanner already reports is the reasoning. The status is in the fix state already.
          *
-         *     Uploading again from the same publisher sets aside what they said before rather than deleting it, so what an approval was granted on the strength of stays readable.
+         *     Uploading again from the same publisher sets aside what they said before rather than deleting it, so what an approval was granted on the strength of stays readable. The publisher is the `publisher` parameter, else the one the document names: an OpenVEX author or a CSAF publisher name. A document naming none is refused unless the parameter names one.
          *
          *     OpenVEX and CSAF-VEX both read. The two say the same thing in different shapes — one puts the status on a statement, the other in which list a product identifier appears in — and both become the same claim here, because what a publisher is saying does not depend on which file they wrote it in. Which of the two a document is decides itself; anything else is refused with a sentence rather than half-read.
          *
@@ -10628,7 +10630,7 @@ export interface components {
             fetched_by?: string;
             /** @description The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of */
             identifier?: string;
-            /** @description The publisher the document names, as it is matched. Empty where it was turned away before that was read */
+            /** @description The publisher its statements are recorded under, as it is matched: the one the upload named, else the one the document names. Empty where it was turned away before that was read */
             publisher: string;
             /** @description Why it was turned away, as the sender was told */
             reason?: string;
@@ -15900,7 +15902,7 @@ export interface components {
             readonly $schema?: string;
             /** @description The document's digest, which is how a revision is noticed later */
             digest: string;
-            /** @description The publisher the document names */
+            /** @description The publisher the statements were recorded under: the one the request names, else the one the document names */
             publisher: string;
             /**
              * Format: int64
@@ -27548,7 +27550,7 @@ export interface operations {
     "upload-vex-statements": {
         parameters: {
             query?: {
-                /** @description The publisher, where the document does not name itself. At most 191 characters */
+                /** @description The publisher, in place of the one the document names. Required where the document names none. At most 191 characters */
                 publisher?: string;
             };
             header?: never;

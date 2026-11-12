@@ -19,6 +19,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound/boundtest"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/advisoryapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -366,8 +367,8 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 	// fixed width, so two publishers agreeing for that many characters would
 	// collapse into one and the second upload would set aside statements it
 	// has nothing to do with. And where the query parameter is absent the
-	// value falls back to the name the client gave the file it uploaded,
-	// which is the path with nothing else guarding it.
+	// value is the author the document names, which has nothing else
+	// guarding its width.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		document := `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
@@ -378,12 +379,12 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 
 		httpapitest.RefusedWith(t, r.Vexed(t, "admin", strings.Repeat("d", 192), document),
 			http.StatusUnprocessableEntity)
-		// The file name stands in for a publisher the query leaves out, and is
-		// held to the same width by the handler rather than by the parameter's
-		// declared bound. The handler's refusal says how to name a publisher
-		// instead; the store's, reached with the handler's check deleted, does
-		// not.
-		named := r.VexedAs(t, "admin", "", strings.Repeat("d", 187)+".json", document)
+		// The document's author stands in for a publisher the query leaves
+		// out, and is held to the same width by the handler. The handler's
+		// refusal says how to name a publisher instead; the store's, reached
+		// with the handler's check deleted, does not.
+		named := r.VexedAs(t, "admin", "", "statements.json",
+			strings.Replace(document, `"Example"`, `"`+strings.Repeat("d", 192)+`"`, 1))
 		httpapitest.RefusedWith(t, named, http.StatusUnprocessableEntity)
 		if !strings.Contains(named.Body.String(), "?publisher=") {
 			t.Errorf("a file name too long to be the publisher is not told how to name one: %s",
@@ -404,17 +405,17 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 
 func TestWhoPublishedItIsHeldWithoutCharactersThatReorderText(t *testing.T) {
 	// The publisher is shown wherever the evidence is, and a right-to-left
-	// override in it reads reversed there. The file name it falls back to is
-	// the client's, and so is the query parameter.
+	// override in it reads reversed there. The author it falls back to is the
+	// document's, and the query parameter is the client's.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		document := `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
-			"author":"Example","timestamp":"2026-09-01T00:00:00Z","version":1,
+			"author":"acme\u202enosj","timestamp":"2026-09-01T00:00:00Z","version":1,
 			"statements":[{"vulnerability":{"name":"CVE-2026-9998"},"status":"not_affected",
 			  "justification":"vulnerable_code_not_present",
 			  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}`
 		for _, each := range []struct{ query, file, want string }{
-			{"", "acme\u202enosj.vex", "acmenosj.vex"},
+			{"", "statements.json", "acmenosj"},
 			{"acme%E2%80%AE%07", "statements.json", "acme"},
 		} {
 			got := r.VexedAs(t, "admin", each.query, each.file, document)
@@ -479,6 +480,59 @@ func TestADocumentPastTheByteLimitIsRefusedAsTooLarge(t *testing.T) {
 		padded := strings.Replace(document, "Not built.", strings.Repeat("a", 6<<10), 1)
 		if got := r.Vexed(t, "admin", "debian", padded); !tooLarge(got) {
 			t.Errorf("a document with a 6 KiB field answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+// Supersession is keyed on who issued a document, never on the name of the
+// file it arrived as. A revision under a new file name sets aside what the
+// publisher no longer says; another publisher's file of the same name sets
+// aside nothing of theirs; a document naming nobody is refused.
+func TestAVexDocumentIsSupersededByItsPublisherAndNeverByItsFileName(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		by := func(author, issue string) string {
+			return `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
+				"author":` + author + `,"timestamp":"2026-09-01T00:00:00Z","version":1,
+				"statements":[{"vulnerability":{"name":"` + issue + `"},"status":"not_affected",
+				  "justification":"vulnerable_code_not_present",
+				  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}`
+		}
+		taken := func(got *httptest.ResponseRecorder) advisoryapi.StatementsTakenBody {
+			t.Helper()
+			if got.Code != http.StatusCreated {
+				t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+			}
+			var body advisoryapi.StatementsTakenBody
+			if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			return body
+		}
+
+		first := taken(r.VexedAs(t, "admin", "", "debian-vex-1.json", by(`"Debian"`, "CVE-2026-9998")))
+		if first.Publisher != "Debian" {
+			t.Errorf("recorded under %q, want the author the document names", first.Publisher)
+		}
+		revised := taken(r.VexedAs(t, "admin", "", "debian-vex-2.json", by(`"Debian"`, "CVE-2026-9997")))
+		if revised.Superseded != 1 {
+			t.Errorf("a revision under a new file name set aside %d statements, want 1",
+				revised.Superseded)
+		}
+		other := taken(r.VexedAs(t, "admin", "", "debian-vex-2.json", by(`"Ubuntu"`, "CVE-2026-9997")))
+		if other.Publisher != "Ubuntu" || other.Superseded != 0 {
+			t.Errorf("another publisher's file of the same name answered %+v, want nothing set aside",
+				other)
+		}
+
+		nobody := r.VexedAs(t, "admin", "", "vex.json", by(`null`, "CVE-2026-9997"))
+		httpapitest.RefusedWith(t, nobody, http.StatusUnprocessableEntity)
+		if !strings.Contains(nobody.Body.String(), "?publisher=") {
+			t.Errorf("a document naming no publisher is not told how to name one: %s",
+				nobody.Body.String())
+		}
+		if named := r.VexedAs(t, "admin", "Debian", "vex.json", by(`null`, "CVE-2026-9997")); named.Code != http.StatusCreated {
+			t.Errorf("a publisher the request names answered %d: %s", named.Code, named.Body.String())
 		}
 	})
 }

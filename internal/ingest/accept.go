@@ -578,7 +578,9 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	if sender := access.Sender(subject); r.Credential == nil && sender != "" {
 		r.Credential = &sender
 	}
-	r.Reason = truncate(r.Reason, 2000)
+	// A refusal may quote the document it refuses, NUL and bytes that are
+	// not text included.
+	r.Reason = truncate(bound.Text(r.Reason), 2000)
 
 	// An update and then an insert, rather than an upsert: there is no
 	// portable spelling of one, two of the four engines want ON CONFLICT and

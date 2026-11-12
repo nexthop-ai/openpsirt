@@ -104,6 +104,11 @@ type Result struct {
 	// current one, and applying an older one over it would reopen everything
 	// the newer one closed.
 	Superseded bool
+	// AlreadyApplied says the build already shows this scan, so the read
+	// changed nothing. A job runs again where its worker stopped after the
+	// apply committed and before the job was marked done; the branch's
+	// documents are gone by then, and the scan is applied either way.
+	AlreadyApplied bool
 	// Retained says whether the documents were kept. A tagged release keeps
 	// them so it can be re-scanned years later against data that did not
 	// exist when it was built.
@@ -149,14 +154,21 @@ func (r *Reader) Once(ctx context.Context) (*Result, error) {
 			// are different things an operator acts on differently and the
 			// queue has no words for either.
 			if marked := r.markFailed(settled, job.Reference, err); marked != nil {
+				// What it sent is kept, because the failure is not recorded.
 				r.logger.Error("could not record why a scan failed",
 					"scan", job.Reference, "error", marked)
-			} else if !last {
 				return nil
-			} else if back := r.reinstate(settled, job.Reference); back != nil {
+			}
+			if !last {
+				return nil
+			}
+			if back := r.reinstate(settled, job.Reference); back != nil {
 				r.logger.Error("could not bring back the scan this one had overtaken",
 					"scan", job.Reference, "error", back)
 			}
+			// Nothing reads a failed scan again: a re-send of the same bytes
+			// writes them anew, and a job put back is told to ask for them.
+			r.letGoFailed(settled, job.Reference)
 			return nil
 		})
 	if ending.HandedOver {
@@ -186,6 +198,10 @@ func (r *Reader) Run(ctx context.Context, interval time.Duration) {
 			r.logger.Info("skipped a scan a newer one had already replaced", "scan", result.ScanID)
 			return true, nil
 		}
+		if result.AlreadyApplied {
+			r.logger.Info("skipped a scan the build already shows", "scan", result.ScanID)
+			return true, nil
+		}
 		r.logger.Info("read a scan",
 			"scan", result.ScanID, "components", result.Components,
 			"nodes_opened", result.Applied.NodesOpened, "nodes_closed", result.Applied.NodesClosed,
@@ -211,7 +227,23 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	if err != nil {
 		return nil, fmt.Errorf("job names %q, which is not a scan: %w", reference, err)
 	}
+	result, err := r.readScan(ctx, scanID)
+	if err == nil {
+		return result, nil
+	}
+	// A newer scan applied while this one was read lets go of what this one
+	// sent, so the read fails part way. The scan is overtaken, which is what
+	// it is recorded as, never failed.
+	if scan, found := NewStore(r.db.DB).ByID(ctx, scanID); found == nil {
+		if last, read := lastApplied(ctx, r.db.DB, scan.BuildID); read == nil && last > scanID {
+			return &Result{ScanID: scanID, Superseded: true}, nil
+		}
+	}
+	return nil, err
+}
 
+// readScan reads one scan and applies it.
+func (r *Reader) readScan(ctx context.Context, scanID int64) (*Result, error) {
 	scans := NewStore(r.db.DB)
 	scan, err := scans.ByID(ctx, scanID)
 	if errors.Is(err, ErrNoScan) {
@@ -228,6 +260,36 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		return nil, err
 	}
 
+	// The graph reads scan identifiers as time, so a scan older than the one
+	// the build last applied is never applied, and nothing reads what it sent
+	// again. One the build already shows was applied by an attempt whose job
+	// was not marked done; its branch documents are gone, so it is answered
+	// before they are looked for.
+	last, err := lastApplied(ctx, r.db.DB, scan.BuildID)
+	if err != nil {
+		return nil, err
+	}
+	if last >= scanID {
+		r.letGo(ctx, build.Moves, scan.BuildID, scanID)
+		return &Result{ScanID: scanID, Superseded: last > scanID, AlreadyApplied: last == scanID}, nil
+	}
+
+	// Uploads are accepted in the order they arrive and read in whatever order
+	// workers pick them up, so a scan can reach here after a newer one has
+	// already been applied. Applying it then would replace today's picture
+	// with yesterday's and reopen everything the newer one closed — the same
+	// harm the arrival check prevents at the door, arriving from behind.
+	//
+	// What it sent is kept: the newer one may not have been read yet, and if
+	// it fails this one is read again.
+	newest, err := scans.Newest(ctx, scan.BuildID)
+	if err != nil {
+		return nil, err
+	}
+	if passedBy(scan, newest) {
+		return &Result{ScanID: scanID, Superseded: true}, nil
+	}
+
 	documents := NewDocuments(r.db.DB)
 	held, err := documents.List(ctx, scanID)
 	if err != nil {
@@ -242,20 +304,11 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		}
 	}
 	if inventory == nil {
+		if sent, err := documents.Sent(ctx, []int64{scanID}); err == nil && len(sent[scanID]) > 0 {
+			return nil, refusal.Errorf("what scan %d sent was let go after its last attempt failed; "+
+				"send the inventory again", scanID)
+		}
 		return nil, fmt.Errorf("scan %d has no inventory to read", scanID)
-	}
-
-	// Uploads are accepted in the order they arrive and read in whatever order
-	// workers pick them up, so a scan can reach here after a newer one has
-	// already been applied. Applying it then would replace today's picture
-	// with yesterday's and reopen everything the newer one closed — the same
-	// harm the arrival check prevents at the door, arriving from behind.
-	newest, err := scans.Newest(ctx, scan.BuildID)
-	if err != nil {
-		return nil, err
-	}
-	if passedBy(scan, newest) {
-		return &Result{ScanID: scanID, Superseded: true}, nil
 	}
 
 	doc, err := sbom.Read(documents.Open(ctx, inventory), r.limits)
@@ -375,14 +428,11 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 				overtaken = true
 				return nil
 			}
-			// The graph reads scan identifiers as time, so a scan older than
-			// the one the build last applied is not applied over it.
-			var last *int64
-			if err := tx.NewSelect().Table("build").Column("last_scan_id").
-				Where(`"id" = ?`, scan.BuildID).Scan(ctx, &last); err != nil {
-				return fmt.Errorf("read what the build last applied: %w", err)
+			last, err := lastApplied(ctx, tx, scan.BuildID)
+			if err != nil {
+				return err
 			}
-			if last != nil && *last > scanID {
+			if last > scanID {
 				overtaken = true
 				return nil
 			}
@@ -448,21 +498,77 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	}
 
 	// A branch is superseded by the next night's build, so what it sent is not
-	// kept. A tag is not superseded by anything, and re-scanning it years from
-	// now needs both what it contained and what the build had already argued
-	// about its own patches.
+	// kept, nor what the scans this one passed sent: none of them is applied
+	// once the build shows this one. Those set aside while this one waited to
+	// be read kept theirs in case it failed. A tag is not superseded by
+	// anything, and re-scanning it years from now needs both what it contained
+	// and what the build had already argued about its own patches.
 	//
 	// After the apply has committed, so a failure here is not the read's: the
 	// scan is applied, and reported as failed it would be marked so and the
 	// scan it overtook read again over it. The documents are then kept, which
 	// costs storage and changes no answer, and the log line is what says so.
 	if build.Moves {
-		if err := documents.Discard(ctx, scanID); err != nil {
-			r.logger.Error("could not let go of what a branch scan sent", "scan", scanID,
-				"build", scan.BuildID, "error", err)
+		passed, err := documents.heldBefore(ctx, scan.BuildID, scanID)
+		if err != nil {
+			r.logger.Error("could not read which passed scans still hold documents",
+				"scan", scanID, "build", scan.BuildID, "error", err)
 		}
+		r.letGo(ctx, build.Moves, scan.BuildID, append(passed, scanID)...)
 	}
 	return result, nil
+}
+
+// lastApplied returns the scan the build last applied, or zero.
+func lastApplied(ctx context.Context, db bun.IDB, buildID int64) (int64, error) {
+	var last int64
+	if err := db.NewSelect().
+		TableExpr(`"build" AS "t"`).
+		ColumnExpr(`COALESCE("t"."last_scan_id", 0)`).
+		Where(`"t"."id" = ?`, buildID).
+		Scan(ctx, &last); err != nil {
+		return 0, fmt.Errorf("read what the build last applied: %w", err)
+	}
+	return last, nil
+}
+
+// letGo releases what branch scans sent, once nothing will read it again.
+// A failure is logged, because the scan's outcome stands either way: kept
+// documents cost storage and change no answer.
+func (r *Reader) letGo(ctx context.Context, moves bool, buildID int64, scanIDs ...int64) {
+	if !moves {
+		return
+	}
+	documents := NewDocuments(r.db.DB)
+	for _, scanID := range scanIDs {
+		if err := documents.Discard(ctx, scanID); err != nil {
+			r.logger.Error("could not let go of what a branch scan sent", "scan", scanID,
+				"build", buildID, "error", err)
+		}
+	}
+}
+
+// letGoFailed releases what a branch scan sent once its last attempt failed.
+func (r *Reader) letGoFailed(ctx context.Context, reference string) {
+	scanID, err := strconv.ParseInt(reference, 10, 64)
+	if err != nil {
+		return
+	}
+	scan, err := NewStore(r.db.DB).ByID(ctx, scanID)
+	if err != nil {
+		if !errors.Is(err, ErrNoScan) {
+			r.logger.Error("could not read the failed scan to let go of what it sent",
+				"scan", scanID, "error", err)
+		}
+		return
+	}
+	build, err := catalog.NewStore(r.db.DB).Describe(ctx, scan.BuildID)
+	if err != nil {
+		r.logger.Error("could not read the failed scan's build to let go of what it sent",
+			"scan", scanID, "build", scan.BuildID, "error", err)
+		return
+	}
+	r.letGo(ctx, build.Moves, scan.BuildID, scanID)
 }
 
 // markFailed records that a scan could not be read.
@@ -500,13 +606,9 @@ func (r *Reader) reinstate(ctx context.Context, reference string) error {
 		return err
 	}
 
-	var shown int64
-	if err := r.db.NewSelect().
-		TableExpr(`"build" AS "t"`).
-		ColumnExpr(`COALESCE("t"."last_scan_id", 0)`).
-		Where(`"t"."id" = ?`, failed.BuildID).
-		Scan(ctx, &shown); err != nil {
-		return fmt.Errorf("read what the build shows: %w", err)
+	shown, err := lastApplied(ctx, r.db.DB, failed.BuildID)
+	if err != nil {
+		return err
 	}
 	if shown == newest.ID {
 		return nil

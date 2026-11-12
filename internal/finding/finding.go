@@ -612,11 +612,13 @@ const UnstatedFailure = "the scan could not be completed"
 // matched against are known once it has run. A finding that appeared or
 // vanished because either moved is unexplainable without them.
 //
-// The failure is served on the receipt to the key that sent the scan. A
-// scanner's own words are kept, because they are what tells a producer why. A
-// failure the database or its driver raised is recorded as UnstatedFailure:
-// its text carries the statement and the address a connection dialed, and the
-// cause is in the log the job's settling writes.
+// The failure is served on the receipt to the key that sent the scan, so it
+// passes the one test for publishing an error's text: a scanner's own words,
+// which the scanner adapter states as a refusal because they are what tells a
+// producer why, are kept, and every other cause is recorded as
+// UnstatedFailure. A database or driver error carries the statement and the
+// address a connection dialed, and a file system or network error the path or
+// endpoint it reached; the cause is in the log the job's settling writes.
 func (s *Store) Finish(ctx context.Context, runID int64, version, databaseVersion,
 	caution string, cause error) error {
 
@@ -624,10 +626,10 @@ func (s *Store) Finish(ctx context.Context, runID int64, version, databaseVersio
 	failure := ""
 	switch {
 	case cause == nil:
-	case database.FromEngine(cause):
-		failure = UnstatedFailure
-	default:
+	case database.Publishable(cause):
 		failure = cause.Error()
+	default:
+		failure = UnstatedFailure
 	}
 	// A scanner writes what it likes to standard error, and the failure and
 	// the caution quote it. A run whose end cannot be recorded stays open.

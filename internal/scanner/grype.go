@@ -23,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
@@ -144,14 +145,16 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	cmd.Stderr = &errs
 	cmd.WaitDelay = waitDelay
 
+	// What the scanner said is published on the producer's receipt, because
+	// it is what tells them why.
 	if err := background.Run(cmd); err != nil {
-		return Result{}, fmt.Errorf("run %s: %w: %s", g.executable(), err, tail(errs.String()))
+		return Result{}, refusal.Errorf("run %s: %w: %s", g.executable(), err, tail(errs.String()))
 	}
 	// A report past its ceiling fails the run and complaints past theirs do
 	// not: a report read in part reads as a product that stopped having
 	// problems, while a scanner with a lot to say still scanned.
 	if out.over {
-		return Result{}, fmt.Errorf("the scanner wrote more than the %d byte report limit",
+		return Result{}, refusal.Errorf("the scanner wrote more than the %d byte report limit",
 			limits.MaxOutput)
 	}
 	// Read from the buffer rather than from a copy of it. A second full copy
@@ -371,7 +374,7 @@ func matches(decoder *json.Decoder, limits Limits, result *Result) error {
 	for decoder.More() {
 		read++
 		if read > limits.MaxMatches {
-			return fmt.Errorf("the scanner reported more than the %d match limit", limits.MaxMatches)
+			return refusal.Errorf("the scanner reported more than the %d match limit", limits.MaxMatches)
 		}
 		var match grypeMatch
 		if err := decoder.Decode(&match); err != nil {
@@ -734,7 +737,7 @@ func references(limits Limits, lists ...[]string) ([]finding.Reference, error) {
 				continue
 			}
 			if len(kept) >= limits.MaxReferences {
-				return nil, fmt.Errorf(
+				return nil, refusal.Errorf(
 					"one match points at more than the %d reference limit", limits.MaxReferences)
 			}
 			seen[url] = true
