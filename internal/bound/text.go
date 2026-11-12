@@ -12,9 +12,8 @@ import (
 // Text is another program's bytes as text every engine stores: each run of
 // invalid bytes read as one U+FFFD, then each NUL dropped. PostgreSQL refuses
 // both in a text column and MySQL and MariaDB refuse invalid UTF-8 in strict
-// mode. On
-// PostgreSQL and SQLite the query builder fails a statement handed a string
-// holding a NUL, and on MySQL and MariaDB it drops the NUL.
+// mode. On PostgreSQL and SQLite the query builder fails a statement handed a
+// string holding a NUL, and on MySQL and MariaDB it drops the NUL.
 func Text(s string) string {
 	if strings.IndexByte(s, 0) < 0 && !hasInvalid(s) {
 		return s

@@ -105,17 +105,17 @@ func Build(ctx context.Context, opts Options, inputs []Input) ([]Run, Report, er
 	return build(ctx, runGit, opts, inputs)
 }
 
-// MinSalt is the fewest bytes a salt may hold. A run names its salt by an
+// minSalt is the fewest bytes a salt may hold. A run names its salt by an
 // unkeyed digest anybody reading the run sees, so a short salt is guessed
 // offline from that digest, and then every short line it keys.
-const MinSalt = 32
+const minSalt = 32
 
 // CheckSalt refuses a salt too short to key a fingerprint, saying how to make
 // one that is not.
 func CheckSalt(salt []byte) error {
-	if len(salt) < MinSalt {
+	if len(salt) < minSalt {
 		return fmt.Errorf("the salt is %d bytes; write at least %d random bytes, for example with openssl rand -hex %d",
-			len(salt), MinSalt, MinSalt)
+			len(salt), minSalt, minSalt)
 	}
 	return nil
 }

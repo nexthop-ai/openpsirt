@@ -243,7 +243,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 	if err != nil {
 		return err
 	}
-	return s.files.Delete(ctx, row.ObjectKey)
+	return s.removeBytes(ctx, row.ObjectKey)
 }
 
 // removeRedacted removes the bytes of a file already marked redacted, and
@@ -254,7 +254,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 // finishes: deleting what is already gone is not an error, so the repeat is
 // safe whoever marked it.
 func (s *Store) removeRedacted(ctx context.Context, key string) error {
-	if err := s.files.Delete(ctx, key); err != nil {
+	if err := s.removeBytes(ctx, key); err != nil {
 		return fmt.Errorf("remove a redacted file: %w", err)
 	}
 	return ErrGone
@@ -325,7 +325,7 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 			// outcome the guard is for. The bytes stay.
 			continue
 		}
-		if err := s.removeClaimed(ctx, row.ObjectKey); err != nil {
+		if err := s.removeBytes(ctx, row.ObjectKey); err != nil {
 			// The row is gone and the bytes are not. Named, because the key
 			// is the only thing left that can find them, and stepped over, so
 			// one undeletable object does not stall every row after it.
@@ -346,7 +346,7 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 
 // claim deletes an unattached, unredacted row, answering whether it did.
 //
-// On a context of its own, as removeClaimed is: a stop during the statement
+// On a context of its own, as removeBytes is: a stop during the statement
 // can answer it failed after the delete committed, which leaves bytes no row
 // names and no log line names either. The check before each row ends the pass.
 func (s *Store) claim(ctx context.Context, id int64) (int64, error) {
@@ -363,9 +363,10 @@ func (s *Store) claim(ctx context.Context, id int64) (int64, error) {
 	return database.Affected(res)
 }
 
-// removeClaimed removes the bytes of a row the pass deleted, on a context of
-// its own, because a stop between the two would leave bytes no row names.
-func (s *Store) removeClaimed(ctx context.Context, key string) error {
+// removeBytes removes the bytes of a row already deleted or marked redacted,
+// on a context of its own, because a caller going away or a stop between the
+// row and its bytes would leave bytes behind.
+func (s *Store) removeBytes(ctx context.Context, key string) error {
 	removing, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
 	defer cancel()
 	return s.files.Delete(removing, key)
