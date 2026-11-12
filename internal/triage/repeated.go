@@ -71,15 +71,39 @@ const DefaultRepeatedAt = 2
 func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, productID int64,
 	atLeast, limit, offset int) ([]Repeated, int, error) {
 
+	out, err := s.Repeats(ctx, subject, productID, atLeast)
+	if err != nil {
+		return nil, 0, err
+	}
+	// Counted over the grouping, which is an occurrence rather than a deferral:
+	// the report's own subject is how many occurrences keep being put off.
+	total := len(out)
+	limit = database.InBulk.Of(limit)
+	if offset >= len(out) {
+		return nil, total, nil
+	}
+	out = out[offset:]
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, total, nil
+}
+
+// Repeats is the whole of that list, in its order.
+//
+// Every deferral the subject reads is grouped here rather than in SQL, so the
+// whole list is worked out for any page of it; a file reads it once.
+func (s *Store) Repeats(ctx context.Context, subject access.Subject, productID int64,
+	atLeast int) ([]Repeated, error) {
+
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second.
 	if subject.Kind != access.Person {
-		return nil, 0, access.Denied("read which deferrals repeat")
+		return nil, access.Denied("read which deferrals repeat")
 	}
 	if atLeast <= 0 {
 		atLeast = DefaultRepeatedAt
 	}
-	limit = database.InBulk.Of(limit)
 
 	var rows []struct {
 		ProductID          int64      `bun:"product_id"`
@@ -138,7 +162,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		q = q.Where(`"de"."product_id" = ?`, productID)
 	}
 	if err := readableBy(q, subject, "de").Scan(ctx, &rows); err != nil {
-		return nil, 0, fmt.Errorf("read what keeps being put off: %w", err)
+		return nil, fmt.Errorf("read what keeps being put off: %w", err)
 	}
 
 	type occurrenceAt struct {
@@ -200,15 +224,5 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 			cmp.Compare(a.Product, b.Product),
 			cmp.Compare(a.OccurrenceIdentity, b.OccurrenceIdentity))
 	})
-	// Counted over the grouping, which is an occurrence rather than a deferral:
-	// the report's own subject is how many occurrences keep being put off.
-	total := len(out)
-	if offset >= len(out) {
-		return nil, total, nil
-	}
-	out = out[offset:]
-	if len(out) > limit {
-		out = out[:limit]
-	}
-	return out, total, nil
+	return out, nil
 }

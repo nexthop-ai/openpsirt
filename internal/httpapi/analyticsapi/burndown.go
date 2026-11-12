@@ -27,11 +27,7 @@ type BurndownQuery struct {
 	Severity  core.Rating `query:"severity" doc:"The least severe band kept: high keeps critical and high. An unrated issue reads as medium"`
 	Component string      `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
 	Purl      string      `query:"purl" doc:"Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"`
-	Beneath   string      `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
-	Version   string      `query:"beneath_version" doc:"The version, where the build holds that name at several"`
-	Ecosystem string      `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
-	Namespace string      `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
-	Package   string      `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
+	core.Subtree
 }
 
 // burndownAsked is a burndown query read: day 0, the narrowing and the scope,
@@ -72,9 +68,7 @@ func (q BurndownQuery) read(ctx context.Context, in core.Deps) (*burndownAsked, 
 	if out.scope, err = core.Scoped(ctx, in, subject, q.ScopeQuery); err != nil {
 		return nil, err
 	}
-	beneath, err := core.BeneathStarts(ctx, in, out.scope, q.Beneath, graph.Choice{
-		Version: q.Version, Ecosystem: q.Ecosystem, Namespace: q.Namespace,
-	}, q.Package)
+	beneath, err := q.Starts(ctx, in, out.scope)
 	if err != nil {
 		return nil, err
 	}
@@ -232,36 +226,28 @@ func registerBurndown(api huma.API, in core.Deps) {
 		if input.Purl != "" {
 			about = append(about, core.Stated{Label: "purl", Value: input.Purl})
 		}
-		out := core.Exporting{
+		// Every day in one answer: a burndown is worked out over the whole
+		// window, so it is held whole.
+		rows := make([][]string, 0, len(b.Points))
+		added, done := 0, 0
+		for _, p := range b.Points {
+			added += p.New + p.Returned
+			done += p.Fixed + p.Dismissed
+			row := []string{
+				core.LastDay(p.At), strconv.Itoa(p.Left), strconv.Itoa(p.New), strconv.Itoa(p.Returned),
+				strconv.Itoa(p.Fixed), strconv.Itoa(p.Dismissed), strconv.Itoa(p.Restored),
+				strconv.Itoa(p.Baseline), strconv.Itoa(p.FirstScans), strconv.Itoa(added), strconv.Itoa(done),
+			}
+			for _, band := range bands {
+				row = append(row, strconv.Itoa(p.BySeverity[band]))
+			}
+			rows = append(rows, row)
+		}
+		return core.Export(in, input.Format, "burndown", core.Exporting{
 			What:   "the findings burndown",
 			About:  about,
 			Header: header,
-			// Every day in one answer: a burndown is worked out over the whole
-			// window, so there is no offset that means anything.
-			Rows: func(_ context.Context, _, offset int) ([][]string, error) {
-				if offset > 0 {
-					return nil, nil
-				}
-				rows := make([][]string, 0, len(b.Points))
-				added, done := 0, 0
-				for _, p := range b.Points {
-					added += p.New + p.Returned
-					done += p.Fixed + p.Dismissed
-					row := []string{
-						core.LastDay(p.At), strconv.Itoa(p.Left), strconv.Itoa(p.New), strconv.Itoa(p.Returned),
-						strconv.Itoa(p.Fixed), strconv.Itoa(p.Dismissed), strconv.Itoa(p.Restored),
-						strconv.Itoa(p.Baseline), strconv.Itoa(p.FirstScans), strconv.Itoa(added), strconv.Itoa(done),
-					}
-					for _, band := range bands {
-						row = append(row, strconv.Itoa(p.BySeverity[band]))
-					}
-					rows = append(rows, row)
-				}
-				return rows, nil
-			},
-		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "burndown", out)
-		}}, nil
+			Held:   rows,
+		})
 	})
 }

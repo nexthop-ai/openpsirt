@@ -150,27 +150,18 @@ func registerCodeFindingTrend(api huma.API, in core.Deps) {
 		if _, _, _, err := input.Window(time.Now()); err != nil {
 			return nil, err
 		}
-		out := core.Exporting{
+		// Every step in one answer, because a trend is worked out over the
+		// whole window.
+		trended, err := input.trended(ctx, in, subject, scope)
+		if err != nil {
+			return nil, core.Refused(in.Logger, err, "the code findings over time could not be worked out")
+		}
+		return core.Export(in, input.Format, "code findings over time-"+strings.ToLower(input.Product), core.Exporting{
 			What:   "code findings over time",
 			About:  []core.Stated{input.Stated()},
 			Header: []string{input.StepEnding(), "split", "part", "not fixed", "opened", "fixed", "changes"},
-			// Every step in one answer, because a trend is worked out over
-			// the whole window: the second page is empty and the walk stops.
-			Rows: func(ctx context.Context, _, offset int) ([][]string, error) {
-				if offset > 0 {
-					return nil, nil
-				}
-				trended, err := input.trended(ctx, in, subject, scope)
-				if err != nil {
-					return nil, err
-				}
-				return trendRows(trended, false), nil
-			},
-		}
-		name := "code findings over time-" + strings.ToLower(input.Product)
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, name, out)
-		}}, nil
+			Held:   trendRows(trended, false),
+		})
 	})
 }
 

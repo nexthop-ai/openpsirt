@@ -15,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -104,38 +103,14 @@ func registerAnalytics(api huma.API, in core.Deps) {
 			"Sending both `weeks` and `days` is refused.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		core.ScopeQuery
-		core.Steps
-		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
-		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
-		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
-		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
-		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
-		Package   string `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
+		TrendQuery
 	}) (*core.ListOutput[PointBody], error) {
 		in := core.Of(ctx, in)
-		subject, err := core.Reading(ctx)
+		asked, err := input.read(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		since, step, steps, err := input.Window(time.Now())
-		if err != nil {
-			return nil, err
-		}
-		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
-		if err != nil {
-			return nil, err
-		}
-		// Resolved after the scope, which is what authorizes the request: a
-		// name is looked up only in a build the caller may read.
-		beneath, err := core.BeneathStarts(ctx, in, scope, input.Beneath, graph.Choice{
-			Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
-		}, input.Package)
-		if err != nil {
-			return nil, err
-		}
-		points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope, since, step, steps,
-			finding.Within{Component: input.Component, Beneath: beneath})
+		points, err := asked.points(ctx, in)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the trend could not be worked out", err)
 		}
@@ -377,7 +352,6 @@ func registerNotes(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		names := catalog.NewStore(in.DB.DB)
 		from, to, err := input.buildIDs(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
@@ -387,9 +361,12 @@ func registerNotes(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
-		about := finding.Note{
-			From: describing(ctx, names, from, input.From, input.FromVariant),
-			To:   describing(ctx, names, to, input.To, input.ToVariant),
+		var about finding.Note
+		if about.From, err = describing(ctx, in, from, input.From, input.FromVariant); err != nil {
+			return nil, err
+		}
+		if about.To, err = describing(ctx, in, to, input.To, input.ToVariant); err != nil {
+			return nil, err
 		}
 		// The tooling the later build was last measured with, and when. A note
 		// somebody kept for a year is re-checkable only if it says what
@@ -429,13 +406,17 @@ func registerNotes(api huma.API, in core.Deps) {
 // falling back to what the request called it.
 //
 // A heading naming the branch or tag and variant this deployment files a build under
-// is our internals on the first line of a document going to a customer.
-func describing(ctx context.Context, names *catalog.Store, buildID int64, branchOrTag, variant string) string {
-	placed, err := names.Describe(ctx, buildID)
-	if err != nil || placed == nil {
-		return strings.TrimSpace(branchOrTag + " " + variant)
+// is our internals on the first line of a document going to a customer, so a
+// lookup that failed fails the note rather than heading it with them.
+func describing(ctx context.Context, in core.Deps, buildID int64, branchOrTag, variant string) (string, error) {
+	placed, err := catalog.NewStore(in.DB.DB).Describe(ctx, buildID)
+	if err != nil {
+		return "", core.WentWrong(in.Logger, "the builds could not be named", err)
 	}
-	return strings.TrimSpace(placed.BranchOrTag + " " + placed.Variant)
+	if placed == nil {
+		return strings.TrimSpace(branchOrTag + " " + variant), nil
+	}
+	return strings.TrimSpace(placed.BranchOrTag + " " + placed.Variant), nil
 }
 
 func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {

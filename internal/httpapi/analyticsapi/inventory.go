@@ -217,6 +217,13 @@ func registerInventoryComparisonExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
+		rows := make([][]string, 0, len(changes))
+		for _, change := range changes {
+			rows = append(rows, []string{
+				string(change.Kind), change.Name,
+				strings.Join(change.Before, "; "), strings.Join(change.After, "; "),
+			})
+		}
 		out := core.Exporting{
 			What: "inventory comparison of two builds",
 			About: []core.Stated{
@@ -225,22 +232,8 @@ func registerInventoryComparisonExport(api huma.API, in core.Deps) {
 				{Label: "change", Value: string(input.Change)},
 			},
 			Header: []string{"change", "name", "before", "after"},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				if offset > 0 {
-					return nil, nil
-				}
-				rows := make([][]string, 0, len(changes))
-				for _, change := range changes {
-					rows = append(rows, []string{
-						string(change.Kind), change.Name,
-						strings.Join(change.Before, "; "), strings.Join(change.After, "; "),
-					})
-				}
-				return rows, nil
-			},
+			Held:   rows,
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "inventory-comparison-"+core.DownloadName(input.Product), out)
-		}}, nil
+		return core.Export(in, input.Format, "inventory-comparison-"+core.DownloadName(input.Product), out)
 	})
 }

@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -78,7 +78,6 @@ func registerDueExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		store := finding.NewStore(in.DB.DB)
 		now := time.Now().UTC()
 		out := core.Exporting{
 			What:  "what is running out of time",
@@ -88,15 +87,15 @@ func registerDueExport(api huma.API, in core.Deps) {
 				"product", "product name", "branch_or_tag", "branch or tag name", "variant", "variant name",
 				"occurrences", "held by", "held by name", "due", "days left",
 			},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				late, _, err := store.RunningOutPage(ctx, subject, scope,
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				late, _, err := finding.NewStore(db).RunningOutPage(ctx, subject, scope,
 					time.Duration(input.Days)*24*time.Hour, limit, offset)
 				if err != nil {
 					return nil, err
 				}
 				// The rows the screen states, so the file and the screen
 				// cannot round or name a holder differently.
-				bodies, err := lateBodies(ctx, in, late, now)
+				bodies, err := lateBodies(ctx, db, late, now)
 				if err != nil {
 					return nil, err
 				}
@@ -116,9 +115,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 				return rows, nil
 			},
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "running-out", out)
-		}}, nil
+		return core.Export(in, input.Format, "running-out", out)
 	})
 }
 
@@ -162,7 +159,7 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		// Read whole rather than paged, unlike every other export here: a
+		// Read whole rather than paged: a
 		// comparison is one answer computed from two builds at once and there
 		// is no page of it to ask for. Bounded by what two builds hold, which
 		// is what the screen already reads.
@@ -170,6 +167,43 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 			input.IncludePrivate)
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
+		}
+		rows := make([][]string, 0, len(comparison.Fixed)+len(comparison.Closed)+
+			len(comparison.Newly)+len(comparison.Still))
+		for _, group := range []struct {
+			what string
+			of   []finding.Changed
+			// stands says the rows carry what the build decided about
+			// them, which is true of what is still there and of
+			// nothing else: what was fixed needs no justification and
+			// what is newly present has not been looked at yet.
+			stands bool
+		}{
+			{what: "fixed", of: comparison.Fixed},
+			// Apart from the fixes, by the same split the screen and
+			// the release note read: a superseded bump and a closure
+			// nothing explains are not work anybody did.
+			{what: "closed, not fixed", of: comparison.Closed},
+			{what: "newly present", of: comparison.Newly},
+			{what: "still present", of: comparison.Still, stands: true},
+		} {
+			// Read through the same function the screen reads, so the
+			// file cannot come to answer less than the screen it was
+			// taken from. Read apart from it, an approved
+			// not-applicable and a row nobody has looked at are the
+			// same nine columns.
+			for _, body := range changed(group.of, true, group.stands) {
+				closedRun := ""
+				if body.ClosedRun != 0 {
+					closedRun = strconv.FormatInt(body.ClosedRun, 10)
+				}
+				rows = append(rows, []string{
+					group.what, body.Vulnerability, body.Component, body.Severity,
+					string(body.Because), body.FromVersion, body.MovedTo, body.ArrivedFrom,
+					closedRun, string(body.State), string(body.Outcome),
+					string(body.Justification), body.Due,
+				})
+			}
 		}
 		out := core.Exporting{
 			What: "comparison of two builds",
@@ -187,53 +221,9 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 				"from version", "moved to", "arrived from", "closed by run",
 				"state", "outcome", "justification", "due",
 			},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				if offset > 0 {
-					return nil, nil
-				}
-				rows := make([][]string, 0, len(comparison.Fixed)+len(comparison.Closed)+
-					len(comparison.Newly)+len(comparison.Still))
-				for _, group := range []struct {
-					what string
-					of   []finding.Changed
-					// stands says the rows carry what the build decided about
-					// them, which is true of what is still there and of
-					// nothing else: what was fixed needs no justification and
-					// what is newly present has not been looked at yet.
-					stands bool
-				}{
-					{what: "fixed", of: comparison.Fixed},
-					// Apart from the fixes, by the same split the screen and
-					// the release note read: a superseded bump and a closure
-					// nothing explains are not work anybody did.
-					{what: "closed, not fixed", of: comparison.Closed},
-					{what: "newly present", of: comparison.Newly},
-					{what: "still present", of: comparison.Still, stands: true},
-				} {
-					// Read through the same function the screen reads, so the
-					// file cannot come to answer less than the screen it was
-					// taken from. Read apart from it, an approved
-					// not-applicable and a row nobody has looked at are the
-					// same nine columns.
-					for _, body := range changed(group.of, true, group.stands) {
-						closedRun := ""
-						if body.ClosedRun != 0 {
-							closedRun = strconv.FormatInt(body.ClosedRun, 10)
-						}
-						rows = append(rows, []string{
-							group.what, body.Vulnerability, body.Component, body.Severity,
-							string(body.Because), body.FromVersion, body.MovedTo, body.ArrivedFrom,
-							closedRun, string(body.State), string(body.Outcome),
-							string(body.Justification), body.Due,
-						})
-					}
-				}
-				return rows, nil
-			},
+			Held: rows,
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "comparison-"+core.DownloadName(input.Product), out)
-		}}, nil
+		return core.Export(in, input.Format, "comparison-"+core.DownloadName(input.Product), out)
 	})
 }
 
@@ -273,7 +263,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
 		in := core.Of(ctx, in)
-		subject, store, err := core.Triaging(ctx, in)
+		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -298,8 +288,8 @@ func registerAuditExport(api huma.API, in core.Deps) {
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
 				"agreements", "reasoning",
 			},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				audited, _, err := store.Audit(ctx, subject, filter, since, until, limit, offset)
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				audited, _, err := triage.NewStore(db).Audit(ctx, subject, filter, since, until, limit, offset)
 				if err != nil {
 					return nil, err
 				}
@@ -347,9 +337,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 				return rows, nil
 			},
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "audit", out)
-		}}, nil
+		return core.Export(in, input.Format, "audit", out)
 	})
 }
 
@@ -372,7 +360,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 		core.QueueNarrowing
 	}) (*huma.StreamResponse, error) {
 		in := core.Of(ctx, in)
-		subject, store, err := core.Triaging(ctx, in)
+		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -391,7 +379,8 @@ func registerQueueExport(api huma.API, in core.Deps) {
 				"occurrences", "builds",
 				"previously approved", "deferred days", "reasoning",
 			},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				store := triage.NewStore(db)
 				waiting, _, err := store.Queue(ctx, subject, filter, limit, offset)
 				if err != nil {
 					return nil, err
@@ -406,7 +395,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 				for _, row := range waiting {
 					occurrences = append(occurrences, row.DecisionOccurrence)
 				}
-				named, err := core.DescribeDecisionOccurrences(ctx, in, store, occurrences, nil)
+				named, err := core.DescribeDecisionOccurrences(ctx, db, store, occurrences, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -440,9 +429,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 				return rows, nil
 			},
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "review-queue", out)
-		}}, nil
+		return core.Export(in, input.Format, "review-queue", out)
 	})
 }
 
@@ -476,17 +463,13 @@ func registerComponentExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.MinimumSeverity, at.Filter, at.Store
-		line := "everything"
-		if floor.Hides() {
-			line = floor.Word
-		}
+		subject, scope, floor, narrowed := at.Subject, at.Scope, at.MinimumSeverity, at.Filter
 		out := core.Exporting{
 			What:   "findings by component",
-			About:  []core.Stated{{Label: "triaged at or above", Value: line}},
+			About:  []core.Stated{core.TriagedAtOrAbove(floor)},
 			Header: []string{"component", "version", "upstream", "ecosystem", "issues", "occurrences", "exploited"},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				groups, _, err := store.ComponentGroups(ctx, subject, scope, limit, offset, narrowed)
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				groups, _, err := finding.NewStore(db).ComponentGroups(ctx, subject, scope, limit, offset, narrowed)
 				if err != nil {
 					return nil, err
 				}
@@ -502,9 +485,7 @@ func registerComponentExport(api huma.API, in core.Deps) {
 			},
 		}
 		name := "components-" + strings.ToLower(input.Product)
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, name, out)
-		}}, nil
+		return core.Export(in, input.Format, name, out)
 	})
 }
 
@@ -537,19 +518,24 @@ func registerChangeExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		since, until, err := input.Window(0, time.Now().UTC())
+		now := time.Now().UTC()
+		since, until, err := input.Window(0, now)
 		if err != nil {
 			return nil, err
 		}
-		store := trail.NewStore(in.DB.DB)
+		// An open end is the moment the file was asked for, so a change
+		// recorded while it is written lies past the period on every page.
+		if until.IsZero() {
+			until = now
+		}
 		out := core.Exporting{
 			What: "what has been changed administratively",
 			About: []core.Stated{
 				{Label: "from", Value: asDay(since)}, {Label: "to", Value: asDay(until)}, {Label: "kind", Value: string(input.Kind)},
 			},
 			Header: []string{"at", "actor", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				changes, _, err := store.Changes(ctx, subject, trail.Kind(input.Kind),
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				changes, _, err := trail.NewStore(db).Changes(ctx, subject, trail.Kind(input.Kind),
 					trail.Over{Since: since, Until: until}, limit, offset)
 				if err != nil {
 					return nil, err
@@ -557,7 +543,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 				// The person, by the identity they sign in under and their
 				// display name beside it, read a page at a time like every
 				// other name this file carries.
-				views, err := core.ChangeViews(ctx, in.DB.DB, changes)
+				views, err := core.ChangeViews(ctx, db, changes)
 				if err != nil {
 					return nil, err
 				}
@@ -572,9 +558,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 				return rows, nil
 			},
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "administrative-changes", out)
-		}}, nil
+		return core.Export(in, input.Format, "administrative-changes", out)
 	})
 }
 
@@ -595,33 +579,12 @@ func registerTrendExport(api huma.API, in core.Deps) {
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
-		core.ScopeQuery
-		core.Steps
-		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
-		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
-		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
-		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
-		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
-		Package   string `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
+		TrendQuery
 	}) (*huma.StreamResponse, error) {
 		in := core.Of(ctx, in)
-		subject, err := core.Reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		since, step, steps, err := input.Window(time.Now())
-		if err != nil {
-			return nil, err
-		}
-		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
-		if err != nil {
-			return nil, err
-		}
 		// Resolved before the file is begun, so a name the build does not hold
 		// is refused with a status rather than written as a file cut short.
-		beneath, err := core.BeneathStarts(ctx, in, scope, input.Beneath, graph.Choice{
-			Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
-		}, input.Package)
+		asked, err := input.read(ctx, in)
 		if err != nil {
 			return nil, err
 		}
@@ -637,44 +600,34 @@ func registerTrendExport(api huma.API, in core.Deps) {
 				header = append(header, split+" "+band)
 			}
 		}
+		// Every step in one answer, because a trend is worked out over the
+		// whole window rather than a page at a time.
+		points, err := asked.points(ctx, in)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "the trend could not be worked out", err)
+		}
+		rows := make([][]string, 0, len(points))
+		for _, point := range points {
+			row := []string{
+				core.LastDay(point.At), strconv.Itoa(point.New), strconv.Itoa(point.Corrected),
+				strconv.Itoa(point.Returned), strconv.Itoa(point.Restored), strconv.Itoa(point.Baseline),
+				strconv.Itoa(point.FirstScans), strconv.Itoa(point.Open),
+			}
+			for _, split := range []map[string]int{
+				point.NewBySeverity, point.CorrectedBySeverity, point.ReturnedBySeverity, point.BySeverity,
+			} {
+				for _, band := range bands {
+					row = append(row, strconv.Itoa(split[band]))
+				}
+			}
+			rows = append(rows, row)
+		}
 		out := core.Exporting{
 			What:   "the backlog over time",
 			About:  []core.Stated{input.Stated()},
 			Header: header,
-			// Every step in one answer, because a trend is worked out over the
-			// whole window rather than a page at a time: there is no offset
-			// that means anything here, so the second page is empty and the
-			// walk stops.
-			Rows: func(ctx context.Context, _, offset int) ([][]string, error) {
-				if offset > 0 {
-					return nil, nil
-				}
-				points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope,
-					since, step, steps, finding.Within{Component: input.Component, Beneath: beneath})
-				if err != nil {
-					return nil, err
-				}
-				rows := make([][]string, 0, len(points))
-				for _, point := range points {
-					row := []string{
-						core.LastDay(point.At), strconv.Itoa(point.New), strconv.Itoa(point.Corrected),
-						strconv.Itoa(point.Returned), strconv.Itoa(point.Restored), strconv.Itoa(point.Baseline),
-						strconv.Itoa(point.FirstScans), strconv.Itoa(point.Open),
-					}
-					for _, split := range []map[string]int{
-						point.NewBySeverity, point.CorrectedBySeverity, point.ReturnedBySeverity, point.BySeverity,
-					} {
-						for _, band := range bands {
-							row = append(row, strconv.Itoa(split[band]))
-						}
-					}
-					rows = append(rows, row)
-				}
-				return rows, nil
-			},
+			Held:   rows,
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "trend", out)
-		}}, nil
+		return core.Export(in, input.Format, "trend", out)
 	})
 }

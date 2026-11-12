@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
@@ -183,15 +184,15 @@ func (a CodeFindingsAsked) scoped(ctx context.Context, in core.Deps) (access.Sub
 }
 
 // codeFindingRows is a page of code findings as the list and its file both state them, with
-// who holds each one named.
-func codeFindingRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]CodeFindingRowBody, error) {
+// who holds each one named through db.
+func codeFindingRows(ctx context.Context, db bun.IDB, rows []analysis.QueueRow) ([]CodeFindingRowBody, error) {
 	parties := make([]int64, 0, len(rows))
 	for _, r := range rows {
 		if r.Holder != nil {
 			parties = append(parties, *r.Holder)
 		}
 	}
-	who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, parties)
+	who, err := access.NewStore(db).WhoHolds(ctx, parties)
 	if err != nil {
 		return nil, err
 	}
@@ -309,13 +310,13 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			What:   "code findings",
 			About:  []core.Stated{{Label: "lists", Value: listedAs(input.State, input.Assigned == finding.HeldByNobody, scope, input.Beneath)}},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				page, err := analysis.CodeFindingPageOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
 					limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				listed, err := codeFindingRows(ctx, in, page)
+				listed, err := codeFindingRows(ctx, db, page)
 				if err != nil {
 					return nil, err
 				}
@@ -327,9 +328,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			},
 		}
 		name := "code findings-" + strings.ToLower(input.Product)
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, name, out)
-		}}, nil
+		return core.Export(in, input.Format, name, out)
 	})
 
 	registerCodeFindingQueueAcross(api, in)
@@ -345,7 +344,7 @@ func queueOutput(ctx context.Context, in core.Deps, queue *analysis.Queue) (*Cod
 		out.Body.States[string(state)] = n
 	}
 	var err error
-	if out.Body.Items, err = codeFindingRows(ctx, in, queue.Rows); err != nil {
+	if out.Body.Items, err = codeFindingRows(ctx, in.DB.DB, queue.Rows); err != nil {
 		return nil, core.WentWrong(in.Logger, "who holds the code findings could not be read", err)
 	}
 	return out, nil
@@ -429,13 +428,13 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 				{Label: "products", Value: "every product you read security testing work in"},
 			},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				page, err := analysis.CodeFindingPageOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
 					limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				listed, err := codeFindingRows(ctx, in, page)
+				listed, err := codeFindingRows(ctx, db, page)
 				if err != nil {
 					return nil, err
 				}
@@ -446,8 +445,6 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 				return rows, nil
 			},
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "code findings", out)
-		}}, nil
+		return core.Export(in, input.Format, "code findings", out)
 	})
 }

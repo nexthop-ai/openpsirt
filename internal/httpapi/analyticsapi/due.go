@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -81,7 +82,7 @@ func registerDue(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "what is running out of time could not be read", err)
 		}
 
-		bodies, err := lateBodies(ctx, in, rows, time.Now().UTC())
+		bodies, err := lateBodies(ctx, in.DB.DB, rows, time.Now().UTC())
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "who is dealing with these could not be read", err)
 		}
@@ -96,8 +97,8 @@ func registerDue(api huma.API, in core.Deps) {
 }
 
 // lateBodies renders rows running out of time, as the screen and its export
-// both state them, from the moment now.
-func lateBodies(ctx context.Context, in core.Deps, rows []finding.Late, now time.Time) ([]LateBody, error) {
+// both state them, from the moment now, naming holders through db.
+func lateBodies(ctx context.Context, db bun.IDB, rows []finding.Late, now time.Time) ([]LateBody, error) {
 	owners := make([]int64, 0, len(rows))
 	for _, row := range rows {
 		if row.AssignedTo != nil {
@@ -107,7 +108,7 @@ func lateBodies(ctx context.Context, in core.Deps, rows []finding.Late, now time
 	// Whoever holds it, which is a person or a team: the assignment column
 	// holds a party, and a list naming only people reports a team's work as
 	// nobody's.
-	who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, owners)
+	who, err := access.NewStore(db).WhoHolds(ctx, owners)
 	if err != nil {
 		return nil, err
 	}

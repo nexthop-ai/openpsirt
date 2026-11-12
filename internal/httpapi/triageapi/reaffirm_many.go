@@ -83,7 +83,7 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 		for _, row := range mine {
 			occurrences = append(occurrences, row.DecisionOccurrence)
 		}
-		named, err := core.DescribeDecisionOccurrences(ctx, in, store, occurrences, nil)
+		named, err := core.DescribeDecisionOccurrences(ctx, in.DB.DB, store, occurrences, nil)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what is yours to re-affirm could not be read", err)
 		}

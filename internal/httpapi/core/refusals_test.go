@@ -4,13 +4,17 @@
 package core
 
 import (
+	"errors"
 	"io"
 	"log/slog"
+	"net/http"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/refusaltest"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // mappers is what each refusal mapper in this package answers err with.
@@ -59,4 +63,20 @@ func TestAStoresRefusalIsPublishedByTheCatchAllMappers(t *testing.T) {
 		"RefusedDecision":    RefusedDecision(quiet, said),
 		"DeclineDeclaration": DeclineDeclaration(quiet, said),
 	})
+}
+
+// A lost race a store wrapped as a refusal is a fault in each mapper that
+// ends in the catch-all tail, never a 422 telling the caller to go again.
+func TestALostRaceWrappedAsARefusalIsAFaultInTheCatchAllMappers(t *testing.T) {
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	lost := refusal.Errorf("that lost a race: %w", database.ErrGoAgain)
+	for name, got := range map[string]error{
+		"Asked":           Asked(quiet, lost),
+		"RefusedDecision": RefusedDecision(quiet, lost),
+	} {
+		var se huma.StatusError
+		if !errors.As(got, &se) || se.GetStatus() != http.StatusInternalServerError {
+			t.Errorf("%s answered a lost race wrapped as a refusal with %v", name, got)
+		}
+	}
 }

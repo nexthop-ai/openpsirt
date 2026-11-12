@@ -41,6 +41,7 @@ back.
 | Rule | Reason |
 |---|---|
 | Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure | |
+| A read made of many statements that must agree runs in one read-only snapshot, the one transaction outside that helper, ended by rolling back | It writes nothing, so nothing certifies it and it loses no race; a file written as it reads cannot be read again. Every engine takes the same options, and SQLite begins it without the write lock (`design-docs/analytics-exports.md` § Exports) |
 | Any other failure is reported, never retried | A constraint violation retried hammers the database and hangs |
 | Nothing a transaction depends on is read outside it | A retry re-runs the closure against a moved database |
 | A read made before the transaction as an early refusal is repeated inside it, and the inside one decides | |

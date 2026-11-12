@@ -153,6 +153,10 @@ func registerUnmatchedComponentsExport(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		narrowed := onlyReason(listed, string(input.Reason))
+		rows := make([][]string, 0, len(narrowed))
+		for _, one := range narrowed {
+			rows = append(rows, []string{string(one.Reason), one.Name, one.Version, one.Purl, one.CPE})
+		}
 		out := core.Exporting{
 			What: "components a scanner cannot match",
 			About: []core.Stated{
@@ -160,19 +164,8 @@ func registerUnmatchedComponentsExport(api huma.API, in core.Deps) {
 				{Label: "reason", Value: string(input.Reason)},
 			},
 			Header: []string{"reason", "name", "version", "purl", "cpe"},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				if offset > 0 {
-					return nil, nil
-				}
-				rows := make([][]string, 0, len(narrowed))
-				for _, one := range narrowed {
-					rows = append(rows, []string{string(one.Reason), one.Name, one.Version, one.Purl, one.CPE})
-				}
-				return rows, nil
-			},
+			Held:   rows,
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "unmatched-components-"+core.DownloadName(input.Product), out)
-		}}, nil
+		return core.Export(in, input.Format, "unmatched-components-"+core.DownloadName(input.Product), out)
 	})
 }

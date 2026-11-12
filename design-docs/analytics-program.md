@@ -329,6 +329,10 @@ how long, counted as the deferral threshold counts
 (`design-docs/triage-approval.md` § The deferral threshold). A withdrawn or lapsed
 deferral counts for the part that ran, and overlapping stretches count once.
 
+| Rule | Reason |
+|---|---|
+| The list is grouped in the application from every deferral the reader may read, and its file reads it once | A page of it costs the whole read |
+
 ## Limits
 
 | Limit | Detail |

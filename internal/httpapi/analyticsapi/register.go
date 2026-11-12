@@ -317,14 +317,7 @@ func registerRegister(api huma.API, in core.Deps) {
 			},
 		}
 		name := "register-" + strings.ToLower(input.Product+"-"+input.BranchOrTag+"-"+input.Variant)
-		release, err := streamSlotsFor(in.DB).take()
-		if err != nil {
-			return nil, err
-		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			defer release()
-			core.WriteExport(writer, input.Format, name, out)
-		}}, nil
+		return core.Export(in, input.Format, name, out)
 	})
 }
 

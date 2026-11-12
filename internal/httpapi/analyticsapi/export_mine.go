@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -33,11 +34,11 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 		Format string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
 		in := core.Of(ctx, in)
-		subject, store, err := core.Triaging(ctx, in)
+		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		out := core.Exporting{
+		return core.Export(in, input.Format, "my-decisions", core.Exporting{
 			What: "your decisions",
 			Header: []string{
 				"decision", "proposed", "outcome", "became", "when", "by", "by name",
@@ -45,7 +46,8 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 				"variant", "variant name", "component",
 				"rows", "issues", "occurrences", "reasoning",
 			},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+				store := triage.NewStore(db)
 				mine, _, err := store.Became(ctx, subject, limit, offset)
 				if err != nil || len(mine) == 0 {
 					return nil, err
@@ -60,11 +62,11 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 						actors = append(actors, row.By)
 					}
 				}
-				named, err := core.DescribeDecisionOccurrences(ctx, in, store, occurrences, nil)
+				named, err := core.DescribeDecisionOccurrences(ctx, db, store, occurrences, nil)
 				if err != nil {
 					return nil, err
 				}
-				who, err := core.WhoSigned(ctx, in.DB.DB, actors)
+				who, err := core.WhoSigned(ctx, db, actors)
 				if err != nil {
 					return nil, err
 				}
@@ -99,9 +101,6 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 				}
 				return rows, nil
 			},
-		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "my-decisions", out)
-		}}, nil
+		})
 	})
 }

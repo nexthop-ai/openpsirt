@@ -9,6 +9,7 @@ Benchmark runs behind the analytics rules.
 - [Trend beneath a replaced version](#trend-beneath-a-replaced-version)
 - [Daily trend](#daily-trend)
 - [Burndown and component groups](#burndown-and-component-groups)
+- [Export snapshots](#export-snapshots)
 
 ## Grouping before the join
 
@@ -320,3 +321,27 @@ review of this work, each engine run alone.
 | A year of history costs the burndown its reads over the closed rows | The product alone takes 2.7 s on MySQL 8.4, so the time is outside the dismissals and the replaced components |
 | A day 0 left empty pays the whole history | It is the first scan, so a year-old product reads a year each time the page opens |
 | A walk from below the root is written without the seeds of what nothing pulls in | The planner prices them at every node of the build (`design-docs/data-model-graph.md` § Path traversal) |
+
+## Export snapshots
+
+One read-only REPEATABLE READ transaction held ten minutes on MySQL 8 and
+MariaDB at CI's versions, beside a writer committing 100 transactions a
+second, each updating 10 random rows of 10,000 and inserting 10. Other test
+runs shared the servers.
+
+| Elapsed | Writes | MySQL history list | MySQL scan in the snapshot | MariaDB history list | MariaDB scan in the snapshot |
+|---|---|---|---|---|---|
+| 0 s | 0 | 152 | | 59 | |
+| 60 s | 5,963 | 30,226 | 53 ms | 34,113 | 47 ms |
+| 180 s | 17,897 | 43,784 | 99 ms | 49,079 | 76 ms |
+| 300 s | 29,925 | 55,824 | 193 ms | 61,118 | 141 ms |
+| 452 s | 44,947 | 106,056 | 940 ms | 114,566 | 426 ms |
+| 607 s | 60,406 | 139,646 | 688 ms | 154,061 | 527 ms |
+| 10 s after it ended | | 323 | | 0 | |
+
+| Finding | Detail |
+|---|---|
+| The history list grows by about one entry per write transaction committed anywhere on the server | The step after 360 s coincides with other test runs on the servers |
+| It clears within ten seconds of the snapshot ending | |
+| Without a snapshot it stays under 300 | The same writer for three minutes: at most 265 on MySQL and 271 on MariaDB |
+| A read inside the snapshot slows as rows it reads gain versions | A scan of the 10,000 updated rows went from 25 ms to about 0.7 to 0.9 s on MySQL, 14 ms to about 0.5 s on MariaDB |

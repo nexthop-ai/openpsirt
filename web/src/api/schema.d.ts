@@ -17881,7 +17881,7 @@ export interface operations {
                 component?: string;
                 /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused */
                 purl?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -17935,7 +17935,7 @@ export interface operations {
                 component?: string;
                 /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused */
                 purl?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24330,7 +24330,7 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24503,7 +24503,7 @@ export interface operations {
             query?: {
                 branch_or_tag?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24638,7 +24638,7 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24778,7 +24778,7 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24916,7 +24916,7 @@ export interface operations {
             query?: {
                 branch_or_tag?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -28931,7 +28931,7 @@ export interface operations {
                 days?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -28983,7 +28983,7 @@ export interface operations {
                 days?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;

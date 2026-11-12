@@ -299,18 +299,34 @@ type CountedPaging struct {
 	Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 }
 
+// Subtree narrows to a component of one build and everything under it, or
+// to a package's components and everything under them. Declared once, so
+// every list, trend and file that narrows to a subtree reads it in the same
+// words.
+type Subtree struct {
+	Beneath          string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
+	BeneathVersion   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
+	BeneathEcosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+	BeneathNamespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
+	BeneathPurl      string `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
+}
+
+// Starts resolves the components the subtree starts at, in a scope the
+// caller has already been authorized for. Nil where nothing was asked.
+func (s Subtree) Starts(ctx context.Context, in Deps, scope finding.Scope) ([]int64, error) {
+	return BeneathStarts(ctx, in, scope, s.Beneath, graph.Choice{
+		Version: s.BeneathVersion, Ecosystem: s.BeneathEcosystem, Namespace: s.BeneathNamespace,
+	}, s.BeneathPurl)
+}
+
 // AtOneBuild narrows a list within a single product's builds, and has no
 // meaning across products: a subtree is a walk over one build's edges, and
 // "differs between builds" and the spread across variants are statements
 // about a selection.
 type AtOneBuild struct {
-	Beneath          string        `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices"`
-	BeneathVersion   string        `query:"beneath_version" doc:"The version, where the build holds that name at several"`
-	BeneathEcosystem string        `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
-	BeneathNamespace string        `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
-	BeneathPurl      string        `query:"beneath_purl" maxLength:"512" doc:"Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"`
-	Differs          bool          `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
-	AcrossVariants   VariantSpread `query:"across_variants" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
+	Subtree
+	Differs        bool          `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
+	AcrossVariants VariantSpread `query:"across_variants" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
 
 // BeneathIn resolves the component a list or a trend is narrowed beneath. Nil

@@ -159,7 +159,7 @@ func registerCountsAcross(api huma.API, in core.Deps) {
 		}
 		rows = append(rows, []string{"waiting", strconv.Itoa(body.Waiting)}, []string{"ruled", strconv.Itoa(body.Ruled)},
 			[]string{"past end of life", strconv.Itoa(body.Ended)})
-		return file.stream(input.Format, "", nil, rows), nil
+		return file.stream(in, input.Format, "", nil, rows)
 	})
 }
 
@@ -221,7 +221,7 @@ func registerTrendAcross(api huma.API, in core.Deps) {
 		}
 		stepped := file
 		stepped.header = append([]string{input.StepEnding()}, file.header[1:]...)
-		return stepped.stream(input.Format, "", []core.Stated{input.Stated()}, trendRows(got, true)), nil
+		return stepped.stream(in, input.Format, "", []core.Stated{input.Stated()}, trendRows(got, true))
 	})
 }
 
@@ -268,7 +268,7 @@ func registerJudgingAcross(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		return file.stream(input.Format, "", weeksStated(input.Weeks), judgingRows(got)), nil
+		return file.stream(in, input.Format, "", weeksStated(input.Weeks), judgingRows(got))
 	})
 }
 
@@ -313,6 +313,6 @@ func registerCoverageAcross(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		return file.stream(input.Format, "", weeksStated(input.Weeks), coverageRows(got, true)), nil
+		return file.stream(in, input.Format, "", weeksStated(input.Weeks), coverageRows(got, true))
 	})
 }

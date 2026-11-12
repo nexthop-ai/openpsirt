@@ -213,34 +213,31 @@ func registerRemediation(api huma.API, in core.Deps) {
 			}
 			productID = named.ID
 		}
-		store := triage.NewStore(in.DB.DB)
-		out := core.Exporting{
+		// Read whole, once, before the file begins: the list is grouped from
+		// every deferral the reader may read, so a page of it costs the whole
+		// read, and a refusal or a failed read is a status rather than a file
+		// cut short.
+		rows, err := triage.NewStore(in.DB.DB).Repeats(ctx, subject, productID, input.AtLeast)
+		if err != nil {
+			return nil, core.Refused(in.Logger, err, "cannot read what keeps being put off")
+		}
+		written := make([][]string, 0, len(rows))
+		for _, row := range repeatBodies(rows) {
+			written = append(written, []string{
+				row.Product, row.ProductName, row.Vulnerability, row.Severity, row.Occurrence,
+				strconv.Itoa(row.Times), strconv.Itoa(row.TotalDays),
+				strconv.FormatBool(row.Standing), row.LastUntil,
+			})
+		}
+		return core.Export(in, input.Format, "repeated-deferrals", core.Exporting{
 			What:  "repeated deferrals",
 			About: []core.Stated{{Label: "deferred at least", Value: strconv.Itoa(input.AtLeast) + " times"}},
 			Header: []string{
 				"product", "product_name", "issue", "severity", "occurrence", "times",
 				"total_days", "standing", "last_until",
 			},
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				rows, _, err := store.RepeatsPage(ctx, subject, productID,
-					input.AtLeast, limit, offset)
-				if err != nil {
-					return nil, err
-				}
-				written := make([][]string, 0, len(rows))
-				for _, row := range repeatBodies(rows) {
-					written = append(written, []string{
-						row.Product, row.ProductName, row.Vulnerability, row.Severity, row.Occurrence,
-						strconv.Itoa(row.Times), strconv.Itoa(row.TotalDays),
-						strconv.FormatBool(row.Standing), row.LastUntil,
-					})
-				}
-				return written, nil
-			},
-		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "repeated-deferrals", out)
-		}}, nil
+			Held: written,
+		})
 	})
 }
 

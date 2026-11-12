@@ -10,7 +10,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -168,10 +167,9 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			// nothing on and 404 for a name nobody ever declared,
 			// which is a way to read the deployment's product list
 			// one guess at a time.
-			product, err := catalog.NewStore(in.DB.DB).
-				VisibleProduct(ctx, subject, input.Product)
+			product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 			if err != nil {
-				return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+				return nil, err
 			}
 			filter.ProductIDs = []int64{product.ID}
 		}
@@ -180,7 +178,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided could not be read", err)
 		}
-		details, err := core.DescribeDecisionOccurrences(ctx, in, store, occurrences, reasoning)
+		details, err := core.DescribeDecisionOccurrences(ctx, in.DB.DB, store, occurrences, reasoning)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided could not be read", err)
 		}
@@ -212,7 +210,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
-		details, err := core.DescribeDecisionOccurrences(ctx, in, store, []triage.DecisionOccurrence{*occurrence},
+		details, err := core.DescribeDecisionOccurrences(ctx, in.DB.DB, store, []triage.DecisionOccurrence{*occurrence},
 			map[int64]string{occurrence.ID: reasoning})
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
@@ -252,7 +250,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			}
 			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
-		described, err := core.DescribeDecisionOccurrences(ctx, in, store, []triage.DecisionOccurrence{whole.DecisionOccurrence},
+		described, err := core.DescribeDecisionOccurrences(ctx, in.DB.DB, store, []triage.DecisionOccurrence{whole.DecisionOccurrence},
 			map[int64]string{whole.DecisionOccurrence.ID: whole.Reasoning})
 		if err != nil || len(described) == 0 {
 			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
@@ -471,7 +469,7 @@ func registerOccurrenceDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the reasoning could not be read", err)
 		}
-		details, err := core.DescribeDecisionOccurrences(ctx, in, store, all, reasoning)
+		details, err := core.DescribeDecisionOccurrences(ctx, in.DB.DB, store, all, reasoning)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided here could not be read", err)
 		}

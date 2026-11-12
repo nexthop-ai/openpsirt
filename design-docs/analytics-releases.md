@@ -44,7 +44,7 @@ document; the comparison screen keeps all three sets.
 |---|---|
 | The line under the heading makes it re-checkable: the two builds, the day the later was last measured, and the scanner and vulnerability-database versions | Databases ship bad data and are corrected |
 | Dated by the measurement, never the request | |
-| Builds are named by the catalog's display names | |
+| Builds are named by the catalog's display names; a lookup that fails fails the note | Heading it with the names this deployment files builds under puts internals on a customer document |
 | Fixes are grouped by component, closure reason and version pair, the issues closed listed under it | One kernel upgrade closes 917 issues |
 | A bullet carries the score, whether known exploited, and an address written in angle brackets that names `http`, `https` or `mailto` by the rule for an address beside a decision, or is left out | |
 | Every name, version, identifier, severity word, build name and scanner and database version is escaped where written, only where a character opens syntax there | `design-docs/text.md` § Rendered and escaped text |
