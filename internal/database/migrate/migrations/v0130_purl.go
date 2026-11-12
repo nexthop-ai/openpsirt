@@ -251,22 +251,27 @@ func purlWithoutCredentialV0130(purl string) string {
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
 		if !found {
-			kept = append(kept, pair)
-			continue
+			// No qualifier the specification allows: the rest of a value
+			// holding a raw "&", such as a password, so that value and every
+			// pair after it go.
+			if len(kept) > 0 {
+				kept = kept[:len(kept)-1]
+			}
+			break
 		}
-		address, err := url.PathUnescape(value)
+		decoded, err := url.PathUnescape(value)
 		if err != nil {
 			break
 		}
-		if !schemedV0130(address) {
-			bare, readable := withoutPasswordV0130(address)
+		if !schemedV0130(decoded) {
+			bare, readable := withoutPasswordV0130(decoded)
 			if !readable {
 				break
 			}
 			if at := strings.IndexAny(bare, "?#"); at >= 0 {
 				bare = bare[:at]
 			}
-			if bare != address {
+			if bare != decoded {
 				pair = key + "=" + qualifierEscapedV0130(bare)
 			}
 			kept = append(kept, pair)
@@ -275,7 +280,7 @@ func purlWithoutCredentialV0130(purl string) string {
 			}
 			continue
 		}
-		parsed, err := url.Parse(address)
+		parsed, err := url.Parse(decoded)
 		if err != nil {
 			break
 		}

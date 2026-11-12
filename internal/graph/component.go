@@ -272,20 +272,25 @@ func StoredPurl(purl string) string {
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
 		if !found {
-			kept = append(kept, pair)
-			continue
+			// No qualifier the specification allows: the rest of a value
+			// holding a raw "&", such as a password, so that value and every
+			// pair after it go.
+			if len(kept) > 0 {
+				kept = kept[:len(kept)-1]
+			}
+			break
 		}
-		address, err := url.PathUnescape(value)
+		decoded, err := url.PathUnescape(value)
 		if err != nil {
 			// An escape that does not decode hides where an address and its
 			// credential end. Neither the pair nor any after it is kept: a
 			// credential holding a raw "&" goes on into the pairs after it.
 			break
 		}
-		if !sourcelink.Schemed(address) {
+		if !sourcelink.Schemed(decoded) {
 			// An address written without a scheme loses a password before
 			// its host and anything from its query on.
-			bare, readable := sourcelink.WithoutPassword(address)
+			bare, readable := sourcelink.WithoutPassword(decoded)
 			if !readable {
 				// Where its credential ends cannot be told; it and the pairs
 				// after it, which may hold the rest, are not kept.
@@ -294,7 +299,7 @@ func StoredPurl(purl string) string {
 			if at := strings.IndexAny(bare, "?#"); at >= 0 {
 				bare = bare[:at]
 			}
-			if bare != address {
+			if bare != decoded {
 				pair = key + "=" + qualifierEscaped(bare)
 			}
 			kept = append(kept, pair)
@@ -303,7 +308,7 @@ func StoredPurl(purl string) string {
 			}
 			continue
 		}
-		parsed, err := url.Parse(address)
+		parsed, err := url.Parse(decoded)
 		if err != nil {
 			// Where its credential ends cannot be told; it and the pairs
 			// after it, which may hold the rest, are not kept.

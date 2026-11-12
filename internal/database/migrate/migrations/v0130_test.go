@@ -202,6 +202,7 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 			{"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git",
 				"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git"},
 			{"pkg:generic/c@1?checksum=sha256:abc123", "pkg:generic/c@1?checksum=sha256:abc123"},
+			{"pkg:generic/bu@1?arch=amd64&vcs_url=https://to&SECRET@host.example.com/x", "pkg:generic/bu@1?arch=amd64"},
 			{"pkg:generic/am@1?vcs_url=https://u:SEC&RET@host.example.com/x", "pkg:generic/am@1"},
 			{"pkg:generic/ae@1?vcs_url=https://u:SEC&x=RET@host.example.com/x", "pkg:generic/ae@1"},
 			{"pkg:generic/ah@1?vcs_url=https://u:SEC#a&RET@host.example.com/x", "pkg:generic/ah@1"},
