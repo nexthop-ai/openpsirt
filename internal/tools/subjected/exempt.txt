@@ -327,7 +327,6 @@ triage.LapseCodeFindings A background pass: an analyzer run lapses the decisions
 triage.Restamp A helper over a narrowed read: it moves the stamp of a decision the caller's write already authorized, inside its transaction.
 triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
 triage.Store.Applying Not varying by reader: whether a decision stands at a place. Its route resolves the place for the caller first.
-triage.Store.DeferredSoFar A helper over a narrowed read: the second-person rule asks it of a place the write already authorized.
 triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
 triage.Store.Lapse A background pass: it lapses decisions whose versions moved.
 triage.Store.LapseRatedWorse A background pass: it lapses claims whose issue was rated worse.

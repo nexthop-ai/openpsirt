@@ -25,25 +25,16 @@ import (
 // records anything. It sat in the file that renders the review queue, which is
 // the screen the gate produces work for rather than the rule itself.
 
-// DeferredSoFar is the total time a finding has been put off, across every
-// deferral ever recorded about the same occurrence.
+// DeferredAt is the total time each of several occurrences of one issue in one
+// product has been put off, across every deferral ever recorded about it, keyed
+// by occurrence, in one statement for all of them.
 //
 // Cumulative rather than per deferral, because otherwise deferring repeatedly
 // for just under the threshold never needs agreement — and four consecutive
 // twenty-nine day deferrals are a year nobody approved.
-func (s *Store) DeferredSoFar(ctx context.Context, occurrence DecisionOccurrence) (time.Duration, error) {
-	occurrence.ID = -1
-	totals, err := s.deferredSoFar(ctx, []DecisionOccurrence{occurrence})
-	if err != nil {
-		return 0, err
-	}
-	return totals[occurrence.ID], nil
-}
-
-// DeferredAt is the same total for several occurrences of one issue in one
-// product, keyed by occurrence, in one statement for all of them. A form deciding
-// about those occurrences says whether a deferral would stand on its own, and that
-// is the total it is measured against.
+//
+// A form deciding about those occurrences says whether a deferral would stand
+// on its own, and that is the total it is measured against.
 //
 // Counted over the deferrals the subject may read. A deferral sits at the
 // occurrence it defers, so somebody deciding about an occurrence reads every deferral
