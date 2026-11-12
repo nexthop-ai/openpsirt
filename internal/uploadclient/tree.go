@@ -81,50 +81,70 @@ func num(o obj, key string) (int, bool) {
 	return 0, false
 }
 
-// eachLocation calls fn with every location object a result names: its
-// locations, its related locations, every step of every flow, and every frame
-// of every stack.
-func eachLocation(result obj, fn func(loc obj)) {
-	for _, loc := range objects(result, "locations") {
-		fn(loc)
-	}
-	for _, loc := range objects(result, "relatedLocations") {
-		fn(loc)
-	}
-	for _, stack := range objects(result, "stacks") {
-		for _, frame := range objects(stack, "frames") {
-			if loc := child(frame, "location"); loc != nil {
-				fn(loc)
-			}
+// eachLocation calls fn with every location object under v, at any depth: a
+// result's locations, related locations and flow steps, which are what a
+// pruned run holds. A location holds no location below it, so the walk stops
+// at one.
+func eachLocation(v any, fn func(loc obj)) {
+	switch t := v.(type) {
+	case obj:
+		if _, ok := t["physicalLocation"].(obj); ok {
+			fn(t)
+			return
 		}
-	}
-	for _, flow := range objects(result, "codeFlows") {
-		for _, thread := range objects(flow, "threadFlows") {
-			for _, step := range objects(thread, "locations") {
-				if loc := child(step, "location"); loc != nil {
-					fn(loc)
-				}
-			}
+		for _, member := range t {
+			eachLocation(member, fn)
+		}
+	case list:
+		for _, member := range t {
+			eachLocation(member, fn)
 		}
 	}
 }
 
-// eachRunLocation calls fn with every location object a run names outside its
-// results: the flow steps it lists once for its results to cite, and the
-// places each notification of each invocation names.
-func eachRunLocation(run obj, fn func(loc obj)) {
-	for _, step := range objects(run, "threadFlowLocations") {
-		if loc := child(step, "location"); loc != nil {
-			fn(loc)
-		}
-	}
-	for _, inv := range objects(run, "invocations") {
-		for _, key := range []string{"toolExecutionNotifications", "toolConfigurationNotifications"} {
-			for _, note := range objects(inv, key) {
-				for _, loc := range objects(note, "locations") {
-					fn(loc)
+// stripSnippets removes the snippet of every region and context region of a
+// physical location under v, at any depth, and counts them. A member named
+// snippet anywhere else is a key a producer chose, such as a message string's
+// identifier, and stays.
+func stripSnippets(v any) int {
+	n := 0
+	switch t := v.(type) {
+	case obj:
+		if physical, ok := t["physicalLocation"].(obj); ok {
+			for _, part := range []string{"region", "contextRegion"} {
+				if region, ok := physical[part].(obj); ok {
+					if _, ok := region["snippet"]; ok {
+						delete(region, "snippet")
+						n++
+					}
 				}
 			}
+		}
+		for _, member := range t {
+			n += stripSnippets(member)
+		}
+	case list:
+		for _, member := range t {
+			n += stripSnippets(member)
+		}
+	}
+	return n
+}
+
+// eachMessage calls fn with every object under v, at any depth, holding
+// markdown as a string: a message, or a rule's description.
+func eachMessage(v any, fn func(m obj)) {
+	switch t := v.(type) {
+	case obj:
+		if _, ok := t["markdown"].(string); ok {
+			fn(t)
+		}
+		for _, member := range t {
+			eachMessage(member, fn)
+		}
+	case list:
+		for _, member := range t {
+			eachMessage(member, fn)
 		}
 	}
 }

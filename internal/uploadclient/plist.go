@@ -98,7 +98,7 @@ func clangResult(diag map[string]any, files []string) obj {
 	loc := plistLocation(diag["location"], files)
 	steps := clangSteps(diag, files)
 	if function, _ := diag["issue_context"].(string); function != "" {
-		loc["logicalLocations"] = list{obj{"name": function, "kind": "function"}}
+		loc["logicalLocations"] = list{obj{"name": function}}
 	}
 	// The diagnostic's last step names the range the result is about.
 	if len(steps) > 0 {
@@ -192,7 +192,7 @@ func clangSteps(diag map[string]any, files []string) list {
 		}
 		loc["message"] = obj{"text": message}
 		if f := functions[depth]; f != "" {
-			loc["logicalLocations"] = list{obj{"name": f, "kind": "function"}}
+			loc["logicalLocations"] = list{obj{"name": f}}
 		}
 		steps = append(steps, obj{"location": loc, "nestingLevel": depth})
 		if name, ok := quoted(message, "Calling "); ok {

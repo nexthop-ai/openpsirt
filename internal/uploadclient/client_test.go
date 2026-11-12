@@ -137,6 +137,20 @@ func TestAPlistGivesTheIssueHashTheFunctionAndTheCallChain(t *testing.T) {
 	}
 }
 
+// A converted document is written in the shape the deployment reads, so the
+// prune applied to a forwarded run finds nothing of its own to remove.
+func TestAConvertedRunLosesNothingToThePrune(t *testing.T) {
+	root := sources(t)
+	for _, in := range []string{"clang18-a.plist", "cppcheck222.xml"} {
+		_, report := built(t, Options{Root: root, Work: root}, fixture(t, in))
+		for _, part := range []string{"run fields", "result fields", "invocation fields"} {
+			if n := report.Removed[part]; n != 0 {
+				t.Errorf("%s: %d %s removed from a converted run", in, n, part)
+			}
+		}
+	}
+}
+
 func TestAPlistIsOneUnitAnalyzed(t *testing.T) {
 	root := sources(t)
 	three := 3
@@ -318,23 +332,46 @@ func TestAnHTMLReportIsRefused(t *testing.T) {
 }
 
 // carrying is a SARIF document whose one result carries every kind of
-// source text a document can.
+// source text a document can, in every place SARIF allows a location, and an
+// invocation carrying the job's command line and environment.
 const carrying = `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"CodeQL","rules":[
  {"id":"cpp/x","fullDescription":{"text":"x","markdown":"` + "`x`" + `"}}]}},
  "artifacts":[{"location":{"uri":"a.c"},"contents":{"text":"int main(void) { return 0; }"}}],
  "results":[{"ruleIndex":0,"message":{"markdown":"**leaks** buf"},
   "locations":[{"physicalLocation":{"artifactLocation":{"index":0},
    "region":{"startLine":7,"startColumn":9,"endLine":7,"endColumn":2,"snippet":{"text":"return 1;"}},
-   "contextRegion":{"startLine":6,"endLine":8,"snippet":{"text":"if (n > 10) {"}}}}],
+   "contextRegion":{"startLine":6,"endLine":8,"snippet":{"text":"if (n > 10) {"}}},
+   "annotations":[{"startLine":7,"snippet":{"text":"annotated text"}}]}],
   "stacks":[{"frames":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
    "region":{"startLine":3,"snippet":{"text":"frame text"}}}}}]}],
   "attachments":[{"artifactLocation":{"uri":"a.c"},"regions":[{"startLine":1,"snippet":{"text":"attached text"}}]}],
+  "suppressions":[{"kind":"inSource","location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+   "region":{"startLine":2,"snippet":{"text":"suppressed text"}}}}}],
+  "graphs":[{"nodes":[{"id":"n","location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+   "region":{"startLine":2,"snippet":{"text":"node text"}}}},
+   "children":[{"id":"c","location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+    "region":{"startLine":2,"snippet":{"text":"child node text"}}}}}]}]}],
+  "codeFlows":[{"threadFlows":[{"locations":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+   "region":{"startLine":2}}},
+   "stack":{"frames":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+    "region":{"startLine":2,"snippet":{"text":"step frame text"}}}}}]}}]}]}],
+  "provenance":{"conversionSources":[{"artifactLocation":{"uri":"a.c"},
+   "region":{"startLine":2,"snippet":{"text":"converted text"}}}]},
   "partialFingerprints":{"primaryLocationLineHash":"abc:1"},
   "fixes":[{"description":{"text":"free it"}}]}],
  "threadFlowLocations":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
   "region":{"startLine":4,"snippet":{"text":"flow text"}}}}}],
- "invocations":[{"executionSuccessful":true,"toolExecutionNotifications":[{"message":{"text":"n"},
-  "locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":5,"snippet":{"text":"notified text"}}}}]}]}]}]}`
+ "invocations":[{"executionSuccessful":true,
+  "commandLine":"codeql --token=command-line-secret","arguments":["--token=argument-secret"],
+  "environmentVariables":{"CI_JOB_TOKEN":"environment-secret"},
+  "toolExecutionNotifications":[{"message":{"text":"n"},
+  "locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":5,"snippet":{"text":"notified text"}}}}],
+  "exception":{"stack":{"frames":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+   "region":{"startLine":5,"snippet":{"text":"exception frame text"}}}}}]},
+   "innerExceptions":[{"stack":{"frames":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+    "region":{"startLine":5,"snippet":{"text":"inner exception text"}}}}}]}}]}}]}],
+ "graphs":[{"nodes":[{"id":"r","location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+  "region":{"startLine":5,"snippet":{"text":"run graph text"}}}}}]}]}]}`
 
 func TestNoSourceLeavesWithoutSnippets(t *testing.T) {
 	root := sources(t)
@@ -344,12 +381,15 @@ func TestNoSourceLeavesWithoutSnippets(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, text := range []string{"return 0;", "return 1;", "if (n > 10)", "free it", "markdown", "`x`",
-		"frame text", "attached text", "flow text", "notified text"} {
+		"frame text", "attached text", "flow text", "notified text",
+		"suppressed text", "node text", "child node text", "step frame text", "converted text", "annotated text",
+		"exception frame text", "inner exception text", "run graph text"} {
 		if bytes.Contains(said, []byte(text)) {
 			t.Errorf("the run carries %q: %s", text, said)
 		}
 	}
-	want := map[string]int{"contents": 1, "fixes": 1, "snippets": 5, "markdown": 2, "attachments": 1}
+	want := map[string]int{"contents": 1, "fixes": 1, "snippets": 2, "markdown": 2, "attachments": 1,
+		"invocation fields": 6, "run fields": 2, "result fields": 7}
 	if !reflect.DeepEqual(report.Removed, want) {
 		t.Errorf("removed %v; want %v", report.Removed, want)
 	}
@@ -363,6 +403,117 @@ func TestNoSourceLeavesWithoutSnippets(t *testing.T) {
 	region := child(child(objects(res, "locations")[0], "physicalLocation"), "region")
 	if _, ok := region["endColumn"]; ok {
 		t.Errorf("region %v; want an end before the start left out", region)
+	}
+}
+
+// A member named snippet outside a region is a key the producer chose, and
+// the deployment reads it: a message string a result cites, a fingerprint.
+func TestAProducersOwnSnippetKeyStays(t *testing.T) {
+	root := sources(t)
+	doc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"CodeQL","rules":[
+ {"id":"cpp/x","messageStrings":{"snippet":{"text":"Found {0}"}}}]}},
+ "results":[{"ruleId":"cpp/x","message":{"id":"snippet","arguments":["a"]},
+  "partialFingerprints":{"snippet":"abc:1"}}]}]}`
+	run, report := built(t, Options{Root: root, Work: root}, Input{Name: "codeql.sarif", Data: []byte(doc)})
+	rule := objects(child(child(run, "tool"), "driver"), "rules")[0]
+	if str(child(child(rule, "messageStrings"), "snippet"), "text") != "Found {0}" {
+		t.Errorf("rule %v; want its message string kept", rule)
+	}
+	if str(child(objects(run, "results")[0], "partialFingerprints"), "snippet") != "abc:1" {
+		t.Errorf("result %v; want its fingerprint kept", objects(run, "results")[0])
+	}
+	if n := report.Removed["snippets"]; n != 0 {
+		t.Errorf("%d snippets removed; want none", n)
+	}
+}
+
+// An invocation is forwarded with only what the deployment reads of it. The
+// rest, the command line, its arguments and the environment among them,
+// carries whatever the CI job held.
+func TestAnInvocationCarriesOnlyWhatTheDeploymentReads(t *testing.T) {
+	root := sources(t)
+	run, _ := built(t, Options{Root: root, Work: root}, Input{Name: "codeql.sarif", Data: []byte(carrying)})
+	invocations := objects(run, "invocations")
+	if len(invocations) == 0 {
+		t.Fatal("the run has no invocation, so this checked nothing")
+	}
+	notified := 0
+	for _, inv := range invocations {
+		for key := range inv {
+			if _, read := invocationShape[key]; !read {
+				t.Errorf("an invocation carries %s, which the deployment does not read", key)
+			}
+		}
+		for _, n := range objects(inv, "toolExecutionNotifications") {
+			notified++
+			for key := range n {
+				if key != "level" && key != "descriptor" {
+					t.Errorf("a notification carries %s, which the deployment does not read", key)
+				}
+			}
+		}
+	}
+	if notified == 0 {
+		t.Fatal("no invocation has a notification, so this checked nothing")
+	}
+	said, err := json.Marshal(run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{"command-line-secret", "argument-secret", "environment-secret"} {
+		if bytes.Contains(said, []byte(secret)) {
+			t.Errorf("the run carries %q", secret)
+		}
+	}
+}
+
+// A run and its results are forwarded with only what the deployment reads of
+// them, at every depth. A converter's own invocation, a web request's
+// headers, a flow step's state and a property bag carry whatever the CI job
+// held.
+func TestARunCarriesOnlyWhatTheDeploymentReads(t *testing.T) {
+	doc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"CodeQL","properties":{"commandLine":"driver-property-secret"}}},
+ "conversion":{"tool":{"driver":{"name":"multitool"}},
+  "invocation":{"commandLine":"convert --token=conversion-secret"}},
+ "webRequests":[{"headers":{"Authorization":"run-request-secret"}}],
+ "properties":{"environment":"run-property-secret"},
+ "results":[{"ruleId":"x","message":{"text":"m"},"properties":{"environment":"result-property-secret"},
+  "suppressions":[{"status":"accepted","justification":"suppression-secret","properties":{"k":"suppression-secret"}}],
+  "codeFlows":[{"threadFlows":[{"locations":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+   "region":{"startLine":2}}},"state":{"API_TOKEN":{"text":"step-state-secret"}},
+   "webRequest":{"headers":{"Authorization":"step-request-secret"}}}]}]}],
+  "webRequest":{"headers":{"Authorization":"result-request-secret"}},
+  "webResponse":{"headers":{"Set-Cookie":"result-response-secret"}}}]}]}`
+	root := sources(t)
+	run, report := built(t, Options{Root: root, Work: root}, Input{Name: "codeql.sarif", Data: []byte(doc)})
+	said, err := json.Marshal(run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{"conversion-secret", "run-request-secret", "result-request-secret",
+		"result-response-secret", "run-property-secret", "result-property-secret",
+		"suppression-secret", "step-state-secret", "step-request-secret", "driver-property-secret"} {
+		if bytes.Contains(said, []byte(secret)) {
+			t.Errorf("the run carries %q: %s", secret, said)
+		}
+	}
+	results := objects(run, "results")
+	if len(results) == 0 {
+		t.Fatal("the run has no result, so this checked nothing")
+	}
+	for _, res := range results {
+		for key := range res {
+			if _, read := resultShape[key]; !read {
+				t.Errorf("a result carries %s, which the deployment does not read", key)
+			}
+		}
+	}
+	// The conversion, the web requests, the driver's and the run's
+	// properties; the result's properties, web request and response, the
+	// suppression's justification and properties, the step's state and web
+	// request.
+	if report.Removed["run fields"] != 4 || report.Removed["result fields"] != 7 {
+		t.Errorf("removed %v; want four run fields and seven result fields", report.Removed)
 	}
 }
 
@@ -381,8 +532,10 @@ func TestSnippetsAreTheCheckoutsLines(t *testing.T) {
 	if from, _ := num(context, "startLine"); from != 5 {
 		t.Errorf("context from line %d; want 5", from)
 	}
+	// The location and the flow step. A suppression's location, a step's
+	// stack, a stack, a graph and a conversion source are not forwarded.
 	if report.Snippets != 2 {
-		t.Errorf("%d snippets; want the result's location and its stack frame", report.Snippets)
+		t.Errorf("%d snippets; want one for each location of the result", report.Snippets)
 	}
 }
 
