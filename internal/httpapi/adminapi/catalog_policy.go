@@ -6,7 +6,6 @@ package adminapi
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -84,10 +83,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			"Nothing is served for any product while the deployment does not publish at all, " +
 			"and nothing about an undisclosed flaw is ever served.\n\n" +
 			"Turned off, the product's documents are withdrawn and stop being served at once. " +
-			"Turned on, they are written again by the next pass, a few minutes later. Turning it on " +
-			"is refused where another product that publishes, or has published, has a name that " +
-			"folds to the same filename: a document's filename is built from the product's name, " +
-			"lower-cased with everything but letters, digits, plus and hyphen made an underscore. " +
+			"Turned on, they are written again by the next pass, a few minutes later. " +
 			"Recorded in the administrative trail.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
@@ -117,11 +113,6 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			}
 			if before == in.Body.Publishes {
 				return nil
-			}
-			if in.Body.Publishes && !before {
-				if err := pathsFree(ctx, tx, d.Logger, product.ID, product.Name); err != nil {
-					return err
-				}
 			}
 			if err := store.SetPublishes(ctx, product.ID, in.Body.Publishes); err != nil {
 				return core.WentWrong(d.Logger, "whether it publishes could not be recorded", err)
@@ -414,20 +405,4 @@ func publishing(publishes bool) string {
 		return "published"
 	}
 	return "not published"
-}
-
-// pathsFree refuses a product whose documents would be published at another
-// product's paths, asked where a product starts publishing and where one that
-// publishes is renamed.
-func pathsFree(ctx context.Context, tx bun.IDB, logger *slog.Logger, productID int64, name string) error {
-	other, err := publish.FoldsLike(ctx, tx, productID, name)
-	if err != nil {
-		return core.WentWrong(logger, "whether another product publishes at its paths could not be read", err)
-	}
-	if other != "" {
-		return huma.Error409Conflict(fmt.Sprintf("%s publishes, or has published, under a name "+
-			"that folds to the same filename as this one, so their documents would share paths. "+
-			"Give this product a name that folds differently first", other))
-	}
-	return nil
 }

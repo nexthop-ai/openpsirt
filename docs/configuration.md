@@ -902,11 +902,11 @@ or variant keeps its name once it has a scanned build and a document of its
 product has been served, and a release also once its own OpenVEX document has
 been. A release or variant nothing was scanned for may be renamed.
 
-A document's filename is built from its product's name, lower-cased, with
-every run of characters other than letters, digits, a plus and a hyphen made
-one underscore. Turning publishing on for a product, or renaming one that
-publishes, is refused where another product that publishes or has published
-gets the same filename this way.
+A CSAF VEX document's tracking identifier is `VEX-`, the product's numeric
+identifier, its name and the issue, such as `VEX-12-sonic-GHSA-x-y`. Its
+filename is that identifier lower-cased, with every run of characters other
+than letters, digits, a plus and a hyphen made one underscore, so two products'
+documents never share one.
 
 ## Upstream currency
 
@@ -1659,6 +1659,8 @@ v0.10.2 named `reaffirm-claim`.
 | A VEX document uploaded without `publisher` is filed under the publisher it names: an OpenVEX author or a CSAF publisher name. One naming neither is refused with 422. v0.12.0 filed it under its file name | Clear what v0.12.0 filed under a file name, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, those statements stay in force beside the ones later uploads file under the document's own publisher |
 | A VEX document replaces only an earlier revision of itself: the same publisher and the same OpenVEX `@id` or CSAF tracking identifier. v0.12.0 replaced every earlier document from that publisher | Clear what v0.12.0 recorded under each publisher, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, a revision stating an identifier replaces none of it, and what v0.12.0 recorded stays in force beside the revision |
 | A build's components are shown, searched and given to the scanner by the name and version that build stated. v0.12.0 used those of whichever build described the package first, in any product | Nothing. A build shows its own once its inventory is sent again; until then it keeps the names and versions v0.12.0 showed |
+| A CSAF VEX document's tracking identifier opens on its product's numeric identifier, `VEX-12-sonic-GHSA-x-y` where v0.12.0 wrote `VEX-sonic-GHSA-x-y`, so every CSAF VEX document's identifier and path change once. The first publishing pass after the upgrade writes each at its new path as a new document, version 1 in the current year's folder, and its old path answers 404. Nothing is written to or left in [the published advisory directory](#the-published-advisory-directory), which holds advisories alone, so no file is orphaned | Nothing for a reader that follows the provider index or the feed. Point a link or bookmark kept to a single CSAF VEX document at its new path |
+| Turning publishing on for a product, and renaming one that publishes, are no longer refused for a name that folds like another product's | Nothing |
 
 #### VEX statements from v0.12.0
 

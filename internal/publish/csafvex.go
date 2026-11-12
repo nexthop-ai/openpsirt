@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,7 +65,10 @@ func (g *Generator) vexDocuments(product *catalog.Product, builds []*built,
 // relationship.
 func (g *Generator) vexDocument(product *catalog.Product, facts []placed, described string) Generated {
 	issue := facts[0].fact
-	tracking := "VEX-" + product.Name + "-" + issue.Issue
+	// The product's identifier first: a run of digits ends at the first
+	// hyphen, so no two products share a filename however their names and
+	// issues fold.
+	tracking := "VEX-" + strconv.FormatInt(product.ID, 10) + "-" + product.Name + "-" + issue.Issue
 	title := issue.Issue + " in " + product.DisplayName
 
 	tree, statuses := g.treeFor(product, facts)

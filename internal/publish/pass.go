@@ -158,7 +158,7 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 		// nearly everything on nearly every pass. The write reads again
 		// inside its own transaction and decides there.
 		if was, ok := held[at]; ok && was.Settled == one.Settled && was.Statuses == statuses &&
-			was.WithdrawnAt == nil {
+			was.WithdrawnAt == nil && !one.movedFrom(was) {
 			continue
 		}
 		revised, err := p.documents.revise(ctx, product.ID, one, statuses)
@@ -188,16 +188,13 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 	return wrote, errors.Join(failed...)
 }
 
-// ErrPathTaken is a document whose path another product's document already
-// holds: two tracking identifiers the standard's filename rule folds alike,
-// from two product names that fold alike or from where one product's name
-// ends and its issue's begins. Retrying
-// never clears it, and neither does withdrawing the other product's, which
-// keeps its path; it is refused in words, naming the path and the other
-// product. Turning publishing on is refused where two product names fold
-// alike; a clash across the boundary between product and issue is refused
-// here, document by document.
-var ErrPathTaken = refusal.New("another product's document is published at the same path")
+// ErrPathTaken is a document whose path another document already holds: two
+// issues of one product whose names the standard's filename rule folds alike.
+// Documents of two products never share a path, since a tracking identifier
+// opens on its product's identifier, a run of digits the first hyphen ends.
+// Retrying never clears it; it is refused in words naming the path and the
+// document holding it, and the pass carries on with the rest.
+var ErrPathTaken = refusal.New("another document is published at the same path")
 
 // Statuses is which statuses the deployment publishes now.
 func Statuses(ctx context.Context, db bun.IDB) (string, error) {
@@ -264,7 +261,7 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 			return fmt.Errorf("read the published %s about %s: %w", one.Kind, one.Subject, err)
 		}
 
-		if was != nil && was.Settled == one.Settled {
+		if was != nil && was.Settled == one.Settled && !one.movedFrom(*was) {
 			if was.Statuses == statuses && was.WithdrawnAt == nil {
 				return nil
 			}
@@ -275,7 +272,7 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 
 		at := revision{Version: 1, First: now, Current: now}
 		summary := "Initial version."
-		if was != nil {
+		if was != nil && !one.movedFrom(*was) {
 			at.Version, at.First = was.Version+1, was.FirstAt.UTC()
 			history, err := historyOf(one.Kind, was)
 			if err != nil {
@@ -294,15 +291,14 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 		path := one.path(at)
 		var other string
 		switch err := tx.NewSelect().Model((*Document)(nil)).
-			Join(`JOIN "product" AS "p" ON "p"."id" = "pub"."product_id"`).
-			ColumnExpr(`"p"."display_name"`).
+			ColumnExpr(`"pub"."subject"`).
 			Where(`"pub"."path_digest" = ?`, digestOf(path)).
 			Where(`NOT ("pub"."product_id" = ? AND "pub"."kind" = ? AND "pub"."subject" = ?)`,
 				productID, one.Kind, one.Subject).
 			Scan(ctx, &other); {
 		case err == nil:
-			return fmt.Errorf("%w: %s is held by a document of %s, whose tracking identifier "+
-				"folds to the same filename; turn publishing off for this product", ErrPathTaken, path, other)
+			return fmt.Errorf("%w: %s is held by the document about %s, whose name folds to "+
+				"the same filename", ErrPathTaken, path, other)
 		case !database.IsNoRows(err):
 			return fmt.Errorf("read who publishes at %s: %w", path, err)
 		}
@@ -326,7 +322,8 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 		res, err := tx.NewUpdate().Model((*Document)(nil)).
 			Set(`"path" = ?`, row.Path).Set(`"path_digest" = ?`, row.PathDigest).
 			Set(`"tracking_id" = ?`, row.TrackingID).Set(`"title" = ?`, row.Title).
-			Set(`"version" = ?`, row.Version).Set(`"current_at" = ?`, row.CurrentAt).
+			Set(`"version" = ?`, row.Version).Set(`"first_at" = ?`, row.FirstAt).
+			Set(`"current_at" = ?`, row.CurrentAt).
 			Set(`"statuses" = ?`, row.Statuses).Set(`"settled" = ?`, row.Settled).
 			Set(`"withdrawn_at" = NULL`).Set(`"document" = ?`, row.Body).
 			Where(`"id" = ?`, was.ID).Where(`"version" = ?`, was.Version).

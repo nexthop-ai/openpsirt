@@ -147,7 +147,7 @@ One document per issue per product, across every branch, tag and variant.
 | Element | Filled by |
 |---|---|
 | Category and version | `csaf_vex`, CSAF 2.0 |
-| Tracking identifier | `VEX-<product>-<issue>`, fixed while the issue keeps its name |
+| Tracking identifier | `VEX-<product id>-<product>-<issue>`, such as `VEX-12-sonic-GHSA-x-y` at `vex-12-sonic-ghsa-x-y.json`; fixed while the issue keeps its name |
 | Title | The issue and the product's display name |
 | Product tree | The publisher, the product, a leaf per named build with the package identifier its inventory gave itself; every component and every component pulling one in, by package identifier; relationships placing each component in a build or beneath its consumer |
 | Status | A component holding for anybody by its own identifier, anything else by the relationship; a product under two statuses keeps the more cautious |
@@ -187,8 +187,9 @@ A revision is a fact about a moment: recorded, and read by requests.
 | Rule | Reason |
 |---|---|
 | A revision is written only where its digest moved: the stated address, the publisher, the title, the product tree and the statements | Moving the deployment's address or publisher revises everything |
-| Turning publishing on for a product, or renaming a publishing one, is refused, naming the other, where a product that publishes or has published folds alike | The filename rule folds `edge.os` and `edge os` to one path; a withdrawn document keeps its path |
-| The pass refuses a path another product holds, naming the path and the first product and saying to turn the second off, and carries on with the rest | Reached by turning both on at once, or by a tracking identifier folding alike across the boundary between product name and issue |
+| Two products' CSAF VEX documents never share a path | The tracking identifier opens on the product's identifier, a run of digits the first hyphen ends, so the filename rule folding `edge.os` and `edge os` alike, or `acme` with `GHSA-x-y` and `acme-ghsa` with `x-y`, gives two paths |
+| The pass refuses a path another document holds, naming the path and the issue holding it, and carries on with the rest | Two issues of one product whose names fold alike under the filename rule |
+| A document held at a path its tracking identifier no longer gives is published at the new path as a new document, its first version and a new year folder, and the old path serves nothing | A tracking identifier stays the same across a document's versions; a reader following the provider index or feed finds the new path |
 | A rename is refused once a document that may name the part was served, withdrawn ones included | Readers hold documents by names |
 | Naming a part: a product, any document about it; a release, its OpenVEX document and, once it has a scanned build, every CSAF VEX document of its product; a variant, every document of its product once it has a scanned build | Which builds a revision named is in its bytes alone. Unscanned, a release or variant may be renamed |
 | The next revision is one past the last, with every earlier one in its history; its first release, and so its year folder, never moves | |
@@ -245,3 +246,4 @@ what moved.
 |---|---|
 | A document is up to five minutes behind a decision agreed or a scan landing | Turning a product off and narrowing the statuses act at once, being asked on every request |
 | Every document of a product is worked out every pass | 3.3 s on a full-size image (`design-docs/publishing-measurements.md`); a record of what moved would copy the findings (REQ-74) |
+| A path an earlier tracking identifier shape gave is held until that document is published again at its new path; a withdrawn one keeps it | Only a product named as another's identifier and a hyphen, such as `12-sonic` beside product 12 `sonic`, can reach it, and the pass names the path held |

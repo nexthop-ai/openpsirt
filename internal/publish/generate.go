@@ -70,6 +70,14 @@ type Generated struct {
 	render func(at revision) ([]byte, error)
 }
 
+// movedFrom reports whether this document is served somewhere other than
+// where was is. A document whose tracking identifier changed shape is served
+// at a new path, and is a new document there rather than a revision of the
+// one at the old path.
+func (one Generated) movedFrom(was Document) bool {
+	return one.path(revision{First: was.FirstAt.UTC()}) != was.Path
+}
+
 // Product is every document one product publishes, under the statuses given.
 //
 // Every branch, tag and variant in use that has been scanned is read, at what

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -250,7 +251,7 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 		var issues []string
 		for _, one := range w.listed(setting.SettledStatuses) {
 			if one.Kind == publish.CSAFVEX {
-				issues = append(issues, strings.TrimPrefix(one.TrackingID, "VEX-"+w.Product.Name+"-"))
+				issues = append(issues, strings.TrimPrefix(one.TrackingID, "VEX-"+strconv.FormatInt(w.Product.ID, 10)+"-"+w.Product.Name+"-"))
 			}
 		}
 		if !slices.Equal(issues, []string{"CVE-2026-1001"}) {
@@ -362,37 +363,127 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 	})
 }
 
-// Two products whose names the standard's filename rule folds alike cannot
-// both publish a CSAF document about one issue. Both turned on at once, past
-// the refusal an administrator's write meets, the second is refused in words
-// naming the first, and everything else it publishes is still written.
-func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
+// Two products publish a CSAF VEX document each at a path of its own, whether
+// their names fold alike under the standard's filename rule or one product's
+// name and issue fold like the other's across the boundary between them: a
+// tracking identifier opens on its product's identifier.
+func TestTwoProductsNeverShareACSAFPath(t *testing.T) {
+	for _, pair := range [][2][2]string{
+		{{"edge.os", "CVE-2026-1001"}, {"edge os", "CVE-2026-1001"}},
+		{{"acme", "GHSA-x-y"}, {"acme-ghsa", "x-y"}},
+	} {
+		t.Run(pair[0][0]+" beside "+pair[1][0], func(t *testing.T) {
+			fixture.Each(t, func(t *testing.T, f *fixture.World) {
+				w := newWorld(t, f)
+				for i, one := range pair {
+					product := w.DeclareProduct(one[0], one[0])
+					w.hold(product)
+					build := w.BuildFor(w.DeclareBranchOrTag(product, "main", catalog.Branch, nil),
+						w.DeclareVariant(product, "x86", true))
+					root := graph.Described{Purl: "pkg:generic/edge@1." + fmt.Sprint(i), Name: "edge",
+						Version: "1." + fmt.Sprint(i)}
+					w.ship(build, root, edge{root, openssl})
+					w.report(build, reported{one[1], openssl})
+					w.decide(build, one[1], openssl,
+						decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+					w.publishes(product, true)
+				}
+				wrote, err := w.pass.Once(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if wrote.Skipped != 0 {
+					t.Errorf("%d products were not worked out, want none", wrote.Skipped)
+				}
+				paths := map[string]bool{}
+				for _, one := range w.listed("all") {
+					if one.Kind == publish.CSAFVEX {
+						paths[one.Path] = true
+					}
+				}
+				if len(paths) != 2 {
+					t.Errorf("the two products published CSAF VEX documents at %v, want two paths", paths)
+				}
+			})
+		})
+	}
+}
+
+// A CSAF VEX document held at a path its tracking identifier no longer gives
+// is published at the new one as a new document, its first version, and the
+// old path serves nothing.
+func TestADocumentWhosePathMovedStartsAgainAtTheNewOne(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
-		var buildIDs []*catalog.Build
-		for _, name := range []string{"edge.os", "edge os"} {
-			product := w.DeclareProduct(name, name)
-			w.hold(product)
-			build := w.BuildFor(w.DeclareBranchOrTag(product, "main", catalog.Branch, nil),
-				w.DeclareVariant(product, "x86", true))
-			root := graph.Described{Purl: "pkg:generic/edge@1." + fmt.Sprint(len(buildIDs)), Name: "edge",
-				Version: "1." + fmt.Sprint(len(buildIDs))}
-			w.ship(build, root, edge{root, openssl})
-			w.report(build, reported{"CVE-2026-1001", openssl})
-			w.decide(build, "CVE-2026-1001", openssl,
-				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
-			w.publishes(product, true)
-			buildIDs = append(buildIDs, build)
+		ctx := t.Context()
+		root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
+		w.ship(w.Build, root, edge{root, openssl})
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		if _, err := w.pass.Once(ctx); err != nil {
+			t.Fatal(err)
 		}
+		var now publish.Document
+		if err := w.DB.DB.NewSelect().Model(&now).ExcludeColumn("document").
+			Where(`"pub"."kind" = ?`, publish.CSAFVEX).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Held where an earlier shape of the tracking identifier put it.
+		old := publish.DirectoryPath + "2025/vex-sonic-cve-2026-1001.json"
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
+			Set(`"path" = ?`, old).Set(`"path_digest" = ?`, strings.Repeat("c", 64)).
+			Set(`"tracking_id" = ?`, "VEX-sonic-CVE-2026-1001").Set(`"version" = ?`, 3).
+			Set(`"first_at" = ?`, now.FirstAt.AddDate(-1, 0, 0)).
+			Where(`"id" = ?`, now.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		wrote, err := w.pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wrote.Revised != 1 {
+			t.Errorf("the pass revised %d documents, want the one that moved", wrote.Revised)
+		}
+		var moved publish.Document
+		if err := w.DB.DB.NewSelect().Model(&moved).ExcludeColumn("document").
+			Where(`"pub"."id" = ?`, now.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if moved.Path != now.Path || moved.TrackingID != now.TrackingID || moved.Version != 1 {
+			t.Errorf("the moved document is at %s as %s version %d, want %s as %s version 1",
+				moved.Path, moved.TrackingID, moved.Version, now.Path, now.TrackingID)
+		}
+		if _, err := w.documents.At(ctx, w.anybody(), old, "all"); !errors.Is(err, publish.ErrNotPublished) {
+			t.Errorf("the old path answered %v, want nothing published there", err)
+		}
+	})
+}
+
+// Two issues of one product whose names fold alike under the standard's
+// filename rule cannot both be published at the one path they fold to. The
+// second is refused in words naming the first, and everything else the
+// product publishes is still written.
+func TestTwoIssuesFoldedAlikeDoNotStopEachOther(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
+		w.ship(w.Build, root, edge{root, openssl})
+		w.report(w.Build, reported{"GHSA-a.b", openssl}, reported{"GHSA-a_b", openssl})
+		for _, issue := range []string{"GHSA-a.b", "GHSA-a_b"} {
+			w.decide(w.Build, issue, openssl,
+				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		}
+		w.publishes(w.Product, true)
 		wrote, err := w.pass.Once(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
 		if wrote.Skipped != 1 {
-			t.Errorf("%d products were not worked out, want the second", wrote.Skipped)
+			t.Errorf("%d products were not worked out, want this one", wrote.Skipped)
 		}
-		openvex := 0
-		csafCount := 0
+		openvex, csafCount := 0, 0
 		for _, one := range w.listed("all") {
 			switch one.Kind {
 			case publish.OpenVEX:
@@ -401,35 +492,14 @@ func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
 				csafCount++
 			}
 		}
-		if openvex != 2 || csafCount != 1 {
-			t.Errorf("published %d OpenVEX and %d CSAF documents, want both OpenVEX and one CSAF",
-				openvex, csafCount)
+		if openvex != 1 || csafCount != 1 {
+			t.Errorf("published %d OpenVEX and %d CSAF documents, want one of each", openvex, csafCount)
 		}
-		// And it stays that way rather than going round again.
-		again, err := w.pass.Once(t.Context())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if again.Skipped != 1 || again.Revised != 0 {
-			t.Errorf("the next pass skipped %d and revised %d", again.Skipped, again.Revised)
-		}
-		_, err = w.pass.Product(t.Context(), w.anybody(), mustProduct(t, w, "edge os"), "all")
-		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(err.Error(), "of edge.os,") ||
-			!strings.Contains(err.Error(), "turn publishing off for this product") ||
-			strings.Contains(err.Error(), "name folds") {
-			t.Errorf("the second product's document was refused as %v, want the path taken by edge.os", err)
+		_, err = w.pass.Product(t.Context(), w.anybody(), w.Product, "all")
+		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(strings.ToLower(err.Error()), "the document about ghsa-a") {
+			t.Errorf("the second issue's document was refused as %v, want the path taken by the first", err)
 		}
 	})
-}
-
-// mustProduct is a product by name.
-func mustProduct(t *testing.T, w *world, name string) *catalog.Product {
-	t.Helper()
-	product, err := w.Catalog.ProductByName(t.Context(), name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return product
 }
 
 // A document names the address it is served at and its publisher, so moving

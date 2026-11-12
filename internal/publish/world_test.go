@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -195,7 +196,7 @@ func (w *world) listed(statuses string) []publish.Listing {
 func (w *world) csafAbout(product *catalog.Product, issue string) *advisory.Document {
 	w.t.Helper()
 	for _, one := range w.listed("all") {
-		if one.Kind == publish.CSAFVEX && one.TrackingID == "VEX-"+product.Name+"-"+issue {
+		if one.Kind == publish.CSAFVEX && one.TrackingID == "VEX-"+strconv.FormatInt(product.ID, 10)+"-"+product.Name+"-"+issue {
 			doc, err := w.documents.At(w.t.Context(), w.anybody(), one.Path, "all")
 			if err != nil {
 				w.t.Fatal(err)

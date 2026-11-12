@@ -222,15 +222,6 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 						"product or to the new name. Change the mapping in configuration first, " +
 						"then rename the product")
 				}
-				held, err := store.Publishes(ctx)
-				if err != nil {
-					return core.WentWrong(d.Logger, "that product could not be renamed", err)
-				}
-				if held[product.ID] {
-					if err := pathsFree(ctx, tx, d.Logger, product.ID, name); err != nil {
-						return err
-					}
-				}
 				if err := store.RenameProduct(ctx, product.ID, name); err != nil {
 					return declineRename(d.Logger, err)
 				}
