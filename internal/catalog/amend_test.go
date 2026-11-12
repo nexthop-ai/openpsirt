@@ -392,3 +392,37 @@ func TestRenamingAProductOntoATakenNameIsRefused(t *testing.T) {
 		}
 	})
 }
+
+// A rename names the product its row belongs to, and a row of another product
+// matches nothing: the taken-name check was asked of the product named, so
+// renaming another product's row would answer a question nobody asked.
+func TestARenameOfAnotherProductsRowMatchesNothing(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		mine, _, _ := declared(t, ctx, s)
+		theirs, err := s.DeclareProduct(ctx, "other", "Other")
+		if err != nil {
+			t.Fatal(err)
+		}
+		release, err := s.DeclareBranchOrTag(ctx, theirs.ID, "main", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := s.DeclareVariant(ctx, theirs.ID, "intel", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RenameVariant(ctx, mine.ID, variant.ID, "renamed"); !errors.Is(err, catalog.ErrNotFound) {
+			t.Errorf("renaming another product's variant answered %v", err)
+		}
+		if err := s.RenameBranchOrTag(ctx, mine.ID, release.ID, "renamed"); !errors.Is(err, catalog.ErrNotFound) {
+			t.Errorf("renaming another product's release answered %v", err)
+		}
+		if got, err := s.VariantByName(ctx, theirs.ID, "intel"); err != nil || got.ID != variant.ID {
+			t.Errorf("the other product's variant moved: %+v, %v", got, err)
+		}
+		if got, err := s.BranchOrTagByName(ctx, theirs.ID, "main"); err != nil || got.ID != release.ID {
+			t.Errorf("the other product's release moved: %+v, %v", got, err)
+		}
+	})
+}

@@ -12,7 +12,7 @@ import { useWho } from "../app/session";
 import { counted, holding } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
 import { buildFindingsAt } from "../app/routes";
-import { AddButton, Declare, FacingField, Field } from "../ui/Declare";
+import { AddButton, Declare, FacingField, Field, RenameDrawer, RetireRefused } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -230,29 +230,23 @@ export function Variants() {
         </Wide>
       )}
 
-      <Declare
-        title={`Edit ${editing}`}
-        open={editing !== ""}
+      <RenameDrawer
+        editing={editing}
         onClose={() => setEditing("")}
-        onSubmit={() => amend.mutate()}
-        error={amend.error}
-        busy={amend.isPending || renameTo.trim() === ""}
-        ok="Save"
+        save={amend}
+        ready={renameTo.trim() !== ""}
         hint="A name cannot be corrected once a VEX document has gone out: readers hold the document by it."
+        name={{
+          value: renameTo,
+          onChange: setRenameTo,
+          placeholder: "broadcom",
+          hint: "What builds and scans call it",
+        }}
       >
-        <Field
-          label="Name"
-          value={renameTo}
-          onChange={setRenameTo}
-          placeholder="broadcom"
-          hint="What builds and scans call it"
-        />
         <FacingField id="edit-facing" value={editFacing} onChange={setEditFacing} />
-      </Declare>
+      </RenameDrawer>
 
-      {/* A refused retirement is said. Without it the button re-enables and
-          the row stays, which reads as nothing having happened. */}
-      {retire.error != null && <Failed error={retire.error} what="That could not be retired." />}
+      <RetireRefused error={retire.error} />
 
       <Declare
         title="Add variant"

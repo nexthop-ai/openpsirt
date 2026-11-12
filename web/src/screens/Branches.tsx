@@ -12,7 +12,7 @@ import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { counted, holding } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
-import { AddButton, Declare, Field } from "../ui/Declare";
+import { AddButton, Declare, Field, RenameDrawer, RetireRefused } from "../ui/Declare";
 import { Crumbs } from "../ui/Crumbs";
 import { Empty } from "../ui/Empty";
 import { EndOfLife } from "../ui/EndOfLife";
@@ -329,28 +329,21 @@ export function Branches() {
         </Wide>
       )}
 
-      <Declare
-        title={`Edit ${editing}`}
-        open={editing !== ""}
+      <RenameDrawer
+        editing={editing}
         onClose={() => setEditing("")}
-        onSubmit={() => amend.mutate()}
-        error={amend.error}
-        busy={amend.isPending || renameTo.trim() === ""}
-        ok="Save"
+        save={amend}
+        ready={renameTo.trim() !== ""}
         hint="Locked once a published document names it."
-      >
-        <Field
-          label="Name"
-          value={renameTo}
-          onChange={setRenameTo}
-          placeholder="master"
-          hint="What builds and scans call it"
-        />
-      </Declare>
+        name={{
+          value: renameTo,
+          onChange: setRenameTo,
+          placeholder: "master",
+          hint: "What builds and scans call it",
+        }}
+      />
 
-      {/* A refused retirement is said. Without it the button re-enables and
-          the row stays, which reads as nothing having happened. */}
-      {retire.error != null && <Failed error={retire.error} what="That could not be retired." />}
+      <RetireRefused error={retire.error} />
 
       <Declare
         title="Add branch or tag"
