@@ -149,8 +149,10 @@ schema they build on each of the four engines, captured from the tag.
 | One database per engine climbs the releases, checked at each; it also holds the unstopped v0.9.0 to v0.10.0 and v0.11.0 to v0.12.0 upgrades to their declarations | It reaches both schemas on its way. The v0.10.0 check is followed by a rung, which fails on a scratch table it leaves behind |
 
 A file a release owns is a migration numbered after the previous release's last
-up to its own, or a declaration named for it. A release changing no schema owns
-no file and carries the previous release's last migration as its own.
+up to its own, or a declaration named for it. Only a Go file that is not a test
+is either, for the files owned and for the last migration alike. A release
+changing no schema owns no file and carries the previous release's last
+migration as its own.
 
 `make release-freeze` freezes a release on a branch from the head of `main`
 that lands before the tag. The release workflow runs `make release-check` and
@@ -171,7 +173,7 @@ refuses a tag whose release is not frozen, before building anything.
 | A migration numbered past the release's last | It would ship unheld |
 | Declarations named for a release nothing froze | The same, for tables a migration reads |
 | A record missing an engine's schema, or holding an empty one | The schema test cannot hold that engine |
-| A tag that is not `vX.Y.Z` or `vX.Y.Z-rc.N` | A candidate is held to the record of the release it precedes. Any other suffix is refused, so `git describe` output is never a release |
+| A tag that is not `vX.Y.Z` or `vX.Y.Z-rc.N`, each number without leading zeros | A candidate is held to the record of the release it precedes. Any other suffix is refused, so `git describe` output is never a release. One release has one spelling, so it is never frozen twice |
 
 | Freeze refuses, before writing anything | Reason |
 |---|---|
