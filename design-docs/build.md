@@ -172,7 +172,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | the interface's manifest, lockfile or source | `licenses` too |
 | the interface's route table | the Go tier too, since a Go test holds server links to it |
 | Go reaching no SQL | `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `subjected`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
-| a query, the schema, a migration, or the shared test harness | `reserved`, `test-all`, `check-engines` |
+| a query, the schema, a migration, the shared test harness, or Go importing `database/sql`, the query builder or the harness | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: the registering package, or a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |
 | a tool's module under `tools/` | the whole gate |
@@ -184,6 +184,8 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | A program chooses the tier | |
 | An unclassified path takes the whole gate | The makefile, container, chart, assets and fixtures |
 | A Go file is classified by its whole content | An edit anywhere in a file of queries can move a query |
+| SQL keywords match in upper case alone | In lower case they are Go's `select`, `strings.Join` and prose |
+| Importing `database/sql`, the query builder or the harness takes the engines tier | A builder predicate holds no keyword, and a test of a query in another file holds no SQL |
 | A file takes every tier it lands in | |
 | Every tier reachable alone scans for secrets | A pushed credential is in the remote's history |
 | Every target `check` runs is in some narrow tier, held by a test, the checks it runs beside the tests included; a target one of them depends on is made inside it | |
