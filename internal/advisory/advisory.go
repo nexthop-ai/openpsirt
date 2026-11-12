@@ -369,12 +369,6 @@ func summaryOf(issue *finding.Vulnerability, identifier string) string {
 	return identifier
 }
 
-// IsCVE says the issue is filed under a CVE rather than under an identifier
-// this deployment minted.
-func IsCVE(identifier string) bool {
-	return len(identifier) > 4 && identifier[:4] == "CVE-"
-}
-
 // namesOf is every identifier an issue answers to.
 //
 // Read for the document rather than for the screen: a reader searching by the

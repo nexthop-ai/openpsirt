@@ -323,3 +323,30 @@ func TestAnIssueIsAddedToAnAdvisoryWhateverItsCapitals(t *testing.T) {
 		}
 	})
 }
+
+// An agreement landing while the document is being assembled leaves the
+// stored bytes saying final, not draft: the issuance's transaction has just
+// confirmed an agreement stands on this edition, and the bytes sent say what
+// they are.
+func TestAnIssuanceAgreedToWhileBeingBuiltIsStoredAsFinal(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		advisory.Between(f.store, func() {
+			if _, err := advisory.NewStore(f.db.DB).Approve(t.Context(), f.approver, named); err != nil {
+				t.Fatalf("agreeing in between: %v", err)
+			}
+		})
+		recorded, err := f.store.Issued(t.Context(), f.who, issuer, named, "First.")
+		if err != nil {
+			t.Fatalf("the issuance: %v", err)
+		}
+		var doc advisory.Document
+		if err := json.Unmarshal([]byte(recorded.Document), &doc); err != nil {
+			t.Fatal(err)
+		}
+		if doc.Document.Tracking.Status != advisory.StatusFinal {
+			t.Errorf("the stored bytes say %q, want %q", doc.Document.Tracking.Status, advisory.StatusFinal)
+		}
+	})
+}

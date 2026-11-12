@@ -98,7 +98,7 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	// A CVE assigned later is another name for the same issue, and the issue
 	// is then filed under it. Where that has happened the document says so in
 	// the field a reader looks in.
-	if IsCVE(issue.Identifier) {
+	if finding.IsCVE(issue.Identifier) {
 		vulnerability.CVE = issue.Identifier
 	}
 	// And every other name it goes by, in the field that carries names. A
@@ -111,7 +111,7 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 			continue
 		}
 		vulnerability.IDs = append(vulnerability.IDs, Issued{SystemName: "alias", Text: name})
-		if vulnerability.CVE == "" && IsCVE(name) {
+		if vulnerability.CVE == "" && finding.IsCVE(name) {
 			vulnerability.CVE = name
 		}
 	}

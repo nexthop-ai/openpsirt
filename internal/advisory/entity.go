@@ -13,7 +13,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
@@ -21,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // ErrNoPrefix says no prefix is configured to mint an identifier from.
@@ -289,17 +289,15 @@ func seen(subject access.Subject) []int64 {
 	return products
 }
 
-// fold is an identifier as uniqueness and lookup ask it.
+// fold is an advisory's identifier as uniqueness and lookup ask it.
 //
-// Lower-cased and bounded, which is what the folded column beside an issue's
-// identifier holds — so one spelling answers for an advisory's own name and
-// for the issue names a narrowed list compares against. A name people type is
-// matched without regard to capitals; the stored value is normalized rather
-// than the comparison asked to fold, because the four engines default to
-// different collations and a normalized value compares the same under any of
-// them.
+// The fold an issue's identifier is stored under, so an advisory's own name
+// and an issue's compare by one rule. A name people type is matched without
+// regard to capitals; the stored value is normalized rather than the
+// comparison asked to fold, because the four engines default to different
+// collations and a normalized value compares the same under any of them.
 func fold(identifier string) string {
-	return bound.HeadRunes(strings.ToLower(strings.TrimSpace(identifier)), database.NameWidth)
+	return finding.FoldIdentifier(identifier)
 }
 
 // Add names an issue in a product as covered by the advisory.
@@ -613,13 +611,13 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 			JOIN "vulnerability" AS "c2" ON "c2"."id" = "ac2"."vulnerability_id"
 			JOIN "vulnerability" AS "v2" ON "v2"."issue_id" = "c2"."issue_id"
 			WHERE "ac2"."advisory_id" = "ad"."id" AND "ac2"."removed_at" IS NULL
-			  AND "v2"."identifier_folded" = ?)`, fold(over.Vulnerability))
+			  AND "v2"."identifier_folded" = ?)`, finding.FoldIdentifier(over.Vulnerability))
 	}
 	if over.Product != "" {
 		q = q.Where(`EXISTS (SELECT 1 FROM "advisory_issue" AS "ac3"
 			JOIN "product" AS "pd3" ON "pd3"."id" = "ac3"."product_id"
 			WHERE "ac3"."advisory_id" = "ad"."id" AND "ac3"."removed_at" IS NULL
-			  AND "pd3"."name" = ?)`, fold(over.Product))
+			  AND "pd3"."name" = ?)`, typedname.Matching(over.Product))
 	}
 
 	total, err := q.Clone().Count(ctx)

@@ -279,3 +279,19 @@ func TestThePackagePageIsAnsweredForTheInterfaceToo(t *testing.T) {
 		t.Errorf("a malformed identifier was given the address %q", got)
 	}
 }
+
+// A CVE is one in the form the CVE program issues. A name merely starting
+// with the prefix is not one, so it neither files an issue as a CVE nor fills
+// a published document's cve field, whose pattern a reader's validator holds
+// the whole document to.
+func TestOnlyAWellFormedCVEIsACVE(t *testing.T) {
+	for name, want := range map[string]bool{
+		"CVE-2024-1234": true, "CVE-2024-12345678": true,
+		"CVE-2024-XXXX": false, "CVE-PENDING": false, "CVE-2024-123": false,
+		"CVE-": false, "GHSA-xxxx-xxxx-xxxx": false, " CVE-2024-1234": false,
+	} {
+		if got := IsCVE(name); got != want {
+			t.Errorf("IsCVE(%q) = %v, want %v", name, got, want)
+		}
+	}
+}

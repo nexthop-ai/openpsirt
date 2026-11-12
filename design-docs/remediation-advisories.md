@@ -72,7 +72,7 @@ inherited issues reach the release note and the disposition register.
 
 | Rule | Reason |
 |---|---|
-| The agreement is asked before the issuance | The bytes sent must say what they are |
+| The agreement is asked before the issuance, inside its transaction, and the bytes stored say `final` | The bytes sent must say what they are; an agreement landing while the document was assembled leaves it saying draft |
 | How far a document travels is its distribution label, from whether anything it covers is held back; the editorial state is independent | A disclosed document can be unfinished, and an embargoed one ready |
 
 ## Editions and agreement

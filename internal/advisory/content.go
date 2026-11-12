@@ -171,10 +171,12 @@ func (s *Store) referencesTo(ctx context.Context,
 	out := make([]Reference, 0, len(held))
 	for _, one := range held {
 		// An address a scanner or a feed supplied, going into a document
-		// somebody else's tooling will follow. The same rule an address
-		// stored beside a decision goes through, for the stronger case: this one
-		// leaves the deployment.
-		if one.URL == "" || seen[one.URL] || markdown.Addressable(one.URL) != nil {
+		// somebody else's tooling will follow: absolute, on a scheme a document
+		// leaving the deployment links to, and passing the rule an address
+		// stored beside a decision goes through. A relative address, or one
+		// naming something inside this deployment, points nowhere outside it,
+		// and the standard's reference is a URI.
+		if one.URL == "" || seen[one.URL] || markdown.Autolinkable(one.URL) != nil {
 			continue
 		}
 		seen[one.URL] = true

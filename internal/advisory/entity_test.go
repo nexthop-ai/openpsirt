@@ -353,6 +353,13 @@ func TestTwoAdvisoriesMayCoverOneFlaw(t *testing.T) {
 		if total != 2 || len(rows) != 2 {
 			t.Errorf("%d of %d advisories cover it, want both", len(rows), total)
 		}
+		// However the issue's name is typed, by the fold its identifier is
+		// stored under.
+		typed := "  " + strings.ToLower(identifier) + " "
+		if _, total, err := f.store.List(t.Context(), f.who,
+			advisory.Covering{Vulnerability: typed}, 0, 0); err != nil || total != 2 {
+			t.Errorf("%d advisories cover %q: %v, want both", total, typed, err)
+		}
 	})
 }
 

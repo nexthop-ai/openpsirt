@@ -689,7 +689,13 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 			// The same address twice, which is what two reports pointing at
 			// one page is, and one a browser must not be handed.
 			finding.Reference{URL: "https://example.test/commit/abc", Kind: finding.Report},
-			finding.Reference{URL: "ms-msdt:calc", Kind: finding.Report})
+			finding.Reference{URL: "ms-msdt:calc", Kind: finding.Report},
+			// Addresses that point nowhere outside this deployment, or are no
+			// URI at all.
+			finding.Reference{URL: "www.vendor.example/advisory/1", Kind: finding.Report},
+			finding.Reference{URL: "issue:CVE-2026-1", Kind: finding.Report},
+			finding.Reference{URL: "/v1/findings/1", Kind: finding.Report},
+			finding.Reference{URL: "attachment:notes.txt", Kind: finding.Report})
 
 		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
@@ -1190,6 +1196,47 @@ func TestAReleaseTheRecordSaysWasNeverAffectedIsNotNamed(t *testing.T) {
 			if strings.Contains(id, fixtures.TagName) {
 				t.Errorf("the document names %q, a release never affected", id)
 			}
+		}
+	})
+}
+
+// A name of the issue that starts like a CVE and is not one stays among its
+// other names, and the document's cve field stays empty: the standard holds
+// that field to the CVE program's form, and a reader's validator refuses the
+// whole document over it.
+func TestANameShapedLikeACVEIsNotStatedAsOne(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
+			BuildIDs: []int64{f.master}, Component: carrier.Name, Severity: "high",
+			Summary: "The management socket answers before anyone authenticated.", Disclosed: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// As a scan file reports it, which is the one way such a name
+		// arrives: one typed by hand is refused unless it is well formed.
+		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: identifier, Aliases: []string{"CVE-2026-XXXX"}}}); err != nil {
+			t.Fatal(err)
+		}
+		// Filed under it, by the rule that files an issue under the name
+		// shaped like the best known scheme.
+		named := f.covering(t, [2]string{"sonic", "CVE-2026-XXXX"})
+		doc, err := f.store.ForAdvisory(ctx, f.who, issuer, named)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		one := doc.Vulnerabilities[0]
+		if one.CVE != "" {
+			t.Errorf("the document states %q as the CVE", one.CVE)
+		}
+		listed := false
+		for _, id := range one.IDs {
+			listed = listed || id.Text == "CVE-2026-XXXX"
+		}
+		if !listed {
+			t.Errorf("the name shaped like a CVE is not among the issue's names: %+v", one.IDs)
 		}
 	})
 }

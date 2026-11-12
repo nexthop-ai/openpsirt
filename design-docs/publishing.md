@@ -153,7 +153,7 @@ One document per issue per product, across every branch, tag and variant.
 | Flags | One per reason for products not affected |
 | Threats | What stops the flaw, where named, for a product not affected |
 | Remediations | For an affected product, no fix planned or none available, and what to do where named |
-| Identifiers | The CVE where the issue has one, and every other name by its prefix |
+| Identifiers | The CVE where the issue has one in the CVE program's form, and every other name by its prefix |
 | Notes | What the issue is, in the reporter's words, else its name |
 | References | The document's served address |
 | Distribution | TLP WHITE, the standard's word for TLP 2.0's CLEAR |

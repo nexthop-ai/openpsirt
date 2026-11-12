@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
@@ -68,14 +69,14 @@ func (g *Generator) vexDocument(product *catalog.Product, facts []placed, descri
 
 	tree, statuses := g.treeFor(product, facts)
 	vulnerability := advisory.Vulnerability{Status: statuses.status}
-	if advisory.IsCVE(issue.Issue) {
+	if finding.IsCVE(issue.Issue) {
 		vulnerability.CVE = issue.Issue
 	} else {
 		vulnerability.IDs = append(vulnerability.IDs,
 			advisory.Issued{SystemName: systemOf(issue.Issue), Text: issue.Issue})
 	}
 	for _, alias := range issue.Aliases {
-		if vulnerability.CVE == "" && advisory.IsCVE(alias) {
+		if vulnerability.CVE == "" && finding.IsCVE(alias) {
 			vulnerability.CVE = alias
 			continue
 		}
