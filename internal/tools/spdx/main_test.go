@@ -130,7 +130,7 @@ func TestFixingWritesNothingThroughASymbolicLink(t *testing.T) {
 	if len(faults) != 0 || examined != 1 || written != 1 {
 		t.Errorf("faults %v, examined %d, written %d; want the regular file alone stamped", faults, examined, written)
 	}
-	if body, _ := os.ReadFile(outside); string(body) != "echo outside\n" {
+	if body, _ := os.ReadFile(outside); string(body) != "echo outside\n" { //nolint:gosec // G304: a file this test wrote in its own directory
 		t.Errorf("the file a link points to was rewritten:\n%s", body)
 	}
 	if body, _ := os.ReadFile("run.sh"); !strings.Contains(string(body), "SPDX-License-Identifier") {
