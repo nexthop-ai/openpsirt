@@ -22,11 +22,10 @@ import (
 // otherwise be skipped or written twice.
 //
 // Read only, and the one transaction a request makes outside InTransaction;
-// migrations run their own. It writes nothing,
-// so nothing certifies it at COMMIT and it has no race to lose; and what fn
-// does with each statement's rows has usually left the process by the time
-// any later statement could fail, so it cannot be run again. It ends by
-// rolling back.
+// migrations run their own. It writes nothing, so nothing certifies it at
+// COMMIT and it has no race to lose; and what fn does with each statement's
+// rows has usually left the process by the time any later statement could
+// fail, so it cannot be run again. It ends by rolling back.
 //
 // Every engine takes the same options. SQLite begins a read-only transaction
 // deferred, never with the write lock every other transaction takes as it
@@ -37,6 +36,9 @@ import (
 // long as the file, so on PostgreSQL a server's bound on a session idle inside
 // a transaction, or on a transaction's length, would end it partway through.
 // Both are lifted for the snapshot alone, and fn's context bounds it instead.
+// MySQL and MariaDB end any session idle past wait_timeout, inside a
+// transaction or not; its default of eight hours is far past any export's
+// ceiling, and it is left as the server sets it.
 func Snapshot(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) error) error {
 	if tx, inside := db.(bun.Tx); inside {
 		// Already inside a transaction, which is a view of its own.
