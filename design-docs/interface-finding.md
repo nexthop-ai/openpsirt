@@ -135,7 +135,7 @@ filter box past a dozen. It reads back "59 of 62, three left open under X".
 |---|---|
 | The filter narrows what the group checkbox acts on | It decides what a decision covers |
 | The count beside the name is read off the same rows, and a consumer matching nothing is not drawn | The number says what the click does |
-| The read-back counts only excluded locations still listed; one decided elsewhere since leaves the count | It states what the decision covers |
+| The read-back counts only excluded locations still listed, and the decision names its occurrences only where one listed is excluded; one decided elsewhere since narrows nothing | A decision naming today's rows covers no occurrence the fold gains later |
 
 ## The reach sheet
 

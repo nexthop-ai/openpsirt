@@ -9,7 +9,7 @@ import { unwrap, whichOf } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
 import { labeled, reasonOffered, reasonsFor, type Justification } from "./Outcome";
-import { Covering, consumersOf, type Sitting } from "./Covering";
+import { Covering, consumersOf, namedOccurrences, type Sitting } from "./Covering";
 import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
 import { Review, type Other, type Plan } from "./Review";
@@ -511,6 +511,7 @@ export function Decide({
   const ready = waiting === null;
 
   function body() {
+    const named = namedOccurrences(open, excluded);
     return {
       outcome: outcome as OneAtATime,
       // Narrowed rather than asserted: submit is disabled until one is
@@ -522,7 +523,7 @@ export function Decide({
       ...(needsFixedVersion ? { fixed_version: fixedVersion.trim() } : {}),
       ...(needsLanding ? { committed_to: lands } : {}),
       reasoning,
-      ...(excluded.size > 0 ? { occurrences: covering.map((p) => p.occurrence) } : {}),
+      ...(named ? { occurrences: named } : {}),
       ...(extending ? { extends: extending.decisionId } : {}),
       ...(prefill?.fromStatement ? { from_statement: prefill.fromStatement } : {}),
     };

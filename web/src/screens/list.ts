@@ -158,14 +158,14 @@ export function widened(path: string, params: URLSearchParams): string {
 // What qualifies the component a subtree starts at. Each belongs to the name it
 // qualifies: kept after that name changes, it asks for the new name at the old
 // one's version.
-export const BENEATH_PARTS = ["beneath_version", "beneath_ecosystem", "beneath_namespace"] as const;
+const BENEATH_PARTS = ["beneath_version", "beneath_ecosystem", "beneath_namespace"] as const;
 
 // Every parameter naming a subtree: either root, by name or by package
 // identifier, and what qualifies the name. The server takes one root.
-const SUBTREE = ["beneath", "beneath_purl", ...BENEATH_PARTS] as const;
+export const SUBTREE = ["beneath", "beneath_purl", ...BENEATH_PARTS] as const;
 
 // The query without the named filters.
-function without<Q extends object, K extends string>(query: Q, keys: readonly K[]): Omit<Q, K> {
+function omitting<Q extends object, K extends string>(query: Q, keys: readonly K[]): Omit<Q, K> {
   const dropped: readonly string[] = keys;
   return Object.fromEntries(
     Object.entries(query).filter(([key]) => !dropped.includes(key)),
@@ -550,7 +550,7 @@ export function listQuery(params: URLSearchParams) {
 // left in the address, so switching a product off does not silently narrow by
 // something the reader can no longer see or clear.
 export function acrossProducts(query: ReturnType<typeof listQuery>) {
-  return without(query, [...SUBTREE, "differs", "across_variants"] as const);
+  return omitting(query, [...SUBTREE, "differs", "across_variants"] as const);
 }
 
 // What is specific to a variant is a question about one of them, so the
@@ -559,14 +559,14 @@ export function acrossProducts(query: ReturnType<typeof listQuery>) {
 // variant it was about is widened away narrows nothing and refuses the list.
 export function withinVariant(query: ReturnType<typeof listQuery>, named: boolean) {
   if (named || query.across_variants !== "only") return query;
-  return without(query, ["across_variants"] as const);
+  return omitting(query, ["across_variants"] as const);
 }
 
 // A subtree is a walk over one build's edges, and the server refuses it over a
 // selection naming anything else. Dropped where the selection is not one
 // build, for the reason the variant's filter is dropped above.
 export function withinBuild(query: ReturnType<typeof listQuery>, oneBuild: boolean) {
-  return oneBuild ? query : without(query, SUBTREE);
+  return oneBuild ? query : omitting(query, SUBTREE);
 }
 
 // Where a list is asked: the product, branch and variant its selection names,

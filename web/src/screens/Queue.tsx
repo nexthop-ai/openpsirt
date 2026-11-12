@@ -189,7 +189,7 @@ export function Queue() {
             through. There is no file of what is to re-affirm, so that tab
             offers none rather than another list under its heading. */}
         {!reaffirm && (
-          <span style={{ marginLeft: "auto" }}>
+          <span className="noprint" style={{ marginLeft: "auto" }}>
             <Downloads href={file} />
           </span>
         )}

@@ -24,6 +24,13 @@ describe("a screen head on paper", () => {
     expect(found).toEqual({ examined: 2, found: [] });
   });
 
+  it("reports an action drawn only on a condition, and passes one marked noprint", () => {
+    const found = read(`const x = <div className="screen-head"><h2>T</h2>
+      {ok && (<span><button>Go</button></span>)}
+      {ok ? <span className="noprint"><a href="/">CSV</a></span> : null}</div>;`);
+    expect(found).toEqual({ examined: 2, found: ["x.tsx:2"] });
+  });
+
   it("reports a print rule hiding every span under a head", () => {
     expect(hiddenByPosition(`.tabs2, .screen-head > span { display: none !important; }`)).toEqual([
       ".screen-head > span",

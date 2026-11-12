@@ -11,7 +11,8 @@ import { Unread } from "../ui/Reading";
 import type { Readable } from "../ui/Count";
 import { called, identifiersIn, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
 import { useState } from "react";
-import { BENEATH_PARTS, sentFor, validFilter, withoutInvalid, type ListScope } from "./list";
+import { SUBTREE, sentFor, validFilter, withoutInvalid, type ListScope } from "./list";
+import { BUMP_FILTERS } from "./FindingsViews";
 // The findings list's filters, apart from the list itself.
 //
 // Everything the server can narrow by is here, named for what it asks, each
@@ -353,12 +354,12 @@ export function activeFilters(
   add("purl", "Package", at("purl"));
   each("declared_as", "Producer said", DECLARED_AS);
   add("under", "Inside container", at("under"));
-  // With what qualifies it, which goes when the chip does.
+  // With what qualifies it, and any other root, which go when the chip does.
   add(
     "beneath",
     "At or under",
     at("beneath") && [at("beneath"), at("beneath_version")].filter(Boolean).join(" "),
-    [["beneath", ""], ...BENEATH_PARTS.map((part): [string, string] => [part, ""])],
+    SUBTREE.map((part): [string, string] => [part, ""]),
   );
   // One root is sent, and a component names the narrower.
   if (!at("beneath")) add("beneath_purl", "At or under", at("beneath_purl"));
@@ -938,4 +939,22 @@ export function Narrowed({
       )}
     </div>
   );
+}
+
+// The filters the by-bump view can apply, by the key their chip carries.
+const BUMPABLE = new Set<string>(Object.keys(BUMP_FILTERS));
+
+// The filters in force that the by-bump view cannot apply, as their chips name
+// them. A bump has no occurrence, no deadline and no assignee, so a filter
+// asking about one has no row there to narrow; the filters it does take take
+// one value each, so a second value is named too. A filter the selection drops
+// is in force nowhere and is not named.
+export function unbumped(asked: URLSearchParams, scope: ListScope): string[] {
+  const chips = activeFilters(asked, undefined, scope);
+  return [
+    ...chips.filter((each) => !BUMPABLE.has(each.key)).map((each) => each.label),
+    ...chips
+      .filter((each) => BUMPABLE.has(each.key) && asked.getAll(each.key).length > 1)
+      .map((each) => each.label + " past the first"),
+  ];
 }
