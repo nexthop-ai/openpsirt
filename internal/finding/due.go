@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -120,6 +121,10 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 	}
 }
 
+// noVersionToTake is each state in which upstream offers no version to take.
+// A list asks it of every occurrence in SQL, so the two read one set.
+var noVersionToTake = []FixState{NoFix, WontFix}
+
 // Closable reports whether anything upstream would close a finding in this
 // state, which is what makes a deadline on it meetable.
 //
@@ -136,12 +141,7 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // and it is the direction that loses a deadline somebody could have met. So an
 // unstated state stays on the clock.
 func Closable(state FixState) bool {
-	switch state {
-	case NoFix, WontFix:
-		return false
-	default:
-		return true
-	}
+	return !slices.Contains(noVersionToTake, state)
 }
 
 // Clocked is whether a finding in this state carries a deadline at all.

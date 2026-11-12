@@ -163,10 +163,6 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			return fmt.Errorf("read how much one action may write: %w", err)
 		}
 
-		// Where each added build holds the flaw's subject is read here: a
-		// build that stopped shipping the component since the early check is
-		// refused rather than given a finding under its root.
-
 		// Widening first. A build added and then immediately closed by the
 		// same call is not something to guard against — the two sets are
 		// disjoint by construction — and doing the opening first means a
@@ -176,6 +172,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			if here[build] {
 				continue
 			}
+			// Resolved again inside the transaction: a build that stopped
+			// shipping the component since the early check is refused rather
+			// than given a finding under its root.
 			componentID, name, err := likeIn(ctx, tx, build, &rows[0])
 			if err != nil {
 				return err

@@ -104,11 +104,13 @@ func publishedPurlsV0130(ctx context.Context, tx bun.Tx, cleaned map[string]stri
 	if len(cleaned) == 0 {
 		return nil
 	}
-	type swap struct{ from, to string }
-	swaps := make([]swap, 0, len(cleaned))
+	// No quoted string begins another, so the order the pairs are tried in
+	// changes nothing.
+	swaps := make([]string, 0, 2*len(cleaned))
 	for from, to := range cleaned {
-		swaps = append(swaps, swap{jsonStringV0130(from), jsonStringV0130(to)})
+		swaps = append(swaps, jsonStringV0130(from), jsonStringV0130(to))
 	}
+	replacer := strings.NewReplacer(swaps...)
 	for after := int64(0); ; {
 		type held struct {
 			id       int64
@@ -129,10 +131,7 @@ func publishedPurlsV0130(ctx context.Context, tx bun.Tx, cleaned map[string]stri
 			}
 			read++
 			after = row.id
-			document := row.document
-			for _, s := range swaps {
-				document = strings.ReplaceAll(document, s.from, s.to)
-			}
+			document := replacer.Replace(row.document)
 			if document != row.document {
 				found = append(found, held{id: row.id, document: document})
 			}

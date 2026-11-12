@@ -844,8 +844,8 @@ func groupDecorations(q *bun.SelectQuery) *bun.SelectQuery {
 		// one state exploitation puts back on it (Clocked), so a reason for
 		// no deadline is asked of every occurrence rather than of the ends
 		// of an order the words happen to sort in.
-		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" IN (?, ?) THEN 0 ELSE 1 END) AS "closable_any"`,
-			NoFix, WontFix).
+		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" IN (?) THEN 0 ELSE 1 END) AS "closable_any"`,
+			bun.List(noVersionToTake)).
 		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" = ? THEN 1 ELSE 0 END) AS "wont_fix_any"`, WontFix).
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
