@@ -87,6 +87,30 @@ describe("where a finding sits in the list it was opened from", () => {
     expect(next.searchParams.get("from")).toContain("across=1");
   });
 
+  it("finds itself across products by its product as well", async () => {
+    serve((path) =>
+      path === "/v1/findings"
+        ? {
+            data: {
+              items: [
+                { ...row("CVE-2026-0001"), product: "edgeos" },
+                { ...row("CVE-2026-0002"), product: "edgeos" },
+                { ...row("CVE-2026-0002"), product: "sonic" },
+                { ...row("CVE-2026-0003"), product: "edgeos" },
+              ],
+              total: 4,
+            },
+          }
+        : undefined,
+    );
+    mount.render(screen(<Walk walking from="state=undecided&across=1" />));
+    await settle();
+    expect(seen?.at).toBe(2);
+    expect(seen?.previous?.row.product).toBe("edgeos");
+    expect(seen?.previous?.row.vulnerability).toBe("CVE-2026-0002");
+    expect(seen?.next?.row.vulnerability).toBe("CVE-2026-0003");
+  });
+
   // The page the findings list drew under an address, cached where the list
   // caches it.
   function listed(from: string, items: ReturnType<typeof row>[], total: number) {

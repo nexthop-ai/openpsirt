@@ -39,6 +39,28 @@ describe("the change history on the audit log", () => {
     expect(mount.host().textContent).not.toContain("Change history");
   });
 
+  it("stays drawn for an auditor over a period with no changes, saying so", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: false,
+            audits: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<AuditLog />, "/audit-log"));
+    await settle();
+    expect(mount.host().textContent).toContain("Change history");
+    expect(mount.host().textContent).toContain("No changes over this period");
+  });
+
   it("never asks for more rows than the route answers", async () => {
     const asked: number[] = [];
     serve((path, init) => {

@@ -285,7 +285,7 @@ describe("a chip and the by-upgrade list", () => {
   });
 });
 
-describe("a chip and the by-upgrade list", () => {
+describe("what the by-upgrade list says it cannot apply", () => {
   it("names only filters in force over the selection as ones it cannot apply", () => {
     const params = new URLSearchParams("beneath=openssl&state=undecided&state=affected");
     const oneBuild = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };

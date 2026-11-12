@@ -12,8 +12,8 @@ import type { Row, withinVariant } from "./list";
 export const NAMED_AT_ONCE = 2000;
 
 // The reads a decision on the findings list makes stale. The view counts are
-// held for five minutes, and two of them are not under the `findings` prefix,
-// so each is named.
+// held for five minutes and not all sit under the `findings` prefix, so each
+// is named.
 const listReads = ["findings", "findings-by-component", "planned-upgrades", "holdings"];
 
 // useRereadList reads the findings list's own reads again.
