@@ -211,6 +211,15 @@ type unreadable struct {
 func (u unreadable) Error() string { return u.err.Error() }
 func (u unreadable) Unwrap() error { return u.err }
 
+// local is a failure of this deployment during a pass, its database or its
+// lease, and says nothing about the publisher. The pass records how far it read
+// and leaves the supplier due, and records nothing of the failure against the
+// publisher.
+type local struct{ err error }
+
+func (l local) Error() string { return l.err.Error() }
+func (l local) Unwrap() error { return l.err }
+
 // From reads one supplier and records what is about a component this product
 // ships.
 //
@@ -255,7 +264,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, feed Feed) (Taken
 	// that arrives during it is matched by the next one.
 	ships, err := f.shipped(ctx, feed.ProductID)
 	if err != nil {
-		return took, err
+		return took, local{err}
 	}
 
 	sums := &digests{}
@@ -311,6 +320,8 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, feed Feed) (Taken
 			}
 		case ctx.Err() != nil:
 			return took, nil
+		case errors.As(err, new(local)):
+			return took, err
 		case err != nil:
 			// The publisher could not be reached. The mark stops here: moved
 			// past, everything behind it would be skipped without having been
@@ -412,7 +423,7 @@ func (f *Fetcher) kept(ctx context.Context) (bool, error) {
 	}
 	mine, err := f.Keep(ctx)
 	if err != nil {
-		return false, fmt.Errorf("keep the lease on reading what suppliers publish: %w", err)
+		return false, local{fmt.Errorf("keep the lease on reading what suppliers publish: %w", err)}
 	}
 	return mine, nil
 }
@@ -776,8 +787,11 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one 
 			}, statements)
 		return err
 	})
-	if err != nil {
+	switch {
+	case errors.Is(err, errWithdrawn):
 		return 0, err
+	case err != nil:
+		return 0, local{err}
 	}
 	return recorded, nil
 }
@@ -794,11 +808,14 @@ func (f *Fetcher) turnedAway(ctx context.Context, by access.Subject, feed Feed, 
 	if !got.whole {
 		return nil
 	}
-	return finding.NewStore(f.db).TurnedAway(ctx, by, feed.ProductID, finding.Supplied{
+	if err := finding.NewStore(f.db).TurnedAway(ctx, by, feed.ProductID, finding.Supplied{
 		Source: finding.FromAdvisory, Publisher: got.publisher, Identifier: got.identifier,
 		Document: one.address,
 		Arrived:  &finding.Arrival{FeedID: feed.ID, Digest: got.digest},
-	}, refused.Error())
+	}, refused.Error()); err != nil {
+		return local{err}
+	}
+	return nil
 }
 
 // mostSumBytes bounds a digest file. One line holding a digest and a file name
@@ -1057,13 +1074,13 @@ func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string
 			return nil, answered
 		case res.StatusCode == http.StatusUnauthorized, res.StatusCode == http.StatusForbidden:
 			return nil, unreadable{err: answered, barred: true}
-		case res.StatusCode >= 400:
-			// A refusal that names this one address is about the document. A
-			// publisher's listing still naming a withdrawn advisory is the
-			// ordinary case.
+		default:
+			// Any other answer names this one address and is about the
+			// document: a refusal, a success with nothing to read, or a
+			// redirect naming nowhere. A publisher's listing still naming a
+			// withdrawn advisory is the ordinary case.
 			return nil, unreadable{err: answered}
 		}
-		return nil, answered
 	}
 	body, err := io.ReadAll(io.LimitReader(res.Body, most+1))
 	if err != nil {

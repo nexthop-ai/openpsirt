@@ -4,10 +4,14 @@
 package supplier_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
 
 // A publisher's content delivery network answering a rate limit, a timeout or
@@ -216,6 +220,58 @@ func TestAListingAddressThatMakesNoRequestDoesNotStopTheOthers(t *testing.T) {
 		}
 		if took.Documents != 1 {
 			t.Errorf("read %+v, want the document the other listing names", took)
+		}
+	})
+}
+
+// A document answered with a success holding nothing, or a redirect naming
+// nowhere, is answered that way on every pass. It is stepped over like a
+// refusal, so it never holds the mark.
+func TestADocumentAnsweredWithNothingToReadIsSteppedOver(t *testing.T) {
+	for _, code := range []int{http.StatusNoContent, http.StatusMultipleChoices} {
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			shipping(t, func(t *testing.T, f *ships) {
+				ctx := t.Context()
+				p := serving(t)
+				p.publishes("/2026/EL-47.json", "2026-09-20T00:00:00Z", "")
+				p.failing["/2026/EL-47.json"] = code
+				p.publishes("/2026/EL-48.json", "2026-09-21T00:00:00Z",
+					advisory("EL-2026-0048", "libnl-3-200", "3.7.1", "CVE-2026-5208"))
+
+				took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if took.Refused != 1 || took.Documents != 1 {
+					t.Errorf("read %+v, want the document answered %d stepped over", took, code)
+				}
+			})
+		})
+	}
+}
+
+// A failure of this deployment during a pass, its lease here, is not the
+// publisher failing: nothing is recorded against the supplier and it stays due.
+func TestAFailureHereIsNotRecordedAgainstTheSupplier(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-49.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0049", "libnl-3-200", "3.7.1", "CVE-2026-5209"))
+		store, row, pass := passOver(t, f, p, "test")
+		fetch := fetching(t, f, p)
+		fetch.Keep = func(context.Context) (bool, error) { return false, errors.New("connection reset") }
+		supplier.FetchForTest(pass, fetch)
+
+		if _, err := supplier.FromForTest(ctx, pass, *row); err == nil {
+			t.Fatal("a pass whose lease could not be asked for reported nothing")
+		}
+		rows, err := store.For(ctx, f.by, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].Failed != "" || rows[0].FetchedAt != nil {
+			t.Errorf("a failure here was recorded against the supplier: %+v", rows)
 		}
 	})
 }

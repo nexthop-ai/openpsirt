@@ -5,6 +5,7 @@ package supplier
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -211,6 +212,16 @@ func (p *Pass) from(ctx context.Context, feed Feed) (Taken, error) {
 	if took.Barred > 0 {
 		barred = refusal.Errorf("that publisher refused %d of what it lists, the last %s",
 			took.Barred, took.BarredBy)
+	}
+	// A failure of this deployment says nothing about the publisher: the mark
+	// moves as far as the pass read, the supplier stays due, and the error is
+	// logged, never recorded as what the publisher did.
+	if errors.As(err, new(local)) {
+		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark, barred); marked != nil {
+			p.logger.Error("recording how far a supplier was read",
+				"supplier", feed.Display, "error", marked)
+		}
+		return took, err
 	}
 	if cut || (took.Filled && err == nil) {
 		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark,
