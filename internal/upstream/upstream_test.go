@@ -627,6 +627,69 @@ func TestStoppingTrustingAnUpstreamIsSaidAsThatToADecisionCitingIt(t *testing.T)
 	})
 }
 
+// A supplier saying a cited statement again, word for word, in another of its
+// documents leaves the decision citing it untold, and saying something else
+// tells it.
+func TestASupplierRepeatingACitedStatementElsewhereTellsNobody(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		claim := *w.statement(ownBuild, "")
+		if err := w.Access.GrantRole(ctx, w.proposer.ID, w.fork.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		record := func(name string, month time.Month, status string) {
+			t.Helper()
+			at := time.Date(2026, month, 1, 0, 0, 0, 0, time.UTC)
+			said := claim
+			said.Status = status
+			if _, _, err := w.findings.RecordStatements(ctx, w.admin, w.fork.ID, finding.Supplied{
+				Source: finding.FromVex, Identifier: "https://supplier.test/vex/" + name,
+				Publisher: "Supplier", Document: name + ".json", Digest: name, SaidAt: &at,
+			}, []finding.Statement{said}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		told := func() int {
+			t.Helper()
+			if _, _, err := notify.NewWatch(w.DB.DB, slog.New(slog.DiscardHandler)).Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			rows, _, err := notify.NewStore(w.DB.DB).Waiting(ctx, w.proposer, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			n := 0
+			for _, row := range rows {
+				if row.Kind == notify.StatementRevised && row.ClearedAt == nil {
+					n++
+				}
+			}
+			return n
+		}
+		record("march", time.March, claim.Status)
+		var cited int64
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"id"`).
+			Where(`"product_id" = ? AND "source" = ? AND "document" = ?`, w.fork.ID, finding.FromVex, "march.json").
+			Scan(ctx, &cited); err != nil {
+			t.Fatal(err)
+		}
+		w.decisionCiting(w.forkBuild, ownBuild, libnl.Name, triage.NotApplicable,
+			triage.CodeNotInExecutePath, &cited)
+
+		record("june", time.June, claim.Status)
+		if got := told(); got != 0 {
+			t.Errorf("the supplier repeating the statement in another document told the decision %d times", got)
+		}
+		record("july", time.July, "affected")
+		if got := told(); got != 1 {
+			t.Errorf("the supplier saying something else told the decision %d times, want once", got)
+		}
+	})
+}
+
 // A document that does not match the digest served beside it is not taken,
 // from an upstream that signs nothing, so only the digest stands in the way.
 func TestADocumentNotMatchingItsDigestIsNotTaken(t *testing.T) {

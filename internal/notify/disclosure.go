@@ -101,16 +101,18 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Where(`"de"."state" = ?`, triage.Approved).
 		// And the statement it cited is no longer what that publisher says.
 		Where(`"ss"."superseded_at" IS NOT NULL`).
-		// An upstream's statement the upstream says again, word for word, is
-		// current again: trusting an upstream once more records what it says
-		// as new rows, and the ground under the decision has not moved.
-		Where(`NOT ("ss"."source" = ? AND EXISTS (SELECT 1 FROM "received_vex_statement" AS "sn"
+		// A statement its publisher says again, word for word, in a row in
+		// force is current again, and the ground under the decision has not
+		// moved: another document of theirs overtaking it with the same
+		// claim records a row of its own, as trusting an upstream once more
+		// does.
+		Where(`NOT EXISTS (SELECT 1 FROM "received_vex_statement" AS "sn"
 			WHERE "sn"."product_id" = "ss"."product_id" AND "sn"."publisher" = "ss"."publisher"
 			  AND "sn"."source" = "ss"."source" AND "sn"."vulnerability" = "ss"."vulnerability"
 			  AND "sn"."component" = "ss"."component" AND "sn"."about" = "ss"."about"
 			  AND "sn"."status" = "ss"."status"
 			  AND COALESCE("sn"."justification", '') = COALESCE("ss"."justification", '')
-			  AND "sn"."superseded_at" IS NULL))`, finding.FromUpstream).
+			  AND "sn"."superseded_at" IS NULL)`).
 		// Whether it was set aside because the product stopped trusting its
 		// upstream, which is said as that rather than as the upstream
 		// changing its mind.
