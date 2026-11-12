@@ -294,7 +294,9 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 
 // A commitment carries no visibility of its own, so it is read through what it
 // is about: one over undisclosed work is told to nobody who may not read that
-// work, whether a decision argued for it or not.
+// work. Without a decision that is its fold's findings in the build; argued by
+// a decision it is every occurrence the decision covers, whatever the build's
+// own findings are, a case the reader was brought into counting as reading it.
 func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 	for _, argued := range []bool{false, true} {
 		name := "without a decision"
@@ -306,12 +308,11 @@ func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 				ctx := t.Context()
 				f.shipped(t, twoConsumers())
 				f.foundOnLibnl(t)
-				if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-					Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(ctx); err != nil {
-					t.Fatal(err)
-				}
 				var decisionID *int64
 				if argued {
+					// The build's findings stay disclosed; the decision
+					// covers an undisclosed occurrence, so only the
+					// decision withholds the commitment.
 					by := f.somebodyElse(t)
 					id := decisionSaying(t, f.db, by, "upgrade-needed")
 					f.decision(t, decisionRow{
@@ -319,6 +320,9 @@ func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 						Occurrence: "libnl", State: "approved", Visibility: string(access.Private),
 					})
 					decisionID = &id
+				} else if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+					Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(ctx); err != nil {
+					t.Fatal(err)
 				}
 				committer := f.someoneElse(t, access.PrivateTriage)
 				if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
@@ -327,14 +331,23 @@ func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				for _, c := range []struct {
+				cases := []struct {
 					what string
 					who  access.Subject
 					want int
 				}{
 					{"a reader of disclosed work alone", f.holding(t, access.PublicRead), 0},
 					{"a reader of both", f.holding(t, access.PublicRead, access.PrivateRead), 1},
-				} {
+				}
+				if argued {
+					cases = append(cases, struct {
+						what string
+						who  access.Subject
+						want int
+					}{"somebody on the issue's case", f.holding(t, access.PublicRead).OnCases(
+						map[int64][]int64{f.productID: {f.issue(t, "CVE-2026-1")}}), 1})
+				}
+				for _, c := range cases {
 					planned, err := f.store.PlannedUpgradesFor(ctx, c.who, f.build)
 					if err != nil {
 						t.Fatal(err)

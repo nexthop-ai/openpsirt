@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -265,7 +266,7 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this build is waiting on: %w", err)
 	}
-	if rows, err = s.toldOf(ctx, buildID, visible, rows); err != nil {
+	if rows, err = s.toldOf(ctx, subject, buildID, visible, rows); err != nil {
 		return nil, err
 	}
 	if len(rows) == 0 {
@@ -340,15 +341,17 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 	return planned, nil
 }
 
-// toldOf keeps the commitments a reader at these visibilities may be told of.
-// The commitment row carries no visibility, so it is read through what it is
-// about. One made by a decision is shown where every occurrence the decision
-// covers is at a visibility the reader holds, the test reading the decision
-// itself makes. One without a decision is shown where some finding at its
-// fold in this build, open or closed, is: a commitment whose findings have all
-// closed has landed, and stays readable to whoever could read them.
-func (s *Store) toldOf(ctx context.Context, buildID int64, visible []access.Visibility,
-	rows []Upgrade) ([]Upgrade, error) {
+// toldOf keeps the commitments a reader may be told of, visible being what
+// they read in the build's product. The commitment row carries no visibility,
+// so it is read through what it is about. One made by a decision is shown
+// where the reader reads every occurrence the decision covers, each in its own
+// product and issue, a case they were brought into included: the test reading
+// the decision itself makes. One without a decision is shown where some
+// finding at its fold in this build, open or closed, is visible: a commitment
+// whose findings have all closed has landed, and stays readable to whoever
+// could read them.
+func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int64,
+	visible []access.Visibility, rows []Upgrade) ([]Upgrade, error) {
 
 	var decisions []int64
 	var folds []string
@@ -361,17 +364,23 @@ func (s *Store) toldOf(ctx context.Context, buildID int64, visible []access.Visi
 	}
 	withheld := map[int64]bool{}
 	if len(decisions) > 0 {
-		var ids []int64
+		var covered []struct {
+			DecisionID      int64             `bun:"decision_id"`
+			ProductID       int64             `bun:"product_id"`
+			VulnerabilityID int64             `bun:"vulnerability_id"`
+			Visibility      access.Visibility `bun:"visibility"`
+		}
 		if err := s.db.NewSelect().
 			TableExpr(`"decision_occurrence" AS "de"`).
-			ColumnExpr(`DISTINCT "de"."decision_id"`).
+			ColumnExpr(`DISTINCT "de"."decision_id", "de"."product_id", "de"."vulnerability_id", "de"."visibility"`).
 			Where(`"de"."decision_id" IN (?)`, bun.List(decisions)).
-			Where(`"de"."visibility" NOT IN (?)`, bun.List(visible)).
-			Scan(ctx, &ids); err != nil {
-			return nil, fmt.Errorf("read which commitments argue about undisclosed work: %w", err)
+			Scan(ctx, &covered); err != nil {
+			return nil, fmt.Errorf("read what the commitments' decisions cover: %w", err)
 		}
-		for _, id := range ids {
-			withheld[id] = true
+		for _, row := range covered {
+			if !slices.Contains(access.VisibleOn(subject, row.ProductID, row.VulnerabilityID), row.Visibility) {
+				withheld[row.DecisionID] = true
+			}
 		}
 	}
 	seen := map[string]bool{}
