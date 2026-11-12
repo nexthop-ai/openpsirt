@@ -91,7 +91,7 @@ Each operation carries a structured statement of what it asks of a caller
 | The line in the description is rendered from the declaration | Two hand-written copies disagree |
 | The line states the scope and the roles, a scope the middleware enforces whatever roles are held coming after the roles | A pipeline key holding every listed role is not told it may call a person-only operation |
 | A declaration states whether it is a gate or narrowed | Each misread as the other hides a hole or invents one |
-| A test asks each gated operation as somebody holding none of its roles, and a 2xx fails it | |
+| A test asks each gated operation as somebody holding none of its roles, and any answer other than 400, 403, 404 or 422 fails it | A success, a redirect and a fault are all failures to refuse; the test sends no body, so an operation taking one refuses its shape first |
 | An operation declaring neither scope nor roles is refused by a gate | |
 | "Any signed-in person" and "any recognized credential" are two scopes | A pipeline key is not somebody; two operations take any credential, a key reading back the scans filed on a build it may upload to and their receipts |
 | The part of a declaration about the subject alone is enforced before any handler; a role on a product stays in the handler | The role needs the product resolved |
