@@ -211,7 +211,7 @@ export function CodeFindings() {
             </>
           )}
         </p>
-        <span style={{ marginLeft: "auto" }}>
+        <span style={{ marginLeft: "auto" }} className="noprint">
           {/* A suppression rule and a trend belong to one product. */}
           {!across && (
             <>
