@@ -640,13 +640,21 @@ const (
 	Off = "off"
 )
 
-// Switch reports whether a switch is on, answering fallback where it is unset.
+// Switch reports whether a switch is on, answering fallback where it is unset
+// or holds a word other than on and off, as Duration and Count read a value
+// they cannot as unset.
 func (s *Store) Switch(ctx context.Context, name string, fallback bool) (bool, error) {
 	value, set, err := s.Get(ctx, name)
 	if err != nil || !set {
 		return fallback, err
 	}
-	return value == On, nil
+	switch value {
+	case On:
+		return true, nil
+	case Off:
+		return false, nil
+	}
+	return fallback, nil
 }
 
 // Store reads and writes settings.

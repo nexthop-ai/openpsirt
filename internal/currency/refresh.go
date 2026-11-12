@@ -217,11 +217,7 @@ func leaseFor(interval time.Duration) time.Duration {
 
 // enabled reports whether this deployment has turned asking on.
 func (r *Refresher) enabled(ctx context.Context) (bool, error) {
-	value, set, err := setting.NewStore(r.db).Get(ctx, setting.UpstreamCurrency)
-	if err != nil {
-		return false, err
-	}
-	return set && value == setting.On, nil
+	return setting.NewStore(r.db).Switch(ctx, setting.UpstreamCurrency, false)
 }
 
 // stale is one component due a question.
@@ -593,10 +589,7 @@ const MostSummary = 300
 // clip shortens text to a bound, on a rune boundary, and trims what is left.
 func clip(text string, most int) string {
 	text = strings.Join(strings.Fields(bound.Text(text)), " ")
-	if len([]rune(text)) <= most {
-		return text
-	}
-	return strings.TrimSpace(string([]rune(text)[:most]))
+	return strings.TrimSpace(bound.HeadRunes(text, most))
 }
 
 // MostAddress bounds an address an index hands over.

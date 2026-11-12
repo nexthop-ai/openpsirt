@@ -21,6 +21,7 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 		paths = append(paths, r.URL.EscapedPath())
 		switch r.URL.Path {
 		case "/v1/vulns/CVE-2024-3094":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			_, _ = w.Write([]byte(`{"id":"CVE-2024-3094","published":"2024-03-29T16:51:12.588Z",` +
 				`"modified":"2026-11-05T10:31:12.351990229Z"}`))
 		case "/v1/vulns/CVE-2026-0500":
@@ -30,7 +31,11 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 		case "/v1/vulns/CVE-2026-0400":
 			w.WriteHeader(http.StatusBadRequest)
 		case "/v1/vulns/CVE-2026-0501":
+			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"CVE-2026-0501"}`))
+		case "/v1/vulns/CVE-2026-0200":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write([]byte(`<html>Sign in to continue</html>`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found"}`))
@@ -55,6 +60,7 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 		"CVE-2026-0500":  issuedate.ErrNotAnswering,
 		"CVE-2026-0403":  issuedate.ErrNotAnswering,
 		"CVE-2026-0400":  issuedate.ErrUnaskable,
+		"CVE-2026-0200":  issuedate.ErrNotAnswering,
 		"CVE-2026-0501":  issuedate.ErrUnknown,
 		"../admin":       issuedate.ErrUnaskable,
 		"CVE-1 2":        issuedate.ErrUnaskable,

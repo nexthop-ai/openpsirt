@@ -20,12 +20,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
@@ -104,6 +106,13 @@ func (o *OSV) Dates(ctx context.Context, name string) (Dates, error) {
 		// A proxy's 403 or anything else unexpected says nothing about the
 		// issue, so it stays due.
 		return Dates{}, fmt.Errorf("%w: %s answered %s", ErrNotAnswering, at, resp.Status)
+	}
+	// A page in place of a record is a proxy or a portal answering, not OSV,
+	// so the issue stays due; a record that fails to read is recorded.
+	if media, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type")); err != nil ||
+		media != "application/json" {
+		return Dates{}, fmt.Errorf("%w: %s answered %s, not a record", ErrNotAnswering, at,
+			bound.HeadRunes(bound.Text(resp.Header.Get("Content-Type")), 100))
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, mostBody+1))
 	if err != nil {
