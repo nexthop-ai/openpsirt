@@ -2023,7 +2023,7 @@ export interface paths {
          *
          *     Send-backs are counted for the deployment rather than per person: the record holds that a decision was sent back and not by whom, and the reason travels as a comment.
          *
-         *     Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
+         *     Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error. A narrowing to a team is the exception: from anybody but an administrator it is refused with 403.
          *
          *     Asked for neither a period nor a window, this is the last 90 days.
          *
@@ -19137,7 +19137,7 @@ export interface operations {
                 days?: number;
                 /** @description Limit to decisions made in one product, by name */
                 product?: string;
-                /** @description Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team */
+                /** @description Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists */
                 team?: string;
                 /** @description The most rows to return */
                 limit?: number;
@@ -19898,7 +19898,7 @@ export interface operations {
                 days?: number;
                 /** @description Limit to decisions made in one product, by name */
                 product?: string;
-                /** @description Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team */
+                /** @description Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists */
                 team?: string;
             };
             header?: never;

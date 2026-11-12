@@ -52,7 +52,7 @@ func registerEffort(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.Period
 		Product string `query:"product" doc:"Limit to decisions made in one product, by name"`
-		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team"`
+		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most rows to return"`
 		Offset  int    `query:"offset" minimum:"0" doc:"How many rows to skip, in the order the report is sorted"`
 	}) (*core.OverPeriod[SpentBody], error) {

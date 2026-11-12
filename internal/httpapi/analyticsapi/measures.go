@@ -74,13 +74,14 @@ func registerMeasures(api huma.API, in core.Deps) {
 			"holds that a decision was sent back and not by whom, and the reason travels as a " +
 			"comment.\n\n" +
 			"Narrowed to what you may read, like every count here — so two people asking get " +
-			"different answers rather than one of them getting an error.\n\n" +
+			"different answers rather than one of them getting an error. A narrowing to a team is " +
+			"the exception: from anybody but an administrator it is refused with 403.\n\n" +
 			"Asked for neither a period nor a window, this is the last 90 days.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.Period
 		Product string `query:"product" doc:"Limit to decisions made in one product, by name"`
-		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team"`
+		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists"`
 	}) (*struct{ Body MeasuresBody }, error) {
 		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
