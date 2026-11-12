@@ -320,6 +320,10 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 			Where(`"redacted_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
+			if stopped = ctx.Err(); stopped != nil {
+				// Stopped during the claim, which is not the row's fault.
+				break
+			}
 			failed++
 			unreadable(ctx, s.logger, row, err)
 			continue

@@ -10,7 +10,7 @@ import (
 )
 
 // Text is another program's bytes as text every engine stores: each run of
-// invalid bytes read as one U+FFFD and each NUL dropped. PostgreSQL refuses both in a text
+// invalid bytes read as one U+FFFD, then each NUL dropped. PostgreSQL refuses both in a text
 // column and MySQL and MariaDB refuse invalid UTF-8 in strict mode. On
 // PostgreSQL and SQLite the query builder fails a statement handed a string
 // holding a NUL, and on MySQL and MariaDB it drops the NUL.
@@ -18,8 +18,9 @@ func Text(s string) string {
 	if strings.IndexByte(s, 0) < 0 && !hasInvalid(s) {
 		return s
 	}
-	// NULs first, so one between two invalid bytes does not split their run.
-	return strings.ToValidUTF8(strings.ReplaceAll(s, "\x00", ""), "�")
+	// Invalid bytes first: a NUL dropped first could join the bytes either
+	// side of it into a character nobody wrote.
+	return strings.ReplaceAll(strings.ToValidUTF8(s, "�"), "\x00", "")
 }
 
 func hasInvalid(s string) bool { return strings.ToValidUTF8(s, "") != s }
@@ -73,27 +74,38 @@ func text(v reflect.Value) {
 		}
 	case reflect.Map:
 		keys := v.MapKeys()
-		if v.Type().Key().Kind() == reflect.String {
+		var held map[string]bool
+		if v.Type().Key().Kind() == reflect.String && slices.ContainsFunc(keys, needsRepair) {
 			// Sorted, so which of two keys repairing alike wins does not
 			// depend on the order a map happens to be walked in.
 			slices.SortFunc(keys, func(a, b reflect.Value) int { return strings.Compare(a.String(), b.String()) })
+			held = make(map[string]bool, len(keys))
+			for _, key := range keys {
+				held[key.String()] = true
+			}
 		}
 		for _, key := range keys {
 			value := repaired(v.MapIndex(key))
-			if key.Kind() != reflect.String || Text(key.String()) == key.String() {
+			if !needsRepair(key) {
 				v.SetMapIndex(key, value)
 				continue
 			}
 			// A key read the way its value is, or a repaired value no longer
 			// finds the entry a lookup by it should.
 			v.SetMapIndex(key, reflect.Value{})
-			fixed := reflect.ValueOf(Text(key.String())).Convert(key.Type())
-			if original(keys, fixed) {
+			fixed := Text(key.String())
+			// A key already there was valid, and keeps its own value.
+			if held[fixed] {
 				continue
 			}
-			v.SetMapIndex(fixed, value)
+			v.SetMapIndex(reflect.ValueOf(fixed).Convert(key.Type()), value)
 		}
 	}
+}
+
+// needsRepair says a map key is a string Text changes.
+func needsRepair(key reflect.Value) bool {
+	return key.Kind() == reflect.String && Text(key.String()) != key.String()
 }
 
 // repaired is a map's value with Text applied to what it holds. A map's values
@@ -109,16 +121,4 @@ func repaired(value reflect.Value) reflect.Value {
 	copied.Set(value)
 	text(copied)
 	return copied
-}
-
-// original says whether key was among the keys a map held before any was
-// repaired. A repaired key is valid, so one that was there already was valid
-// and keeps its own value.
-func original(keys []reflect.Value, key reflect.Value) bool {
-	for _, k := range keys {
-		if k.String() == key.String() {
-			return true
-		}
-	}
-	return false
 }

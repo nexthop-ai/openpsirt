@@ -217,3 +217,5 @@ not.
 | Rule | Reason |
 |---|---|
 | Uploads are not scanned for malware | Scanning belongs in front of the bucket, an operator's choice |
+| On a MySQL or MariaDB cluster, the look for a row whose commit was answered as failed can reach a node the commit has not, and the bytes are then removed under a committed row | The commit failing on the caller's side is rare, and the alternative keeps the bytes of every failed upload |
+| A database outage that fails an upload leaves its bytes, named in the log and by no row | The look for its row fails too, and removing them could remove a committed row's bytes |
