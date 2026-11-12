@@ -154,9 +154,12 @@ func TestTheSettingsTableIsWhatTheLoaderReads(t *testing.T) {
 }
 
 func TestEverySettingIsWrittenDown(t *testing.T) {
-	// Where a setting is read: every file in this package.
+	// Where a setting is read: every file in this package. Only these are
+	// read; a name elsewhere is one an operator is told about.
+	loaded := map[string]bool{}
 	reads := map[string]bool{}
 	for name := range loaderReads(t) {
+		loaded[name] = true
 		reads[name] = true
 	}
 	// Where one is named in a message, an API description or a field telling
@@ -226,19 +229,7 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 		}
 	}
 
-	var missing, invented []string
-	for name := range reads {
-		if !written[name] {
-			missing = append(missing, envPrefix+name)
-		}
-	}
-	for name := range written {
-		if !reads[name] {
-			invented = append(invented, envPrefix+name)
-		}
-	}
-	sort.Strings(missing)
-	sort.Strings(invented)
+	missing, invented := undocumented(reads, loaded, written)
 	if len(missing) > 0 {
 		t.Errorf("read and not documented, so an operator would have to find %s in the source:\n  %s",
 			plural(len(missing)), strings.Join(missing, "\n  "))
@@ -267,16 +258,47 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 	if len(set) == 0 {
 		t.Fatal("the chart sets no settings, so this checked nothing")
 	}
-	var ignored []string
-	for name := range set {
-		if !reads[name] {
-			ignored = append(ignored, envPrefix+name)
-		}
-	}
-	sort.Strings(ignored)
+	_, ignored := undocumented(nil, loaded, set)
 	if len(ignored) > 0 {
 		t.Errorf("set by the chart and read by nothing, so a cluster install carries %s and the process ignores it:\n  %s",
 			plural(len(ignored)), strings.Join(ignored, "\n  "))
+	}
+}
+
+// undocumented compares the names a page or chart writes with the program's.
+// Missing is every name the program reads or tells an operator to set that
+// the page does not write. Invented is every name the page writes that the
+// loader does not read: a name a message mentions is not read by mentioning
+// it.
+func undocumented(told, loaded, written map[string]bool) (missing, invented []string) {
+	for name := range told {
+		if !written[name] {
+			missing = append(missing, envPrefix+name)
+		}
+	}
+	for name := range written {
+		if !loaded[name] {
+			invented = append(invented, envPrefix+name)
+		}
+	}
+	sort.Strings(missing)
+	sort.Strings(invented)
+	return missing, invented
+}
+
+func TestASettingOnlyAMessageNamesIsNotRead(t *testing.T) {
+	told := map[string]bool{"READ": true, "MENTIONED": true}
+	loaded := map[string]bool{"READ": true}
+	missing, invented := undocumented(told, loaded, map[string]bool{"READ": true, "MENTIONED": true})
+	if len(missing) != 0 {
+		t.Errorf("reported %v missing, want nothing", missing)
+	}
+	if want := []string{envPrefix + "MENTIONED"}; !slices.Equal(invented, want) {
+		t.Errorf("reported %v invented, want %v", invented, want)
+	}
+	missing, invented = undocumented(told, loaded, map[string]bool{"READ": true})
+	if want := []string{envPrefix + "MENTIONED"}; !slices.Equal(missing, want) || len(invented) != 0 {
+		t.Errorf("reported %v missing and %v invented, want %v and nothing", missing, invented, want)
 	}
 }
 
