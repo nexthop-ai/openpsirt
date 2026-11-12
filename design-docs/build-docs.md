@@ -29,6 +29,9 @@ Built with mkdocs-material, published to GitHub Pages, sets versioned by `mike`
 |---|---|
 | The default is `latest` once a release carries it, and `main` until then | Unreleased documentation at the root describes a version nobody can install |
 | Every push to `main` resets the default | A default another run moved is put back |
+| A set is built in a job holding a read of the repository alone, and its pages branch pushed by a job that runs none of the build tools, only as commits on top of the published branch | The build tools come from pip; with the write beside them they could rewrite branches and tags |
+| A repository with no pages branch has its first set pushed as the whole branch | A fork or a new installation has published nothing |
+| The pushes of every set are fast-forwards of the branch its build started from, and a release's jobs share no concurrency group with the merge workflow | Two `mike` runs racing on one branch leave a version directory with no entry in the switcher; a newer run queued in a group cancels the one waiting there |
 
 ## Link check
 
