@@ -53,6 +53,22 @@ describe("how a stylesheet is read", () => {
     expect(() => cssRules(`.foo { color: red; &:hover { color: blue; } }`)).toThrow(/nested/);
   });
 
+  it("refuses a rule nested first inside another rule", () => {
+    expect(() => cssRules(`.foo { &:hover { color: blue; } }`)).toThrow(/nested/);
+    expect(() => cssRules(`.foo { & .x { position: fixed; } color: red; }`)).toThrow(/nested/);
+  });
+
+  it("refuses a rule nested inside an at-rule inside another rule", () => {
+    expect(() =>
+      cssRules(`.x { @media (max-width: 1px) { .y { color: red; } } color: blue; }`),
+    ).toThrow(/nested/);
+  });
+
+  it("reads a rule first inside an at-rule nested in another at-rule", () => {
+    const css = `@supports (display: grid) { @media (max-width: 780px) { .chip { padding: 0; } } }`;
+    expect(cssRules(css).map((rule: { selector: string }) => rule.selector)).toEqual([".chip"]);
+  });
+
   it("reads a rule inside an at-rule block without the block's prelude", () => {
     const css = `@media (max-width: 780px) {\n  .chip { padding: 0; }\n}`;
     expect(cssRules(css).map((rule: { selector: string }) => rule.selector)).toEqual([".chip"]);

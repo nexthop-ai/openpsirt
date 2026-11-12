@@ -55,6 +55,7 @@ Satisfies REQ-75.
 | A class this project defines that Tailwind also defines | Tailwind, imported wholesale, emits a utility for any recognized name, and wins for the properties it sets: `class="col fixed"` takes `position: fixed`. Every class the stylesheet defines is put to Tailwind's compiler, so a new utility is caught |
 | A rule that styles nothing | Matched against the whole source, since `col ${kind}` builds a modifier; it reports a name mentioned nowhere. Charting library names and the `language-` prefix are excluded |
 | A class on an element nothing styles | A label with no fill is invisible on a dark canvas. Names Tailwind emits are excluded by asking its compiler |
+| A rule nested inside another rule | Refused, wherever in its parent it sits: the reader takes innermost blocks, so the outer rule would go unread by every check here. A rule inside an at-rule's block is read |
 | A modifier whose bare rule draws a box | A modifier such as `.state.warn` whose own rule sets display, margin, padding, border or background, longhands included, styles every element carrying it, so a table chip draws as a callout. A web test reads every stylesheet |
 
 ## Whole-interface checks
