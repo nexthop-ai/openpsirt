@@ -20,9 +20,10 @@ import (
 // This package cannot use dbtest: dbtest builds the schema and the schema is
 // these migrations, and Go allows no such cycle. The migration lock's own test
 // is in the same position and opens a connection the same way.
-var resumableURLs = map[database.Engine]string{
-	database.MySQL:   "OPENPSIRT_TEST_MYSQL_URL",
-	database.MariaDB: "OPENPSIRT_TEST_MARIADB_URL",
+var serverURLs = map[database.Engine]string{
+	database.Postgres: "OPENPSIRT_TEST_POSTGRES_URL",
+	database.MySQL:    "OPENPSIRT_TEST_MYSQL_URL",
+	database.MariaDB:  "OPENPSIRT_TEST_MARIADB_URL",
 }
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
@@ -42,7 +43,17 @@ func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
 	// success path says nothing about it. Both of the other two run it, and
 	// both kinds of object a migration makes, a table and an index, are
 	// stepped over.
-	for engine, env := range resumableURLs {
+	// The engines are the ones the application says commit around every
+	// data-definition statement, which is the list check-engines holds this
+	// test to.
+	for _, engine := range database.Engines() {
+		if !engine.CommitsDataDefinition() {
+			continue
+		}
+		env, ok := serverURLs[engine]
+		if !ok {
+			t.Fatalf("%s commits data definition and this names no URL for it", engine)
+		}
 		t.Run(string(engine), func(t *testing.T) {
 			engines.SkipUnless(t, engine)
 			address := os.Getenv(env)
