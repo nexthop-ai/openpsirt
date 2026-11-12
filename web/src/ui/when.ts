@@ -183,3 +183,11 @@ function magnitude(seconds: number): string {
 
 // Milliseconds in a day, for arithmetic over dates the server sends in UTC.
 export const DAY_MS = 86_400_000;
+
+// daysSince is how many whole days ago a day or a moment was. A bare day is the
+// start of that day in UTC, as the server writes days. Not a number where the
+// value is not a date.
+export function daysSince(at: string, now = Date.now()): number {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(at) ? `${at}T00:00:00Z` : at;
+  return Math.floor((now - Date.parse(day)) / DAY_MS);
+}

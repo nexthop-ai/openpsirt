@@ -148,6 +148,23 @@ select.minimumseverity {
   min-width: 13ch;
 }
 
+/* A person's reasoning or comment, one block wherever it is read: a standing
+   decision, the decision page, a prior decision, a queue card, a comment, a
+   version of a justification. The markdown inside owns its paragraph
+   margins. */
+.standing .why,
+.decision .why,
+.prior .why,
+.qcard .why,
+.said2 .bubble,
+.version .words {
+  background: var(--raised);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  font-size: var(--step--1);
+  max-width: 78ch;
+}
+
 /* Rendered markdown, wherever a person's text is shown. */
 .prose-openpsirt p {
   margin: 0 0 8px;

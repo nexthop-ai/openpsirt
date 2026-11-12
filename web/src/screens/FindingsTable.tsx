@@ -8,7 +8,7 @@ import { Severity, Exploited, Incident } from "../ui/Severity";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
-import { DAY_MS, on } from "../ui/when";
+import { daysSince, on } from "../ui/when";
 import { own } from "../ui/own";
 import { Peek, Sits } from "./FindingsViews";
 import { SORTS, identityOf, type Row } from "./list";
@@ -66,7 +66,7 @@ export function DecidedNotice({ decided, onDismiss }: { decided: Decided; onDism
 // anybody who wants it. This is also the age a deadline relates to.
 function openFor(opened: string | undefined): string | null {
   if (!opened) return null;
-  const days = Math.floor((Date.now() - Date.parse(opened + "T00:00:00Z")) / DAY_MS);
+  const days = daysSince(opened);
   if (!Number.isFinite(days) || days < 0) return null;
   if (days < 60) return `open ${days}d`;
   if (days < 730) return `open ${Math.floor(days / 30)}mo`;

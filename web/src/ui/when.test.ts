@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { at, lasted, on, since, typedMoment, typedNow } from "./when";
+import { at, daysSince, lasted, on, since, typedMoment, typedNow } from "./when";
 
 // Two forms and no others. A stored string shown with its time and offset is
 // the tool displaying its storage rather than answering the question.
@@ -151,5 +151,23 @@ describe("how a typed minute is read", () => {
     expect(typedMoment("")).toBe("");
     expect(typedMoment("2026-10-03")).toBe("");
     expect(typedMoment("2026-13-40T99:99")).toBe("");
+  });
+});
+
+describe("days since", () => {
+  const noon = Date.parse("2026-09-07T12:00:00Z");
+
+  it("counts a bare day from its start in UTC", () => {
+    expect(daysSince("2026-09-06", noon)).toBe(1);
+    expect(daysSince("2026-09-07", noon)).toBe(0);
+  });
+
+  it("counts a moment from itself", () => {
+    expect(daysSince("2026-09-06T13:00:00Z", noon)).toBe(0);
+    expect(daysSince("2026-09-05T12:00:00Z", noon)).toBe(2);
+  });
+
+  it("is not a number for what is not a date", () => {
+    expect(daysSince("soon", noon)).toBeNaN();
   });
 });
