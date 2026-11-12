@@ -520,6 +520,11 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	}
 
 	work := queue.New(db, queueing)
+	// Refused before anything is claimed or leased: those compare moments
+	// one replica wrote with another's clock.
+	if err := work.CheckClock(ctx); err != nil {
+		return nil, passes{}, err
+	}
 	// Named before the handler is built as well as before the workers are:
 	// work that must happen once — rewriting deadlines after a policy
 	// change — is held by one replica, and the name is what holds it.

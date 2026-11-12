@@ -125,6 +125,7 @@ currency.Refresher.Once A background pass: one cycle of the currency refresher.
 currency.Refresher.Run A background pass: the currency refresher asks package indexes about components on a schedule.
 currency.RootOwners Not varying by reader: the names the deployment's own roots are published under. The unanswered list classifies against them and answers only the names its reader may see.
 database.AnalyzeEveryTable A background pass: startup and the migrations refresh the engine's table statistics.
+database.DB.ServerTime Not varying by reader: the database server's own clock.
 database.InBatches Not varying by reader: an engine helper inserting rows its caller already chose.
 database.InBatchesKeeping Not varying by reader: an engine helper inserting rows its caller already chose, keeping any already there.
 database.InBatchesUnkeyed Not varying by reader: an engine helper inserting rows its caller already chose, reading no identifiers back.
@@ -273,6 +274,7 @@ queue.Queue.Add A background pass: it queues a job for the workers.
 queue.Queue.AddTx Not varying by reader: it queues a job for the workers inside the transaction that made its work, which its caller already authorized.
 queue.Queue.AddUnlessWaitingTx Not varying by reader: it queues a job for the workers inside the transaction that made its work, unless one is waiting untried, which its caller already authorized.
 queue.Queue.Bury A background pass: the undertaker fails jobs whose worker died.
+queue.Queue.CheckClock A background pass: startup and the undertaker compare this replica's clock with the database's.
 queue.Queue.Claim A background pass: a worker claims a job.
 queue.Queue.Depth Not varying by reader: how many jobs of a kind wait, which bounds uploads and shows on a screen only an administrator reaches.
 queue.Queue.Fail A background pass: a worker records a job failed.
