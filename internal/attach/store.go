@@ -408,8 +408,7 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 // request's is often why the record failed: a client that went away.
 //
 // A failure answered during the commit does not say the commit failed, so the
-// row is looked for first: bytes a committed row names stay, for the sweep to
-// collect with their row.
+// row is looked for first: bytes a committed row names stay with their row.
 func (s *Store) unrecorded(ctx context.Context, token, key string) {
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
 	defer cancel()

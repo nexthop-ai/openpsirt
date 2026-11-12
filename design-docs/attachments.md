@@ -207,9 +207,9 @@ not.
 | A row the reaper could not finish does not end the pass | One undeletable object would stall collection |
 | What the reaper destroyed and failed to destroy is named by key, never counted | |
 | A reaper pass stopped part way claims no further row, logs what it could not finish, and its stop is not logged as a failure | Every claim after the stop fails, naming rows nothing is wrong with |
-| The reaper removes a claimed row's bytes on a context of their own, bounded at 30 seconds | A stop between the row and its bytes would leave bytes no row names |
+| The reaper claims a row and removes its bytes on a context of their own, bounded at 30 seconds | A stop answering the claim failed after it committed, or landing between the row and its bytes, would leave bytes nothing names |
 | The bytes of an upload whose row failed are removed on a context of their own, bounded at 30 seconds | A caller that went away is the commonest reason the row failed, and its context fails the removal too |
-| Those bytes are kept where the row is found, or cannot be looked for | A commit answered as failed may have landed, and its row is collected with its bytes |
+| Those bytes are kept where the row is found, or cannot be looked for | A commit answered as failed may have landed, and the bytes stay with their row |
 | Bytes an upload could not remove are logged by key on every path that uploads | The key is the only thing left that finds them |
 
 ## Limits

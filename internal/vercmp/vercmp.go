@@ -101,8 +101,8 @@ func SchemeOf(ecosystem string) Scheme {
 // free text, and nothing between there and here cuts it up — so without this
 // a version nobody meant is a request for memory.
 //
-// Checked in Order and Leads rather than in each scheme, so every scheme is
-// held to it, the next one added included.
+// Checked in Order and Leads, so every scheme is held to it, the next one
+// added included.
 //
 // The bound is far above every real version and far below any size worth
 // allocating for. The longest in the taken suites is 30 bytes.
