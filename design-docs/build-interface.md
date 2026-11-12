@@ -75,3 +75,4 @@ Satisfies REQ-75.
 | A name that is also a Tailwind utility passes the collision and unstyled checks | Both ask the same compiler |
 | The unused-export check matches names, never imports | A name that is an ordinary word elsewhere passes |
 | A bare `eslint-disable` switches off the reason rule with the rest | A disable naming no rule switches every rule off, and the reason rule is one of them |
+| The route-parameter check reads names, never types | A `.get`, `.has` or `.getAll` on any value sharing a query-parameter name in the same file counts as reading the parameter, and so does one on a property of a name any file sets from the query parameters |
