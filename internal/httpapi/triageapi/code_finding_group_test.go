@@ -13,6 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -568,6 +571,58 @@ func TestAnUndoneRecordAsFlawIsTrailedUnderEachCodeFindingsOwnName(t *testing.T)
 		}
 		if len(withdrawn) != 1 || !strings.Contains(withdrawn[0], "cppcheck/overflow") {
 			t.Errorf("the overflow's grant ended trailed as %q; want it under the overflow's name", withdrawn)
+		}
+	})
+}
+
+func TestAnotherProductsCodeFindingHasNoKinAndGroupsNothing(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		overflowsBesideTheLeak(t, r, "416", "787", 4)
+		var leak int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."id"`).
+			Where(`"f"."occurrence_identity" = ?`, occurrence).Limit(1).Scan(ctx, &leak); err != nil {
+			t.Fatal(err)
+		}
+		names := catalog.NewStore(r.DB.DB)
+		mine, err := names.ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := names.ProductByName(ctx, "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		person, err := r.Rights.Ensure(ctx, "theirs-analyst", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, product := range []int64{mine.ID, theirs.ID} {
+			for _, role := range []access.Role{access.SecurityTestingRead, access.SecurityTestingTriage} {
+				if err := r.Rights.GrantRole(ctx, person.ID, product, role); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		analyst, err := r.Rights.Resolve(ctx, "theirs-analyst")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Asked of its own product, the leak has the overflow as kin, so the
+		// answer of none asked of another product is the product's binding.
+		for _, c := range []struct {
+			product int64
+			want    int
+		}{{mine.ID, 1}, {theirs.ID, 0}} {
+			kin, err := analysis.KinOf(ctx, r.DB.DB, analyst, c.product, leak)
+			if err != nil || len(kin) != c.want {
+				t.Errorf("asked of product %d, the leak has kin %+v, %v; want %d", c.product, kin, err, c.want)
+			}
+			members, err := analysis.Unanswered(ctx, r.DB.DB, analyst, c.product, leak)
+			if err != nil || len(members) != c.want {
+				t.Errorf("asked of product %d, the leak groups %+v, %v; want %d", c.product, members, err, c.want)
+			}
 		}
 	})
 }

@@ -118,6 +118,7 @@ answers one code finding on one build.
 | The occurrence identity addresses it | A rule name holds a slash |
 | Read through the Evidence consumer, analysis kind alone (`design-docs/kinds.md` § Consumers) | |
 | Read in the data layer at the subject's visibilities; one nobody may read answers as an empty occurrence (REQ-42, REQ-43) | |
+| Every read naming a code finding and a product binds the code finding to a build of that product: the evidence, its kin, the decision's check and the code findings one decision answers | A visibility is held by every product's findings, so reading it alone answers another product's |
 | The open finding answers, else the newest | |
 | Links are built when read, from the newest run's repositories and the settings | A host change reaches every place |
 

@@ -106,13 +106,15 @@ type Located struct {
 	Link                   sourcelink.Link
 }
 
-// EvidenceOf is the evidence for one code finding, answered where the subject may
-// read the code finding and as no code finding otherwise. The product's repository settings
+// EvidenceOf is the evidence for one code finding, answered where the code
+// finding is the product's and the subject may read it there, and as no code
+// finding otherwise. The product's repository settings
 // say where each place links to.
 func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, codeFinding *finding.Finding, productID int64) (Evidence, error) {
 	reach := finding.CodeFindingReach(subject, productID)
 	read, err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Where(`"f"."id" = ?`, codeFinding.ID).
+		Where(onProductBuild("f"), productID).
 		Where(reach.Full, reach.FullArgs...).
 		Exists(ctx)
 	switch {

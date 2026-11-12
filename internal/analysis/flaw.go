@@ -840,13 +840,14 @@ func RecordAsFlaw(ctx context.Context, db bun.IDB, subject access.Subject, in Re
 	return &Recorded{Identifier: identifier, Component: component, Builds: len(builds), Occurrences: len(rows)}, nil
 }
 
-// Answerable refuses a decision about a code finding the subject no longer reads in
-// full, or one recorded as a flaw, which is judged instead. Asked inside the
+// Answerable refuses a decision about a code finding that is not the product's,
+// or that the subject no longer reads in full, or one recorded as a flaw, which is judged instead. Asked inside the
 // transaction writing the decision.
 func Answerable(ctx context.Context, tx bun.IDB, subject access.Subject, productID int64, codeFinding *finding.Finding) error {
 	reach := finding.CodeFindingReach(subject, productID)
 	read, err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
 		Where(`"f"."id" = ?`, codeFinding.ID).
+		Where(onProductBuild("f"), productID).
 		Where(reach.Full, reach.FullArgs...).
 		Exists(ctx)
 	if err != nil {

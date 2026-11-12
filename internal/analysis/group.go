@@ -115,7 +115,8 @@ type Kin struct {
 }
 
 // KinOf is the code findings on a code finding's build that are the same flaw as it, or
-// possibly are, where the subject may read them: same first, then by line.
+// possibly are, where the subject may read them: same first, then by line. A code
+// finding that is not the product's has none.
 func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, codeFindingID int64) ([]Kin, error) {
 	// A grant of one code finding, or of one case, reads no other code finding.
 	if !subject.Sees(productID) {
@@ -142,6 +143,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, c
 		ColumnExpr(`CASE WHEN "ag"."last_line" BETWEEN "ar"."last_line" - ? AND "ar"."last_line" + ? `+
 			`THEN 1 ELSE 0 END AS "same"`, groupLines, groupLines).
 		Where(`"f"."id" = ?`, codeFindingID).
+		Where(onProductBuild("f"), productID).
 		Where(nearby(duplicateLines)).
 		// A code finding included in its flaw's case is read by the flaw's readers
 		// beside the product's own visibilities, as the queue reads it.
@@ -168,7 +170,8 @@ type Member struct {
 // Unanswered is the code findings on a code finding's build that are the same flaw as it and
 // that nothing answers yet, where the subject may read them: open, under no
 // live decision, waiting or not, covered by no suppression rule, not recorded as a flaw, and
-// seen in a release still in support. A code finding already answered keeps its own
+// seen in a release still in support. A code finding that is not the product's has
+// none. A code finding already answered keeps its own
 // answer, and a code finding past its end of life is kept as it stands.
 func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, codeFindingID int64) ([]Member, error) {
 	visible, err := finding.CodeFindingVisible(subject, productID)
@@ -189,6 +192,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		Join(`JOIN "finding" AS "g" ON "g"."id" = ?`, codeFindingID).
 		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
 		ColumnExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility"`).
+		Where(onProductBuild("g"), productID).
 		Where(nearby(groupLines)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
