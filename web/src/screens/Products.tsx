@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { AddButton, Declare, Field } from "../ui/Declare";
+import { AddButton, Declare, Field, RenameDrawer, RetireRefused } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Failed } from "../ui/Failed";
@@ -385,23 +385,19 @@ export function Products({ who }: { who: Who }) {
         onClose={() => setUpstreamOf("")}
       />
 
-      <Declare
-        title={`Edit ${editing}`}
-        open={editing !== ""}
+      <RenameDrawer
+        editing={editing}
         onClose={() => setEditing("")}
-        onSubmit={() => amend.mutate()}
-        error={amend.error}
-        busy={amend.isPending || renameTo.trim() === "" || showAs.trim() === ""}
-        ok="Save"
+        save={amend}
+        ready={renameTo.trim() !== "" && showAs.trim() !== ""}
         hint="Locked once a published document names it. The display name can always change."
+        name={{
+          value: renameTo,
+          onChange: setRenameTo,
+          placeholder: "sonic",
+          hint: "What scans, paths and documents call it",
+        }}
       >
-        <Field
-          label="Name"
-          value={renameTo}
-          onChange={setRenameTo}
-          placeholder="sonic"
-          hint="What scans, paths and documents call it"
-        />
         <Field
           label="Shown as"
           value={showAs}
@@ -409,11 +405,9 @@ export function Products({ who }: { who: Who }) {
           placeholder="SONiC"
           hint="What screens and reports show"
         />
-      </Declare>
+      </RenameDrawer>
 
-      {/* A refused retirement is said. Without it the button re-enables and
-          the row stays, which reads as nothing having happened. */}
-      {retire.error != null && <Failed error={retire.error} what="That could not be retired." />}
+      <RetireRefused error={retire.error} />
 
       <Declare
         title="Add product"
