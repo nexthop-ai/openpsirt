@@ -444,7 +444,16 @@ func receiverOf(fn *ast.FuncDecl) string {
 // Subject inside the access package itself.
 func takesSubject(pkg string, fn *ast.FuncDecl) bool {
 	for _, param := range fn.Type.Params.List {
-		switch t := param.Type.(type) {
+		// A subject taken by pointer or as the last of several arrives as
+		// surely as one taken by value.
+		typ := param.Type
+		if star, ok := typ.(*ast.StarExpr); ok {
+			typ = star.X
+		}
+		if many, ok := typ.(*ast.Ellipsis); ok {
+			typ = many.Elt
+		}
+		switch t := typ.(type) {
 		case *ast.SelectorExpr:
 			if pkg, ok := t.X.(*ast.Ident); ok && pkg.Name == "access" && t.Sel.Name == "Subject" {
 				return true

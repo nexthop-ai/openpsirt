@@ -20,6 +20,14 @@ func (s *Store) Unnarrowed(ctx context.Context, id int64) error {
 	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
 }
 
+func (s *Store) ByPointer(ctx context.Context, subject *access.Subject, id int64) error {
+	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+
+func (s *Store) AsTheLast(ctx context.Context, id int64, subjects ...access.Subject) error {
+	return s.db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+
 func (v *Vulnerabilities) Raw(ctx context.Context, id int64) error {
 	_, err := v.db.NewRaw("SELECT 1").Exec(ctx)
 	return err
@@ -73,8 +81,8 @@ func twice(a int) int { return a * 2 }
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 10 {
-		t.Errorf("%d store methods and functions were examined, want the eight exported store methods "+
+	if examined != 12 {
+		t.Errorf("%d store methods and functions were examined, want the ten exported store methods "+
 			"and the two exported functions that query", examined)
 	}
 	reported := map[string]bool{}
@@ -84,6 +92,8 @@ func twice(a int) int { return a * 2 }
 	for name, want := range map[string]bool{
 		"finding.Store.Narrowed":      false,
 		"finding.Store.Unnarrowed":    true,
+		"finding.Store.ByPointer":     false,
+		"finding.Store.AsTheLast":     false,
 		"finding.Vulnerabilities.Raw": true,
 		"finding.Store.Arithmetic":    false,
 		"finding.Store.unexported":    false,
