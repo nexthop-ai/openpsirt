@@ -81,6 +81,31 @@ func (e Excluded) Host(host string) bool {
 	return false
 }
 
+// Permit refuses a host a document chose before anything is resolved: a port
+// other than want, a host that is neither a plain name nor an address, and a
+// host an administrator excluded. It answers the host lowered and without a
+// trailing dot, as every later comparison reads it; each refusal wraps
+// ErrRefused. An empty port is want.
+//
+// A plain name is checked because the transport maps a name written in other
+// scripts to the one it resolves: a fullwidth letter in a host passes a
+// comparison against the excluded names and then dials the host they name.
+// The port is checked because one naming every port on a host would make the
+// fetcher a port scanner whose findings come back in an error.
+func (e Excluded) Permit(host, port, want string) (string, error) {
+	name := strings.TrimSuffix(strings.ToLower(host), ".")
+	switch {
+	case port != "" && port != want:
+		return "", fmt.Errorf("%w a request to %s on port %s: only the https port is reached",
+			ErrRefused, name, port)
+	case net.ParseIP(name) == nil && !HostName(name):
+		return "", fmt.Errorf("%w a request to %q: not a host name", ErrRefused, host)
+	case e.Host(name):
+		return "", fmt.Errorf("%w a request to %s: an administrator excluded it", ErrRefused, name)
+	}
+	return name, nil
+}
+
 // address reports whether an address is in a network an administrator
 // excluded. A well-known NAT64 or 6to4 address is judged by the IPv4 address
 // it reaches as well.

@@ -146,7 +146,8 @@ the dialer every other request uses never sees git's connections.
 | Rule | Reason |
 |---|---|
 | A tunnel only, to port 443 of the one host the repository is on | Redirects, submodules and lazy objects have no route |
-| A host excluded by name, or by a network holding its address, is refused | |
+| A tunnel's host passes the one check every host a document chose passes: the https port, a plain name or address, and no name an administrator excluded, read lowered without a trailing dot | Two copies of the check drift |
+| A host excluded by a network holding its address is refused | |
 | Loopback, private, link-local, shared and the local-use NAT64 prefix are refused regardless, on the resolved address at connect time (REQ-69) | The local-use prefix places the IPv4 address where the network chose |
 | A well-known NAT64 address is judged by its last 32 bits against both rules | `64:ff9b::a00:5` is 10.0.0.5. Refused whole, an IPv6-only deployment reaches no IPv4-only host |
 | Git reads no system or personal configuration, credential helper, hook or terminal | Each changes where git goes or what it sends |

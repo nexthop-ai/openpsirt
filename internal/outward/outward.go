@@ -121,15 +121,9 @@ func Authority(hostport string) string {
 // redirect followed, and no connection to an address inside this network or
 // in an excluded one — checked on the address a name resolved to, at the
 // moment of connecting. Before anything is resolved, a request is refused
-// that names a host excluded by name, a host that is not a plain name or
-// address, a port other than the https one, or a user.
-//
-// A plain name is checked because the transport maps a name written in other
-// scripts to the one it resolves: a fullwidth letter in a host passes a
-// comparison against the excluded names and then dials the host they name.
-// The port is checked because the addresses come from a publisher's document,
-// and one naming every port on a host would make the fetcher a port scanner
-// whose findings come back in the supplier's error.
+// that names a user, or that Excluded.Permit refuses: a port other than the
+// https one, a host that is not a plain name or address, or a host excluded
+// by name.
 func Open(within time.Duration, excluded Excluded) *http.Client {
 	return open(within, excluded, HTTPSPort)
 }
@@ -138,19 +132,11 @@ func Open(within time.Duration, excluded Excluded) *http.Client {
 // a server on a port of its own.
 func open(within time.Duration, excluded Excluded, port string) *http.Client {
 	return client(within, excluded.Reachable, func(to *url.URL) error {
-		host := strings.ToLower(strings.TrimSuffix(to.Hostname(), "."))
-		switch {
-		case to.User != nil:
-			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, host)
-		case to.Port() != "" && to.Port() != port:
-			return fmt.Errorf("%w a request to %s on port %s: only the https port is reached",
-				ErrRefused, host, to.Port())
-		case net.ParseIP(host) == nil && !HostName(host):
-			return fmt.Errorf("%w a request to %q: not a host name", ErrRefused, to.Hostname())
-		case excluded.Host(host):
-			return fmt.Errorf("%w a request to %s: an administrator excluded it", ErrRefused, host)
+		if to.User != nil {
+			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, to.Hostname())
 		}
-		return nil
+		_, err := excluded.Permit(to.Hostname(), to.Port(), port)
+		return err
 	})
 }
 
@@ -193,12 +179,12 @@ func ConfiguredTrusting(within time.Duration, roots *x509.CertPool) *http.Client
 // user in an address. host carries its port where it names one. roots are the
 // certificate authorities the host is checked against, nil for the system's.
 func Pinned(within time.Duration, host string, roots *x509.CertPool) *http.Client {
-	pinned := strings.ToLower(host)
+	pinned := Authority(host)
 	c := client(within, anywhere, func(to *url.URL) error {
 		switch {
 		case to.User != nil:
 			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, to.Hostname())
-		case strings.ToLower(to.Host) != pinned:
+		case Authority(to.Host) != pinned:
 			return fmt.Errorf("%w a request to %s: only the configured host %s is reached",
 				ErrRefused, to.Host, host)
 		}
