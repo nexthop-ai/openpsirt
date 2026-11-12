@@ -16836,7 +16836,7 @@ export interface components {
             proposed: number;
             /**
              * Format: int64
-             * @description Decisions of theirs they took back
+             * @description Decisions they withdrew, whoever proposed them, dated by the proposal
              */
             withdrawn: number;
         };

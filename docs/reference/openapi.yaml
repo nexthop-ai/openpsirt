@@ -15649,7 +15649,7 @@ components:
           format: int64
           type: integer
         withdrawn:
-          description: Decisions of theirs they took back
+          description: Decisions they withdrew, whoever proposed them, dated by the proposal
           format: int64
           type: integer
       required:

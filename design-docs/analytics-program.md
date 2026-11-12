@@ -314,7 +314,7 @@ longest:
 | The arithmetic runs in the application | Subtraction and percentiles are spelled four ways |
 | A wait is measured from the finding the decision is about | An occurrence sits in every product |
 | Bounded to the most recent few thousand decisions, saying how many and whether the ceiling was reached | |
-| Throughput is per person: a decision in the window it was proposed, an agreement in the window it was given | |
+| Throughput is per person: a decision in the window it was proposed, an agreement in the window it was given, a withdrawal to whoever withdrew it in the window the decision was proposed | Any triager on the product may withdraw. A withdrawal recorded with nobody named counts for nobody |
 | Throughput, waits and send-backs count decisions, made, agreed and withdrawn alike; a wait runs from a decision's earliest finding to its first proposal | |
 | Send-backs are counted for the deployment | The record holds no sender |
 | It narrows to one product or one team's people | |

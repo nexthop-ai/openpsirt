@@ -312,6 +312,30 @@ func TestWhatAPersonGotThroughIsCountedInDecisions(t *testing.T) {
 	})
 }
 
+func TestAWithdrawalCountsForWhoeverWithdrewIt(t *testing.T) {
+	// Any triager on the product may withdraw, so the proposer is not always
+	// the one who took the decision back.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		dropped := f.decisionsMany(t, f.occurrences("under-a"))
+		if _, err := f.store.Withdraw(ctx, f.reviewer, dropped[0].DecisionID); err != nil {
+			t.Fatal(err)
+		}
+		measured, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{}, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]triage.Worked{}
+		for _, one := range measured.Throughput {
+			got[one.Person] = one
+		}
+		if p, a := got["proposer"], got["approver"]; p.Withdrawn != 0 || a.Withdrawn != 1 {
+			t.Errorf("the proposer is credited %d withdrawals and the withdrawer %d, want 0 and 1",
+				p.Withdrawn, a.Withdrawn)
+		}
+	})
+}
+
 func TestADecisionThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
 	// The cap applies to the decisions that grew, worst first. Taken off the
 	// oldest agreements, a decision agreed to after them never appears.

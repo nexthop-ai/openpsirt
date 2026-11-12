@@ -314,9 +314,11 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		return nil
 	}
 
-	// Proposed and withdrawn are both read off the row. Withdrawn is
-	// dated by the proposal for the same reason the audit is: a decision belongs
-	// to the window it was argued in. Both count decisions, as agreements do: a
+	// Proposed and withdrawn are both read off the row. A withdrawal is the
+	// work of whoever withdrew it, which any triager on the product may do, and
+	// one recorded with nobody named counts for nobody. It is dated by the
+	// proposal for the same reason the audit is: a decision belongs to the
+	// window it was argued in. Both count decisions, as agreements do: a
 	// decision writes a row per occurrence and is one piece of work.
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
@@ -330,12 +332,13 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	}
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
-			ColumnExpr(`"de"."proposed_by" AS "person"`).
+			ColumnExpr(`"de"."ended_by" AS "person"`).
 			ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 			Where(`"de"."state" = ?`, Withdrawn).
+			Where(`"de"."ended_by" IS NOT NULL`).
 			Where(`"de"."proposed_at" < ?`, until).
-			GroupExpr(`"de"."proposed_by"`)
-		return only.narrow(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"))
+			GroupExpr(`"de"."ended_by"`)
+		return only.by(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"), `"de"."ended_by"`)
 	}, func(w *Worked) *int { return &w.Withdrawn }); err != nil {
 		return nil, err
 	}

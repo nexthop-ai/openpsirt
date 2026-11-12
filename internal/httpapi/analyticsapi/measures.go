@@ -28,7 +28,7 @@ type WorkedBody struct {
 	Person    string `json:"person"`
 	Proposed  int    `json:"proposed" doc:"Decisions they made in the window"`
 	Approved  int    `json:"approved" doc:"Decisions they agreed to, dated by the agreement: an approver's week is the week they approved in"`
-	Withdrawn int    `json:"withdrawn" doc:"Decisions of theirs they took back"`
+	Withdrawn int    `json:"withdrawn" doc:"Decisions they withdrew, whoever proposed them, dated by the proposal"`
 }
 
 // MeasuresBody is the state of triage, against what is open.
