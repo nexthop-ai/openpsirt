@@ -406,3 +406,20 @@ func TestAnAddressIsStoredAsItParsesAndRecordedByItsHost(t *testing.T) {
 		}
 	}
 }
+
+// A host is the same however an address writes it: in capitals, with a closing
+// dot, or naming the port https reaches by default.
+func TestAHostIsComparedAsItIsReached(t *testing.T) {
+	for _, same := range [][2]string{
+		{"csaf.example.test", "csaf.example.test:443"},
+		{"CSAF.example.test", "csaf.example.test."},
+		{"[::1]", "[::1]:443"},
+	} {
+		if Authority(same[0]) != Authority(same[1]) {
+			t.Errorf("%s and %s compare apart", same[0], same[1])
+		}
+	}
+	if Authority("csaf.example.test") == Authority("csaf.example.test:8443") {
+		t.Error("another port compares as the same host")
+	}
+}

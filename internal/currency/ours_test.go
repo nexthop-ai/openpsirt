@@ -47,6 +47,8 @@ func TestTheNamespaceYieldsThreeSpellings(t *testing.T) {
 		{"a forge host written bare, and its account under it",
 			"gitlab.com/acme/psirt", []string{"acme"}},
 		{"a forge host alone names nobody", "https://github.com", nil},
+		{"an organization's page names its account", "https://github.com/orgs/acme", []string{"acme"}},
+		{"a project's page names the project", "https://sourceforge.net/projects/acme", []string{"acme"}},
 		{"a name stated twice in two spellings is held once",
 			"https://acme.test", []string{"acme", "acme.test", "test.acme"}},
 		{"nothing configured holds nothing back", "", nil},

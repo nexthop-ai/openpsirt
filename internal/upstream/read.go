@@ -153,10 +153,13 @@ func resolve(base, named string) (string, error) {
 	return to.String(), nil
 }
 
-// cached is what one listing last answered with.
+// cached is what one listing last answered with, and how many of its entries
+// named no document this can read, which an answer that nothing moved leaves
+// as they were.
 type cached struct {
 	Tag      string `json:"tag,omitempty"`
 	Modified string `json:"modified,omitempty"`
+	Skipped  int    `json:"skipped,omitempty"`
 }
 
 // listed is one document a listing names, and the moment it says the document
@@ -261,7 +264,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 	}
 	if !moved {
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", nil, false)
+		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", unreadEntries(skipped), false)
 	}
 
 	var documents []Document
@@ -327,24 +330,31 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		took.Moved = true
 	}
 
-	// A pass that left documents unread or refused, or entries it could not
-	// read, keeps no validator, so the next pass reads the listings whole,
-	// comes back for them, and records again what stopped it.
+	// A pass that left documents unread or refused keeps no validator, so
+	// the next pass reads the listings whole and comes back for them. Entries
+	// it could not read are kept with the validators, so an answer that
+	// nothing moved records them again.
 	r.remember(up.ID, current, tried, refusedNow)
 	listings := kept
-	if took.Filled || took.Refused > 0 || skipped > 0 {
+	if took.Filled || took.Refused > 0 {
 		listings = ""
 	}
-	var failed error
-	switch {
-	case len(refused) > 0:
+	failed := unreadEntries(skipped)
+	if len(refused) > 0 {
 		failed = refusal.Errorf("%d of what the upstream lists could not be taken; the last: %v",
 			len(refused), refused[len(refused)-1])
-	case skipped > 0:
-		failed = refusal.Errorf("%d entries of what the upstream lists name no document this can read, "+
-			"so nothing it stopped listing is withdrawn", skipped)
 	}
 	return took, NewStore(r.db).reached(ctx, up, listings, "", failed, took.Filled)
+}
+
+// unreadEntries is what entries naming no document this can read stopped, or
+// nil where there were none.
+func unreadEntries(skipped int) error {
+	if skipped == 0 {
+		return nil
+	}
+	return refusal.Errorf("%d entries of what the upstream lists name no document this can read, "+
+		"so nothing it stopped listing is withdrawn", skipped)
 }
 
 // inTurn is the entries a read takes, in the order it takes them: each listed
@@ -472,7 +482,6 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 			case err != nil:
 				return nil, nil, 0, err
 			}
-			kept[address] = *validator
 			var entries []listed
 			if feeds {
 				entries, err = fromFeed(address, body)
@@ -482,6 +491,12 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 			if err != nil {
 				return nil, nil, 0, err
 			}
+			for _, one := range entries {
+				if one.skipped {
+					validator.Skipped++
+				}
+			}
+			kept[address] = *validator
 			if len(out)+len(entries) > r.listed {
 				return nil, nil, 0, refusal.Errorf("the upstream's listings name more than the %d "+
 					"documents this reads", r.listed)
@@ -495,7 +510,11 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 	case err != nil:
 		return nil, "", false, 0, err
 	case unchanged == len(addresses):
-		return nil, encoded(kept), false, 0, nil
+		skipped := 0
+		for _, one := range kept {
+			skipped += one.Skipped
+		}
+		return nil, encoded(kept), false, skipped, nil
 	case unchanged > 0:
 		// One listing answered that nothing moved and another that something
 		// did: every one is read whole.
@@ -578,15 +597,16 @@ func entryOf(listing, named, at string) listed {
 }
 
 // onHost reports whether an address is https on the host, at the port, of
-// another. The client refuses another host, and sends plain http to the same
-// one.
+// another, compared as the client compares them. The client refuses another
+// host, and sends plain http to the same one.
 func onHost(base, where string) bool {
 	from, err := url.Parse(base)
 	if err != nil {
 		return false
 	}
 	to, err := url.Parse(where)
-	return err == nil && to.Scheme == "https" && to.User == nil && strings.EqualFold(to.Host, from.Host)
+	return err == nil && to.Scheme == "https" && to.User == nil &&
+		outward.Authority(to.Host) == outward.Authority(from.Host)
 }
 
 // fromChanges reads the documents a directory's list of changes names: a path

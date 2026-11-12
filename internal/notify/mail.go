@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"mime"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -197,8 +198,10 @@ func messageID(from string) (string, error) {
 		return "", fmt.Errorf("name a message: %w", err)
 	}
 	domain := "openpsirt.invalid"
-	if _, after, ok := strings.Cut(oneLine(from), "@"); ok && after != "" {
-		domain = strings.Trim(after, "<> ")
+	if parsed, err := mail.ParseAddress(oneLine(from)); err == nil {
+		if at := strings.LastIndex(parsed.Address, "@"); at >= 0 && at < len(parsed.Address)-1 {
+			domain = parsed.Address[at+1:]
+		}
 	}
 	return "<" + hex.EncodeToString(random[:]) + "@" + domain + ">", nil
 }

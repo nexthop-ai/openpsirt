@@ -230,6 +230,9 @@ func (p *Pass) Once(ctx context.Context) (string, error) {
 	if err := intern(ctx, p.db, commits, now); err != nil {
 		return "", err
 	}
+	if err := endAbandoned(ctx, p.db); err != nil {
+		return "", err
+	}
 	next, err := p.choose(ctx, commits, now)
 	if err != nil || next == nil {
 		return "", err
@@ -528,9 +531,25 @@ func (c *candidate) before(other *candidate) bool {
 }
 
 // unfinished is what a visit records as having stopped it while it runs. A
-// visit that ends records how; one still recording this once nobody holds the
-// lease was ended by something that stopped the process.
+// visit that ends records how; one still recording this, unended, when the
+// pass next chooses was ended by something that stopped the process.
 const unfinished = "the visit did not finish"
+
+// endAbandoned ends every visit still recorded as unfinished, at the moment it
+// began. Asked by the pass before it chooses, which no visit is under way
+// beside, since the lease holder visits one repository at a time: any such row
+// is a visit the process did not survive.
+func endAbandoned(ctx context.Context, db bun.IDB) error {
+	if _, err := db.NewUpdate().Model((*repositoryRow)(nil)).
+		Set(`"ended_at" = "fetched_at"`).
+		Where(`"failed" = ?`, unfinished).
+		Where(`"fetched_at" IS NOT NULL`).
+		Where(`("ended_at" IS NULL OR "ended_at" < "fetched_at")`).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("end the visits the process did not survive: %w", err)
+	}
+	return nil
+}
 
 // errStopped is a visit that stopped because the lease was lost. Not a
 // failure of the repository.

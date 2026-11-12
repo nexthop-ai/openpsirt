@@ -17,7 +17,8 @@ import (
 // A visit records itself as unfinished while it runs, so one whose process
 // is killed part way waits out a day like any failure, rather than being
 // chosen first on restart and killing the process again. The report reads it
-// as under way while a replica holds the lease, and as failed once none does.
+// as under way while a replica holds the lease, until the pass next chooses
+// and ends it, and as failed after that or once nobody holds the lease.
 func TestAVisitTheProcessDidNotSurviveWaitsOutADay(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -54,13 +55,10 @@ func TestAVisitTheProcessDidNotSurviveWaitsOutADay(t *testing.T) {
 		if _, err := db.DB.NewUpdate().Table("patch_repository").
 			Set(`"fetched_at" = ?`, time.Now().UTC().Add(-time.Minute)).
 			Set(`"reached_at" = ?`, time.Now().UTC().Add(-time.Hour)).
+			Set(`"ended_at" = ?`, time.Now().UTC().Add(-time.Hour)).
 			Where(`"url" = ?`, repositoryOf("killed")).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if visited, err := pass.Once(ctx); err != nil || visited != "" {
-			t.Errorf("a visit the process did not survive was chosen again: %q %v", visited, err)
-		}
-
 		state := func() patchbranch.State {
 			t.Helper()
 			repositories, _, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
@@ -77,6 +75,16 @@ func TestAVisitTheProcessDidNotSurviveWaitsOutADay(t *testing.T) {
 		}
 		if got := state(); got != patchbranch.Working {
 			t.Errorf("with the lease held the report reads %s, want under way", got)
+		}
+
+		// The pass, choosing again, finds no visit under way beside it, so
+		// the unfinished one is ended and reads as failed whoever holds the
+		// lease.
+		if visited, err := pass.Once(ctx); err != nil || visited != "" {
+			t.Errorf("a visit the process did not survive was chosen again: %q %v", visited, err)
+		}
+		if got := state(); got != patchbranch.Failed {
+			t.Errorf("once the pass chose again the report reads %s, want failed", got)
 		}
 	})
 }

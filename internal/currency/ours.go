@@ -258,11 +258,16 @@ func fromNamespace(namespace string) []string {
 	// A forge host is shared by everybody, so it names nobody; the account
 	// under it is the organization.
 	if forges[host] {
-		account, _, _ := strings.Cut(strings.Trim(path, "/"), "/")
-		if account == "" {
-			return nil
+		for _, segment := range strings.Split(strings.Trim(path, "/"), "/") {
+			switch {
+			case segment == "" || generic[segment]:
+				return nil
+			case forgePaths[segment]:
+				continue
+			}
+			return []string{segment}
 		}
-		return []string{account}
+		return nil
 	}
 	labels := strings.Split(host, ".")
 	reversed := make([]string, 0, len(labels))
@@ -288,6 +293,10 @@ func fromNamespace(namespace string) []string {
 var forges = map[string]bool{
 	"github.com": true, "gitlab.com": true, "bitbucket.org": true, "sourceforge.net": true,
 }
+
+// forgePaths are the words a forge puts in front of an account in a page's
+// path: an organization's page on GitHub, a project's on SourceForge.
+var forgePaths = map[string]bool{"orgs": true, "users": true, "groups": true, "projects": true, "p": true}
 
 // publisherHost reads the host out of what a deployment configured as its
 // namespace, and the path after it.

@@ -68,10 +68,10 @@ func TestADocumentAnsweredWithARedirectIsRefusedAlone(t *testing.T) {
 	})
 }
 
-// A listing holding an entry that cannot be read keeps no validator, so the
-// next read takes it whole and records again what stopped it, rather than
-// hearing that nothing moved and clearing the failure.
-func TestAListingWithAnEntryThatCannotBeReadIsReadWholeAgain(t *testing.T) {
+// A listing holding an entry that cannot be read keeps it with its validator,
+// so a next read hearing that nothing moved records again what stopped it,
+// rather than clearing the failure.
+func TestAnEntryThatCannotBeReadStaysRecordedWhileNothingMoves(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.trust()

@@ -82,6 +82,9 @@ type RepositoryProgress struct {
 	Reason    string
 	// HeldBytes is the size of the copy when the last visit finished.
 	HeldBytes *int64
+
+	// unended is a visit begun and not ended.
+	unended bool
 }
 
 // Totals is the whole of the work.
@@ -139,6 +142,8 @@ func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]Rep
 		if repository.Failed != nil {
 			one.Reason = *repository.Failed
 		}
+		one.unended = repository.FetchedAt != nil &&
+			(repository.EndedAt == nil || repository.EndedAt.Before(*repository.FetchedAt))
 		if repository.HeldBytes != nil {
 			held += *repository.HeldBytes
 		}
@@ -191,8 +196,9 @@ func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]Rep
 		one.Worst = severityOf(worst)
 	}
 
-	// A visit under way records itself as unfinished, and is one while a
-	// replica holds the lease.
+	// A visit under way records itself as unfinished and is not ended, while
+	// a replica holds the lease; the pass ends one the process did not
+	// survive before it chooses the next.
 	visiting, err := queue.Held(ctx, db, Lease, now)
 	if err != nil {
 		return nil, Totals{}, err
@@ -276,7 +282,7 @@ func stateOf(one RepositoryProgress, excluded outward.Excluded, visiting bool) S
 	switch {
 	case excluded.Host(Commit{Repository: one.URL}.Host()):
 		return Refused
-	case one.Reason == unfinished && visiting:
+	case one.Reason == unfinished && one.unended && visiting:
 		return Working
 	case one.Reason != "":
 		return Failed

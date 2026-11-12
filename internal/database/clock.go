@@ -21,7 +21,10 @@ func (d *DB) ServerTime(ctx context.Context) (time.Time, error) {
 	case Postgres:
 		query = `SELECT EXTRACT(EPOCH FROM CLOCK_TIMESTAMP())::float8`
 	case MySQL, MariaDB:
-		query = `SELECT UNIX_TIMESTAMP(NOW(6))`
+		// UTC_TIMESTAMP and a difference of two datetimes follow no session
+		// time zone, where UNIX_TIMESTAMP(NOW()) is ambiguous in the hour a
+		// zone's clocks go back.
+		query = `SELECT TIMESTAMPDIFF(MICROSECOND, '1970-01-01 00:00:00', UTC_TIMESTAMP(6)) / 1000000`
 	case SQLite:
 		query = `SELECT (julianday('now') - 2440587.5) * 86400.0`
 	default:

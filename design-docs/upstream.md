@@ -49,7 +49,7 @@ copy of the upstream ordinarily sits.
 
 | Rule | Reason |
 |---|---|
-| Only that host, at its port: a description, feed or list of changes naming another host is refused before anything is resolved | |
+| Only that host, at its port: a description, feed or list of changes naming another host is refused before anything is resolved. A host compares without regard to capitals or a closing dot, and no port is port 443 | |
 | https only, no redirect followed, no user in an address | |
 | A listing entry naming a document off https or on another host is never requested, and counts as an entry that cannot be read | |
 | A document answered with a redirect is refused alone, and the read goes on | It is refused the same way every time |
@@ -83,7 +83,7 @@ reaches out, settled by a lease.
 | What is gone | A document no listing names is withdrawn only by a complete read: every listing read whole, every entry naming a document and a moment, every moved document taken and checked. Otherwise nothing is withdrawn, and an unreadable entry is recorded as what stopped the read |
 | A moved upstream | Its first complete read lets a document under the same tracking identifier replace the old address's, as a revision, and withdraws what the new address does not list |
 | A document | Compared against the digest served beside it, and its signature where a key is trusted. One failing either is not taken, and the next pass reads the listings whole |
-| An entry that cannot be read | The pass keeps no validator, so the next reads the listings whole and records it again; an answer that nothing moved never clears it |
+| An entry that cannot be read | Counted beside its listing's validator, so an answer that nothing moved records it again and never clears it |
 | A document refused again | Each replica remembers what it refused at the moment its listing named, and tries those after every other entry, so refusals at the head of a listing never fill a pass |
 | An address that comes to hold another document | What the document it held said is set aside, unless another listed address still holds that document |
 | Its name | The tracking identifier it names itself by; its next revision replaces its statements |

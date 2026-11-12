@@ -265,3 +265,23 @@ func TestAMessageCarriesItsDateAndIdentifier(t *testing.T) {
 		t.Errorf("the encoding reads %q", got)
 	}
 }
+
+// A message's identifier is at the domain of the sender's address, however the
+// sender is written, and at a reserved domain where it names none.
+func TestAMessageIdentifierIsAtTheSendersDomain(t *testing.T) {
+	for from, want := range map[string]string{
+		"psirt@example.test":                 "@example.test>",
+		`"psirt@corp" <psirt@corp.example>`:  "@corp.example>",
+		"PSIRT <psirt@example.test>":         "@example.test>",
+		"psirt@example.test (Security Team)": "@example.test>",
+		"nobody":                             "@openpsirt.invalid>",
+	} {
+		id, err := messageID(from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(id, "<") || !strings.HasSuffix(id, want) || strings.ContainsAny(id, ` "()`) {
+			t.Errorf("%q names its message %q, want it at %s", from, id, want)
+		}
+	}
+}

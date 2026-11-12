@@ -80,7 +80,7 @@ A name this deployment calls its own is never sent. Three sources, unioned:
 
 | Source | Yields |
 |---|---|
-| The namespace this deployment publishes under, already required for CSAF and VEX | The host, the host reversed (a Maven group or Java package), and each label short of the top-level domain; under a forge host (github.com, gitlab.com, bitbucket.org, sourceforge.net), the account its path names and nothing of the host |
+| The namespace this deployment publishes under, already required for CSAF and VEX | The host, the host reversed (a Maven group or Java package), and each label short of the top-level domain; under a forge host (github.com, gitlab.com, bitbucket.org, sourceforge.net), the account its path names, past a word such as `orgs` or `projects` in front of it, and nothing of the host |
 | What each build declared itself to be, read from the scan record | The account, scope or group beside the name, and for a Go module path the account after its host, whatever suffix, subdirectory or forge group follows. A root is the product built here. The component standing for the product is stored by name alone, so the record is the source |
 | What the deployment stated | Whatever else an operator named |
 
