@@ -114,7 +114,7 @@ person.
 | A pipeline key says it never expires | A blank reads unset |
 | Who has left is on the list | |
 | The list narrows to who holds what; a grant out of force does not match | |
-| A person's name and address are recorded here | Mail reaches nobody without one |
+| A person's name and address are recorded here, by an administrator; an auditor sees the address and no control to change it | Mail reaches nobody without one |
 | An address stated empty clears it; left out leaves it | Coming off mail is not leaving |
 | A control an auditor may not use is disabled and says why; only a signed-in administrator mints or withdraws a credential | A credential cannot create another |
 | A role chip's withdraw mark is for an administrator only, where roles are assigned here | Manage is disabled for others with the reason |
@@ -122,6 +122,7 @@ person.
 | The credentials panel is drawn for an administrator only | Its reads are administrator-only and its empty state would lie |
 | A key's branch and variant are offered from what the product holds, the server refusing; choosing a product clears them | |
 | The two deployment-wide holdings are checkboxes beside the grid, each with what it grants | One is a reader who changes nothing |
+| The grid places a held role by the name that addresses its product, never by a display name | A display name is free text and can equal another product's name |
 | A pipeline key is created where keys are listed | |
 | A token's product narrowing is asked at creation; the list shows each token's reach | |
 | A withdrawn credential stays, dimmed, the button replaced by the word | What used it stays answerable |

@@ -99,6 +99,28 @@ describe("the access screen", () => {
     expect(mount.host().querySelector('[title="Withdraw this role"]')).toBeNull();
   });
 
+  it("offers an auditor no control to change somebody's address", async () => {
+    deployment();
+    mount.render(screen(<Access who={auditor} />));
+    await settle();
+    expect(mount.host().textContent).toContain("alice");
+    const labels = Array.from(mount.host().querySelectorAll("button")).map((each) =>
+      each.textContent?.trim(),
+    );
+    expect(labels).not.toContain("Add");
+    expect(labels).not.toContain("Change");
+  });
+
+  it("offers an administrator the control to change somebody's address", async () => {
+    deployment();
+    mount.render(screen(<Access who={admin} />));
+    await settle();
+    const labels = Array.from(mount.host().querySelectorAll("button")).map((each) =>
+      each.textContent?.trim(),
+    );
+    expect(labels.some((each) => each === "Add" || each === "Change")).toBe(true);
+  });
+
   it("refreshes the lists of held work when a withdrawn role hands work back", async () => {
     deployment();
     const sent = answer("DELETE", () => ({ data: { released: 1 } }));
