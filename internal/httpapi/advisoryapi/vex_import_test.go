@@ -19,6 +19,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound/boundtest"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/advisoryapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -464,6 +465,41 @@ func TestADocumentsIdentifierIsHeldWithoutCharactersThatReorderText(t *testing.T
 		if taken.Superseded != 1 {
 			t.Errorf("a revision whose identifier differs by an override set aside %d statements, want 1",
 				taken.Superseded)
+		}
+	})
+}
+
+func TestADocumentWithALongIdentifierIsReplacedByItsRevision(t *testing.T) {
+	// An OpenVEX identifier is an IRI of any length. One longer than is
+	// recorded is held as its digest, which its revision states again.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		long := "https://example.test/vex/" + strings.Repeat("x", finding.MostDocumentName)
+		named := func(id, issue string) string {
+			return `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"` + id + `",
+				"author":"acme","timestamp":"2026-09-01T00:00:00Z","version":1,
+				"statements":[{"vulnerability":{"name":"` + issue + `"},"status":"not_affected",
+				  "justification":"vulnerable_code_not_present",
+				  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}`
+		}
+		taken := func(id, issue string) advisoryapi.StatementsTakenBody {
+			t.Helper()
+			got := r.VexedAs(t, "admin", "", "vex.json", named(id, issue))
+			if got.Code != http.StatusCreated {
+				t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+			}
+			var body advisoryapi.StatementsTakenBody
+			if err := json.Unmarshal(got.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			return body
+		}
+		taken(long, "CVE-2026-9998")
+		if other := taken(long+"y", "CVE-2026-9996"); other.Superseded != 0 {
+			t.Errorf("another long identifier set aside %d statements, want none", other.Superseded)
+		}
+		if revised := taken(long, "CVE-2026-9997"); revised.Superseded != 1 {
+			t.Errorf("the revision set aside %d statements, want 1", revised.Superseded)
 		}
 	})
 }

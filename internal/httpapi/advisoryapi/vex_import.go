@@ -189,13 +189,13 @@ func registerVexImport(api huma.API, in core.Deps) {
 		// the publisher and the document's own identifier. Held without
 		// characters that reorder or hide text, as the publisher is, and then
 		// matched exactly, because it is read out of the document every time.
+		// One longer than the column is held as its digest: an OpenVEX
+		// identifier is an IRI of any length, and a revision states the same
+		// one, so its digest keys it as well.
 		from.Identifier = strings.TrimSpace(attach.Visible(said.Identifier))
 		if utf8.RuneCountInString(from.Identifier) > finding.MostDocumentName {
-			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
-				"the document's identifier is longer than the %d characters this records",
-				finding.MostDocumentName))
-			turnedAway(ctx, in, by, product.ID, from, refused)
-			return nil, refused
+			sum := sha256.Sum256([]byte(from.Identifier))
+			from.Identifier = "sha256:" + hex.EncodeToString(sum[:])
 		}
 		if publisher == "" {
 			refused := huma.Error422UnprocessableEntity(

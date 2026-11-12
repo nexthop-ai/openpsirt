@@ -84,7 +84,7 @@ one claim shape.
 | The build's suppression reader reads these | One parser bounds the hostile-input surface (REQ-66) |
 | A document is digested as it streams, and past the size bound refused for size before any parse error | |
 | A VEX document's publisher is the one the request names, else the one the document names: an OpenVEX author, a CSAF publisher name. One naming neither is refused | Supersession is keyed on who issued a document (REQ-08); a file name collides between publishers and changes between revisions |
-| A VEX document is replaced only by a later revision of itself: the same publisher and the document's own identifier, an OpenVEX `@id` or a CSAF tracking identifier (REQ-31). A document stating none is keyed on the empty identifier | Another document from the same supplier covers other products; a file name changes between revisions |
+| A VEX document is replaced only by a later revision of itself: the same publisher and the document's own identifier, an OpenVEX `@id` or a CSAF tracking identifier (REQ-31). A document stating none is keyed on the empty identifier; one longer than a document name is recorded keyed on its SHA-256 digest | Another document from the same supplier covers other products; a file name changes between revisions; an IRI has no length bound |
 | Publisher names, advisory names and VEX document identifiers are held without control or format characters, from request or document | A right-to-left override reads reversed beside evidence |
 | A revision sets aside what the document no longer says, never deleting; each statement keeps its digest | Approvals stay readable |
 | The same bytes again write nothing where they read as what stands, and replace it where the reader now derives differently | |
