@@ -68,6 +68,20 @@ describe("the occurrences a decision covers", () => {
     expect(mount.host().textContent).toContain("13 of 14 covered · 1 left open under kernel");
   });
 
+  it("counts only excluded occurrences still listed", () => {
+    mount.render(
+      <Covering
+        occurrences={occurrences}
+        excluded={new Set(["kernel/netfilter", "gone/decided-elsewhere"])}
+        onChange={() => undefined}
+        matching={2}
+        differing={1}
+        reach={answered}
+      />,
+    );
+    expect(mount.host().textContent).toContain("13 of 14 covered · 1 left open under kernel");
+  });
+
   it("covers everything again on Cover all", async () => {
     left.now = new Set();
     mount.render(<Holding />);

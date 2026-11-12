@@ -52,6 +52,22 @@ describe("the references a finding cites", () => {
     act(() => more?.click());
     expect(links()).toBe(15);
   });
+
+  it("lists an address once, the advisory's included", () => {
+    mount.render(
+      screen(
+        <References
+          advisory="https://example.com/a"
+          refs={[
+            { url: "https://example.com/a", kind: "advisory" },
+            { url: "https://example.com/b", kind: "report" },
+            { url: "https://example.com/b", kind: "report" },
+          ]}
+        />,
+      ),
+    );
+    expect(mount.host().querySelectorAll("li")).toHaveLength(2);
+  });
 });
 
 describe("recording that a product was exploited", () => {

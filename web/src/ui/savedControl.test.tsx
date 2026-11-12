@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { answer, location, mounted, screen, serve, settle } from "../test/mount";
 import { Saved } from "./Saved";
+import { PUBLISHED } from "../test/outcomes";
 
 const mount = mounted();
 
@@ -105,5 +106,53 @@ describe("a saved filter", () => {
     await save("exploited");
     expect(sent()[0]?.[1].body.query).toBe("exploited=1");
     expect(mount.host().querySelector('[role="status"]')?.textContent).toBe("Saved.");
+  });
+});
+
+describe("a saved filter that prepares a decision", () => {
+  async function preparing(outcome: string) {
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return { data: { identity: "ana", name: "Ana", kind: "person", outcomes: PUBLISHED } };
+      }
+      if (path === "/v1/session/me/saved-filters") return { data: { items: [], total: 0 } };
+      return undefined;
+    });
+    mount.render(screen(<Picking />, "/findings?component=linux"));
+    await settle();
+    act(() => button("Save this")?.click());
+    const field = mount.host().querySelector<HTMLInputElement>('input[type="text"]');
+    if (!field) throw new Error("no name field");
+    act(() => type(field, "kernel"));
+    const box = mount.host().querySelector<HTMLInputElement>('input[type="checkbox"]');
+    act(() => box?.click());
+    const selects = () => mount.host().querySelectorAll<HTMLSelectElement>("select");
+    act(() => pick(selects()[selects().length - 1]!, outcome));
+    const reasoning = mount.host().querySelector("textarea");
+    if (reasoning) {
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
+          reasoning,
+          "the module is not built",
+        );
+        reasoning.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+    await settle();
+    return selects;
+  }
+
+  it("holds Save back until a reason is chosen where the outcome needs one", async () => {
+    const selects = await preparing("not-applicable");
+    expect(button("Save")?.disabled).toBe(true);
+    act(() => pick(selects()[selects().length - 1]!, "component_not_present"));
+    expect(button("Save")?.disabled).toBe(false);
+  });
+
+  it("offers no reason that needs mitigation text a filter cannot carry", async () => {
+    const selects = await preparing("not-applicable");
+    const offered = Array.from(selects()[selects().length - 1]!.options).map((each) => each.value);
+    expect(offered).toContain("component_not_present");
+    expect(offered).not.toContain("inline_mitigations_already_exist");
   });
 });

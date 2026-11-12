@@ -134,6 +134,8 @@ every product.
 | A rule preparing a deferral without a length | It would prepare a form that cannot be submitted |
 | A length beside any other outcome, refused and never dropped | A decision refuses a date beside a non-deferral alike |
 | A deferral kept as a date fills nothing and says so | |
+| An outcome stating a reason, saved with none: Save waits for one | The server refuses it |
+| The reason that needs mitigation text is not offered | A filter carries no mitigation text, so the server refuses it |
 
 ## Limits
 

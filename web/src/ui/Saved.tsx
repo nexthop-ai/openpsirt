@@ -3,6 +3,7 @@
 
 import { labeled, reasonOffered, reasonsFor } from "./Outcome";
 import { useOutcomes } from "./outcomes";
+import { mustMitigate } from "./Decide";
 import { notACredential } from "./noautofill";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -140,12 +141,14 @@ export function Saved({
   // reasons each may state. A correction carries past every version bump, so
   // the three reasons a bump can change are not among the ones it offers.
   const needsJustification = useOutcomes().needsJustification(outcome);
-  const reasons = reasonsFor(outcome);
+  // A filter carries no mitigation text, so the one reason that asks for it
+  // cannot be prepared and is not offered.
+  const reasons = reasonsFor(outcome).filter((each) => !mustMitigate(outcome, each.value));
   // Dropped rather than carried when the outcome moves under it: a correction
   // takes only the reasons no version bump can answer, and a rule prepared
   // with one the endpoint refuses fails when somebody presses the button
   // rather than when they saved the thing that fills it in.
-  const reason = reasonOffered(outcome, justification);
+  const reason = mustMitigate(outcome, justification) ? "" : reasonOffered(outcome, justification);
 
   const kept = useKept();
   const save = useMutation({
@@ -384,6 +387,7 @@ export function Saved({
               (rule &&
                 (outcome === "" ||
                   reasoning.trim() === "" ||
+                  (needsJustification && reason === "") ||
                   // A deferral with no length opens the form with the outcome
                   // chosen and no date, which cannot be submitted: the date is
                   // worked out from the length as somebody submits it.

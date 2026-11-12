@@ -242,9 +242,10 @@ export function Editor({
                 bodySerializer: (body: unknown) => body as FormData,
               }),
             );
+      const label = labelOf(stored.filename ?? "");
       const written = stored.inline
-        ? `![${stored.filename}](${stored.reference})`
-        : `[${stored.filename}](${stored.reference})`;
+        ? `![${label}](${stored.reference})`
+        : `[${label}](${stored.reference})`;
       // Written into the text as it is now. The field stays editable while
       // the upload runs, so the value this call began with has gone stale.
       const field = box.current;
@@ -377,6 +378,13 @@ export function Editor({
       )}
     </div>
   );
+}
+
+// labelOf is a file's name as link text. A stored name keeps brackets, angle
+// brackets and emphasis marks, which would end the link early or read as
+// markup the server refuses, so each is escaped and a line break is a space.
+export function labelOf(name: string): string {
+  return name.replace(/[\r\n]+/g, " ").replace(/[\\[\]<>*_`]/g, (each) => `\\${each}`);
 }
 
 // forget clears a draft once its text has actually been accepted, re-exported
