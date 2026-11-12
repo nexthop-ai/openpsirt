@@ -281,9 +281,8 @@ func TestThePackagePageIsAnsweredForTheInterfaceToo(t *testing.T) {
 }
 
 // A CVE is one in the form the CVE program issues. A name merely starting
-// with the prefix is not one, so it neither files an issue as a CVE nor fills
-// a published document's cve field, whose pattern a reader's validator holds
-// the whole document to.
+// with the prefix is not one, so it never fills a published document's cve
+// field, whose pattern a reader's validator holds the whole document to.
 func TestOnlyAWellFormedCVEIsACVE(t *testing.T) {
 	for name, want := range map[string]bool{
 		"CVE-2024-1234": true, "CVE-2024-12345678": true,

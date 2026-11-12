@@ -49,8 +49,8 @@ import (
 // is a read that finds nothing new nearly every time it runs.
 const betweenWrites = time.Hour
 
-// Lease is the name of the work the directory writer holds while it writes.
-const Lease = "advisory.directory"
+// lease is the name of the work the directory writer holds while it writes.
+const lease = "advisory.directory"
 
 // travels is the one label this directory carries.
 const travels = advisory.Travelable
@@ -170,7 +170,7 @@ type Written struct {
 
 // Run writes the directory until the context ends.
 func (w *Writer) Run(ctx context.Context, interval time.Duration) {
-	defer w.leases.Handback(ctx, Lease, w.replica, w.logger)
+	defer w.leases.Handback(ctx, lease, w.replica, w.logger)
 	background.Every(ctx, interval, betweenWrites, func(ctx context.Context) {
 		w.interval = interval
 		// Logged and carried on, like every other background pass here. A
@@ -304,7 +304,7 @@ func (w *Writer) keep(ctx context.Context) (bool, error) {
 	if cycle <= 0 {
 		cycle = betweenWrites
 	}
-	mine, err := w.leases.Take(ctx, Lease, w.replica, 2*cycle)
+	mine, err := w.leases.Take(ctx, lease, w.replica, 2*cycle)
 	if err != nil || !mine {
 		w.wrote, w.held = "", 0
 	}
