@@ -4,10 +4,14 @@
 package adminapi_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
@@ -28,26 +32,47 @@ func rewritesWaiting(t *testing.T, r *httpapitest.Reach) int {
 func TestAPolicyStatedAgainIsNoChange(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		done(t, r, http.MethodPost, "/v1/products/mine/branches-and-tags", `{"name":"v9","kind":"tag"}`)
-		for _, each := range []struct{ what, path, first, second string }{
-			{"a setting", "/v1/settings/remediation.due.high", `{"value":"720h"}`, `{"value":"480h"}`},
+		// again is the first stated in other words where it can be; empty, it
+		// is the first word for word.
+		for _, each := range []struct{ what, path, first, second, again string }{
+			{"a setting", "/v1/settings/remediation.due.high", `{"value":"720h"}`, `{"value":"480h"}`,
+				`{"value":"43200m"}`},
 			{"pair thresholds", "/v1/products/mine/pair-thresholds",
-				`{"share":80,"approvers":3}`, `{"share":70,"approvers":3}`},
-			{"publication", "/v1/products/mine/publication", `{"publishes":true}`, `{"publishes":false}`},
+				`{"share":80,"approvers":3}`, `{"share":70,"approvers":3}`, ""},
+			{"publication", "/v1/products/mine/publication", `{"publishes":true}`, `{"publishes":false}`, ""},
 			{"a minimum severity", "/v1/products/mine/minimum-severity",
-				`{"minimum_severity":"high"}`, `{"minimum_severity":""}`},
+				`{"minimum_severity":"high"}`, `{"minimum_severity":""}`, ""},
 			{"a product's end of life", "/v1/products/mine/end-of-life",
-				`{"on":"2030-01-31"}`, `{"on":""}`},
+				`{"on":"2030-01-31"}`, `{"on":""}`, ""},
 			{"a release date", "/v1/products/mine/branches-and-tags/v9/release",
-				`{"released_on":"2026-03-31"}`, `{"released_on":"2026-04-01"}`},
+				`{"released_on":"2026-03-31"}`, `{"released_on":"2026-04-01"}`, ""},
 			{"a release's end of life", "/v1/products/mine/branches-and-tags/master/end-of-life",
-				`{"on":"2030-01-31"}`, `{"on":""}`},
+				`{"on":"2030-01-31"}`, `{"on":""}`, ""},
 			{"repositories", "/v1/products/mine/repositories",
 				`{"hosts":[{"remote":"GitHub.com/","web":"https://github.com/","style":"github"}],"paths":[]}`,
-				`{"hosts":[],"paths":[]}`},
+				`{"hosts":[],"paths":[]}`, ""},
 		} {
 			done(t, r, http.MethodPut, each.path, each.first)
 			before, waiting := trailCount(t, r), rewritesWaiting(t, r)
-			done(t, r, http.MethodPut, each.path, each.first)
+			again := each.first
+			if each.again != "" {
+				again = each.again
+			}
+			done(t, r, http.MethodPut, each.path, again)
+			if each.again != "" {
+				var listed struct {
+					Items []struct {
+						Name  string `json:"name"`
+						Value string `json:"value"`
+					} `json:"items"`
+				}
+				httpapitest.Read(t, r, "admin", "/v1/settings", &listed)
+				for _, one := range listed.Items {
+					if "/v1/settings/"+one.Name == each.path && one.Value != "720h" {
+						t.Errorf("%s stated again in other words is stored as %q, want 720h", each.what, one.Value)
+					}
+				}
+			}
 			if rows := trailSince(t, r, before).Items; len(rows) != 0 {
 				t.Errorf("%s stated again recorded %+v", each.what, rows)
 			}
@@ -63,9 +88,7 @@ func TestAPolicyStatedAgainIsNoChange(t *testing.T) {
 }
 
 // A change to what decides a deadline queues one rewrite in the act, and a
-// rewrite still waiting takes the changes after it. Run in the process that
-// took the request, a restart lost it and every stored deadline kept the old
-// policy with nothing saying so.
+// rewrite still waiting takes the changes after it.
 func TestAPolicyChangeQueuesOneRewriteOfDeadlines(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		for _, each := range []struct{ path, body string }{
@@ -79,6 +102,40 @@ func TestAPolicyChangeQueuesOneRewriteOfDeadlines(t *testing.T) {
 			if n := rewritesWaiting(t, r); n != 1 {
 				t.Errorf("after %s, %d deadline rewrites are waiting, want one", each.path, n)
 			}
+		}
+	})
+}
+
+// Publication stated off again still withdraws what the product serves: a
+// publish run that began before it went off can have written since.
+func TestPublicationStatedOffAgainWithdrawsWhatIsStillServed(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		done(t, r, http.MethodPut, "/v1/products/mine/publication", `{"publishes":true}`)
+		done(t, r, http.MethodPut, "/v1/products/mine/publication", `{"publishes":false}`)
+		var product int64
+		if err := r.DB.DB.NewSelect().Table("product").Column("id").
+			Where(`"name" = ?`, "mine").Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		at := time.Now().UTC().Truncate(time.Microsecond)
+		sum := sha256.Sum256([]byte("late"))
+		late := &publish.Document{
+			ProductID: product, Kind: publish.OpenVEX, Subject: "master",
+			Path: publish.OpenVEXPath + "mine/master.json", PathDigest: hex.EncodeToString(sum[:]),
+			TrackingID: "x", Title: "x", Version: 1, FirstAt: at, CurrentAt: at,
+			Statuses: "all", Settled: hex.EncodeToString(sum[:]), Body: "{}",
+		}
+		if _, err := r.DB.DB.NewInsert().Model(late).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		done(t, r, http.MethodPut, "/v1/products/mine/publication", `{"publishes":false}`)
+		held := new(publish.Document)
+		if err := r.DB.DB.NewSelect().Model(held).Where(`"pub"."id" = ?`, late.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if held.WithdrawnAt == nil {
+			t.Error("a document written after publication went off is still served once it is stated off again")
 		}
 	})
 }

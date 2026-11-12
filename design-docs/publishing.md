@@ -35,7 +35,7 @@ document is about disclosed work in it (REQ-63, REQ-37).
 | Switch | Held | Default | Effect |
 |---|---|---|---|
 | The deployment publishes | Deployment configuration | Off | Off, every path answers as one nothing is published at, and the pass does not start |
-| A product publishes | The product, set by an administrator, in the trail | Off | On, the next pass writes its documents. Off, they are withdrawn at once. On again, nothing is served until the next pass, and an unchanged document returns as the revision it was |
+| A product publishes | The product, set by an administrator, in the trail | Off | On, the next pass writes its documents. Off, they are withdrawn at once, and again each time off is stated, since a pass begun before can still write. On again, nothing is served until the next pass, and an unchanged document returns as the revision it was |
 | The statuses published | An administrator's setting | Every status somebody decided | Limited, only not affected and fixed; a document left with none is withdrawn |
 | The rate one client may ask at | Deployment configuration | 600 a minute | Past it, 429 with when to ask again |
 | The signing key | A configured secret | None | Every document carries a detached OpenPGP signature, and the provider claims the trusted provider role |

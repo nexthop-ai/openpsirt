@@ -113,13 +113,14 @@ func registerCatalogRepositories(api huma.API, d core.Declaring) {
 			case err != nil:
 				return core.WentWrong(d.Logger, "the repository settings could not be recorded", err)
 			}
-			// Settings stated again, as stored, are no change to record.
+			// Recorded as stored, which is what the comparison is made on:
+			// settings stated again, as stored, are no change to record.
 			now, err := store.Config(ctx, product.ID)
 			if err != nil {
 				return core.WentWrong(d.Logger, "the repository settings could not be read", err)
 			}
-			before, after := said(repositoriesSaid(was)), said(repositoriesSaid(stated))
-			if said(repositoriesSaid(now)) == before {
+			before, after := said(repositoriesSaid(was)), said(repositoriesSaid(now))
+			if after == before {
 				return nil
 			}
 			if err := core.Noted(ctx, tx, trail.Setting, "repositories of "+product.Name,

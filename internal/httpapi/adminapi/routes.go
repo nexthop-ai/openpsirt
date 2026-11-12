@@ -41,6 +41,7 @@ func Register(api huma.API, in core.Deps) {
 			return ingest.NewStore(in.DB.DB)
 		},
 		RewriteDeadlines: func(ctx context.Context, tx bun.IDB) error {
+			in := core.Of(ctx, in)
 			return rewritingDeadlines(ctx, in.Logger, tx, in.Queue)
 		},
 	})

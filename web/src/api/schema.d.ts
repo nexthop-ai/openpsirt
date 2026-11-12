@@ -2894,7 +2894,7 @@ export interface paths {
          *
          *     An empty date clears the override, so the release follows its product again. Clearing is not the same as stating the product's current date: a release that stated it would stop following when the product changed.
          *
-         *     Deadlines are rewritten afterwards by a queued job; the response returns before that has finished. A 503 means too much work is waiting to queue the rewrite; nothing was changed, so send it again. Stating the date already in force changes nothing and records nothing.
+         *     Deadlines are rewritten afterwards by a queued job; the response returns before that has finished. Stating the date already in force changes nothing and records nothing. A full queue refuses the change with 503, recording nothing; send it again later.
          *
          *     Requires: administrator
          */
@@ -4780,7 +4780,7 @@ export interface paths {
          *
          *     Nothing is deleted or hidden: the findings and the history stay, and stay reportable. What ends is what is expected of us.
          *
-         *     An empty date clears it, because extended support happens. Deadlines are rewritten afterwards by a queued job; the response returns before that has finished. A 503 means too much work is waiting to queue the rewrite; nothing was changed, so send it again. Stating the date already in force changes nothing and records nothing.
+         *     An empty date clears it, because extended support happens. Deadlines are rewritten afterwards by a queued job; the response returns before that has finished. Stating the date already in force changes nothing and records nothing. A full queue refuses the change with 503, recording nothing; send it again later.
          *
          *     Requires: administrator
          */
@@ -5544,7 +5544,7 @@ export interface paths {
          *
          *     An empty value clears the override, so the product follows the deployment again. Clearing is not the same as stating the deployment's current minimum severity: a product that stated it would stop following when the deployment changed.
          *
-         *     Deadlines are rewritten afterwards by a queued job, because moving the minimum severity moves what is on a clock at all. The response returns before that has finished. A 503 means too much work is waiting to queue the rewrite; nothing was changed, so send it again. Stating the value already in force changes nothing and records nothing.
+         *     Deadlines are rewritten afterwards by a queued job, because moving the minimum severity moves what is on a clock at all. The response returns before that has finished. Stating the value already in force changes nothing and records nothing. A full queue refuses the change with 503, recording nothing; send it again later.
          *
          *     Requires: administrator
          */
@@ -7198,7 +7198,7 @@ export interface paths {
          *
          *     Only the settings this deployment recognizes may be set. A name it does not know is refused, because storing it would create something nothing ever reads.
          *
-         *     A value equal to the one stored changes nothing and records nothing. Changing a deadline window queues a rewrite of stored deadlines; the response returns before it has run, and a 503 means too much work is waiting to queue it, so nothing was changed and the request may be sent again.
+         *     A value equal to the one stored changes nothing and records nothing. Changing a deadline window queues a rewrite of stored deadlines; the response returns before it has run, and a full queue refuses the change with 503, recording nothing; send it again later.
          *
          *     Requires: administrator
          */

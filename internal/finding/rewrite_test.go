@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -60,6 +61,97 @@ func TestABurstOfPolicyChangesIsOneWaitingRewrite(t *testing.T) {
 		queueRewrite(t, f, work)
 		if n := waitingRewrites(t, f); n != 1 {
 			t.Errorf("a change after the rewrite started left %d waiting, want one more", n)
+		}
+	})
+}
+
+// A rewrite waiting to be tried again does not take a later change: it may be
+// on its last attempt, and it waits out its backoff first.
+func TestARewriteWaitingToBeTriedAgainTakesNoLaterChange(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		work := queue.New(f.db, queue.DefaultOptions())
+		queueRewrite(t, f, work)
+		job, err := work.Claim(ctx, "elsewhere", queue.Deadlines)
+		if err != nil || job == nil {
+			t.Fatalf("the waiting rewrite could not be claimed: %v", err)
+		}
+		if err := work.Fail(ctx, job.ID, "elsewhere", errors.New("interrupted")); err != nil {
+			t.Fatal(err)
+		}
+		if n := waitingRewrites(t, f); n != 1 {
+			t.Fatalf("a failed rewrite left %d waiting, want it waiting to be tried again", n)
+		}
+		queueRewrite(t, f, work)
+		if n := waitingRewrites(t, f); n != 2 {
+			t.Errorf("a change after a rewrite failed left %d waiting, want one more", n)
+		}
+	})
+}
+
+// A policy change taken by a waiting rewrite holds that rewrite until it
+// commits, so a claim made meanwhile either waits or passes it by: claimed
+// before the commit, it would read the old policy with nothing queued after.
+func TestAWaitingRewriteIsNotClaimedBeforeThePolicyChangeItTookCommits(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		work := queue.New(f.db, queue.DefaultOptions())
+		queueRewrite(t, f, work)
+
+		tx, err := f.db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := finding.RewriteDeadlines(ctx, tx, work); err != nil {
+			t.Fatal(err)
+		}
+		type claim struct {
+			job *queue.Job
+			err error
+		}
+		answers := make(chan claim, 1)
+		go func() {
+			job, err := work.Claim(ctx, "elsewhere", queue.Deadlines)
+			answers <- claim{job, err}
+		}()
+		took := func(c claim) *queue.Job {
+			if c.err != nil {
+				t.Fatal(c.err)
+			}
+			return c.job
+		}
+		// A server engine passes a held job by and finds nothing; SQLite
+		// waits for the writer.
+		var early *queue.Job
+		answered := false
+		select {
+		case c := <-answers:
+			early = took(c)
+			answered = true
+			if early != nil {
+				t.Fatal("the waiting rewrite was claimed before the change it took had committed")
+			}
+		case <-time.After(500 * time.Millisecond):
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		if !answered {
+			select {
+			case c := <-answers:
+				early = took(c)
+			case <-time.After(30 * time.Second):
+				t.Fatal("the claim did not go on once the change committed")
+			}
+		}
+		if early == nil {
+			if early, err = work.Claim(ctx, "elsewhere", queue.Deadlines); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if early == nil {
+			t.Error("the waiting rewrite was not claimable once the change committed")
 		}
 	})
 }

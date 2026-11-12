@@ -29,7 +29,7 @@ working list.
 | Nothing on a release out of support is on a clock (REQ-15), applied separately | It reaches exploited findings too |
 | A product may state its own, and one stating none inherits rather than copies; clearing it is its own act | A copy stops following the deployment unseen |
 | Stating one is administration, the authority setting the deployment's | It hides findings |
-| Moving either rewrites what is stored, as a job queued in the act, one replica at a time (`design-docs/queue.md` § Leases) | Run in the process taking the request, a restart loses it and stored deadlines keep a superseded policy |
+| Moving either rewrites what is stored, as a job queued in the act, one replica at a time (`design-docs/queue.md` § Leases) | A queued job outlives a restart, and is tried again as every job is |
 
 ## Issue assessments
 

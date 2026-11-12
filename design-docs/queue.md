@@ -35,7 +35,7 @@ claim goes stale.
 |---|---|
 | A job holds no payload | The queue stays small however large its subject |
 | Kinds are defined with the queue: read a scan, scan for vulnerabilities, sweep the assignment rules, apply an analyzer's run to its build, check a replaced inventory, rewrite deadlines after a policy change | |
-| Work any one run does all of is queued once while a job for it waits unclaimed: the waiting job takes the later request, and one already claimed does not | A job not yet started reads what it decides from when it runs; a claimed one may have read it already |
+| Work any one run does all of is queued once while a job for it waits unclaimed and untried: the waiting job takes the later request, and one already claimed or waiting to be tried again does not. The request writes the waiting job, so a claim made meanwhile waits for its commit or passes it by. Two requests racing with none waiting may each queue one, and the run repeats | A job not yet started reads its input when it runs |
 | A kind is stored in the row | Renaming one leaves queued work nothing claims |
 
 ## Exclusive handout
@@ -142,7 +142,7 @@ it takes a **lease** on the work's name under the same conditional update.
 |---|---|---|
 | May be skipped | Does nothing this cycle and asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; failing work whose worker never came back |
 | Once a period | Asks every few minutes whether the lease has lapsed, takes it for the period and leaves it to lapse; the holder is refused until then like any other replica, so the expiry records when the work is next due. It is never handed back on shutdown, and a failed pass hands it back so the next replica asking runs it | Sweeping every ruled product (`design-docs/access-assignment.md` § The sweep) |
-| Must happen | Runs as a queued job, which waits for its turn, then applies. A failed take is a missed turn, asked again at the next poll; the wait ends only with its context, and a job ended before applying is tried again by the queue | Rewriting deadlines after a policy change, queued in the change's transaction; changes arriving while it waits are taken by it, and one arriving while it runs queues one more |
+| Must happen | Runs as a queued job, which waits for its turn, then applies. A failed take is a missed turn, asked again at the next poll; the wait ends only with its context, and a job ended before applying is tried again by the queue. The work runs no longer than the lease | Rewriting deadlines after a policy change, queued in the change's transaction; changes arriving while it waits are taken by it, and one arriving while it runs queues one more |
 
 Work that waits reads what it decides from after its turn comes, inside what
 serializes it.

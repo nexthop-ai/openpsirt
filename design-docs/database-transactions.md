@@ -72,7 +72,7 @@ back.
 | Applying a saved assignment rule to what is open | Refuses the rule with 503, recording nothing. Work arriving in the product also sweeps |
 | Placing work a scan, an analyzer run or a recorded flaw opened | Not the arrival's failure. The next arrival or rule in the product sweeps, and the daily sweep of every ruled product within a day (`design-docs/access-assignment.md` § The sweep) |
 | Scanning an inventory a read stored | Not the read's failure. The periodic pass asks again once the queue drains |
-| Rewriting deadlines after a policy change | Refuses the change with 503, recording nothing. A rewrite already waiting takes the change instead of queuing one |
+| Rewriting deadlines after a policy change | Refuses the change with 503, recording nothing. A rewrite waiting and never tried takes the change instead of queuing one |
 
 | Outside the act | Reason |
 |---|---|

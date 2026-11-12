@@ -393,8 +393,8 @@ func registerSettings(api huma.API, in core.Deps) {
 			"refused, because storing it would create something nothing ever reads.\n\n" +
 			"A value equal to the one stored changes nothing and records nothing. Changing a " +
 			"deadline window queues a rewrite of stored deadlines; the response returns before " +
-			"it has run, and a 503 means too much work is waiting to queue it, so nothing was " +
-			"changed and the request may be sent again.",
+			"it has run, and a full queue refuses the change with 503, recording nothing; " +
+			"send it again later.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Name string `path:"name"`
@@ -494,7 +494,14 @@ func registerSettings(api huma.API, in core.Deps) {
 			}
 			// A value that did not move is no change: nothing is recorded,
 			// and nothing is rewritten.
-			if had && before == value {
+			if had && sameSetting(settable[row].kind, before, value) {
+				// Stored as it stood, so the trail's last value is still the
+				// one held.
+				if before != value {
+					if _, _, err := settings.Change(ctx, input.Name, before); err != nil {
+						return recording(in.Logger, "that setting could not be recorded", err)
+					}
+				}
 				return nil
 			}
 			if err := core.Noted(ctx, tx, trail.Setting, input.Name,
@@ -503,9 +510,9 @@ func registerSettings(api huma.API, in core.Deps) {
 			}
 			// A deadline is stored on the finding when it is first seen,
 			// so changing how long something may stay open makes every
-			// stored one wrong. Queued with the change rather than left
-			// until the next scan: a number somebody just typed that moves
-			// nothing is worse than a slow screen.
+			// stored one wrong. A rewrite is queued with the change, since a
+			// number somebody just typed that moves nothing is worse than a
+			// slow screen.
 			if settable[row].movesDeadlines {
 				return rewritingDeadlines(ctx, in.Logger, tx, in.Queue)
 			}
@@ -519,8 +526,8 @@ func registerSettings(api huma.API, in core.Deps) {
 }
 
 // rewritingDeadlines queues the rewrite a policy change forces, in the
-// transaction making the change (finding.RewriteDeadlines). A full queue
-// refuses the change, which records nothing.
+// transaction making the change (finding.RewriteDeadlines). A rewrite that
+// cannot be queued refuses the change, which records nothing.
 func rewritingDeadlines(ctx context.Context, logger *slog.Logger, tx bun.IDB, q *queue.Queue) error {
 	err := finding.RewriteDeadlines(ctx, tx, q)
 	if errors.Is(err, queue.ErrBacklogFull) {
@@ -531,6 +538,26 @@ func rewritingDeadlines(ctx context.Context, logger *slog.Logger, tx bun.IDB, q 
 		return core.WentWrong(logger, "the deadline rewrite could not be queued", err)
 	}
 	return nil
+}
+
+// sameSetting reports whether two spellings of a setting of this kind say the
+// same thing: 360h and 21600m are one length of time, and 010 and 10 one count.
+func sameSetting(kind setting.Kind, a, b string) bool {
+	switch kind {
+	case setting.Duration:
+		x, errX := time.ParseDuration(a)
+		y, errY := time.ParseDuration(b)
+		if errX == nil && errY == nil {
+			return x == y
+		}
+	case setting.Count, setting.Size, setting.Percent:
+		x, errX := strconv.Atoi(a)
+		y, errY := strconv.Atoi(b)
+		if errX == nil && errY == nil {
+			return x == y
+		}
+	}
+	return a == b
 }
 
 // settingRow finds a setting's row, and whether it is one.
