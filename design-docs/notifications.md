@@ -116,6 +116,8 @@ told at once.
 | Rule | Reason |
 |---|---|
 | Only somebody who could already read it, from the editor's autocomplete query | On an undisclosed finding the notification is the disclosure |
+| A decision's text reaches only somebody reading every product and visibility its rows hold, and is withheld as the strictest of them | A bulk decision can cover a disclosed issue and an undisclosed one |
+| A decision whose rows name several issues is told about its product alone | One issue would misdescribe the rest |
 | An unheld name and one held by a non-reader are not distinguished | Otherwise it answers who can see undisclosed work |
 | Never the author; never a failure of the write | |
 | Plain `@ana` where the name is letters, digits and `. _ : @ -`, starting and ending with a letter or digit; delimited `@\<ana+psirt@example.com>` otherwise | The plain form stops at the first other character, so `ana+psirt@example.com` or `auth0\|abc` names somebody else. The backslash keeps markdown from reading a tag. `@<…>` is read too where markdown leaves it text or links it |

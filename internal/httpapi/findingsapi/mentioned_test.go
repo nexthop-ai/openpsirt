@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
@@ -131,6 +133,78 @@ func TestAMentionOnUndisclosedWorkReachesNobodyWhoMayNotSeeIt(t *testing.T) {
 		}
 		if held != 0 {
 			t.Errorf("%d mentions were written for somebody who may not read the work", held)
+		}
+	})
+}
+
+func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsStrictest(t *testing.T) {
+	// A bulk decision can cover a disclosed issue and an undisclosed one. A
+	// name in its text reaches only somebody who reads every row, and the
+	// notification is withheld as undisclosed work, whichever row was written
+	// first.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedWithEvidence(t)
+		decision, _ := r.Claimed(t, "private-triage", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		flaw := r.Embargoed(t)
+
+		// The undisclosed row, written beside the disclosed one the route
+		// wrote first, as one bulk decision over both issues holds them.
+		var first triage.DecisionOccurrence
+		if err := r.DB.DB.NewSelect().Model(&first).
+			Where(`"de"."decision_id" = ?`, decision).Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if first.Visibility != access.Public {
+			t.Fatalf("the route wrote a %s row, want the disclosed one first", first.Visibility)
+		}
+		var issue int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"vulnerability"`).Column("id").
+			Where(`"identifier" = ?`, flaw).Scan(ctx, &issue); err != nil {
+			t.Fatal(err)
+		}
+		undisclosed := first
+		undisclosed.ID = 0
+		undisclosed.Decision = nil
+		// Who is told reads every row whether or not it stands, so the
+		// row needs no live key of its own.
+		undisclosed.LiveKey = nil
+		undisclosed.VulnerabilityID = issue
+		undisclosed.Visibility = access.Private
+		undisclosed.OccurrenceIdentity = strings.Repeat("0", len(first.OccurrenceIdentity))
+		if _, err := r.DB.DB.NewInsert().Model(&undisclosed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		said := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/decisions/"+httpapitest.Itoa(decision)+"/comments",
+			`{"body":"@reader and @private, could you look at both?"}`)
+		if said.Code >= 400 {
+			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
+		}
+
+		var told []struct {
+			Identity        string `bun:"identity"`
+			Private         bool   `bun:"private"`
+			SecurityTesting bool   `bun:"security_testing"`
+			VulnerabilityID *int64 `bun:"vulnerability_id"`
+		}
+		if err := r.DB.DB.NewSelect().TableExpr(`"notification" AS "n"`).
+			Join(`JOIN "person" AS "p" ON "p"."id" = "n"."person_id"`).
+			ColumnExpr(`"p"."identity"`).ColumnExpr(`"n"."private"`).
+			ColumnExpr(`"n"."security_testing"`).ColumnExpr(`"n"."vulnerability_id"`).
+			Where(`"n"."kind" = ?`, "mentioned").Scan(ctx, &told); err != nil {
+			t.Fatal(err)
+		}
+		if len(told) != 1 || told[0].Identity != "private" {
+			t.Fatalf("the mention was written for %+v, want only the person reading both rows", told)
+		}
+		if !told[0].Private || told[0].SecurityTesting {
+			t.Errorf("the mention was withheld as private=%t security-testing=%t, want private alone",
+				told[0].Private, told[0].SecurityTesting)
+		}
+		if told[0].VulnerabilityID != nil {
+			t.Errorf("a decision over two issues was told as about issue %d", *told[0].VulnerabilityID)
 		}
 	})
 }

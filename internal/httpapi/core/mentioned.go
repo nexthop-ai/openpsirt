@@ -18,11 +18,11 @@ import (
 // MentionTarget is the subject of a piece of text, for deciding who may be
 // told they were named in it.
 //
-// The four things that decide it, rather than the row one of the callers
-// happens to hold. A mention in a decision's comment is about an occurrence and
-// a mention in an issue's note is about an issue in a product, and both resolve
-// to one set: the names typed that may read the thing being written about, at
-// its visibility.
+// What decides it, rather than the row one of the callers happens to hold. A
+// mention in a decision's comment is about its occurrences and a mention in an
+// issue's note is about an issue in a product, and both resolve to one set: the
+// names typed that may read the thing being written about, at every visibility
+// it holds.
 type MentionTarget struct {
 	ProductID       int64
 	VulnerabilityID int64
@@ -31,6 +31,17 @@ type MentionTarget struct {
 	// start of an occurrence identity for a decision, the issue's name for a
 	// note.
 	About string
+	// Also is every other product and visibility the text is about, for a
+	// decision whose rows span several. A name reaches somebody only where
+	// they read at every one, and the notification is withheld as the
+	// strictest of them.
+	Also []Reach
+}
+
+// Reach is one product and visibility a piece of text is about.
+type Reach struct {
+	ProductID  int64
+	Visibility access.Visibility
 }
 
 // mentionCap bounds how many people one piece of text can call for.
@@ -69,25 +80,45 @@ func TellMentioned(ctx context.Context, in Deps, subject access.Subject,
 	if len(markdown.Mentions(body)) == 0 {
 		return nil
 	}
-	// Any row of the decision answers for what the text is about: a decision
-	// is one action in one product, and who may be told is decided at the
-	// visibility of what it is about. The first row is the one every other
-	// reader of the decision is shown as its representative.
+	// A decision's rows can span visibilities, a bulk decision covering a
+	// disclosed issue and an undisclosed one, so the text is about every
+	// product and visibility its rows hold, and the issue only where every
+	// row shares one.
 	_, rows, err := store.ReadDecision(ctx, subject, decisionID)
 	if err != nil || len(rows) == 0 {
 		in.Log().WarnContext(ctx, "could not tell who was named", "error", err)
 		return markdown.Mentions(body)
 	}
-	dropped, err := Mentioned(ctx, in, subject, MentionTarget{
-		ProductID:       rows[0].ProductID,
-		VulnerabilityID: rows[0].VulnerabilityID,
-		Visibility:      rows[0].Visibility,
-		About:           rows[0].OccurrenceIdentity[:min(8, len(rows[0].OccurrenceIdentity))],
-	}, body, weblink.Decision(decisionID))
+	dropped, err := Mentioned(ctx, in, subject, decisionTarget(rows), body, weblink.Decision(decisionID))
 	if err != nil {
 		in.Log().WarnContext(ctx, "could not tell who was named", "error", err)
 	}
 	return dropped
+}
+
+// decisionTarget is what a decision's rows are about: the first row's product
+// and visibility, every other distinct pair beside it, and the issue where
+// every row names the same one.
+func decisionTarget(rows []triage.DecisionOccurrence) MentionTarget {
+	first := rows[0]
+	target := MentionTarget{
+		ProductID:       first.ProductID,
+		VulnerabilityID: first.VulnerabilityID,
+		Visibility:      first.Visibility,
+		About:           first.OccurrenceIdentity[:min(8, len(first.OccurrenceIdentity))],
+	}
+	seen := map[Reach]bool{{ProductID: first.ProductID, Visibility: first.Visibility}: true}
+	for _, row := range rows[1:] {
+		if row.VulnerabilityID != target.VulnerabilityID {
+			target.VulnerabilityID = 0
+		}
+		reach := Reach{ProductID: row.ProductID, Visibility: row.Visibility}
+		if !seen[reach] {
+			seen[reach] = true
+			target.Also = append(target.Also, reach)
+		}
+	}
+	return target
 }
 
 // Mentioned tells whoever a piece of text named that it named them.
@@ -153,6 +184,26 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 	for _, reader := range readers {
 		byName[strings.ToLower(reader.Identity)] = reader.ID
 	}
+	private := about.Visibility != access.Public
+	securityTesting := about.Visibility == access.SecurityTesting
+	for _, reach := range about.Also {
+		private = private || reach.Visibility != access.Public
+		securityTesting = securityTesting || reach.Visibility == access.SecurityTesting
+		also, err := access.NewStore(in.DB.DB).ReadersNamed(ctx, subject,
+			reach.ProductID, reach.Visibility, names)
+		if err != nil {
+			return append(dropped, names...), fmt.Errorf("read who may be told: %w", err)
+		}
+		reads := make(map[int64]bool, len(also))
+		for _, reader := range also {
+			reads[reader.ID] = true
+		}
+		for name, id := range byName {
+			if !reads[id] {
+				delete(byName, name)
+			}
+		}
+	}
 
 	// A note on a report with no issue is about the product alone.
 	var issue *int64
@@ -167,8 +218,8 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 			Link: link,
 			// Anything not disclosed carries no detail out of the
 			// deployment, security testing material included.
-			Private:         about.Visibility != access.Public,
-			SecurityTesting: about.Visibility == access.SecurityTesting,
+			Private:         private,
+			SecurityTesting: securityTesting,
 			Concerns:        notify.Concerning(about.ProductID, about.VulnerabilityID, 0),
 			// The same two as columns. Concerns is a string a digest
 			// matches on; these are what a read narrows by, and a
