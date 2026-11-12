@@ -439,7 +439,10 @@ func (s *Store) unrecorded(ctx context.Context, token, key string) bool {
 // upload's uncommitted insert does not include it.
 const uploadLock = "attachment uploads"
 
-// cleanupWait bounds removing the bytes of an upload whose record failed.
+// cleanupWait bounds a removal that runs on a context of its own so that it
+// finishes past a stop or a caller going away: an upload's bytes whose record
+// failed, the collection pass's claim and its bytes, and a redacted file's
+// bytes.
 const cleanupWait = 30 * time.Second
 
 // roomIn refuses an upload the deployment has no space for.

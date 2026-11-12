@@ -129,8 +129,8 @@ func registerVariantEdits(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Variant string `path:"variant"`
 	}) (*struct{}, error) {
-		return retireRow(ctx, d, "variant", func(ctx context.Context, tx bun.Tx) (string, func() error, error) {
-			store, product, variant, err := core.VariantIn(ctx, d.In(ctx), tx, in.Product, in.Variant)
+		return retireRow(ctx, d, "variant", func(ctx context.Context, held core.Declaring, tx bun.Tx) (string, func() error, error) {
+			store, product, variant, err := core.VariantIn(ctx, held, tx, in.Product, in.Variant)
 			if err != nil {
 				return "", nil, err
 			}
@@ -242,8 +242,8 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 	}) (*struct{}, error) {
-		return retireRow(ctx, d, "product", func(ctx context.Context, tx bun.Tx) (string, func() error, error) {
-			store, product, err := core.ProductIn(ctx, d.In(ctx), tx, in.Product)
+		return retireRow(ctx, d, "product", func(ctx context.Context, held core.Declaring, tx bun.Tx) (string, func() error, error) {
+			store, product, err := core.ProductIn(ctx, held, tx, in.Product)
 			if err != nil {
 				return "", nil, err
 			}
@@ -321,8 +321,8 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 	}) (*struct{}, error) {
-		return retireRow(ctx, d, "release", func(ctx context.Context, tx bun.Tx) (string, func() error, error) {
-			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d.In(ctx), tx, in.Product, in.BranchOrTag)
+		return retireRow(ctx, d, "release", func(ctx context.Context, held core.Declaring, tx bun.Tx) (string, func() error, error) {
+			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, held, tx, in.Product, in.BranchOrTag)
 			if err != nil {
 				return "", nil, err
 			}
@@ -333,19 +333,19 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 }
 
 // retireRow retires one catalog row, as every level does: an administrator's
-// act, in one transaction with its trail row. find resolves the row and
-// answers what the trail names it by and the store's retirement of it. A row
-// already retired is refused naming noun, so two administrators at once do not
-// both record having retired it.
+// act, in one transaction with its trail row. find resolves the row through
+// the deployment it is handed, and answers what the trail names it by and the
+// store's retirement of it. A row already retired is refused naming noun, so
+// two administrators at once do not both record having retired it.
 func retireRow(ctx context.Context, d core.Declaring, noun string,
-	find func(ctx context.Context, tx bun.Tx) (string, func() error, error)) (*struct{}, error) {
+	find func(ctx context.Context, in core.Declaring, tx bun.Tx) (string, func() error, error)) (*struct{}, error) {
 
 	in := d.In(ctx)
 	if err := core.Administrating(ctx); err != nil {
 		return nil, err
 	}
 	if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
-		about, retire, err := find(ctx, tx)
+		about, retire, err := find(ctx, in, tx)
 		if err != nil {
 			return err
 		}
