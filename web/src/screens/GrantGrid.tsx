@@ -49,13 +49,12 @@ export function GrantGrid({
 }) {
   const products = useProducts();
 
-  // A held role names its product as it is shown; a grant names it as the API
-  // takes it. Both are mapped to the second, or every grant looks like the
-  // first one on that product.
+  // A held role names its product by the name that addresses it, matched
+  // regardless of capitals. A display name is free text and may equal another
+  // product's name, so it is never read as one.
   const canon = new Map<string, string>();
   for (const each of products.data?.items ?? []) {
     canon.set((each.name ?? "").toLowerCase(), each.name ?? "");
-    if (each.display_name) canon.set(each.display_name.toLowerCase(), each.name ?? "");
   }
   const names = (products.data?.items ?? []).map((each) => each.name ?? "").filter(Boolean);
 
@@ -75,11 +74,9 @@ export function GrantGrid({
     );
   }
 
-  // The grants that bear on a product: a role on the product
-  // itself, or one held across the estate. Narrowed here because this is the
-  // thing that knows how a product is spelled in each place — a held role
-  // names it as it is shown and a grant names it as the API takes it — and
-  // judged by the rule in roles.ts, which is the one with tests against it.
+  // The grants that bear on a product: a role on the product itself, or one
+  // held across the estate. Judged by the rule in roles.ts, which is the one
+  // with tests against it.
   function bearingOn(product: string): Holding[] {
     return holds.filter(
       (each) => each.everywhere || canon.get((each.product ?? "").toLowerCase()) === product,
