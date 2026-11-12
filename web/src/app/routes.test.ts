@@ -42,7 +42,7 @@ const SAMPLES: Record<string, () => string[]> = {
   codeFindingsAcrossAt: () => [
     routes.codeFindingsAcrossAt(),
     routes.codeFindingsAcrossAt({ assigned: "nobody", state: "dismissed", series: odd }),
-    routes.codeFindingsAcrossAt({ component: odd, component_version: odd, method: odd }),
+    routes.codeFindingsAcrossAt({ component: odd, component_version: odd, method: "sast" }),
   ],
   codeFindingAt: () => [routes.codeFindingAt(build, odd)],
   suppressionRulesAt: () => [routes.suppressionRulesAt(odd)],
@@ -268,5 +268,14 @@ describe("where a row opens", () => {
       "",
     );
     expect(new URLSearchParams(at.split("?")[1]).has("rule")).toBe(false);
+  });
+});
+
+describe("a code findings address", () => {
+  it("carries only a state and a method the list takes", () => {
+    // @ts-expect-error - a state the code findings list does not have
+    expect(routes.codeFindingsAt("sonic", { state: "closed" })).toContain("state=closed");
+    // @ts-expect-error - a method the code findings list does not have
+    expect(routes.codeFindingsAcrossAt({ method: "fuzzing" })).toContain("method=fuzzing");
   });
 });

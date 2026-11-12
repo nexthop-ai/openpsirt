@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { refusedAt, type Holding } from "../app/families";
 import { codeFindingsAt, repositoriesAt } from "../app/routes";
+import { beneathOf } from "../api/queries";
 import {
   useComponentCodeCounts,
   useCodeFindingTrend,
@@ -228,12 +229,7 @@ export function CodeHistory({
     branch_or_tag: build.branch_or_tag ?? "",
     variant: build.variant ?? "",
   };
-  const beneath = {
-    beneath: component,
-    beneath_version: which.version,
-    beneath_ecosystem: which.ecosystem,
-    beneath_namespace: which.namespace,
-  };
+  const beneath = beneathOf(component, which);
   const [step, setStep] = useState<TrendStep>("day");
   const trend = useCodeFindingTrend(
     product,

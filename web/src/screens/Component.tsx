@@ -8,7 +8,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
-import { unwrap, whichOf } from "../api/queries";
+import { beneathOf, unwrap, whichOf } from "../api/queries";
 import {
   analyticsReportAt,
   decisionAt,
@@ -1234,6 +1234,11 @@ function Ships({
 // The trend window of what opened and closed at this package and under it.
 function History({ product, pkg, here }: { product: string; pkg: Package; here: Build }) {
   const component = pkg.name;
+  const beneath = beneathOf(component, {
+    version: pkg.version,
+    ecosystem: here.ecosystem,
+    namespace: pkg.namespace,
+  });
   const [step, setStep] = useState<TrendStep>("day");
   const trend = useQuery({
     queryKey: [
@@ -1255,12 +1260,9 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
               product,
               branch_or_tag: here.branch_or_tag ?? "",
               variant: here.variant ?? "",
-              beneath: component,
               // The subtree of one component, so it says which where the name
               // is held as more than one.
-              ...(pkg.version ? { beneath_version: pkg.version } : {}),
-              ...(here.ecosystem ? { beneath_ecosystem: here.ecosystem } : {}),
-              ...(pkg.namespace ? { beneath_namespace: pkg.namespace } : {}),
+              ...beneath,
               ...stepQuery(step),
             },
           },
@@ -1288,10 +1290,7 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
           to={analyticsReportAt("findings-burndown", {
             branch_or_tag: here.branch_or_tag,
             variant: here.variant,
-            beneath: component,
-            beneath_version: pkg.version || undefined,
-            beneath_ecosystem: here.ecosystem || undefined,
-            beneath_namespace: pkg.namespace || undefined,
+            ...beneath,
           })}
         >
           this and what it pulls in

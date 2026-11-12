@@ -23,11 +23,13 @@ address can set is a narrowing nobody uses.
 |---|---|
 | A filter is labeled with the question it asks, grouped: severity and risk, what upstream did, triage progress, where the row came from, the component, time. A value says what it is | |
 | One chip per filter in force above the list, naming filter and value, removable by clicking, whether or not the panel is open | A count alone hides what narrows |
+| A value the list leaves off the request draws no chip and is not counted among the filters in force | A chip over an unnarrowed list says it answers a question the server was not asked |
 | The selection is a chip too, first, one per level, product first | It rides on the path, so nothing else shows why the list is narrower |
 | Removing a selection chip widens by a level and carries the filters, but not the branch and variant, which the new address puts back | |
 | A subtree goes with the build it was walked in; widening out of the build drops it, and a selection that is not one build does not send it | The server refuses it over anything else |
 | What qualifies a subtree's root (version, ecosystem, namespace) goes with the root: a new root, a cleared root and a removed chip drop them | |
 | A subtree started at every component of one package identifier is a chip of its own, and goes with the build as a subtree does | A repository row at several commits arrives this way |
+| A subtree has one root: naming it by component drops one named by package identifier, and the reverse | The server refuses a list naming both |
 | A date the server does not take as YYYY-MM-DD, or that rolls over such as February 30, is left off the request | The server refuses the whole list over it |
 | A cleared filter drops its key and never writes its default | The list's three silent-address defaults apply only where the key is absent |
 | The count of filters in force is read from the address | |
@@ -36,7 +38,7 @@ address can set is a narrowing nobody uses.
 | New today writes the date a day back, never the word, as the panel's First seen after; it is pressed only while that date is a day back, and does not clear another date | A sent list means the same thing when opened |
 | Open on is a date in the panel and a chip, and reads the list as it stood that day, closed rows included (`design-docs/analytics-controls.md` § The disposition register) | "What were we carrying on the day of the audit" |
 | A bar filter is one control: name, value and menu. A value in force tints it. A multi-answer filter (decision state, holder) ticks and stays open; a step on a scale (severity, due) picks one and closes | A name cannot wrap away from its value |
-| A control holding several answers says the first and how many more: "Undecided +1". The bar's menus and the panel's tick lists keep the offered order, open on an arrow key, move with arrows, Home and End, and close on Escape back to the control | |
+| A control holding several answers says the first and how many more: "Undecided +1". The bar's menus and the panel's tick lists keep the offered order, open on an arrow key, move with arrows, Home and End, close on Escape back to the control, and close on Tab as focus moves on; one keyboard handler serves both | A list left open sits over the next control |
 | The panel is shut until opened, whatever the address narrows by | It is most of a screen, and the chips already say it |
 | Exploited and fix available are two flags; a kept filter in the former single word is rewritten by the upgrade, and an address elsewhere opens without that narrowing | "Exploited, and a fix exists" is a batch somebody assembles |
 | The decision state sits beside the severity floor on the bar | What is unanswered is reached for first; urgency already leads with exploited, and the fix is a column |
@@ -79,7 +81,7 @@ boxes, the component, label, VEX publisher and weakness are chip fields.
 | Severity stays a floor | |
 | Ticks sit behind a control saying what is ticked, and the chips name each | A closed control reading "Any" over three ticks looks unnarrowed |
 | Carried as the parameter repeated, marked exploded on both sides; an HTTP test asks for two states and counts rows | A server reading the first word narrows less, silently |
-| A word the server does not take is left off the request, its chip still naming it; each parameter's words are checked against the generated client both ways | A stale saved word refuses the whole list |
+| A word the server does not take is left off the request; each parameter's words are checked against the generated client both ways | A stale saved word refuses the whole list |
 | A comma ends a word in a typed filter | A pasted list is several words |
 
 | Rule over a group | Reason |

@@ -3,7 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
-import { statusOf, unwrap } from "./queries";
+import { PAGE, statusOf, unwrap } from "./queries";
 
 // An advisory as the screens read and change it: the list, the one, what it
 // covers, and what has gone out.
@@ -43,10 +43,6 @@ export function useAfterAdvisory() {
     for (const key of afterAdvisory) void queries.invalidateQueries({ queryKey: [key] });
   };
 }
-
-// The rows one request carries. The server's own default, named here so the
-// pager and the request cannot disagree about where a page ends.
-export const PAGE = 50;
 
 export function useAdvisories(offset: number): UseQueryResult<{
   items: Listed[] | null;

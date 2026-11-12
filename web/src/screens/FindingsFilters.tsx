@@ -11,7 +11,7 @@ import { Unread } from "../ui/Reading";
 import type { Readable } from "../ui/Count";
 import { called, identifiersIn, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
 import { useState } from "react";
-import { BENEATH_PARTS } from "./list";
+import { BENEATH_PARTS, validFilter } from "./list";
 // The findings list's filters, apart from the list itself.
 //
 // Everything the server can narrow by is here, named for what it asks, each
@@ -260,7 +260,12 @@ export function activeFilters(
   weaknesses?: Map<string, Named>,
 ): Active[] {
   const out: Active[] = [];
-  const at = (key: string) => params.get(key) ?? "";
+  // A value the list does not send draws no chip: it narrows nothing.
+  const at = (key: string) => {
+    const value = params.get(key) ?? "";
+    return validFilter(key, value) ? value : "";
+  };
+  const all = (key: string) => params.getAll(key).filter((value) => validFilter(key, value));
   const add = (key: string, label: string, value: string, clears?: [string, string][]) => {
     if (value) out.push({ key, label, value, clears: clears ?? [[key, ""]] });
   };
@@ -287,7 +292,7 @@ export function activeFilters(
   // than as "3 chosen", because a summary somebody cannot act on sends them
   // back into the panel to find out what it means.
   const each = (key: string, label: string, pairs: Pairs) => {
-    for (const value of params.getAll(key).filter(Boolean)) {
+    for (const value of all(key)) {
       out.push({ key, label, value: said(pairs, value), clears: [[key, value]] });
     }
   };
@@ -310,7 +315,7 @@ export function activeFilters(
   // chip widens to both rather than deleting the parameter, because deleting
   // it is how the address asks for the default back.
   const oneOf = (key: string, label: string, pairs: Pairs, both: string[]) => {
-    const chosen = params.getAll(key).filter(Boolean);
+    const chosen = all(key);
     if (chosen.length !== 1) return;
     out.push({
       key,
@@ -334,7 +339,7 @@ export function activeFilters(
   each("vex_status", "VEX status", VEX_STATUS);
   each("build_says", "Build says", BUILD_SAYS);
   each("component", "Component", []);
-  for (const kind of params.getAll("ecosystem").filter(Boolean)) {
+  for (const kind of all("ecosystem")) {
     out.push({
       key: "ecosystem",
       label: "Package type",
@@ -372,7 +377,7 @@ export function activeFilters(
   // The same for a decision: the decision page links to where its rows sat. One
   // chip for the decision and the states together, because the states mean
   // nothing without it.
-  const decisionStates = params.getAll("decision_state").filter(Boolean);
+  const decisionStates = all("decision_state");
   add(
     "decision",
     "Where decision",
@@ -385,7 +390,7 @@ export function activeFilters(
   );
   add("proposed_after", "Decided after", at("proposed_after"));
   add("closed_after", "Closed after", at("closed_after"));
-  for (const id of params.getAll("weakness").filter(Boolean)) {
+  for (const id of all("weakness")) {
     const named = weaknesses?.get(id);
     out.push({
       key: "weakness",

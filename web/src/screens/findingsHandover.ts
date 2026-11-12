@@ -6,6 +6,10 @@ import { api } from "../api/client";
 import { unwrap, whichOf } from "../api/queries";
 import type { Row, withinVariant } from "./list";
 
+// The most rows one assignment may name. The server takes this many picked rows
+// in one request; past it, "select all" asks by the filter and names none.
+export const NAMED_AT_ONCE = 2000;
+
 // useHandOver is the two ways the findings list hands rows to a person or a
 // team.
 //

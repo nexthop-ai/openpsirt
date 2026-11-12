@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { unwrap } from "../api/queries";
+import { PAGE, unwrap } from "../api/queries";
 import { settingsAt, type Build } from "../app/routes";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -13,9 +13,6 @@ import { Loading } from "../ui/Loading";
 import { Paged } from "../ui/Paged";
 import { Wide } from "../ui/Wide";
 import { at as minute } from "../ui/when";
-
-// A page of a list read here.
-const PAGE = 50;
 
 // How often a page holding an unsettled run is asked for again.
 const UNSETTLED = 15_000;

@@ -21,8 +21,9 @@ import { Count } from "../ui/Count";
 import { QueueFilters } from "./QueueFilters";
 import { REASONS, wordsFor } from "./queueReasons";
 import { fileAt } from "../api/links";
+import { PAGE } from "../api/queries";
 import { Card, Dated } from "./QueueCard";
-import { PAGE, useQueueReads } from "./useQueueReads";
+import { useQueueReads } from "./useQueueReads";
 import { useQueueApproval } from "./useQueueApproval";
 import { Downloads } from "../ui/Downloads";
 

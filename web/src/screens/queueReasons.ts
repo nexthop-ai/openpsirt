@@ -8,43 +8,44 @@ export type Reason = NonNullable<
   NonNullable<paths["/v1/review-queue"]["get"]["parameters"]["query"]>["reason"]
 >;
 
-// The three lists the queue holds, in the order the tabs offer them, with the
-// words each is drawn in.
+// The lists the queue holds, in the order the tabs offer them, with the words
+// each is drawn in. Keyed by every reason the server takes, so one it adds is
+// a compile error here.
 type Words = { reason: Reason; tab: string; empty: string; stated: string };
 
-const APPROVAL: Words = {
-  reason: "approval",
-  tab: "To approve",
-  empty: "A decision needing a second person would appear here.",
-  stated: "Pending approval",
-};
-
-export const REASONS: Words[] = [
-  APPROVAL,
-  {
-    reason: "expired-deferral",
+const WORDS = {
+  approval: {
+    tab: "To approve",
+    empty: "A decision needing a second person would appear here.",
+    stated: "Pending approval",
+  },
+  "expired-deferral": {
     tab: "Expired deferrals",
     empty: "A deferral whose date has passed would appear here.",
     stated: "Deferral expired",
   },
-  {
-    reason: "missed-fix-date",
+  "missed-fix-date": {
     tab: "Missed fix dates",
     empty: "A promised upgrade or patch whose date passed with the finding open would appear here.",
     stated: "Fix date missed",
   },
-];
+} satisfies Record<Reason, Omit<Words, "reason">>;
+
+export const REASONS: Words[] = (Object.keys(WORDS) as Reason[]).map((reason) => ({
+  reason,
+  ...WORDS[reason],
+}));
 
 // The words one list is drawn in.
 export function wordsFor(reason: Reason): Words {
-  return REASONS.find((each) => each.reason === reason) ?? APPROVAL;
+  return { reason, ...WORDS[reason] };
 }
 
 // The list the address names. Anything else is the approvals, which is what
 // the queue opens on.
 export function queueReason(params: URLSearchParams): Reason {
-  const asked = params.get("reason");
-  return REASONS.find((each) => each.reason === asked)?.reason ?? "approval";
+  const asked = params.get("reason") ?? "";
+  return Object.hasOwn(WORDS, asked) ? (asked as Reason) : "approval";
 }
 
 // What a dated decision promised, as a card names it: "Upgrade to 3.0.15 by

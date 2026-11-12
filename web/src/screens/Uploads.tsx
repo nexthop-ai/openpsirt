@@ -7,7 +7,7 @@ import { at as minute, on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { unwrap } from "../api/queries";
+import { PAGE, unwrap } from "../api/queries";
 import { Carried } from "../ui/Carried";
 import { CarriedPatches } from "../ui/CarriedPatches";
 import { Empty } from "../ui/Empty";
@@ -24,9 +24,6 @@ import { counted as familyCounted, holding } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
 import { AnalysisRuns, Documents } from "./UploadLists";
 import { Paged } from "../ui/Paged";
-
-// A page of receipts. Every upload past it is reached through the pager.
-const PAGE = 50;
 
 // How often a page holding an unsettled upload is asked for again.
 const UNSETTLED = 15_000;
