@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -445,6 +446,46 @@ func TestAnActThatCouldNotFinishLeavesNothingBehind(t *testing.T) {
 		if strings.Contains(got.Body.String(), `"newcomer"`) {
 			t.Errorf("the person was left behind by a request that answered a refusal: %s",
 				got.Body.String())
+		}
+	})
+}
+
+// Declared from two requests at once, a team is declared by one of them: the
+// request losing the race runs again, finds the team, and says it made nothing.
+func TestDeclaringOneTeamTwiceAtOnceIsOneDeclaration(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for round := range 4 {
+			name := "kernel-" + string(rune('a'+round))
+			codes := make([]int, 4)
+			var wait sync.WaitGroup
+			for i := range codes {
+				wait.Go(func() {
+					codes[i] = httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+						`{"name":"`+name+`"}`).Code
+				})
+			}
+			wait.Wait()
+			created := 0
+			for i, code := range codes {
+				switch code {
+				case http.StatusCreated:
+					created++
+				case http.StatusOK:
+				default:
+					t.Fatalf("declaring %s at once: caller %d answered %d", name, i+1, code)
+				}
+			}
+			if created != 1 {
+				t.Errorf("declaring %s at once answered created %d times, want once", name, created)
+			}
+			rows, err := r.DB.DB.NewSelect().TableExpr(`"admin_change"`).
+				Where(`"about" = ?`, name).Count(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rows != 1 {
+				t.Errorf("declaring %s at once left %d trail rows, want one", name, rows)
+			}
 		}
 	})
 }

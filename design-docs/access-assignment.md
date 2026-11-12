@@ -74,6 +74,7 @@ groups to use instead.
 | The queue is narrowed per viewer, counts included, and a matrix test asserts it | "Kernel team · 14" says two embargoed items exist |
 | A team gives up queued work no remaining member reads, whenever its members or their reading change; retiring empties the queue | § Lost reading |
 | Retiring a team keeps its row and name, and declaring the name again brings it back | Assigned work keeps a name to show |
+| Declaring one team, or putting one person on a team, from two requests at once is one team or one membership, and neither request is refused | A deployment script run twice at once is the ordinary case; the request losing the race to the index runs again and finds the row |
 
 | Bound | Reason |
 |---|---|

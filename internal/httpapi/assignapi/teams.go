@@ -115,6 +115,9 @@ func registerTeams(api huma.API, a core.Administering) {
 		var body TeamBody
 		var declared bool
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			// Every attempt decides afresh: a retry runs against a team
+			// another request has just declared.
+			declared = false
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err

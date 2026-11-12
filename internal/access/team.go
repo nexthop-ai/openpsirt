@@ -136,6 +136,11 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			CreatedAt: s.now().Truncate(time.Microsecond),
 		}
 		if _, err := tx.NewInsert().Model(fresh).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				// Declared by another request since the lookup. Run again,
+				// the lookup finds it and this answers with that team.
+				return fmt.Errorf("declare the team %q: %w", matched, database.ErrGoAgain)
+			}
 			return err
 		}
 		*team = *fresh
@@ -273,7 +278,8 @@ func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 // ON DUPLICATE KEY UPDATE, and engine-specific SQL stays out of the core.
 // Both statements in one transaction, so what the read saw is what the write
 // writes against; two administrators adding the same person at once resolve
-// against the primary key.
+// against the primary key, and the one refused by it runs again and finds the
+// membership.
 func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool, error) {
 	added := false
 	add := func(ctx context.Context, db bun.IDB) error {
@@ -286,12 +292,19 @@ func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool
 		if on > 0 {
 			return nil
 		}
-		_, err = db.NewInsert().Model(&Membership{
+		if _, err := db.NewInsert().Model(&Membership{
 			TeamID: teamID, PersonID: personID,
 			AddedAt: s.now().Truncate(time.Microsecond), AddedBy: by,
-		}).Exec(ctx)
-		added = err == nil
-		return err
+		}).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				// Added by another request since the count. Run again, the
+				// count finds the membership and this answers already there.
+				return fmt.Errorf("put person %d on team %d: %w", personID, teamID, database.ErrGoAgain)
+			}
+			return err
+		}
+		added = true
+		return nil
 	}
 	if err := database.Within(ctx, s.db, add); err != nil {
 		return false, fmt.Errorf("put that person on the team: %w", err)
