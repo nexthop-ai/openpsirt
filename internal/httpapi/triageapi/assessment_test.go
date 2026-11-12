@@ -178,3 +178,55 @@ func TestAnAssessmentSomebodyMayNotReachAnswersAsOneNobodyMade(t *testing.T) {
 		}
 	})
 }
+
+// TestEveryPageOfWaitingRatingsCarriesTheStoresTotal pins the steady state:
+// the count and what agreeing would do ask one readability rule, so no
+// waiting claim is left off a page and every page reports the same total.
+func TestEveryPageOfWaitingRatingsCarriesTheStoresTotal(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedInTwoImages(t)
+		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-9998"} {
+			made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+				"/v1/products/mine/issues/"+issue+"/assessment",
+				`{"severity":"low","reasoning":"Not reachable in how we build it."}`)
+			if made.Code != http.StatusCreated {
+				t.Fatalf("rating %s answered %d: %s", issue, made.Code, made.Body.String())
+			}
+			var decision struct {
+				NeedsApproval bool `json:"needs_approval"`
+			}
+			if err := json.Unmarshal(made.Body.Bytes(), &decision); err != nil {
+				t.Fatal(err)
+			}
+			if !decision.NeedsApproval {
+				t.Fatalf("rating %s needed nobody, so no page asks what agreeing would do", issue)
+			}
+		}
+		seen := map[int64]bool{}
+		for offset := range 2 {
+			var page struct {
+				Items []struct {
+					ID int64 `json:"id"`
+				} `json:"items"`
+				Total int `json:"total"`
+			}
+			got := httpapitest.AsPerson(t, r, "reviewer", http.MethodGet,
+				fmt.Sprintf("/v1/assessments?state=proposed&limit=1&offset=%d", offset), "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("listing answered %d: %s", got.Code, got.Body.String())
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &page); err != nil {
+				t.Fatal(err)
+			}
+			if page.Total != 2 || len(page.Items) != 1 {
+				t.Errorf("page %d holds %d of a total of %d; want one of two", offset, len(page.Items), page.Total)
+			}
+			for _, item := range page.Items {
+				seen[item.ID] = true
+			}
+		}
+		if len(seen) != 2 {
+			t.Errorf("the two pages hold %d ratings; want both", len(seen))
+		}
+	})
+}

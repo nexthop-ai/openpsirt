@@ -265,10 +265,10 @@ func registerAssessment(api huma.API, in core.Deps) {
 
 // assessmentPage is the page of assessments the list answers, and its total.
 //
-// A waiting claim WhatAgreeingWouldDo did not answer stopped being readable
-// between the list and that read. It is left off rather than failing the
-// whole page, and out of the total, which counts only what the reader may
-// reach.
+// The count and WhatAgreeingWouldDo ask one readability rule, so a waiting
+// claim it did not answer stopped being readable between the two reads. It is
+// left off rather than failing the whole page, and the page's total is
+// lowered to match what the page shows.
 func assessmentPage(decisions []finding.Assessment, total int, would map[int64]finding.Consequence,
 	bodyOf func(finding.Assessment) AssessmentBody) ([]AssessmentBody, int) {
 
