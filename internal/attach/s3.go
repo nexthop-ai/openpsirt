@@ -116,6 +116,13 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 			// malformed escape in a password is the commonest reason it fails.
 			return nil, errors.New("object store endpoint: not an address at all")
 		}
+		// A password holding an unescaped "/", "?" or "#" parses with part
+		// of it as the host, so the client would be pointed there and the
+		// address shown with the credential in it.
+		if redact.Stray(parsed) {
+			return nil, fmt.Errorf("object store endpoint: %s: percent-encode "+
+				"/ ? # @ in the user name and password", redact.URL(endpoint))
+		}
 		// A name and password in the address are taken out of it and handed
 		// over as credentials, which is also what makes the signing
 		// well-defined. The client is given the address without them, so

@@ -247,6 +247,14 @@ func TestAnEndpointIsShownWithoutItsCredentials(t *testing.T) {
 	if err == nil || strings.Contains(err.Error(), "hunter2") {
 		t.Errorf("a plaintext endpoint answered %v, want a refusal without the signature", err)
 	}
+	// A password with an unescaped "/" parses with its start as the host.
+	_, err = NewBucket(context.Background(), BucketConfig{
+		Endpoint: "http://AKIAX:123/" + "abcSecret" + "@minio.example.test:9000", Bucket: "advisories",
+		Region: "us-east-1", Names: directoryNames, AllowHTTP: true,
+	})
+	if err == nil || strings.Contains(err.Error(), "abcSecret") || strings.Contains(err.Error(), "123") {
+		t.Errorf("a spilled endpoint answered %v, want a refusal without the password", err)
+	}
 	bucket, err := NewBucket(context.Background(), BucketConfig{
 		Endpoint: (&url.URL{Scheme: "https", User: url.UserPassword("name", "hunter2"),
 			Host: "s3.example.test", Path: "/", RawQuery: "token=hunter2"}).String(),
