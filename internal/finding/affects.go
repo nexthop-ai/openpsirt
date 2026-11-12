@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -213,7 +215,10 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// Each build taken out is counted where this closed a row of it: a
 		// concurrent edit that closed its rows first took it out, and this
 		// did not.
-		for build, ofBuild := range closing {
+		// In order of build, so two edits closing the same builds lock them
+		// in the same order.
+		for _, build := range slices.Sorted(maps.Keys(closing)) {
+			ofBuild := closing[build]
 			closed := int64(0)
 			if err := database.IDsInBatches(ctx, ofBuild, func(ctx context.Context, batch []int64) error {
 				result, err := tx.NewUpdate().Model((*Finding)(nil)).

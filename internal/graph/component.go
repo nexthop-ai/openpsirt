@@ -262,6 +262,11 @@ func StoredPurl(purl string) string {
 		return purl
 	}
 	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
+	if hasSubpath && strings.Contains(subpath, "@") {
+		// A subpath holding an "@" is the rest of an address whose password
+		// holds a fragment mark, so it is read as part of that address.
+		qualifiers, subpath, hasSubpath = qualifiers+"#"+subpath, "", false
+	}
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
 	for _, pair := range pairs {

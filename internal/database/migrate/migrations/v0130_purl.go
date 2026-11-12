@@ -243,6 +243,9 @@ func purlWithoutCredentialV0130(purl string) string {
 		return purl
 	}
 	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
+	if hasSubpath && strings.Contains(subpath, "@") {
+		qualifiers, subpath, hasSubpath = qualifiers+"#"+subpath, "", false
+	}
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
 	for _, pair := range pairs {
