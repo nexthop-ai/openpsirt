@@ -156,7 +156,15 @@ describe("a code finding", () => {
     });
     const opened = [...mount.host().querySelectorAll('a[target="_blank"]')];
     expect(opened).toHaveLength(2);
-    for (const a of opened) expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+    for (const a of opened) {
+      expect((a.getAttribute("rel") ?? "").split(" ").sort()).toEqual(["noopener", "noreferrer"]);
+    }
+  });
+
+  it("draws an address that fails the check as words, never a link", async () => {
+    await drawn(false, { ...EVIDENCE, compare: "javascript:alert(1)" });
+    expect(mount.host().querySelector('a[href^="javascript"]')).toBeNull();
+    expect(mount.host().textContent).not.toContain("Compare builds");
   });
 
   it("names the commit its repository was at in the build it was last seen in and the next", async () => {

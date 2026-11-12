@@ -21,7 +21,7 @@ import { Failed } from "../ui/Failed";
 import { Holder } from "../ui/Holder";
 import { Loading } from "../ui/Loading";
 import { labeled } from "../ui/Outcome";
-import { linkable } from "../ui/addressable";
+import { Outward } from "../ui/Outward";
 import { on } from "../ui/when";
 import {
   CODE_FINDING_OUTCOMES,
@@ -121,18 +121,9 @@ export function CodeFinding() {
             <Commit sha={evidence.not_seen_commit} />
           )}
           {evidence.unchanged && " · the code did not change between those builds"}
-          {linkable(evidence.compare) && (
-            <>
-              {" · "}
-              <a
-                href={linkable(evidence.compare) ?? undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Compare builds
-              </a>
-            </>
-          )}
+          <Outward href={evidence.compare} className="" unlinked={null} lead=" · ">
+            Compare builds
+          </Outward>
         </p>
       </div>
 
@@ -230,26 +221,22 @@ function Commit({ sha }: { sha: string }) {
 
 // One location the analyzer named: where, what it said there, and the code.
 function Location({ location }: { location: CodeFindingOccurrence }) {
-  const href = linkable(location.link);
   const where = located(location.path, location.start_line);
   return (
     <div>
       <div>
-        {href ? (
-          <a
-            className="mono"
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={location.revision}
-          >
-            {where}
-          </a>
-        ) : (
-          <span className="mono" title={location.unlinked}>
-            {where}
-          </span>
-        )}
+        <Outward
+          href={location.link}
+          className="mono"
+          title={location.revision}
+          unlinked={
+            <span className="mono" title={location.unlinked}>
+              {where}
+            </span>
+          }
+        >
+          {where}
+        </Outward>
         {location.function && <span className="hint"> in {location.function}</span>}
         {location.approximate && (
           <span className="hint" title="The line is where the code was, not where it is.">
