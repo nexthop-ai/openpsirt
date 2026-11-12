@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useIssueIn } from "../api/issue";
+import { BUILDS_MOST, useIssueIn } from "../api/issue";
 import { Failed } from "../ui/Failed";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { Required } from "../ui/Required";
@@ -63,7 +63,6 @@ export function AffectedBuilds({
   // different build attached to them. There is no safe half: either the whole
   // set is in hand or nothing is written.
   const rows = holds.data?.items ?? [];
-  const partial = (holds.data?.total ?? rows.length) > rows.length;
 
   const now = useMemo(() => {
     const held = new Set<string>();
@@ -72,6 +71,8 @@ export function AffectedBuilds({
     }
     return held;
   }, [holds.data, product]);
+  // Past the most one write names, the whole list cannot be sent either.
+  const partial = (holds.data?.total ?? rows.length) > rows.length || now.size > BUILDS_MOST;
 
   const set = useMutation({
     mutationFn: async (picked: string[]) =>
@@ -185,7 +186,13 @@ export function AffectedBuilds({
           <button
             type="button"
             className="btn"
-            disabled={!changed || picked.length === 0 || wantsReason || set.isPending}
+            disabled={
+              !changed ||
+              picked.length === 0 ||
+              picked.length > BUILDS_MOST ||
+              wantsReason ||
+              set.isPending
+            }
             onClick={() => set.mutate(picked)}
           >
             {set.isPending ? "Setting…" : "Set which builds it affects"}
@@ -193,6 +200,11 @@ export function AffectedBuilds({
           {picked.length === 0 && (
             <span className="hint" style={{ marginLeft: 8 }}>
               Pick at least one build.
+            </span>
+          )}
+          {picked.length > BUILDS_MOST && (
+            <span className="hint" style={{ marginLeft: 8 }}>
+              {BUILDS_MOST.toLocaleString()} builds at most.
             </span>
           )}
         </>

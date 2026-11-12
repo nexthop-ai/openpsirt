@@ -155,11 +155,12 @@ export function Findings() {
   // rather than the raw parameters, so the default is visible, removable and
   // travels with a link like any other filter.
   const asked = useMemo(() => asAsked(params, view), [params, view]);
-  const advanced = activeFilters(asked).length;
+  const scope = { product, branch_or_tag: branchOrTag, variant };
+  const advanced = activeFilters(asked, undefined, scope).length;
   // What narrows the list from behind More filters, which is every chip but
   // the ones the bar sets itself — so the count on that button is about what
   // it opens.
-  const elsewhere = activeFilters(asked).filter(
+  const elsewhere = activeFilters(asked, undefined, scope).filter(
     (each) =>
       !ON_THE_BAR.has(each.key) && !(each.key === "opened_after" && each.value === daysBack(1)),
   ).length;
@@ -693,7 +694,7 @@ export function Findings() {
           meant opening a panel and looking at nine controls. */}
       <Narrowed
         params={asked}
-        scope={{ product, branch_or_tag: branchOrTag, variant }}
+        scope={scope}
         // Widening a level is a move rather than a parameter change, because
         // the selection rides on the path. The filters travel with it: what
         // was asked of one product is the same question asked of all of them,

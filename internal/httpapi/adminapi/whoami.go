@@ -114,8 +114,8 @@ type WhoBody struct {
 	// there contradicts the setting the server dates it by.
 	DiscloseAfter string `json:"disclose_after,omitempty" doc:"The time an undisclosed flaw reported from outside has before its disclosure date, as a duration such as 2160h0m0s"`
 	// MostWeaknesses is how many weaknesses one recorded flaw states. A
-	// screen picking them stops there, rather than sending a record the
-	// server refuses whole.
+	// screen picking them stops there, since a record past it is refused
+	// whole.
 	MostWeaknesses int `json:"most_weaknesses,omitempty" doc:"The number of weaknesses one recorded flaw states at most. A screen picking them stops at it"`
 	// Outcomes is the same for everybody and is answered here because every
 	// screen that records or reads a decision needs it before it draws.

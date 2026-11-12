@@ -21002,12 +21002,12 @@ paths:
           schema:
             description: The issue, by any name it is known under
             type: string
-        - description: "Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused rather than answered empty"
+        - description: "Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found"
           explode: false
           in: query
           name: product
           schema:
-            description: "Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused rather than answered empty"
+            description: "Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found"
             type: string
         - explode: false
           in: query

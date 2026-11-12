@@ -10,6 +10,7 @@ import { accept, answer, screen, serve, settle, mounted } from "../test/mount";
 import { readingDependencies } from "../test/reach";
 import { change, press } from "../test/controls";
 import { belongTo } from "../app/drafts";
+import { FLOORS } from "../ui/severities";
 
 const mount = mounted();
 
@@ -49,7 +50,7 @@ describe("the review queue", () => {
     const floors = Array.from(
       mount.host().querySelectorAll<HTMLOptionElement>('select[aria-label="Severity"] option'),
     ).map((each) => each.value);
-    expect(floors).toEqual(["", "medium", "high", "critical"]);
+    expect(floors).toEqual(["", ...FLOORS.filter((floor) => floor !== "low")]);
   });
 
   it("exports what became of your decisions on the Mine tab", async () => {

@@ -383,6 +383,19 @@ export function validFilter(key: string, value: string): boolean {
   return CHECKED[key]?.(value) ?? true;
 }
 
+// The address with every checked filter's value the list does not send taken
+// out. Such a value narrows nothing and draws no chip, so nothing else
+// removes it.
+export function withoutInvalid(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  for (const key of Object.keys(CHECKED)) {
+    const kept = next.getAll(key).filter((value) => validFilter(key, value));
+    next.delete(key);
+    for (const value of kept) next.append(key, value);
+  }
+  return next;
+}
+
 // An exploit likelihood the server takes: above nothing, at most certain.
 function likelihoodOf(raw: string | null): number | undefined {
   const asked = num(raw, 0, 1);
@@ -499,7 +512,10 @@ export function listQuery(params: URLSearchParams) {
     ...(params.get("beneath") && params.get("beneath_namespace")
       ? { beneath_namespace: params.get("beneath_namespace") ?? "" }
       : {}),
-    ...(params.get("beneath_purl") ? { beneath_purl: params.get("beneath_purl") ?? "" } : {}),
+    // One root: the server refuses both, and a component names the narrower.
+    ...(params.get("beneath_purl") && !params.get("beneath")
+      ? { beneath_purl: params.get("beneath_purl") ?? "" }
+      : {}),
     ...(params.get("under_build") === "yes" ? { under_build: true } : {}),
     ...(states.length > 0 ? { state: states } : {}),
     ...(outcomes.length > 0 ? { outcome: outcomes } : {}),
@@ -543,9 +559,7 @@ export function acrossProducts(query: ReturnType<typeof listQuery>) {
 // variant it was about is widened away narrows nothing and refuses the list.
 export function withinVariant(query: ReturnType<typeof listQuery>, named: boolean) {
   if (named || query.across_variants !== "only") return query;
-  const { across_variants, ...rest } = query;
-  void across_variants;
-  return rest;
+  return without(query, ["across_variants"] as const);
 }
 
 // A subtree is a walk over one build's edges, and the server refuses it over a
@@ -553,6 +567,20 @@ export function withinVariant(query: ReturnType<typeof listQuery>, named: boolea
 // build, for the reason the variant's filter is dropped above.
 export function withinBuild(query: ReturnType<typeof listQuery>, oneBuild: boolean) {
   return oneBuild ? query : without(query, SUBTREE);
+}
+
+// Where a list is asked: the product, branch and variant its selection names,
+// each empty where it names none.
+export type ListScope = { product: string; branch_or_tag: string; variant: string };
+
+// The request a list sends for an address, as its selection shapes it: a
+// subtree only over one build, what is specific to a variant only where one
+// is named, and neither those nor what differs between builds across
+// products.
+export function sentFor(params: URLSearchParams, scope: ListScope) {
+  const oneBuild = Boolean(scope.branch_or_tag && scope.variant);
+  const query = withinBuild(withinVariant(listQuery(params), Boolean(scope.variant)), oneBuild);
+  return scope.product ? query : acrossProducts(query);
 }
 
 // A row's own identity, for finding it again in a list read afresh, and the
@@ -563,9 +591,6 @@ export function identityOf(row: Row): string {
   return `${row.product ?? ""} ${row.vulnerability} ${row.fold}`;
 }
 
-// The key the findings list caches a page of rows under. A finding opened from
-// the list reads its neighbors from that page where it can, so both sides name
-// the page through this one key.
 // The mark a finding's `from` carries where the list it was opened from spans
 // every product. The list's own query never reads it, so it reaches no server.
 export const ACROSS = "across";
@@ -578,6 +603,9 @@ export function withoutAcross(from: string): string {
   return next.toString();
 }
 
+// The key the findings list caches a page of rows under. A finding opened from
+// the list reads its neighbors from that page where it can, so both sides name
+// the page through this one key.
 export function findingsPageKey(
   product: string,
   branchOrTag: string,

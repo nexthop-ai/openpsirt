@@ -213,7 +213,6 @@ const EVERY = new URLSearchParams(
     "declared_as=library",
     "under=sonic-swss",
     "beneath=curl",
-    "beneath_purl=pkg:github/sonic-net/sonic-swss",
     "under_build=yes",
     "hide=zlib",
     "running=overdue",
@@ -283,5 +282,36 @@ describe("a chip and the by-upgrade list", () => {
     for (const chip of chips) {
       expect(sent(without(EVERY, chip)) !== sent(EVERY), chip.key).toBe(chip.key in BUMP_FILTERS);
     }
+  });
+});
+
+describe("a chip and where the list is asked", () => {
+  it("draws none for a filter the selection leaves off the request", () => {
+    const params = new URLSearchParams("beneath=openssl&differs=1&state=undecided");
+    const keys = (scope: { product: string; branch_or_tag: string; variant: string }) =>
+      activeFilters(params, undefined, scope).map((chip) => chip.key);
+    expect(keys({ product: "", branch_or_tag: "", variant: "" })).toEqual(["state"]);
+    expect(keys({ product: "sonic", branch_or_tag: "", variant: "" })).toEqual([
+      "state",
+      "differs",
+    ]);
+    expect(keys({ product: "sonic", branch_or_tag: "master", variant: "broadcom" })).toEqual([
+      "state",
+      "beneath",
+      "differs",
+    ]);
+  });
+
+  it("draws one subtree root where the address names both", () => {
+    const params = new URLSearchParams("beneath=openssl&beneath_purl=pkg:github/a/b");
+    expect(activeFilters(params).map((chip) => chip.key)).toEqual(["beneath"]);
+    expect(listQuery(params)).not.toHaveProperty("beneath_purl");
+  });
+});
+
+describe("clearing every chip of an address carrying a value the list does not send", () => {
+  it("takes that value out too", () => {
+    const cleared = withoutAny(new URLSearchParams("state=bogus&open_for=0&sort=age"));
+    expect(cleared.toString()).toBe("sort=age");
   });
 });

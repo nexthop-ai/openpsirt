@@ -23,13 +23,13 @@ address can set is a narrowing nobody uses.
 |---|---|
 | A filter is labeled with the question it asks, grouped: severity and risk, what upstream did, triage progress, where the row came from, the component, time. A value says what it is | |
 | One chip per filter in force above the list, naming filter and value, removable by clicking, whether or not the panel is open | A count alone hides what narrows |
-| A value the list leaves off the request draws no chip and is not counted among the filters in force | A chip over an unnarrowed list says it answers a question the server was not asked |
+| A value the list leaves off the request, for its value or for the selection, draws no chip and is not counted among the filters in force; clearing every filter takes it out of the address too | A chip over an unnarrowed list says it answers a question the server was not asked |
 | The selection is a chip too, first, one per level, product first | It rides on the path, so nothing else shows why the list is narrower |
 | Removing a selection chip widens by a level and carries the filters, but not the branch and variant, which the new address puts back | |
 | A subtree goes with the build it was walked in; widening out of the build drops it, and a selection that is not one build does not send it | The server refuses it over anything else |
 | What qualifies a subtree's root (version, ecosystem, namespace) goes with the root: a new root, a cleared root and a removed chip drop them | |
 | A subtree started at every component of one package identifier is a chip of its own, and goes with the build as a subtree does | A repository row at several commits arrives this way |
-| A subtree has one root: naming it by component drops one named by package identifier, and the reverse | The server refuses a list naming both |
+| A subtree has one root: naming it by component drops one named by package identifier, and the reverse; an address naming both sends and chips the component | The server refuses a list naming both |
 | A date the server does not take as YYYY-MM-DD, or that rolls over such as February 30, is left off the request | The server refuses the whole list over it |
 | A cleared filter drops its key and never writes its default | The list's three silent-address defaults apply only where the key is absent |
 | The count of filters in force is read from the address | |

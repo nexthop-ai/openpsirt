@@ -2,17 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useAfterHandBack } from "./intake";
-import {
-  queryOptions,
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type UseQueryResult,
-} from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import type { paths } from "./schema";
 import { PAGE, unwrap } from "./queries";
 import { useAfterDecision } from "./decisions";
+import { useInvalidating } from "./invalidate";
 import type { Build } from "../app/routes";
 
 // Static analysis code findings: the queue, one code finding's evidence, and the product's
@@ -37,12 +32,12 @@ export type CodeFindingMethod = NonNullable<
 
 // Everything an act on a code finding or a rule can move.
 function useAfterCodeFinding() {
-  const queries = useQueryClient();
+  const rules = useInvalidating(["suppression-rules"]);
   const decided = useAfterDecision();
   // The decision's own set carries the code findings and the code finding; a suppression rule's
   // coverage moves with either.
   return () => {
-    void queries.invalidateQueries({ queryKey: ["suppression-rules"] });
+    rules();
     decided();
   };
 }
@@ -356,11 +351,10 @@ export function useFlawOffer(build: Build, occurrence: string, wanted: boolean) 
 // code finding, the queue, the decisions and a flaw that is now on the findings
 // lists.
 function useAfterRecordAsFlaw() {
-  const queries = useQueryClient();
+  const recorded = useInvalidating(["code-finding-flaw", "findings"]);
   const after = useAfterCodeFinding();
   return () => {
-    void queries.invalidateQueries({ queryKey: ["code-finding-flaw"] });
-    void queries.invalidateQueries({ queryKey: ["findings"] });
+    recorded();
     after();
   };
 }

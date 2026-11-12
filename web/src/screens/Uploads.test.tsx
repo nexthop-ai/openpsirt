@@ -3,8 +3,9 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Link } from "react-router-dom";
 import { Uploads } from "./Uploads";
-import { mounted, screen, serve, settle } from "../test/mount";
+import { location, mounted, screen, serve, settle } from "../test/mount";
 
 // The page of receipts is asked for again only while an upload on it has not
 // settled. A settled page asked for on a timer is load on the server for an
@@ -110,6 +111,45 @@ describe("the SBOM receipts", () => {
     expect(
       calls.filter(([at]) => at === SCANS).map(([, init]) => init?.params?.query?.offset),
     ).toEqual([0, 50]);
+  });
+});
+
+describe("the page of receipts of another build", () => {
+  it("opens on its first page", async () => {
+    const get = serve((path) => {
+      if (path === SCANS) return { data: { items: [receipt("scanned")], total: 60 } };
+      return { data: { items: [], total: 0, quiet: 0 } };
+    });
+    mount.render(
+      screen(
+        <>
+          <Uploads />
+          <Link to="/products/sonic/branches-and-tags/master/variants/y/uploads">other</Link>
+        </>,
+        "/products/sonic/branches-and-tags/master/variants/x/uploads",
+        "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads",
+      ),
+    );
+    await settle();
+    const button = (words: string) =>
+      Array.from(mount.host().querySelectorAll<HTMLElement>("button, a")).find(
+        (each) => each.textContent === words,
+      );
+    act(() => button("Next")?.click());
+    await settle();
+    act(() => button("other")?.click());
+    await settle();
+    expect(location()).toBe("/products/sonic/branches-and-tags/master/variants/y/uploads");
+    const calls = get.mock.calls as unknown as [
+      path: string,
+      init: {
+        params?: { path?: { variant?: string }; query?: { offset?: number } };
+      },
+    ][];
+    const asked = calls
+      .filter(([at, init]) => at === SCANS && init?.params?.path?.variant === "y")
+      .map(([, init]) => init?.params?.query?.offset);
+    expect(asked).toEqual([0]);
   });
 });
 

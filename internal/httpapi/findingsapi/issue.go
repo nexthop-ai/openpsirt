@@ -89,7 +89,7 @@ func registerIssue(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
-		Product       string `query:"product" doc:"Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
+		Product       string `query:"product" doc:"Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found"`
 		Limit         int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
 	}) (*IssueOutput, error) {
 		in := core.Of(ctx, in)

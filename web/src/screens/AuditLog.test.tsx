@@ -15,6 +15,30 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 describe("the change history on the audit log", () => {
+  it("is neither asked for nor drawn for a reader who neither administers nor audits", async () => {
+    const asked: string[] = [];
+    serve((path) => {
+      asked.push(path);
+      if (path === "/v1/session/me") {
+        return {
+          data: {
+            identity: "tia",
+            name: "Tia",
+            admin: false,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
+      }
+      if (path === "/v1/administration/changes") return { status: 403 };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<AuditLog />, "/audit-log"));
+    await settle();
+    expect(asked).not.toContain("/v1/administration/changes");
+    expect(mount.host().textContent).not.toContain("Change history");
+  });
+
   it("never asks for more rows than the route answers", async () => {
     const asked: number[] = [];
     serve((path, init) => {
