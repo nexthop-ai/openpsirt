@@ -312,9 +312,39 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 // Pair it with whatever says the decision still applies — `live_key IS NOT NULL`
 // where any version will do, KeyMatches where the versions matter.
 func InForce() (string, []any) {
-	return `("de"."state" = ? OR ("de"."state" = ? AND "de"."needs_approval" = ? AND "de"."sent_back_at" IS NULL))`,
-		[]any{"approved", "proposed", false}
+	return InForceOn("de"), nil
 }
+
+// InForceOn is InForce asked of the decision occurrence under alias, as a
+// fragment binding nothing, so a statement assembled from fragments can say it
+// where a placeholder has no argument list to join. The words are this
+// package's named states, never anything a caller supplies. The alias is
+// written at the call site, never supplied by a request (REQ-66).
+func InForceOn(alias string) string {
+	a := `"` + alias + `".`
+	return `(` + a + `"state" = '` + StateApproved + `' OR (` + a + `"state" = '` + StateProposed + `' AND ` +
+		a + `"needs_approval" = FALSE AND ` + a + `"sent_back_at" IS NULL))`
+}
+
+// StandsInForce is InForce asked of a decision occurrence already read: its
+// state, whether it waits for a second person, and whether it was sent back.
+// A test holds the two to one answer over every combination.
+func StandsInForce(state string, needsApproval, sentBack bool) bool {
+	return state == StateApproved || (state == StateProposed && !needsApproval && !sentBack)
+}
+
+// The states a decision occurrence is stored in. Named here, where the
+// statements reading them are, and taken by the triage package for its own.
+const (
+	// StateProposed is made and, where it needs one, waiting for a second person.
+	StateProposed = "proposed"
+	// StateApproved is agreed to by a second person.
+	StateApproved = "approved"
+	// StateWithdrawn is taken back by somebody who may argue it.
+	StateWithdrawn = "withdrawn"
+	// StateLapsed is stopped applying because the code or its rating moved.
+	StateLapsed = "lapsed"
+)
 
 // RunningOutPage reports findings whose deadline is within this many days and
 // which nobody has decided about, most pressing first, from a position in the

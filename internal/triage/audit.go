@@ -74,7 +74,7 @@ func (j AuditedOccurrence) Standing() bool {
 	if j.LiveKey == nil {
 		return false
 	}
-	return j.State == Approved || (j.State == Proposed && !j.NeedsApproval && j.SentBackAt == nil)
+	return finding.StandsInForce(string(j.State), j.NeedsApproval, j.SentBackAt != nil)
 }
 
 // BySomebodyElse reports whether the people who proposed and agreed differ,

@@ -382,7 +382,7 @@ func togetherAt(ctx context.Context, db bun.IDB, productID int64, occurrenceIden
 		Where(`"rv"."kind" = ?`, string(kind.Rule)).
 		Where(`"sc"."outcome" = ?`, string(Confirmed)).
 		Where(`"dc"."live_key" IS NOT NULL`).
-		Where(`("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL))`).
+		Where(finding.InForceOn("dc")).
 		Where(`"ov"."kind" = ?`, string(kind.Rule)).
 		Where(`"od"."live_key" IS NOT NULL`).
 		Where(`"od"."occurrence_identity" <> ?`, occurrenceIdentity).

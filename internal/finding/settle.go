@@ -37,8 +37,8 @@ func (d liveDecision) anyVersion() bool { return slices.Contains(AnyVersionOutco
 // outranks is whether one decision has more standing than another: approved
 // over proposed, and otherwise the newer.
 func (d liveDecision) outranks(other liveDecision) bool {
-	if (d.State == "approved") != (other.State == "approved") {
-		return d.State == "approved"
+	if (d.State == StateApproved) != (other.State == StateApproved) {
+		return d.State == StateApproved
 	}
 	if !d.ProposedAt.Equal(other.ProposedAt) {
 		return d.ProposedAt.After(other.ProposedAt)
@@ -211,7 +211,7 @@ func (v *Vulnerabilities) supersede(ctx context.Context, set []liveDecision, mer
 			continue
 		}
 		if _, err := v.db.NewUpdate().TableExpr(`"decision_occurrence"`).
-			Set(`"state" = ?`, "lapsed").
+			Set(`"state" = ?`, StateLapsed).
 			Set(`"ended_at" = ?`, now).
 			Set(`"live_key" = NULL`).
 			Where(`"id" = ?`, d.ID).Exec(ctx); err != nil {

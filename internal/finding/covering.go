@@ -96,11 +96,11 @@ func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility) *
 
 	return q.
 		Join(`LEFT JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
-			AND "de"."state" = 'approved'
+			AND "de"."state" = ?
 			AND "de"."live_key" IS NOT NULL
 			AND "de"."visibility" IN (?)
 			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "decision" AS "mc"
-				WHERE "mc"."id" = "de"."decision_id")`), productID, bun.List(visible)).
+				WHERE "mc"."id" = "de"."decision_id")`), productID, StateApproved, bun.List(visible)).
 		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id" AND ` + coveringOutcomes()).
 		ColumnExpr(`MIN("cl"."outcome") AS "outcome"`).
 		ColumnExpr(`MIN("de"."id") AS "decided_by"`).

@@ -1169,3 +1169,45 @@ func TestProposingUnderAMergedNameLeavesTheRequestAsGivenAndNamesWhatStands(t *t
 		}
 	})
 }
+
+func TestTheInForceRuleAnswersAlikeInAStatementAndInGo(t *testing.T) {
+	// Whether a decision is in force is asked by statements and of rows
+	// already read. The two spellings answer alike for every state, need for
+	// agreement and sending back a row can hold.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		row := f.decisions(t, f.at())
+		sentAt := time.Now().UTC().Truncate(time.Second)
+		asked := 0
+		for _, state := range []string{finding.StateProposed, finding.StateApproved,
+			finding.StateWithdrawn, finding.StateLapsed} {
+			for _, needs := range []bool{false, true} {
+				for _, sentBack := range []bool{false, true} {
+					var sent *time.Time
+					if sentBack {
+						sent = &sentAt
+					}
+					if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
+						Set(`"state" = ?`, state).Set(`"needs_approval" = ?`, needs).
+						Set(`"sent_back_at" = ?`, sent).
+						Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
+					n, err := f.db.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
+						Where(`"de"."id" = ?`, row.ID).Where(finding.InForceOn("de")).Count(ctx)
+					if err != nil {
+						t.Fatal(err)
+					}
+					asked++
+					if inGo := finding.StandsInForce(state, needs, sentBack); (n == 1) != inGo {
+						t.Errorf("%s, needing agreement %v, sent back %v: the statement says %v and Go says %v",
+							state, needs, sentBack, n == 1, inGo)
+					}
+				}
+			}
+		}
+		if asked == 0 {
+			t.Fatal("no combination was asked, so this checked nothing")
+		}
+	})
+}

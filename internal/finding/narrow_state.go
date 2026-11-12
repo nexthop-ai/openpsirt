@@ -253,8 +253,8 @@ func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	// rule, and a literal here is the shape somebody copies to a place
 	// where it does matter.
 	const (
-		proposed = "proposed"
-		lapsed   = "lapsed"
+		proposed = StateProposed
+		lapsed   = StateLapsed
 	)
 	// "Waiting" and "lapsed" count a decision in that state whether or not it
 	// still stands; "approved" counts only the decision that currently stands,
@@ -371,7 +371,7 @@ func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products [
 		}
 		// Every flag flagColumns computes needs one of the two: lapsed is the
 		// state, and the rest require the key.
-		needed, args, into = `("de"."state" = ? OR "de"."live_key" IS NOT NULL)`, []any{"lapsed"}, &filter.placedIssues
+		needed, args, into = `("de"."state" = ? OR "de"."live_key" IS NOT NULL)`, []any{StateLapsed}, &filter.placedIssues
 	}
 	q := s.db.NewSelect().TableExpr(DecisionOccurrences).
 		ColumnExpr(`"dv"."issue_id"`).Distinct().
