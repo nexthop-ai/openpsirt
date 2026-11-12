@@ -548,6 +548,18 @@ export function identityOf(row: Row): string {
 // The key the findings list caches a page of rows under. A finding opened from
 // the list reads its neighbors from that page where it can, so both sides name
 // the page through this one key.
+// The mark a finding's `from` carries where the list it was opened from spans
+// every product. The list's own query never reads it, so it reaches no server.
+export const ACROSS = "across";
+
+// withoutAcross is a carried list's address with that mark taken off, for the
+// list's own address.
+export function withoutAcross(from: string): string {
+  const next = new URLSearchParams(from);
+  next.delete(ACROSS);
+  return next.toString();
+}
+
 export function findingsPageKey(
   product: string,
   branchOrTag: string,

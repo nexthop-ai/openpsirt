@@ -147,6 +147,13 @@ describe("the findings list's keys", () => {
     }
   }
 
+  it("opens a row marked as from the list across products", async () => {
+    await drawRows();
+    const link = mount.host().querySelector<HTMLAnchorElement>("#findingRows a[href*='from=']");
+    const from = new URL(link?.getAttribute("href") ?? "", "http://here").searchParams.get("from");
+    expect(new URLSearchParams(from ?? "").get("across")).toBe("1");
+  });
+
   it("moves the cursor on an arrow nothing else answers", async () => {
     await drawRows();
     const scrolled = await scrolledRows(() => {
