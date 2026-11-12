@@ -293,8 +293,13 @@ func StopV0130AfterOverrideLiveRule(ctx context.Context, db *database.DB) error 
 		if err != nil {
 			return err
 		}
+		mark := func() error {
+			_, err := tx.NewUpdate().TableExpr(`"advisory_override"`).Set(`"live" = ?`, true).
+				Where(`"removed_at" IS NULL`).Where(`"live" IS NULL`).Exec(ctx)
+			return err
+		}
 		return u.change(advisoryOverrideV0130(u.t), change{table: "advisory_override",
-			add: []added{{column: "live"}}, constraints: []string{"advisory_override_live_once"}})
+			add: []added{{column: "live"}}, then: mark, constraints: []string{"advisory_override_live_once"}})
 	})
 }
 

@@ -239,8 +239,8 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		case standing == affected:
 			return nil
 		case affected:
-			// A row of its own, never a cleared one revived: who marked the
-			// release and who cleared it each time stays on the record.
+			// A new row each time, so who marked the release and who cleared
+			// it each time stays on the record.
 			if _, err := tx.NewInsert().Model(&Override{
 				AdvisoryID: row.ID, ProductID: named.ID, VulnerabilityID: issue.ID,
 				BranchOrTagID: at.BranchOrTagID, VariantID: at.VariantID,
