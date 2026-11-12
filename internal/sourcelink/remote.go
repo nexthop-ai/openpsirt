@@ -61,7 +61,7 @@ func parse(remote string) (host, path string) {
 // from the rest is not shown.
 func WithoutCredential(remote string) string {
 	s := strings.TrimSpace(remote)
-	if !strings.Contains(s, "://") {
+	if !Schemed(s) {
 		bare, readable := WithoutPassword(s)
 		if !readable {
 			return ""
@@ -77,6 +77,28 @@ func WithoutCredential(remote string) string {
 	}
 	u.User, u.RawQuery, u.ForceQuery = nil, "", false
 	return u.String()
+}
+
+// Schemed is whether an address opens on a scheme and "://", or on "//"
+// naming a host with no scheme. Either is read as an address with a user,
+// host, query and fragment; anything else, a "://" later in a path included,
+// is read as written without a scheme.
+func Schemed(address string) bool {
+	if strings.HasPrefix(address, "//") {
+		return true
+	}
+	end := strings.Index(address, "://")
+	if end <= 0 {
+		return false
+	}
+	for i, c := range address[:end] {
+		letter := ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+		later := ('0' <= c && c <= '9') || c == '+' || c == '-' || c == '.'
+		if !letter && (i == 0 || !later) {
+			return false
+		}
+	}
+	return true
 }
 
 // WithoutPassword is an address written without a scheme, such as a purl's

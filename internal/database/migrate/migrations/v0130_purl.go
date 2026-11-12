@@ -48,10 +48,8 @@ func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
 // upload stated.
 var remoteColumnsV0130 = [][2]string{{"graph_node", "repository"}, {"series_module", "remote"}}
 
-// remoteCredentialsV0130 rewrites each remote written without a scheme that
-// holds an "@" or a question mark as v0.13.0 stores it, and one that cannot
-// be read as no remote. A remote with a scheme v0.12.0 already stored without
-// its credential.
+// remoteCredentialsV0130 rewrites each remote holding an "@" or a question
+// mark as v0.13.0 stores it, and one that cannot be read as no remote.
 func remoteCredentialsV0130(ctx context.Context, tx bun.Tx, batch int) error {
 	for _, at := range remoteColumnsV0130 {
 		table, column := at[0], at[1]
@@ -61,8 +59,8 @@ func remoteCredentialsV0130(ctx context.Context, tx bun.Tx, batch int) error {
 				remote string
 			}
 			rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
-				WHERE "id" > ? AND ("`+column+`" LIKE ? OR "`+column+`" LIKE ?) AND "`+column+`" NOT LIKE ?
-				ORDER BY "id" LIMIT ?`, after, "%@%", "%?%", "%://%", batch)
+				WHERE "id" > ? AND ("`+column+`" LIKE ? OR "`+column+`" LIKE ?)
+				ORDER BY "id" LIMIT ?`, after, "%@%", "%?%", batch)
 			if err != nil {
 				return fmt.Errorf("read the remotes of %s: %w", table, err)
 			}
@@ -231,6 +229,7 @@ func jsonStringV0130(value string) string {
 // subpath holding a value after an address, since it is that address's
 // fragment.
 func purlWithoutCredentialV0130(purl string) string {
+	purl = strings.TrimSpace(purl)
 	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.EqualFold(scheme, "pkg") {
 		purl = scheme + ":" + strings.TrimLeft(rest, "/")
 	}
@@ -254,7 +253,7 @@ func purlWithoutCredentialV0130(purl string) string {
 			}
 			continue
 		}
-		if !strings.Contains(address, "://") {
+		if !schemedV0130(address) {
 			bare, readable := withoutPasswordV0130(address)
 			if readable {
 				if at := strings.IndexAny(bare, "?#"); at >= 0 {
@@ -315,6 +314,25 @@ func queryUnescapedV0130(value string) bool {
 	return at >= 0 && strings.Contains(value[at:], "=")
 }
 
+// schemedV0130 is whether an address opens on a scheme and "://", or on "//".
+func schemedV0130(address string) bool {
+	if strings.HasPrefix(address, "//") {
+		return true
+	}
+	end := strings.Index(address, "://")
+	if end <= 0 {
+		return false
+	}
+	for i, c := range address[:end] {
+		letter := ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+		later := ('0' <= c && c <= '9') || c == '+' || c == '-' || c == '.'
+		if !letter && (i == 0 || !later) {
+			return false
+		}
+	}
+	return true
+}
+
 // withoutPasswordV0130 is an address written without a scheme with a user
 // and password written before its host taken out, and whether it can be read
 // at all. A user with no password is kept, as an scp-style address names one.
@@ -341,13 +359,17 @@ func withoutPasswordV0130(address string) (string, bool) {
 	return address, true
 }
 
-// remoteWithoutCredentialV0130 is a remote written without a scheme as
-// v0.13.0 stores one: without a password before its host or a query. A
-// remote with a scheme v0.12.0 already stored that way, and is returned as it
-// is.
+// remoteWithoutCredentialV0130 is a remote as v0.13.0 stores one: without a
+// user, password or query, and none where its credential ends cannot be
+// told.
 func remoteWithoutCredentialV0130(remote string) string {
-	if strings.Contains(remote, "://") {
-		return remote
+	if schemedV0130(remote) {
+		u, err := url.Parse(remote)
+		if err != nil {
+			return ""
+		}
+		u.User, u.RawQuery, u.ForceQuery = nil, "", false
+		return u.String()
 	}
 	bare, readable := withoutPasswordV0130(remote)
 	if !readable {

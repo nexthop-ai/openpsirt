@@ -280,7 +280,7 @@ func StoredPurl(purl string) string {
 			}
 			continue
 		}
-		if !strings.Contains(address, "://") {
+		if !sourcelink.Schemed(address) {
 			// An address written without a scheme loses a password before
 			// its host and anything from its query on.
 			bare, readable := sourcelink.WithoutPassword(address)

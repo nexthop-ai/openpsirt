@@ -202,6 +202,10 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 			{"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git",
 				"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git"},
 			{"pkg:generic/c@1?checksum=sha256:abc123", "pkg:generic/c@1?checksum=sha256:abc123"},
+			{"pkg:golang/example.com/ls@v1?repository_url=user:SECRET@github.com/o/https://r",
+				"pkg:golang/example.com/ls@v1?repository_url=github.com/o/https://r"},
+			{"pkg:golang/example.com/pr@v1?vcs_url=//user:SECRET@host.example.com/x",
+				"pkg:golang/example.com/pr@v1?vcs_url=//host.example.com/x"},
 			{"pkg:generic/ux@1?download_url=https://h.example.com/a%zz?x=1&token=SECRET&arch=amd64",
 				"pkg:generic/ux@1"},
 			{"pkg:golang/example.com/sl@v1?repository_url=deploy:ab%2FSECRET@gitlab.example.com:grp/x.git&arch=amd64",
@@ -366,6 +370,8 @@ func TestTheV0130UpgradeTakesCredentialsOutOfRemotes(t *testing.T) {
 			{"gitlab.example.com/g/p.git?private_token=SECRET", ptr("gitlab.example.com/g/p.git")},
 			{"deploy:ab/SECRET@gitlab.example.com:g/p.git", nil},
 			{"git@github.com:a/b.git", ptr("git@github.com:a/b.git")},
+			{"user:SECRET@gitlab.example.com/o/https://r", ptr("gitlab.example.com/o/https://r")},
+			{"//user:SECRET@gitlab.example.com/g/p.git", ptr("//gitlab.example.com/g/p.git")},
 			{"https://github.com/a/b.git", ptr("https://github.com/a/b.git")},
 		}
 		exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
