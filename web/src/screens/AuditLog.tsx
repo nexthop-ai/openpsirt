@@ -504,14 +504,6 @@ function Administered() {
     );
   }
   if (!reads) return null;
-  if (changes.isPending) {
-    return (
-      <div style={{ marginTop: 24 }}>
-        <h3>Change history</h3>
-        <Loading />
-      </div>
-    );
-  }
 
   return (
     <div style={{ marginTop: 24 }} id="changes">
@@ -553,10 +545,14 @@ function Administered() {
           ))}
         </select>
       </div>
-      {/* Empty is an answer, said once the read is in; under a kind, the
-          picker stays so it can be put back. */}
-      {rows.length === 0 && !kind && <Empty title="No changes over this period" />}
-      {rows.length === 0 && kind && (
+      {/* The head and picker stay drawn while a new narrowing is read, so a
+          pick keeps its focus. Empty is an answer, said once the read is in;
+          under a kind, the picker stays so it can be put back. */}
+      {changes.isPending && <Loading />}
+      {!changes.isPending && rows.length === 0 && !kind && (
+        <Empty title="No changes over this period" />
+      )}
+      {!changes.isPending && rows.length === 0 && kind && (
         <Empty title="No changes of that kind">
           <button
             type="button"
@@ -571,54 +567,56 @@ function Administered() {
           </button>
         </Empty>
       )}
-      <Wide>
-        <table>
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Who</th>
-              <th>What</th>
-              <th>Was</th>
-              <th>Became</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={`${row.at} ${row.about} ${i}`}>
-                <td className="id">{at(row.at)}</td>
-                <td>
-                  {row.actor === "configuration" ? (
-                    <span className="hint" title="The deployment's startup configuration">
-                      configuration
-                    </span>
-                  ) : row.actor === "merge" ? (
-                    <span
-                      className="hint"
-                      title="A scan merging two issues its report named together"
-                    >
-                      merge
-                    </span>
-                  ) : row.actor === "upgrade" ? (
-                    <span
-                      className="hint"
-                      title="The upgrade, withdrawing a key or token whose name another holds"
-                    >
-                      upgrade
-                    </span>
-                  ) : (
-                    row.by_name || row.by
-                  )}
-                </td>
-                <td>
-                  <span className="hint">{row.kind}</span> {row.about}
-                </td>
-                <td>{row.unset ? <span className="hint">unset</span> : row.was}</td>
-                <td>{row.cleared ? <span className="hint">cleared</span> : row.became}</td>
+      {rows.length > 0 && (
+        <Wide>
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Who</th>
+                <th>What</th>
+                <th>Was</th>
+                <th>Became</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Wide>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={`${row.at} ${row.about} ${i}`}>
+                  <td className="id">{at(row.at)}</td>
+                  <td>
+                    {row.actor === "configuration" ? (
+                      <span className="hint" title="The deployment's startup configuration">
+                        configuration
+                      </span>
+                    ) : row.actor === "merge" ? (
+                      <span
+                        className="hint"
+                        title="A scan merging two issues its report named together"
+                      >
+                        merge
+                      </span>
+                    ) : row.actor === "upgrade" ? (
+                      <span
+                        className="hint"
+                        title="The upgrade, withdrawing a key or token whose name another holds"
+                      >
+                        upgrade
+                      </span>
+                    ) : (
+                      row.by_name || row.by
+                    )}
+                  </td>
+                  <td>
+                    <span className="hint">{row.kind}</span> {row.about}
+                  </td>
+                  <td>{row.unset ? <span className="hint">unset</span> : row.was}</td>
+                  <td>{row.cleared ? <span className="hint">cleared</span> : row.became}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Wide>
+      )}
       {(changes.data?.total ?? 0) > rows.length && (
         <p className="hint noprint">
           Showing the newest {rows.length.toLocaleString()} of{" "}

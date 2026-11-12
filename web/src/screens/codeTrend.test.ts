@@ -40,5 +40,8 @@ describe("a marker saying a run is not comparable", () => {
       "semgrep/default: not comparable, didn't finish",
     );
     expect(markerSaid(marker)).toBe("semgrep/default: not comparable, for another reason");
+    expect(markerSaid({ ...marker, reason: "added-later" as never })).toBe(
+      "semgrep/default: not comparable, for another reason",
+    );
   });
 });

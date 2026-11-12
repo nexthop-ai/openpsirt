@@ -40,19 +40,38 @@ function drawn(node) {
 const tagOf = (element) =>
   (ts.isJsxElement(element) ? element.openingElement : element).tagName.getText();
 
+// What a function body returns, from any return in it outside a nested
+// function, or the expression an arrow function is.
+function returned(body) {
+  if (!ts.isBlock(body)) return drawn(body);
+  const out = [];
+  const visit = (node) => {
+    if (ts.isFunctionLike(node)) return;
+    if (ts.isReturnStatement(node) && node.expression) out.push(...drawn(node.expression));
+    ts.forEachChild(node, visit);
+  };
+  body.statements.forEach(visit);
+  return out;
+}
+
 // What each component declared in one source draws at its root, by name: the
-// spans it would place directly under a head it is drawn in.
+// spans it would place directly under a head it is drawn in. A component is a
+// capitalized function, declared or bound to a name.
 export function componentRoots(file, source) {
   const roots = new Map();
+  const add = (name, body) => roots.set(name, { file, source, drawn: returned(body) });
   const visit = (node) => {
     if (ts.isFunctionDeclaration(node) && node.name && /^[A-Z]/.test(node.name.text) && node.body) {
-      const drawnAtRoot = [];
-      for (const statement of node.body.statements) {
-        if (ts.isReturnStatement(statement) && statement.expression) {
-          drawnAtRoot.push(...drawn(statement.expression));
-        }
-      }
-      roots.set(node.name.text, { file, source, drawn: drawnAtRoot });
+      add(node.name.text, node.body);
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      /^[A-Z]/.test(node.name.text) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      add(node.name.text, node.initializer.body);
     }
     ts.forEachChild(node, visit);
   };

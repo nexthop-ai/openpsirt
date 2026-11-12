@@ -56,8 +56,11 @@ export function markerSaid(m: CodeFindingMarker): string {
       return `${m.series}: new version${between()}${builds}`;
     case "rules":
       return `${m.series}: rule set changed${between(" rules")}${builds}`;
-    case "not-comparable":
-      return `${m.series}: not comparable, ${m.reason ? REASONS[m.reason] : "for another reason"}${builds}`;
+    case "not-comparable": {
+      // A page loaded before the server added a reason holds no words for it.
+      const words: Record<string, string | undefined> = REASONS;
+      return `${m.series}: not comparable, ${words[m.reason ?? ""] ?? "for another reason"}${builds}`;
+    }
   }
 }
 

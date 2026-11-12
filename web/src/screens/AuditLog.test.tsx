@@ -7,6 +7,7 @@ import { AuditLog, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./
 import { classesOf } from "../ui/outcomes";
 import { PUBLISHED } from "../test/outcomes";
 import { screen, serve, settle, mounted } from "../test/mount";
+import { change } from "../test/controls";
 import { api } from "../api/client";
 import { readingDependencies } from "../test/reach";
 
@@ -107,6 +108,49 @@ describe("the change history on the audit log", () => {
 });
 
 describe("the change history while it is read", () => {
+  it("keeps the kind picker drawn while a kind just picked is read", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+          },
+        };
+      }
+      if (path === "/v1/administration/changes") {
+        return {
+          data: {
+            items: [{ at: "2026-10-01T00:00:00Z", actor: "ana", about: "role", what: "x" }],
+            total: 1,
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<AuditLog />, "/audit-log"));
+    await settle();
+    const picker = mount
+      .host()
+      .querySelector<HTMLSelectElement>('select[aria-label="Kind of change"]');
+    expect(picker).not.toBeNull();
+    const answered = vi.mocked(api.GET).getMockImplementation() as unknown as (
+      path: string,
+      init: unknown,
+    ) => unknown;
+    vi.mocked(api.GET).mockImplementation(((path: string, init: unknown) =>
+      path === "/v1/administration/changes"
+        ? new Promise<never>(() => {})
+        : answered(path, init)) as never);
+    change(picker, "role");
+    await settle();
+    expect(picker?.isConnected).toBe(true);
+    expect(mount.host().textContent).toContain("Loading");
+  });
+
   it("says nothing about an empty kind until the answer arrives", async () => {
     const pending = new Promise<never>(() => {});
     serve((path) => {

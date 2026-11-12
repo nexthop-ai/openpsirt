@@ -6,7 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { belongTo } from "../app/drafts";
 import { Component } from "./Component";
 import { button, change, press } from "../test/controls";
-import { accept, location, mounted, screen, serve, settle, type Sent } from "../test/mount";
+import {
+  accept,
+  client,
+  location,
+  mounted,
+  screen,
+  serve,
+  settle,
+  watchInvalidations,
+  type Sent,
+} from "../test/mount";
 
 const mount = mounted();
 
@@ -61,11 +71,14 @@ describe("scheduling an upgrade of a component", () => {
     const sent = accept(() => ({
       data: { decision_id: 9, occurrences: 2, issues: 2, waiting: false, held: false },
     }));
+    const queries = client();
+    const invalidated = watchInvalidations(queries);
     mount.render(
       screen(
         <Component />,
         "/products/sonic/components/libnl?branch_or_tag=master&variant=broadcom&version=3.7",
         PATTERN,
+        queries,
       ),
     );
     await settle();
@@ -90,6 +103,8 @@ describe("scheduling an upgrade of a component", () => {
       },
     });
     expect(mount.host().textContent).toContain("Recorded against 2 occurrences across 2 issues.");
+    // A decision, so the queue and the proposer's own list move with it.
+    expect(invalidated()).toEqual(expect.arrayContaining(["queue", "my-decisions", "holdings"]));
   });
 
   it("opens on the other version's own build when that version is picked", async () => {
