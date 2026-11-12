@@ -122,7 +122,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeoutCause(ctx, timeout, errOutlasted)
 	defer cancel()
 
 	limits := g.Limits.OrDefault()
@@ -170,15 +170,24 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	return result, nil
 }
 
+// errOutlasted is the cause a run's own wall-clock bound ends it with, told
+// apart from the caller's context ending first.
+var errOutlasted = errors.New("the scanner outlasted its bound")
+
 // failed says why a run of the scanner ended without a report.
 //
 // What the scanner said is published on the producer's receipt, because it is
-// what tells them why, as is how it ended. Where it never started, the error
-// names the executable and what the operating system said of it, which is
-// configuration and stays in the log.
+// what tells them why, as is how it ended. A run the caller ended, by shutting
+// down or losing its claim, says nothing about the producer's inventory, and
+// is a fault. Where it never started, the error names the executable and what
+// the operating system said of it, which is configuration and stays in the
+// log.
 func (g Grype) failed(ctx context.Context, timeout time.Duration, err error, said string) error {
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+	switch cause := context.Cause(ctx); {
+	case errors.Is(cause, errOutlasted):
 		return refusal.Errorf("the scanner did not finish within %s: %s", timeout, tail(said))
+	case cause != nil:
+		return fmt.Errorf("run %s, ended by its caller: %w", g.executable(), cause)
 	}
 	var exited *exec.ExitError
 	if errors.As(err, &exited) {

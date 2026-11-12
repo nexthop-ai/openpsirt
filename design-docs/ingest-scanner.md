@@ -45,6 +45,7 @@ references, and a producer controls the first.
 |---|---|
 | The scanner exited or was killed | How it ended and the end of what it said |
 | The wall-clock bound passed | The bound and the end of what it said |
+| Its caller ended it: a shutdown, a lost claim, a caller's own deadline | That the scan could not be completed; the cause goes to the log, since it says nothing about the inventory |
 | The scanner never started | That the scan could not be completed; the executable and the operating system's error go to the log, as configuration |
 
 ## Ratings a report carries
