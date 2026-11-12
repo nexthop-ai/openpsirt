@@ -170,8 +170,8 @@ work it leaves with a holder who cannot open it.
 |---|---|
 | A role withdrawn on one product | Their work there they may no longer read: everything where it was their last role, otherwise the undisclosed or security testing work, and the reports, the role let them read |
 | A role withdrawn across every product | The same, product by product |
-| A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went or nothing was derived before, since a trusted-header sign-in runs on every request |
-| The first group-bound sign-in after a switch into group-bound mode | What administrator-assigned roles let them hold that their groups do not let them read |
+| A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went, since a trusted-header sign-in runs on every request |
+| The first group-bound sign-in after a switch into group-bound mode | What administrator-assigned roles let them hold that their groups do not let them read. Told by nothing derived before it, neither a role nor administration nor auditing |
 | A switch out of group-bound mode | The same, for everybody holding work, against the restored assigned roles |
 | Somebody taken off a team | The team's work no remaining member reads |
 | A team retired | Everything in its queue |
@@ -196,4 +196,4 @@ work it leaves with a holder who cannot open it.
 |---|---|
 | A rule naming a component with a letter outside ASCII matches on the three servers and not on SQLite | SQLite folds ASCII only. No deployment runs SQLite; agreement needs a stored folded name, a schema change |
 | The batch-fullness rule is reasoned, never pinned by a test | The divergence needs a write between a batch's read and write; what is pinned is that a sweep spanning several batches routes everything it matches |
-| After a switch into group-bound mode, work held by somebody who never signs in again stays with them until they do, are deactivated, or it is handed back by hand | Their set-aside roles grant nothing, so the work is in no list. A person whose groups derive no role is asked about on every sign-in |
+| After a switch into group-bound mode, work held by somebody who never signs in again stays with them until they do, are deactivated, or it is handed back by hand | Their set-aside roles grant nothing, so the work is in no list. A person whose groups derive no role and no administration or auditing they did not already hold is asked about on every sign-in |

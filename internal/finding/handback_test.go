@@ -4,9 +4,12 @@
 package finding_test
 
 import (
+	"context"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -344,6 +347,76 @@ func TestSwitchingIntoGroupBoundModeHandsBackAtEachFirstSignIn(t *testing.T) {
 				t.Errorf("first signed in through %v, %s holds %v, want %v",
 					one.groups, one.who.Identity, got, one.want)
 			}
+		}
+	})
+}
+
+// A first sign-in into group-bound mode whose groups derive no role on any
+// product still hands back what the set-aside assignments let them hold, and
+// the sign-ins after it, deriving the same, ask nothing.
+func TestAFirstSignInDerivingNoRoleHandsBackOnceAndNoMore(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		asked := 0
+		rights := access.NewStore(f.db.DB).HandingBack(func(ctx context.Context, db bun.IDB, narrowed access.Narrowed) error {
+			asked++
+			return finding.HandBack(ctx, db, narrowed)
+		})
+		product := f.productName(t)
+		first, _ := f.modeWorld(t, rights, []access.Mapping{
+			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
+			{Group: "administrators", Grants: string(access.Administers)},
+		},
+			[]access.Role{access.PublicTriage, access.SecurityTestingRead},
+			[]access.Role{access.PublicTriage, access.PrivateTriage})
+		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+
+		asked = 0
+		for range 3 {
+			if _, err := rights.AdmitByGroups(ctx,
+				access.Arrival{ViaProxy: true, Username: first.Identity}, []string{"administrators"}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := f.stillHeld(t, first.Party()); len(got) != 0 {
+			t.Errorf("signed in through a group deriving no role, %s holds %v, want nothing", first.Identity, got)
+		}
+		if asked != 1 {
+			t.Errorf("three sign-ins deriving the same asked for a hand-back %d times, want once", asked)
+		}
+	})
+}
+
+// A first group-bound sign-in deriving no role hands back what somebody holds
+// even where no assigned role is left to have let them hold it.
+func TestAFirstSignInDerivingNoRoleHandsBackWorkHeldWithNoRoleAtAll(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		rights := access.NewStore(f.db.DB).HandingBack(finding.HandBack)
+		product := f.productName(t)
+		first, _ := f.modeWorld(t, rights, []access.Mapping{
+			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
+			{Group: "administrators", Grants: string(access.Administers)},
+		},
+			[]access.Role{access.PublicTriage, access.SecurityTestingRead},
+			[]access.Role{access.PublicTriage, access.PrivateTriage})
+		// Held with no role behind it, as work assigned before assigning asked
+		// for one can be.
+		if _, err := f.db.DB.NewDelete().Table("role_grant").
+			Where(`"person_id" = ?`, first.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := rights.AdmitByGroups(ctx,
+			access.Arrival{ViaProxy: true, Username: first.Identity}, []string{"administrators"}); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.stillHeld(t, first.Party()); len(got) != 0 {
+			t.Errorf("signed in through a group deriving no role, %s holds %v, want nothing", first.Identity, got)
 		}
 	})
 }
