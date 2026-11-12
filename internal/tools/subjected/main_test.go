@@ -275,12 +275,21 @@ func Benchmarked(b *testing.B) {}
 `),
 		},
 		"internal/kerneltest": {"internal/kerneltest/k.go": store("kerneltest")},
+		"internal/generated": {
+			"internal/generated/g.go": store("generated"),
+			"internal/generated/gen.go": []byte(`//go:build ignore
+
+package main
+
+func main() {}
+`),
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 6 {
-		t.Errorf("%d store methods were examined, want the six outside programs and harnesses", examined)
+	if examined != 7 {
+		t.Errorf("%d store methods were examined, want the seven outside programs and harnesses", examined)
 	}
 	reported := map[string]bool{}
 	for _, one := range found {
@@ -295,6 +304,7 @@ func Benchmarked(b *testing.B) {}
 		"served.Store.Unnarrowed":         true,
 		"kerneltest.Store.Unnarrowed":     true,
 		"latest.Store.Unnarrowed":         true,
+		"generated.Store.Unnarrowed":      true,
 	} {
 		if reported[name] != want {
 			t.Errorf("%s reported = %v, want %v (reported %v)", name, reported[name], want, reported)

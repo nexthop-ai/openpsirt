@@ -175,8 +175,8 @@ type declared struct {
 
 // inSources is every exported store method and function of one package that
 // queries with no subject, and how many it examined. The package is named by
-// its directory under internal/, its files keyed by path. A program answers
-// nothing.
+// its directory under internal/, its files keyed by path. A file of package
+// main is left out, so a program answers nothing.
 func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 	fset := token.NewFileSet()
 	paths := make([]string, 0, len(sources))
@@ -190,8 +190,11 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 		if err != nil {
 			return nil, 0, fmt.Errorf("%s: %w", path, err)
 		}
+		// A program's files, or a generator kept beside a package under a
+		// build constraint, are read by no request; the package's other
+		// files still are.
 		if file.Name.Name == "main" {
-			return nil, 0, nil
+			continue
 		}
 		imported := importNames(file)
 		for _, decl := range file.Decls {
