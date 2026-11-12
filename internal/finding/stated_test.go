@@ -152,3 +152,36 @@ func TestARowAcrossProductsIsNeverNamedByAnotherProductsBuild(t *testing.T) {
 		}
 	})
 }
+
+// A statement about a build names the component as that build stated it,
+// whichever product described the package first.
+func TestABuildsStatementNamesTheComponentAsTheBuildStatedIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		cat := catalog.NewStore(f.db.DB)
+		other, err := cat.DeclareProduct(ctx, "edge-router", "Edge")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cat.DeclareVariant(ctx, other.ID, "broadcom", true); err != nil {
+			t.Fatal(err)
+		}
+		poisoned := libnl
+		poisoned.Name = "nothing"
+		f.shippedTo(t, f.anotherBranchOf(t, other.ID, "main"), graph.Snapshot{
+			Root:         at("edge", "1.0"),
+			Components:   []graph.Described{poisoned},
+			Dependencies: []graph.Dependency{{Parent: at("edge", "1.0"), Child: poisoned}},
+		})
+
+		f.decidedBeneath(t, []recorded{{under: swss.Name}, {under: teamd.Name}})
+		covered, _, err := finding.CoveredInBuild(ctx, f.db.DB, f.productID, f.build,
+			[]access.Visibility{access.Public}, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(covered) != 1 || covered[0].Component != libnl.Name {
+			t.Errorf("the build's statement names %+v, want %s", covered, libnl.Name)
+		}
+	})
+}
