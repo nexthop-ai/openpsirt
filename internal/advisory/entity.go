@@ -322,6 +322,9 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 
 	var added time.Time
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		if err := s.mayWrite(ctx, tx, subject, row, "name a flaw on an advisory"); err != nil {
+			return err
+		}
 		added = s.now().UTC().Truncate(time.Microsecond)
 		// Asked inside the transaction, because the unique constraint is what
 		// actually decides it and a count read outside describes a database
@@ -359,7 +362,7 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 		}
 		return reopen(ctx, tx, row, subject.ID, added)
 	})
-	if errors.Is(err, ErrAlreadyCovered) {
+	if errors.Is(err, ErrAlreadyCovered) || errors.Is(err, access.ErrDenied) {
 		return nil, err
 	}
 	if err != nil {
@@ -396,6 +399,9 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 		return err
 	}
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		if err := s.mayWrite(ctx, tx, subject, row, "take a flaw off an advisory"); err != nil {
+			return err
+		}
 		removed := s.now().UTC().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Cover)(nil)).
 			Set(`"removed_at" = ?`, removed).
@@ -423,7 +429,7 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 		}
 		return reopen(ctx, tx, row, subject.ID, removed)
 	})
-	if errors.Is(err, ErrNoSuchIssue) {
+	if errors.Is(err, ErrNoSuchIssue) || errors.Is(err, access.ErrDenied) {
 		return err
 	}
 	if err != nil {
@@ -667,7 +673,7 @@ func (s *Store) editing(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if err := s.mayWrite(ctx, subject, row, what); err != nil {
+	if err := s.mayWrite(ctx, s.db, subject, row, what); err != nil {
 		return nil, nil, nil, err
 	}
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)

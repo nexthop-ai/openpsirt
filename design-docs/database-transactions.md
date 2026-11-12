@@ -65,6 +65,13 @@ back.
 | The product a supplier, an uploaded VEX document or an uploaded advisory names | Which product they are recorded against |
 | The claims a document makes, folded and paired | Which standing claims it repeats and which it sets aside. Copied from the caller's on every attempt |
 | The moment a write is dated | When the act happened. Read from the clock on every attempt, so a retried attempt is not dated before the write it lost to |
+| The product a token is narrowed to or an assignment rule names | Which product the write is recorded against. One renamed or out of reach since the request arrived is refused |
+| The names a collaborator's case is recorded under | The names the trail records, as the case has them when the grant lands |
+| Whether a code finding is fixed | Whether a decision about it is refused |
+| Whether the person judging a report may still be told of the issue it is judged as | Whether the judgment is written |
+| What an advisory covers, on any change to what it says | Whether the writer may write it, whether there is anything to agree to, and whether a release marked is on it |
+| How many filters one person may keep | Whether a new saved filter is kept |
+| A saved filter's row | Built from the request on every attempt, so a retried attempt carries no identifier the rolled-back one was given |
 
 | Inside the act | Reason |
 |---|---|

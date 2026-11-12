@@ -173,11 +173,8 @@ var ErrNoSuchFilter = refusal.New("you have kept no filter by that name")
 // naming one build or one run belong to the list on screen, and one filter per
 // person is applied within whichever that is.
 func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
-	name, query string, prepares Filter, cap int) (*Filter, error) {
+	name, query string, prepares Filter) (*Filter, error) {
 
-	if cap <= 0 {
-		cap = setting.DefaultSavedPerPerson
-	}
 	matched := typedname.Matching(name)
 	if matched == "" {
 		return nil, refusal.Errorf("a saved filter needs a name")
@@ -234,14 +231,17 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		// deferral beside no outcome would be a prefill that half-fires.
 		prepares = Filter{}
 	}
-	kept := &Filter{
+	// The value each attempt starts from. A retry re-runs the write against
+	// a database that has moved, so it never inherits what a previous
+	// attempt read or inserted into it: an identifier, or a creation time.
+	want := Filter{
 		PersonID: personID,
 		Name:     matched, DisplayName: strings.TrimSpace(name),
-		Query:     unscoped(strings.TrimPrefix(strings.TrimSpace(query), "?")),
-		CreatedAt: s.now().Truncate(time.Microsecond),
-		Outcome:   prepares.Outcome, Justification: prepares.Justification,
+		Query:   unscoped(strings.TrimPrefix(strings.TrimSpace(query), "?")),
+		Outcome: prepares.Outcome, Justification: prepares.Justification,
 		Reasoning: prepares.Reasoning, DeferDays: prepares.DeferDays,
 	}
+	var kept *Filter
 
 	turn, err := s.ensureTurn(ctx, personID)
 	if err != nil {
@@ -251,6 +251,8 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 	// portable spelling of an upsert and because what the insert writes
 	// against has to be what the update just saw.
 	write := func(ctx context.Context, db bun.IDB) error {
+		row := want
+		row.CreatedAt = s.now().Truncate(time.Microsecond)
 		// One person's saves take turns, on a row of their own: the count
 		// below bounds only what this transaction can see, and two saves of
 		// different names at once both count one under the limit and both
@@ -267,16 +269,16 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 			return err
 		}
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
-			Set(`"query" = ?`, kept.Query).
-			Set(`"display_name" = ?`, kept.DisplayName).
+			Set(`"query" = ?`, row.Query).
+			Set(`"display_name" = ?`, row.DisplayName).
 			// The decision it prepares is replaced too, including with nothing:
 			// saving over a name is deciding what that name means now, and a
 			// prefill that survived being taken off would fire on a filter
 			// somebody thought they had made ordinary.
-			Set(`"outcome" = ?`, kept.Outcome).
-			Set(`"justification" = ?`, kept.Justification).
-			Set(`"reasoning" = ?`, kept.Reasoning).
-			Set(`"defer_days" = ?`, kept.DeferDays).
+			Set(`"outcome" = ?`, row.Outcome).
+			Set(`"justification" = ?`, row.Justification).
+			Set(`"reasoning" = ?`, row.Reasoning).
+			Set(`"defer_days" = ?`, row.DeferDays).
 			Where(`"person_id" = ?`, personID).
 			Where(`"name" = ?`, matched).
 			Exec(ctx)
@@ -288,21 +290,30 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 			return err
 		}
 		if n > 0 {
-			return db.NewSelect().Model(kept).
+			if err := db.NewSelect().Model(&row).
 				Where(`"person_id" = ?`, personID).
 				Where(`"name" = ?`, matched).
-				Limit(1).Scan(ctx)
+				Limit(1).Scan(ctx); err != nil {
+				return err
+			}
+			kept = &row
+			return nil
 		}
 		// Counted inside the same transaction as the write it bounds, after
 		// the turn above, and only on the path that adds a row: replacing one
-		// of your own is not how a table fills up.
+		// of your own is not how a table fills up. The limit is read here
+		// too, so an attempt taken again counts against the limit as it is.
+		limit, err := setting.NewStore(db).Count(ctx, setting.SavedPerPerson, setting.DefaultSavedPerPerson)
+		if err != nil {
+			return err
+		}
 		held, err := db.NewSelect().Model((*Filter)(nil)).
 			Where(`"person_id" = ?`, personID).
 			Count(ctx)
 		if err != nil {
 			return err
 		}
-		if held >= int64(cap) {
+		if held >= int64(limit) {
 			return refusal.Errorf("you are keeping %d saved filters, which is the "+
 				"limit: forget one before keeping another", held)
 		}
@@ -310,12 +321,13 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		// a lost race: the unique index refuses this add, and taken again, the
 		// update finds that filter and replaces it. A second save by the same
 		// person waits for its turn above, so it never lands here.
-		if _, err := db.NewInsert().Model(kept).Exec(ctx); err != nil {
+		if _, err := db.NewInsert().Model(&row).Exec(ctx); err != nil {
 			if database.IsDuplicate(err) {
 				return database.ErrGoAgain
 			}
 			return err
 		}
+		kept = &row
 		return nil
 	}
 	if err := database.Within(ctx, s.db, write); err != nil {

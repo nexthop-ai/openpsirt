@@ -210,7 +210,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 		}
 	}) (*struct{ Body RuleBody }, error) {
 		in := core.Of(ctx, in)
-		subject, product, err := ruleWriter(ctx, in, input.Product)
+		subject, err := ruleWriter(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -220,7 +220,10 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 		var rule *finding.AssignmentRule
 		var team *access.Team
 		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
-			var err error
+			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
+			if err != nil {
+				return err
+			}
 			if team, err = core.TeamNamed(ctx, in.Logger, access.NewStore(tx), input.Body.Team); err != nil {
 				return err
 			}
@@ -268,11 +271,15 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 			ID      int64  `path:"id"`
 		}) (*struct{}, error) {
 			in := core.Of(ctx, in)
-			subject, product, err := ruleWriter(ctx, in, input.Product)
+			subject, err := ruleWriter(ctx, in, input.Product)
 			if err != nil {
 				return nil, err
 			}
 			if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+				product, err := ruleProduct(ctx, in, tx, subject, input.Product)
+				if err != nil {
+					return err
+				}
 				if err := finding.NewStore(tx).RetireRule(ctx, subject, product, input.ID); err != nil {
 					return core.Absent(in.Logger, err, "that rule could not be retired", core.NoSuchRule)
 				}
@@ -299,21 +306,33 @@ const reportRuleKeyed = "a rule placing reports names no package and no place: a
 // which is satisfied by any one of what it names. Writing a rule performs the
 // act the assigner right is named for — continuously, on behalf of whoever
 // wrote it — so it asks for that right and not merely for triage.
-func ruleWriter(ctx context.Context, in core.Deps, name string) (access.Subject, int64, error) {
+//
+// It is an early refusal. The product a rule is written against is resolved
+// again inside the act, by ruleProduct, and that one decides.
+func ruleWriter(ctx context.Context, in core.Deps, name string) (access.Subject, error) {
 	subject, err := core.Reading(ctx)
 	if err != nil {
-		return access.Subject{}, 0, err
+		return access.Subject{}, err
 	}
-	product, err := core.ProductNamedVisibly(ctx, in, subject, name)
+	if _, err := ruleProduct(ctx, in, in.DB.DB, subject, name); err != nil {
+		return access.Subject{}, err
+	}
+	return subject, nil
+}
+
+// ruleProduct is the product a rule is written against, over db, refusing
+// somebody who may not hand work to anybody there.
+func ruleProduct(ctx context.Context, in core.Deps, db bun.IDB, subject access.Subject, name string) (int64, error) {
+	product, err := core.ProductNamedVisiblyIn(ctx, in, db, subject, name)
 	if err != nil {
-		return access.Subject{}, 0, err
+		return 0, err
 	}
 	if !subject.Holds(access.Assigner, product.ID) {
 		// The product resolved, so the caller can see it: refused for the
 		// role. A product they cannot see was answered as not there above.
-		return access.Subject{}, 0, huma.Error403Forbidden("not authorized")
+		return 0, huma.Error403Forbidden("not authorized")
 	}
-	return subject, product.ID, nil
+	return product.ID, nil
 }
 
 // queueSweep asks for the rules to be applied to what is already open, in the

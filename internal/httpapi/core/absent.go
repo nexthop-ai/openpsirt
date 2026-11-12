@@ -374,7 +374,16 @@ func Undeclared(logger *slog.Logger, err error, reading string) error {
 func ProductNamedVisibly(ctx context.Context, in Deps, subject access.Subject,
 	name string) (*catalog.Product, error) {
 
-	product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, name)
+	return ProductNamedVisiblyIn(ctx, in, in.DB.DB, subject, name)
+}
+
+// ProductNamedVisiblyIn is ProductNamedVisibly over db: the transaction an act
+// is made in, which repeats the lookup an early refusal made before it, or the
+// pooled handle.
+func ProductNamedVisiblyIn(ctx context.Context, in Deps, db bun.IDB, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := catalog.NewStore(db).VisibleProduct(ctx, subject, name)
 	if err != nil {
 		return nil, Absent(in.Logger, err, "that product could not be looked up", NoSuchProduct)
 	}
