@@ -323,7 +323,10 @@ screens using them.
 | Invalidation | Each mutation hook runs through a real query client, and the test reads the keys it invalidates |
 | Look | A person |
 
-The gate measures statement coverage per file and fails a file no test reaches.
+The gate measures statement and function coverage per file, and fails a file
+where no test runs a statement or no test calls a function. A screen only
+imported runs its module-level statements and calls none of its functions, so
+a screen no test renders fails.
 The entry point and the test harness are outside the measure.
 
 ## Gaps the checks left
