@@ -31,7 +31,7 @@ describe("signing out", () => {
         // Read inside the call the sequence awaits, which is the only place
         // that can tell "before" from "after".
         clearedFirst = restore("revise:1") === "";
-        return Promise.resolve(true);
+        return Promise.resolve("ended" as const);
       },
       () => {},
     ).then(() => {
@@ -54,7 +54,7 @@ describe("signing out", () => {
     // there is one provider: the address is lost the moment somebody presses
     // Back, and the tab's mark is what survives it.
     const went = vi.fn();
-    expect(await signOut(() => Promise.resolve(true), went)).toBe(true);
+    expect(await signOut(() => Promise.resolve("ended" as const), went)).toBe("ended");
     expect(went).toHaveBeenCalledTimes(1);
     expect(String(went.mock.calls[0]?.[0])).toContain("signed-out");
     expect(window.sessionStorage.length, "nothing marks the forward in this tab").toBeGreaterThan(
@@ -66,22 +66,39 @@ describe("signing out", () => {
     // The server clears the cookie only when it ends the session, so leaving
     // here hands the next person on this browser a live session.
     for (const end of [
-      () => Promise.resolve(false),
+      () => Promise.resolve("not-ended" as const),
       () => Promise.reject(new Error("the network went away")),
     ]) {
       keep("revise:3", "text nobody outside should ever see");
       const went = vi.fn();
-      expect(await signOut(end, went)).toBe(false);
+      expect(await signOut(end, went)).toBe("not-ended");
       expect(went).not.toHaveBeenCalled();
       expect(restore("revise:3")).toBe("");
     }
   });
 
+  it("stays, with drafts cleared, where a proxy holds the sign-in", async () => {
+    // Leaving for the signed-out page would be answered by the proxy signing
+    // the next request straight back in.
+    keep("revise:4", "text nobody outside should ever see");
+    const went = vi.fn();
+    expect(await signOut(() => Promise.resolve("at-the-proxy" as const), went)).toBe(
+      "at-the-proxy",
+    );
+    expect(went).not.toHaveBeenCalled();
+    expect(restore("revise:4")).toBe("");
+  });
+
   it("reads a refusal for want of any session as signed out", () => {
-    expect(signedOutBy(204)).toBe(true);
-    expect(signedOutBy(401)).toBe(true);
-    expect(signedOutBy(503)).toBe(false);
-    expect(signedOutBy(500)).toBe(false);
+    expect(signedOutBy(204)).toBe("ended");
+    expect(signedOutBy(400)).toBe("ended");
+    expect(signedOutBy(401)).toBe("ended");
+    expect(signedOutBy(503)).toBe("not-ended");
+    expect(signedOutBy(500)).toBe("not-ended");
+  });
+
+  it("reads a 409 as a sign-in the proxy holds", () => {
+    expect(signedOutBy(409)).toBe("at-the-proxy");
   });
 });
 

@@ -6982,7 +6982,7 @@ export interface paths {
         post?: never;
         /**
          * Sign out
-         * @description Ends the session the request arrived on, everywhere rather than in this browser alone — the session is stored, so it stops working whichever copy of the application answers next.
+         * @description Ends the session the request arrived on, everywhere rather than in this browser alone — the session is stored, so it stops working whichever copy of the application answers next. A browser a trusted proxy signed in holds no session here, so its sign-out is refused with 409: it signs out at the proxy, which otherwise signs the next request straight back in.
          *
          *     Requires: your own sign-in, as a person and not a pipeline key
          */

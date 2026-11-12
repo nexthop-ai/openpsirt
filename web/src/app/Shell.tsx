@@ -821,7 +821,7 @@ function Me({ who }: { who: Who }) {
   // A sign-out in flight, and one the server did not complete, which keeps
   // the page and offers it again.
   const [leaving, setLeaving] = useState(false);
-  const [stuck, setStuck] = useState(false);
+  const [stuck, setStuck] = useState<"not-ended" | "at-the-proxy" | null>(null);
   // The choice made, and the machine's own answer. They differ for somebody who
   // has chosen nothing: the operating system is answering, and the menu has to
   // show which of the two that came out as while still marking the choice as
@@ -923,23 +923,28 @@ function Me({ who }: { who: Who }) {
             disabled={leaving}
             onClick={() => {
               setLeaving(true);
-              setStuck(false);
+              setStuck(null);
               void signOut(
                 async () => signedOutBy((await api.DELETE("/v1/session", {})).response.status),
                 (where) => window.location.assign(where),
-              ).then((ended) => {
-                if (ended) return;
+              ).then((answer) => {
+                if (answer === "ended") return;
                 setLeaving(false);
-                setStuck(true);
+                setStuck(answer);
               });
             }}
           >
-            {stuck ? "Try signing out again" : "Sign out"}
+            {stuck === "not-ended" ? "Try signing out again" : "Sign out"}
             <span className="tag">{who.identity}</span>
           </button>
-          {stuck && (
+          {stuck === "not-ended" && (
             <p className="hint" role="alert" style={{ margin: "4px 10px" }}>
               Sign-out didn&rsquo;t reach the server. You&rsquo;re still signed in here.
+            </p>
+          )}
+          {stuck === "at-the-proxy" && (
+            <p className="hint" role="alert" style={{ margin: "4px 10px" }}>
+              Your proxy signed you in. Sign out there.
             </p>
           )}
         </div>

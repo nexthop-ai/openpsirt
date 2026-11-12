@@ -4,7 +4,7 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Shell } from "./Shell";
-import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
+import { answer, location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Who } from "./session";
 
 const mount = mounted();
@@ -54,6 +54,38 @@ describe("the top search", () => {
     const at = await searched("openssl", { status: 503 });
     expect(at).toBe("/start");
     expect(mount.host().textContent).toContain("could not be looked up");
+  });
+});
+
+// The sign-out under the person's menu, for one answer from the server.
+async function signedOut(status: number): Promise<string> {
+  serve(() => ({ data: { items: [], total: 0 } }));
+  answer("DELETE", (path) => (path === "/v1/session" ? { status } : undefined));
+  mount.render(screen(<Shell who={who}>{null}</Shell>, "/start"));
+  await settle();
+  const press = (label: string) =>
+    Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.getAttribute("aria-label") === label || each.textContent?.startsWith(label),
+    );
+  await act(async () => press("You")?.click());
+  await act(async () => press("Sign out")?.click());
+  await settle();
+  // Still here: leaving would be the signed-out page.
+  expect(location()).toBe("/start");
+  return mount.host().textContent ?? "";
+}
+
+describe("signing out", () => {
+  it("says to sign out at the proxy where the proxy signed the reader in", async () => {
+    const said = await signedOut(409);
+    expect(said).toContain("Sign out there");
+    expect(said).not.toContain("didn’t reach the server");
+  });
+
+  it("offers it again where the server did not end the session", async () => {
+    const said = await signedOut(503);
+    expect(said).toContain("Try signing out again");
+    expect(said).not.toContain("Sign out there");
   });
 });
 

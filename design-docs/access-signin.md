@@ -79,6 +79,7 @@ provider, where the asserted name is that name at the provider.
 | Naming the header and naming the sources it is honored from are both required; a half-configuration stops the process | Reaching the container directly bypasses the proxy |
 | Membership may come in a second header, with its name and separator configured | It extends no trust beyond the username header |
 | The sources are also the proxies whose forwarded client the published documents rate-limit (`design-docs/publishing.md`) | Where it publishes, they may be named with no header and are read for that alone, and every address is still refused as a source |
+| A sign-out arriving through the proxy is refused 409, naming the proxy as where to sign out | No session of this deployment stands behind it, and the proxy's own cookie signs the next request back in |
 
 ## Name and identifier
 

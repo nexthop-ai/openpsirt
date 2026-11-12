@@ -21,7 +21,7 @@ Satisfies REQ-42, REQ-61, REQ-66.
 | 400 | An undeclared query parameter, an unreadable query string, or a NUL character in typed input, naming the input |
 | 403 | An act the caller may not do on a product they can see: an issue act or an assignment rule without its role |
 | 404 | Not there, **or** not the caller's: one answer |
-| 409 | A conflict with what the request names: a scan older than the one held, a role granted the wrong way for the mode, an approval by the decision's proposer, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was generated, retiring something retired, a name another row holds |
+| 409 | A conflict with what the request names: a scan older than the one held, a role granted the wrong way for the mode, an approval by the decision's proposer, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was generated, retiring something retired, a name another row holds, a sign-out from a browser a trusted proxy signed in |
 | 422 | Understood and not storable as written, such as a promise naming a release past end-of-life |
 
 | Rule | Reason |
