@@ -242,7 +242,7 @@ where a stopped upgrade made it already.
 
 | Upgrade note | Detail |
 |---|---|
-| Names and versions | A node from before the upgrade shows the component's name and version, and is found by the component's name, until its build is scanned again |
+| Names and versions | A node from before the upgrade shows the component's name and version, and is found by the component's name, until its build's inventory is sent again; a rescan alone keeps them |
 | VEX statements filed under a file name | Carry no document identifier and no real publisher, and stay in force beside a later upload's. The document is not kept, so nothing backfills them; `docs/configuration.md` § VEX statements under a file name says how to clear them |
 
 | Check, on each engine | What it holds |
