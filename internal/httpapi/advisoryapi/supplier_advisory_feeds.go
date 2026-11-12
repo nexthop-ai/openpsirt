@@ -7,14 +7,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -116,11 +115,7 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 		// Normalized here so the stored value is the address as it parses. The
 		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
-		address := strings.TrimSpace(input.Body.URL)
-		parsed, err := url.Parse(address)
-		if err == nil {
-			address = parsed.String()
-		}
+		address := outward.Normalized(input.Body.URL)
 		var row *supplier.Feed
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename or a retirement
@@ -145,7 +140,7 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 			// deployment started reading from.
 			if err := core.Noted(ctx, tx, trail.Setting,
 				"supplier advisory feed · "+product.Name+" · "+row.Display,
-				nil, trail.Said(hostOf(row.URL), true)); err != nil {
+				nil, trail.Said(outward.Host(row.URL), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
 			return nil
@@ -202,14 +197,4 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 		}
 		return &struct{}{}, nil
 	})
-}
-
-// hostOf is the host an address names, for a record that keeps what matters
-// and not the rest of the path.
-func hostOf(address string) string {
-	parsed, err := url.Parse(address)
-	if err != nil {
-		return ""
-	}
-	return parsed.Hostname()
 }

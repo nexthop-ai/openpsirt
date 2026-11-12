@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/outward/outwardtest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
@@ -53,8 +54,7 @@ func TestThisDeploymentsDirectoryIsReadByItsOwnSupplierReader(t *testing.T) {
 		fetch := supplier.NewFetcher(f.db, sbom.Limits{}, outward.Excluded{})
 		// The addresses the directory names are its published ones, answered
 		// here by the test server.
-		fetch.Client = &http.Client{Transport: hosted{at: reached.Host,
-			inner: server.Client().Transport}}
+		fetch.Client = &http.Client{Transport: outwardtest.Hosted(reached.Host, server.Client().Transport)}
 		fetch.Pause = 0
 		took, err := fetch.From(ctx, admin, *source)
 		if err != nil {
@@ -99,16 +99,4 @@ func TestTheProviderDescriptionNamesThePublisherTheDocumentsDo(t *testing.T) {
 			t.Errorf("the description names %s and the document %s", one.String(), other.String())
 		}
 	})
-}
-
-// hosted sends every request to the test server, whatever host it names.
-type hosted struct {
-	at    string
-	inner http.RoundTripper
-}
-
-func (h hosted) RoundTrip(req *http.Request) (*http.Response, error) {
-	sent := req.Clone(req.Context())
-	sent.URL.Host = h.at
-	return h.inner.RoundTrip(sent)
 }

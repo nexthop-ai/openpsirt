@@ -24,6 +24,20 @@ const MostQuoted = 64
 // ErrTooLarge is returned when a document runs past the size it is allowed.
 var ErrTooLarge = refusal.New("document is larger than the configured limit")
 
+// Counting is a reader that says how much has gone past it: the length a size
+// refusal needs, which a stream read without being held does not otherwise
+// carry.
+type Counting struct {
+	R io.Reader
+	N int64
+}
+
+func (c *Counting) Read(p []byte) (int, error) {
+	n, err := c.R.Read(p)
+	c.N += int64(n)
+	return n, err
+}
+
 // Capped stops a reader at a byte count.
 //
 // io.LimitedReader reports the truncation as an end of file, which reaches the

@@ -391,3 +391,18 @@ func TestAClientBuiltForOneCallLeavesNoConnectionOpen(t *testing.T) {
 			inner.MaxIdleConns, inner.IdleConnTimeout, inner.TLSHandshakeTimeout)
 	}
 }
+
+func TestAnAddressIsStoredAsItParsesAndRecordedByItsHost(t *testing.T) {
+	for _, c := range []struct{ typed, stored, host string }{
+		{"  https://Hooks.example.test:8443/a b  ", "https://Hooks.example.test:8443/a%20b", "Hooks.example.test"},
+		{"https://example.test", "https://example.test", "example.test"},
+		{" ://no scheme ", "://no scheme", ""},
+	} {
+		if got := Normalized(c.typed); got != c.stored {
+			t.Errorf("%q was stored as %q, want %q", c.typed, got, c.stored)
+		}
+		if got := Host(c.stored); got != c.host {
+			t.Errorf("%q was recorded by %q, want %q", c.stored, got, c.host)
+		}
+	}
+}

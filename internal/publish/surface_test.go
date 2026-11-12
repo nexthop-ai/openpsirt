@@ -19,8 +19,6 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
@@ -33,6 +31,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/published"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/signing"
+	"github.com/nexthop-ai/openpsirt/internal/signing/signingtest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -413,29 +412,7 @@ func TestASignedProviderSignsEveryDocument(t *testing.T) {
 // testKey is a signing key made for one test, never committed.
 func testKey(t *testing.T) string {
 	t.Helper()
-	return testKeyMadeAt(t, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-}
-
-// testKeyMadeAt is a signing key made for one test, created at the moment given.
-func testKeyMadeAt(t *testing.T, created time.Time) string {
-	t.Helper()
-	cfg := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, Time: func() time.Time { return created }}
-	entity, err := openpgp.NewEntity("Example PSIRT", "", "psirt@example.test", cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out bytes.Buffer
-	writer, err := armor.Encode(&out, openpgp.PrivateKeyType, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := entity.SerializePrivate(writer, cfg); err != nil {
-		t.Fatal(err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return out.String()
+	return signingtest.Key(t, signingtest.Made, 0)
 }
 
 // A reader holding a signature made by a key since replaced is sent the new
@@ -455,7 +432,7 @@ func TestASignatureByAReplacedKeyIsSentAgain(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		after, err := signing.Read(testKeyMadeAt(t, time.Now().UTC().Add(-time.Minute)), "")
+		after, err := signing.Read(signingtest.Key(t, time.Now().UTC().Add(-time.Minute), 0), "")
 		if err != nil {
 			t.Fatal(err)
 		}

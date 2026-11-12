@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/outward/outwardtest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
@@ -183,9 +184,7 @@ func (a aliased) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !a.known[strings.ToLower(req.URL.Hostname())] {
 		return nil, fmt.Errorf("no such host %s", req.URL.Hostname())
 	}
-	sent := req.Clone(req.Context())
-	sent.URL.Host = a.at
-	return a.inner.RoundTrip(sent)
+	return outwardtest.Hosted(a.at, a.inner).RoundTrip(req)
 }
 
 // advisory is one CSAF security advisory about a package at a version.

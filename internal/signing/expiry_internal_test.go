@@ -10,9 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	"github.com/nexthop-ai/openpsirt/internal/signing/signingtest"
 )
 
 // expiring is a key valid now and for the lifetime given, in seconds, from its
@@ -20,24 +18,7 @@ import (
 func expiring(t *testing.T, lifetime uint32) *Signer {
 	t.Helper()
 	created := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
-	cfg := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, Time: func() time.Time { return created },
-		KeyLifetimeSecs: lifetime}
-	entity, err := openpgp.NewEntity("Example PSIRT", "", "psirt@example.test", cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out bytes.Buffer
-	writer, err := armor.Encode(&out, openpgp.PrivateKeyType, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := entity.SerializePrivate(writer, cfg); err != nil {
-		t.Fatal(err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	signer, err := Read(out.String(), "")
+	signer, err := Read(signingtest.Key(t, created, lifetime), "")
 	if err != nil {
 		t.Fatal(err)
 	}

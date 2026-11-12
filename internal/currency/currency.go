@@ -144,25 +144,14 @@ const (
 func New() *Client {
 	return &Client{
 		HTTP: outward.Guarded(
-			hostOf(DefaultGoProxy), hostOf(DefaultNPM),
-			hostOf(DefaultPyPI), hostOf(DefaultCrates),
-			hostOf(DefaultMaven), hostOf(DefaultNuGet),
+			outward.Host(DefaultGoProxy), outward.Host(DefaultNPM),
+			outward.Host(DefaultPyPI), outward.Host(DefaultCrates),
+			outward.Host(DefaultMaven), outward.Host(DefaultNuGet),
 		),
 		GoProxy: DefaultGoProxy, NPM: DefaultNPM,
 		PyPI: DefaultPyPI, Crates: DefaultCrates,
 		Maven: DefaultMaven, NuGet: DefaultNuGet,
 	}
-}
-
-// hostOf is the host part of one of the index addresses above, which are
-// compile-time constants — so a value that will not parse is a mistake in this
-// file rather than anything a deployment can cause.
-func hostOf(address string) string {
-	parsed, err := url.Parse(address)
-	if err != nil {
-		return ""
-	}
-	return parsed.Hostname()
 }
 
 // askers is every ecosystem this has an index for, beside the asker for each.

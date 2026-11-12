@@ -211,6 +211,26 @@ func Loopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// Host is the host an address names without its port, or nothing for an
+// address that does not parse.
+func Host(address string) string {
+	parsed, err := url.Parse(address)
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
+}
+
+// Normalized is an address as it parses, trimmed of the space around it; one
+// that does not parse is returned trimmed, for the check refusing it to name.
+func Normalized(address string) string {
+	address = strings.TrimSpace(address)
+	if parsed, err := url.Parse(address); err == nil {
+		return parsed.String()
+	}
+	return address
+}
+
 // anywhere is the address check of a client whose address an administrator
 // configured: none.
 func anywhere(string) error { return nil }

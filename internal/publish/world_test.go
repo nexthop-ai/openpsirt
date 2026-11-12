@@ -18,7 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -94,36 +93,12 @@ type edge struct{ parent, child graph.Described }
 // ship records a scan of a build: its root and what hangs beneath it.
 func (w *world) ship(build *catalog.Build, root graph.Described, edges ...edge) {
 	w.t.Helper()
-	ctx := w.t.Context()
 	w.built = w.built.Add(time.Minute)
-	scan, outcome, err := ingest.NewStore(w.DB.DB).Record(ctx, ingest.Arriving{
-		BuildID: build.ID, ContentHash: "hash-" + w.built.Format(time.RFC3339Nano),
-		BuiltAt: w.built, ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		w.t.Fatalf("record a scan: %v %v", outcome, err)
-	}
-	snap := graph.Snapshot{Root: root}
-	seen := map[string]bool{}
+	deps := make([]graph.Dependency, 0, len(edges))
 	for _, one := range edges {
-		for _, part := range []graph.Described{one.parent, one.child} {
-			if part != root && !seen[part.Purl] {
-				seen[part.Purl] = true
-				snap.Components = append(snap.Components, part)
-			}
-		}
-		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: one.parent, Child: one.child})
+		deps = append(deps, graph.Dependency{Parent: one.parent, Child: one.child})
 	}
-	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, build.ID, scan.ID, snap); err != nil {
-		w.t.Fatal(err)
-	}
-	if root.Purl != "" {
-		if _, err := w.DB.DB.NewUpdate().TableExpr(`"scan"`).
-			Set(`"root_identifier" = ?`, root.Purl).
-			Where(`"id" = ?`, scan.ID).Exec(ctx); err != nil {
-			w.t.Fatal(err)
-		}
-	}
+	w.Ship(build, w.built, root, deps...)
 }
 
 // reported is one issue a scanner reported in one component.
@@ -135,12 +110,7 @@ type reported struct {
 // report runs a scanner over a build, reporting these and nothing else.
 func (w *world) report(build *catalog.Build, found ...reported) {
 	w.t.Helper()
-	ctx := w.t.Context()
-	run, err := w.findings.Begin(ctx, finding.Run{BuildID: build.ID, Scanner: "grype", RanHere: true})
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	var rows []finding.Reported
+	rows := make([]finding.Reported, 0, len(found))
 	for _, one := range found {
 		rows = append(rows, finding.Reported{
 			Issue: finding.Named{Identifier: one.issue, Severity: "high",
@@ -148,9 +118,7 @@ func (w *world) report(build *catalog.Build, found ...reported) {
 			Component: one.component,
 		})
 	}
-	if _, err := w.findings.Apply(ctx, build.ID, run.ID, rows); err != nil {
-		w.t.Fatal(err)
-	}
+	w.Report(build, rows...)
 }
 
 // decision is what one decision says.
@@ -170,57 +138,15 @@ type decision struct {
 // a build, and has the second person agree to it where it needs one.
 func (w *world) decide(build *catalog.Build, issue string, component graph.Described, said decision) {
 	w.t.Helper()
-	ctx := w.t.Context()
-	vulnerability, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, issue)
-	if err != nil {
-		w.t.Fatal(err)
+	approver := &w.approver
+	if said.waiting {
+		approver = nil
 	}
-	var open []finding.Finding
-	if err := w.DB.DB.NewSelect().Model(&open).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Where(`"f"."build_id" = ?`, build.ID).
-		Where(`"f"."vulnerability_id" = ?`, vulnerability).
-		Where(`"c"."name" = ?`, component.Name).
-		Where(`"f"."closed_at" IS NULL`).
-		Scan(ctx); err != nil || len(open) == 0 {
-		w.t.Fatalf("%s is open at %d occurrences of %s: %v", issue, len(open), component.Name, err)
-	}
-	var proposals []triage.Proposal
-	placed := map[string]bool{}
-	for _, one := range open {
-		// One occurrence holds every version of a name it ever shipped, so two
-		// findings of one issue may share it.
-		if placed[one.OccurrenceIdentity] {
-			continue
-		}
-		placed[one.OccurrenceIdentity] = true
-		at, err := w.findings.OccurrenceFor(ctx, w.proposer, build.ID, vulnerability, one.OccurrenceIdentity)
-		if err != nil {
-			w.t.Fatal(err)
-		}
-		proposals = append(proposals, triage.Proposal{
-			Occurrence: triage.Occurrence{
-				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
-				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
-				OnTag: at.OnTag,
-			},
-			Outcome: said.outcome, Justification: said.justification, Mitigation: said.mitigation,
-			Scope: said.scope, FixedVersion: said.fixedVersion, CommittedTo: said.committedTo,
-			DeferredUntil: said.deferredUntil,
-			Reasoning:     "Read the code.", By: w.proposer.ID, MadeOn: []int64{build.ID},
-			BindingAcross: []int64{build.ID},
-		})
-	}
-	recorded, err := w.decisions.ProposeMany(ctx, w.proposer, proposals)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	if recorded[0].NeedsApproval && !said.waiting {
-		if _, err := w.decisions.ApproveDecision(ctx, w.approver, recorded[0].DecisionID, "", nil, ""); err != nil {
-			w.t.Fatal(err)
-		}
-	}
+	w.Decide(build, issue, component.Name, triage.Proposal{
+		Outcome: said.outcome, Justification: said.justification, Mitigation: said.mitigation,
+		Scope: said.scope, FixedVersion: said.fixedVersion, CommittedTo: said.committedTo,
+		DeferredUntil: said.deferredUntil,
+	}, w.proposer, approver)
 }
 
 // publishes turns a product's documents on or off.
