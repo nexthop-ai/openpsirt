@@ -1014,12 +1014,7 @@ func updateAsRead(ctx context.Context, q *bun.UpdateQuery, h *finding.CodeFindin
 	if err != nil {
 		return fmt.Errorf("include the code finding in disclosure or take it out: %w", err)
 	}
-	if n, err := database.Affected(result); err != nil {
-		return fmt.Errorf("include the code finding in disclosure or take it out: %w", err)
-	} else if n != 1 {
-		return fmt.Errorf("include the code finding in disclosure or take it out: %w", database.ErrGoAgain)
-	}
-	return nil
+	return database.MovedAll(result, 1, "include the code finding in disclosure or take it out")
 }
 
 // recordedFor is the flaw record of a code finding the subject reads in full, for an inclusion

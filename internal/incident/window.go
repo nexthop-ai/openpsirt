@@ -635,11 +635,9 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 			}
 			return fmt.Errorf("change a window: %w", err)
 		}
-		changed, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("change a window: %w", err)
-		}
-		if changed == 0 {
+		if changed, err := database.Changed(res, "change a window"); err != nil {
+			return err
+		} else if !changed {
 			return ErrNoSuchWindow
 		}
 		if err := limit(ctx, tx, id, products); err != nil {

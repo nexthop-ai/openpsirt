@@ -193,11 +193,9 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 		if err != nil {
 			return fmt.Errorf("withdraw the release named as carrying the fix: %w", err)
 		}
-		changed, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("withdraw the release named as carrying the fix: %w", err)
-		}
-		if changed == 0 {
+		if changed, err := database.Changed(res, "withdraw the release named as carrying the fix"); err != nil {
+			return err
+		} else if !changed {
 			return ErrNoSuchFix
 		}
 		var name string

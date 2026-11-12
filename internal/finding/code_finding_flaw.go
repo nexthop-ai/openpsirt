@@ -91,12 +91,7 @@ func (h CodeFindingFlaw) Unlink(ctx context.Context, db bun.IDB) error {
 	if err != nil {
 		return fmt.Errorf("undo the flaw record: %w", err)
 	}
-	if n, err := database.Affected(result); err != nil {
-		return fmt.Errorf("undo the flaw record: %w", err)
-	} else if n != 1 {
-		return fmt.Errorf("undo the flaw record: %w", database.ErrGoAgain)
-	}
-	return nil
+	return database.MovedAll(result, 1, "undo the flaw record")
 }
 
 // Describing writes a run onto the flaw records of the code findings it is about to
@@ -304,10 +299,9 @@ func codeFindingsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilit
 		if err != nil {
 			return fmt.Errorf("record the code findings recorded as this flaw as disclosed: %w", err)
 		}
-		if n, err := database.Affected(result); err != nil {
-			return fmt.Errorf("record the code findings recorded as this flaw as disclosed: %w", err)
-		} else if n != 1 {
-			return fmt.Errorf("record the code findings recorded as this flaw as disclosed: %w", database.ErrGoAgain)
+		if err := database.MovedAll(result, 1,
+			"record the code findings recorded as this flaw as disclosed"); err != nil {
+			return err
 		}
 		if h.Included() && h.Visibility == access.SecurityTesting {
 			included = append(included, h)
@@ -339,12 +333,7 @@ func codeFindingsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilit
 	if err != nil {
 		return fmt.Errorf("record the code findings disclosed with their flaw: %w", err)
 	}
-	if n, err := database.Affected(result); err != nil {
-		return fmt.Errorf("record the code findings disclosed with their flaw: %w", err)
-	} else if n != int64(len(ids)) {
-		return fmt.Errorf("record the code findings disclosed with their flaw: %w", database.ErrGoAgain)
-	}
-	return nil
+	return database.MovedAll(result, len(ids), "record the code findings disclosed with their flaw")
 }
 
 // StripDisclosedCodeFindings strips the source a run kept beside these code finding findings

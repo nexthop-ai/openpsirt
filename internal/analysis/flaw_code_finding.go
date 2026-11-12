@@ -261,12 +261,7 @@ func takeFlawBack(ctx context.Context, tx bun.IDB, subject access.Subject, produ
 		if err != nil {
 			return fmt.Errorf("take the flaw back out of its builds: %w", err)
 		}
-		if n, err := database.Affected(result); err != nil {
-			return fmt.Errorf("take the flaw back out of its builds: %w", err)
-		} else if n != int64(len(batch)) {
-			return fmt.Errorf("take the flaw back out of its builds: %w", database.ErrGoAgain)
-		}
-		return nil
+		return database.MovedAll(result, len(batch), "take the flaw back out of its builds")
 	})
 }
 
