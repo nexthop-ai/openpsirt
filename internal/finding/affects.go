@@ -124,13 +124,12 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		}
 
 		here := map[int64]bool{}
-		var closing []int64
+		// The rows of each build being taken out: a build holding the
+		// component at two occurrences is one build.
+		closing := map[int64][]int64{}
 		// The number of rows this would open, counted as they are resolved.
 		opened := 0
-		// The builds being taken out, as against the rows that
-		// is: a build holding the component at two occurrences is one build.
 		out.Closed = 0
-		leaving := map[int64]bool{}
 		for i := range rows {
 			row := &rows[i]
 			// Only a flaw somebody recorded. A scanned issue's build set is
@@ -147,8 +146,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			}
 			here[row.BuildID] = true
 			if !wanted[row.BuildID] {
-				closing = append(closing, row.ID)
-				leaving[row.BuildID] = true
+				closing[row.BuildID] = append(closing[row.BuildID], row.ID)
 			}
 		}
 		if len(closing) > 0 && because == "" {
@@ -216,13 +214,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// Each build taken out is counted where this closed a row of it: a
 		// concurrent edit that closed its rows first took it out, and this
 		// did not.
-		for build := range leaving {
-			var ofBuild []int64
-			for i := range rows {
-				if rows[i].BuildID == build {
-					ofBuild = append(ofBuild, rows[i].ID)
-				}
-			}
+		for build, ofBuild := range closing {
 			closed := int64(0)
 			if err := database.IDsInBatches(ctx, ofBuild, func(ctx context.Context, batch []int64) error {
 				result, err := tx.NewUpdate().Model((*Finding)(nil)).

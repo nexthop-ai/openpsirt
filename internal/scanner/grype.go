@@ -813,9 +813,10 @@ type publishedRating struct {
 // rating picks the severity score to record, the vector it assumes, and
 // every rating the report states beside it.
 //
-// One per generation of the scheme, the first stated in each: a report
-// carries several ratings from different sources and they disagree, and
-// taking the first stated is at least a stable answer. The vector travels with
+// One per generation of the scheme, the worst stated in each, with the source
+// and kind of the rating that stated it: a report carries several ratings from
+// different sources and they disagree, and the worst does not depend on the
+// order a match lists them. The vector travels with
 // the number so that what the number assumed is readable rather than lost, and
 // who published it travels with them for the same reason: everything else a
 // scan says carries its provenance.

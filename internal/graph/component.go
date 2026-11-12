@@ -280,15 +280,28 @@ func StoredPurl(purl string) string {
 		}
 		addressLast = strings.Contains(address, "://")
 		if !addressLast {
-			if host, held := withoutPassword(address); held {
-				pair = key + "=" + qualifierEscaped(host)
+			// An address written without a scheme loses a password before
+			// its host and anything from its query on.
+			bare, held := withoutPassword(address)
+			if at := strings.IndexAny(bare, "?#"); at >= 0 {
+				bare, held = bare[:at], true
+			}
+			if held {
+				pair = key + "=" + qualifierEscaped(bare)
 			}
 			kept = append(kept, pair)
+			if queryUnescaped(value) {
+				break
+			}
 			continue
 		}
 		parsed, err := url.Parse(address)
 		if err != nil {
-			// Where its credential ends cannot be told, so it is not kept.
+			// Where its credential ends cannot be told, so it is not kept,
+			// and neither is a query written after it.
+			if queryUnescaped(value) {
+				break
+			}
 			continue
 		}
 		// A user with no password on an ssh address names the account the
@@ -347,7 +360,7 @@ func withoutPassword(address string) (string, bool) {
 	}
 	at := strings.LastIndex(address[:end], "@")
 	if at <= 0 || at == end-1 || !strings.Contains(address[:at], ":") {
-		return "", false
+		return address, false
 	}
 	return address[at+1:], true
 }

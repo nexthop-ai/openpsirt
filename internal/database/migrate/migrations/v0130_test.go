@@ -4,6 +4,7 @@
 package migrations_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -201,6 +202,12 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 			{"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git",
 				"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git"},
 			{"pkg:generic/c@1?checksum=sha256:abc123", "pkg:generic/c@1?checksum=sha256:abc123"},
+			{"pkg:generic/bp@1?download_url=https://b.example.com:abc/s3.bin?X-Amz-Credential=A&X-Amz-Signature=SECRET",
+				"pkg:generic/bp@1"},
+			{"pkg:maven/org/rq@1?repository_url=repo.example.com/maven?private_token=SECRET&type=jar",
+				"pkg:maven/org/rq@1?repository_url=repo.example.com/maven"},
+			{"pkg:maven/org/re@1?repository_url=repo.example.com/maven%3Fprivate_token%3DSECRET&type=jar",
+				"pkg:maven/org/re@1?repository_url=repo.example.com/maven&type=jar"},
 			{"pkg:generic/h@1?download_url=https://h.example.com/a=b/f.tgz%3Ftoken%3Dx&upstream=openssl%403.0",
 				"pkg:generic/h@1?download_url=https://h.example.com/a%3Db/f.tgz&upstream=openssl%403.0"},
 			{"pkg://deb/debian/curl@8.5.0", "pkg:deb/debian/curl@8.5.0"},
@@ -256,6 +263,66 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 					t.Errorf("%s holds %q after the upgrade for %q, want %q", table, got[i], c.stored, c.want)
 				}
 			}
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// A document served to anybody states each identifier as the upgrade leaves
+// it, and an identifier a cleaned one begins is left as it was.
+func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0120)
+		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+		exec := func(query string, args ...any) {
+			t.Helper()
+			if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+		}
+		//nolint:gosec // G101: the credential this upgrade takes out
+		const (
+			raw     = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git&arch=amd64"
+			clean   = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git&arch=amd64"
+			slashed = "pkg://deb/debian/curl@8.5.0"
+			longer  = "pkg://deb/debian/curl@8.5.0-1"
+		)
+		exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
+		var product int64
+		if err := db.DB.NewRaw(`SELECT MAX("id") FROM "product"`).Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		for i, purl := range []string{raw, slashed} {
+			exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
+				"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				fmt.Sprintf("identity-%d", i), purl, "x", "1", "x", fmt.Sprintf("fold-%d", i), at)
+		}
+		body := func(root, other string) string {
+			encoded, err := json.Marshal(map[string]any{
+				"product": map[string]string{"@id": root},
+				"helpers": []string{other, longer},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(encoded)
+		}
+		exec(`INSERT INTO "published_document" ("product_id", "kind", "subject", "path", "path_digest",
+			"tracking_id", "title", "version", "first_at", "current_at", "statuses", "settled", "document")
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			product, "csaf-vex", "CVE-2026-1", "p/cve-2026-1.json", "digest", "tracking", "title", 1, at, at,
+			"affected", "settled", body(raw, slashed))
+
+		dbtest.MigrateTo(t, db, v0130)
+
+		var got string
+		if err := db.DB.NewRaw(`SELECT "document" FROM "published_document"`).Scan(ctx, &got); err != nil {
+			t.Fatal(err)
+		}
+		if want := body(clean, "pkg:deb/debian/curl@8.5.0"); got != want {
+			t.Errorf("the published document holds\n%s\nafter the upgrade, want\n%s", got, want)
 		}
 		leaveAtLatest(t, ctx, db)
 	})

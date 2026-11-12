@@ -5,6 +5,7 @@ package migrations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -24,18 +25,26 @@ const purlBatchV0130 = 5_000
 // purlCredentialsV0130 rewrites the package identifiers v0.12.0 stored as
 // v0.13.0 stores them: the slashes after the scheme dropped, and any
 // credential and query taken out of the addresses its qualifiers hold. Only a
-// row starting "pkg:/" in any case, or holding a colon after its qualifiers
-// start, plain or escaped, is read: an address has one, and a distribution's
-// arch and distro qualifiers do not. Only a row that changes is written, so
+// row starting "pkg:/" in any case, or holding a colon, a question mark or a
+// fragment mark after its qualifiers start, plain or escaped, is read: an
+// address with a credential or a query has one, and a distribution's arch and
+// distro qualifiers do not. Only a row that changes is written, so
 // a start after one that stopped part way writes what the first missed.
-// No identity is rewritten.
+// No identity is rewritten. Each document served to anybody then states every
+// identifier it holds as it now stands.
 func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
-	return purlCredentialsInBatchesV0130(ctx, tx, purlBatchV0130)
+	cleaned, err := purlCredentialsInBatchesV0130(ctx, tx, purlBatchV0130)
+	if err != nil {
+		return err
+	}
+	return publishedPurlsV0130(ctx, tx, cleaned, purlBatchV0130)
 }
 
 // purlCredentialsInBatchesV0130 cleans as purlCredentialsV0130 does, reading
-// batch rows at a time.
-func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) error {
+// batch rows at a time, and returns each identifier it rewrote beside what it
+// became.
+func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) (map[string]string, error) {
+	cleaned := map[string]string{}
 	for _, at := range purlColumnsV0130 {
 		table, column := at[0], at[1]
 		for after := int64(0); ; {
@@ -44,10 +53,12 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 				purl string
 			}
 			rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
-				WHERE "id" > ? AND ("`+column+`" LIKE ? OR LOWER("`+column+`") LIKE ? OR LOWER("`+column+`") LIKE ?)
-				ORDER BY "id" LIMIT ?`, after, "%?%:%", "%?%3a%", "pkg:/%", batch)
+				WHERE "id" > ? AND ("`+column+`" LIKE ? OR "`+column+`" LIKE ? OR "`+column+`" LIKE ?
+				  OR LOWER("`+column+`") LIKE ? OR LOWER("`+column+`") LIKE ? OR LOWER("`+column+`") LIKE ?
+				  OR LOWER("`+column+`") LIKE ?)
+				ORDER BY "id" LIMIT ?`, after, "%?%:%", "%?%?%", "%?%#%", "%?%3a%", "%?%3f%", "%?%23%", "pkg:/%", batch)
 			if err != nil {
-				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
+				return nil, fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
 			var found []held
 			read := 0
@@ -55,24 +66,25 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 				var row held
 				if err := rows.Scan(&row.id, &row.purl); err != nil {
 					_ = rows.Close()
-					return fmt.Errorf("read a package identifier of %s: %w", table, err)
+					return nil, fmt.Errorf("read a package identifier of %s: %w", table, err)
 				}
 				read++
 				after = row.id
-				if cleaned := purlWithoutCredentialV0130(row.purl); cleaned != row.purl {
-					found = append(found, held{id: row.id, purl: cleaned})
+				if clean := purlWithoutCredentialV0130(row.purl); clean != row.purl {
+					found = append(found, held{id: row.id, purl: clean})
+					cleaned[row.purl] = clean
 				}
 			}
 			if err := rows.Close(); err != nil {
-				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
+				return nil, fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
 			if err := rows.Err(); err != nil {
-				return fmt.Errorf("read the package identifiers of %s: %w", table, err)
+				return nil, fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
 			for _, row := range found {
 				if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "`+column+`" = ? WHERE "id" = ?`,
 					row.purl, row.id); err != nil {
-					return fmt.Errorf("clean the package identifier of %s %d: %w", table, row.id, err)
+					return nil, fmt.Errorf("clean the package identifier of %s %d: %w", table, row.id, err)
 				}
 			}
 			if read < batch {
@@ -80,7 +92,73 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) er
 			}
 		}
 	}
-	return nil
+	return cleaned, nil
+}
+
+// publishedPurlsV0130 rewrites each identifier the cleaning rewrote wherever a
+// document served to anybody states it. A document states one as a whole JSON
+// string, so the quoted encoding is matched, and one identifier beginning
+// another is never matched inside it. A document left unchanged is not
+// written.
+func publishedPurlsV0130(ctx context.Context, tx bun.Tx, cleaned map[string]string, batch int) error {
+	if len(cleaned) == 0 {
+		return nil
+	}
+	type swap struct{ from, to string }
+	swaps := make([]swap, 0, len(cleaned))
+	for from, to := range cleaned {
+		swaps = append(swaps, swap{jsonStringV0130(from), jsonStringV0130(to)})
+	}
+	for after := int64(0); ; {
+		type held struct {
+			id       int64
+			document string
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT "id", "document" FROM "published_document"
+			WHERE "id" > ? ORDER BY "id" LIMIT ?`, after, batch)
+		if err != nil {
+			return fmt.Errorf("read the published documents: %w", err)
+		}
+		var found []held
+		read := 0
+		for rows.Next() {
+			var row held
+			if err := rows.Scan(&row.id, &row.document); err != nil {
+				_ = rows.Close()
+				return fmt.Errorf("read a published document: %w", err)
+			}
+			read++
+			after = row.id
+			document := row.document
+			for _, s := range swaps {
+				document = strings.ReplaceAll(document, s.from, s.to)
+			}
+			if document != row.document {
+				found = append(found, held{id: row.id, document: document})
+			}
+		}
+		if err := rows.Close(); err != nil {
+			return fmt.Errorf("read the published documents: %w", err)
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("read the published documents: %w", err)
+		}
+		for _, row := range found {
+			if _, err := tx.ExecContext(ctx, `UPDATE "published_document" SET "document" = ? WHERE "id" = ?`,
+				row.document, row.id); err != nil {
+				return fmt.Errorf("clean published document %d: %w", row.id, err)
+			}
+		}
+		if read < batch {
+			return nil
+		}
+	}
+}
+
+// jsonStringV0130 is a string as encoding/json writes it, quotes included.
+func jsonStringV0130(value string) string {
+	encoded, _ := json.Marshal(value)
+	return string(encoded)
 }
 
 // purlWithoutCredentialV0130 is a package identifier as v0.13.0 stores one:
@@ -117,14 +195,24 @@ func purlWithoutCredentialV0130(purl string) string {
 		}
 		addressLast = strings.Contains(address, "://")
 		if !addressLast {
-			if host, held := withoutPasswordV0130(address); held {
-				pair = key + "=" + qualifierEscapedV0130(host)
+			bare, held := withoutPasswordV0130(address)
+			if at := strings.IndexAny(bare, "?#"); at >= 0 {
+				bare, held = bare[:at], true
+			}
+			if held {
+				pair = key + "=" + qualifierEscapedV0130(bare)
 			}
 			kept = append(kept, pair)
+			if queryUnescapedV0130(value) {
+				break
+			}
 			continue
 		}
 		parsed, err := url.Parse(address)
 		if err != nil {
+			if queryUnescapedV0130(value) {
+				break
+			}
 			continue
 		}
 		_, password := parsed.User.Password()
@@ -175,7 +263,7 @@ func withoutPasswordV0130(address string) (string, bool) {
 	}
 	at := strings.LastIndex(address[:end], "@")
 	if at <= 0 || at == end-1 || !strings.Contains(address[:at], ":") {
-		return "", false
+		return address, false
 	}
 	return address[at+1:], true
 }
