@@ -322,6 +322,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		BranchOrTag   string `bun:"branch_or_tag"`
 		Variant       string `bun:"variant"`
 		Component     string `bun:"component"`
+		Named         string `bun:"named"`
 		Vulnerability string `bun:"vulnerability"`
 		ProductID     int64  `bun:"product_id"`
 		// Read so that a collaborator brought onto this one case keeps the
@@ -342,7 +343,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 				WhereOr(rating.BandExpr+" = ?", "critical")
 		}).
 		Where("NOT "+standing, args...).
-		GroupExpr(`"p"."name", "st"."name", "va"."name", `+shownComponent+`, "v"."identifier", "st"."product_id", "v"."id"`).
+		GroupExpr(`"p"."name", "st"."name", "va"."name", "c"."name", `+shownComponent+`, "v"."identifier", "st"."product_id", "v"."id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is critical on a release: %w", err)
@@ -373,7 +374,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		}
 		holds := Holds{
 			About: identify("critical-on-release", row.Product, row.BranchOrTag, row.Variant,
-				row.Vulnerability, row.Component),
+				row.Vulnerability, row.Named),
 			Body: fmt.Sprintf("%s %s and is open against %s, which has been released. Nothing has been decided about it.",
 				row.Vulnerability, why, where),
 			Link: weblink.Finding(row.Product, row.BranchOrTag, row.Variant,

@@ -4,8 +4,10 @@
 package notify_test
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -537,6 +539,67 @@ func TestACriticalASupplierAnswersIsNotTold(t *testing.T) {
 		sweep(t, db)
 		if told := openFor(t, db, triager, notify.CriticalOnRelease); len(told) != 0 {
 			t.Errorf("the triager was told %q about an occurrence a supplier answers", told)
+		}
+	})
+}
+
+// An alert standing over a finding is identified by the component, so a build
+// restating the component's name moves what the alert says and leaves the
+// alert standing, rather than clearing it and telling everybody again.
+func TestAnAlertStandsWhereTheBuildRestatesTheComponentsName(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		rights := access.NewStore(db.DB)
+		released := w.BuildFor(w.Tag, w.Customer)
+		triager := recordPerson(t, rights, "triager@example.com", false, w.Product.ID, access.PublicTriage)
+
+		stated := func(name string, at int) {
+			t.Helper()
+			scan, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
+				BuildID: released.ID, ContentHash: fmt.Sprintf("restated-%d", at),
+				BuiltAt: time.Now().UTC().Add(time.Duration(at-3) * time.Hour), ParserVersion: "test",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
+			libnl := graph.Described{Purl: "pkg:generic/libnl@3.7.0", Name: name, Version: "3.7.0"}
+			if _, err := fixture.ApplyGraph(ctx, db.DB, released.ID, scan.ID, graph.Snapshot{
+				Root: root, Components: []graph.Described{libnl},
+				Dependencies: []graph.Dependency{{Parent: root, Child: libnl}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		standing := func() []int64 {
+			t.Helper()
+			if _, _, err := notify.NewWatch(db.DB, quiet).Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asksByID(t, db, triager), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ids []int64
+			for _, row := range rows {
+				if row.Kind == notify.CriticalOnRelease {
+					ids = append(ids, row.ID)
+				}
+			}
+			return ids
+		}
+
+		stated("libnl", 1)
+		critical(t, db, released.ID, "CVE-2026-SHIPPED", "critical")
+		before := standing()
+		if len(before) != 1 {
+			t.Fatalf("the triager was told %v, want one alert", before)
+		}
+		stated("LibNL", 2)
+		if after := standing(); !slices.Equal(after, before) {
+			t.Errorf("restating the component's name turned alert %v into %v", before, after)
 		}
 	})
 }

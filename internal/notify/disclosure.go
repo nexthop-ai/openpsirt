@@ -176,6 +176,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		BranchOrTag     string    `bun:"branch_or_tag"`
 		Variant         string    `bun:"variant"`
 		Component       string    `bun:"component"`
+		Named           string    `bun:"named"`
 		Vulnerability   string    `bun:"vulnerability"`
 		ProductID       int64     `bun:"product_id"`
 		VulnerabilityID int64     `bun:"vulnerability_id"`
@@ -198,7 +199,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 			}
 			return `"f"."disclose_at" <= ?`
 		}(), time.Now().UTC()).
-		GroupExpr(`"p"."name", "st"."name", "va"."name", `+shownComponent+`, "v"."identifier", "st"."product_id", "v"."id"`).
+		GroupExpr(`"p"."name", "st"."name", "va"."name", "c"."name", `+shownComponent+`, "v"."identifier", "st"."product_id", "v"."id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is past its disclosure date: %w", err)
@@ -250,7 +251,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 			// One condition per occurrence, because the link and whoever holds the
 			// work are per occurrence.
 			About: identify(about, row.Product, row.BranchOrTag, row.Variant,
-				row.Vulnerability, row.Component),
+				row.Vulnerability, row.Named),
 			Body: body,
 			Link: weblink.Finding(row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component, ""),

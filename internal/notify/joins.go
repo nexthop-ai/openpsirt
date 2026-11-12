@@ -12,7 +12,9 @@ import (
 )
 
 // shownComponent is the name a finding's build stated for its component,
-// which a message names and a grouping groups on.
+// which a message names. An alert is identified by the component row's name,
+// which a build restating its components leaves alone, so an alert standing
+// over a finding is not cleared and raised again when the name shown moves.
 var shownComponent = graph.NodeName("sn", "c")
 
 // A finding with the names a message has to say.
@@ -52,6 +54,7 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(shownComponent + ` AS "component"`).
+		ColumnExpr(`"c"."name" AS "named"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		// The product and the issue as identifiers too: what a message says is
 		// a name, and what a later read narrows by is a column.
