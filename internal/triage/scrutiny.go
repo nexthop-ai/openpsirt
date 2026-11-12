@@ -282,13 +282,16 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// one. An approval is a fact about a moment, so it is right that this
 	// stands — and it is still the first thing an auditor asks after a
 	// reorganization.
-	// Asked of each standing row of the decision the reader may read, at that
-	// row's visibility; a decision with any row they could not agree to now is
-	// listed, with every row the agreement covers counted.
-	mayStillApprove, stillArgs := access.MayApproveWhere(`"ap"."approved_by"`, `"dl"."product_id"`, `"dl"."visibility"`)
-	lost := readableBy(s.db.NewSelect().ColumnExpr("1").
+	// Asked of each standing row the reader may read, at that row's
+	// visibility; an agreement with any row its approver could not agree to
+	// now is listed, with every row it covers counted. The agreements are
+	// worked out once, uncorrelated, so a decision of many rows is not asked
+	// again for each of them.
+	mayStillApprove, stillArgs := access.MayApproveWhere(`"apl"."approved_by"`, `"dl"."product_id"`, `"dl"."visibility"`)
+	lost := readableBy(s.db.NewSelect().ColumnExpr(`"apl"."id"`).
 		TableExpr(`"decision_occurrence" AS "dl"`).
-		Where(`"dl"."decision_id" = "de"."decision_id"`).
+		Join(`JOIN "decision_approval" AS "apl" ON "apl"."decision_id" = "dl"."decision_id"`).
+		Where(`"apl"."withdrawn_at" IS NULL`).
 		Where(finding.InForceOn("dl")).
 		Where(`NOT `+mayStillApprove, stillArgs...), subject, "dl")
 	var lapsed []struct {
@@ -318,7 +321,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// agreed could agree today, asked by the rule a signed-in approver is
 		// asked by. A grant made inactive by a change of mode grants nothing
 		// while it sits there, so it is not a right somebody still holds.
-		Where(`EXISTS (?)`, lost).
+		Where(`"ap"."id" IN (?)`, lost).
 		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(int64(room))).Scan(ctx, &lapsed)
