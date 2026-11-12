@@ -162,15 +162,30 @@ func New() *Client {
 // either components selected and never asked or components asked about and
 // never selected — and silently, because nothing joins the two spellings.
 //
+// Each carries whether its asker can turn a name into a request at all, which
+// the report reads to tell a name never sent from one sent and not answered.
+//
 // Lower case, because that is how a package identifier's type is compared.
-var askers = map[string]func(*Client) Asker{
-	"golang": func(c *Client) Asker { return goProxy{c} },
-	"npm":    func(c *Client) Asker { return npmRegistry{c} },
-	"pypi":   func(c *Client) Asker { return pyPI{c} },
-	"cargo":  func(c *Client) Asker { return cratesIO{c} },
-	"maven":  func(c *Client) Asker { return mavenCentral{c} },
-	"nuget":  func(c *Client) Asker { return nugetGallery{c} },
+var askers = map[string]index{
+	"golang": {func(c *Client) Asker { return goProxy{c} }, anyName},
+	"npm":    {func(c *Client) Asker { return npmRegistry{c} }, anyName},
+	"pypi":   {func(c *Client) Asker { return pyPI{c} }, anyName},
+	"cargo":  {func(c *Client) Asker { return cratesIO{c} }, anyName},
+	"maven": {func(c *Client) Asker { return mavenCentral{c} }, func(name string) bool {
+		_, _, ok := mavenCoordinates(name)
+		return ok
+	}},
+	"nuget": {func(c *Client) Asker { return nugetGallery{c} }, walkable},
 }
+
+// index is one ecosystem's asker, and whether it sends a request for a name.
+type index struct {
+	asker   func(*Client) Asker
+	askable func(name string) bool
+}
+
+// anyName is an asker that sends a request for every name Asked reads.
+func anyName(string) bool { return true }
 
 // Askable is every ecosystem this has an index for.
 //
@@ -196,11 +211,11 @@ func Askable() []string {
 // Named by the type in a package identifier, so the caller does not have to
 // keep its own mapping of what is askable.
 func (c *Client) For(ecosystem string) Asker {
-	asker, held := askers[ecosystem]
+	one, held := askers[ecosystem]
 	if !held {
 		return nil
 	}
-	return asker(c)
+	return one.asker(c)
 }
 
 // mostBody is how much of somebody else's document we will read.

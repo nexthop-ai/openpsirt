@@ -53,6 +53,7 @@ every request.
 | Where the bound stops the walk with no release, the package is recorded as asked with no version | A release may sit on an unread page |
 | A page is read only from the registration it came from | A page named elsewhere, or an address with a dot segment, is not followed |
 | A Maven group or artifact that is empty, `.` or `..` is recorded as unaskable, never asked | It names another place in the repository |
+| A package identifier whose path holds a segment that is empty, `.` or `..`, decoded, names nothing to ask, in every ecosystem | A server resolving it answers about another package |
 | A PyPI name is asked as PyPI spells it: lower case, each run of hyphens, underscores and dots one hyphen | Otherwise the index redirects, and the client follows no redirect |
 
 ## Answer classes
@@ -71,7 +72,7 @@ every request.
 | Where npm's full document is refused and the abbreviated one falls into a bad day, the answer is the bad day | |
 | A previous answer is never overwritten by an empty one | Not-found also answers a renamed package and some transient conditions, and would leave the hole for a month |
 | A version answered with no date keeps the date held while the version is unmoved | npm's abbreviated document and a missing Maven project document answer the version alone |
-| A name the Maven or NuGet asker refuses before sending is reported as unreadable | It was never sent |
+| A name an asker refuses before sending is reported as unreadable, read from the one table of askers | It was never sent |
 
 ## Names held back
 
@@ -79,7 +80,7 @@ A name this deployment calls its own is never sent. Three sources, unioned:
 
 | Source | Yields |
 |---|---|
-| The namespace this deployment publishes under, already required for CSAF and VEX | The host, the host reversed (a Maven group or Java package), and each label short of the top-level domain |
+| The namespace this deployment publishes under, already required for CSAF and VEX | The host, the host reversed (a Maven group or Java package), and each label short of the top-level domain; under a forge host (github.com, gitlab.com, bitbucket.org, sourceforge.net), the account its path names and nothing of the host |
 | What each build declared itself to be, read from the scan record | The account, scope or group beside the name, and for a Go module path the account after its host, whatever suffix, subdirectory or forge group follows. A root is the product built here. The component standing for the product is stored by name alone, so the record is the source |
 | What the deployment stated | Whatever else an operator named |
 

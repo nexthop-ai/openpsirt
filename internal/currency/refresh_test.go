@@ -326,6 +326,10 @@ func TestTheNameAskedComesFromTheIdentifier(t *testing.T) {
 		// either way as this component's upstream version.
 		{"pkg:npm/%zz/node@20.1.0", "", "", false},
 		{"pkg:golang/example.com/%2@v1", "", "", false},
+		{"pkg:golang/x/../../github.com/other/mod@v1", "", "", false},
+		{"pkg:golang/example.com/./mod@v1", "", "", false},
+		{"pkg:npm/%2e%2e/node@20.1.0", "", "", false},
+		{"pkg:golang/example.com//mod@v1", "", "", false},
 	} {
 		ecosystem, name, ok := currency.Asked(c.purl)
 		if ok != c.ok || ecosystem != c.ecosystem || name != c.name {
