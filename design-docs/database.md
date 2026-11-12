@@ -106,6 +106,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Rule | Reason |
 |---|---|
 | The server is asked what it is, whatever the URL says | A MySQL-protocol connection may be MySQL or MariaDB. Believing the URL applies the wrong floor. MariaDB names itself in its version string |
+| PostgreSQL's version is read from its version number setting, never its version sentence | A pre-release names its version with no dot, and the first dotted number in the sentence is the compiler's |
 | A server below the floor stops the process at start, naming the version found and the version required | Otherwise it fails later, in whichever query first needs what the server lacks |
 | The connection is asked what encryption it negotiated | It stops a start only where the deployment requires encryption (§ Connection encryption) |
 
@@ -124,6 +125,7 @@ offers; the other connects in cleartext unless asked.
 | Required is imposed on every connection the pool opens | A transport that can fall back (`sslmode` `prefer` or `allow`, `tls=preferred`, or none named) is replaced by one that cannot. One asking for cleartext, or `allowFallbackToPlaintext` true, is refused. A MySQL value is read as the driver reads it: any case, 0 and 1 as false and true |
 | A PostgreSQL URL naming no mode is judged by `PGSSLMODE` | The driver takes the environment's mode there. A mode is appended only where that one is weak, so `verify-full` is never replaced |
 | A PostgreSQL key is read as the driver reads it | Decoded, last value of a repeat wins, every repeat judged. A pair the URL parser cannot read is refused, naming the setting |
+| A MySQL connection string's settings are found where the driver finds them | After the first `?` following the last `/`. Its password is not escaped and may hold both |
 | The driver's parsed configuration is the last word on PostgreSQL | It merges a service file above the environment and under the URL, which can supply a mode the URL does not show. Every attempt it makes, first and each fallback, must be encrypted |
 | A server that will not say is refused under required | |
 | Required against SQLite is refused | A file opened directly has no connection to encrypt |

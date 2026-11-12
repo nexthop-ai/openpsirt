@@ -151,7 +151,7 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 			scrub(err, target))
 	}
 
-	server, err := identify(ctx, sqldb, target.Engine)
+	server, err := identify(ctx, sqldb, target)
 	if err != nil {
 		_ = sqldb.Close()
 		return nil, err
@@ -228,11 +228,12 @@ func mandatoryTransport(target Target, getenv func(string) string) (string, erro
 			RequiredEncryption, target.Redacted, setting)
 	}
 	// The query is what follows the address: after the host for a URL, and
-	// after the database for the MySQL driver's form, whose password is not
-	// escaped and may hold a question mark.
+	// after the database for the MySQL driver's form. That driver's password
+	// is not escaped and may hold a slash and a question mark, so the database
+	// starts at the last slash, where the driver starts it.
 	after := 0
 	if target.Engine != Postgres {
-		after = strings.Index(target.DSN, ")/")
+		after = strings.LastIndex(target.DSN, "/")
 		if after < 0 {
 			return "", fmt.Errorf("%s: the connection string names no database", target.Redacted)
 		}
@@ -489,15 +490,32 @@ func driverFor(e Engine) (driver string, dialect func() schema.Dialect, err erro
 }
 
 // identify asks the server what it is, rather than believing the URL.
-func identify(ctx context.Context, db *sql.DB, declared Engine) (Server, error) {
-	query := "SELECT version()"
-	if declared == SQLite {
-		query = "SELECT sqlite_version()"
-	}
-
+//
+// A failure carries the driver's error, scrubbed of the credentials as every
+// error leaving this package with one inside it is.
+func identify(ctx context.Context, db *sql.DB, target Target) (Server, error) {
+	declared := target.Engine
 	var raw string
-	if err := db.QueryRowContext(ctx, query).Scan(&raw); err != nil {
-		return Server{}, fmt.Errorf("ask %s for its version: %w", declared, err)
+	var version Version
+	var err error
+	switch declared {
+	case Postgres:
+		// The version's number is asked for on its own: the sentence version()
+		// returns names a pre-release as "18beta1", with no dot, and the
+		// first dotted number in it is the compiler's.
+		var number string
+		err = db.QueryRowContext(ctx, "SELECT version(), current_setting('server_version_num')").
+			Scan(&raw, &number)
+		if err == nil {
+			version, err = postgresVersion(number)
+		}
+	case SQLite:
+		err = db.QueryRowContext(ctx, "SELECT sqlite_version()").Scan(&raw)
+	default:
+		err = db.QueryRowContext(ctx, "SELECT version()").Scan(&raw)
+	}
+	if err != nil {
+		return Server{}, scrub(fmt.Errorf("ask %s for its version: %w", declared, err), target)
 	}
 
 	engine := declared
@@ -511,9 +529,10 @@ func identify(ctx context.Context, db *sql.DB, declared Engine) (Server, error) 
 		}
 	}
 
-	version, err := parseVersion(raw)
-	if err != nil {
-		return Server{}, fmt.Errorf("%s reported an unreadable version %q: %w", engine, raw, err)
+	if declared != Postgres {
+		if version, err = parseVersion(raw); err != nil {
+			return Server{}, fmt.Errorf("%s reported an unreadable version %q: %w", engine, raw, err)
+		}
 	}
 	return Server{Engine: engine, Version: version, Raw: raw, Transport: transportOf(ctx, db, engine)}, nil
 }
@@ -567,6 +586,16 @@ func transportOf(ctx context.Context, db *sql.DB, engine Engine) string {
 		return "none"
 	}
 	return unknown
+}
+
+// postgresVersion reads PostgreSQL's server_version_num: the major release
+// times ten thousand, plus the minor.
+func postgresVersion(number string) (Version, error) {
+	n, err := strconv.Atoi(strings.TrimSpace(number))
+	if err != nil || n <= 0 {
+		return Version{}, fmt.Errorf("PostgreSQL reported an unreadable version number %q", number)
+	}
+	return Version{Major: n / 10000, Minor: n % 10000}, nil
 }
 
 var versionPattern = regexp.MustCompile(`(\d+)\.(\d+)(?:\.(\d+))?`)

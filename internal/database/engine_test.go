@@ -105,7 +105,7 @@ func TestMySQLDSNNegotiatesTLSUnlessTheURLSaysOtherwise(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseURL: %v", err)
 	}
-	if !contains(got.DSN, "tls=preferred") {
+	if !strings.Contains(got.DSN, "tls=preferred") {
 		t.Errorf("DSN %q does not ask for a transport", got.DSN)
 	}
 
@@ -124,7 +124,7 @@ func TestMySQLDSNNegotiatesTLSUnlessTheURLSaysOtherwise(t *testing.T) {
 		if strings.Count(got.DSN, "tls=") != 1 {
 			t.Errorf("ParseURL(%q) DSN %q names tls more than once", raw, got.DSN)
 		}
-		if contains(got.DSN, "tls=preferred") {
+		if strings.Contains(got.DSN, "tls=preferred") {
 			t.Errorf("ParseURL(%q) DSN %q overrode the transport the URL asked for", raw, got.DSN)
 		}
 	}
@@ -147,7 +147,7 @@ func TestMySQLDSNAlwaysAsksForUTCTimesAndStandardQuoting(t *testing.T) {
 	// replaces includes the strictness that makes an oversized value an error
 	// rather than a silent truncation.
 	for _, want := range []string{"charset=utf8mb4", "parseTime=true", "loc=UTC", "ANSI_QUOTES", "CONCAT", "clientFoundRows=true"} {
-		if !contains(got.DSN, want) {
+		if !strings.Contains(got.DSN, want) {
 			t.Errorf("DSN %q is missing %q", got.DSN, want)
 		}
 	}
@@ -158,10 +158,10 @@ func TestPasswordsAreNotLogged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseURL: %v", err)
 	}
-	if contains(got.Redacted, "hunter2") {
+	if strings.Contains(got.Redacted, "hunter2") {
 		t.Errorf("redacted form still contains the password: %q", got.Redacted)
 	}
-	if !contains(got.DSN, "hunter2") {
+	if !strings.Contains(got.DSN, "hunter2") {
 		t.Error("the DSN lost the password; it is what actually connects")
 	}
 }
@@ -333,17 +333,6 @@ func TestOnlySQLiteIsNonProduction(t *testing.T) {
 	}
 }
 
-func contains(haystack, needle string) bool {
-	return len(haystack) >= len(needle) && (func() bool {
-		for i := 0; i+len(needle) <= len(haystack); i++ {
-			if haystack[i:i+len(needle)] == needle {
-				return true
-			}
-		}
-		return false
-	})()
-}
-
 func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
 	// The settings are appended after the URL's own query and the driver takes
 	// the last value of a name, so a sql_mode an operator wrote was dropped
@@ -354,13 +343,13 @@ func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
 		t.Fatalf("ParseURL: %v", err)
 	}
 	for _, want := range []string{"ANSI,NO_ZERO_DATE", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
-		if !contains(got.DSN, url.QueryEscape(want)) {
+		if !strings.Contains(got.DSN, url.QueryEscape(want)) {
 			t.Errorf("DSN %q lost %q", got.DSN, want)
 		}
 	}
 	// And what the server already held is no longer the base, because the
 	// operator named one.
-	if contains(got.DSN, url.QueryEscape("@@sql_mode")) {
+	if strings.Contains(got.DSN, url.QueryEscape("@@sql_mode")) {
 		t.Errorf("DSN %q added the operator's mode to the server's instead of replacing it", got.DSN)
 	}
 
@@ -371,7 +360,7 @@ func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseURL: %v", err)
 	}
-	if !contains(got.DSN, url.QueryEscape("'IT''S'")) {
+	if !strings.Contains(got.DSN, url.QueryEscape("'IT''S'")) {
 		t.Errorf("DSN %q does not carry the operator's mode as a SQL string", got.DSN)
 	}
 
@@ -382,7 +371,7 @@ func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseURL: %v", err)
 	}
-	if !contains(got.DSN, url.QueryEscape("CONCAT(',','ANSI',")) {
+	if !strings.Contains(got.DSN, url.QueryEscape("CONCAT(',','ANSI',")) {
 		t.Errorf("DSN %q quotes the operator's quoted mode a second time", got.DSN)
 	}
 }
