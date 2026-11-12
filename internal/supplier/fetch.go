@@ -24,6 +24,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -341,17 +342,8 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, feed Feed) (Taken
 
 // wait pauses between requests, answering early if the context ends.
 func (f *Fetcher) wait(ctx context.Context) error {
-	if f.Pause <= 0 {
-		return ctx.Err()
-	}
-	timer := time.NewTimer(f.Pause)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
+	background.Pause(ctx, f.Pause)
+	return ctx.Err()
 }
 
 // listing is one place a publisher lists what they have issued.

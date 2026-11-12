@@ -94,7 +94,7 @@ func (p *Pass) Once(ctx context.Context) (Wrote, error) {
 	if held <= 0 {
 		held = betweenPasses
 	}
-	mine, err := p.leases.Take(ctx, Lease, p.replica, 5*held)
+	mine, err := p.leases.Take(ctx, Lease, p.replica, queue.LeaseFor(held))
 	if err != nil || !mine {
 		return wrote, err
 	}

@@ -208,11 +208,9 @@ func (p *Pass) holding(ctx context.Context) (bool, error) {
 	if p.leases == nil {
 		return true, nil
 	}
-	held := 5 * p.interval
-	if held < 30*time.Minute {
-		held = 30 * time.Minute
-	}
-	return p.leases.Take(ctx, Lease, p.replica, held)
+	// At least half an hour, which a visit renews every minute through a
+	// fetch that may run for a quarter of an hour.
+	return p.leases.Take(ctx, Lease, p.replica, max(queue.LeaseFor(p.interval), 30*time.Minute))
 }
 
 // Once records what patch links name, visits the one repository most worth

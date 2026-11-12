@@ -56,6 +56,20 @@ func Every(ctx context.Context, interval, fallback time.Duration, pass func(cont
 	}
 }
 
+// Pause waits d between one request to somebody else's service and the next,
+// ending early when ctx ends. A d of zero or less waits for nothing.
+func Pause(ctx context.Context, d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+}
+
 // Drain runs once on the timer Every keeps, as many times in a row as it
 // reports more to do, so a backlog drains at the speed of the work rather
 // than at the speed of the poll.

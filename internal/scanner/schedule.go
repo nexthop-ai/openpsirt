@@ -174,7 +174,7 @@ func (s *Schedule) leaseFor() time.Duration {
 	if interval <= 0 {
 		interval = betweenSchedules
 	}
-	return max(5*interval, time.Minute)
+	return queue.LeaseFor(interval)
 }
 
 // dueLimit is how many re-scans one cycle asks for.

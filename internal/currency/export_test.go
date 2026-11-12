@@ -16,13 +16,6 @@ import (
 // has already lapsed.
 func Asking(r *Refresher, interval time.Duration) { r.interval = interval }
 
-// RenewEvery is how many components a pass gets through before it asks for the
-// lease again.
-//
-// Exported for the test alone: a second spelling of the number there would
-// pass while the pass used a different one.
-const RenewEvery = renewEvery
-
 // MostBody is how much of one document is read, for the test that sends one
 // byte more.
 const MostBody = mostBody

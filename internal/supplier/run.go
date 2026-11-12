@@ -262,7 +262,7 @@ func (p *Pass) fetching(ctx context.Context) (bool, error) {
 		// test drives directly, where there is one of it by construction.
 		return true, nil
 	}
-	return p.leases.Take(ctx, FetchLease, p.replica, leaseFor(p.interval))
+	return p.leases.Take(ctx, FetchLease, p.replica, queue.LeaseFor(p.interval))
 }
 
 // every is how long a supplier stands before it is read again.
@@ -272,19 +272,4 @@ func (p *Pass) every(ctx context.Context) (time.Duration, error) {
 		return 0, fmt.Errorf("read how often to read suppliers again: %w", err)
 	}
 	return held, nil
-}
-
-// leaseFor is how long to hold the lease, given how often the pass runs.
-//
-// Several cycles, so a replica that is briefly slow does not lose the work to
-// another and then take it back; bounded below so a very short interval in a
-// test does not produce a lease that has already lapsed by the time it is read.
-// What keeps it alive across a long pass is the renewal inside the pass rather
-// than this number.
-func leaseFor(interval time.Duration) time.Duration {
-	held := 5 * interval
-	if held < time.Minute {
-		held = time.Minute
-	}
-	return held
 }

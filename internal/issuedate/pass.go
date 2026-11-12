@@ -48,10 +48,6 @@ const betweenAsks = 100 * time.Millisecond
 // betweenCycles is how often the pass looks where the caller says nothing.
 const betweenCycles = time.Minute
 
-// renewEvery is how many issues a pass asks about before it takes the lease
-// again; one issue is up to five requests.
-const renewEvery = 25
-
 // Lease names the work of asking OSV, so one replica asks.
 const Lease = "issue.dates"
 
@@ -117,13 +113,9 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 	})
 }
 
-// asking takes the lease, or answers true where there is none to take.
+// asking takes the lease.
 func (p *Pass) asking(ctx context.Context) (bool, error) {
-	if p.leases == nil {
-		return true, nil
-	}
-	held := max(5*p.interval, time.Minute)
-	return p.leases.Take(ctx, Lease, p.replica, held)
+	return p.leases.Take(ctx, Lease, p.replica, queue.LeaseFor(p.interval))
 }
 
 // dueIssue is one issue due an answer.
@@ -140,17 +132,18 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	answered := 0
-	for at, issue := range due {
+	// One issue is up to five requests, so the lease is renewed on the clock
+	// as well as on the count.
+	renewal := queue.NewRenewal(p.asking, queue.LeaseFor(p.interval), p.Now)
+	for _, issue := range due {
 		if ctx.Err() != nil {
 			return answered, nil
 		}
-		if at > 0 && at%renewEvery == 0 {
-			switch mine, err := p.asking(ctx); {
-			case err != nil:
-				return answered, fmt.Errorf("keep the lease on asking for issue dates: %w", err)
-			case !mine:
-				return answered, nil
-			}
+		switch mine, err := renewal.Keep(ctx); {
+		case err != nil:
+			return answered, fmt.Errorf("keep the lease on asking for issue dates: %w", err)
+		case !mine:
+			return answered, nil
 		}
 		// Read before every request, so turning this off stops the pass
 		// part way.
@@ -189,12 +182,12 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 func (p *Pass) ask(ctx context.Context, names []string) (Dates, error) {
 	for i, name := range names {
 		if i > 0 {
-			p.pause(ctx)
+			background.Pause(ctx, p.Pause)
 		}
 		dates, err := p.Asker.Dates(ctx, name)
 		switch {
 		case err == nil:
-			p.pause(ctx)
+			background.Pause(ctx, p.Pause)
 			return dates, nil
 		case errors.Is(err, ErrUnknown):
 		case errors.Is(err, ErrUnaskable):
@@ -203,21 +196,8 @@ func (p *Pass) ask(ctx context.Context, names []string) (Dates, error) {
 			return Dates{}, err
 		}
 	}
-	p.pause(ctx)
+	background.Pause(ctx, p.Pause)
 	return Dates{}, ErrUnknown
-}
-
-// pause waits between requests, and stops waiting when the context ends.
-func (p *Pass) pause(ctx context.Context) {
-	if p.Pause <= 0 {
-		return
-	}
-	timer := time.NewTimer(p.Pause)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-	case <-timer.C:
-	}
 }
 
 // due reads the issues whose answer is missing or old, never-asked first and

@@ -137,7 +137,7 @@ it takes a **lease** on the work's name under the same conditional update.
 | Holder | The host and process an operator reads, plus random characters, since replicas on the host network share a name and every container process is the first |
 | First use | The row is made inside the taking transaction, leaving a row another replica made alone. A cluster refusing that at commit makes the take go again |
 | Clocks | Claims, leases and burials compare a moment one replica wrote with another replica's clock. A process whose clock stands more than 15 seconds from the database's refuses to start, and each burial pass logs one that drifted past it since; a quarter of the shortest lease, a minute |
-| Duration | Outlasts a cycle, sized from how often the pass runs, so a replica stopping without release holds the work a few passes. Not renewed mid-pass. A process restarted in place after a crash is a new holder and waits out every lease the old one held, up to the mail and webhook leases' full length |
+| Duration | Outlasts a cycle, sized from how often the pass runs, so a replica stopping without release holds the work a few passes; five cycles and at least a minute for a pass reaching another service. A pass reaching another service takes it again as it runs: the upstream and supplier readers before every listing and document; the currency and issue-date passes every 25 steps or once half the lease has gone by, whichever comes first, since one step is one request or several; a patch-branch visit, held at least half an hour, every minute. A process restarted in place after a crash is a new holder and waits out every lease the old one held, up to the mail and webhook leases' full length |
 
 | Work shape | On losing the race | Passes |
 |---|---|---|

@@ -122,8 +122,7 @@ func (p *Pass) Once(ctx context.Context) (Read, error) {
 
 // reaching reports whether this replica is the one that reaches out.
 func (p *Pass) reaching(ctx context.Context) (bool, error) {
-	held := max(5*p.interval, time.Minute)
-	return p.leases.Take(ctx, ReadLease, p.replica, held)
+	return p.leases.Take(ctx, ReadLease, p.replica, queue.LeaseFor(p.interval))
 }
 
 // Again queues a scan of every build of a product that holds an inventory, so
