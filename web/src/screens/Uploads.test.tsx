@@ -83,6 +83,36 @@ async function opened(at: string, kinds: unknown[]) {
   return { tabs, asked };
 }
 
+describe("the SBOM receipts", () => {
+  it("page past the newest receipts, so an older upload is reachable", async () => {
+    const get = serve((path) => {
+      if (path === SCANS) return { data: { items: [receipt("scanned")], total: 60 } };
+      return { data: { items: [], total: 0, quiet: 0 } };
+    });
+    mount.render(
+      screen(
+        <Uploads />,
+        "/products/sonic/branches-and-tags/master/variants/x/uploads",
+        "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads",
+      ),
+    );
+    await settle();
+    expect(mount.host().textContent).toContain("Showing 1–1 of 60");
+    const next = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Next",
+    );
+    act(() => next?.click());
+    await settle();
+    const calls = get.mock.calls as unknown as [
+      path: string,
+      init: { params?: { query?: { limit?: number; offset?: number } } },
+    ][];
+    expect(
+      calls.filter(([at]) => at === SCANS).map(([, init]) => init?.params?.query?.offset),
+    ).toEqual([0, 50]);
+  });
+});
+
 describe("the tabs", () => {
   it("are the kinds the server lists, so a kind the reader may not read has none", async () => {
     const { tabs } = await opened("", [
