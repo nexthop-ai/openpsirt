@@ -576,13 +576,13 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
-		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, '') AS "consumer"`).
+		ColumnExpr(`COALESCE(`+graph.StatedName("sun", `"f"."build_id"`, `"f"."consumer_id"`, "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
 		// The package of the fold this occurrence is. A fold covers every
 		// binary one source package was built at one version, so an occurrence
 		// named only by its consumer would leave a reader unable to tell curl's
 		// from libcurl4t64's.
-		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+		ColumnExpr(graph.StatedName("sn", `"f"."build_id"`, `"f"."component_id"`, "c")+` AS "component"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(`"f"."disclose_at" AS "disclose_at"`).

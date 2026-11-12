@@ -273,3 +273,32 @@ func TestANameTypedIntoAFilterMatchesTheNameTheBuildStated(t *testing.T) {
 		}
 	})
 }
+
+// A finding closed because its build no longer ships the component has no
+// open node, and is shown by the name the build last stated, never the row's.
+func TestAClosedRowIsShownByTheNameItsBuildLastStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		f.shippedTo(t, elsewhere, stating(twoConsumers(), rot13))
+		f.shipped(t, twoConsumers())
+		f.applied(t, found("CVE-2026-1", libnl))
+		f.shipped(t, withoutLibnl())
+		f.applied(t)
+
+		rows, _, err := f.store.Register(ctx, f.holding(t, access.PublicRead), f.build,
+			finding.Registering{Closed: true}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 0 {
+			t.Fatal("the register holds no closed row")
+		}
+		for _, row := range rows {
+			if row.Component != libnl.Name {
+				t.Errorf("a closed row is shown as %q, want %q as the build last stated it",
+					row.Component, libnl.Name)
+			}
+		}
+	})
+}

@@ -496,7 +496,7 @@ func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, buil
 	err = occurrenceColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
-		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, '') AS "consumer"`).
+		ColumnExpr(`COALESCE(`+graph.StatedName("sun", `"f"."build_id"`, `"f"."consumer_id"`, "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
 		Apply(inFoldOf(buildID, vulnerabilityID, componentID, visible)).
 		OrderExpr(`consumer, "occurrence_identity", component_upstream, consumer_upstream`).

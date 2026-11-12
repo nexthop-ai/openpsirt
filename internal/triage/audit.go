@@ -465,9 +465,9 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
 		ColumnExpr(`"earliest"."decision_occurrence_id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"v"."identifier" AS "issue"`).
-		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
-		ColumnExpr(graph.NodeVersion("sn", "c")+` AS "version"`).
-		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, ?) AS "consumer"`, "").
+		ColumnExpr(graph.StatedName("sn", `"f"."build_id"`, `"f"."component_id"`, "c")+` AS "component"`).
+		ColumnExpr(graph.StatedVersion("sn", `"f"."build_id"`, `"f"."component_id"`, "c")+` AS "version"`).
+		ColumnExpr(`COALESCE(`+graph.StatedName("sun", `"f"."build_id"`, `"f"."consumer_id"`, "uc")+`, ?) AS "consumer"`, "").
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		Scan(ctx, &rows)

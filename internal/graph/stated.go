@@ -41,12 +41,27 @@ func NodeVersion(node, component string) string {
 // StatedJoin joins, as alias, the node the build holds the component at now,
 // where the query names the build and the component by the columns build and
 // componentID. A build holds one open node for a component, so the join adds
-// no row; a component the build no longer holds joins nothing, and reads the
-// row's name and version through NodeName and NodeVersion.
+// no row; a component the build no longer holds joins nothing. NodeName and
+// NodeVersion then read the row's; StatedName and StatedVersion read the
+// build's latest node, closed included, before the row's.
 func StatedJoin(alias, build, componentID string) string {
 	return `LEFT JOIN "graph_node" AS "` + alias + `" ON "` + alias + `"."build_id" = ` + build +
 		` AND "` + alias + `"."component_id" = ` + componentID +
 		` AND "` + alias + `"."closed_scan_id" IS NULL`
+}
+
+// StatedName is the name a build stated for a component joined through
+// StatedJoin as alias: the open node's, else the build's latest node's, else
+// the row's. The latest node is read only where no node is open, which is a
+// component the build no longer holds, so a list of what is open pays nothing
+// for it. Not for GROUP BY, since the fallback reads ungrouped columns.
+func StatedName(alias, build, componentID, component string) string {
+	return `COALESCE("` + alias + `"."name", ` + BuildName(build, componentID, component) + `)`
+}
+
+// StatedVersion is StatedName's version.
+func StatedVersion(alias, build, componentID, component string) string {
+	return `COALESCE("` + alias + `"."version", ` + BuildVersion(build, componentID, component) + `)`
 }
 
 // BuildName is the name a build stated for a component, where the query names
