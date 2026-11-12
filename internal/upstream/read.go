@@ -260,6 +260,8 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		// Another replica reads now; what it records stands.
 		took.Filled = true
 		return took, nil
+	case errors.As(err, new(local)):
+		return took, err
 	case err != nil:
 		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 	}
@@ -307,6 +309,8 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 			refusedNow[one.address] = one.at
 			refused = append(refused, fmt.Errorf("%s: %w", one.address, err))
 			continue
+		case errors.As(err, new(local)):
+			return took, err
 		case err != nil:
 			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 		}
@@ -323,7 +327,9 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		if current[address] || !complete {
 			continue
 		}
-		if err := r.withdraw(ctx, up, address); err != nil {
+		if err := r.withdraw(ctx, up, address); errors.As(err, new(local)) {
+			return took, err
+		} else if err != nil {
 			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 		}
 		took.Withdrawn++
@@ -462,7 +468,7 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 			if r.keep != nil {
 				switch mine, err := r.keep(ctx); {
 				case err != nil:
-					return nil, nil, 0, err
+					return nil, nil, 0, local{err}
 				case !mine:
 					return nil, nil, 0, errLeaseLost
 				}
@@ -638,6 +644,25 @@ var errLeaseLost = errors.New("the lease on reading upstreams was lost")
 // ran.
 var errWithdrawn = refusal.New("that upstream is no longer trusted as it was")
 
+// local is a failure of this deployment during a pass, its database or its
+// lease, and says nothing about the upstream. The pass records nothing against
+// the upstream, which stays due, and the error reaches the log alone, since a
+// database's own text is never shown.
+type local struct{ err error }
+
+func (l local) Error() string { return l.err.Error() }
+func (l local) Unwrap() error { return l.err }
+
+// localUnlessRefused marks a failure recording what a document said as this
+// deployment's, unless it is a refusal of what the document holds, which is
+// the upstream's.
+func localUnlessRefused(err error) error {
+	if err == nil || refusal.In(err) {
+		return err
+	}
+	return local{err}
+}
+
 // document reads one document, checks it against the digest and the signature
 // served beside it, and records what it says, answering whether what it says
 // moved.
@@ -730,7 +755,7 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 		return nil
 	})
 	if err != nil {
-		return false, err
+		return false, localUnlessRefused(err)
 	}
 	return moved, nil
 }
@@ -756,9 +781,9 @@ func recordedAt(ctx context.Context, tx bun.IDB, up Upstream, address string) (D
 // and forgets it was read.
 func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) error {
 	if err := finding.EnsureStatementsLock(ctx, r.db); err != nil {
-		return err
+		return local{err}
 	}
-	return database.Within(ctx, r.db, func(ctx context.Context, tx bun.IDB) error {
+	return localUnlessRefused(database.Within(ctx, r.db, func(ctx context.Context, tx bun.IDB) error {
 		if err := finding.TakeStatements(ctx, tx); err != nil {
 			return err
 		}
@@ -792,7 +817,7 @@ func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) erro
 			return fmt.Errorf("forget a document an upstream withdrew: %w", err)
 		}
 		return nil
-	})
+	}))
 }
 
 // servedElsewhere reports whether the document recorded at one address is

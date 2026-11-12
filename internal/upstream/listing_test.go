@@ -5,6 +5,7 @@ package upstream_test
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -200,6 +201,32 @@ func TestAReadThatLostTheLeaseReadsNoListing(t *testing.T) {
 		}
 		if up.FetchedAt != nil {
 			t.Error("a read that lost the lease recorded an attempt")
+		}
+	})
+}
+
+// A pass that cannot ask for the lease failed here, so it records nothing
+// against the upstream and leaves it due.
+func TestAReadThatCannotAskForTheLeaseRecordsNothing(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		upstream.Keeping(w.reader, func(context.Context) (bool, error) {
+			return false, errors.New("the database went away")
+		})
+		up, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil || up == nil {
+			t.Fatalf("the fork trusts no upstream: %v", err)
+		}
+		if _, err := w.reader.From(t.Context(), *up); err == nil {
+			t.Fatal("a read that could not ask for the lease reported nothing")
+		}
+		up, err = upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if up.FetchedAt != nil || up.Failed != "" {
+			t.Errorf("a read that could not ask for the lease recorded an attempt: failed %q", up.Failed)
 		}
 	})
 }

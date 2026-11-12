@@ -77,6 +77,7 @@ reaches out, settled by a lease.
 | Step | What happens |
 |---|---|
 | A read that fails | Withdraws nothing, however it failed: a 404 or other error, a TLS fault, a timeout. It is recorded and raised (§ Failure notices) |
+| A failure here | This deployment's database or lease failing records nothing against the upstream, which stays due; the error reaches the log alone |
 | The description | Read every pass. Any set of keys other than the trusted set (one added, dropped or replaced, any where none was trusted, none where some were) stops the read and is recorded as the keys offered until the upstream is trusted again. Only a successful read clears what stopped the last one |
 | The listings | Each feed labeled WHITE or CLEAR, otherwise each directory's list of changes, asked with the entity tag and date each last answered. Where all answer that nothing moved, nothing else is asked; where one moved, every listing is read whole |
 | What moved | A document listed at a new moment is read and replaces what it said: a repeated statement stays as it is, declined or not, a revised one is replaced, a dropped one withdrawn |

@@ -184,7 +184,8 @@ type index struct {
 	askable func(name string) bool
 }
 
-// anyName is an asker that sends a request for every name Asked reads.
+// anyName is the askable test of an asker that sends a request for every name
+// Asked reads.
 func anyName(string) bool { return true }
 
 // Askable is every ecosystem this has an index for.
