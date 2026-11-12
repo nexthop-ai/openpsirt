@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { cssRules } from "./class-rules.mjs";
-import { interfaceSources, parse, SRC } from "./parsed.mjs";
+import { interfaceSources, SRC } from "./parsed.mjs";
 
 // What a person presses: a button, or a link drawn as one. A plain link, such
 // as a breadcrumb's, reads as its text on paper and stays.
@@ -25,10 +25,11 @@ function classOf(element) {
   return "";
 }
 
-// The elements one child of a head draws: itself, or what a condition in
-// braces draws on either arm.
+// The elements one child of a head draws: itself, what a fragment holds, or
+// what a condition in braces draws on either arm.
 function drawn(node) {
-  if (ts.isJsxElement(node)) return [node];
+  if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) return [node];
+  if (ts.isJsxFragment(node)) return node.children.flatMap(drawn);
   if (ts.isJsxExpression(node)) return node.expression ? drawn(node.expression) : [];
   if (ts.isParenthesizedExpression(node)) return drawn(node.expression);
   if (ts.isBinaryExpression(node)) return drawn(node.right);
@@ -36,26 +37,58 @@ function drawn(node) {
   return [];
 }
 
-// Every span directly under a screen head, or drawn there by a condition,
-// that holds an action and is not marked `noprint`, as "file:line".
-export function printedActions(file, source) {
-  const found = [];
+const tagOf = (element) =>
+  (ts.isJsxElement(element) ? element.openingElement : element).tagName.getText();
+
+// What each component declared in one source draws at its root, by name: the
+// spans it would place directly under a head it is drawn in.
+export function componentRoots(file, source) {
+  const roots = new Map();
+  const visit = (node) => {
+    if (ts.isFunctionDeclaration(node) && node.name && /^[A-Z]/.test(node.name.text) && node.body) {
+      const drawnAtRoot = [];
+      for (const statement of node.body.statements) {
+        if (ts.isReturnStatement(statement) && statement.expression) {
+          drawnAtRoot.push(...drawn(statement.expression));
+        }
+      }
+      roots.set(node.name.text, { file, source, drawn: drawnAtRoot });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return roots;
+}
+
+// Every span directly under a screen head, drawn there by a condition, or at
+// the root of a component drawn there, that holds an action and is not marked
+// `noprint`, as "file:line".
+export function printedActions(file, source, components = new Map()) {
+  const found = new Set();
   let examined = 0;
+  const check = (child, where, text) => {
+    if (ts.isJsxSelfClosingElement(child) || tagOf(child) !== "span") return;
+    examined++;
+    if (/\bnoprint\b/.test(classOf(child.openingElement))) return;
+    if (!ACTION.test(child.getText())) return;
+    const line = text.getLineAndCharacterOfPosition(child.getStart()).line + 1;
+    found.add(`${where}:${line}`);
+  };
   const visit = (node) => {
     if (ts.isJsxElement(node) && /\bscreen-head\b/.test(classOf(node.openingElement))) {
       for (const child of node.children.flatMap(drawn)) {
-        if (child.openingElement.tagName.getText() !== "span") continue;
-        examined++;
-        if (/\bnoprint\b/.test(classOf(child.openingElement))) continue;
-        if (!ACTION.test(child.getText())) continue;
-        const line = source.getLineAndCharacterOfPosition(child.getStart()).line + 1;
-        found.push(`${file}:${line}`);
+        const component = components.get(tagOf(child));
+        if (component) {
+          for (const inner of component.drawn) check(inner, component.file, component.source);
+        } else {
+          check(child, file, source);
+        }
       }
     }
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return { examined, found };
+  return { examined, found: [...found] };
 }
 
 // Every print rule that hides spans under a head by position, as its selector.
@@ -70,13 +103,19 @@ export function hiddenByPosition(css) {
 // The whole interface, and the print sheet.
 export function sweep() {
   let examined = 0;
-  const found = [];
-  for (const { file, text } of interfaceSources()) {
-    if (!file.endsWith(".tsx")) continue;
-    const one = printedActions(path.relative(SRC, file), parse(text, file));
+  const found = new Set();
+  const sources = interfaceSources()
+    .filter(({ file }) => file.endsWith(".tsx"))
+    .map(({ file, source }) => ({ file: path.relative(SRC, file), source }));
+  const components = new Map();
+  for (const { file, source } of sources) {
+    for (const [name, root] of componentRoots(file, source)) components.set(name, root);
+  }
+  for (const { file, source } of sources) {
+    const one = printedActions(file, source, components);
     examined += one.examined;
-    found.push(...one.found);
+    for (const each of one.found) found.add(each);
   }
   const hidden = hiddenByPosition(readFileSync(path.join(SRC, "styles", "print.css"), "utf8"));
-  return { examined, found, hidden };
+  return { examined, found: [...found], hidden };
 }
