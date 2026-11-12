@@ -12,12 +12,16 @@ import (
 )
 
 // A declaration ends where the decoder ends it: a bracket inside its quotes
-// does not end it. Ended earlier, the guard reads what follows as a comment
+// does not end it, and a quote or bracket inside a comment within it is
+// neither. Ended earlier, the guard reads what follows as a comment
 // the decoder never saw, and counts no tag after it.
 func TestATagAfterADeclarationIsStillBounded(t *testing.T) {
 	long := "<a " + strings.Repeat("b", 200) + ">"
 	for name, declaration := range map[string]string{
-		"a bracket in quotes": `<!DOCTYPE a "x><!--">`,
+		"a bracket in quotes":          `<!DOCTYPE a "x><!--">`,
+		"a quote in a comment":         `<!DOCTYPE x [<!-- ' -->]>`,
+		"a bracket in a comment":       `<!DOCTYPE x [<!-- < -->]>`,
+		"a nested bracket, no comment": `<!DOCTYPE x [<!ENTITY a "b">]>`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			guard := &tagGuard{r: strings.NewReader(declaration + long), most: 64}

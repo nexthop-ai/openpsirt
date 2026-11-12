@@ -91,8 +91,12 @@ type tagGuard struct {
 	last   [2]byte
 	// nested is how many angle brackets a declaration has opened and not
 	// closed, as the decoder counts them: a declaration ends at the bracket
-	// closing the first, outside quotes.
-	nested int
+	// closing the first, outside quotes. opening is how much of a comment's
+	// opening an angle bracket inside a declaration has begun, the bracket
+	// included, and commented whether a comment inside one is being read.
+	nested    int
+	opening   int
+	commented bool
 }
 
 // markup is where a document's reader stands: between tags, or inside one of
@@ -156,7 +160,8 @@ func (g *tagGuard) step(c byte) error {
 		case !strings.HasPrefix(commentOpening, string(g.opened)) &&
 			!strings.HasPrefix(charDataOpening, string(g.opened)):
 			g.state, g.quote, g.nested = inDeclaration, 0, 0
-			g.declaration(c)
+			g.opening, g.commented = 0, false
+			g.declaration(c, ended)
 		}
 	case inComment:
 		if c == '>' && ended == [2]byte{'-', '-'} {
@@ -171,7 +176,7 @@ func (g *tagGuard) step(c byte) error {
 			g.state = inText
 		}
 	case inDeclaration:
-		g.declaration(c)
+		g.declaration(c, ended)
 	case inTag:
 		g.length++
 		return g.tag(c)
@@ -179,11 +184,35 @@ func (g *tagGuard) step(c byte) error {
 	return nil
 }
 
-// declaration moves the guard past one byte of a declaration. A bracket
-// inside quotes is text, and one closing a bracket the declaration opened
-// does not end it, which is how the decoder reads one; read any other way, the
-// guard and the decoder disagree on where the tags after it are.
-func (g *tagGuard) declaration(c byte) {
+// declaration moves the guard past one byte of a declaration, ended being
+// the two bytes before it. A bracket inside quotes is text, one closing a
+// bracket the declaration opened does not end it, and a comment inside it is
+// skipped whole, quotes and brackets included, which is how the decoder reads
+// one; read any other way, the guard and the decoder disagree on where the
+// tags after it are.
+func (g *tagGuard) declaration(c byte, ended [2]byte) {
+	if g.commented {
+		// The decoder ends the comment at the byte after its two dashes,
+		// and refuses the document where that byte is not a closing bracket.
+		if ended == [2]byte{'-', '-'} {
+			g.commented = false
+		}
+		return
+	}
+	if g.opening > 0 {
+		if c == commentOpening[g.opening-1] {
+			g.opening++
+			if g.opening > len(commentOpening) {
+				// The opening's own dashes never end the comment.
+				g.opening, g.commented, g.last = 0, true, [2]byte{}
+			}
+			return
+		}
+		// Not a comment: the bracket opened a nested one, and this byte is
+		// read as any other.
+		g.opening = 0
+		g.nested++
+	}
 	switch {
 	case g.quote != 0:
 		if c == g.quote {
@@ -192,7 +221,7 @@ func (g *tagGuard) declaration(c byte) {
 	case c == '"' || c == '\'':
 		g.quote = c
 	case c == '<':
-		g.nested++
+		g.opening = 1
 	case c == '>' && g.nested > 0:
 		g.nested--
 	case c == '>':
