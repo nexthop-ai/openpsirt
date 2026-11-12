@@ -129,3 +129,39 @@ func TestAnExtensionKeepsWhomItsSourceHoldsFor(t *testing.T) {
 		}
 	})
 }
+
+func TestExtendingLeavesTheProposalsAsGiven(t *testing.T) {
+	// The gate writes whether a second person is needed onto the proposals
+	// it works on; a retried attempt is handed the caller's, as given.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		source, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Occurrence: f.at(), Outcome: triage.NotApplicable,
+			Justification: triage.CodeNotInExecutePath,
+			Reasoning:     "Never reached.", By: f.proposer, NeedsApproval: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.ApproveDecision(ctx, f.reviewer, source.DecisionID, "", nil, ""); err != nil {
+			t.Fatal(err)
+		}
+		another := f.at()
+		another.VulnerabilityID = f.secondIssue(t)
+		given := []triage.Proposal{{
+			Occurrence: another, Outcome: triage.NotApplicable,
+			Justification: triage.CodeNotInExecutePath,
+			Reasoning:     "Same path as the last one.", By: f.proposer,
+		}}
+		made, err := f.store.Extend(ctx, f.triager, source.DecisionID, given)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !made[0].NeedsApproval {
+			t.Fatal("a dismissal extended needed nobody, so the gate wrote nothing to see")
+		}
+		if given[0].NeedsApproval {
+			t.Error("extending rewrote the proposal it was handed")
+		}
+	})
+}

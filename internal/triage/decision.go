@@ -286,17 +286,19 @@ var ErrNotExtendable = refusal.New("that decision cannot be extended")
 // driver the image does not build — and each arrived with no decision. An
 // extension is a decision of its own, recorded as derived from the one it
 // carries, and it needs a second person like any other dismissal: the approver
-// is told the argument was read once already, not that it was agreed to twice
-// .
+// is told the argument was read once already, not that it was agreed to twice.
 //
 // Everything it turns on is read inside the transaction that writes: whether
 // the source is approved, and what it was a decision about.
 func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
-	proposals []Proposal) ([]*DecisionOccurrence, error) {
+	given []Proposal) ([]*DecisionOccurrence, error) {
 
-	if len(proposals) == 0 {
+	if len(given) == 0 {
 		return nil, nil
 	}
+	// The gate writes what it works out onto the proposals, so it works on a
+	// copy and the caller's are left as given.
+	proposals := slices.Clone(given)
 
 	var recorded []*DecisionOccurrence
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
