@@ -56,7 +56,9 @@ func startHeld(t *testing.T, addr string, migrate func(context.Context, *databas
 	t.Setenv("OPENPSIRT_AUTO_MIGRATE", "true")
 	t.Setenv("OPENPSIRT_RECORDS_UPDATE", "false")
 	t.Setenv("OPENPSIRT_RECORDS_DIR", t.TempDir())
-	t.Setenv("OPENPSIRT_SHUTDOWN_GRACE", "2s")
+	if _, set := os.LookupEnv("OPENPSIRT_SHUTDOWN_GRACE"); !set {
+		t.Setenv("OPENPSIRT_SHUTDOWN_GRACE", "2s")
+	}
 	if _, set := os.LookupEnv("OPENPSIRT_BOOTSTRAP_ADMINS"); !set {
 		t.Setenv("OPENPSIRT_BOOTSTRAP_ADMINS", "root")
 	}
@@ -335,5 +337,45 @@ func TestAStopBeforeThePortOpensExitsCleanly(t *testing.T) {
 
 	if err := run(nil, os.Environ(), quiet, quiet); err != nil {
 		t.Errorf("a start stopped before its port opened answered %v", err)
+	}
+}
+
+// A request still running past the grace after a stop signal fails the exit,
+// through the program as a supervisor runs it: the signal ends serving, and
+// what the drain could not finish is returned rather than read as a stop.
+func TestARequestThatOverrunsTheGraceAfterASignalFailsTheExit(t *testing.T) {
+	t.Setenv("OPENPSIRT_SHUTDOWN_GRACE", "200ms")
+	s := startHeld(t, freeAddress(t), schema.Up)
+	s.entering(t)
+	close(s.release)
+	deadline := time.Now().Add(30 * time.Second)
+	for s.get(t, "/readyz", "").StatusCode != http.StatusOK {
+		if time.Now().After(deadline) {
+			t.Fatal("/readyz was not ready 30s after the migration was let go")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// A request whose headers never end keeps its connection active, and the
+	// drain waits on it until the grace runs out.
+	conn, err := net.Dial("tcp", s.addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	if _, err := conn.Write([]byte("GET /healthz HTTP/1.1\r\nHost: x\r\n")); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	s.stop()
+	select {
+	case err := <-s.done:
+		s.done <- err
+		if err == nil || !strings.Contains(err.Error(), "shutdown:") {
+			t.Errorf("a stop whose drain overran the grace answered %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("the server did not stop within 30s of being told to")
 	}
 }
