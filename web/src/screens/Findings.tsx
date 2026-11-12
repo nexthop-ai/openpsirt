@@ -69,7 +69,7 @@ import {
 } from "./list";
 import { allFindingsAt, findingAt } from "../app/routes";
 import { useReseed } from "../ui/reseed";
-import { fileAt } from "../api/links";
+import { exportQuery, fileAt } from "../api/links";
 
 // The filters the bar sets itself, so the count on More filters leaves them out.
 const ON_THE_BAR = new Set(["q", "floor", "state", "assigned", "running"]);
@@ -276,14 +276,10 @@ export function Findings() {
   // front of somebody. The two lists are two endpoints, and the spanning one
   // drops the filters a single build resolves, so the query is narrowed the
   // same way the screen's own read narrows it.
-  const asFile = useMemo(() => {
-    const carried = Object.entries(spanning ? acrossProducts(query) : { ...query, ...selection })
-      .filter(([key]) => key !== "limit" && key !== "offset")
-      .flatMap(([key, value]) =>
-        Array.isArray(value) ? value.map((each) => [key, String(each)]) : [[key, String(value)]],
-      ) as [string, string][];
-    return new URLSearchParams(carried).toString();
-  }, [query, selection, spanning]);
+  const asFile = useMemo(
+    () => exportQuery(spanning ? acrossProducts(query) : { ...query, ...selection }).toString(),
+    [query, selection, spanning],
+  );
 
   const listFile = (format: "csv" | "json") =>
     spanning

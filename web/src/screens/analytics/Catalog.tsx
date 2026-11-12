@@ -8,6 +8,7 @@ import { GROUPS, ON_SCREENS, leadsTo, scopeWords, type Needs, type Report } from
 import { fileAt, linkTo } from "../../api/links";
 import { holding } from "../../app/families";
 import { useWho } from "../../app/session";
+import { Downloads } from "../../ui/Downloads";
 
 // The catalog of named reports.
 //
@@ -79,11 +80,12 @@ export function Catalog() {
           <li>
             <div>
               What is <b>running out of time</b> —{" "}
-              <a href={fileAt("/v1/running-out.{format}", "csv", { query: { days: "30" } })}>CSV</a>{" "}
-              ·{" "}
-              <a href={fileAt("/v1/running-out.{format}", "json", { query: { days: "30" } })}>
-                JSON
-              </a>
+              <Downloads
+                inline
+                href={(format) =>
+                  fileAt("/v1/running-out.{format}", format, { query: { days: "30" } })
+                }
+              />
             </div>
             <div className="hint">
               Open, undecided and due within 30 days. <span className="id">?days=</span> takes up to

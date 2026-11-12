@@ -37,6 +37,7 @@ complete list exists to filter afterwards. A file is read one of three ways.
 | A list and its file are built from one function | |
 | A file takes its screen's filters, declared once; an undeclared filter is refused | An export dropping a filter showed eight rows on screen and seven thousand in the file |
 | Paging is kept apart from the filters | A file pages internally and offers no page size |
+| A screen's file link carries its filters with each value of a list as its own repetition of the name, and never its page | The server reads `a,b` as one value named `a,b` |
 | Every page of a paged file, and every name a page carries, is read through one snapshot | Each page is its own statement, and a row written between two of them moves every later row, so the file repeats or skips a row and says it is complete |
 | A list grouped in the application from everything it reads is read whole, once | Paged, every page repeats the whole read: what keeps being put off is grouped from every deferral |
 | A failure part-way writes a line saying the file is incomplete, and is logged | The 200 has gone out, so nothing else tells an operator; a reader that went away is a warning |

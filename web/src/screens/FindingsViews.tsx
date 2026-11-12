@@ -28,7 +28,8 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { cut } from "../ui/cut";
 import { componentAt } from "../app/routes";
-import { fileAt } from "../api/links";
+import { exportQuery, fileAt } from "../api/links";
+import { Downloads } from "../ui/Downloads";
 
 // A component's place, as the two ends that differ between sibling rows —
 // or, where the selection spans builds, which build the row is being read in.
@@ -188,8 +189,7 @@ export function ByComponent({
         {/* The same answer as a file, narrowed the same way. This is the
             shape a release meeting argues over, and a file spares copying the
             table out. */}
-        <a href={componentsFile(at, query, "csv")}>CSV</a> ·{" "}
-        <a href={componentsFile(at, query, "json")}>JSON</a>
+        <Downloads inline href={(format) => componentsFile(at, query, format)} />
       </p>
 
       <Wide>
@@ -429,8 +429,7 @@ export function ByBump({
         {/* The same answer as a file, narrowed the same way. A bump list is
             what a release meeting works from, and taking it away meant
             copying the table out by hand. */}
-        Download <a href={bundlesFile(at, narrowed, "csv")}>CSV</a> ·{" "}
-        <a href={bundlesFile(at, narrowed, "json")}>JSON</a>.
+        Download <Downloads inline href={(format) => bundlesFile(at, narrowed, format)} />.
       </p>
       <p className="hint" style={{ margin: "0 0 8px" }}>
         Ordered by what each upgrade would close.
@@ -654,14 +653,9 @@ function bundlesFile(
   query: Record<string, unknown>,
   format: "csv" | "json",
 ): string {
-  const asked = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (key === "limit" || key === "offset" || value === undefined || value === "") continue;
-    asked.set(key, String(value));
-  }
   return fileAt("/v1/products/{product}/planned-upgrades.{format}", format, {
     path: { product: at.product },
-    query: asked,
+    query: exportQuery(query),
   });
 }
 
@@ -676,23 +670,12 @@ function componentsFile(
   query: Record<string, unknown>,
   format: "csv" | "json",
 ): string {
-  const asked = new URLSearchParams();
-  for (const [key, value] of Object.entries({
-    ...query,
-    ...(at.branch_or_tag ? { branch_or_tag: at.branch_or_tag } : {}),
-    ...(at.variant ? { variant: at.variant } : {}),
-  })) {
-    // Only what the export takes, and never the paging: a file is every row
-    // the filters admit rather than the page that happened to be on screen.
-    if (key === "limit" || key === "offset" || value === undefined || value === "") continue;
-    if (Array.isArray(value)) {
-      for (const one of value) asked.append(key, String(one));
-    } else {
-      asked.set(key, String(value));
-    }
-  }
   return fileAt("/v1/products/{product}/findings/components.{format}", format, {
     path: { product: at.product },
-    query: asked,
+    query: exportQuery({
+      ...query,
+      ...(at.branch_or_tag ? { branch_or_tag: at.branch_or_tag } : {}),
+      ...(at.variant ? { variant: at.variant } : {}),
+    }),
   });
 }

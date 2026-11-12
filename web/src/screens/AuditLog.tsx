@@ -27,6 +27,7 @@ import { fileAt as linkedFile } from "../api/links";
 import { reasonSaid } from "./codeFindings";
 import { useWho } from "../app/session";
 import { readsNothing } from "../app/families";
+import { Downloads } from "../ui/Downloads";
 
 // The share of the audit log one page holds. The server's own ceiling is two
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -235,12 +236,7 @@ export function AuditLog() {
               auditor is given a document rather than a screen, and this was
               copied out by hand. The filters travel in the address, so the
               file is this page's own address with a suffix. */}
-          <a className="btn quiet" href={fileAt(params, "csv")}>
-            CSV
-          </a>{" "}
-          <a className="btn quiet" href={fileAt(params, "json")}>
-            JSON
-          </a>{" "}
+          <Downloads href={(format) => fileAt(params, format)} />{" "}
           <button type="button" className="btn" onClick={() => window.print()}>
             Print
           </button>
@@ -505,12 +501,7 @@ function Administered() {
         <h3>Change history</h3>
         <span style={{ marginLeft: "auto" }} className="noprint">
           {/* The record an access review is written from, as a file. */}
-          <a className="btn quiet" href={changesAt(params, "csv")}>
-            CSV
-          </a>{" "}
-          <a className="btn quiet" href={changesAt(params, "json")}>
-            JSON
-          </a>
+          <Downloads href={(format) => changesAt(params, format)} />
         </span>
       </div>
       <p className="hint">

@@ -16,6 +16,7 @@ import { Wide } from "../../ui/Wide";
 import { useWho } from "../../app/session";
 import { counted, holding } from "../../app/families";
 import { HeldCell, HeldLine } from "../../ui/HeldLine";
+import { Downloads } from "../../ui/Downloads";
 
 // The releases still shipped and no longer maintained.
 //
@@ -99,8 +100,7 @@ export function Support() {
           ) : (
             <>
               <p className="hint">
-                Download <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
-                <a href={fileAt("json", asked)}>JSON</a>
+                Download <Downloads inline href={(format) => fileAt(format, asked)} />
               </p>
               <Wide>
                 <table>

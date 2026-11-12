@@ -22,6 +22,7 @@ import { fileAt } from "../api/links";
 import { useWho } from "../app/session";
 import { counted, heldLine, holding } from "../app/families";
 import { HeldLine } from "../ui/HeldLine";
+import { Downloads } from "../ui/Downloads";
 
 // The rows of each column shown before it says how many more there are.
 const SHOWN = 8;
@@ -208,24 +209,14 @@ export function Compare() {
                   three parts a row belongs to: it is one comparison, and
                   three of anything that has to be kept together is three
                   chances to send somebody two of them. */}
-              <a
-                className="btn quiet"
-                href={fileAt("/v1/products/{product}/comparison.{format}", "csv", {
-                  path: { product },
-                  query: asked,
-                })}
-              >
-                CSV
-              </a>
-              <a
-                className="btn quiet"
-                href={fileAt("/v1/products/{product}/comparison.{format}", "json", {
-                  path: { product },
-                  query: asked,
-                })}
-              >
-                JSON
-              </a>
+              <Downloads
+                href={(format) =>
+                  fileAt("/v1/products/{product}/comparison.{format}", format, {
+                    path: { product },
+                    query: asked,
+                  })
+                }
+              />
               {/* Offered only where the browser has a clipboard to write to,
                   which it keeps from a page served without TLS. "Copied" is
                   said once the write is done, and a refusal says so. */}

@@ -22,6 +22,7 @@ import { HeldLine } from "../../ui/HeldLine";
 // the data: ones that appear and vanish with the rows are columns nobody can
 // build a spreadsheet against.
 import { BANDS } from "../../ui/severities";
+import { Downloads } from "../../ui/Downloads";
 
 // The direction of the backlog, and the kind of thing making it move.
 //
@@ -97,12 +98,7 @@ export function Backlog() {
         )}
         {figures && (
           <span style={{ marginLeft: "auto" }} className="noprint">
-            <a className="btn quiet" href={file("csv")}>
-              CSV
-            </a>{" "}
-            <a className="btn quiet" href={file("json")}>
-              JSON
-            </a>
+            <Downloads href={file} />
           </span>
         )}
       </div>
