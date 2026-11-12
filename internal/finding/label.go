@@ -241,7 +241,7 @@ func (s *Store) LabelsInUse(ctx context.Context, subject access.Subject,
 		Where(`"ft"."product_id" = ?`, productID).
 		Where(onSomethingReadable, append([]any{bun.List(visible)}, kindArgs...)...).
 		GroupExpr(`"ft"."label"`).
-		OrderExpr(`used DESC, "typed"`).
+		OrderExpr(`"used" DESC, "typed"`).
 		Limit(100).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what is in use: %w", err)

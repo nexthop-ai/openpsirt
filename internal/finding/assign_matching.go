@@ -187,12 +187,12 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 func (s *Store) leftBehind(ctx context.Context, productID int64, visible []access.Visibility,
 	issues []int64, fold string, to *int64) ([]Piece, error) {
 
-	held := "assigned_to IS NULL"
+	held := `"assigned_to" IS NULL`
 	var args []any
 	if to != nil {
 		// Null-safe, so its negation holds for an occurrence nobody holds: NOT
 		// over a comparison with NULL is NULL, and the row would be left out.
-		held = "(assigned_to IS NOT NULL AND assigned_to = ?)"
+		held = `("assigned_to" IS NOT NULL AND "assigned_to" = ?)`
 		args = append(args, *to)
 	}
 	var ids []int64

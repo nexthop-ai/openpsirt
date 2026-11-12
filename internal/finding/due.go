@@ -464,7 +464,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// plan. Then the exploited flag, exploited first, because it is in the
 		// grouping: a merge refiles the gone issue's findings with their flag
 		// as it was, so one component in one build can hold a group of each.
-		OrderExpr(`due, "v"."identifier", "component", "f"."build_id", "version", "f"."component_id", "f"."urgency_exploited" DESC`).
+		OrderExpr(`"due", "v"."identifier", "component", "f"."build_id", "version", "f"."component_id", "f"."urgency_exploited" DESC`).
 		Limit(int64(limit)).Offset(int64(offset))
 
 	var late []Late

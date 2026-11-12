@@ -722,7 +722,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, buildIDs []int6
 		q = q.ColumnExpr(`COUNT("pi".?) AS ?`, column, column)
 		into = append(into, &onBinary[j])
 	}
-	err := q.GroupExpr(`"pi"."build_id", "pi".fold, `+oneFix+`, `+severalOf+`, `+rating.EffectiveExpr).
+	err := q.GroupExpr(`"pi"."build_id", "pi"."fold", `+oneFix+`, `+severalOf+`, `+rating.EffectiveExpr).
 		Scan(ctx, into...)
 	if err != nil {
 		return openFolds{}, fmt.Errorf("read what is open across a source package: %w", err)

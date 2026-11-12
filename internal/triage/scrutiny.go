@@ -216,7 +216,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(`"ap"."batch" IS NOT NULL`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		GroupExpr(`"ap"."batch", "pe"."identity"`).
-		OrderExpr("written DESC").
+		OrderExpr(`"written" DESC`).
 		Limit(int64(room))).Scan(ctx, &bulk)
 	if err != nil {
 		return nil, fmt.Errorf("read which agreements were given in bulk: %w", err)
@@ -251,7 +251,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		GroupExpr(`"pr"."identity", "ape"."identity"`).
-		OrderExpr("written DESC").
+		OrderExpr(`"written" DESC`).
 		Limit(int64(room))).Scan(ctx, &pairs)
 	if err != nil {
 		return nil, fmt.Errorf("read who agrees with whom: %w", err)
@@ -329,7 +329,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// while it sits there, so it is not a right somebody still holds.
 		Where(inLost, lostArgs...).
 		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
-		OrderExpr("written DESC").
+		OrderExpr(`"written" DESC`).
 		Limit(int64(room))).Scan(ctx, &lapsed)
 	if err != nil {
 		return nil, fmt.Errorf("read which approvers have lost the right: %w", err)
