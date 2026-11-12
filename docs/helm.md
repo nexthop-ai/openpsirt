@@ -53,6 +53,16 @@ Each secret value is given one of two ways, never both.
 `existingSecret` is the recommended form. A value in `values.yaml` is kept in
 the release history and usually in version control.
 
+A changed value rolls the pods through a checksum on the pod template, salted
+so that nobody reading the Deployment can test guesses at a password. The
+chart keeps a random salt in the Secret `<fullname>-rollout-salt`, which stays
+through upgrades and an uninstall. A render with no cluster, `helm template`
+or Argo CD, cannot read it back and rolls the pods on every render: set
+`rolloutSalt` to a long random value there. `<fullname>` is the name the
+chart's resources share: `fullnameOverride` where set, otherwise the release
+name followed by `-` and the chart name (`nameOverride` where set) unless the
+release name holds it, cut to 63 characters.
+
 | Secret | Default key |
 |---|---|
 | `database.existingSecret` | `database-url` |

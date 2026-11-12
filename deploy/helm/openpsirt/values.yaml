@@ -369,6 +369,14 @@ tolerations: []
 affinity: {}
 podAnnotations: {}
 
+# The salt the pods' checksum of the chart-held secrets is taken with, which
+# rolls the pods when one of them changes. Left empty, the chart keeps a random
+# one in the Secret <fullname>-rollout-salt, <fullname> being the name the
+# chart's resources share. A render with no cluster, such as
+# helm template or Argo CD, cannot read that Secret back and draws a new salt
+# every time, rolling the pods on every sync: set a long random value here.
+rolloutSalt: ""
+
 # The vulnerability scanner ships in the image. This deployment runs the scan
 # rather than trusting whatever a producer's pipeline installed, so that counts
 # are comparable between products rather than being a property of somebody's

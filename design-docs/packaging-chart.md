@@ -114,6 +114,8 @@ set.
 | A Secret exists only while its reader is configured; clearing a provider's issuer removes it | A leftover holds a live credential |
 | The database URL always comes from a Secret, named or chart-created; the values file warns a password there enters the release history | Mail credentials follow suit |
 | Bootstrap admins are applied at every startup, as the install notes say | The recovery path: add yourself and upgrade |
+| A Secret the chart holds rolls the pods when it changes, through a checksum of the Secrets on the pod template, salted | Anybody reading the Deployment sees every other byte the checksum covers, and could test guesses at a weak password offline |
+| The salt is `rolloutSalt` where set; otherwise the one the Secret named for the chart's full name with `-rollout-salt` holds, read back at each upgrade, or a new random one stored there and kept through upgrades and uninstall | A new salt rolls the pods. A render with no cluster reads nothing back and draws a new salt each time, so it sets `rolloutSalt` |
 
 ## Limits
 
