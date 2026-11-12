@@ -16,7 +16,7 @@ import { own } from "../ui/own";
 import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
 import { mayOf, useWho } from "../app/session";
-import { linkable } from "../ui/addressable";
+import { Outward } from "../ui/Outward";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
@@ -37,14 +37,10 @@ import {
 // output. What fails the check is still shown — losing the address would lose
 // the evidence — it is simply not clickable.
 function Away({ url }: { url?: string }) {
-  const href = linkable(url);
-  if (!href) {
-    return <span className="id">{url}</span>;
-  }
   return (
-    <a href={href} target="_blank" rel="noreferrer noopener">
-      {href.replace(/^https?:\/\//, "")}
-    </a>
+    <Outward href={url} className="">
+      {(url ?? "").trim().replace(/^https?:\/\//, "")}
+    </Outward>
   );
 }
 

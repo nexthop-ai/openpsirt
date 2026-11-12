@@ -105,6 +105,27 @@ export default tseslint.config(
       ],
     },
   },
+  // An address from outside is linked through Outward alone, which checks it
+  // and draws what fails as words. A caller of the check itself is a caller
+  // that can forget half of it.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "src/ui/Outward.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/addressable"],
+              importNames: ["linkable"],
+              message: "Link an outside address with <Outward>, which checks it.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },

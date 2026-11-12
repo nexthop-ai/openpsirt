@@ -21,20 +21,49 @@ export function Outward({
   href,
   children,
   className = "linkish",
+  title,
+  unlinked,
+  lead,
 }: {
   href: string | undefined | null;
   // The link's own text. The raw value is what a failed address falls back to,
-  // whatever this is.
+  // whatever this is, unless `unlinked` says otherwise.
   children?: ReactNode;
+  // Empty draws the link with no class of its own.
   className?: string;
+  title?: string;
+  // What is drawn where the address is missing or fails the check: where this
+  // is left out, the raw value, or nothing for no address; nothing where it is
+  // null.
+  unlinked?: ReactNode;
+  // What stands before the address wherever anything is drawn, such as a
+  // separator in a line of facts.
+  lead?: ReactNode;
 }) {
   const at = linkable(href);
   const written = String(href ?? "");
-  if (!written) return null;
-  if (!at) return <span className="id">{written}</span>;
+  if (!written && unlinked === undefined) return null;
+  if (!at) {
+    if (unlinked === null) return null;
+    return (
+      <>
+        {lead}
+        {unlinked ?? <span className="id">{written}</span>}
+      </>
+    );
+  }
   return (
-    <a href={at} target="_blank" rel="noreferrer noopener" className={className}>
-      {children ?? written}
-    </a>
+    <>
+      {lead}
+      <a
+        href={at}
+        target="_blank"
+        rel="noreferrer noopener"
+        className={className || undefined}
+        title={title}
+      >
+        {children ?? written}
+      </a>
+    </>
   );
 }
