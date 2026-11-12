@@ -293,11 +293,12 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 	}
 
 	gone, orphaned, failed := 0, 0, 0
+	var stopped error
 	for i := range stale {
 		// A stopped pass stops claiming: every claim after the stop fails,
 		// and each would log an error naming a row nothing is wrong with.
-		if err := ctx.Err(); err != nil {
-			return gone, err
+		if stopped = ctx.Err(); stopped != nil {
+			break
 		}
 		row := &stale[i]
 		// The row first, and the bytes after. The other order ran the guard
@@ -334,7 +335,7 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 			// outcome the guard is for. The bytes stay.
 			continue
 		}
-		if err := s.files.Delete(ctx, row.ObjectKey); err != nil {
+		if err := s.removeClaimed(ctx, row.ObjectKey); err != nil {
 			// The row is gone and the bytes are not. Named, because the key
 			// is the only thing left that can find them, and stepped over, so
 			// one undeletable object does not stall every row after it.
@@ -352,7 +353,15 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 		s.logger.WarnContext(ctx, "a collection pass could not finish every row",
 			"collected", gone, "orphaned", orphaned, "unreadable", failed)
 	}
-	return gone, nil
+	return gone, stopped
+}
+
+// removeClaimed removes the bytes of a row the pass deleted, on a context of
+// its own, because a stop between the two would leave bytes no row names.
+func (s *Store) removeClaimed(ctx context.Context, key string) error {
+	removing, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
+	defer cancel()
+	return s.files.Delete(removing, key)
 }
 
 // unreadable says which row a collection pass could not claim, and why.
