@@ -6,6 +6,7 @@ package finding_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -539,6 +540,94 @@ func TestTheSameDocumentReadDifferentlyReplacesWhatStands(t *testing.T) {
 		}
 		if len(said) != 1 {
 			t.Errorf("the statement under the name it is read as now: %d found", len(said))
+		}
+	})
+}
+
+// A revision moving a statement to another product leaves the subject it was
+// about, and the publisher's statement it had overtaken there stands again.
+// Set aside again by a revision withdrawing it, an overtaken statement is not
+// counted, because nothing in force changed.
+func TestAStatementMovedAwayRestoresWhatItOvertook(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		record := func(id, digest string, said ...finding.Statement) int {
+			t.Helper()
+			_, setAside, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: id,
+					Document: id + ".json", Digest: digest}, said)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return setAside
+		}
+		about := func(status string) finding.Statement {
+			return finding.Statement{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+				Component: "zlib1g", About: "1.3", Status: status}
+		}
+		inForce := func(id string) int {
+			t.Helper()
+			var n int
+			if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`COUNT(*)`).
+				Where(`"document_id" = ?`, id).Where(`"superseded_at" IS NULL`).Scan(ctx, &n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+
+		record("older", "sha256:1", about("affected"))
+		if setAside := record("newer", "sha256:2", about("not_affected")); setAside != 1 {
+			t.Errorf("the newer document set aside %d statements, want the older one", setAside)
+		}
+		placed := about("not_affected")
+		placed.WithinPurl, placed.Within, placed.WithinAbout = "pkg:generic/appliance@2", "appliance", "2"
+		placed.Placement = finding.PlacedInside
+		record("newer", "sha256:3", placed)
+		if inForce("older") != 1 || inForce("newer") != 1 {
+			t.Errorf("after the newer statement moved to another product, %d of the older"+
+				" and %d of the newer are in force, want one each", inForce("older"), inForce("newer"))
+		}
+
+		// Overtaken again, then withdrawn by its own revision.
+		record("newest", "sha256:4", about("not_affected"))
+		if setAside := record("older", "sha256:5"); setAside != 0 {
+			t.Errorf("withdrawing an overtaken statement counted %d set aside, want none", setAside)
+		}
+	})
+}
+
+// The same bytes uploaded again bring a statement recorded before its time
+// was kept up to date with the time its document states.
+func TestTheSameDocumentAgainRecordsWhenItWasSaid(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		said := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		record := func() {
+			t.Helper()
+			if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: "march",
+					Document: "march.json", Digest: "sha256:1", SaidAt: &said},
+				[]finding.Statement{{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+					Component: "zlib1g", About: "1.3", Status: "not_affected"}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record()
+		// As an older release recorded it, with no time.
+		if _, err := f.db.DB.NewUpdate().Table("received_vex_statement").Set(`"said_at" = NULL`).
+			Where(`"document_id" = ?`, "march").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		record()
+		var at []time.Time
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("said_at").
+			Where(`"document_id" = ?`, "march").Where(`"said_at" IS NOT NULL`).Scan(ctx, &at); err != nil {
+			t.Fatal(err)
+		}
+		if len(at) != 1 || !at[0].Equal(said) {
+			t.Errorf("the statement uploaded again records it was said at %v, want %v", at, said)
 		}
 	})
 }

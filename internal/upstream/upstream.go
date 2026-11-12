@@ -232,8 +232,16 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, productID 
 		return nil, err
 	}
 	var out *Upstream
+	if err := finding.EnsureStatementsLock(ctx, s.db); err != nil {
+		return nil, err
+	}
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		out = nil
+		// Taken first, as recording statements takes it, so a recording
+		// in flight never restores what this sets aside.
+		if err := finding.TakeStatements(ctx, tx); err != nil {
+			return err
+		}
 		held, err := s.of(ctx, tx, productID)
 		if err != nil || held == nil {
 			return err

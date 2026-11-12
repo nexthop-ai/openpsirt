@@ -6,6 +6,7 @@ package finding
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"slices"
 	"strings"
@@ -15,6 +16,54 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
+
+// statementsLock names the row a transaction recording a publisher's
+// statements writes before it reads anything.
+const statementsLock = "received statements"
+
+// statementsLease is the part of a lease row that taking one needs.
+type statementsLease struct {
+	bun.BaseModel `bun:"table:lease"`
+
+	Name string `bun:"name,pk"`
+}
+
+// EnsureStatementsLock makes the row TakeStatements writes.
+//
+// Outside the transaction, because a second writer's insert is refused by the
+// primary key, and on PostgreSQL a refused statement aborts the transaction it
+// is in.
+func EnsureStatementsLock(ctx context.Context, db bun.IDB) error {
+	_, err := db.NewInsert().Model(&statementsLease{Name: statementsLock}).Exec(ctx)
+	if err != nil && !database.IsDuplicate(err) {
+		return fmt.Errorf("record the statements lock: %w", err)
+	}
+	return nil
+}
+
+// TakeStatements makes every other transaction recording statements wait for
+// this one. The caller takes it before the transaction reads anything: MySQL
+// and MariaDB fix what a transaction reads at its first read, so a read
+// before the wait would not see what the other transaction wrote, and both
+// documents' newest statements would stand.
+//
+// The write puts a new value in the row every time. An update setting a
+// column to what it already holds is matched and not written on MySQL and
+// MariaDB, and a cluster certifies only rows that were written, so two
+// recordings on two nodes would both commit.
+func TakeStatements(ctx context.Context, tx bun.IDB) error {
+	res, err := tx.NewUpdate().Model((*statementsLease)(nil)).
+		Set(`"held_by" = ?`, rand.Text()).
+		Where(`"name" = ?`, statementsLock).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("wait for other statements being recorded: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return fmt.Errorf("wait for other statements being recorded: the lock row is not recorded")
+	}
+	return nil
+}
 
 // heldByItsDocument chooses the statements a document still makes: those in
 // force, and those a newer statement from the same publisher overtook, which
@@ -131,21 +180,32 @@ func newestStands(ctx context.Context, tx bun.IDB, productID int64, publisher, s
 	}); err != nil {
 		return 0, fmt.Errorf("restore what the publisher said last: %w", err)
 	}
-	newests := make([]int64, 0, len(overtaken))
-	for id := range overtaken {
-		newests = append(newests, id)
+	// One statement per batch of rows, each row's newest chosen by a CASE:
+	// a document regenerated under a new identifier overtakes one statement
+	// per subject, and a write per newest is a round trip per claim.
+	pairs := make([][2]int64, 0, len(overtaken))
+	for by, ids := range overtaken {
+		for _, id := range ids {
+			pairs = append(pairs, [2]int64{id, by})
+		}
 	}
-	slices.SortFunc(newests, cmp.Compare)
-	for _, by := range newests {
-		ids := overtaken[by]
-		slices.Sort(ids)
-		if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-			_, err := tx.NewUpdate().Model((*Statement)(nil)).
-				Set(`"superseded_at" = COALESCE("superseded_at", ?)`, now).
-				Set(`"overtaken_by" = ?`, by).
-				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
-			return err
-		}); err != nil {
+	slices.SortFunc(pairs, func(a, b [2]int64) int { return cmp.Compare(a[0], b[0]) })
+	for from := 0; from < len(pairs); from += database.BatchSize {
+		batch := pairs[from:min(from+database.BatchSize, len(pairs))]
+		var choose strings.Builder
+		args := make([]any, 0, 2*len(batch)+1)
+		ids := make([]int64, 0, len(batch))
+		choose.WriteString(`CASE "id"`)
+		for _, pair := range batch {
+			choose.WriteString(` WHEN ? THEN ?`)
+			args = append(args, pair[0], pair[1])
+			ids = append(ids, pair[0])
+		}
+		choose.WriteString(` END`)
+		if _, err := tx.NewUpdate().Model((*Statement)(nil)).
+			Set(`"superseded_at" = COALESCE("superseded_at", ?)`, now).
+			Set(`"overtaken_by" = `+choose.String(), args...).
+			Where(`"id" IN (?)`, bun.List(ids)).Exec(ctx); err != nil {
 			return 0, fmt.Errorf("set aside what the publisher said before: %w", err)
 		}
 	}

@@ -176,6 +176,9 @@ func statedNames(ctx context.Context, db bun.IDB, buildIDs, componentIDs []int64
 		ColumnExpr(`"n"."opened_scan_id", "n"."closed_scan_id"`).
 		Where(`"n"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"n"."component_id" IN (?)`, bun.List(componentIDs)).
+		// Both values of the root flag, so the index led by the build, the
+		// flag and the component answers it, as graph.BuildName's does.
+		Where(`"n"."is_root" IN (FALSE, TRUE)`).
 		Where(`"n"."name" IS NOT NULL`).
 		Scan(ctx, &rows); err != nil {
 		return said, fmt.Errorf("read what these builds call these components: %w", err)

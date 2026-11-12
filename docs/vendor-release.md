@@ -62,7 +62,10 @@ claim whichever way it arrived, and the next scan applies it.
 
 A later revision of a document, from the same publisher with the same OpenVEX
 `@id`, sets aside what the earlier one said, across the whole product. Another
-document from that publisher stands beside it. A document with no `@id` is
+document from that publisher stands beside it, except where both speak about
+the same component and vulnerability: there the newer statement stands, by the
+statement's `timestamp`, else the document's, else the order they were
+uploaded in. A document with no `@id` is
 replaced by the publisher's next one with none, so give each release and each
 variant an `@id` of its own.
 

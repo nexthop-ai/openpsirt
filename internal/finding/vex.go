@@ -355,6 +355,9 @@ func (from Supplied) valid() error {
 // Across documents, the publisher's newest statement about a product and an
 // issue is the one in force, and their older ones about it are set aside as
 // overtaken (newestStands).
+//
+// A caller recording inside a transaction of its own calls
+// EnsureStatementsLock before it and TakeStatements as its first statement.
 func (s *Store) RecordStatements(ctx context.Context, by access.Subject, productID int64,
 	from Supplied, said []Statement) (recorded, superseded int, err error) {
 
@@ -367,13 +370,12 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		recorded, superseded = 0, 0
 		now := s.now().UTC().Truncate(time.Microsecond)
 
-		// Taken first, before anything is read: two documents from one
-		// publisher recorded at once would each read the other's statements
-		// as absent, and both newest statements would stand. An ordinary row
-		// update, so every engine takes the lock and the second waits.
-		if _, err := tx.NewUpdate().Table("product").Set(`"id" = "id"`).
-			Where(`"id" = ?`, productID).Exec(ctx); err != nil {
-			return fmt.Errorf("take the product: %w", err)
+		// Taken before anything is read, here and by a caller whose
+		// transaction reads first: two documents recorded at once would each
+		// read the other's statements as absent, and both newest statements
+		// would stand.
+		if err := TakeStatements(ctx, tx); err != nil {
+			return err
 		}
 
 		// A copy of its own on every attempt. The closure is re-run whole
@@ -405,7 +407,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var standing []Statement
 		err := tx.NewSelect().Model(&standing).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification").
+				"within_about", "placement", "status", "justification", "said_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
@@ -437,7 +439,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var held []Statement
 		heldBy := tx.NewSelect().Model(&held).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification", "said_at").
+				"within_about", "placement", "status", "justification", "said_at", "superseded_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
@@ -461,7 +463,13 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		if err != nil {
 			return fmt.Errorf("set aside what they said before: %w", err)
 		}
-		superseded = len(gone)
+		// Counted where it was in force: one already overtaken changes
+		// nothing anybody reads.
+		for _, row := range held {
+			if _, set := slices.BinarySearch(gone, row.ID); set && row.Superseded == nil {
+				superseded++
+			}
+		}
 
 		for placed, ids := range repeated {
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
@@ -526,19 +534,22 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			recorded += len(batch)
 		}
 
-		touched := make([]Statement, 0, len(claims)+len(gone))
+		// Every row the document held, with what it says now: a row moved to
+		// another placement leaves the subject it was about.
+		touched := make([]Statement, 0, len(claims)+len(held))
 		touched = append(touched, claims...)
-		for _, row := range held {
-			if _, set := slices.BinarySearch(gone, row.ID); set {
-				touched = append(touched, row)
-			}
-		}
+		touched = append(touched, held...)
 		overtaken, err := newestStands(ctx, tx, productID, publisher, from.Source, touched, now)
 		if err != nil {
 			return err
 		}
 		superseded += overtaken
 		return nil
+	}
+	if pool, ok := database.Handle(s.db); ok {
+		if err := EnsureStatementsLock(ctx, pool); err != nil {
+			return 0, 0, err
+		}
 	}
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		if err := replace(ctx, tx); err != nil {
@@ -868,7 +879,8 @@ func nullable(value string) any {
 }
 
 // sameReading reports whether two sets of statements say the same things,
-// in any order. Only what a reader derives from the document is compared.
+// in any order. Only what a reader derives from the document is compared,
+// when each was said included.
 func sameReading(held, said []Statement) bool {
 	if len(held) != len(said) {
 		return false
@@ -876,9 +888,13 @@ func sameReading(held, said []Statement) bool {
 	reading := func(rows []Statement) []string {
 		out := make([]string, len(rows))
 		for i, one := range rows {
+			said := ""
+			if one.SaidAt != nil {
+				said = one.SaidAt.UTC().Format(time.RFC3339Nano)
+			}
 			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
 				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Status,
-				one.Justification, one.Statement}, "\x00")
+				one.Justification, one.Statement, said}, "\x00")
 		}
 		slices.Sort(out)
 		return out

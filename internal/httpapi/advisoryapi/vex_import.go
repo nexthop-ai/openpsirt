@@ -108,7 +108,10 @@ func registerVexImport(api huma.API, in core.Deps) {
 			"reasoning. The status is in the fix state already.\n\n" +
 			"Uploading a later revision of the same document sets aside what the earlier one " +
 			"said rather than deleting it, so what an approval was granted on the strength of " +
-			"stays readable. Another document from the same publisher sets aside nothing. A " +
+			"stays readable. Another document from the same publisher replaces nothing of this " +
+			"one, and of the publisher's statements about one product and vulnerability, the " +
+			"newest stands, whichever document carried it: by the statement's own timestamp, " +
+			"else its document's, else the upload order. A " +
 			"document is its publisher and its own identifier: an OpenVEX `@id` or a CSAF " +
 			"tracking id. The publisher is the `publisher` parameter, else the one the " +
 			"document names: an OpenVEX author or a CSAF publisher name. A document naming none " +
@@ -252,8 +255,14 @@ func recordSupplied(ctx context.Context, in core.Deps, by access.Subject, produc
 
 	statements := statementsOf(said)
 	var recorded, superseded int
+	if err := finding.EnsureStatementsLock(ctx, in.DB); err != nil {
+		return 0, 0, core.NotRecorded(in.Log(), err)
+	}
 	if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 		in := core.Of(ctx, in)
+		if err := finding.TakeStatements(ctx, tx); err != nil {
+			return core.NotRecorded(in.Logger, err)
+		}
 		product, err := catalog.NewStore(tx).ProductByName(ctx, productName)
 		if err != nil {
 			return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
