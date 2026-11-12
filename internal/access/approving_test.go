@@ -13,8 +13,8 @@ import (
 // TestTheApprovingConditionAnswersAsTheApprovingRule holds the statement a
 // query asks "may this person agree today" by to the rule a signed-in subject
 // is asked by: every role alone and every pair of roles, granted on the
-// product or across every product, at every visibility, and an administrator
-// granted nothing.
+// product or across every product, at every visibility, somebody deactivated,
+// and an administrator granted nothing.
 func TestTheApprovingConditionAnswersAsTheApprovingRule(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -88,6 +88,17 @@ func TestTheApprovingConditionAnswersAsTheApprovingRule(t *testing.T) {
 		}
 		if examined == 0 || approving == 0 || approving == examined {
 			t.Fatalf("%d of %d cases approve, so the comparison separated nothing", approving, examined)
+		}
+
+		// Somebody who left keeps the grants that made them an approver.
+		departed := holding(t, f, "departed", "Departed", sonic, access.Approver, access.PrivateRead)
+		if _, err := f.store.Deactivate(ctx, departed.ID); err != nil {
+			t.Fatal(err)
+		}
+		for _, v := range access.Visibilities() {
+			if got, want := ask(departed.ID, v), rule("departed", v); got || want {
+				t.Errorf("somebody deactivated may approve at %s: the statement says %v, the rule %v", v, got, want)
+			}
 		}
 
 		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)

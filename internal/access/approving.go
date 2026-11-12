@@ -46,7 +46,9 @@ func MayApproveWhere(personColumn, productColumn, visibilityColumn string) (stri
 	if len(parts) == 0 {
 		return `1 = 0`, nil
 	}
-	return `(` + strings.Join(parts, " OR ") + `)`, args
+	// A deactivated account keeps its grant rows and is refused at sign-in.
+	return `(EXISTS (SELECT 1 FROM "person" AS "pa" WHERE "pa"."id" = ` + personColumn +
+		` AND "pa"."deactivated_at" IS NULL) AND (` + strings.Join(parts, " OR ") + `))`, args
 }
 
 // holdingOn is the condition that the person in personColumn holds one of

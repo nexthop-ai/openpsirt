@@ -112,7 +112,7 @@ findings, each where the reader may read it.
 | Growth is capped after it is found, most grown first; ties break by decision, then approver | Capped before, the oldest fill the page |
 | What a decision covers now is what its live rows reach | |
 | Coverage is counted for a bounded set of decisions per statement | One per decision is ten thousand round trips |
-| Somebody could not give an approval now where the approving rule refuses them today: reading at the decision's visibility, and the approver capability or triage there, the capability alone at security testing, each granted on the product or across every product and in force | The statement is built from the rule a signed-in approver is asked by. An administrator holds no role ungranted, so is listed like anybody else |
+| Somebody could not give an approval now where the approving rule refuses them today: reading at the decision's visibility, and the approver capability or triage there, the capability alone at security testing, each granted on the product or across every product and in force, held by an account not deactivated | The statement is built from the rule a signed-in approver is asked by. An administrator holds no role ungranted, so is listed like anybody else |
 
 ## Dismissals and last uploads
 
