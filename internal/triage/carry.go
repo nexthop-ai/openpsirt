@@ -201,11 +201,6 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toBuild, occurrenceID int6
 		// them.
 		OnTag int `bun:"on_tag"`
 	}
-	// Undisclosed where any open finding there is, disclosed where there are
-	// findings and none is, and nothing where there are none. The kinds a
-	// version carries hold no other visibility.
-	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
-	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		// The issue the row is read as, which is the one the new line holds.
@@ -213,13 +208,7 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toBuild, occurrenceID int6
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).
-		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
-				WHEN `+undisclosed+` THEN ? ELSE ? END
-			FROM "finding" AS "f"
-			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
-				AND `+kinds+`), '')
-			AS "visibility"`, append([]any{private, string(access.Private), string(access.Public), toBuild},
-			kindArgs...)...).
+		Apply(landingOnLine(toBuild, "visibility")).
 		Apply(versionsOnLine(toBuild, "component_now", "consumer_now")).
 		// A line carried onto that was built once. It is a fact about the
 		// build rather than about the decision, and the rule that refuses a
@@ -239,6 +228,26 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toBuild, occurrenceID int6
 		ComponentUpstream:  row.Component, ConsumerUpstream: row.Consumer,
 		OnTag: row.OnTag == 1,
 	}, nil
+}
+
+// landingOnLine adds the visibility a row's occurrence lands at on a line, as
+// the column named: undisclosed where any open finding there is, disclosed
+// where there are findings and none is, and empty where there are none. The
+// kinds a version carries hold no other visibility. One spelling, because
+// what is offered for carrying and what a carry writes and authorizes are
+// both read through it.
+func landingOnLine(toBuild int64, as string) func(*bun.SelectQuery) *bun.SelectQuery {
+	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
+	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
+				WHEN `+undisclosed+` THEN ? ELSE ? END
+			FROM "finding" AS "f"
+			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
+				AND `+kinds+`), '')
+			AS "`+as+`"`, append([]any{private, string(access.Private), string(access.Public), toBuild},
+			kindArgs...)...)
+	}
 }
 
 // versionsOnLine adds the versions a row's occurrence sits at on a line, as
@@ -390,7 +399,6 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// what a carried decision would be written at.
 		Landing string `bun:"landing"`
 	}
-	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
 	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	gKinds, gKindArgs := kindsOf(kind.VersionCarry, "g")
 	err := s.db.NewSelect().
@@ -425,13 +433,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 				AND `+kinds+`)
 			AS "still_there"`, append([]any{toBuild}, kindArgs...)...).
 		// The visibility the occurrence lands at, read as occurrenceOnLine reads it.
-		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
-				WHEN `+undisclosed+` THEN ? ELSE ? END
-			FROM "finding" AS "f"
-			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
-				AND `+kinds+`), '')
-			AS "landing"`, append([]any{private, string(access.Private), string(access.Public), toBuild},
-			kindArgs...)...).
+		Apply(landingOnLine(toBuild, "landing")).
 		// A date it carries that has already gone by, either of them.
 		ColumnExpr(`(COALESCE("cl"."deferred_until", "cl"."committed_to") IS NOT NULL
 			AND COALESCE("cl"."deferred_until", "cl"."committed_to") <= ?) AS "ran_out"`, s.now()).
