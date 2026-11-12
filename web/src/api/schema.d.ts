@@ -1853,11 +1853,11 @@ export interface paths {
          * List findings for one issue
          * @description Every build that carries this issue, across every product you may see or in the one product `product` names, with how far it has been decided in each.
          *
-         *     One row per build and component, not per occurrence: the same component in two builds is two things somebody ships, and sixty occurrences of it in one build is one piece of work with a count.
+         *     One row per build and component, with a count of its occurrences.
          *
-         *     Narrowed the way every other read is, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
+         *     The rows, `total` and the count of products cover only products you may read.
          *
-         *     Nothing affected is an answer: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time. A `product` you cannot see is refused with 404, as one that does not exist is.
+         *     An issue that affects nothing you may read answers `total` zero with empty `items`, whether nobody here has seen it or it sits only in products you cannot read. A `product` you cannot see is refused with 404, as one that does not exist is.
          *
          *     Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
          *
