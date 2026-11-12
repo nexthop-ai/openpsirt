@@ -155,6 +155,7 @@ Both are authorized identically and first.
 | Content type | Chosen by this deployment, never the uploaded one |
 | Disposition | `Content-Disposition: attachment` |
 | File name | The uploaded name without its directory, with control and format characters, quotes, backslashes and slashes replaced, cut to 120 bytes. A right-to-left override before `fdp.exe` shows a program as a document |
+| A name past ASCII | Quoted with each character past ASCII replaced by `_`, and carried whole in the RFC 6266 `filename*` parameter. A header is ISO-8859-1, and an object store refuses a signed URL whose disposition is not |
 | Inline display | A small allowlist of raster image types; a vector image is a document with a scripting engine |
 
 The signed URL carries these as response overrides, so they survive the
