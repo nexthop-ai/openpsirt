@@ -27,6 +27,12 @@
 // and so is a type built from one: an alias of it, or a struct embedding it.
 // The rule is applied per function, because a file holding one query of each
 // kind names both tables while each query names one.
+//
+// A function also reaches what the readers it calls reach. A reader that lists
+// one table is exempt because its answer is half of what somebody holds, and a
+// caller taking that half without the other is the defect this gate exists
+// for. A call is matched by the name it calls, so a method of the same name on
+// another type reaches the same tables.
 package main
 
 import (
@@ -34,11 +40,13 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
@@ -60,21 +68,32 @@ var allowed = []string{
 }
 
 // inside is each function that may reach one table alone, and why. Keyed by
-// file and function, so a new query beside one of these is still checked.
+// file and function, a method by its receiver's type and name, so a new query
+// beside one of these is still checked, and so is a method of the same name
+// on another type in the same file.
 var inside = map[string]string{
-	"internal/access/estate.go:GrantEstateRole": "records a grant across the estate, and its duplicate check " +
+	"internal/access/estate.go:Store.GrantEstateRole": "records a grant across the estate, and its duplicate check " +
 		"is about an estate row: holding a role on one product does not make one covering all of them a duplicate",
-	"internal/access/estate.go:WithdrawEstateRole": "withdraws a grant across the estate, which is one row of that table",
-	"internal/access/estate.go:EstateGrants":       "lists what one person holds across the estate, beside Grants",
-	"internal/access/estate.go:EveryEstateGrant":   "lists what everybody holds across the estate, beside People",
-	"internal/access/estate.go:PeopleReaching": "reads both tables, through People and EveryEstateGrant, " +
-		"which this gate names one table each",
-	"internal/access/grants.go:GrantRole": "records a grant on one product, which is one row of that table",
-	"internal/access/grants.go:holds": "whether a per-product grant that failed to insert is already there, " +
+	"internal/access/estate.go:Store.WithdrawEstateRole": "withdraws a grant across the estate, which is one row of that table",
+	"internal/access/estate.go:Store.EstateGrants":       "lists what one person holds across the estate, beside Grants",
+	"internal/access/estate.go:Store.EveryEstateGrant":   "lists what everybody holds across the estate, beside People",
+	"internal/access/grants.go:Store.GrantRole":          "records a grant on one product, which is one row of that table",
+	"internal/access/grants.go:Store.holds": "whether a per-product grant that failed to insert is already there, " +
 		"which is a question about that row; an estate grant does not make it a duplicate",
-	"internal/access/grants.go:People":   "lists what everybody holds per product, beside EveryEstateGrant",
-	"internal/access/grants.go:Grants":   "lists what one person holds per product, beside EstateGrants",
-	"internal/access/grants.go:Withdraw": "withdraws a grant on one product, which is one row of that table",
+	"internal/access/grants.go:Store.People":   "lists what everybody holds per product, beside EveryEstateGrant",
+	"internal/access/grants.go:Store.Grants":   "lists what one person holds per product, beside EstateGrants",
+	"internal/access/grants.go:Store.Withdraw": "withdraws a grant on one product, which is one row of that table",
+}
+
+// halves is each exemption whose answer is half of what somebody holds, read
+// beside the other half. A caller reaches what one reaches, so a caller asking
+// one half alone is reported where it asks. A writer is not a half: recording
+// or withdrawing one row decides nothing about what somebody holds.
+var halves = []string{
+	"internal/access/estate.go:Store.EstateGrants",
+	"internal/access/estate.go:Store.EveryEstateGrant",
+	"internal/access/grants.go:Store.People",
+	"internal/access/grants.go:Store.Grants",
 }
 
 // reach is which grant tables a piece of source reaches.
@@ -86,19 +105,28 @@ type reach struct{ perProduct, estate bool }
 type models map[string]map[string]reach
 
 // scope is what a name in one file can mean: a package-level name or type of
-// its own package, or a type of a package it imports under some name.
+// its own package, an exported name or type of a package it imports under some
+// name, or a reader it calls by name.
 type scope struct {
 	names   map[string]reach
 	imports map[string]map[string]reach
+	calls   map[string]reach
 }
 
 // reached reports which grant tables a node reaches: by a table's name in a
-// string, by a type whose declaration names one, or by a package-level name
-// whose declaration reaches one.
+// string, by a type whose declaration names one, by a package-level name whose
+// declaration reaches one, or by a call to a reader that reaches one.
 func reached(n ast.Node, in scope) reach {
 	var r reach
 	ast.Inspect(n, func(n ast.Node) bool {
 		switch n := n.(type) {
+		case *ast.CallExpr:
+			switch fun := n.Fun.(type) {
+			case *ast.SelectorExpr:
+				r = r.or(in.calls[fun.Sel.Name])
+			case *ast.Ident:
+				r = r.or(in.calls[fun.Name])
+			}
 		case *ast.BasicLit:
 			if n.Kind != token.STRING {
 				return true
@@ -236,9 +264,10 @@ func declared(file *ast.File, in scope) map[string]reach {
 	return names
 }
 
-// imported is the types of each package a file imports, by the name the file
-// calls it. An import with no name of its own is called by the package's
-// declared name, which `packages` holds, or failing that its last element.
+// imported is the exported names and types of each package a file imports, by
+// the name the file calls it. An import with no name of its own is called by
+// the package's declared name, which `packages` holds, or failing that its last
+// element.
 func imported(file *ast.File, types models, packages map[string]string) map[string]map[string]reach {
 	byName := map[string]map[string]reach{}
 	for _, spec := range file.Imports {
@@ -270,46 +299,85 @@ func merged(a, b map[string]reach) map[string]reach {
 	return out
 }
 
-// tree is what the walk learns about the whole tree before any function is
+// tree is what is learned about the whole tree before any function is
 // judged: each directory's package-level names and types, each package's
 // types by import path, and each import path's declared package name.
 type tree struct {
+	module   string
 	names    map[string]map[string]reach
 	types    models
 	packages map[string]string
+}
+
+// importPath is the import path of the package a file is in.
+func (t tree) importPath(path string) string {
+	return t.module + "/" + filepath.ToSlash(filepath.Dir(path))
+}
+
+// visible is what another package can name of each package, by import path:
+// its types, and its exported constants and variables.
+func (t tree) visible() models {
+	out := models{}
+	for importPath, types := range t.types {
+		out[importPath] = merged(nil, types)
+	}
+	for dir, names := range t.names {
+		importPath := t.module + "/" + filepath.ToSlash(dir)
+		for name, r := range names {
+			if first := []rune(name)[0]; unicode.IsUpper(first) {
+				if out[importPath] == nil {
+					out[importPath] = map[string]reach{}
+				}
+				out[importPath][name] = out[importPath][name].or(r)
+			}
+		}
+	}
+	return out
+}
+
+// funcName is how a function is keyed: by name, and a method by its
+// receiver's type and name, so two methods of one name on different types are
+// two functions.
+func funcName(fn *ast.FuncDecl) string {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return fn.Name.Name
+	}
+	typ := fn.Recv.List[0].Type
+	for {
+		switch t := typ.(type) {
+		case *ast.StarExpr:
+			typ = t.X
+			continue
+		case *ast.IndexExpr:
+			typ = t.X
+			continue
+		case *ast.IndexListExpr:
+			typ = t.X
+			continue
+		case *ast.Ident:
+			return t.Name + "." + fn.Name.Name
+		}
+		return fn.Name.Name
+	}
 }
 
 // oneAlone is every function or package-level name in a file that reaches one
 // grant table and not the other, with the table it leaves out.
 //
 // A function reaches what its body names, including the package-level names
-// and types it uses: `pkg` holds those of the file's package, and where it is
-// nil the file's own are read. `types` holds the types of every package the
-// file may import. A package-level name is reported by itself, since a name
-// reaching one table is a query that asks one; a type is not, since a model
-// declares a table rather than asking it.
-//
-// Lifted out of the walk so it can be asked directly: a gate reachable only by
-// running the program over the tree has an exit code for its only evidence.
-func oneAlone(path string, src []byte, pkg map[string]reach, types models, packages map[string]string) (map[string]string, error) {
+// and types of its package, which `known` holds, the exported names and types
+// of what it imports, and the readers it calls, which `calls` holds by name. A
+// package-level name is reported by itself, since a name reaching one table is
+// a query that asks one; a type is not, since a model declares a table rather
+// than asking it.
+func oneAlone(path string, src []byte, known tree, visible models, calls map[string]reach) (map[string]string, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), path, src, 0)
 	if err != nil {
 		return nil, err
 	}
-	imports := imported(file, types, packages)
-	local := typesIn(file, scope{imports: imports})
-	for {
-		next := merged(local, typesIn(file, scope{names: local, imports: imports}))
-		if !grown(local, next) {
-			break
-		}
-		local = next
-	}
-	own := declared(file, scope{names: local, imports: imports})
-	if pkg == nil {
-		pkg = merged(own, local)
-	}
-	in := scope{names: pkg, imports: imports}
+	imports := imported(file, visible, known.packages)
+	pkg := known.names[filepath.Dir(path)]
+	in := scope{names: pkg, imports: imports, calls: calls}
 	found := map[string]string{}
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
@@ -317,10 +385,10 @@ func oneAlone(path string, src []byte, pkg map[string]reach, types models, packa
 			continue
 		}
 		if table, only := reached(fn.Body, in).missing(); only {
-			found[fn.Name.Name] = table
+			found[funcName(fn)] = table
 		}
 	}
-	for name, r := range own {
+	for name, r := range declared(file, scope{names: pkg, imports: imports}) {
 		if table, only := r.missing(); only {
 			found[name] = table
 		}
@@ -328,36 +396,31 @@ func oneAlone(path string, src []byte, pkg map[string]reach, types models, packa
 	return found, nil
 }
 
-// learn reads the whole tree, tests aside, for what `tree` holds. A file's
-// package-level names are judged with its own package's types and the types of
-// what it imports, so types are read in passes of their own first.
-func learn(module string) (tree, error) {
-	t := tree{names: map[string]map[string]reach{}, types: models{}, packages: map[string]string{}}
+// learn reads every file it is given, by path from the repository root, for
+// what `tree` holds. A file's package-level names are judged with its own
+// package's names and types and with what it imports, so types are read in
+// passes of their own first, then names.
+func learn(module string, sources map[string][]byte) (tree, error) {
+	t := tree{module: module, names: map[string]map[string]reach{}, types: models{}, packages: map[string]string{}}
 	files := map[string]*ast.File{}
-	_, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
-		if strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
+	for path, text := range sources {
 		file, err := parser.ParseFile(token.NewFileSet(), path, text, 0)
 		if err != nil {
-			return err
+			return t, err
 		}
 		files[path] = file
-		importPath := module + "/" + filepath.ToSlash(filepath.Dir(path))
+		importPath := t.importPath(path)
 		t.packages[importPath] = file.Name.Name
 		t.types[importPath] = merged(t.types[importPath], typesIn(file, scope{}))
-		return nil
-	})
-	if err != nil {
-		return t, err
 	}
 	// A type built from a model in another package needs that package's types
-	// first, in whatever order the walk read them, so the passes repeat until
-	// no type reaches anything new.
+	// first, in whatever order the files are read, so the passes repeat until
+	// no type reaches anything new. Names do the same, since a constant may be
+	// built from another package's.
 	for changed := true; changed; {
 		changed = false
 		for path, file := range files {
-			importPath := module + "/" + filepath.ToSlash(filepath.Dir(path))
+			importPath := t.importPath(path)
 			in := scope{names: t.types[importPath], imports: imported(file, t.types, t.packages)}
 			if next := typesIn(file, in); grown(t.types[importPath], next) {
 				t.types[importPath] = merged(t.types[importPath], next)
@@ -365,17 +428,98 @@ func learn(module string) (tree, error) {
 			}
 		}
 	}
-	for path, file := range files {
-		dir := filepath.Dir(path)
-		importPath := module + "/" + filepath.ToSlash(dir)
-		in := scope{names: t.types[importPath], imports: imported(file, t.types, t.packages)}
-		t.names[dir] = merged(t.names[dir], declared(file, in))
-	}
 	for path := range files {
 		dir := filepath.Dir(path)
-		t.names[dir] = merged(t.names[dir], t.types[module+"/"+filepath.ToSlash(dir)])
+		t.names[dir] = merged(t.names[dir], t.types[t.importPath(path)])
+	}
+	for changed := true; changed; {
+		changed = false
+		visible := t.visible()
+		for path, file := range files {
+			dir := filepath.Dir(path)
+			in := scope{names: t.names[dir], imports: imported(file, visible, t.packages)}
+			if next := declared(file, in); grown(t.names[dir], next) {
+				t.names[dir] = merged(t.names[dir], next)
+				changed = true
+			}
+		}
 	}
 	return t, nil
+}
+
+// check is every function or package-level name reaching one grant table
+// alone, keyed by file and name, across the files it is given. A file under an
+// allowed path is not judged, though what it declares is still learned.
+//
+// The readers named in `halves` pass what they reach to their callers, and a
+// reader may call another, so the judging repeats until what they reach stops
+// changing.
+//
+// A test file is neither learned nor judged: a test may assert about one table
+// on purpose, saying what is in a row rather than deciding what somebody may
+// reach.
+func check(module string, files map[string][]byte, halves []string) (map[string]string, error) {
+	sources := map[string][]byte{}
+	for path, text := range files {
+		if !strings.HasSuffix(path, "_test.go") {
+			sources[path] = text
+		}
+	}
+	known, err := learn(module, sources)
+	if err != nil {
+		return nil, err
+	}
+	visible := known.visible()
+	calls := map[string]reach{}
+	for {
+		found := map[string]string{}
+		for path, text := range sources {
+			if allowedPath(path) {
+				continue
+			}
+			names, err := oneAlone(path, text, known, visible, calls)
+			if err != nil {
+				return nil, err
+			}
+			for name, table := range names {
+				found[path+":"+name] = table
+			}
+		}
+		// What a reader reaches only grows as what it calls grows, so it is
+		// only ever added to, and the repetition ends. A reader that reached
+		// one table and is no longer reported as reaching one alone reaches
+		// both.
+		next := maps.Clone(calls)
+		for _, key := range halves {
+			name := key[strings.LastIndex(key, ":")+1:]
+			name = name[strings.LastIndex(name, ".")+1:]
+			switch found[key] {
+			case estate:
+				next[name] = next[name].or(reach{perProduct: true})
+			case perProduct:
+				next[name] = next[name].or(reach{estate: true})
+			default:
+				if next[name] != (reach{}) {
+					next[name] = reach{perProduct: true, estate: true}
+				}
+			}
+		}
+		if maps.Equal(next, calls) {
+			return found, nil
+		}
+		calls = next
+	}
+}
+
+// allowedPath reports whether a file is one a grant table may be named in
+// alone.
+func allowedPath(path string) bool {
+	for _, where := range allowed {
+		if strings.HasPrefix(filepath.ToSlash(path), where) {
+			return true
+		}
+	}
+	return false
 }
 
 // moduleOf is the module path go.mod in the working directory declares.
@@ -418,44 +562,20 @@ func main() {
 		fmt.Fprintln(os.Stderr, "granted:", err)
 		os.Exit(1)
 	}
-	known, err := learn(module)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "granted:", err)
-		os.Exit(1)
-	}
-	found := map[string]string{}
+	sources := map[string][]byte{}
 	// web holds the interface, which reaches no table: it asks this server.
 	read, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
-		// A test may assert about one table on purpose: it is saying what is
-		// in a row rather than deciding what somebody may reach.
-		if strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		for _, where := range allowed {
-			if strings.HasPrefix(path, where) {
-				return nil
-			}
-		}
-		pkg := known.names[filepath.Dir(path)]
-		if pkg == nil {
-			pkg = map[string]reach{}
-		}
-		names, err := oneAlone(path, text, pkg, known.types, known.packages)
-		if err != nil {
-			return err
-		}
-		for name, table := range names {
-			found[path+":"+name] = table
-		}
+		sources[path] = text
 		return nil
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "granted:", err)
 		os.Exit(1)
 	}
-	if read == 0 {
-		fmt.Fprintln(os.Stderr, "granted: no Go file was read, so this checked nothing")
-		os.Exit(2)
+	found, err := check(module, sources, halves)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "granted:", err)
+		os.Exit(1)
 	}
 	if bad := verdict(found, inside); len(bad) > 0 {
 		fmt.Fprintln(os.Stderr,

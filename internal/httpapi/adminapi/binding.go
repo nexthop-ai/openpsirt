@@ -174,13 +174,13 @@ func registerRevocation(api huma.API, a core.Administering) {
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot list the tokens", err)
 		}
-		people, _, err := rights.People(ctx)
+		ids := make([]int64, 0, len(tokens))
+		for _, token := range tokens {
+			ids = append(ids, token.PersonID)
+		}
+		owners, err := rights.Handles(ctx, ids)
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot read whose tokens these are", err)
-		}
-		owners := map[int64]string{}
-		for _, person := range people {
-			owners[person.ID] = person.Identity
 		}
 		// Every product named once for the whole list, rather than a read per
 		// narrowed token.
