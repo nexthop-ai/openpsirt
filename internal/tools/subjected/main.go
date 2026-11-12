@@ -221,10 +221,10 @@ func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 		}
 		name := pkg + "." + fn.Name.Name
 		if fn.Recv != nil {
-			// A method of an unexported type is reached through this
-			// package alone, which is what is read here.
+			// An exported method of an unexported type is still reached
+			// from another package, through a constructor or an interface.
 			receiver := receiverOf(fn)
-			if !stores[receiver] || !ast.IsExported(receiver) {
+			if !stores[receiver] {
 				continue
 			}
 			name = pkg + "." + receiver + "." + fn.Name.Name
@@ -423,13 +423,19 @@ func isVersion(element string) bool {
 
 // receiverOf is the name of the type a method is declared on.
 func receiverOf(fn *ast.FuncDecl) string {
-	switch t := fn.Recv.List[0].Type.(type) {
-	case *ast.StarExpr:
-		if named, ok := t.X.(*ast.Ident); ok {
-			return named.Name
-		}
-	case *ast.Ident:
-		return t.Name
+	t := fn.Recv.List[0].Type
+	if star, ok := t.(*ast.StarExpr); ok {
+		t = star.X
+	}
+	// A generic receiver names its type with its parameters after it.
+	switch generic := t.(type) {
+	case *ast.IndexExpr:
+		t = generic.X
+	case *ast.IndexListExpr:
+		t = generic.X
+	}
+	if named, ok := t.(*ast.Ident); ok {
+		return named.Name
 	}
 	return ""
 }

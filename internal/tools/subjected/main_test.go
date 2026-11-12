@@ -105,8 +105,9 @@ func twice(a int) int { return a * 2 }
 
 func TestACallIntoAnotherPackageIsNotTakenForOneOfThisPackages(t *testing.T) {
 	// strings.Replace is not this package's Replace, whatever that does, and
-	// a method of an unexported type is reached through this package alone. A
-	// local named as an import could be is still this package's.
+	// a local named as an import could be is still this package's. An exported
+	// method of an unexported or generic type is reached from other packages
+	// through a constructor or an interface, so it is read.
 	source := []byte(`package sourcelink
 
 import (
@@ -131,6 +132,10 @@ func Shadowed(ctx context.Context, store *Store) error { return store.Replace(ct
 func (c *chunks) Read(ctx context.Context) error {
 	return c.db.NewSelect().Scan(ctx)
 }
+
+func (c *Cache[K, V]) Get(ctx context.Context) error {
+	return c.db.NewSelect().Scan(ctx)
+}
 `)
 	found, _, err := inSource("sourcelink", "r.go", source)
 	if err != nil {
@@ -146,7 +151,8 @@ func (c *chunks) Read(ctx context.Context) error {
 		"sourcelink.Shadowed":      true,
 		"sourcelink.Normalize":     false,
 		"sourcelink.Fold":          false,
-		"sourcelink.chunks.Read":   false,
+		"sourcelink.chunks.Read":   true,
+		"sourcelink.Cache.Get":     true,
 	} {
 		if reported[name] != want {
 			t.Errorf("%s reported = %v, want %v", name, reported[name], want)
