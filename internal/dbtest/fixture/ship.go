@@ -21,7 +21,7 @@ func (w *World) Ship(build *catalog.Build, builtAt time.Time, root graph.Describ
 	w.t.Helper()
 	ctx := w.t.Context()
 	scan, outcome, err := ingest.NewStore(w.DB.DB).Record(ctx, ingest.Arriving{
-		BuildID: build.ID, ContentHash: "hash-" + builtAt.Format(time.RFC3339Nano),
+		BuildID: build.ID, ContentHash: "hash-" + builtAt.UTC().Format(time.RFC3339Nano),
 		BuiltAt: builtAt, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {

@@ -50,11 +50,11 @@ func (w *Watch) Check(ctx context.Context) bool {
 	case !now.Before(until):
 		w.logger.ErrorContext(ctx, "the key published documents are signed with has expired: "+
 			"a document dated after its expiry cannot be signed, and the next start is refused",
-			"fingerprint", w.signer.fingerprint, "expired", until.Format(time.RFC3339))
+			"fingerprint", w.signer.fingerprint, "expired", until.UTC().Format(time.RFC3339))
 	case until.Sub(now) <= Warning:
 		w.logger.WarnContext(ctx, "the key published documents are signed with expires soon: "+
 			"extend it or configure another before then",
-			"fingerprint", w.signer.fingerprint, "expires", until.Format(time.RFC3339))
+			"fingerprint", w.signer.fingerprint, "expires", until.UTC().Format(time.RFC3339))
 	default:
 		return false
 	}

@@ -179,7 +179,7 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 		// and the record is the one already kept.
 		if toldAt.Before(record.KnownAt) {
 			return refusal.Errorf("that is before this became known, at %s. Correct whichever of "+
-				"the two is wrong", record.KnownAt.Format(time.RFC3339))
+				"the two is wrong", record.KnownAt.UTC().Format(time.RFC3339))
 		}
 		if windowID != nil {
 			window, err := inForce(ctx, tx, *windowID)
