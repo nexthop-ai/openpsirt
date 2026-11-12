@@ -32,6 +32,12 @@ var ErrSamePerson = refusal.New("that would hand their work to themselves")
 var ErrRecipientMayNotRead = refusal.New("some of this is undisclosed or security testing and they may " +
 	"not read work of that visibility there, so handing it to them would show it to them")
 
+// ErrRecipientHoldsNothing says work was handed to somebody who holds no role in
+// a product some of it is in, or has left: they could never open it, so it
+// would sit in no list.
+var ErrRecipientHoldsNothing = refusal.New("they hold no role in a product some of this is in, " +
+	"so the work would sit with somebody who cannot open it")
+
 // moveWork is the write itself, apart from the answering: which rows move, and
 // what they move to.
 //
@@ -529,12 +535,15 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 	return moved, err
 }
 
-// mayReadAllOf refuses a hand-over whose recipient may not read the
-// undisclosed or security testing part of what it moves.
+// mayReadAllOf refuses a hand-over whose recipient could not open what it
+// moves.
 //
-// Asked per product and per visibility, of the products where the work being
-// moved holds something other than disclosed work, and inside the transaction
-// that moves it. A party no person holds reads nothing withheld.
+// Asked per product of everything being moved, disclosed work included, and
+// inside the transaction that moves it: a recipient who holds no role in a
+// product, or has left, is refused there whatever the work's visibility, the
+// rule a hand-back keeps disclosed work by. Each visibility other than public
+// is then asked about on its own, because each is its own grant. A party no
+// person holds is refused.
 func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 	var held []struct {
 		ProductID  int64             `bun:"product_id"`
@@ -548,11 +557,10 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 		ColumnExpr(`DISTINCT "st"."product_id" AS "product_id", "f"."visibility" AS "visibility"`).
 		Where(`"f"."assigned_to" = ?`, from).
 		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" <> ?`, access.Public).
 		Where(notRecordedAsFlaw).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &held); err != nil {
-		return fmt.Errorf("read where their undisclosed and security testing work is: %w", err)
+		return fmt.Errorf("read where their work is: %w", err)
 	}
 	reported, err := reportProductsHeld(ctx, tx, from)
 	if err != nil {
@@ -576,10 +584,24 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 		return fmt.Errorf("read who is taking the work on: %w", err)
 	}
 	if len(people) == 0 {
-		return ErrRecipientMayNotRead
+		return ErrRecipientHoldsNothing
 	}
 	rights := access.NewStore(tx)
+	asked := map[int64]bool{}
 	for _, one := range held {
+		if !asked[one.ProductID] {
+			asked[one.ProductID] = true
+			holds, err := rights.HoldsAnythingIn(ctx, people[0], one.ProductID)
+			if err != nil {
+				return err
+			}
+			if !holds {
+				return ErrRecipientHoldsNothing
+			}
+		}
+		if one.Visibility == access.Public {
+			continue
+		}
 		reads, err := rights.PersonReads(ctx, people[0], one.ProductID, one.Visibility)
 		if err != nil {
 			return err

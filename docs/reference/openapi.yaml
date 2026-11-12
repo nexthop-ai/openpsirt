@@ -21983,7 +21983,7 @@ paths:
 
         Nothing tells this software that somebody has gone — membership is read at sign-in, and a person who has left never signs in again. So this is an action an administrator takes rather than something that happens on its own, and until it is taken their work is in no list at all: not in the shared one because it is assigned, and not in anybody's own because they are not here.
 
-        Send `to` instead to hand it to a named person rather than to nobody.
+        Send `to` instead to hand it to a named person rather than to nobody. That is refused with 422 where they hold no role in a product any of the work is in, have been deactivated, or may not read the visibility some of it sits at.
 
         Requires: administrator
       operationId: hand-back-assignments
@@ -24729,6 +24729,8 @@ paths:
         Send `person` as an empty string to hand it back to nobody, which is this same operation rather than one of its own.
 
         Send `team` instead to assign it to a team. That is a queue rather than a holding: it stays unheld until somebody takes it, and anybody on the team may take it with the triage right alone. Assigning to a team asks that at least one member may read what is being assigned there — not that every member may.
+
+        A person is given it only where they hold a role in the product and have not been deactivated, and only where they may read it at every visibility it holds; anybody else is refused with 422.
 
         Findings arriving later under the same component start unassigned.
 
@@ -30114,7 +30116,7 @@ paths:
 
         Without the assigner right you may take what nobody holds and hand back your own. Rows somebody else holds are left with them, and `moved` counts only what changed hands.
 
-        Refused as a whole where any row has not been disclosed and the person or team may not read undisclosed work in the product.
+        Refused as a whole where the person holds no role in the product or has been deactivated, or where any row has not been disclosed and the person or team may not read undisclosed work in the product.
 
         Requires: public-triage or private-triage or security-testing-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
       operationId: assign-matching-findings

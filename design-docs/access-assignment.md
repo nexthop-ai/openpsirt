@@ -29,6 +29,7 @@ it is (REQ-34).
 | Findings arriving under an assigned component start unowned | Starting work needs nobody else's attention |
 | Assigner is held alongside triage, never instead of it, checked at the endpoint and the store; the session answer carries the same conjunction | An interface draws no control that always fails |
 | Who may be assigned is visibility, never a grant of its own | |
+| A person is given work only where they hold a role in its product and have not left, whatever its visibility, at every route that hands work to a person | Disclosed work travels with its assignment by the rule a hand-back keeps it by (§ Lost reading); handed to anybody else it names a product they hold nothing on, or sits with somebody refused at sign-in |
 | The write that moves the rows refuses a hand-off the caller may not make | A path that skipped its check still moves nothing |
 | Whether the recipient reads the work is asked inside the write's transaction, at every visibility open there: the single assignment, a code finding's, assignment by narrowing and an upgrade's holder | A scan recording an undisclosed occurrence in between would be handed over unasked |
 | A finding is assigned for a whole group: one issue in one component, however many occurrences | |
@@ -153,7 +154,7 @@ administrator acts their work is in no list.
 | Operation | Meaning |
 |---|---|
 | Releasing | It goes back to be picked up |
-| Handing over | Names who deals with it now. Refused whole where any of it sits at a visibility the recipient may not read in its product, asked inside the moving transaction. Code findings move too |
+| Handing over | Names who deals with it now. Refused whole where the recipient holds no role in a product any of it is in, has left, or may not read the visibility some of it sits at in its product, asked inside the moving transaction. Code findings move too |
 
 Only an administrator does either; a person hands back their own by assigning it
 to nobody. Deactivation is `design-docs/access-grants.md` § Somebody who has

@@ -125,6 +125,9 @@ func registerAssigning(api huma.API, in core.Deps) {
 			"holding: it stays unheld until somebody takes it, and anybody on the team may " +
 			"take it with the triage right alone. Assigning to a team asks that at least one " +
 			"member may read what is being assigned there — not that every member may.\n\n" +
+			"A person is given it only where they hold a role in the product and have not " +
+			"been deactivated, and only where they may read it at every visibility it holds; " +
+			"anybody else is refused with 422.\n\n" +
 			"Findings arriving later under the same component start unassigned.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Giving work to somebody else also needs assigner. Taking unowned work, "+
@@ -161,60 +164,20 @@ func registerAssigning(api huma.API, in core.Deps) {
 		}
 
 		// Every right this needs is checked before any name is looked
-		// up. The triage check above is not enough on its own: giving
-		// work to somebody else asks for more, and resolving the name
-		// first answers "does this person have an account here"
-		// differently depending on whether they do — which is a staff
-		// directory for the price of one request, to anybody who may
-		// triage.
+		// up, inside receiverOf. The triage check above is not enough on
+		// its own: giving work to somebody else asks for more.
 		//
-		// The same rule the component path states, asked in one place. Two
-		// spellings drift over which status a refused hand-off is, and
-		// answer a 404 on one route and a 422 on the other about the
-		// identical condition.
-		if err := mayHandOver(subject, product, input.Body.Person, input.Body.Team); err != nil {
+		// An assignment carries visibility of what was assigned, so the
+		// receiver is asked against the level of the work, at the strictest
+		// visibility open there, inside the write: an occurrence recorded
+		// undisclosed between the two is part of what they are asked about.
+		to, err := receiverOf(ctx, in, subject, product, input.Body.Person, input.Body.Team)
+		if err != nil {
 			return nil, err
 		}
 
-		var to *int64
-		// whoToTell is the person to tell. The column holds the party they are
-		// assignable as, and a notification goes to somebody. A team tells
-		// nobody: a queue filling up is digest content rather than an
-		// interruption.
-		var whoToTell int64
-		// admits is asked about the strictest visibility open here inside the
-		// write that hands the work over, so an occurrence recorded undisclosed
-		// between the two is part of what the recipient is asked about.
-		var admits finding.Admits
-		rights := access.NewStore(in.DB.DB)
-		switch {
-		case input.Body.Person != "":
-			person, err := core.PersonNamed(ctx, in.Logger, rights, input.Body.Person)
-			if err != nil {
-				return nil, err
-			}
-			// An assignment carries visibility of what was assigned, so the
-			// check is against the level rather than against their present
-			// sight of the row — which, before the assignment, they do not
-			// have. Handing an embargoed finding to somebody cleared for
-			// nothing embargoed would make the assignment the disclosure.
-			party := person.PartyID
-			to, whoToTell = &party, person.ID
-			admits = personAdmits(person, product)
-		case input.Body.Team != "":
-			team, err := core.TeamNamed(ctx, in.Logger, rights, input.Body.Team)
-			if err != nil {
-				return nil, err
-			}
-			// At least one member has to be able to read what is being
-			// assigned there, asked at the strictest visibility present.
-			party := team.PartyID
-			to = &party
-			admits = teamAdmits(team, product)
-		}
-
 		_, withheld, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, build, issue,
-			component, to, admits)
+			component, to.to, to.admits)
 		if err != nil {
 			return nil, recipient(err, func(err error) error { return core.RefusedFinding(in, err) })
 		}
@@ -247,11 +210,10 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// happened; answering with an error would invite a retry that
 		// assigns it again, and the notification is the lesser half of
 		// the two.
-		if to != nil && *to != subject.Party() &&
-			seenBy(ctx, in, input.Body.Person, product, withheld) {
+		if to.told(ctx, in, subject, product, withheld) {
 			private, securityTesting := notify.Withholding(withheld)
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
-				PersonID: whoToTell, Kind: notify.Assigned,
+				PersonID: to.tell, Kind: notify.Assigned,
 				Body: input.Vulnerability + " in " + input.Component +
 					", in " + input.Product + " " + input.BranchOrTag + " " + input.Variant,
 				Link: weblink.Finding(input.Product, input.BranchOrTag, input.Variant,
@@ -273,7 +235,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 				// read narrows by.
 				ProductID:       &product,
 				VulnerabilityID: &issue,
-			}, "person", whoToTell)
+			}, "person", to.tell)
 		}
 		return &struct{}{}, nil
 	})
@@ -290,7 +252,9 @@ func registerAssigning(api huma.API, in core.Deps) {
 			"administrator takes rather than something that happens on its own, and until it is " +
 			"taken their work is in no list at all: not in the shared one because it is assigned, " +
 			"and not in anybody's own because they are not here.\n\n" +
-			"Send `to` instead to hand it to a named person rather than to nobody.",
+			"Send `to` instead to hand it to a named person rather than to nobody. That is " +
+			"refused with 422 where they hold no role in a product any of the work is in, have " +
+			"been deactivated, or may not read the visibility some of it sits at.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Identity string `path:"identity"`
@@ -431,41 +395,10 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		// "me" rather than making a screen know its own identity and
-		// spell it into a path. It is also the only form that cannot
-		// name somebody else by accident. Theirs and their teams'
-		// queues, because "assigned to me" means mine or my team's
-		// everywhere the phrase appears. Asked of somebody else it is
-		// the same question about a different holder.
-		holders := subject.Mine()
-		if input.Identity != "me" {
-			rights := access.NewStore(in.DB.DB)
-			person, err := rights.ByIdentity(ctx, input.Identity)
-			switch {
-			case errors.Is(err, access.ErrNoSuchPerson):
-				// A name nobody holds answers exactly as a name somebody holds
-				// whose work this caller cannot see: an empty list. Refusing
-				// instead would answer "does this person have an account here"
-				// for any credential at all, including one holding no product
-				// — a directory of the organization for the price of one
-				// request. This read is narrowed by what the caller may see
-				// anyway, so nothing is lost by answering it for a name that
-				// reaches nobody.
-				holders = []int64{core.Nobody}
-			case err != nil:
-				// A read that could not be made is not that answer.
-				return nil, core.WentWrong(in.Logger, "that person could not be looked up", err)
-			default:
-				teams, err := rights.TeamsOf(ctx, person.ID)
-				if err != nil {
-					return nil, core.WentWrong(in.Logger,
-						"what they are dealing with could not be read", err)
-				}
-				holders = []int64{person.PartyID}
-				for _, team := range teams {
-					holders = append(holders, team.PartyID)
-				}
-			}
+		holders, err := holdersOf(ctx, in, subject, input.Identity,
+			"what they are dealing with could not be read")
+		if err != nil {
+			return nil, err
 		}
 		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, kind.Family(input.Family), subject, holders,
 			scope, input.Limit, input.Offset)
@@ -517,23 +450,9 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		// A name nothing matches holds nothing, rather than being refused.
-		// Refusing would answer "is there a team called this" for any
-		// credential, which is a directory of how the organization divides its
-		// work for the price of one request — and the read below is narrowed
-		// by what the caller may see anyway.
-		//
-		// A read that could not be made is not that answer. Told apart by
-		// the sentinel rather than by "any error at all": read as "no such
-		// team", a database nobody can reach answers that this team is holding
-		// nothing — which is the exact false statement this route was written
-		// to stop a screen making.
-		holders := []int64{core.Nobody}
-		switch team, err := access.NewStore(in.DB.DB).TeamByName(ctx, input.Team); {
-		case err == nil:
-			holders = []int64{team.PartyID}
-		case !errors.Is(err, access.ErrNoSuchTeam):
-			return nil, core.WentWrong(in.Logger, "that team could not be looked up", err)
+		holders, err := teamHolders(ctx, in, input.Team)
+		if err != nil {
+			return nil, err
 		}
 		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, kind.Family(input.Family), subject, holders,
 			scope, input.Limit, input.Offset)
@@ -614,6 +533,65 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		}
 		return out, nil
 	})
+}
+
+// holdersOf is the parties whose work one person is dealing with: theirs and
+// every team they are on, because "assigned to me" means mine or my team's
+// everywhere the phrase appears. "me" is the caller, so a screen never spells
+// its own identity into a path and cannot name somebody else by accident.
+//
+// A name nobody holds holds nothing, answered exactly as a name somebody
+// holds whose work the caller cannot see: refusing it would answer "does this
+// person have an account here" for any credential at all, and every read
+// using this is narrowed by what the caller may see anyway. A read that could
+// not be made is a fault, never that answer; failed says what could not be
+// read.
+//
+// Never empty: an empty list of holders reads as work nobody holds, which
+// would answer the unassigned list as somebody's own.
+func holdersOf(ctx context.Context, in core.Deps, subject access.Subject, identity,
+	failed string) ([]int64, error) {
+
+	holders := subject.Mine()
+	if identity != "me" {
+		rights := access.NewStore(in.DB.DB)
+		person, err := rights.ByIdentity(ctx, identity)
+		switch {
+		case errors.Is(err, access.ErrNoSuchPerson):
+			holders = nil
+		case err != nil:
+			return nil, core.WentWrong(in.Logger, "that person could not be looked up", err)
+		default:
+			teams, err := rights.TeamsOf(ctx, person.ID)
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, failed, err)
+			}
+			holders = []int64{person.PartyID}
+			for _, team := range teams {
+				holders = append(holders, team.PartyID)
+			}
+		}
+	}
+	if len(holders) == 0 {
+		holders = []int64{core.Nobody}
+	}
+	return holders, nil
+}
+
+// teamHolders is the party one team's work is held by, for the reason
+// holdersOf answers a name nobody holds: a name nothing matches holds
+// nothing, rather than answering "is there a team called this". A read that
+// could not be made is a fault, told apart by the sentinel: read as "no such
+// team", a database nobody can reach answers that the team holds nothing.
+func teamHolders(ctx context.Context, in core.Deps, name string) ([]int64, error) {
+	team, err := access.NewStore(in.DB.DB).TeamByName(ctx, name)
+	switch {
+	case err == nil:
+		return []int64{team.PartyID}, nil
+	case errors.Is(err, access.ErrNoSuchTeam):
+		return []int64{core.Nobody}, nil
+	}
+	return nil, core.WentWrong(in.Logger, "that team could not be looked up", err)
 }
 
 // locateFinding resolves the names in a path to the finding they address.
