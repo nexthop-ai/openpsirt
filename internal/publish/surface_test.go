@@ -191,11 +191,13 @@ func TestAReaderKeepingACopyFetchesOnlyWhatChanged(t *testing.T) {
 		s := surfaceOver(w, 1000, signer)
 		document := publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json"
 		for _, one := range []struct {
-			path  string
-			dated bool
+			path   string
+			dated  bool
+			salted bool
 		}{
-			{publish.MetadataPath, false}, {publish.FeedPath, false}, {publish.IndexPath, false},
-			{publish.OpenVEXIndex, false}, {document, true}, {document + publish.SignatureSuffix, true},
+			{publish.MetadataPath, false, false}, {publish.FeedPath, false, false},
+			{publish.IndexPath, false, false}, {publish.OpenVEXIndex, false, false},
+			{document, true, false}, {document + publish.SignatureSuffix, false, true},
 		} {
 			first := s.get(http.MethodGet, one.path, nil)
 			tag, modified := first.Header().Get("ETag"), first.Header().Get("Last-Modified")
@@ -206,11 +208,15 @@ func TestAReaderKeepingACopyFetchesOnlyWhatChanged(t *testing.T) {
 				t.Errorf("GET %s with its tag = %d, want 304", one.path, rec.Code)
 			}
 			if !one.dated {
-				// A list that shrank is newer than its newest document, so it
-				// is revalidated by its tag alone.
+				// A list that shrank is newer than its newest document, and a
+				// signature's key may be replaced by one valid before it, so
+				// each is revalidated by its tag alone.
 				if modified != "" {
-					t.Errorf("GET %s carries the date %q, which a list that shrank would not move",
+					t.Errorf("GET %s carries the date %q, which would not move with what it answers",
 						one.path, modified)
+				}
+				if one.salted {
+					continue
 				}
 				if again := s.get(http.MethodGet, one.path, nil); !bytes.Equal(again.Body.Bytes(), first.Body.Bytes()) {
 					t.Errorf("GET %s twice over nothing that moved answered two different bodies", one.path)
@@ -416,65 +422,82 @@ func testKey(t *testing.T) string {
 }
 
 // A reader holding a signature made by a key since replaced is sent the new
-// key's signature, whether it asks by tag or by date: the provider description
-// names only the new key, so the old signature no longer verifies against
-// anything the provider lists.
+// key's signature, whether it asks by tag or by date, and whether the new key
+// became valid before or after the document was released: the provider
+// description names only the new key, so the old signature no longer verifies
+// against anything the provider lists.
 func TestASignatureByAReplacedKeyIsSentAgain(t *testing.T) {
 	two(t, func(t *testing.T, f *fixture.World) {
 		w, _ := publishedWorld(t, f)
-		// Released a day ago, so a key made now is newer than every document.
+		// Released a day ago, between the two replacement keys.
 		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
 			Set(`"current_at" = ?`, time.Now().UTC().Add(-24*time.Hour)).
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		before, err := signing.Read(testKey(t), "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		after, err := signing.Read(signingtest.Key(t, time.Now().UTC().Add(-time.Minute), 0), "")
-		if err != nil {
-			t.Fatal(err)
-		}
-		old, replaced := surfaceOver(w, 1000, before), surfaceOver(w, 1000, after)
-		var path string
-		for _, one := range strings.Fields(string(old.body(publish.IndexPath))) {
-			if strings.Contains(one, "/vex-") {
-				path = publish.DirectoryPath + one + publish.SignatureSuffix
-			}
-		}
-		if path == "" {
-			t.Fatal("the index lists no CSAF VEX document")
-		}
-		held := old.get(http.MethodGet, path, nil)
-		if held.Code != http.StatusOK {
-			t.Fatalf("GET %s = %d", path, held.Code)
-		}
-		if rec := old.get(http.MethodGet, path,
-			map[string]string{"If-None-Match": held.Header().Get("ETag")}); rec.Code != http.StatusNotModified {
-			t.Fatalf("the same key asked again by tag = %d, want 304", rec.Code)
-		}
-		for name, value := range map[string]string{
-			"If-None-Match":     held.Header().Get("ETag"),
-			"If-Modified-Since": held.Header().Get("Last-Modified"),
+		for name, made := range map[string]time.Time{
+			"newer than the document": time.Now().UTC().Add(-time.Minute),
+			"older than the document": signingtest.Made.Add(24 * time.Hour),
 		} {
-			rec := replaced.get(http.MethodGet, path, map[string]string{name: value})
-			if rec.Code != http.StatusOK {
-				t.Errorf("a signature by the replaced key asked again by %s = %d, want 200",
-					name, rec.Code)
-				continue
-			}
-			keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(after.PublicKey()))
-			if err != nil {
-				t.Fatal(err)
-			}
-			doc := replaced.body(strings.TrimSuffix(path, publish.SignatureSuffix))
-			if _, err := openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(doc),
-				bytes.NewReader(rec.Body.Bytes()), nil); err != nil {
-				t.Errorf("the signature sent again does not verify against the new key: %v", err)
-			}
+			t.Run(name, func(t *testing.T) { replacedKey(t, w, made) })
 		}
 	})
+}
+
+func replacedKey(t *testing.T, w *world, made time.Time) {
+	before, err := signing.Read(testKey(t), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := signing.Read(signingtest.Key(t, made, 0), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, replaced := surfaceOver(w, 1000, before), surfaceOver(w, 1000, after)
+	var path string
+	for _, one := range strings.Fields(string(old.body(publish.IndexPath))) {
+		if strings.Contains(one, "/vex-") {
+			path = publish.DirectoryPath + one + publish.SignatureSuffix
+		}
+	}
+	if path == "" {
+		t.Fatal("the index lists no CSAF VEX document")
+	}
+	held := old.get(http.MethodGet, path, nil)
+	if held.Code != http.StatusOK {
+		t.Fatalf("GET %s = %d", path, held.Code)
+	}
+	if rec := old.get(http.MethodGet, path,
+		map[string]string{"If-None-Match": held.Header().Get("ETag")}); rec.Code != http.StatusNotModified {
+		t.Fatalf("the same key asked again by tag = %d, want 304", rec.Code)
+	}
+	// The date a reader holds is the document's, since the signature
+	// carries none.
+	dated := old.get(http.MethodGet, strings.TrimSuffix(path, publish.SignatureSuffix), nil).
+		Header().Get("Last-Modified")
+	if dated == "" {
+		t.Fatal("the document carries no date to ask by")
+	}
+	for name, value := range map[string]string{
+		"If-None-Match":     held.Header().Get("ETag"),
+		"If-Modified-Since": dated,
+	} {
+		rec := replaced.get(http.MethodGet, path, map[string]string{name: value})
+		if rec.Code != http.StatusOK {
+			t.Errorf("a signature by the replaced key asked again by %s = %d, want 200",
+				name, rec.Code)
+			continue
+		}
+		keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(after.PublicKey()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc := replaced.body(strings.TrimSuffix(path, publish.SignatureSuffix))
+		if _, err := openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(doc),
+			bytes.NewReader(rec.Body.Bytes()), nil); err != nil {
+			t.Errorf("the signature sent again does not verify against the new key: %v", err)
+		}
+	}
 }
 
 // An advisory is served only where it may travel and every product it covers
