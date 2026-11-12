@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-
+import type { ReactNode } from "react";
 import { api, type Body } from "../api/client";
-
-// AssessmentRow is one decision about how bad an issue is.
-type AssessmentRow = Body<"AssessmentBody">;
-import { unwrap } from "../api/queries";
+import { PAGE, unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
+
+// AssessmentRow is one decision about how bad an issue is.
+type AssessmentRow = Body<"AssessmentBody">;
 
 // The two things waiting for a second person that are not decisions.
 //
@@ -33,9 +33,86 @@ function said(shown: number, total?: number): string {
   return shown.toLocaleString();
 }
 
-// The rows one request of either section carries, matching what the queue
-// asks for. Named here so the pager and the request cannot disagree.
-export const PENDING_PAGE = 50;
+// What either section is drawn from: one page of what waits, and where the
+// page sits in the whole.
+type Pending<T> = {
+  waiting: T[];
+  // The number waiting in all. Without it the page length is printed as the
+  // figure.
+  total?: number;
+  // The offset this page starts at, and the controls that move it, so every
+  // row the total counts is reachable.
+  offset?: number;
+  onGo?: (offset: number) => void;
+  // A failed read, so the section says so rather than drawing nothing. Absent
+  // and empty look identical, and empty is the ordinary state here.
+  error?: unknown;
+};
+
+// One section of what waits for a second person: its heading, its cards, the
+// agreement each card offers, and the pager. A read that failed says so, and
+// nothing waiting draws nothing.
+function PendingSection<T extends { id?: number }>({
+  waiting,
+  total,
+  offset = 0,
+  onGo,
+  error,
+  id,
+  heading,
+  saying,
+  unread,
+  agreeTo,
+  agreed,
+  card,
+}: Pending<T> & {
+  id: string;
+  heading: string;
+  // What the count above the cards counts.
+  saying: string;
+  // What a failed read says could not be read.
+  unread: string;
+  // Sends one agreement, by the row's identifier.
+  agreeTo: (id: number) => Promise<unknown>;
+  // The reads an agreement moves.
+  agreed: string;
+  card: (row: T, agree: () => void, busy: boolean) => ReactNode;
+}) {
+  const queries = useQueryClient();
+  const agree = useMutation({
+    mutationFn: agreeTo,
+    onSuccess: () => void queries.invalidateQueries({ queryKey: [agreed] }),
+  });
+
+  if (error != null) {
+    return (
+      <div style={{ marginTop: 22 }}>
+        <Failed error={error} what={unread} />
+      </div>
+    );
+  }
+  if (waiting.length === 0) return null;
+
+  return (
+    <>
+      <div className="screen-head" id={id} style={{ marginTop: 22 }}>
+        <h2>{heading}</h2>
+        <p>
+          {said(waiting.length, total)} · {saying}
+        </p>
+      </div>
+      {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
+      <div className="queue">
+        {waiting.map((row) => (
+          <div className="card" key={row.id}>
+            {card(row, () => agree.mutate(row.id ?? 0), agree.isPending)}
+          </div>
+        ))}
+      </div>
+      <Paged shown={waiting.length} total={total} offset={offset} limit={PAGE} onGo={onGo} />
+    </>
+  );
+}
 
 // Movements of a disclosure date waiting for a second person.
 //
@@ -50,108 +127,68 @@ export const PENDING_PAGE = 50;
 // asked may not be the one who agrees, which is the control the threshold
 // exists to reach; hiding it would leave somebody hunting for what is holding
 // their case up.
-export function Embargoes({
-  waiting,
-  total,
-  offset = 0,
-  onGo,
-  error,
-}: {
-  waiting: Body<"PendingMovementBody">[];
-  // The number waiting in all. Without it the page length is printed as the
-  // figure.
-  total?: number;
-  // The offset this page starts at, and the controls that move it, so every
-  // row the total counts is reachable.
-  offset?: number;
-  onGo?: (offset: number) => void;
-  // A failed read, so the section says so rather than drawing nothing. Absent
-  // and empty look identical, and empty is the ordinary state here.
-  error?: unknown;
-}) {
-  const queries = useQueryClient();
-  const agree = useMutation({
-    mutationFn: async (id: number) =>
-      unwrap(
-        await api.POST("/v1/disclosure-movements/{id}/approval", { params: { path: { id } } }),
-      ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["movements"] }),
-  });
-
-  if (error != null) {
-    return (
-      <div style={{ marginTop: 22 }}>
-        <Failed error={error} what="Requests to move a disclosure date could not be read." />
-      </div>
-    );
-  }
-  if (waiting.length === 0) return null;
-
+export function Embargoes(pending: Pending<Body<"PendingMovementBody">>) {
   return (
-    <>
-      <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
-        <h2>Disclosure dates</h2>
-        <p>{said(waiting.length, total)} · moves and disclosures waiting for a second person.</p>
-      </div>
-      {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
-      <div className="queue">
-        {waiting.map((row) => (
-          <div className="card" key={row.id}>
-            <div className="cardhead">
-              <span className="id">{row.vulnerability}</span>
-              <span className="hint">
-                {row.product} · asked by {row.by_name || row.by}
-                {row.mine && <> · yours</>}
-              </span>
-            </div>
-            <p className="reading">{row.reason}</p>
-            {row.act === "disclosure" ? (
-              <p className="hint">
-                Disclose · the issue becomes public in {row.product}. This can&rsquo;t be undone.
-              </p>
-            ) : (
-              <p className="hint">
-                {row.act === "duplicate"
-                  ? "Brought forward by a duplicate report"
-                  : row.act === "shortening"
-                    ? "Brought forward"
-                    : "Extended"}{" "}
-                · ends <b>{row.was}</b> → <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()}{" "}
-                days
-                {row.act === "extension" ? " longer" : " sooner"}.
-              </p>
-            )}
-            <div className="cardfoot">
-              <button
-                type="button"
-                className="btn"
-                disabled={agree.isPending || row.mine}
-                title={
-                  row.mine
-                    ? "You asked for this one. The person who asks may not be the one who agrees"
-                    : row.act === "disclosure"
-                      ? "Agree, and make it public"
-                      : "Agree, and move the date"
-                }
-                onClick={() => agree.mutate(row.id ?? 0)}
-              >
-                Agree
-              </button>
-              {row.mine && (
-                <span className="note">Waiting on somebody else — you asked for this one</span>
-              )}
-            </div>
+    <PendingSection
+      {...pending}
+      id="embargoes"
+      heading="Disclosure dates"
+      saying="moves and disclosures waiting for a second person."
+      unread="Requests to move a disclosure date could not be read."
+      agreeTo={async (id) =>
+        unwrap(
+          await api.POST("/v1/disclosure-movements/{id}/approval", { params: { path: { id } } }),
+        )
+      }
+      agreed="movements"
+      card={(row, agree, busy) => (
+        <>
+          <div className="cardhead">
+            <span className="id">{row.vulnerability}</span>
+            <span className="hint">
+              {row.product} · asked by {row.by_name || row.by}
+              {row.mine && <> · yours</>}
+            </span>
           </div>
-        ))}
-      </div>
-      <Paged
-        shown={waiting.length}
-        total={total}
-        offset={offset}
-        limit={PENDING_PAGE}
-        onGo={onGo}
-      />
-    </>
+          <p className="reading">{row.reason}</p>
+          {row.act === "disclosure" ? (
+            <p className="hint">
+              Disclose · the issue becomes public in {row.product}. This can&rsquo;t be undone.
+            </p>
+          ) : (
+            <p className="hint">
+              {row.act === "duplicate"
+                ? "Brought forward by a duplicate report"
+                : row.act === "shortening"
+                  ? "Brought forward"
+                  : "Extended"}{" "}
+              · ends <b>{row.was}</b> → <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()} days
+              {row.act === "extension" ? " longer" : " sooner"}.
+            </p>
+          )}
+          <div className="cardfoot">
+            <button
+              type="button"
+              className="btn"
+              disabled={busy || row.mine}
+              title={
+                row.mine
+                  ? "You asked for this one. The person who asks may not be the one who agrees"
+                  : row.act === "disclosure"
+                    ? "Agree, and make it public"
+                    : "Agree, and move the date"
+              }
+              onClick={agree}
+            >
+              Agree
+            </button>
+            {row.mine && (
+              <span className="note">Waiting on somebody else — you asked for this one</span>
+            )}
+          </div>
+        </>
+      )}
+    />
   );
 }
 
@@ -172,104 +209,70 @@ export function Embargoes({
 // products may rate the same issue differently. A row saying only "CVE-… low"
 // is a word an approver cannot act on: what they are agreeing to is a deadline
 // and a minimum severity in one named place.
-export function Ratings({
-  waiting,
-  total,
-  offset = 0,
-  onGo,
-  error,
-}: {
-  waiting: AssessmentRow[];
-  total?: number;
-  offset?: number;
-  onGo?: (offset: number) => void;
-  error?: unknown;
-}) {
-  const queries = useQueryClient();
-  const agree = useMutation({
-    mutationFn: async (id: number) =>
-      unwrap(await api.POST("/v1/assessments/{id}/agreement", { params: { path: { id } } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["queue"] }),
-  });
-
-  if (error != null) {
-    return (
-      <div style={{ marginTop: 22 }}>
-        <Failed error={error} what="Ratings awaiting approval could not be read." />
-      </div>
-    );
-  }
-  if (waiting.length === 0) return null;
-
+export function Ratings(pending: Pending<AssessmentRow>) {
   return (
-    <>
-      <div className="screen-head" id="ratings" style={{ marginTop: 22 }}>
-        <h2>Ratings awaiting approval</h2>
-        <p>{said(waiting.length, total)} · issues rated milder than the world rates them.</p>
-      </div>
-      {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
-      <div className="queue">
-        {waiting.map((row) => (
-          <div className="card" key={row.id}>
-            <div className="cardhead">
-              <span className="id">{row.vulnerability}</span>
-              <span>
-                <Severity word={row.published ?? ""} /> → <Severity word={row.severity ?? ""} />
-              </span>
-            </div>
-            <p className="hint" style={{ margin: "0 0 6px" }}>
-              In <b>{row.product_name || row.product}</b> — and nowhere else.
-            </p>
-            <p className="reading">{row.reasoning}</p>
-            <p className="hint">
-              {(row.open ?? 0).toLocaleString()} open{" "}
-              {(row.open ?? 0) === 1 ? "finding" : "findings"} you can see in{" "}
-              {row.product_name || row.product}.
-            </p>
-            {(row.off_the_list ?? 0) > 0 ? (
-              <p className="alert" style={{ margin: "6px 0 0" }}>
-                <strong>
-                  This takes {(row.off_the_list ?? 0).toLocaleString()} of them off the working list
-                  in {row.product_name || row.product}.
-                </strong>
-                <span>They stay recorded, with no deadline.</span>
-              </p>
-            ) : (
-              <p className="hint" style={{ margin: "6px 0 0" }}>
-                Still above {row.product_name || row.product}'s minimum severity: later work, not no
-                work.
-              </p>
-            )}
-            <div className="cardfoot">
-              {/* The same rule the extensions above hold to, and the same
-                  reason: the server refuses your own either way, so offering
-                  the button means a click that answers 422 and says nothing
-                  about why. */}
-              <button
-                type="button"
-                className="btn"
-                disabled={agree.isPending || row.mine}
-                title={
-                  row.mine
-                    ? "You made this rating. The person who proposes may not be the one who agrees"
-                    : `Agree, and put the rating in force in ${row.product_name || row.product || "this product"}`
-                }
-                onClick={() => agree.mutate(row.id ?? 0)}
-              >
-                Agree
-              </button>
-              {row.mine && <span className="hint">Yours, so somebody else agrees to it.</span>}
-            </div>
+    <PendingSection
+      {...pending}
+      id="ratings"
+      heading="Ratings awaiting approval"
+      saying="issues rated milder than the world rates them."
+      unread="Ratings awaiting approval could not be read."
+      agreeTo={async (id) =>
+        unwrap(await api.POST("/v1/assessments/{id}/agreement", { params: { path: { id } } }))
+      }
+      agreed="queue"
+      card={(row, agree, busy) => (
+        <>
+          <div className="cardhead">
+            <span className="id">{row.vulnerability}</span>
+            <span>
+              <Severity word={row.published ?? ""} /> → <Severity word={row.severity ?? ""} />
+            </span>
           </div>
-        ))}
-      </div>
-      <Paged
-        shown={waiting.length}
-        total={total}
-        offset={offset}
-        limit={PENDING_PAGE}
-        onGo={onGo}
-      />
-    </>
+          <p className="hint" style={{ margin: "0 0 6px" }}>
+            In <b>{row.product_name || row.product}</b> — and nowhere else.
+          </p>
+          <p className="reading">{row.reasoning}</p>
+          <p className="hint">
+            {(row.open ?? 0).toLocaleString()} open {(row.open ?? 0) === 1 ? "finding" : "findings"}{" "}
+            you can see in {row.product_name || row.product}.
+          </p>
+          {(row.off_the_list ?? 0) > 0 ? (
+            <p className="alert" style={{ margin: "6px 0 0" }}>
+              <strong>
+                This takes {(row.off_the_list ?? 0).toLocaleString()} of them off the working list
+                in {row.product_name || row.product}.
+              </strong>
+              <span>They stay recorded, with no deadline.</span>
+            </p>
+          ) : (
+            <p className="hint" style={{ margin: "6px 0 0" }}>
+              Still above {row.product_name || row.product}'s minimum severity: later work, not no
+              work.
+            </p>
+          )}
+          <div className="cardfoot">
+            {/* The same rule the extensions above hold to, and the same
+            reason: the server refuses your own either way, so offering
+            the button means a click that answers 422 and says nothing
+            about why. */}
+            <button
+              type="button"
+              className="btn"
+              disabled={busy || row.mine}
+              title={
+                row.mine
+                  ? "You made this rating. The person who proposes may not be the one who agrees"
+                  : `Agree, and put the rating in force in ${row.product_name || row.product || "this product"}`
+              }
+              onClick={agree}
+            >
+              Agree
+            </button>
+            {row.mine && <span className="hint">Yours, so somebody else agrees to it.</span>}
+          </div>
+        </>
+      )}
+    />
   );
 }

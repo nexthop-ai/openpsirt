@@ -13,13 +13,19 @@ const DISPOSITION_SAID: Record<Disposition, string> = {
   rejected: "Rejected",
 };
 
-// The four a ruling carries, in the order the form offers them.
-export const RULABLE: readonly Rulable[] = [
-  "duplicate",
-  "not-reproducible",
-  "out-of-scope",
-  "rejected",
-];
+// What a ruling may carry, in the order the form offers them: whether it waits
+// for somebody else, and whether it needs a reason. Keyed by every disposition
+// the server takes in a ruling, so one it adds is a compile error here.
+// Rejecting and declaring out of scope wait for somebody else; a duplicate's
+// reason is the issue it names.
+const RULINGS = {
+  duplicate: { second: false, reason: false },
+  "not-reproducible": { second: false, reason: true },
+  "out-of-scope": { second: true, reason: true },
+  rejected: { second: true, reason: true },
+} satisfies Record<Rulable, { second: boolean; reason: boolean }>;
+
+export const RULABLE = Object.keys(RULINGS) as Rulable[];
 
 // A word the table does not know is shown as it arrived.
 export function dispositionSaid(disposition: string | undefined): string {
@@ -27,14 +33,14 @@ export function dispositionSaid(disposition: string | undefined): string {
   return own<string>(DISPOSITION_SAID, disposition) ?? disposition;
 }
 
-// Rejecting and declaring out of scope wait for somebody else.
+// Whether a ruling of this disposition waits for somebody else.
 export function needsSecond(disposition: Rulable): boolean {
-  return disposition === "out-of-scope" || disposition === "rejected";
+  return RULINGS[disposition].second;
 }
 
-// A duplicate's reason is the issue it names.
+// Whether a ruling of this disposition needs a reason.
 export function needsReason(disposition: Rulable): boolean {
-  return disposition !== "duplicate";
+  return RULINGS[disposition].reason;
 }
 
 // Where a report stands, as the one word its row shows.

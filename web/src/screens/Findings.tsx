@@ -5,8 +5,8 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { questionIn, untaken, useSelection } from "./useSelection";
 import { DecidedNotice, FindingsTable, type Decided } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
-import { ByBump, ByComponent, Pager } from "./FindingsViews";
-import { useHandOver } from "./findingsHandover";
+import { BUMP_FILTERS, ByBump, ByComponent, Pager } from "./FindingsViews";
+import { NAMED_AT_ONCE, useHandOver } from "./findingsHandover";
 import { useFindingsViews } from "./findingsQueries";
 import {
   ASSIGNED,
@@ -89,16 +89,10 @@ const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
   word === "" ? "Any time" : label.replace(/^Due within/, "Within"),
 ]);
 
-// The filters the by-bump view can apply, by the key their chip carries.
-//
-// The rest ask about an occurrence, a deadline or an assignee, and a bump has none
-// of those — so they are named on that screen rather than dropped, which would
-// widen the list back out while the chips go on saying they are on.
-const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "state"]);
-
-// The most rows one assignment may name. The server takes this many picked rows
-// in one request; past it, "select all" asks by the filter and names none.
-const NAMED_AT_ONCE = 2000;
+// The filters the by-bump view can apply, by the key their chip carries. The
+// rest are named on that screen rather than dropped, which would widen the
+// list back out while the chips go on saying they are on.
+const BUMPABLE = new Set(Object.keys(BUMP_FILTERS));
 
 // One row per issue in a component, not per occurrence. Every filter is in the URL,
 // so a link carries what somebody is looking at; every filter is the server's,

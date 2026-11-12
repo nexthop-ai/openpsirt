@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import type { paths } from "./schema";
-import { unwrap } from "./queries";
+import { PAGE, unwrap } from "./queries";
 import { useAfterDecision } from "./decisions";
 import type { Build } from "../app/routes";
 
@@ -35,9 +35,6 @@ export type CodeFindingMethod = NonNullable<
   NonNullable<paths["/v1/products/{product}/code-findings"]["get"]["parameters"]["query"]>["method"]
 >;
 
-// The rows one request carries, named so the pager and the request agree.
-export const PAGE = 50;
-
 // Everything an act on a code finding or a rule can move.
 function useAfterCodeFinding() {
   const queries = useQueryClient();
@@ -53,7 +50,7 @@ function useAfterCodeFinding() {
 // What narrows a product's code findings, on the list and in its file alike.
 // `assigned` reads as the findings list's does: "nobody" keeps the code findings
 // nobody holds.
-type CodeFindingsAsked = {
+export type CodeFindingsAsked = {
   branch_or_tag?: string;
   variant?: string;
   series?: string;
@@ -98,37 +95,25 @@ export function useCodeFindings(
               query: {
                 limit: PAGE,
                 offset: asked.offset ?? 0,
-                ...(asked.series ? { series: asked.series } : {}),
-                ...(asked.method ? { method: asked.method } : {}),
-                ...(asked.state ? { state: asked.state } : {}),
-                ...(asked.assigned ? { assigned: asked.assigned } : {}),
-                ...(asked.component ? { component: asked.component } : {}),
-                ...(asked.component_version ? { component_version: asked.component_version } : {}),
+                ...codeFindingsQuery({
+                  series: asked.series,
+                  method: asked.method,
+                  state: asked.state,
+                  assigned: asked.assigned,
+                  component: asked.component,
+                  component_version: asked.component_version,
+                }),
               },
             },
           }),
         );
       }
+      const { offset, ...narrowing } = asked;
       return unwrap(
         await api.GET("/v1/products/{product}/code-findings", {
           params: {
             path: { product },
-            query: {
-              limit: PAGE,
-              offset: asked.offset ?? 0,
-              ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
-              ...(asked.variant ? { variant: asked.variant } : {}),
-              ...(asked.series ? { series: asked.series } : {}),
-              ...(asked.method ? { method: asked.method } : {}),
-              ...(asked.state ? { state: asked.state } : {}),
-              ...(asked.assigned ? { assigned: asked.assigned } : {}),
-              ...(asked.component ? { component: asked.component } : {}),
-              ...(asked.component_version ? { component_version: asked.component_version } : {}),
-              ...(asked.beneath ? { beneath: asked.beneath } : {}),
-              ...(asked.beneath_version ? { beneath_version: asked.beneath_version } : {}),
-              ...(asked.beneath_ecosystem ? { beneath_ecosystem: asked.beneath_ecosystem } : {}),
-              ...(asked.beneath_namespace ? { beneath_namespace: asked.beneath_namespace } : {}),
-            },
+            query: { limit: PAGE, offset: offset ?? 0, ...codeFindingsQuery(narrowing) },
           },
         }),
       );
@@ -209,19 +194,7 @@ export function codeFindingTrendRead(product: string, asked: CodeFindingTrendAsk
         await api.GET("/v1/products/{product}/code-finding-trend", {
           params: {
             path: { product },
-            query: {
-              ...(asked.days ? { days: asked.days } : { weeks: asked.weeks }),
-              ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
-              ...(asked.variant ? { variant: asked.variant } : {}),
-              ...(asked.series ? { series: asked.series } : {}),
-              ...(asked.method ? { method: asked.method } : {}),
-              ...(asked.component ? { component: asked.component } : {}),
-              ...(asked.component_version ? { component_version: asked.component_version } : {}),
-              ...(asked.beneath ? { beneath: asked.beneath } : {}),
-              ...(asked.beneath_version ? { beneath_version: asked.beneath_version } : {}),
-              ...(asked.beneath_ecosystem ? { beneath_ecosystem: asked.beneath_ecosystem } : {}),
-              ...(asked.beneath_namespace ? { beneath_namespace: asked.beneath_namespace } : {}),
-            },
+            query: codeFindingsQuery(asked),
           },
         }),
       ),

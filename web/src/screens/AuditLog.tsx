@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { useProducts } from "../api/catalog";
 import { usePaging } from "./list";
-import { notYours, unwrap } from "../api/queries";
+import { notYours, PAGE as RULINGS_PAGE, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
@@ -20,7 +20,7 @@ import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
 import { calendarDay, coveringPeriod, endExclusive, stated } from "./analytics/Window";
-import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
+import { useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./ReportRuling";
 import { allFindingsAt, decisionAt } from "../app/routes";
 import { fileAt as linkedFile } from "../api/links";
@@ -65,12 +65,16 @@ export function outcomesSaid(dismisses: (outcome?: string) => boolean): [Outcome
   ]);
 }
 
-const STATES = [
-  ["approved", "agreed"],
-  ["proposed", "waiting"],
-  ["lapsed", "lapsed"],
-  ["withdrawn", "withdrawn"],
-] as const;
+// The states a decision is in, as the filter offers them. Keyed by every state
+// the server counts, so one it adds is a compile error here.
+type DecisionState = keyof Audited["states"];
+const STATE_SAID: Record<DecisionState, string> = {
+  approved: "agreed",
+  proposed: "waiting",
+  lapsed: "lapsed",
+  withdrawn: "withdrawn",
+};
+const STATES = Object.entries(STATE_SAID) as [DecisionState, string][];
 
 // The audit log: what was decided, for somebody auditing it.
 //
@@ -166,9 +170,7 @@ export function AuditLog() {
                 : {}),
               ...(alone ? { alone: true } : {}),
               ...(inForce ? { in_force: true } : {}),
-              ...(states.length > 0
-                ? { state: states as ("proposed" | "approved" | "withdrawn" | "lapsed")[] }
-                : {}),
+              ...(states.length > 0 ? { state: states as DecisionState[] } : {}),
               ...(sent.from ? { from: sent.from } : {}),
               ...(sent.to ? { to: sent.to } : {}),
             },

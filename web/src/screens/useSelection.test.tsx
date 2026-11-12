@@ -3,7 +3,7 @@
 
 import { act, useEffect } from "react";
 import { describe, expect, it } from "vitest";
-import { questionIn, untaken, useSelection } from "./useSelection";
+import { actThrough, questionIn, untaken, useSelection } from "./useSelection";
 import type { Row } from "./list";
 import { mounted } from "../test/mount";
 
@@ -149,5 +149,23 @@ describe("a bulk act over the selection", () => {
     });
     expect(next.has("offset")).toBe(false);
     expect(selection().picked.size).toBe(0);
+  });
+});
+
+describe("one act through a selection", () => {
+  it("tries every entry after one is refused, and names what it tried and what was refused", async () => {
+    const tried: string[] = [];
+    const picked = new Map([
+      ["a", "a"],
+      ["b", "b"],
+      ["c", "c"],
+    ]);
+    const { acted, refused } = await actThrough(picked, async (entry) => {
+      tried.push(entry);
+      if (entry === "b") throw new Error("refused");
+    });
+    expect(tried).toEqual(["a", "b", "c"]);
+    expect([...acted]).toEqual(["a", "b", "c"]);
+    expect(refused).toEqual(["b"]);
   });
 });

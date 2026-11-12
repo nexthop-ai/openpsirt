@@ -4,7 +4,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Queue } from "./Queue";
-import { stillPicked } from "./useQueueApproval";
+import { stillPicked } from "./useSelection";
 import { Product } from "./Product";
 import { accept, answer, screen, serve, settle, mounted } from "../test/mount";
 import { readingDependencies } from "../test/reach";
@@ -40,6 +40,16 @@ describe("the review queue", () => {
       "/v1/review-queue.csv?severity=high",
       "/v1/review-queue.json?severity=high",
     ]);
+  });
+
+  it("offers each severity floor that excludes something, worst last", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    mount.render(screen(<Queue />, "/review-queue"));
+    await settle();
+    const floors = Array.from(
+      mount.host().querySelectorAll<HTMLOptionElement>('select[aria-label="Severity"] option'),
+    ).map((each) => each.value);
+    expect(floors).toEqual(["", "medium", "high", "critical"]);
   });
 
   it("exports what became of your decisions on the Mine tab", async () => {

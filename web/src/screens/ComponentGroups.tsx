@@ -4,7 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { unwrap } from "../api/queries";
+import { beneathOf, unwrap } from "../api/queries";
 import { analyticsReportAt, buildFindingsAt, dependenciesAt, type Build } from "../app/routes";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -29,21 +29,11 @@ export const LISTINGS: { list: Listing; words: string }[] = [
   { list: "ecosystem", words: "By ecosystem" },
 ];
 
-// The subtree of the row's one component, which is what a repository row
-// counts, read on this build.
-function beneathOf(one: NonNullable<Group["component"]>) {
-  return {
-    beneath: one.name,
-    beneath_version: one.version || undefined,
-    beneath_ecosystem: one.ecosystem || undefined,
-    beneath_namespace: one.namespace || undefined,
-  };
-}
-
-// Where a repository row's subtree starts: its one component, or every
-// component of its package identifier where it ships several commits.
+// Where a repository row's subtree starts: its one component, which is what
+// the row counts on this build, or every component of its package identifier
+// where it ships several commits.
 function beneathRow(row: Group) {
-  return row.component ? beneathOf(row.component) : { beneath_purl: row.key };
+  return row.component ? beneathOf(row.component.name, row.component) : { beneath_purl: row.key };
 }
 
 // The burndown of what a row counts. A repository is its subtree on this

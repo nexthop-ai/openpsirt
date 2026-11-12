@@ -113,6 +113,8 @@ they reach.
 | A product somebody cannot reach is absent, and a screen treats it as not there (REQ-42) | The server's answer |
 | `GET /v1/sign-in` is answered without a credential, listing the providers an operator configured (REQ-41); a test asserts it says nothing about whether any account exists | It is what somebody sees before they have a credential |
 | A 401 from `session/me` is an answer: nobody is signed in | A fresh browser |
+| A bound the server refuses past and a screen stops at is read from `session/me`, as the weaknesses one flaw states are; a request size the interface sends, as the rows one assignment names, is held to the published API document by a test | A copy in the interface keeps the old bound after the server's moves |
+| A table of the server's words, such as outcomes, decision states, queue reasons and ruling dispositions, is keyed by the generated type, so a word the server adds fails to compile until the table names it | A word missing from a table is a tab never offered or a card in the wrong words |
 | Markdown is rendered and sanitized in the browser; the server returns markdown only | Preview and published text are one renderer, with no round trip per keystroke |
 
 ## Families a reader holds

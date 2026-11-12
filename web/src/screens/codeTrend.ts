@@ -27,9 +27,9 @@ export const TIERS: Record<string, string> = {
   other: "Everything else",
 };
 
-// Why a run's absences prove nothing, in a few words.
-// eslint-disable-next-line no-restricted-syntax -- Keyed on the server's reasons.
-export const REASONS: Record<string, string> = {
+// Why a run's absences prove nothing, in a few words. Keyed by every reason
+// the server gives, so one it adds is a compile error here.
+export const REASONS: Record<NonNullable<CodeFindingMarker["reason"]>, string> = {
   "exit-status": "exited with an error",
   incomplete: "didn't finish",
   "failure-signal": "reported a failure of its own",
@@ -57,7 +57,7 @@ export function markerSaid(m: CodeFindingMarker): string {
     case "rules":
       return `${m.series}: rule set changed${between(" rules")}${builds}`;
     case "not-comparable":
-      return `${m.series}: not comparable, ${REASONS[m.reason ?? ""] ?? "for another reason"}${builds}`;
+      return `${m.series}: not comparable, ${m.reason ? REASONS[m.reason] : "for another reason"}${builds}`;
   }
 }
 
@@ -86,12 +86,25 @@ export function markersIn(trend: CodeFindingTrend, step: number): CodeFindingMar
   return (trend.markers ?? []).filter((m) => stepOf(trend.points ?? [], m.at) === step);
 }
 
-// The parts a split is drawn with, in order: every tier and method, and each
-// series the trend names, by name.
+// The tiers counts are split by, highest first, then any tier they count that
+// has no name here, under its own word, so a tier the server adds is drawn.
+export function tiersIn(counts: (Record<string, number> | null | undefined)[]): string[] {
+  const unnamed = new Set<string>();
+  for (const each of counts) {
+    for (const tier of Object.keys(each ?? {})) {
+      if (!Object.hasOwn(TIERS, tier)) unnamed.add(tier);
+    }
+  }
+  return [...Object.keys(TIERS), ...[...unnamed].sort()];
+}
+
+// The parts a split is drawn with, in order: every tier, highest first, then
+// any tier the trend counts that has no name here, under its own word; every
+// method; and each series the trend names, by name.
 export function partsOf(trend: CodeFindingTrend, by: TrendSplit): string[] {
   const first = trend.points?.[0];
   if (!first) return [];
-  if (by === "tier") return Object.keys(TIERS);
+  if (by === "tier") return tiersIn((trend.points ?? []).map((point) => point.by_tier));
   if (by === "method") return Object.keys(first.by_method).sort();
   return Object.keys(first.by_series).sort();
 }

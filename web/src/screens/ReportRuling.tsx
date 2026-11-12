@@ -4,8 +4,8 @@
 import { mayOf, useWho } from "../app/session";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { PAGE } from "../api/queries";
 import {
-  PAGE,
   type Rulable,
   type Ruling,
   useApproveRuling,

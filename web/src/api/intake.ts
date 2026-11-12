@@ -4,7 +4,7 @@
 import { useInvalidating } from "./invalidate";
 import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
-import { unwrap } from "./queries";
+import { PAGE, unwrap } from "./queries";
 
 // What arrived, what it was judged to be, and the rulings some of those
 // decisions wait on.
@@ -17,9 +17,6 @@ export type Report = Body<"ReportBody">;
 export type Ruling = Body<"RulingBody">;
 export type Disposition = NonNullable<Report["disposition"]>;
 export type Rulable = Ruling["disposition"];
-
-// The rows one request carries, named so the pager and the request agree.
-export const PAGE = 50;
 
 // Everything an act on a report or a ruling can move. A duplicate ruling moves
 // an issue's disclosure date, and withdrawing one moves it back, so every read

@@ -3,6 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { activeFilters, kindsOffered, without, withoutAny } from "./FindingsFilters";
+import { BUMP_FILTERS, bumpQuery } from "./FindingsViews";
+import { listQuery } from "./list";
 
 // The chips above the findings list: what narrows it, read from the address,
 // and what removing each one leaves.
@@ -179,5 +181,107 @@ describe("the weakness chips", () => {
 
   it("show the number alone before the names are read", () => {
     expect(chips("weakness=CWE-79")).toEqual(["Weakness: CWE-79"]);
+  });
+});
+
+// An address with every filter a chip names in force.
+const EVERY = new URLSearchParams(
+  [
+    "q=ssl",
+    "floor=high",
+    "below=yes",
+    "exploited=1",
+    "fixable=1",
+    "epss_at_least=0.5",
+    "fix_state=fixed",
+    "state=undecided",
+    "outcome=not-affected",
+    "sent_back=1",
+    "planned=planned",
+    "on=branch",
+    "support=past-eol",
+    "assigned=me",
+    "reassessed=1",
+    "origin=manual",
+    "unconfirmed=1",
+    "vex_publisher=acme",
+    "vex_status=fixed",
+    "build_says=affected",
+    "component=curl",
+    "ecosystem=deb",
+    "purl=pkg:deb/debian/curl",
+    "declared_as=library",
+    "under=sonic-swss",
+    "beneath=curl",
+    "beneath_purl=pkg:github/sonic-net/sonic-swss",
+    "under_build=yes",
+    "hide=zlib",
+    "running=overdue",
+    "open_for=30",
+    "open_under=90",
+    "opened_after=2026-01-01",
+    "opened_before=2026-06-01",
+    "open_on=2026-03-01",
+    "opened_by_run=7",
+    "decision=12",
+    "proposed_after=2026-01-01",
+    "closed_after=2026-01-01",
+    "weakness=CWE-79",
+    "label=mine",
+    "differs=1",
+    "variants=only",
+  ].join("&"),
+);
+
+describe("a chip and the list it narrows", () => {
+  it("draws none for a value the list does not send", () => {
+    for (const address of [
+      "open_for=0",
+      "open_under=soon",
+      "epss_at_least=1.5",
+      "epss_at_least=0",
+      "floor=bogus",
+      "opened_after=2026-02-30",
+      "open_on=yesterday",
+      "state=bogus",
+      "outcome=bogus",
+      "fix_state=bogus",
+      "vex_status=bogus",
+      "build_says=bogus",
+      "declared_as=bogus",
+      "assigned=bogus",
+      "origin=bogus",
+      "planned=bogus",
+      "decision=abc",
+      "opened_by_run=-1",
+      "running=never",
+      "hide=%20",
+      "on=branch&on=bogus&on=tag",
+    ]) {
+      expect(activeFilters(new URLSearchParams(address)), address).toEqual([]);
+    }
+  });
+
+  it("narrows the request for every chip it draws", () => {
+    const params = EVERY;
+    const chips = activeFilters(params);
+    expect(chips.length).toBeGreaterThan(0);
+    const sent = JSON.stringify(listQuery(params));
+    for (const chip of chips) {
+      expect(JSON.stringify(listQuery(without(params, chip))), chip.key).not.toBe(sent);
+    }
+  });
+});
+
+describe("a chip and the by-upgrade list", () => {
+  it("narrows the upgrades exactly where the view names the filter as applied", () => {
+    const at = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
+    const sent = (params: URLSearchParams) =>
+      JSON.stringify(bumpQuery(at, listQuery(params), 50, 0));
+    const chips = activeFilters(EVERY);
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(sent(without(EVERY, chip)) !== sent(EVERY), chip.key).toBe(chip.key in BUMP_FILTERS);
+    }
   });
 });
