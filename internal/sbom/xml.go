@@ -159,9 +159,10 @@ func (g *tagGuard) step(c byte) error {
 			g.state, g.last = inCharData, [2]byte{}
 		case !strings.HasPrefix(commentOpening, string(g.opened)) &&
 			!strings.HasPrefix(charDataOpening, string(g.opened)):
+			// The decoder keeps the first byte after "<!" without reading it
+			// as a quote or a bracket, so the guard does too.
 			g.state, g.quote, g.nested = inDeclaration, 0, 0
 			g.opening, g.commented = 0, false
-			g.declaration(c, ended)
 		}
 	case inComment:
 		if c == '>' && ended == [2]byte{'-', '-'} {

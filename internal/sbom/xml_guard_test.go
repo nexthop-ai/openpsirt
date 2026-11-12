@@ -22,6 +22,7 @@ func TestATagAfterADeclarationIsStillBounded(t *testing.T) {
 		"a quote in a comment":         `<!DOCTYPE x [<!-- ' -->]>`,
 		"a bracket in a comment":       `<!DOCTYPE x [<!-- < -->]>`,
 		"a nested bracket, no comment": `<!DOCTYPE x [<!ENTITY a "b">]>`,
+		"a quote straight after <!":    `<!"x>`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			guard := &tagGuard{r: strings.NewReader(declaration + long), most: 64}
