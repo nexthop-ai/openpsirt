@@ -339,35 +339,28 @@ func TestALabelThatIsADotSegmentIsRefused(t *testing.T) {
 	})
 }
 
-// secondInsertFails fails every statement inserting into one table after the
-// first, by handing the driver a context that has already ended.
-type secondInsertFails struct {
+// insertsInto counts the statements inserting into one table.
+type insertsInto struct {
 	table    string
 	mu       sync.Mutex
 	inserted int
 }
 
-func (h *secondInsertFails) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
-	if !strings.HasPrefix(strings.TrimSpace(e.Query), "INSERT") || !strings.Contains(e.Query, `"`+h.table+`"`) &&
-		!strings.Contains(e.Query, "`"+h.table+"`") {
-		return ctx
+func (h *insertsInto) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if strings.HasPrefix(strings.TrimSpace(e.Query), "INSERT") && (strings.Contains(e.Query, `"`+h.table+`"`) ||
+		strings.Contains(e.Query, "`"+h.table+"`")) {
+		h.mu.Lock()
+		h.inserted++
+		h.mu.Unlock()
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.inserted++
-	if h.inserted < 2 {
-		return ctx
-	}
-	failed, cancel := context.WithCancel(ctx)
-	cancel()
-	return failed
+	return ctx
 }
 
-func (h *secondInsertFails) AfterQuery(context.Context, *bun.QueryEvent) {}
+func (h *insertsInto) AfterQuery(context.Context, *bun.QueryEvent) {}
 
-func TestALabelIsPutOnTheWholeFoldOrOnNoneOfIt(t *testing.T) {
-	// Labeling is one act over every package of the fold: a write failing
-	// partway leaves no package labeled.
+func TestALabelIsPutOnTheWholeFoldInOneWrite(t *testing.T) {
+	// Labeling is one act over every package of the fold: one statement
+	// writes them all, so no failure leaves part of the fold labeled.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib, tool := f.curlFold(t)
@@ -375,19 +368,22 @@ func TestALabelIsPutOnTheWholeFoldOrOnNoneOfIt(t *testing.T) {
 		issue := f.issueID(t, "CVE-2026-CURL")
 		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
 
-		hooked := dbtest.Hooked(f.db, &secondInsertFails{table: "finding_label"})
-		err := finding.NewStore(hooked.DB).LabelIt(ctx, who, f.productID, issue, viaTool, "Vendor")
-		labeled, readErr := f.db.DB.NewSelect().Model((*finding.Label)(nil)).
+		counted := &insertsInto{table: "finding_label"}
+		hooked := dbtest.Hooked(f.db, counted)
+		if err := finding.NewStore(hooked.DB).LabelIt(ctx, who, f.productID, issue, viaTool, "Vendor"); err != nil {
+			t.Fatal(err)
+		}
+		labeled, err := f.db.DB.NewSelect().Model((*finding.Label)(nil)).
 			Where(`"vulnerability_id" = ?`, issue).
 			Where(`"component_id" IN (?)`, bun.List([]int64{viaLib, viaTool})).Count(ctx)
-		if readErr != nil {
-			t.Fatal(readErr)
+		if err != nil {
+			t.Fatal(err)
 		}
-		switch {
-		case err == nil && labeled != 2:
-			t.Errorf("labeling succeeded and %d of the fold's two packages carry the word", labeled)
-		case err != nil && labeled != 0:
-			t.Errorf("labeling failed (%v) and left %d of the fold's two packages carrying the word", err, labeled)
+		if labeled != 2 {
+			t.Fatalf("%d of the fold's two packages carry the word, so this checked nothing", labeled)
+		}
+		if counted.inserted != 1 {
+			t.Errorf("the fold's two packages were labeled in %d writes, want one", counted.inserted)
 		}
 	})
 }
