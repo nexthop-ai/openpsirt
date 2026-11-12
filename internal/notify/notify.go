@@ -621,7 +621,11 @@ func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
 				if err != nil {
 					return fmt.Errorf("clear a condition that ended: %w", err)
 				}
-				if n, err := res.RowsAffected(); err != nil || n == 0 {
+				n, err := database.Affected(res)
+				if err != nil {
+					return fmt.Errorf("clear a condition that ended: %w", err)
+				}
+				if n == 0 {
 					continue
 				}
 				cleared++
