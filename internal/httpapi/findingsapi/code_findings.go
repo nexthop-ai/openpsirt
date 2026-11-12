@@ -254,13 +254,9 @@ func codeFindingOccurrence(p analysis.Located) CodeFindingOccurrence {
 func codeFindingFlaw(ctx context.Context, in core.Deps, subject access.Subject, productID int64,
 	occurrence string) (*CodeFindingFlawBody, error) {
 
-	h, err := finding.CodeFindingFlawAt(ctx, in.DB.DB, productID, occurrence)
+	h, err := finding.NewStore(in.DB.DB).CodeFindingFlawFor(ctx, subject, productID, occurrence)
 	if err != nil || h == nil {
 		return nil, err
-	}
-	if !subject.Reads(access.Private, productID) && !subject.OnCase(productID, h.VulnerabilityID) &&
-		!subject.OnCodeFinding(productID, occurrence) {
-		return nil, nil
 	}
 	names, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, []int64{h.VulnerabilityID})
 	if err != nil {

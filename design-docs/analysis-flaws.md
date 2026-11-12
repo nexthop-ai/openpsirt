@@ -125,7 +125,8 @@ code finding, as case collaborators into a flaw (REQ-43,
 | Rule | Reason |
 |---|---|
 | A grant reaches the evidence while the flaw is undisclosed, never its decisions, the build's tree or its kin; disclosure ends it | One code finding |
-| Managed by readers of the product's security testing work | |
+| Managed by readers of the product's security testing work, refused by the store before the flaw record is read | A refusal after the read says whether the code finding was recorded |
+| The flaw a code finding was recorded as is read by the store for a reader of the product's undisclosed work, somebody on the flaw's case or somebody granted the code finding, and answered as unrecorded to anybody else | It names an undisclosed flaw |
 | Refused with 409 once disclosed; granted in one transaction with the flaw record read | |
 | In the trail, and the person told in a line their grant reaches | |
 | A case reader reads an included one in full | |
