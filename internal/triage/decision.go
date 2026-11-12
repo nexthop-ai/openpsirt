@@ -296,13 +296,12 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 	if len(given) == 0 {
 		return nil, nil
 	}
-	// The gate writes what it works out onto the proposals, so it works on a
-	// copy and the caller's are left as given.
-	proposals := slices.Clone(given)
-
 	var recorded []*DecisionOccurrence
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
+		// The gate writes what it works out onto the proposals, so each
+		// attempt works on a fresh copy of what was given.
+		proposals := slices.Clone(given)
 		if err := within.allowed(ctx, subject, proposals); err != nil {
 			return err
 		}
@@ -329,7 +328,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return err
 	})
 	if err != nil {
-		return nil, s.alreadyDecided(ctx, err, occurrencesOf(proposals))
+		return nil, s.alreadyDecided(ctx, err, occurrencesOf(given))
 	}
 	return recorded, nil
 }

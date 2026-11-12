@@ -528,18 +528,16 @@ func (s *Store) write(ctx context.Context, decision *Decision, proposals []Propo
 	// authorizes, and a retried attempt authorizing the rewritten issue
 	// would be authorizing something the request did not name.
 	proposals = slices.Clone(proposals)
-	filed := make([]int64, 0, len(proposals))
-	for _, p := range proposals {
-		filed = append(filed, p.Occurrence.VulnerabilityID)
+	asked := make([]Occurrence, len(proposals))
+	for i := range proposals {
+		asked[i] = proposals[i].Occurrence
 	}
-	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	stood, err := s.asTheyStand(ctx, asked)
 	if err != nil {
 		return nil, err
 	}
 	for i := range proposals {
-		if issue, known := issueOf[proposals[i].Occurrence.VulnerabilityID]; known {
-			proposals[i].Occurrence.VulnerabilityID = issue
-		}
+		proposals[i].Occurrence = stood[i]
 	}
 	if err := s.refuseIfIncident(ctx, decision, proposals); err != nil {
 		return nil, err
@@ -995,18 +993,11 @@ func (s *Store) alreadyDecided(ctx context.Context, err error, occurrences []Occ
 		where = "at one of these occurrences"
 	}
 	// Under the issue each is read as, which is where the write keyed it.
-	filed := make([]int64, 0, len(occurrences))
-	for _, occurrence := range occurrences {
-		filed = append(filed, occurrence.VulnerabilityID)
-	}
-	issueOf, readErr := finding.IssuesOf(ctx, s.db, filed)
+	stood, readErr := s.asTheyStand(ctx, occurrences)
 	if readErr != nil {
 		return err
 	}
-	for _, occurrence := range occurrences {
-		if issue, known := issueOf[occurrence.VulnerabilityID]; known {
-			occurrence.VulnerabilityID = issue
-		}
+	for _, occurrence := range stood {
 		standing, found := s.liveAt(ctx, liveKeysFor(occurrence)...)
 		if !found {
 			continue
@@ -1017,6 +1008,29 @@ func (s *Store) alreadyDecided(ctx context.Context, err error, occurrences []Occ
 			ErrAlreadyDecided, standing.ID, standing.State, where)
 	}
 	return err
+}
+
+// asTheyStand is these occurrences filed under the issue each is read as: one
+// named by an issue that merged into another names the one that stands. A
+// copy, in order; the occurrences given are left as they are. The write keys
+// under it and a refusal looks for the standing decision under it, so the two
+// read one rule.
+func (s *Store) asTheyStand(ctx context.Context, occurrences []Occurrence) ([]Occurrence, error) {
+	filed := make([]int64, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		filed = append(filed, occurrence.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return nil, err
+	}
+	out := slices.Clone(occurrences)
+	for i := range out {
+		if issue, known := issueOf[out[i].VulnerabilityID]; known {
+			out[i].VulnerabilityID = issue
+		}
+	}
+	return out, nil
 }
 
 // ErrNothingOpen says a selection named nothing that is actually open where it
