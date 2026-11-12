@@ -425,7 +425,9 @@ func testKey(t *testing.T) string {
 // key's signature, whether it asks by tag or by date, and whether the new key
 // became valid before or after the document was released: the provider
 // description names only the new key, so the old signature no longer verifies
-// against anything the provider lists.
+// against anything the provider lists. A key re-signed, its fingerprint kept,
+// is sent again too, since a signature dated before its newest self-signature
+// is refused.
 func TestASignatureByAReplacedKeyIsSentAgain(t *testing.T) {
 	two(t, func(t *testing.T, f *fixture.World) {
 		w, _ := publishedWorld(t, f)
@@ -435,21 +437,23 @@ func TestASignatureByAReplacedKeyIsSentAgain(t *testing.T) {
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		for name, made := range map[string]time.Time{
-			"newer than the document": time.Now().UTC().Add(-time.Minute),
-			"older than the document": signingtest.Made.Add(24 * time.Hour),
+		held, resigned := signingtest.Resigned(t, signingtest.Made, time.Now().UTC().Add(-time.Minute))
+		for name, keys := range map[string][2]string{
+			"newer than the document": {testKey(t), signingtest.Key(t, time.Now().UTC().Add(-time.Minute), 0)},
+			"older than the document": {testKey(t), signingtest.Key(t, signingtest.Made.Add(24*time.Hour), 0)},
+			"re-signed":               {held, resigned},
 		} {
-			t.Run(name, func(t *testing.T) { replacedKey(t, w, made) })
+			t.Run(name, func(t *testing.T) { replacedKey(t, w, keys[0], keys[1]) })
 		}
 	})
 }
 
-func replacedKey(t *testing.T, w *world, made time.Time) {
-	before, err := signing.Read(testKey(t), "")
+func replacedKey(t *testing.T, w *world, holding, replacing string) {
+	before, err := signing.Read(holding, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	after, err := signing.Read(signingtest.Key(t, made, 0), "")
+	after, err := signing.Read(replacing, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,6 +651,39 @@ func TestAnUnreadableAdvisoryIsLoggedOnceNotPerRequest(t *testing.T) {
 		}
 		if n := strings.Count(logged.String(), "could not be read back"); n != 1 {
 			t.Errorf("an unreadable advisory was logged %d times, want once: %s", n, logged.String())
+		}
+	})
+}
+
+// A signature the key has expired before is logged once by the surface,
+// however many requests ask for one: the surface takes no credential, so a
+// line per request is one anybody can multiply.
+func TestAnExpiredKeyIsLoggedOnceNotPerRequest(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		// Released after the key expires.
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
+			Set(`"current_at" = ?`, time.Now().UTC().Add(48*time.Hour)).
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		signer, err := signing.Read(signingtest.Key(t, time.Now().UTC().Add(-time.Hour), 24*3600), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var logged bytes.Buffer
+		s := &surface{t: t, h: published.Handler(published.Config{
+			DB: w.DB.DB, Who: who, Base: base, Rate: 1000, List: true, Signer: signer,
+			Logger: slog.New(slog.NewTextHandler(&logged, nil)),
+		})}
+		path := publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json" + publish.SignatureSuffix
+		for range 3 {
+			if rec := s.get(http.MethodGet, path, nil); rec.Code != http.StatusInternalServerError {
+				t.Fatalf("GET %s past the key's expiry = %d, want 500", path, rec.Code)
+			}
+		}
+		if n := strings.Count(logged.String(), "expired at"); n != 1 {
+			t.Errorf("an expired key was logged %d times, want once: %s", n, logged.String())
 		}
 	})
 }

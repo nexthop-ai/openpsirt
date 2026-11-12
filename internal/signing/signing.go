@@ -149,6 +149,10 @@ func (s *Signer) From() time.Time { return s.from }
 // with.
 func (s *Signer) PublicKey() []byte { return s.public }
 
+// ErrExpired says the signing key expired before the date a signature would
+// carry.
+var ErrExpired = errors.New("the signing key has expired")
+
 // Sign is an armored detached signature over body, dated at.
 //
 // Dated by what the document says rather than by the clock, and never before
@@ -165,8 +169,8 @@ func (s *Signer) Sign(body []byte, at time.Time) ([]byte, error) {
 	config := &packet.Config{Time: func() time.Time { return at }}
 	if err := openpgp.ArmoredDetachSign(&out, s.entity, bytes.NewReader(body), config); err != nil {
 		if s.expires && !at.Before(s.until) {
-			return nil, fmt.Errorf("sign the document: the signing key %s expired at %s, "+
-				"before the document's date %s: %w", s.fingerprint,
+			return nil, fmt.Errorf("sign the document: %w: the key %s expired at %s, "+
+				"before the document's date %s: %w", ErrExpired, s.fingerprint,
 				s.until.Format(time.RFC3339), at.UTC().Format(time.RFC3339), err)
 		}
 		return nil, fmt.Errorf("sign the document: %w", err)

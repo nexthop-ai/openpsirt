@@ -5,6 +5,7 @@ package signing
 
 import (
 	"bytes"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -40,6 +41,9 @@ func TestSigningPastTheKeysExpiryNamesTheExpiry(t *testing.T) {
 	_, err := signer.Sign([]byte(`{}`), until.Add(time.Hour))
 	if err == nil {
 		t.Fatal("a document dated after the key expired was signed")
+	}
+	if !errors.Is(err, ErrExpired) {
+		t.Errorf("the refusal %q is not ErrExpired", err)
 	}
 	for _, want := range []string{signer.Fingerprint(), "expired at " + until.Format(time.RFC3339)} {
 		if !strings.Contains(err.Error(), want) {

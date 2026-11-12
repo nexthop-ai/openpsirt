@@ -88,7 +88,13 @@ type server struct {
 	// surface takes no credential, so a per-request log line is one anybody
 	// can multiply.
 	unread sync.Map
+	// expired logs, once per process, that the key has expired before a
+	// document it was asked to sign; the key is the same for every request.
+	expired sync.Once
 }
+
+// errReported is a failure already logged, answered without another line.
+var errReported = errors.New("already reported")
 
 // serve answers one request.
 func (s *server) serve(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +112,9 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, publish.ErrNotPublished):
 		notFound(w)
+		return
+	case errors.Is(err, errReported):
+		problem(w, http.StatusInternalServerError, "this could not be answered just now; try again shortly")
 		return
 	case err != nil:
 		s.Logger.ErrorContext(r.Context(), "a published document could not be served",
@@ -371,22 +380,30 @@ func (s *server) document(ctx context.Context, v *view, path string) (*file, err
 
 // signature is the detached signature over one document, carrying no date.
 //
-// Tagged by the document it signs and the key signing it rather than by its
-// own bytes, which carry a random salt and differ every time: a reader holding
-// the signature of an unchanged document is told so, without the key being
-// used again, and one holding a signature by a key no longer configured is
-// sent the new one. Undated because a replacement key may have become valid
+// Tagged by the document it signs and the public key as published rather than
+// by its own bytes, which carry a random salt and differ every time: a reader
+// holding the signature of an unchanged document is told so, without the key
+// being used again, and one holding a signature by a key replaced or re-signed
+// is sent the new one, since a signature dated before the key's newest
+// self-signature is refused by a reader's tooling. Undated because a replacement key may have become valid
 // before the document was released, and a date that does not move with the
 // key would confirm the old signature to a reader asking by date.
 func (s *server) signature(document *file, asked string) (*file, error) {
 	if s.Signer == nil {
 		return nil, publish.ErrNotPublished
 	}
-	tag := strings.TrimSuffix(tagOf(document.body), `"`) + "." + s.Signer.Fingerprint() + `.asc"`
+	tag := strings.TrimSuffix(tagOf(document.body), `"`) + "." +
+		strings.Trim(tagOf(s.Signer.PublicKey()), `"`) + `.asc"`
 	if asked == tag {
 		return &file{tag: tag, kind: signatureKind}, nil
 	}
 	signed, err := s.Signer.Sign(document.body, document.modified)
+	if errors.Is(err, signing.ErrExpired) {
+		s.expired.Do(func() {
+			s.Logger.Error("a signature could not be made", "error", err)
+		})
+		return nil, errReported
+	}
 	if err != nil {
 		return nil, err
 	}
