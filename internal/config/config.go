@@ -674,6 +674,11 @@ func load(given map[string]string) (Config, error) {
 	if err := apart(c.Directory, c.Attachments); err != nil {
 		return Config{}, err
 	}
+	// The scheme is stored in lower case: published documents, which never
+	// change once signed, state addresses built from it.
+	if scheme, rest, found := strings.Cut(c.BaseURL, "://"); found {
+		c.BaseURL = strings.ToLower(scheme) + "://" + rest
+	}
 	if err := publishing(c, given); err != nil {
 		return Config{}, err
 	}
@@ -727,7 +732,7 @@ func publishing(c Config, given map[string]string) error {
 		return fmt.Errorf("OPENPSIRT_PUBLISH: set OPENPSIRT_PUBLISHER_NAME and " +
 			"OPENPSIRT_PUBLISHER_NAMESPACE too — every published document names its publisher")
 	}
-	if !strings.HasPrefix(c.BaseURL, "https://") {
+	if base, err := url.Parse(c.BaseURL); err != nil || base.Scheme != "https" {
 		return fmt.Errorf("OPENPSIRT_PUBLISH: set OPENPSIRT_BASE_URL to the https address " +
 			"this deployment is reached at — the documents state addresses built from it, " +
 			"and the standard requires them served over TLS")

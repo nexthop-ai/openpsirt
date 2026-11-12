@@ -43,6 +43,7 @@ document is about disclosed work in it (REQ-63, REQ-37).
 | Rule | Reason |
 |---|---|
 | Publishing requires the deployment's `https` address, a publisher name and a namespace | Every stated address is built from it, and every document names the publisher |
+| The deployment's address is read with its scheme in any case and stored in lower case | A signed document never changes, and a reader checking for `https://` compares the text |
 | A deployment also writing the provider directory keeps writing it (`design-docs/remediation-directory.md`) | Advisories then state this deployment's address |
 | A key that does not read, is locked with a missing or wrong passphrase, or cannot sign now is refused at startup, naming the setting | |
 | A publishing setting set while the deployment does not publish is refused at startup | Nothing would read it |
