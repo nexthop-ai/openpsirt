@@ -153,36 +153,59 @@ type statedBy struct {
 }
 
 // statedNames reads what these builds stated these components are called and
-// at which version. A node holding neither predates the node holding them and
-// is left out, so the row's stands.
+// at which version: the open node's, else the build's latest node's, so a row
+// closed since is named as its build last stated it, as graph.StatedName
+// names it. A node holding neither predates the node holding them and is left
+// out, so the row's stands.
 func statedNames(ctx context.Context, db bun.IDB, buildIDs, componentIDs []int64) (statedBy, error) {
 	said := statedBy{pair: map[[2]int64]graph.Component{}, latest: map[int64]graph.Component{}}
 	if len(buildIDs) == 0 || len(componentIDs) == 0 {
 		return said, nil
 	}
 	var rows []struct {
+		ID          int64  `bun:"id"`
 		BuildID     int64  `bun:"build_id"`
 		ComponentID int64  `bun:"component_id"`
 		Name        string `bun:"name"`
 		Version     string `bun:"version"`
 		Opened      int64  `bun:"opened_scan_id"`
+		Closed      *int64 `bun:"closed_scan_id"`
 	}
 	if err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
-		ColumnExpr(`"n"."build_id", "n"."component_id", "n"."name", "n"."version", "n"."opened_scan_id"`).
+		ColumnExpr(`"n"."id", "n"."build_id", "n"."component_id", "n"."name", "n"."version"`).
+		ColumnExpr(`"n"."opened_scan_id", "n"."closed_scan_id"`).
 		Where(`"n"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"n"."component_id" IN (?)`, bun.List(componentIDs)).
-		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."name" IS NOT NULL`).
 		Scan(ctx, &rows); err != nil {
 		return said, fmt.Errorf("read what these builds call these components: %w", err)
 	}
-	opened := map[int64]int64{}
+	// An open node outranks a closed one, then the later opened, then the
+	// later written, which is the order graph.StatedName reads them in.
+	type rank struct {
+		open         bool
+		opened, node int64
+	}
+	above := func(a, b rank) bool {
+		if a.open != b.open {
+			return a.open
+		}
+		if a.opened != b.opened {
+			return a.opened > b.opened
+		}
+		return a.node > b.node
+	}
+	byPair := map[[2]int64]rank{}
+	byComponent := map[int64]rank{}
 	for _, row := range rows {
 		named := graph.Component{Name: row.Name, Version: row.Version}
-		said.pair[[2]int64{row.BuildID, row.ComponentID}] = named
-		if row.Opened >= opened[row.ComponentID] {
-			opened[row.ComponentID] = row.Opened
-			said.latest[row.ComponentID] = named
+		at := rank{open: row.Closed == nil, opened: row.Opened, node: row.ID}
+		pair := [2]int64{row.BuildID, row.ComponentID}
+		if held, ok := byPair[pair]; !ok || above(at, held) {
+			byPair[pair], said.pair[pair] = at, named
+		}
+		if held, ok := byComponent[row.ComponentID]; !ok || above(at, held) {
+			byComponent[row.ComponentID], said.latest[row.ComponentID] = at, named
 		}
 	}
 	return said, nil

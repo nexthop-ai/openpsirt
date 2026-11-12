@@ -300,5 +300,31 @@ func TestAClosedRowIsShownByTheNameItsBuildLastStated(t *testing.T) {
 					row.Component, libnl.Name)
 			}
 		}
+
+		// And the list on a day it was open names it the same way.
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		if _, err := f.db.NewUpdate().Table("finding").Set(`"opened_at" = ?`, today.Add(-5*24*time.Hour)).
+			Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.NewUpdate().Table("finding").Set(`"closed_at" = ?`, today.Add(-3*24*time.Hour)).
+			Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NOT NULL`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		between := today.Add(-4 * 24 * time.Hour)
+		groups, _, err := f.store.Groups(ctx, f.holding(t, access.PublicRead), f.scope, 50, 0,
+			finding.Filter{OpenOn: &between})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(groups) == 0 {
+			t.Fatal("the list on a day the row was open holds nothing")
+		}
+		for _, group := range groups {
+			if group.Component != libnl.Name {
+				t.Errorf("the list on a day the row was open shows it as %q, want %q as the build"+
+					" last stated it", group.Component, libnl.Name)
+			}
+		}
 	})
 }
