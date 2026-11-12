@@ -490,8 +490,8 @@ function Administered() {
         : undefined,
   });
   const rows = changes.data?.items ?? [];
-  // Absent for somebody who is not an administrator, which is the refusal this
-  // section expects. A read that failed for any other reason is said, because
+  // A refusal draws nothing: the section is asked only of an administrator or
+  // an auditor, and one whose role was withdrawn since is refused. A read that failed for any other reason is said, because
   // an audit screen silently missing half of what it is for is the one place
   // a quiet absence costs the most.
   if (changes.isError) {

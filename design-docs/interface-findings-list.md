@@ -112,6 +112,7 @@ bump both start from a filtered set.
 | Assigning a selection in one product is one request, resolved on the server against the list's filter. A refusal is the whole act's and the selection stays; rows a colleague holds that the caller may not take stay selected with a count (`design-docs/access-assignment.md` § Assignment by narrowing) | |
 | Select all, offered on the batch bar in one product once something is ticked, takes every row the filter matches, counted by the list's total and naming no rows; a changed filter ends it | The server assigns what matches when the act lands |
 | Across products each row is its own request, and a loop over a selection survives a refusal: the rest are tried, failures stay selected with a count, and the undo control still appears | |
+| A hand-over reads again every list of who holds what, as a hand-back does: the home tiles, the assigned queues, the held reports and code findings | Each names what the person holds |
 
 ## The by-component view
 
@@ -136,7 +137,7 @@ close: a build's planned upgrades read from the triager's end.
 |---|---|
 | No action column; the package name opens the component, where the upgrade is planned: one source of three binaries is one upgrade and three links | |
 | Versions are listed and never ordered, one package once per version upstream released, with no nearest or latest | An ordering is per ecosystem |
-| The filters it cannot apply are named on the screen; it takes six of the list's | The rest ask about an occurrence, a deadline or an assignee |
+| The filters it cannot apply are named on the screen; it takes six of the list's. A filter the selection drops is in force nowhere and is not named | The rest ask about an occurrence, a deadline or an assignee |
 | Nothing counts occurrences: it says the packages moved, the issues closed, the builds holding it | An upgrade is a fold |
 | The word on screen is "upgrade" | The decisions' word |
 

@@ -47,6 +47,17 @@ function groupsOf(occurrences: Sitting[]): Group[] {
   return [...byConsumer.values()].sort((a, b) => b.items.length - a.items.length);
 }
 
+// The occurrences a decision names, or nothing where it covers every one
+// listed. An excluded occurrence no longer listed narrows nothing, so it does
+// not turn a decision over the whole fold into one over today's rows.
+export function namedOccurrences(
+  listed: { occurrence?: string }[],
+  excluded: Set<string>,
+): string[] | undefined {
+  const kept = listed.filter((each) => !excluded.has(each.occurrence ?? ""));
+  return kept.length < listed.length ? kept.map((each) => each.occurrence ?? "") : undefined;
+}
+
 export function Covering({
   occurrences,
   excluded,

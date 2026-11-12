@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { activeFilters, kindsOffered, without, withoutAny } from "./FindingsFilters";
+import { activeFilters, kindsOffered, unbumped, without, withoutAny } from "./FindingsFilters";
 import { BUMP_FILTERS, bumpQuery } from "./FindingsViews";
 import { listQuery } from "./list";
 
@@ -285,6 +285,17 @@ describe("a chip and the by-upgrade list", () => {
   });
 });
 
+describe("a chip and the by-upgrade list", () => {
+  it("names only filters in force over the selection as ones it cannot apply", () => {
+    const params = new URLSearchParams("beneath=openssl&state=undecided&state=affected");
+    const oneBuild = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
+    const wholeProduct = { product: "sonic", branch_or_tag: "", variant: "" };
+    expect(unbumped(params, oneBuild)).toHaveLength(2);
+    expect(unbumped(params, wholeProduct)).toEqual([unbumped(params, oneBuild)[1]]);
+    expect(unbumped(params, wholeProduct)[0]).toMatch(/past the first$/);
+  });
+});
+
 describe("a chip and where the list is asked", () => {
   it("draws none for a filter the selection leaves off the request", () => {
     const params = new URLSearchParams("beneath=openssl&differs=1&state=undecided");
@@ -306,6 +317,15 @@ describe("a chip and where the list is asked", () => {
     const params = new URLSearchParams("beneath=openssl&beneath_purl=pkg:github/a/b");
     expect(activeFilters(params).map((chip) => chip.key)).toEqual(["beneath"]);
     expect(listQuery(params)).not.toHaveProperty("beneath_purl");
+  });
+
+  it("widens to the whole build when that root's chip is removed, or every chip is", () => {
+    const params = new URLSearchParams("beneath=openssl&beneath_purl=pkg:github/a/b");
+    const chip = activeFilters(params).find((each) => each.key === "beneath");
+    expect(chip).toBeDefined();
+    if (!chip) return;
+    expect(without(params, chip).toString()).toBe("");
+    expect(withoutAny(params).toString()).toBe("");
   });
 });
 

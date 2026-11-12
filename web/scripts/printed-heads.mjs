@@ -25,15 +25,26 @@ function classOf(element) {
   return "";
 }
 
-// Every span directly under a screen head that holds an action and is not
-// marked `noprint`, as "file:line".
+// The elements one child of a head draws: itself, or what a condition in
+// braces draws on either arm.
+function drawn(node) {
+  if (ts.isJsxElement(node)) return [node];
+  if (ts.isJsxExpression(node)) return node.expression ? drawn(node.expression) : [];
+  if (ts.isParenthesizedExpression(node)) return drawn(node.expression);
+  if (ts.isBinaryExpression(node)) return drawn(node.right);
+  if (ts.isConditionalExpression(node)) return [...drawn(node.whenTrue), ...drawn(node.whenFalse)];
+  return [];
+}
+
+// Every span directly under a screen head, or drawn there by a condition,
+// that holds an action and is not marked `noprint`, as "file:line".
 export function printedActions(file, source) {
   const found = [];
   let examined = 0;
   const visit = (node) => {
     if (ts.isJsxElement(node) && /\bscreen-head\b/.test(classOf(node.openingElement))) {
-      for (const child of node.children) {
-        if (!ts.isJsxElement(child) || child.openingElement.tagName.getText() !== "span") continue;
+      for (const child of node.children.flatMap(drawn)) {
+        if (child.openingElement.tagName.getText() !== "span") continue;
         examined++;
         if (/\bnoprint\b/.test(classOf(child.openingElement))) continue;
         if (!ACTION.test(child.getText())) continue;

@@ -338,7 +338,7 @@ export function RecordFlaw() {
         {/* What was recorded here before. The screen that files one is where
             somebody asks whether it is already filed. */}
         {scope.product && (
-          <span style={{ marginLeft: "auto" }}>
+          <span className="noprint" style={{ marginLeft: "auto" }}>
             <Link
               className="btn quiet"
               to={productFindingsAt(scope.product, { origin: "manual", below: "yes" })}

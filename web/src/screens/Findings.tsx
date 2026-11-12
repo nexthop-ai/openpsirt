@@ -5,8 +5,9 @@ import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { questionIn, untaken, useSelection } from "./useSelection";
 import { DecidedNotice, FindingsTable, type Decided } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
-import { BUMP_FILTERS, ByBump, ByComponent, Pager } from "./FindingsViews";
-import { NAMED_AT_ONCE, useHandOver } from "./findingsHandover";
+import { ByBump, ByComponent, Pager } from "./FindingsViews";
+import { NAMED_AT_ONCE, listReads, useHandOver } from "./findingsHandover";
+import { useInvalidating } from "../api/invalidate";
 import { useFindingsViews } from "./findingsQueries";
 import {
   ASSIGNED,
@@ -15,6 +16,7 @@ import {
   Narrowed,
   STATES,
   activeFilters,
+  unbumped,
   without,
   withoutAny,
 } from "./FindingsFilters";
@@ -23,7 +25,7 @@ import { FLOORS } from "../ui/severities";
 import { findingsPath } from "../app/scope";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -89,11 +91,6 @@ const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
   word === "" ? "Any time" : label.replace(/^Due within/, "Within"),
 ]);
 
-// The filters the by-bump view can apply, by the key their chip carries. The
-// rest are named on that screen rather than dropped, which would widen the
-// list back out while the chips go on saying they are on.
-const BUMPABLE = new Set(Object.keys(BUMP_FILTERS));
-
 // One row per issue in a component, not per occurrence. Every filter is in the URL,
 // so a link carries what somebody is looking at; every filter is the server's,
 // so the total beside the list counts the same thing the list shows.
@@ -140,7 +137,8 @@ export function Findings() {
   const beneath = params.get("beneath") ?? "";
   // Every component of one package, as a repository shipped at several
   // commits is asked.
-  const beneathPackage = params.get("beneath_purl") ?? "";
+  // Named alone: where a component root is named too, the list sends that.
+  const beneathPackage = beneath ? "" : (params.get("beneath_purl") ?? "");
   // Everything else the list narrows by is read where the panel draws it.
   // Pulled apart here, one variable per filter, each would have to be threaded
   // through to the control that sets it, and the count of what is on would
@@ -156,11 +154,15 @@ export function Findings() {
   // travels with a link like any other filter.
   const asked = useMemo(() => asAsked(params, view), [params, view]);
   const scope = { product, branch_or_tag: branchOrTag, variant };
-  const advanced = activeFilters(asked, undefined, scope).length;
+  const chips = useMemo(
+    () => activeFilters(asked, undefined, { product, branch_or_tag: branchOrTag, variant }),
+    [asked, product, branchOrTag, variant],
+  );
+  const advanced = chips.length;
   // What narrows the list from behind More filters, which is every chip but
   // the ones the bar sets itself — so the count on that button is about what
   // it opens.
-  const elsewhere = activeFilters(asked, undefined, scope).filter(
+  const elsewhere = chips.filter(
     (each) =>
       !ON_THE_BAR.has(each.key) && !(each.key === "opened_after" && each.value === daysBack(1)),
   ).length;
@@ -314,7 +316,6 @@ export function Findings() {
     return one?.prepares ? { name: one.name, prepares: one.prepares } : null;
   }, [kept.data, params, declined]);
 
-  const queries = useQueryClient();
   // The labels people have put on findings here, for the filter to offer.
   // Read only while the panel that uses it is open: it is a per-product list
   // nobody needs unless they are narrowing by one.
@@ -344,7 +345,7 @@ export function Findings() {
   });
   // The names of the weaknesses the address narrows by, for their chips.
   const weaknessNames = useWeaknessNames(asked.getAll("weakness"));
-  const { hand, handMatching } = useHandOver({ product, query, selection, buildOf });
+  const { hand, handMatching, handed } = useHandOver({ product, query, selection, buildOf });
   const { findings, byIssue, byComponent, byUpgrade } = useFindingsViews({
     product,
     branch_or_tag: branchOrTag,
@@ -383,24 +384,7 @@ export function Findings() {
     };
   }
 
-  // The reads a write here makes stale.
-  //
-  // Three keys rather than one: the view counts are held for five minutes, and
-  // two of the three are not under the `findings` prefix — so a triager who
-  // decided a page of rows in place saw two numbers, drawn side by side with a
-  // third that had moved, still quoting the figures from before their own
-  // writes. That is the half of the rule the hold is justified under: a number
-  // that is wrong in a way nothing reports.
-  function reread() {
-    for (const key of [
-      ["findings"],
-      ["findings-by-component"],
-      ["planned-upgrades"],
-      ["holdings"],
-    ]) {
-      void queries.invalidateQueries({ queryKey: key });
-    }
-  }
+  const reread = useInvalidating(listReads);
 
   // Every change to the question the list is asking goes through the hook that
   // holds the selection, which is where the rule that a changed question
@@ -870,19 +854,9 @@ export function Findings() {
           query={query}
           offset={offset}
           size={page}
-          // A bump has no occurrence, no deadline and no assignee, so the filters
-          // that ask about one have no row here to narrow. Named on screen
-          // rather than dropped quietly — and the three this view does take
-          // take one value each, so a second value asked for is named here
-          // too rather than sent nowhere while the chip above says it is on.
-          cannot={[
-            ...activeFilters(asked)
-              .filter((each) => !BUMPABLE.has(each.key))
-              .map((each) => each.label),
-            ...activeFilters(asked)
-              .filter((each) => BUMPABLE.has(each.key) && asked.getAll(each.key).length > 1)
-              .map((each) => each.label + " past the first"),
-          ]}
+          // Named on screen, because dropping one quietly widens the rows
+          // while its chip above says it is on.
+          cannot={unbumped(asked, scope)}
           onPage={go}
         />
       </>
@@ -967,14 +941,14 @@ export function Findings() {
       }
       setStayed((done.left ?? []).length);
       setEveryFor(null);
-      reread();
+      handed();
       setHanding("");
       return;
     }
     await through((row: Row) => hand.mutateAsync({ row, who, team }));
-    // Once, after the loop. On every write it put a list refetch between each
-    // of them, so a long selection spent its time refetching.
-    reread();
+    // Once, after the loop: invalidating on every write puts a list refetch
+    // between each of them.
+    handed();
     setHanding("");
   }
 
