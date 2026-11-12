@@ -295,7 +295,9 @@ func calledBy(body *ast.BlockStmt, imported map[string]bool) []string {
 		case *ast.Ident:
 			called = append(called, fun.Name)
 		case *ast.SelectorExpr:
-			if pkg, ok := fun.X.(*ast.Ident); ok && imported[pkg.Name] {
+			// A name the parser resolved to a declaration in this file is a
+			// local, whatever import it shares a name with.
+			if pkg, ok := fun.X.(*ast.Ident); ok && pkg.Obj == nil && imported[pkg.Name] {
 				return true
 			}
 			called = append(called, "."+fun.Sel.Name)

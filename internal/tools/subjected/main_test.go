@@ -105,13 +105,15 @@ func twice(a int) int { return a * 2 }
 
 func TestACallIntoAnotherPackageIsNotTakenForOneOfThisPackages(t *testing.T) {
 	// strings.Replace is not this package's Replace, whatever that does, and
-	// a method of an unexported type is reached through this package alone.
+	// a method of an unexported type is reached through this package alone. A
+	// local named as an import could be is still this package's.
 	source := []byte(`package sourcelink
 
 import (
 	"strings"
 
 	text "example.com/typed/v2"
+	"example.com/x-store"
 )
 
 func (s *Store) Replace(ctx context.Context, id int64) error {
@@ -123,6 +125,8 @@ func Normalize(remote string) string { return strings.Replace(remote, ":", "/", 
 func Fold(typed string) string { return text.Replace(typed) }
 
 func Local(ctx context.Context, s *Store) error { return s.Replace(ctx, 1) }
+
+func Shadowed(ctx context.Context, store *Store) error { return store.Replace(ctx, 1) }
 
 func (c *chunks) Read(ctx context.Context) error {
 	return c.db.NewSelect().Scan(ctx)
@@ -139,6 +143,7 @@ func (c *chunks) Read(ctx context.Context) error {
 	for name, want := range map[string]bool{
 		"sourcelink.Store.Replace": true,
 		"sourcelink.Local":         true,
+		"sourcelink.Shadowed":      true,
 		"sourcelink.Normalize":     false,
 		"sourcelink.Fold":          false,
 		"sourcelink.chunks.Read":   false,
