@@ -413,7 +413,12 @@ func TestASignedProviderSignsEveryDocument(t *testing.T) {
 // testKey is a signing key made for one test, never committed.
 func testKey(t *testing.T) string {
 	t.Helper()
-	created := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	return testKeyMadeAt(t, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+}
+
+// testKeyMadeAt is a signing key made for one test, created at the moment given.
+func testKeyMadeAt(t *testing.T, created time.Time) string {
+	t.Helper()
 	cfg := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, Time: func() time.Time { return created }}
 	entity, err := openpgp.NewEntity("Example PSIRT", "", "psirt@example.test", cfg)
 	if err != nil {
@@ -431,6 +436,68 @@ func testKey(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return out.String()
+}
+
+// A reader holding a signature made by a key since replaced is sent the new
+// key's signature, whether it asks by tag or by date: the provider description
+// names only the new key, so the old signature no longer verifies against
+// anything the provider lists.
+func TestASignatureByAReplacedKeyIsSentAgain(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		// Released a day ago, so a key made now is newer than every document.
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
+			Set(`"current_at" = ?`, time.Now().UTC().Add(-24*time.Hour)).
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		before, err := signing.Read(testKey(t), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		after, err := signing.Read(testKeyMadeAt(t, time.Now().UTC().Add(-time.Minute)), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		old, replaced := surfaceOver(w, 1000, before), surfaceOver(w, 1000, after)
+		var path string
+		for _, one := range strings.Fields(string(old.body(publish.IndexPath))) {
+			if strings.Contains(one, "/vex-") {
+				path = publish.DirectoryPath + one + publish.SignatureSuffix
+			}
+		}
+		if path == "" {
+			t.Fatal("the index lists no CSAF VEX document")
+		}
+		held := old.get(http.MethodGet, path, nil)
+		if held.Code != http.StatusOK {
+			t.Fatalf("GET %s = %d", path, held.Code)
+		}
+		if rec := old.get(http.MethodGet, path,
+			map[string]string{"If-None-Match": held.Header().Get("ETag")}); rec.Code != http.StatusNotModified {
+			t.Fatalf("the same key asked again by tag = %d, want 304", rec.Code)
+		}
+		for name, value := range map[string]string{
+			"If-None-Match":     held.Header().Get("ETag"),
+			"If-Modified-Since": held.Header().Get("Last-Modified"),
+		} {
+			rec := replaced.get(http.MethodGet, path, map[string]string{name: value})
+			if rec.Code != http.StatusOK {
+				t.Errorf("a signature by the replaced key asked again by %s = %d, want 200",
+					name, rec.Code)
+				continue
+			}
+			keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(after.PublicKey()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc := replaced.body(strings.TrimSuffix(path, publish.SignatureSuffix))
+			if _, err := openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(doc),
+				bytes.NewReader(rec.Body.Bytes()), nil); err != nil {
+				t.Errorf("the signature sent again does not verify against the new key: %v", err)
+			}
+		}
+	})
 }
 
 // An advisory is served only where it may travel and every product it covers

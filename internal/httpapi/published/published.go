@@ -377,24 +377,31 @@ func (s *server) document(ctx context.Context, v *view, path string) (*file, err
 }
 
 // signature is the detached signature over one document, dated when the
-// document was released.
+// document was released, or when the key became valid where that is later.
 //
-// Tagged by the document it signs rather than by its own bytes, which carry a
-// random salt and differ every time: a reader holding the signature of an
-// unchanged document is told so, without the key being used again.
+// Tagged by the document it signs and the key signing it rather than by its
+// own bytes, which carry a random salt and differ every time: a reader holding
+// the signature of an unchanged document is told so, without the key being
+// used again, and one holding a signature by a key no longer configured is
+// sent the new one. Dated the way the signature is, so a key newer than the
+// document makes every earlier copy stale to a reader asking by date.
 func (s *server) signature(document *file, asked string) (*file, error) {
 	if s.Signer == nil {
 		return nil, publish.ErrNotPublished
 	}
-	tag := strings.TrimSuffix(tagOf(document.body), `"`) + `.asc"`
+	tag := strings.TrimSuffix(tagOf(document.body), `"`) + "." + s.Signer.Fingerprint() + `.asc"`
+	modified := document.modified
+	if s.Signer.From().After(modified) {
+		modified = s.Signer.From()
+	}
 	if asked == tag {
-		return &file{tag: tag, kind: signatureKind, modified: document.modified}, nil
+		return &file{tag: tag, kind: signatureKind, modified: modified}, nil
 	}
 	signed, err := s.Signer.Sign(document.body, document.modified)
 	if err != nil {
 		return nil, err
 	}
-	return &file{tag: tag, body: signed, kind: signatureKind, modified: document.modified}, nil
+	return &file{tag: tag, body: signed, kind: signatureKind, modified: modified}, nil
 }
 
 // digestFile is the file holding a document's digest: the value and then the

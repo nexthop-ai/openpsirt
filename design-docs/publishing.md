@@ -71,7 +71,7 @@ document is about disclosed work in it (REQ-63, REQ-37).
 | Nothing names a row: paths and identifiers are built from names | |
 | Every answer carries an entity tag; a document and its files also the moment it last moved; a request repeating either answers 304 | A list carries no date, since one that shrank is newer than its newest document |
 | `Cache-Control: public, no-cache` | A reader asks every time and fetches only what changed |
-| A signature is tagged by the document it signs | Its bytes carry a random salt, so an unchanged document's signature is confirmed without signing again |
+| A signature is tagged by the document it signs and the signing key's fingerprint, and dated at the later of the document's release and the key becoming valid | Its bytes carry a random salt, so an unchanged document's signature is confirmed without signing again; a reader holding one by a replaced key is sent the new one |
 | A list reads every document's name and dates; a VEX document is read alone. Advisories' bytes are read only for the CSAF lists and for a CSAF path holding no VEX document | A whole-provider reader asks for each document and its files, and none of those lists the rest |
 | A VEX document is looked for before an advisory | Where an advisory's tracking identifier folds to a VEX document's path, the VEX document is served |
 | The feed and the description state the newest document's release, never the clock | An unchanged provider answers the same bytes |
@@ -208,6 +208,8 @@ A revision is a fact about a moment: recorded, and read by requests.
 | Each signature carries a random salt, and each verifies | |
 | A signature is dated no earlier than the key's newest self-signature | Extending expiry or adding a name leaves older documents signable |
 | Digests are worked out on request | |
+| A key expiring is logged as a warning from 30 days before, at start and daily, and as an error once expired | A key past expiry signs nothing dated after it, and the next start is refused |
+| A signature refused for an expired key names the key, the expiry and the document's date | |
 
 ## The publishing pass
 

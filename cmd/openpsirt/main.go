@@ -705,6 +705,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 		branches:  branches,
 		records:   records,
 		documents: documents,
+		key:       signing.NewWatch(from.signer, logger),
 	}, nil
 }
 
