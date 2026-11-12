@@ -24,13 +24,49 @@ func unportable(path string) string {
 			return segment + " holds a character Windows refuses in a file name"
 		case strings.HasSuffix(segment, ".") || strings.HasSuffix(segment, " "):
 			return segment + " ends in a dot or a space, which Windows drops"
+		case strings.ContainsFunc(segment, func(r rune) bool { return r < 0x20 }):
+			return strings.ToValidUTF8(segment, "?") + " holds a control character Windows refuses in a file name"
 		}
 	}
 	return ""
 }
 
+// collisions is every pair of paths, or of directories along them, that differ
+// only in capitals, so a checkout on a filesystem that ignores case writes one
+// over the other.
+func collisions(paths []string) []string {
+	seen := map[string]string{}
+	var found []string
+	for _, path := range paths {
+		segments := strings.Split(path, "/")
+		for i := range segments {
+			prefix := strings.Join(segments[:i+1], "/")
+			folded := strings.ToLower(prefix)
+			if was, ok := seen[folded]; !ok {
+				seen[folded] = prefix
+			} else if was != prefix {
+				found = append(found, prefix+" and "+was+" differ only in capitals")
+				break
+			}
+		}
+	}
+	return found
+}
+
+func TestPathsDifferingOnlyInCapitalsAreReported(t *testing.T) {
+	if got := collisions([]string{"a/README.md", "a/Readme.md"}); len(got) != 1 {
+		t.Errorf("two files folding to one name reported %v", got)
+	}
+	if got := collisions([]string{"a/Docs/x.md", "a/docs/y.md"}); len(got) != 1 {
+		t.Errorf("two directories folding to one name reported %v", got)
+	}
+	if got := collisions([]string{"a/README.md", "a/docs/README.md", "b/readme.txt"}); len(got) != 0 {
+		t.Errorf("distinct paths reported %v", got)
+	}
+}
+
 func TestAPathWindowsCannotCheckOutIsReported(t *testing.T) {
-	for _, path := range []string{"internal/core/nul.go", "a/CON", "a/b:c.go", "a/b."} {
+	for _, path := range []string{"internal/core/nul.go", "a/CON", "a/b:c.go", "a/b.", "a/b\tc.go", "a/\x01"} {
 		if unportable(path) == "" {
 			t.Errorf("%s passed", path)
 		}
@@ -57,5 +93,8 @@ func TestEveryTrackedPathChecksOutOnWindows(t *testing.T) {
 		if why := unportable(path); why != "" {
 			t.Errorf("%s: %s", path, why)
 		}
+	}
+	for _, collision := range collisions(paths) {
+		t.Error(collision)
 	}
 }
