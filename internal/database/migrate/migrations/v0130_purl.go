@@ -5,6 +5,7 @@ package migrations
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -37,7 +38,68 @@ func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
 	if err != nil {
 		return err
 	}
-	return publishedPurlsV0130(ctx, tx, cleaned, purlBatchV0130)
+	if err := publishedPurlsV0130(ctx, tx, cleaned, purlBatchV0130); err != nil {
+		return err
+	}
+	return remoteCredentialsV0130(ctx, tx, purlBatchV0130)
+}
+
+// remoteColumnsV0130 is each table and column holding a repository remote an
+// upload stated.
+var remoteColumnsV0130 = [][2]string{{"graph_node", "repository"}, {"series_module", "remote"}}
+
+// remoteCredentialsV0130 rewrites each remote written without a scheme that
+// holds an "@" or a question mark as v0.13.0 stores it, and one that cannot
+// be read as no remote. A remote with a scheme v0.12.0 already stored without
+// its credential.
+func remoteCredentialsV0130(ctx context.Context, tx bun.Tx, batch int) error {
+	for _, at := range remoteColumnsV0130 {
+		table, column := at[0], at[1]
+		for after := int64(0); ; {
+			type held struct {
+				id     int64
+				remote string
+			}
+			rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
+				WHERE "id" > ? AND ("`+column+`" LIKE ? OR "`+column+`" LIKE ?) AND "`+column+`" NOT LIKE ?
+				ORDER BY "id" LIMIT ?`, after, "%@%", "%?%", "%://%", batch)
+			if err != nil {
+				return fmt.Errorf("read the remotes of %s: %w", table, err)
+			}
+			var found []held
+			read := 0
+			for rows.Next() {
+				var row held
+				if err := rows.Scan(&row.id, &row.remote); err != nil {
+					_ = rows.Close()
+					return fmt.Errorf("read a remote of %s: %w", table, err)
+				}
+				read++
+				after = row.id
+				if clean := remoteWithoutCredentialV0130(row.remote); clean != row.remote {
+					found = append(found, held{id: row.id, remote: clean})
+				}
+			}
+			if err := rows.Close(); err != nil {
+				return fmt.Errorf("read the remotes of %s: %w", table, err)
+			}
+			if err := rows.Err(); err != nil {
+				return fmt.Errorf("read the remotes of %s: %w", table, err)
+			}
+			for _, row := range found {
+				// No remote is stored as none, as an upload's is.
+				value := sql.NullString{String: row.remote, Valid: row.remote != ""}
+				if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "`+column+`" = ? WHERE "id" = ?`,
+					value, row.id); err != nil {
+					return fmt.Errorf("clean the remote of %s %d: %w", table, row.id, err)
+				}
+			}
+			if read < batch {
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // purlCredentialsInBatchesV0130 cleans as purlCredentialsV0130 does, reading
@@ -179,29 +241,30 @@ func purlWithoutCredentialV0130(purl string) string {
 	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
-	addressLast := false
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
 		if !found {
-			addressLast = false
 			kept = append(kept, pair)
 			continue
 		}
 		address, err := url.PathUnescape(value)
 		if err != nil {
-			addressLast = false
+			if queryUnescapedV0130(value) {
+				break
+			}
 			continue
 		}
-		addressLast = strings.Contains(address, "://")
-		if !addressLast {
-			bare, held := withoutPasswordV0130(address)
-			if at := strings.IndexAny(bare, "?#"); at >= 0 {
-				bare, held = bare[:at], true
+		if !strings.Contains(address, "://") {
+			bare, readable := withoutPasswordV0130(address)
+			if readable {
+				if at := strings.IndexAny(bare, "?#"); at >= 0 {
+					bare = bare[:at]
+				}
+				if bare != address {
+					pair = key + "=" + qualifierEscapedV0130(bare)
+				}
+				kept = append(kept, pair)
 			}
-			if held {
-				pair = key + "=" + qualifierEscapedV0130(bare)
-			}
-			kept = append(kept, pair)
 			if queryUnescapedV0130(value) {
 				break
 			}
@@ -235,7 +298,7 @@ func purlWithoutCredentialV0130(purl string) string {
 	if len(kept) > 0 {
 		purl += "?" + strings.Join(kept, "&")
 	}
-	if hasSubpath && (!addressLast || !strings.Contains(subpath, "=")) {
+	if hasSubpath && !strings.Contains(subpath, "=") {
 		purl += "#" + subpath
 	}
 	return purl
@@ -252,19 +315,46 @@ func queryUnescapedV0130(value string) bool {
 	return at >= 0 && strings.Contains(value[at:], "=")
 }
 
-// withoutPasswordV0130 is an address written without a scheme with the user
-// and password written before its host taken out, and whether it held one. A
-// user with no password is kept, as an scp-style address names one.
+// withoutPasswordV0130 is an address written without a scheme with a user
+// and password written before its host taken out, and whether it can be read
+// at all. A user with no password is kept, as an scp-style address names one.
+// A colon before the first slash with no "@" there, and an "@" after it,
+// cannot be read.
 func withoutPasswordV0130(address string) (string, bool) {
-	end := strings.IndexAny(address, "/?#")
-	if end < 0 {
-		end = len(address)
+	head := address
+	if end := strings.IndexAny(head, "?#"); end >= 0 {
+		head = head[:end]
 	}
-	at := strings.LastIndex(address[:end], "@")
-	if at <= 0 || at == end-1 || !strings.Contains(address[:at], ":") {
-		return address, false
+	host := head
+	if end := strings.IndexByte(host, '/'); end >= 0 {
+		host = host[:end]
 	}
-	return address[at+1:], true
+	if at := strings.LastIndex(host, "@"); at >= 0 {
+		if at > 0 && at < len(host)-1 && strings.Contains(host[:at], ":") {
+			return address[at+1:], true
+		}
+		return address, true
+	}
+	if strings.Contains(host, ":") && strings.Contains(head[len(host):], "@") {
+		return "", false
+	}
+	return address, true
+}
+
+// remoteWithoutCredentialV0130 is a remote written without a scheme as
+// v0.13.0 stores one: without a password before its host or a query. A
+// remote with a scheme v0.12.0 already stored that way, and is returned as it
+// is.
+func remoteWithoutCredentialV0130(remote string) string {
+	if strings.Contains(remote, "://") {
+		return remote
+	}
+	bare, readable := withoutPasswordV0130(remote)
+	if !readable {
+		return ""
+	}
+	bare, _, _ = strings.Cut(bare, "?")
+	return bare
 }
 
 // qualifierEscapedV0130 percent-encodes a qualifier's value, leaving the

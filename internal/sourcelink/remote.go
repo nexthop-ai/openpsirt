@@ -56,12 +56,18 @@ func parse(remote string) (host, path string) {
 }
 
 // WithoutCredential is a remote with any credential and query taken out of
-// it, where it is written as an address. A remote comes from an upload, and a
-// token in it would reach every reader of what it is shown on.
+// it. A remote comes from an upload, and a token in it would reach every
+// reader of what it is shown on. One whose credential cannot be told apart
+// from the rest is not shown.
 func WithoutCredential(remote string) string {
 	s := strings.TrimSpace(remote)
 	if !strings.Contains(s, "://") {
-		return s
+		bare, readable := WithoutPassword(s)
+		if !readable {
+			return ""
+		}
+		bare, _, _ = strings.Cut(bare, "?")
+		return bare
 	}
 	u, err := url.Parse(s)
 	if err != nil {
@@ -71,6 +77,35 @@ func WithoutCredential(remote string) string {
 	}
 	u.User, u.RawQuery, u.ForceQuery = nil, "", false
 	return u.String()
+}
+
+// WithoutPassword is an address written without a scheme, such as a purl's
+// `repository_url` or an scp-style remote, with a user and password written
+// before its host taken out, and whether it can be read at all.
+//
+// A user with no password is kept: it is the account an scp-style address
+// such as `git@host:path` names. A colon before the first slash with no `@`
+// there, and an `@` after it, is a password holding a slash or a path holding
+// an `@`; the two cannot be told apart, so it cannot be read.
+func WithoutPassword(address string) (string, bool) {
+	head := address
+	if end := strings.IndexAny(head, "?#"); end >= 0 {
+		head = head[:end]
+	}
+	host := head
+	if end := strings.IndexByte(host, '/'); end >= 0 {
+		host = host[:end]
+	}
+	if at := strings.LastIndex(host, "@"); at >= 0 {
+		if at > 0 && at < len(host)-1 && strings.Contains(host[:at], ":") {
+			return address[at+1:], true
+		}
+		return address, true
+	}
+	if strings.Contains(host, ":") && strings.Contains(head[len(host):], "@") {
+		return "", false
+	}
+	return address, true
 }
 
 // relative is whether a remote is written relative to the repository that

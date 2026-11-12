@@ -50,6 +50,9 @@ func TestACredentialIsTakenOutOfARemote(t *testing.T) {
 		"git@github.com:a/b.git":                                    "git@github.com:a/b.git",
 		"../sibling.git":                                            "../sibling.git",
 		"https://SECRET@[::1/x":                                     "",
+		"oauth2:SECRET@gitlab.example.com:g/p.git":                  "gitlab.example.com:g/p.git",
+		"gitlab.example.com/g/p.git?private_token=SECRET":           "gitlab.example.com/g/p.git",
+		"deploy:ab/SECRET@gitlab.example.com:g/p.git":               "",
 	} {
 		if got := WithoutCredential(remote); got != want {
 			t.Errorf("%q is %q; want %q", remote, got, want)

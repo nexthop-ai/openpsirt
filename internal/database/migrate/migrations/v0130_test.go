@@ -202,6 +202,12 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 			{"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git",
 				"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git"},
 			{"pkg:generic/c@1?checksum=sha256:abc123", "pkg:generic/c@1?checksum=sha256:abc123"},
+			{"pkg:generic/ux@1?download_url=https://h.example.com/a%zz?x=1&token=SECRET&arch=amd64",
+				"pkg:generic/ux@1"},
+			{"pkg:golang/example.com/sl@v1?repository_url=deploy:ab%2FSECRET@gitlab.example.com:grp/x.git&arch=amd64",
+				"pkg:golang/example.com/sl@v1?arch=amd64"},
+			{"pkg:golang/example.com/fr@v1?repository_url=gitlab.example.com/x.git#private_token=SECRET",
+				"pkg:golang/example.com/fr@v1?repository_url=gitlab.example.com/x.git"},
 			{"pkg:generic/bp@1?download_url=https://b.example.com:abc/s3.bin?X-Amz-Credential=A&X-Amz-Signature=SECRET",
 				"pkg:generic/bp@1"},
 			{"pkg:maven/org/rq@1?repository_url=repo.example.com/maven?private_token=SECRET&type=jar",
@@ -327,3 +333,87 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
 		leaveAtLatest(t, ctx, db)
 	})
 }
+
+// A remote a node holds, written without a scheme, loses a password before its
+// host and its query, and one whose credential cannot be told apart is no
+// remote.
+func TestTheV0130UpgradeTakesCredentialsOutOfRemotes(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0120)
+		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+		exec := func(query string, args ...any) {
+			t.Helper()
+			if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+		}
+		id := func(query string) int64 {
+			t.Helper()
+			var out int64
+			if err := db.DB.NewRaw(query).Scan(ctx, &out); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+			return out
+		}
+		//nolint:gosec // G101: the credentials this upgrade takes out
+		cases := []struct {
+			stored string
+			want   *string
+		}{
+			{"oauth2:SECRET@gitlab.example.com:g/p.git", ptr("gitlab.example.com:g/p.git")},
+			{"gitlab.example.com/g/p.git?private_token=SECRET", ptr("gitlab.example.com/g/p.git")},
+			{"deploy:ab/SECRET@gitlab.example.com:g/p.git", nil},
+			{"git@github.com:a/b.git", ptr("git@github.com:a/b.git")},
+			{"https://github.com/a/b.git", ptr("https://github.com/a/b.git")},
+		}
+		exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
+		product := id(`SELECT MAX("id") FROM "product"`)
+		exec(`INSERT INTO "branch_or_tag" ("product_id", "name", "display_name", "kind", "created_at")
+			VALUES (?, ?, ?, ?, ?)`, product, "main", "main", "branch", at)
+		line := id(`SELECT MAX("id") FROM "branch_or_tag"`)
+		exec(`INSERT INTO "variant" ("product_id", "name", "display_name", "customer_facing", "created_at")
+			VALUES (?, ?, ?, ?, ?)`, product, "image", "Image", true, at)
+		variant := id(`SELECT MAX("id") FROM "variant"`)
+		exec(`INSERT INTO "build" ("branch_or_tag_id", "variant_id", "created_at") VALUES (?, ?, ?)`,
+			line, variant, at)
+		build := id(`SELECT MAX("id") FROM "build"`)
+		exec(`INSERT INTO "scan" ("build_id", "content_hash", "built_at", "received_at", "parser_version",
+			"status", "components") VALUES (?, ?, ?, ?, ?, ?, ?)`, build, "hash", at, at, "test", "accepted", 1)
+		scan := id(`SELECT MAX("id") FROM "scan"`)
+		for i, c := range cases {
+			key := fmt.Sprintf("identity-%d", i)
+			exec(`INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key",
+				"first_seen_at") VALUES (?, ?, ?, ?, ?, ?)`, key, "x", "1", "x", key, at)
+			component := id(`SELECT MAX("id") FROM "component"`)
+			exec(`INSERT INTO "graph_node" ("build_id", "component_id", "is_root", "opened_scan_id", "repository")
+				VALUES (?, ?, ?, ?, ?)`, build, component, false, scan, c.stored)
+		}
+
+		dbtest.MigrateTo(t, db, v0130)
+
+		// No remote reads as a word no remote is, since a scan of a null into
+		// a string reads as empty.
+		var got []string
+		if err := db.DB.NewRaw(`SELECT COALESCE("repository", '(none)') FROM "graph_node" ORDER BY "id"`).
+			Scan(ctx, &got); err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != len(cases) {
+			t.Fatalf("the build holds %d nodes after the upgrade, want %d", len(got), len(cases))
+		}
+		for i, c := range cases {
+			want := "(none)"
+			if c.want != nil {
+				want = *c.want
+			}
+			if got[i] != want {
+				t.Errorf("%q is held as %q after the upgrade, want %q", c.stored, got[i], want)
+			}
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+func ptr(s string) *string { return &s }

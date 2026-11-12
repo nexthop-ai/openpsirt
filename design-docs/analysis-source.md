@@ -67,7 +67,7 @@ administrative trail.
 |---|---|
 | A path is in the run repository with the longest prefix holding it | `src/sonic-sairedis/SAI/inc/saiport.h` is `inc/saiport.h` in SAI, at SAI's commit |
 | A relative remote resolves against its parent's remote; an SSH remote reads as its host and path | `.gitmodules` uses both |
-| A remote is recorded and shown without credential or query | A token would reach every reader |
+| A remote is recorded and shown without credential or query, with a scheme or without one; one without a scheme that holds a colon before its first slash, no `@` there and an `@` after it is not recorded | A token would reach every reader, and a password holding a slash cannot be told from a path holding an `@` |
 | A remote on no host the product names is unlinked text | Its host is the uploader's choice |
 | A revision links only as a commit, 7 to 64 hexadecimal digits | A branch moves, and `?` or `#` would steer the link |
 | Each segment is percent-encoded; an empty, `.` or `..` segment unlinks the place | |

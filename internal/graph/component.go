@@ -28,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // Component is a package at a version, shared across every product that ships
@@ -263,33 +264,35 @@ func StoredPurl(purl string) string {
 	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
-	addressLast := false
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
 		if !found {
-			addressLast = false
 			kept = append(kept, pair)
 			continue
 		}
 		address, err := url.PathUnescape(value)
 		if err != nil {
 			// An escape that does not decode hides where an address and its
-			// credential end, so the pair is not kept.
-			addressLast = false
+			// credential end, so the pair is not kept, and neither is a query
+			// written after it.
+			if queryUnescaped(value) {
+				break
+			}
 			continue
 		}
-		addressLast = strings.Contains(address, "://")
-		if !addressLast {
+		if !strings.Contains(address, "://") {
 			// An address written without a scheme loses a password before
 			// its host and anything from its query on.
-			bare, held := withoutPassword(address)
-			if at := strings.IndexAny(bare, "?#"); at >= 0 {
-				bare, held = bare[:at], true
+			bare, readable := sourcelink.WithoutPassword(address)
+			if readable {
+				if at := strings.IndexAny(bare, "?#"); at >= 0 {
+					bare = bare[:at]
+				}
+				if bare != address {
+					pair = key + "=" + qualifierEscaped(bare)
+				}
+				kept = append(kept, pair)
 			}
-			if held {
-				pair = key + "=" + qualifierEscaped(bare)
-			}
-			kept = append(kept, pair)
 			if queryUnescaped(value) {
 				break
 			}
@@ -329,9 +332,9 @@ func StoredPurl(purl string) string {
 	if len(kept) > 0 {
 		purl += "?" + strings.Join(kept, "&")
 	}
-	// A subpath after an address holding a value is that address's fragment,
-	// written unescaped, and is not kept.
-	if hasSubpath && (!addressLast || !strings.Contains(subpath, "=")) {
+	// A subpath holding a value after the qualifiers is the fragment of an
+	// address, written unescaped, and is not kept.
+	if hasSubpath && !strings.Contains(subpath, "=") {
 		purl += "#" + subpath
 	}
 	return purl
@@ -347,22 +350,6 @@ func queryUnescaped(value string) bool {
 	}
 	at := strings.Index(strings.ToLower(value), "%3f")
 	return at >= 0 && strings.Contains(value[at:], "=")
-}
-
-// withoutPassword is an address written without a scheme, such as a
-// `repository_url`, with the user and password written before its host taken
-// out, and whether it held one. A user with no password is kept: it is the
-// account an scp-style address such as `git@host:path` names.
-func withoutPassword(address string) (string, bool) {
-	end := strings.IndexAny(address, "/?#")
-	if end < 0 {
-		end = len(address)
-	}
-	at := strings.LastIndex(address[:end], "@")
-	if at <= 0 || at == end-1 || !strings.Contains(address[:at], ":") {
-		return address, false
-	}
-	return address[at+1:], true
 }
 
 // qualifierEscaped percent-encodes a qualifier's value, leaving the
