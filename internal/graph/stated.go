@@ -72,6 +72,11 @@ func BuildName(build, componentID, component string) string {
 	return statedColumn("name", build, componentID, component)
 }
 
+// BuildFolded is BuildName's fold, which a name is matched on.
+func BuildFolded(build, componentID, component string) string {
+	return statedColumn("name_folded", build, componentID, component)
+}
+
 // BuildVersion is BuildName's version.
 func BuildVersion(build, componentID, component string) string {
 	return statedColumn("version", build, componentID, component)

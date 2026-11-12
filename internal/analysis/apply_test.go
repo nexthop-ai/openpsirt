@@ -1219,3 +1219,29 @@ func TestACodeFindingOnARootRenamedSinceIsOnTheBuild(t *testing.T) {
 		}
 	})
 }
+
+func TestACodeFindingOnAVersionMovedOffPairsByTheNameTheBuildStated(t *testing.T) {
+	// Another build described FRR 10.2 first and named the component row; this
+	// build states it as frr, and moves to frr 10.3. The version it left is
+	// replaced by the one it moved to, as the build's inventory names both.
+	eachWorld(t, func(t *testing.T, w *world) {
+		other := w.BuildFor(w.Tag, w.Customer).ID
+		w.inventoryWith(t, other, graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frrouting", Version: "10.2"})
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		left := w.frr
+		w.inventoryAt(t, w.Build.ID, "inventory-frr-moved", time.Now().UTC().Add(-30*time.Minute),
+			graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"},
+			graph.Described{Purl: "pkg:github/frrouting/frr@10.3", Name: "frr", Version: "10.3"})
+		replaced, err := replacedIn(t.Context(), w.DB.DB, w.Build.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if live := replaced[left]; len(live) != 1 || live[0] != w.frr {
+			t.Errorf("the version the build moved off is replaced by %v, want frr 10.3 (%d)", live, w.frr)
+		}
+	})
+}

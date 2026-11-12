@@ -631,3 +631,33 @@ func TestTheSameDocumentAgainRecordsWhenItWasSaid(t *testing.T) {
 		}
 	})
 }
+
+// A statement dated the epoch keeps that time when a revision repeats it,
+// rather than reading as dated nothing.
+func TestAStatementDatedTheEpochKeepsItsTime(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		epoch := time.Unix(0, 0).UTC()
+		record := func(digest string) {
+			t.Helper()
+			if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: "epoch",
+					Document: "epoch.json", Digest: digest, SaidAt: &epoch},
+				[]finding.Statement{{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+					Component: "zlib1g", About: "1.3", Status: "not_affected"}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record("sha256:1")
+		record("sha256:2")
+		var at []time.Time
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("said_at").
+			Where(`"document_id" = ?`, "epoch").Where(`"said_at" IS NOT NULL`).Scan(ctx, &at); err != nil {
+			t.Fatal(err)
+		}
+		if len(at) != 1 || !at[0].Equal(epoch) {
+			t.Errorf("the statement a revision repeated records it was said at %v, want the epoch", at)
+		}
+	})
+}

@@ -33,10 +33,11 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //     component, which the shared component row holds as the first report of
 //     it stated them.
 //   - A received VEX statement holds when its publisher made it and which
-//     newer statement of theirs set it aside.
+//     newer statement of theirs set it aside, and only the newest of a
+//     publisher's statements about one subject stands.
 func upgradeV0130(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{advisoryCoverLiveV0130,
-		graphNodeStatedV0130, receivedStatementTimedV0130} {
+		graphNodeStatedV0130, receivedStatementTimedV0130, receivedStatementNewestV0130} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

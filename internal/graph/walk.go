@@ -120,7 +120,7 @@ const unplacedSeeds = `"rn"."build_id" = ? AND "rn"."closed_scan_id" IS NULL AND
 			  AND ` + orphaned
 
 // Replaced is the components a build held and holds no longer, each with the
-// live components of the build carrying its name. A finding keeps the
+// live components of the build carrying its name, as the build stated each. A finding keeps the
 // component it opened on, so a rescan at a new version replaces the component
 // and not the finding, and what was found on the old version is counted
 // wherever the present one sits. A component no live one names is left out.
@@ -139,7 +139,7 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 		var rows []named
 		q := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-			ColumnExpr(`"n"."component_id", "c"."name_folded"`).
+			ColumnExpr(`"n"."component_id", `+NodeFolded("n", "c")+` AS "name_folded"`).
 			Where(`"n"."build_id" = ?`, buildID).
 			Distinct()
 		if live {

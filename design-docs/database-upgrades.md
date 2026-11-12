@@ -228,14 +228,17 @@ databases saves.
 
 ## The v0.13.0 upgrade
 
-Migration 47. No row moves; one column is filled. Each piece is stepped over
-where a stopped upgrade made it already.
+Migration 47. One column is filled. Each piece is stepped over where a stopped
+upgrade made it already. One set of rows moves: of a publisher's statements
+standing about one subject in documents of one kind, the older are set aside as
+overtaken by the newest, by upload order, which a stopped upgrade run again
+finds done.
 
 | Table | Gains |
 |---|---|
 | `advisory_issue` | A mark held while the issue is on the advisory: true on every row not taken off, null on the rest; and the issue unique on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § The advisory) |
 | `graph_node` | The name and the version the build stated and the name's fold, all empty, and an index of each build's nodes by the fold (`design-docs/data-model-graph.md` § The dependency graph) |
-| `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX) |
+| `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX); the older of two standing about one subject, such as two supplier advisories, set aside as overtaken by the newer |
 
 | Table | Loses |
 |---|---|
@@ -244,6 +247,7 @@ where a stopped upgrade made it already.
 | Upgrade note | Detail |
 |---|---|
 | Names and versions | A node from before the upgrade shows the component's name and version, and is found by the component's name, until its build's inventory is sent again; a rescan alone keeps them |
+| Advisories from v0.12.0 | Two supplier advisories or upstream documents from one publisher about one product and issue both stood; the older now stands aside, and an approval citing it is flagged as citing a revised statement |
 | VEX statements from v0.12.0 | Carry no document identifier, so a later revision stating an identifier replaces none of them. Those uploaded without `publisher` are filed under the file name, which names no real publisher. The document is not kept, so nothing backfills them; `docs/configuration.md` § VEX statements from v0.12.0 says how to clear them |
 
 | Check, on each engine | What it holds |
@@ -252,7 +256,7 @@ where a stopped upgrade made it already.
 | The same stopped after the column, or after the rule holding the mark, on the servers | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a node | Upgraded, the table built as declared, the node holding no name or version |
 | The same stopped after the name, or after every node column and before the index, on the servers | Upgraded the same, nothing already made replaced |
-| A v0.12.0 database holding a received statement | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it |
+| A v0.12.0 database holding a received statement, and two advisories from one publisher about one subject | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it, the older advisory's set aside as overtaken by the newer's |
 | The same stopped after the time, on the servers | Upgraded the same, nothing already made replaced |
 
 ## Limits

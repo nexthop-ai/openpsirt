@@ -7980,7 +7980,7 @@ export interface components {
             recorded: number;
             /**
              * Format: int64
-             * @description Claims from an earlier upload of this same advisory, set aside rather than deleted
+             * @description Claims set aside rather than deleted: those an earlier upload of this same advisory made and this one does not, and the publisher's older claims about a product and vulnerability this advisory states newer
              */
             superseded: number;
             /** @description What the publisher called it */

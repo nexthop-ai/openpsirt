@@ -19,13 +19,12 @@ import (
 // a new version replaces the component. A root the build no longer holds is
 // left out, since the build's root counts every root it has had.
 //
-// Read from the build's code findings, each component once.
+// Read from the build's code findings, each component once, and paired with
+// the live components by the name the build stated each under, as the
+// inventory's changes pair them: a replaced one by its latest node's, a live
+// one by its open node's.
 func replacedIn(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64, error) {
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
-	var rows []struct {
-		Replaced int64 `bun:"replaced"`
-		Live     int64 `bun:"live"`
-	}
 	held := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."component_id"`).
 		Where(`"f"."build_id" = ?`, buildID).
@@ -33,21 +32,42 @@ func replacedIn(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int
 		Where(`NOT EXISTS (SELECT 1 FROM "graph_node" AS "ln" WHERE "ln"."build_id" = ?
 			AND "ln"."closed_scan_id" IS NULL AND "ln"."component_id" = "f"."component_id")`, buildID).
 		Distinct()
+	var replaced []struct {
+		Component int64  `bun:"component_id"`
+		Name      string `bun:"name_folded"`
+	}
 	if err := db.NewSelect().TableExpr(`(?) AS "h"`, held).
 		Join(`JOIN "component" AS "cr" ON "cr"."id" = "h"."component_id"`).
-		Join(`JOIN "component" AS "cl" ON "cl"."name_folded" = "cr"."name_folded"`).
-		Join(`JOIN "graph_node" AS "nl" ON "nl"."component_id" = "cl"."id"`).
-		ColumnExpr(`"cr"."id" AS "replaced", "cl"."id" AS "live"`).
+		ColumnExpr(`"cr"."id" AS "component_id"`).
+		ColumnExpr(graph.BuildFolded("?", `"cr"."id"`, "cr")+` AS "name_folded"`, buildID).
+		Scan(ctx, &replaced); err != nil {
+		return nil, fmt.Errorf("read the components build %d no longer holds a code finding sits on: %w", buildID, err)
+	}
+	if len(replaced) == 0 {
+		return map[int64][]int64{}, nil
+	}
+	var live []struct {
+		Component int64  `bun:"component_id"`
+		Name      string `bun:"name_folded"`
+	}
+	if err := db.NewSelect().TableExpr(`"graph_node" AS "nl"`).
+		Join(`JOIN "component" AS "cl" ON "cl"."id" = "nl"."component_id"`).
+		ColumnExpr(`"cl"."id" AS "component_id", `+graph.NodeFolded("nl", "cl")+` AS "name_folded"`).
 		Where(`"nl"."build_id" = ?`, buildID).
 		Where(`"nl"."closed_scan_id" IS NULL`).
 		Where(`"nl"."is_root" = ?`, false).
-		Distinct().
-		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read the components build %d no longer holds a code finding sits on: %w", buildID, err)
+		Scan(ctx, &live); err != nil {
+		return nil, fmt.Errorf("read the components build %d holds: %w", buildID, err)
+	}
+	byName := map[string][]int64{}
+	for _, one := range live {
+		byName[one.Name] = append(byName[one.Name], one.Component)
 	}
 	out := map[int64][]int64{}
-	for _, row := range rows {
-		out[row.Replaced] = append(out[row.Replaced], row.Live)
+	for _, one := range replaced {
+		if named := byName[one.Name]; len(named) > 0 {
+			out[one.Component] = named
+		}
 	}
 	return out, nil
 }

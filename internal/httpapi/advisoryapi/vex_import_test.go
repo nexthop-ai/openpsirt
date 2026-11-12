@@ -689,7 +689,10 @@ func TestThePublishersNewestStatementStandsAcrossDocuments(t *testing.T) {
 		upload("june", document("june", "2026-06-02T00:00:00Z", "", ""))
 		standing("a revision of the June document withdrawing it", "not_affected")
 
-		upload("january", document("january", "2026-01-01T00:00:00Z", "affected", ""))
+		if january := upload("january", document("january", "2026-01-01T00:00:00Z", "affected", "")); january.Superseded != 0 {
+			t.Errorf("an older document uploaded later set aside %d statements, want none: its own was never in force",
+				january.Superseded)
+		}
 		standing("an older document uploaded later", "not_affected")
 
 		upload("stamped", document("stamped", "2026-12-01T00:00:00Z", "affected", "2026-02-01T00:00:00Z"))

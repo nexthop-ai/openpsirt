@@ -104,9 +104,10 @@ const statementsPerSubjectRead = 500
 // (REQ-31): every older one is set aside as overtaken by it, and one overtaken
 // before that is now the newest is restored. A revision withdrawing the newest
 // therefore restores the one it overtook. It answers how many statements it
-// set aside that were in force.
+// set aside that were in force before this recording; one inserted by it and
+// overtaken at once was never in force.
 func newestStands(ctx context.Context, tx bun.IDB, productID int64, publisher, source string,
-	touched []Statement, now time.Time) (int, error) {
+	touched []Statement, inserted map[int64]bool, now time.Time) (int, error) {
 
 	subjects := map[string]bool{}
 	var issues []string
@@ -162,7 +163,9 @@ func newestStands(ctx context.Context, tx bun.IDB, productID int64, publisher, s
 				continue
 			}
 			if one.Superseded == nil {
-				setAside++
+				if !inserted[one.ID] {
+					setAside++
+				}
 			} else if one.OvertakenBy != nil && *one.OvertakenBy == newest.ID {
 				continue
 			}

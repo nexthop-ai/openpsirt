@@ -539,7 +539,11 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		touched := make([]Statement, 0, len(claims)+len(held))
 		touched = append(touched, claims...)
 		touched = append(touched, held...)
-		overtaken, err := newestStands(ctx, tx, productID, publisher, from.Source, touched, now)
+		inserted := make(map[int64]bool, len(toInsert))
+		for _, one := range toInsert {
+			inserted[one.ID] = true
+		}
+		overtaken, err := newestStands(ctx, tx, productID, publisher, from.Source, touched, inserted, now)
 		if err != nil {
 			return err
 		}
@@ -785,15 +789,16 @@ func placementOf(one Statement) string {
 type placed struct {
 	WithinPurl, Within, WithinAbout, Placement string
 	// saidAt is when the document says the claim was made, in microseconds
-	// since the epoch, nought where it says nothing: a value, so the claims
-	// of one moment share one write.
+	// since the epoch, where stated says it does: values, so the claims of
+	// one moment share one write.
 	saidAt int64
+	stated bool
 }
 
 // SaidAt is when the document says the claim was made, nil where it says
 // nothing.
 func (p placed) SaidAt() *time.Time {
-	if p.saidAt == 0 {
+	if !p.stated {
 		return nil
 	}
 	at := time.UnixMicro(p.saidAt).UTC()
@@ -831,9 +836,9 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 
 	repeated := map[placed][]int64{}
 	keep := func(one Statement, row Statement) {
-		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement, 0}
+		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement, 0, false}
 		if one.SaidAt != nil {
-			at.saidAt = one.SaidAt.UnixMicro()
+			at.saidAt, at.stated = one.SaidAt.UnixMicro(), true
 		}
 		repeated[at] = append(repeated[at], row.ID)
 	}

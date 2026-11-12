@@ -33,7 +33,7 @@ type AdvisoryTakenBody struct {
 	Identifier string `json:"identifier" doc:"The name the publisher gave the advisory"`
 	Title      string `json:"title,omitempty" doc:"What the publisher called it"`
 	Recorded   int    `json:"recorded" doc:"Claims taken from it"`
-	Superseded int    `json:"superseded" doc:"Claims from an earlier upload of this same advisory, set aside rather than deleted"`
+	Superseded int    `json:"superseded" doc:"Claims set aside rather than deleted: those an earlier upload of this same advisory made and this one does not, and the publisher's older claims about a product and vulnerability this advisory states newer"`
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
