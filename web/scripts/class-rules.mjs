@@ -21,7 +21,9 @@ const escapes = /(^|[\s;])(position\s*:\s*(fixed|absolute|sticky)|inset\s*:)/;
 //
 // A rule nested inside another rule is refused rather than read. The reader
 // takes innermost blocks, so a nested rule would arrive with the outer rule's
-// declarations as its selector and the outer rule would never be seen.
+// declarations as its selector, or with nothing but its own selector where it
+// opens its parent, and the outer rule would never be seen. A block is nested
+// where the brace before it opens a block whose prelude is not an at-rule.
 //
 // A rule is read as the text before its brace, so everything else that can
 // stand before one goes first:
@@ -34,13 +36,31 @@ const escapes = /(^|[\s;])(position\s*:\s*(fixed|absolute|sticky)|inset\s*:)/;
 export function cssRules(text) {
   const css = text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/@[\w-]+[^;{}]*;/g, " ");
   const out = [];
-  for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if (selector.includes(";")) {
+  for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const [, selector, body] = match;
+    if (selector.includes(";") || insideRule(css, match.index)) {
       throw new Error(`a rule nested inside another is not read: ${selector.trim()}`);
     }
     out.push({ selector: selector.trim(), body });
   }
   return out;
+}
+
+// insideRule is whether the text at an offset sits in a block a rule opened,
+// at any depth, as against the top level or at-rule blocks alone.
+function insideRule(css, at) {
+  const opened = [];
+  for (let i = 0; i < at; i++) {
+    if (css[i] === "{") opened.push(i);
+    else if (css[i] === "}") opened.pop();
+  }
+  return opened.some((open) => {
+    const before = Math.max(css.lastIndexOf("{", open - 1), css.lastIndexOf("}", open - 1));
+    return !css
+      .slice(before + 1, open)
+      .trim()
+      .startsWith("@");
+  });
 }
 
 // rulesIn reads one stylesheet as two maps: what each bare class declares, and
