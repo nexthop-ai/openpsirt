@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -84,6 +85,43 @@ func TestStoppingTheKeepAliveDoesNotWaitOnAStalledUse(t *testing.T) {
 	_ = conn.Close()
 }
 
+// A connection whose keep-alive answers after the release gave up on it is
+// closed, never pooled: its session still holds the lock, and a pooled
+// connection would carry it to whichever query took it next.
+func TestALockConnectionAbandonedByTheReleaseIsClosed(t *testing.T) {
+	stalled := &stallingConnector{started: make(chan struct{}), unstall: make(chan struct{})}
+	db := sql.OpenDB(stalled)
+	defer func() { _ = db.Close() }()
+	conn, err := db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	restore := keepAliveEvery
+	keepAliveEvery = 10 * time.Millisecond
+	t.Cleanup(func() { keepAliveEvery = restore })
+
+	keeping := keepAlive(t.Context(), conn)
+	<-stalled.started
+	bounded, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	if err := keeping.stop(bounded); err == nil {
+		t.Fatal("stopping a keep-alive whose use is stalled answered that it stopped")
+	}
+	abandon(keeping, conn)
+	close(stalled.unstall)
+
+	deadline := time.Now().Add(5 * time.Second)
+	for stalled.closed.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if stalled.closed.Load() == 0 {
+		t.Error("the connection holding the lock went back to the pool once its use answered")
+	}
+	if open := db.Stats().OpenConnections; open != 0 {
+		t.Errorf("the pool holds %d connections after the lock's was abandoned", open)
+	}
+}
+
 // The release is given a deadline of its own, whatever the migration's
 // context, so a stalled connection cannot hold the start after the work is
 // done.
@@ -107,6 +145,7 @@ type stallingConnector struct {
 	once    sync.Once
 	started chan struct{}
 	unstall chan struct{}
+	closed  atomic.Int32
 }
 
 func (s *stallingConnector) Open(string) (driver.Conn, error) { return stallingConn{s}, nil }
@@ -118,7 +157,7 @@ func (s *stallingConnector) Driver() driver.Driver { return s }
 type stallingConn struct{ s *stallingConnector }
 
 func (c stallingConn) Prepare(string) (driver.Stmt, error) { return nil, driver.ErrSkip }
-func (c stallingConn) Close() error                        { return nil }
+func (c stallingConn) Close() error                        { c.s.closed.Add(1); return nil }
 func (c stallingConn) Begin() (driver.Tx, error)           { return nil, driver.ErrSkip }
 
 func (c stallingConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {

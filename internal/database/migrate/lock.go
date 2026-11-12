@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha1" //nolint:gosec // G505: a name, not a signature; the choice is the length of the hex, and the input is a database name
 	"database/sql"
+	"database/sql/driver"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -101,6 +102,18 @@ func keepAlive(ctx context.Context, conn *sql.Conn) keeper {
 		}
 	}()
 	return k
+}
+
+// abandon closes the lock's connection once its stalled use ends, which it
+// does when the driver gives up on it or the server answers late. Closed, the
+// session ends and the server frees the lock; returned to the pool, the
+// connection would carry the lock to whichever query takes it next.
+func abandon(k keeper, conn *sql.Conn) {
+	go func() {
+		<-k.finished
+		_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		_ = conn.Close()
+	}()
 }
 
 // keeper is a keep-alive running on the lock's connection.
@@ -202,9 +215,7 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 		keeping := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
 			if err := keeping.stop(ctx); err != nil {
-				// The connection goes back once the stalled use ends, which
-				// it does when the driver gives up on it.
-				go func() { <-keeping.finished; closeConn() }()
+				abandon(keeping, conn)
 				return err
 			}
 			defer closeConn()
@@ -252,9 +263,7 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 		keeping := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
 			if err := keeping.stop(ctx); err != nil {
-				// The connection goes back once the stalled use ends, which
-				// it does when the driver gives up on it.
-				go func() { <-keeping.finished; closeConn() }()
+				abandon(keeping, conn)
 				return err
 			}
 			defer closeConn()
