@@ -160,6 +160,27 @@ func (scope Scope) mayCount(subject access.Subject, what string) error {
 	return nil
 }
 
+// readAcross keeps, of the products a scope across products names, those the
+// subject reads security testing work in, and refuses anybody but a person: a
+// flaw's reader reads one code finding, never a product's queue, and a key
+// reads nothing. A scope in one product is left as it is.
+func (scope Scope) readAcross(subject access.Subject) (Scope, error) {
+	if !scope.across() {
+		return scope, nil
+	}
+	if subject.Kind != access.Person {
+		return scope, access.Denied("read code findings across products")
+	}
+	kept := []int64{}
+	for _, product := range scope.Across {
+		if subject.Reads(access.SecurityTesting, product) {
+			kept = append(kept, product)
+		}
+	}
+	scope.Across = kept
+	return scope, nil
+}
+
 // visible is the visibilities the subject reads in the scope's product, which
 // readable binds. Across products, readable binds each product's own, so none.
 func (scope Scope) visible(subject access.Subject) ([]access.Visibility, error) {
@@ -344,9 +365,12 @@ func OpenCodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject,
 func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	waiting, counted bool, limit, offset int) (*Queue, error) {
 
-	// Across products the scope names only products the reader reads
-	// security testing work in, and each row is narrowed to what they read
-	// in its own.
+	// Across products each row is narrowed to what the reader reads in its
+	// own product.
+	scope, err := scope.readAcross(subject)
+	if err != nil {
+		return nil, err
+	}
 	visible, err := scope.visible(subject)
 	if err != nil {
 		return nil, err

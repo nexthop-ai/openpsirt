@@ -75,12 +75,12 @@ product.
 
 | Rule | Reason |
 |---|---|
-| The products are those the reader holds `security-testing-read` in; a product read no other way contributes nothing, and a reader holding it nowhere is answered an empty queue | A flaw's reader reads one code finding, never a product's queue |
+| The products are those the reader holds `security-testing-read` in, kept by the store whatever products the caller names (REQ-42); a product read no other way contributes nothing, and a reader holding it nowhere is answered an empty queue | A flaw's reader reads one code finding, never a product's queue |
 | Every state and count is the sum of each product's own, row for row | One population, split by product |
 | Each product's state is worked out against that product: the rules that cover it, the outcome standing for it and its flaw records are its own | A rule or a decision belongs to one product |
 | The component and version filters, the method, the series, the state and unheld work narrow as they do in one product | |
 | Beneath is refused, since it names one build | The list across products refuses it the same way (`design-docs/api-lists.md` § Issue-keyed and cross-product reads) |
-| A pipeline key is refused | It sends scans and reads nothing |
+| Anybody but a person is refused, by the store | A key sends scans and reads nothing |
 | `GET /v1/code-findings.{format}` writes it, under the rules of the queue file | |
 | `GET /v1/code-finding-counts` is its counts with no rows, over the products in use alone (`design-docs/analysis-figures.md` § Figures across products) | Home counts the products the session lists, and a retired product is in none |
 

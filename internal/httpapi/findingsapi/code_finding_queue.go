@@ -132,13 +132,16 @@ type CodeFindingsAcrossAsked struct {
 	Beneath          string              `query:"beneath" maxLength:"200" doc:"Refused with 422: a subtree is a walk over one build's edges, so it is asked of one product's list with a branch or tag and a variant"`
 }
 
-// scoped resolves what is asked for against what the reader may see: the
-// products they read security testing work in, every one of them.
+// scoped resolves what is asked for against what the reader may see: every
+// product they hold anything in, which the store narrows to those they read
+// security testing work in.
 func (a CodeFindingsAcrossAsked) scoped(ctx context.Context, in core.Deps) (access.Subject, analysis.Scope, error) {
 	subject, err := core.Reading(ctx)
 	if err != nil {
 		return subject, analysis.Scope{}, err
 	}
+	// The store refuses anybody but a person too; refused here as well, so a
+	// file is refused before its first byte.
 	if subject.Kind != access.Person {
 		return subject, analysis.Scope{}, core.Refused(in.Logger, access.Denied("read code findings across products"),
 			"cannot read the code findings")
@@ -148,15 +151,11 @@ func (a CodeFindingsAcrossAsked) scoped(ctx context.Context, in core.Deps) (acce
 	if _, _, err := core.BeneathAt(ctx, in, finding.Scope{}, strings.TrimSpace(a.Beneath), graph.Choice{}); err != nil {
 		return subject, analysis.Scope{}, err
 	}
+	// Every product the reader holds anything in; the store keeps those they
+	// read security testing work in.
 	products, _ := subject.Products()
-	across := []int64{}
-	for _, product := range products {
-		if subject.Reads(access.SecurityTesting, product) {
-			across = append(across, product)
-		}
-	}
 	out := analysis.Scope{
-		Across: across, Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
+		Across: append([]int64{}, products...), Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
 		Method: analysis.Method(a.Method),
 	}
 	if out.Component = strings.TrimSpace(a.Component); out.Component != "" {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -240,6 +241,33 @@ func TestTheQueueAcrossProductsListsEveryProductReadAsItsOwnQueueDoes(t *testing
 
 // Who may ask the queue across products, and that a subtree, which is one
 // build's, is refused there as the findings list across products refuses it.
+func TestAProductReadOnlyAtAnotherVisibilityAddsNothingAcrossProducts(t *testing.T) {
+	// A disclosed code finding is public, so a product its reader reads only
+	// at public would contribute it were the products not kept to those read
+	// at security testing.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.CodeFindingsInBothProducts(t, r)
+		grantIn(t, r, "security-testing-triager", "theirs", access.PublicRead)
+		theirs, err := catalog.NewStore(r.DB.DB).ProductByName(t.Context(), "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding" AS "f"`).
+			Set(`"visibility" = ?`, access.Public).
+			Where(`"f"."kind" = ?`, kind.Analysis).
+			Where(`"f"."build_id" IN (SELECT "t"."id" FROM "build" AS "t" JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id" WHERE "s"."product_id" = ?)`, theirs.ID).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var got acrossListed
+		httpapitest.Read(t, r, "security-testing-triager", acrossQueue, &got)
+		want := []string{"mine clang-tidy/leak", "mine cppcheck/bad", "mine semgrep/bad"}
+		if !slices.Equal(got.rows(), want) {
+			t.Errorf("a reader of security testing work in one product lists %v; want %v", got.rows(), want)
+		}
+	})
+}
+
 func TestWhoMayListCodeFindingsAcrossProducts(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.CodeFindingsInBothProducts(t, r)
