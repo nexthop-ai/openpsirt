@@ -120,6 +120,8 @@ object store is optional.
 | Every statement is bounded | One real image opens tens of thousands of graph rows and over 300,000 findings, too much SQL for two engines |
 | A membership test over a long list is split and OR-ed | A subtree or a build's dismissed aliases is thousands of identifiers |
 | The hash is computed from the bytes as stored | |
+| A scan's documents and an analysis run's are stored and read by one implementation of the parts | Two copies drift |
+| A document whose parts run out before its stored size ends its stream in an error | Let go while read, its prefix would otherwise read as the whole document |
 | Fixed-width character columns are not used | They blank-pad on some engines, breaking an exact match on a hash |
 
 ## Retention

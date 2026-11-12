@@ -69,7 +69,8 @@ moving forward only.
 | An unreachable listing holds the mark | The mark is shared by every listing |
 | A listing refused the same way each pass does not stop the others | |
 | A listing answered "not authorized", "forbidden" or "accepted" beside one that reads is stepped over, not failed; a supplier with no readable listing fails | Directories carry no label to skip a restricted one by |
-| An unreadable document is stepped over: any answer but 200 other than those holding the mark, too large, malformed, or an address the client refuses (redirect, excluded host, non-https port) | It would stop the supplier for ever |
+| An unreadable document is stepped over: any answer but 200 other than those holding the mark, too large, malformed, an address the client refuses (redirect, excluded host, non-https port), or a document the store refuses to record, such as one naming no publisher or a name past its column's width | It would stop the supplier for ever |
+| A fetched document's names are checked by the store's own rule before anything is recorded | Two checks of one rule drift, and the one the store applies is the one that refuses |
 | An unreachable publisher holds the mark, including a name resolving inward or into an excluded network | |
 | A rate limit, request timeout, "too early" or server error holds the mark | Each asks to be asked again |
 | A failure of this deployment during a pass, its database or its lease, moves the mark as far as the pass read and leaves the supplier due, recorded as this deployment's failure, not the publisher's; when the last attempt was made does not move | It says nothing about the publisher, and one repeating at the same document still shows |

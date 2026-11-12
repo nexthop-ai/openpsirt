@@ -121,6 +121,9 @@ catalog.Store.SetVariantCustomerFacing Who is asking: it records whether a varia
 catalog.Store.TagBranchesAndTags A background pass: the deadline sweep reads which releases cannot change.
 catalog.Store.VariantByName Not varying by reader: resolving a variant name inside a product the route resolved for the caller.
 catalog.Store.VariantsByID Not varying by reader: the names of variants a pipeline key already points at. Its route requires administration.
+chunked.Delete A helper over a narrowed read: the parts of documents Documents.Remove, Documents.Discard or Store.Discard let go, for a scan or analyzer run its caller already authorized or claimed.
+chunked.Write A helper over a narrowed read: the parts of one document Documents.Write or Store.Write stores, on a build the upload route authorized the key for, inside its own transaction.
+chunked.reader.Read A helper over a narrowed read: the bytes of one document Documents.Open or Store.Open was handed, by the ingest reader and the analyzer worker for what they claimed and by the kept document route after Documents.Held answered for a scan the store authorized.
 currency.Refresher.Once A background pass: one cycle of the currency refresher.
 currency.Refresher.Run A background pass: the currency refresher asks package indexes about components on a schedule.
 currency.RootOwners Not varying by reader: the names the deployment's own roots are published under. The unanswered list classifies against them and answers only the names its reader may see.
@@ -233,7 +236,6 @@ ingest.Store.MarkFailed A background pass: the ingest reader records that a scan
 ingest.Store.Newest A helper over a narrowed read: the newest upload to a build, for the register after it read the build's findings with a subject.
 ingest.Store.Record A helper over a narrowed read: the upload route records a scan on a build it authorized the key for, inside its own transaction.
 ingest.Store.Replaced A background pass: the scanner reads one replaced inventory before checking it.
-ingest.chunkReader.Read A helper over a narrowed read: the bytes of one document Documents.Open was handed, by the ingest reader for the scan it claimed and by the kept document route after Documents.Held answered for a scan the store authorized.
 issuedate.Pass.Once A background pass: one slice of the issue date pass.
 issuedate.Pass.Run A background pass: the issue date pass asks when issues were published, on a schedule.
 notify.AnalysisDrops A background pass: the analyzer worker tells who needs to hear when a run stops detecting much of a build at once.
@@ -305,7 +307,6 @@ series.Store.SeriesOf A background pass: the analyzer worker reads the series of
 series.Store.Sightings A background pass: the analyzer worker reads what a series already reported against a build.
 series.Store.Take A background pass: the analyzer worker takes a series so one run of it applies at a time.
 series.Store.Write A helper over a narrowed read: the analyzer upload route holds a run's documents on a build it authorized the key for, inside its own transaction.
-series.chunks.Read A background pass: the bytes of one document Store.Open was handed, read by the analyzer worker applying the run it claimed.
 setting.Store.Change Who is asking: an administrator changing a setting, on a route only an administrator reaches, and startup recording the role mode.
 setting.Store.Count Not varying by reader: a deployment setting read as a count.
 setting.Store.Days Not varying by reader: a deployment setting read as whole days.

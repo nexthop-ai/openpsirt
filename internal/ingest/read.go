@@ -16,6 +16,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/chunked"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -242,7 +243,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// sender sent is told on its receipt whether or not a newer scan has
 	// since applied.
 	var sentLetGo letGoError
-	if !errors.Is(err, ErrReleased) && !errors.As(err, &sentLetGo) {
+	if !errors.Is(err, chunked.ErrReleased) && !errors.As(err, &sentLetGo) {
 		return nil, err
 	}
 	if scan, found := NewStore(r.db.DB).ByID(ctx, scanID); found == nil {

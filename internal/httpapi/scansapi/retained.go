@@ -13,6 +13,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/chunked"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -94,7 +95,7 @@ func registerRetained(api huma.API, in core.Deps) {
 		body := bufio.NewReader(documents.Open(ctx, doc))
 		asXML, err := sbom.EncodedAsXML(body)
 		switch {
-		case errors.Is(err, ingest.ErrReleased):
+		case errors.Is(err, chunked.ErrReleased):
 			return nil, huma.Error410Gone("the contents of that document were let go while it " +
 				"was read, which is what happens to a branch build's. The receipt still says " +
 				"what arrived and what its bytes hashed to")
