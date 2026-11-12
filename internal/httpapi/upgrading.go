@@ -6,6 +6,7 @@ package httpapi
 import (
 	"html"
 	"net/http"
+	"path"
 	"strings"
 )
 
@@ -41,7 +42,7 @@ func Upgrading() http.Handler {
 		}
 		w.Header().Set("Retry-After", upgradingRetry)
 		switch {
-		case r.URL.Path == "/v1" || strings.HasPrefix(r.URL.Path, "/v1/"):
+		case apiPath(path.Clean("/" + r.URL.Path)):
 			Problem(w, http.StatusServiceUnavailable, upgradingSentence)
 		case strings.Contains(r.Header.Get("Accept"), "text/html"):
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -27,3 +27,19 @@ func TestTheUpgradingAnswerCarriesTheBrowserHeaders(t *testing.T) {
 		}
 	}
 }
+
+// While the schema is applied, the API answers in the refusal shape however
+// its path is spelled: capitals and dot segments reach the API, as they do
+// once the router answers, and a client parsing JSON reads the refusal.
+func TestTheUpgradingAnswerKnowsTheAPIHoweverItIsSpelled(t *testing.T) {
+	h := Upgrading()
+	for _, path := range []string{"/v1/version", "/V1/version", "/x/../v1/version", "/v1"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Accept", "text/html")
+		h.ServeHTTP(rec, req)
+		if got := rec.Header().Get("Content-Type"); got != "application/problem+json" {
+			t.Errorf("GET %s while upgrading answered as %q", path, got)
+		}
+	}
+}
