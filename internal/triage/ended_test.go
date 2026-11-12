@@ -333,6 +333,12 @@ func TestAWithdrawalCountsForWhoeverWithdrewIt(t *testing.T) {
 			t.Errorf("the proposer is credited %d withdrawals and the withdrawer %d, want 0 and 1",
 				p.Withdrawn, a.Withdrawn)
 		}
+		// One piece of work each, so the two are ordered by name: a
+		// withdrawal is work done.
+		if len(measured.Throughput) != 2 || measured.Throughput[0].Person != "approver" {
+			t.Errorf("throughput reads %+v; want the withdrawer and the proposer, alike in work, by name",
+				measured.Throughput)
+		}
 	})
 }
 

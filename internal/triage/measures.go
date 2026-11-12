@@ -386,8 +386,8 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	}
 	// Most done first, which is the order somebody reads this in.
 	sort.Slice(out, func(i, j int) bool {
-		left := out[i].Proposed + out[i].Approved
-		right := out[j].Proposed + out[j].Approved
+		left := out[i].Proposed + out[i].Approved + out[i].Withdrawn
+		right := out[j].Proposed + out[j].Approved + out[j].Withdrawn
 		if left != right {
 			return left > right
 		}
