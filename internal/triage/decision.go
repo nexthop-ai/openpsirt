@@ -817,16 +817,16 @@ type SentBack struct {
 	Author int64
 	// Sent is how many rows went back.
 	Sent int
-	// DecisionOccurrence is a representative of what went back: the earliest row.
+	// DecisionOccurrence is a representative of what went back: its most
+	// withheld row, earliest among equals, whose product the notice is
+	// narrowed by.
 	DecisionOccurrence DecisionOccurrence
 	// Undisclosed says at least one row of the decision is about a finding
 	// nobody has announced.
 	//
-	// Not read off DecisionOccurrence above. That row is a representative chosen by
-	// identifier for naming the decision, and a decision is one action over many
-	// occurrences whose rows need not agree about visibility — so the earliest
-	// row being public says nothing about the rest, and what may leave
-	// this deployment is decided by the most careful row in the set.
+	// Read off every row, because a decision is one action over many
+	// occurrences whose rows need not agree about visibility, and what may
+	// leave this deployment is decided by the most careful row in the set.
 	Undisclosed bool
 	// SecurityTesting says at least one row is security testing work, on the same terms.
 	SecurityTesting bool
@@ -870,7 +870,7 @@ func (s *Store) SendBackDecision(ctx context.Context, subject access.Subject, de
 			if row.State != Proposed || row.SentBackAt != nil {
 				continue
 			}
-			if len(ids) == 0 {
+			if len(ids) == 0 || stricter(row, result.DecisionOccurrence) {
 				result.DecisionOccurrence = row
 			}
 			// Anything in this decision undisclosed, which

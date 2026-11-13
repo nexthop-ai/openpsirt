@@ -30,6 +30,11 @@ decision has no state of its own.
 | Undone | Waiting again after somebody had agreed |
 | Several ways | An approver agreed to most of a bulk set and set some aside |
 
+| Rule | Reason |
+|---|---|
+| A notice about a decision's rows (sent back, an agreement withdrawn or undone, a lapse) is withheld as the strictest of them | A bulk decision can cover a disclosed issue and an undisclosed one |
+| It is stored against the product and issue of its most withheld row, the earliest among equals | A withheld notice is read only where its product's undisclosed work is |
+
 An undo and a lapse each notify: an undo reverses what the proposer relied on; a
 lapse hands work back. The lapse and the merge messages are wired at the
 deployment, never inside the scan, because what a scan does and who hears of it

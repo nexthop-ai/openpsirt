@@ -307,15 +307,16 @@ type Undone struct {
 // may leave this deployment.
 //
 // Read off the rows rather than off a representative. A decision is one action
-// over many occurrences whose rows need not agree about visibility, so the earliest
-// row being public says nothing about the rest.
+// over many occurrences whose rows need not agree about visibility. The
+// representative is the most withheld row, earliest among equals, so the
+// product a notice is narrowed by is one holding the work it withholds.
 type ForPerson struct {
 	PersonID             int64
 	DecisionOccurrenceID int64
 	// ProductID is the product the representative row is in, which is
 	// what a telling about these rows is narrowed by later. A person's set
-	// may span products; the representative names one of them, the same way
-	// DecisionID does.
+	// may span products; the representative names the one holding its most
+	// withheld row.
 	ProductID       int64
 	VulnerabilityID int64
 	Rows            int
@@ -520,9 +521,9 @@ func (s *Store) wholeDecisions(ctx context.Context, reached []int64) ([]int64, [
 }
 
 // agreementsWithdrawn gathers whose agreement on a decision the subject withdrew
-// at a moment, one entry each, leaving out the subject. Each entry carries the decision's earliest row as the
-// representative, and whether any of its rows is undisclosed, read off the rows
-// rather than off the representative.
+// at a moment, one entry each, leaving out the subject. Each entry carries the
+// decision's most withheld row as the representative (see stricter), and
+// whether any of its rows is undisclosed, read off the rows.
 func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject, decisionID int64,
 	at time.Time, rows []DecisionOccurrence) ([]ForPerson, error) {
 
@@ -549,7 +550,7 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 		if row.Visibility == access.SecurityTesting {
 			securityTesting = true
 		}
-		if row.ID < first.ID {
+		if stricter(row, first) {
 			first = row
 		}
 	}
@@ -566,7 +567,8 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 
 // proposersOfAll is proposersOf over a set of any size: read chunk rows at a
 // time and merged, so a person is one entry however many chunks their
-// rows fall in. The representative is their earliest row.
+// rows fall in. The representative is their most withheld row, earliest among
+// equals.
 func (s *Store) proposersOfAll(ctx context.Context, ids []int64, chunk int) ([]ForPerson, error) {
 	sorted := slices.Clone(ids)
 	slices.Sort(sorted)
@@ -584,6 +586,13 @@ func (s *Store) proposersOfAll(ctx context.Context, ids []int64, chunk int) ([]F
 				told = append(told, one)
 				continue
 			}
+			// Each chunk's representative is its most withheld row, so its
+			// flags rank it; chunks run in identifier order, so the earlier
+			// keeps a tie.
+			if flagged(one) > flagged(told[i]) {
+				told[i].DecisionOccurrenceID = one.DecisionOccurrenceID
+				told[i].ProductID, told[i].VulnerabilityID = one.ProductID, one.VulnerabilityID
+			}
 			told[i].Rows += one.Rows
 			told[i].Undisclosed = told[i].Undisclosed || one.Undisclosed
 			told[i].SecurityTesting = told[i].SecurityTesting || one.SecurityTesting
@@ -592,7 +601,8 @@ func (s *Store) proposersOfAll(ctx context.Context, ids []int64, chunk int) ([]F
 	return told, nil
 }
 
-// proposersOf gathers who wrote a set of rows, one entry each.
+// proposersOf gathers who wrote a set of rows, one entry each, represented by
+// their most withheld row.
 func (s *Store) proposersOf(ctx context.Context, ids []int64) ([]ForPerson, error) {
 	var rows []DecisionOccurrence
 	if err := s.db.NewSelect().Model(&rows).
@@ -602,16 +612,20 @@ func (s *Store) proposersOf(ctx context.Context, ids []int64) ([]ForPerson, erro
 	}
 	at := map[int64]int{}
 	told := make([]ForPerson, 0, 4)
+	held := make([]DecisionOccurrence, 0, 4)
 	for _, row := range rows {
 		i, seen := at[row.ProposedBy]
 		if !seen {
 			at[row.ProposedBy] = len(told)
-			told = append(told, ForPerson{
-				PersonID: row.ProposedBy, DecisionOccurrenceID: row.ID,
-				ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
-			})
+			told = append(told, ForPerson{PersonID: row.ProposedBy})
+			held = append(held, row)
 			i = len(told) - 1
 		}
+		if stricter(row, held[i]) {
+			held[i] = row
+		}
+		told[i].DecisionOccurrenceID = held[i].ID
+		told[i].ProductID, told[i].VulnerabilityID = held[i].ProductID, held[i].VulnerabilityID
 		told[i].Rows++
 		if row.Visibility != access.Public {
 			told[i].Undisclosed = true
@@ -621,6 +635,44 @@ func (s *Store) proposersOf(ctx context.Context, ids []int64) ([]ForPerson, erro
 		}
 	}
 	return told, nil
+}
+
+// stricter says a row withholds more than another, or as much and is earlier.
+//
+// A notice about a set of rows is withheld as the most withheld of them and
+// stored against that row's product and issue, because a withheld notice is
+// read only where its product's undisclosed work is: stored against a public
+// row's product it would reach a private reader of that product with words
+// about another's undisclosed row, and miss the reader of that other.
+func stricter(row, than DecisionOccurrence) bool {
+	if withholds(row.Visibility) != withholds(than.Visibility) {
+		return withholds(row.Visibility) > withholds(than.Visibility)
+	}
+	return row.ID < than.ID
+}
+
+// withholds ranks a visibility by what a notice about it withholds: security
+// testing work over undisclosed work over public.
+func withholds(visibility access.Visibility) int {
+	switch visibility {
+	case access.Public:
+		return 0
+	case access.SecurityTesting:
+		return 2
+	}
+	return 1
+}
+
+// flagged is the rank withholds gives the most withheld of a person's rows,
+// read off their flags.
+func flagged(one ForPerson) int {
+	switch {
+	case one.SecurityTesting:
+		return 2
+	case one.Undisclosed:
+		return 1
+	}
+	return 0
 }
 
 // authorOf returns who wrote the reasoning a decision currently rests on.
