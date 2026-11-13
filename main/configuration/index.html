@@ -1146,6 +1146,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v0120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.12.0
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1957,6 +1968,17 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v0120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.12.0
+      
+    </span>
+  </a>
   
 </li>
         
@@ -5370,6 +5392,21 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <tr>
 <td><code>withdraw-claim</code></td>
 <td><code>withdraw-decision</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v0120">From v0.12.0<a class="headerlink" href="#from-v0120" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An issue taken off an advisory and put back keeps every stretch it was on, so an advisory issued during any of them is read as naming it. v0.12.0 kept only the last stretch, and the upgrade cannot recover an earlier one</td>
+<td>Nothing the upgrade can do. Where v0.12.0 saw an issue taken off, put back and taken off again, an advisory issued during an earlier stretch is read as not naming it: what went out is shown to readers who may not see that issue, and a rename that issuance should refuse is allowed</td>
 </tr>
 </tbody>
 </table>
