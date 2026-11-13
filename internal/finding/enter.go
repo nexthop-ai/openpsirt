@@ -625,7 +625,15 @@ func carrying(ctx context.Context, db bun.IDB, buildID int64, in Entering) (int6
 		if root {
 			return id, "", nil
 		}
-		return id, name, nil
+		// Keyed on the component row's name, as a scan keys it, whatever
+		// name or capitals were typed: a build's stated name keys nothing, or
+		// one flaw recorded and scanned is two findings.
+		var keyed string
+		if err := db.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`"c"."name"`).
+			Where(`"c"."id" = ?`, id).Scan(ctx, &keyed); err != nil {
+			return 0, "", fmt.Errorf("read what component %d is keyed on: %w", id, err)
+		}
+		return id, keyed, nil
 	}
 
 	// The build itself. A flaw in how the pieces fit together belongs on the
@@ -825,21 +833,6 @@ func (s *Store) ComponentNameIn(ctx context.Context, buildID, componentID int64)
 	err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(graph.BuildName("?", `"c"."id"`, "c"), buildID).
-		Where(`"c"."id" = ?`, componentID).
-		Scan(ctx, &name)
-	if err != nil {
-		return "", fmt.Errorf("look up what component %d is called: %w", componentID, err)
-	}
-	return name, nil
-}
-
-// ComponentName reads what one component is called, as its occurrence
-// identity names it.
-func (s *Store) ComponentName(ctx context.Context, componentID int64) (string, error) {
-	var name string
-	err := s.db.NewSelect().
-		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."name"`).
 		Where(`"c"."id" = ?`, componentID).
 		Scan(ctx, &name)
 	if err != nil {

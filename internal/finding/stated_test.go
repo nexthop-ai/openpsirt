@@ -328,3 +328,70 @@ func TestAClosedRowIsShownByTheNameItsBuildLastStated(t *testing.T) {
 		}
 	})
 }
+
+// A flaw recorded by the name its build stated is keyed on the component row's
+// name, as a scan of that build keys it, so the two are one occurrence.
+func TestAFlawEnteredByTheStatedNameIsKeyedAsAScanKeysIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		poisoned := libnl
+		poisoned.Name = "nothing"
+		f.shippedTo(t, elsewhere, through(poisoned))
+		f.shipped(t, through(libnl))
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: "LIBNL-3-200", Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := finding.OccurrenceIdentity("nothing", swss.Name); rows[0].OccurrenceIdentity != want {
+			t.Error("a flaw entered by the build's own name is keyed on that name, where a scan keys the row's")
+		}
+	})
+}
+
+// Widening a recorded flaw to another build finds the component by the name
+// the flaw's own build stated, never by the row's name, which another build
+// may state for a different package.
+func TestWideningAFlawFindsTheComponentByTheNameItsBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		poisoned := libnl
+		poisoned.Name = "nothing"
+		f.shippedTo(t, elsewhere, through(poisoned))
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		decoy := at("nothing", "1.0")
+		widened := through(libnl)
+		widened.Components = append(widened.Components, decoy)
+		widened.Dependencies = append(widened.Dependencies, graph.Dependency{Parent: root, Child: decoy})
+		f.shippedTo(t, other, widened)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID,
+			[]int64{f.build, other}, ""); err != nil {
+			t.Fatalf("widening: %v", err)
+		}
+		var added finding.Finding
+		if err := f.db.DB.NewSelect().Model(&added).
+			Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
+			Where(`"build_id" = ?`, other).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if added.ComponentID != rows[0].ComponentID {
+			t.Error("widening filed the flaw against the package the other build calls by the row's name")
+		}
+	})
+}
