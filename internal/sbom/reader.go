@@ -447,9 +447,10 @@ func (c *reader) finish() (*Document, error) {
 	// A source package is addressed by its name as a path segment too, so a
 	// source named "." or ".." is no source: from a package identifier, a
 	// pedigree, or a root of that name copied as an ancestor. Before the
-	// edges, which carry these descriptions.
+	// edges, which carry these descriptions. Names are checked trimmed, as
+	// they are stored.
 	for i := range c.described {
-		if typedname.DotSegment(c.described[i].UpstreamName) {
+		if typedname.DotSegment(strings.TrimSpace(c.described[i].UpstreamName)) {
 			c.described[i].UpstreamName, c.described[i].UpstreamVersion = "", ""
 		}
 	}
@@ -460,9 +461,9 @@ func (c *reader) finish() (*Document, error) {
 			continue
 		}
 		// Every address about a component carries its name as a path
-		// segment, stored as written, and a browser resolves "." and ".."
-		// away. The root is exempt: a snapshot names it after the build.
-		if err := typedname.Unclimbing("component name", described.Name); err != nil {
+		// segment, stored trimmed, and a browser resolves "." and ".." away.
+		// The root is exempt: a snapshot names it after the build.
+		if err := typedname.Unclimbing("component name", strings.TrimSpace(described.Name)); err != nil {
 			return nil, refusal.Errorf("%w, so it cannot be tracked", err)
 		}
 		c.doc.Components = append(c.doc.Components, described)

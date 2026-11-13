@@ -189,6 +189,7 @@ A name that is a path segment of its own addresses is never `.` or `..`. A
 browser resolves either before sending, percent-encoded or not, so the thing
 could never be opened, and one in the middle of an address climbs: revoking a
 token of a person named `..` would revoke the caller's own token of that name.
+A name is judged as it is stored, so surrounding space hides nothing.
 
 | Name | Treatment |
 |---|---|

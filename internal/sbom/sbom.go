@@ -273,7 +273,7 @@ func (d *Document) Snapshot(target graph.Described) graph.Snapshot {
 	switch {
 	case !d.RootDeclared:
 		root = target
-	case typedname.DotSegment(root.Name):
+	case typedname.DotSegment(strings.TrimSpace(root.Name)):
 		was := root.Identity()
 		root.Name = target.Name
 		dependencies = make([]graph.Dependency, len(d.Dependencies))

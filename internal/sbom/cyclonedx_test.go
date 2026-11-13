@@ -371,8 +371,9 @@ func TestAComponentWithoutANameIsRefused(t *testing.T) {
 
 func TestAComponentNamedAsADotSegmentIsRefused(t *testing.T) {
 	// Every address about a component carries its name as a path segment, and
-	// a browser resolves "." and ".." away before sending.
-	for _, name := range []string{".", ".."} {
+	// a browser resolves "." and ".." away before sending. A name is stored
+	// trimmed, so surrounding space hides nothing.
+	for _, name := range []string{".", "..", " .. "} {
 		why := refuses(t, strings.Replace(minimal, `"name": "libc", `, `"name": "`+name+`", `, 1))
 		if !strings.Contains(why, "dot segment") {
 			t.Errorf("a component named %q was refused for another reason: %s", name, why)
@@ -383,24 +384,26 @@ func TestAComponentNamedAsADotSegmentIsRefused(t *testing.T) {
 func TestARootNamedAsADotSegmentIsFiledUnderTheBuildsName(t *testing.T) {
 	// A producer scanning the current directory names the root ".". A finding
 	// on the build itself is addressed by the root's name, so the root and
-	// every edge to it take the build's.
-	doc := read(t, strings.Replace(minimal, `"name": "product"`, `"name": "."`, 1))
-	snap := doc.Snapshot(graph.Described{Name: "sonic"})
-	if snap.Root.Name != "sonic" || snap.Root.Version != "1.0" {
-		t.Errorf("the root is %q at %q", snap.Root.Name, snap.Root.Version)
-	}
-	if len(snap.Dependencies) != 1 || snap.Dependencies[0].Parent.Identity() != snap.Root.Identity() {
-		t.Errorf("the edges no longer start at the root: %+v", snap.Dependencies)
-	}
-	if doc.Dependencies[0].Parent.Name != "." {
-		t.Error("taking a snapshot rewrote the document it was taken from")
+	// every edge to it take the build's. A name is stored trimmed.
+	for _, dots := range []string{".", " .. "} {
+		doc := read(t, strings.Replace(minimal, `"name": "product"`, `"name": "`+dots+`"`, 1))
+		snap := doc.Snapshot(graph.Described{Name: "sonic"})
+		if snap.Root.Name != "sonic" || snap.Root.Version != "1.0" {
+			t.Errorf("a root named %q is %q at %q", dots, snap.Root.Name, snap.Root.Version)
+		}
+		if len(snap.Dependencies) != 1 || snap.Dependencies[0].Parent.Identity() != snap.Root.Identity() {
+			t.Errorf("the edges no longer start at the root: %+v", snap.Dependencies)
+		}
+		if doc.Dependencies[0].Parent.Name != dots {
+			t.Error("taking a snapshot rewrote the document it was taken from")
+		}
 	}
 }
 
 func TestASourcePackageNamedAsADotSegmentIsNoSource(t *testing.T) {
 	// A source package is addressed by its name as a path segment, which a
-	// browser resolves away when it is "." or "..".
-	for _, dots := range []string{".", ".."} {
+	// browser resolves away when it is "." or "..", stored trimmed.
+	for _, dots := range []string{".", "..", "%20..%20"} {
 		doc := read(t, strings.Replace(minimal, `"purl": "pkg:deb/debian/libc6@2.41"`,
 			`"purl": "pkg:deb/debian/libc6@2.41?upstream=`+dots+`%402.41"`, 1))
 		for _, c := range doc.Components {
