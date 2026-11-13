@@ -176,19 +176,17 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 	}
 
 	header, contentHash, inventoryHash, err := describe(parts, in.Limits)
-	switch {
-	case refusal.In(err):
-		// The reason recorded is what was wrong with the upload, which the
-		// producer is handed among the errors: the answer's own detail is
-		// the same sentence for every unreadable upload, and a report reading
-		// it cannot tell a version nothing reads from a truncated file.
-		refused := huma.Error422UnprocessableEntity("the upload could not be read", err)
-		note("the upload could not be read: "+err.Error(), nil, nil)
-		return nil, refused
-	case err != nil:
-		// The spooled form failed to read. That is this server's fault and
-		// names a path on it, so it is logged and answered as a fault.
-		return nil, core.WentWrong(in.Logger, "the upload could not be read", err)
+	if err != nil {
+		answer, refused := unreadable(in.Logger, err)
+		if refused {
+			// The reason recorded is what was wrong with the upload, which
+			// the producer is handed among the errors: the answer's own
+			// detail is the same sentence for every unreadable upload, and a
+			// report reading it cannot tell a version nothing reads from a
+			// truncated file.
+			note("the upload could not be read: "+err.Error(), nil, nil)
+		}
+		return nil, answer
 	}
 
 	// A document that does not say when it was built is ordered by when it

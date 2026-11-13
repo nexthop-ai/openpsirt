@@ -550,6 +550,10 @@ func TestAnXMLStartTagLongerThanTheBoundIsRefused(t *testing.T) {
 			bracketed + `></bom>`,
 		"an element inside it": strings.Replace(minimalXML, `<component type="library" bom-ref="a">`,
 			`<component type="library" bom-ref="a"`+tag.String()+`>`, 1),
+		// The guard reads on past a comment and a character data section.
+		"after a comment": `<!-- c --><bom xmlns="http://cyclonedx.org/schema/bom/1.6"` + tag.String() + `></bom>`,
+		"after a character data section": strings.Replace(minimalXML, `<components>`,
+			`<components><![CDATA[x]]><component type="library"`+tag.String()+`/>`, 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := sbom.ReadHeader(strings.NewReader(doc), sbom.Limits{})

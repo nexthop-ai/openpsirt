@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +39,9 @@ func listArchive(t *testing.T, records map[string][]byte) string {
 	t.Helper()
 	var inner bytes.Buffer
 	w := zip.NewWriter(&inner)
-	for name, body := range records {
+	// In name order, so which member comes first is known.
+	for _, name := range slices.Sorted(maps.Keys(records)) {
+		body := records[name]
 		f, err := w.Create("cves/2026/31xxx/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -309,7 +313,8 @@ func TestRecordsLeftOutAreCountedAndOnlyTheFirstKept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if skipped.Count != 3 || skipped.First == nil {
+	// The archive holds them in name order, so the first is CVE-2026-10.
+	if skipped.Count != 3 || skipped.First == nil || !strings.Contains(skipped.First.Error(), "CVE-2026-10.json") {
 		t.Errorf("left out %+v, want three counted and the first kept", skipped)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // backlogRetry is how long a sender turned away by a full backlog is told to
@@ -80,6 +82,18 @@ func backlogged(ctx context.Context, in core.Deps, kind, waiting, done string) e
 		return busy(fmt.Sprintf("%d %s are already waiting to be %s; try again shortly", depth, waiting, done))
 	}
 	return nil
+}
+
+// unreadable answers an upload whose documents could not be read, and says
+// whether the answer refuses the upload. What was wrong with the sender's
+// document is a 422 the upload's receipts record. A spooled part this server
+// failed to read is its own fault, logged and answered as one, because the
+// error names a path on this server.
+func unreadable(logger *slog.Logger, err error) (answer error, refused bool) {
+	if refusal.In(err) {
+		return huma.Error422UnprocessableEntity("the upload could not be read", err), true
+	}
+	return core.WentWrong(logger, "the upload could not be read", err), false
 }
 
 // busy is a 503 saying when to send again, which a client honoring the

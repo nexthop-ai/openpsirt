@@ -105,6 +105,17 @@ func EachIngest(t *testing.T, opts queue.Options, fn func(t *testing.T, f *Inges
 
 func IngestOn(t *testing.T, on Engines, opts queue.Options, fn func(t *testing.T, f *IngestFixture)) {
 	t.Helper()
+	IngestThrough(t, on, opts, nil, fn)
+}
+
+// IngestThrough is IngestOn with the handler's database handle made by
+// through from the fixture's, so a test can watch or interleave what the
+// handler does. The fixture's own handle is left unwatched; nil is the
+// fixture's handle itself.
+func IngestThrough(t *testing.T, on Engines, opts queue.Options,
+	through func(t *testing.T, db *database.DB) *database.DB, fn func(t *testing.T, f *IngestFixture)) {
+
+	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -118,9 +129,13 @@ func IngestOn(t *testing.T, on Engines, opts queue.Options, fn func(t *testing.T
 			t.Fatal(err)
 		}
 
-		q := queue.New(db, opts)
+		served := db
+		if through != nil {
+			served = through(t, db)
+		}
+		q := queue.New(served, opts)
 		handler, _ := httpapi.New(quiet, nil, core.Deps{
-			DB: db, Queue: q,
+			DB: served, Queue: q,
 			Access: access.NewResolver(rights, access.Trust{}),
 			// Small enough that a test can write a document past it. Every
 			// other bound is the default, which OrDefault fills in.

@@ -5,6 +5,7 @@ package scansapi
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -33,5 +34,26 @@ func TestAnUploadThisServerCannotReadIsAFaultNotARefusal(t *testing.T) {
 	}
 	if _, _, _, err := describe(&uploadParts{}, sbom.Limits{}); !refusal.In(err) {
 		t.Errorf("an upload with no inventory answered %v, want a refusal", err)
+	}
+}
+
+// The door answers a part this server could not read as its own fault, and
+// names no path on it; a document it read and refused is a 422 the receipts
+// record.
+func TestTheDoorAnswersAnUnreadablePartAsAFault(t *testing.T) {
+	parts := &uploadParts{Inventory: huma.FormFile{File: failing{strings.NewReader("")}, IsSet: true}}
+	_, _, _, err := describe(parts, sbom.Limits{})
+	answer, refused := unreadable(nil, err)
+	var status huma.StatusError
+	if refused || !errors.As(answer, &status) || status.GetStatus() != http.StatusInternalServerError {
+		t.Errorf("a part this server could not read answered %v, refused %v; want a fault", answer, refused)
+	}
+	if strings.Contains(answer.Error(), "/tmp/") {
+		t.Errorf("the answer names a path on this server: %v", answer)
+	}
+	_, _, _, err = describe(&uploadParts{}, sbom.Limits{})
+	answer, refused = unreadable(nil, err)
+	if !refused || !errors.As(answer, &status) || status.GetStatus() != http.StatusUnprocessableEntity {
+		t.Errorf("an upload with no inventory answered %v, refused %v; want a recorded 422", answer, refused)
 	}
 }

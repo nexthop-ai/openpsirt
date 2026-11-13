@@ -94,8 +94,9 @@ func registerAnalyses(api huma.API, in core.Deps) {
 			"upload takes static analysis alone, and refuses one holding nothing else. A result at an " +
 			"http or https address is dropped and counted as `web-address`; an upload whose every result " +
 			"is at one, a web scanner's, is refused.\n\n" +
-			"Answers 503 with `Retry-After` when as many analyzer runs as the deployment holds " +
-			"are waiting to be applied; send again after that many seconds.",
+			"Answers 503 with `Retry-After` when the deployment is already reading as many " +
+			"uploads as it takes at once, or when as many analyzer runs as it holds are waiting " +
+			"to be applied; send again after that many seconds.",
 		Tags:         []string{"Ingest"},
 		MaxBodyBytes: analysisLimits(in).MaxCompressed + core.Envelope,
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
