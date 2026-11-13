@@ -326,13 +326,14 @@ func uploader() *http.Client {
 //
 // The name is the one the analyzer gives itself, so it is reduced to what a
 // file name holds safely: lower-case letters, digits, ".", "_" and "-", with
-// every other character a "-" and no leading ".". A "/" or ".." left in it
-// would write somewhere other than beside the path named.
+// every other character a "-" and no "." at either end. A "/" or ".." left in
+// it would write somewhere other than beside the path named, and Windows
+// drops a trailing ".", so two names differing by one would be one file.
 func written(out, tool string, runs int) string {
 	if runs == 1 {
 		return out
 	}
-	safe := strings.TrimLeft(strings.Map(func(r rune) rune {
+	safe := strings.Trim(strings.Map(func(r rune) rune {
 		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-' {
 			return r
 		}

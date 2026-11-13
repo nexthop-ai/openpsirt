@@ -178,6 +178,7 @@ func TestAnAnalyzersOwnNameWritesBesideTheOutput(t *testing.T) {
 		"x/../../../../evil": "run.x-..-..-..-..-evil.sarif",
 		"Org/Tool":           "run.org-tool.sarif",
 		"..":                 "run.analyzer.sarif",
+		"Tool.":              "run.tool.sarif",
 	} {
 		t.Run(name, func(t *testing.T) {
 			crafted := filepath.Join(t.TempDir(), "crafted.sarif")
