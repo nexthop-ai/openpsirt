@@ -305,6 +305,8 @@ func TestWhatAProviderMustSupplyBeforeItIsUsable(t *testing.T) {
 		{"a name carrying a slash", whole(func(c *OIDCConfig) { c.Name = "acme/corp" }), "OIDC_NAME"},
 		{"a name carrying a space", whole(func(c *OIDCConfig) { c.Name = "acme corp" }), "OIDC_NAME"},
 		{"an empty name", whole(func(c *OIDCConfig) { c.Name = "" }), "OIDC_NAME"},
+		{"a name that is a dot segment", whole(func(c *OIDCConfig) { c.Name = ".." }), "OIDC_NAME"},
+		{"a name that is a single dot", whole(func(c *OIDCConfig) { c.Name = " . " }), "OIDC_NAME"},
 	} {
 		_, err := NewOIDC(context.Background(), c.cfg)
 		if err == nil {

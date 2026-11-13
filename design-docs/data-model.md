@@ -196,6 +196,7 @@ A name is judged as it is stored, so surrounding space hides nothing.
 | A product, branch or tag, or variant, declared or renamed | Refused |
 | A key, token, saved filter, team, label, supplier, outbound destination or approval batch | Refused |
 | A person recorded by an administrator or by configuration | Refused |
+| An identity provider's configured name | The process does not start (`docs/configuration.md`) |
 | A person a group mapping would record at sign-in | Refused as any unknown arrival is, saying nothing of why |
 | A component in an inventory, other than its root | The inventory is refused (`design-docs/ingest-parsing.md` § Tolerated and refused) |
 | An inventory's root | Filed under the product's name, as a root the document does not name is; a producer scanning the current directory names it `.` |

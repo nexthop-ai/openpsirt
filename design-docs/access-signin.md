@@ -147,6 +147,7 @@ undo it.
 | A group mapping adopts a recorded account only while its authorization is redeemable, never reopening the window | |
 | A group mapping adopts only an authorization waiting under the name | Direct mode refuses the same arrival |
 | A redeemed authorization is not held to it | |
+| A group mapping records nobody under a username of `.` or `..`; the arrival is refused as any unknown one is | `design-docs/data-model.md` § Dot segments |
 
 ### The username claim
 
