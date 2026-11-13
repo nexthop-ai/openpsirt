@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -721,7 +722,7 @@ func TestAFailedJobCanBeSeenAndPutBack(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		failed, total, err := q.FailedJobs(ctx, 0)
+		failed, total, err := q.FailedJobs(ctx, admin, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -741,7 +742,7 @@ func TestAFailedJobCanBeSeenAndPutBack(t *testing.T) {
 		// Put back with its attempts started again. A job that came back with
 		// one attempt left would fail on the next transient failure,
 		// which is not what somebody who fixed the cause asked for.
-		if err := q.Requeue(ctx, job.ID); err != nil {
+		if err := q.Requeue(ctx, admin, job.ID); err != nil {
 			t.Fatal(err)
 		}
 		again, err := q.Claim(ctx, "worker", "ingest")
@@ -754,13 +755,51 @@ func TestAFailedJobCanBeSeenAndPutBack(t *testing.T) {
 	})
 }
 
+// admin administers the deployment, which reading and putting back failed
+// jobs asks for.
+var admin = access.NewPerson(1, "admin", true, nil, 0)
+
+func TestOnlyAnAdministratorReadsOrPutsBackAFailedJob(t *testing.T) {
+	// A last error can name a component of a finding the reader holds
+	// nothing on, so the queue refuses anybody else whoever calls it.
+	opts := queue.DefaultOptions()
+	opts.MaxAttempts = 1
+	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+		ctx := t.Context()
+		job := claimed(t, q, "ingest", "unreadable", "worker")
+		if err := q.Fail(ctx, job.ID, "worker", errors.New("libnl-3-200 at 3.7.0 could not be read")); err != nil {
+			t.Fatal(err)
+		}
+		for name, who := range map[string]access.Subject{
+			"a reader of every product": access.NewPerson(2, "reader", false,
+				map[int64][]access.Role{1: access.Roles()}, 0),
+			"an auditor": func() access.Subject {
+				s := access.NewPerson(3, "auditor", false, nil, 0)
+				s.Audits = true
+				return s
+			}(),
+			"a key": access.NewPipeline(4, "ci", access.Scope{ProductID: 1}),
+		} {
+			if jobs, _, err := q.FailedJobs(ctx, who, 0); !errors.Is(err, access.ErrDenied) {
+				t.Errorf("%s read %d failed jobs and %v, want a refusal", name, len(jobs), err)
+			}
+			if err := q.Requeue(ctx, who, job.ID); !errors.Is(err, access.ErrDenied) {
+				t.Errorf("%s putting a job back answered %v, want a refusal", name, err)
+			}
+		}
+		if jobs, _, err := q.FailedJobs(ctx, admin, 0); err != nil || len(jobs) != 1 {
+			t.Errorf("an administrator read %d failed jobs and %v, want the one", len(jobs), err)
+		}
+	})
+}
+
 func TestOnlyAFailedJobIsPutBack(t *testing.T) {
 	// Putting back a job somebody is running would hand the same work to two
 	// workers, which on an ingest looks like real change rather than an error.
 	each(t, queue.DefaultOptions(), func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		job := claimed(t, q, "ingest", "in-progress", "worker")
-		if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotFailed) {
+		if err := q.Requeue(ctx, admin, job.ID); !errors.Is(err, queue.ErrNotFailed) {
 			t.Errorf("putting back running work answered %v, want it refused", err)
 		}
 	})
@@ -958,7 +997,7 @@ func TestAClippedFailedJobsListSaysHowManyThereAre(t *testing.T) {
 			}
 		}
 
-		page, total, err := q.FailedJobs(ctx, 2)
+		page, total, err := q.FailedJobs(ctx, admin, 2)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
@@ -229,4 +230,83 @@ func TestAReconcileThatLosesItsCommitCountsWhatTheRetryWrote(t *testing.T) {
 		t.Errorf("opened %d cleared %d, want %d and 0", opened, cleared, len(held))
 	}
 	saysExactly(t, openNow(t, db.DB, who.ID, notify.BuildQuiet), held)
+}
+
+// endedOnce opens one condition for the person and clears it, telling them
+// what ended says. It returns the events of the kind told written for them.
+func endedOnce(t *testing.T, w *fixture.World, personID int64, said notify.Telling) ([]notify.Notification, error) {
+	t.Helper()
+	ctx := t.Context()
+	s := notify.NewStore(w.DB.DB)
+	if _, _, err := s.Reconcile(ctx, personID, notify.UpstreamFailing, []notify.Holds{{
+		About: "upstream 1", Body: "An upstream cannot be read.",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := s.ReconcileTelling(ctx, personID, notify.UpstreamFailing, nil,
+		func(notify.Notification) *notify.Telling { return &said })
+	var rows []notify.Notification
+	if err := w.DB.DB.NewSelect().Model(&rows).
+		Where(`"person_id" = ?`, personID).Where(`"kind" = ?`, said.Kind).
+		Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return rows, err
+}
+
+// What a cleared condition says is told as any event is: with its withheld
+// marks and what it is about, and refused where Tell refuses it.
+func TestWhatAClearedConditionSaysIsToldAsAnyEventIs(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ids, err := finding.NewVulnerabilities(w.DB.DB).Intern(t.Context(),
+			[]finding.Named{{Identifier: "SONIC-2026-100001", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		product, issue := w.Product.ID, ids["SONIC-2026-100001"]
+		said := notify.Telling{
+			Kind: notify.UpstreamRecovered, Body: "An undisclosed thing ended.", Link: "/somewhere",
+			Private: true, SecurityTesting: true, ProductID: &product, VulnerabilityID: &issue,
+			Concerns: "about-it",
+		}
+		rows, err := endedOnce(t, w, w.Person.ID, said)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("%d events told, want 1", len(rows))
+		}
+		got := rows[0]
+		if !got.Private || !got.SecurityTesting || got.Concerns != "about-it" ||
+			got.ProductID == nil || *got.ProductID != product ||
+			got.VulnerabilityID == nil || *got.VulnerabilityID != issue {
+			t.Errorf("the event lost what it was told with: private %v, security testing %v, concerns %q, product %v, issue %v",
+				got.Private, got.SecurityTesting, got.Concerns, got.ProductID, got.VulnerabilityID)
+		}
+
+		unattributed := said
+		unattributed.ProductID = nil
+		if _, err := endedOnce(t, w, w.Person.ID, unattributed); err == nil {
+			t.Error("an undisclosed event naming no product was told")
+		}
+	})
+}
+
+// Somebody who has left is told nothing a cleared condition says, as Tell
+// tells them nothing.
+func TestSomebodyWhoHasLeftIsNotToldWhatAClearedConditionSays(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		if _, err := w.Access.Deactivate(t.Context(), w.Person.ID); err != nil {
+			t.Fatal(err)
+		}
+		rows, err := endedOnce(t, w, w.Person.ID, notify.Telling{
+			Kind: notify.UpstreamRecovered, Body: "An upstream can be read again.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 0 {
+			t.Errorf("somebody who has left was told %d events", len(rows))
+		}
+	})
 }

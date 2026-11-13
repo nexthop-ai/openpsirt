@@ -190,7 +190,7 @@ func sarifUploads(ctx context.Context, in core.Deps, subject access.Subject,
 			series.Failed: ingest.UploadFailed,
 		}[series.Status(s.Status)], s.Failure)
 	}
-	refusals, err := store.RefusalsOf(ctx, buildID, kind.Analysis)
+	refusals, err := store.RefusalsOf(ctx, subject, productID, buildID, kind.Analysis, analysis.OpensAt)
 	if err != nil {
 		return UploadKindBody{}, err
 	}

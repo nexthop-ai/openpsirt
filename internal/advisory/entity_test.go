@@ -257,10 +257,11 @@ func TestAnAdvisoryCoveringNothingGeneratesNothing(t *testing.T) {
 	})
 }
 
-func TestTakingAnIssueOffRecordsWhoDidAndPuttingItBackRevivesTheRow(t *testing.T) {
+func TestTakingAnIssueOffRecordsWhoDidAndPuttingItBackKeepsEachStretch(t *testing.T) {
 	// Who removed an issue from an advisory is a question a deleted row does
-	// not answer, so the row stays. Adding it again revives that row rather
-	// than writing a second, which is what keeps the pair unique.
+	// not answer, so the row stays. Adding it again writes a second row, so
+	// the stretch an earlier issuance named it in is kept, and the issue is
+	// still on the advisory once.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 		named := f.covering(t, [2]string{"sonic", identifier})
@@ -293,7 +294,7 @@ func TestTakingAnIssueOffRecordsWhoDidAndPuttingItBackRevivesTheRow(t *testing.T
 		if err := f.store.Drop(t.Context(), f.who, named, "sonic", identifier); err == nil {
 			t.Error("taking it off twice answered as though it had been there")
 		}
-		// And putting it back is one row, not two.
+		// Putting it back is a second row, beside the stretch that ended.
 		if _, err := f.store.Add(t.Context(), f.who, named, "sonic", identifier); err != nil {
 			t.Fatalf("putting it back: %v", err)
 		}
@@ -303,6 +304,22 @@ func TestTakingAnIssueOffRecordsWhoDidAndPuttingItBackRevivesTheRow(t *testing.T
 		}
 		if len(held) != 1 {
 			t.Errorf("after putting it back it covers %d issues", len(held))
+		}
+		rows, err := f.db.DB.NewSelect().TableExpr(`"advisory_issue" AS "ac"`).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		ended, err := f.db.DB.NewSelect().TableExpr(`"advisory_issue" AS "ac"`).
+			Where(`"ac"."removed_at" IS NOT NULL`).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rows != 2 || ended != 1 {
+			t.Errorf("after putting it back %d rows record it, %d of them ended; want 2 and 1", rows, ended)
+		}
+		// And it is on the advisory once.
+		if _, err := f.store.Add(t.Context(), f.who, named, "sonic", identifier); !errors.Is(err, advisory.ErrAlreadyCovered) {
+			t.Errorf("putting it on twice answered %v, want already covered", err)
 		}
 	})
 }

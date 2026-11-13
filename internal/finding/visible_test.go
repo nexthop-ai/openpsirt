@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -287,6 +288,154 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 				if err := read.ask(who.subject); !errors.Is(err, access.ErrDenied) {
 					t.Errorf("%s asking %s got %v, want a refusal", who.what, read.what, err)
 				}
+			}
+		}
+	})
+}
+
+// A commitment carries no visibility of its own, so it is read through what it
+// is about: one over undisclosed work is told to nobody who may not read that
+// work. Without a decision that is its fold's findings in the build; argued by
+// a decision it is every occurrence the decision covers, whatever the build's
+// own findings are. A case widens no read of a build, so it reaches nothing
+// here.
+func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
+	for _, argued := range []bool{false, true} {
+		name := "without a decision"
+		if argued {
+			name = "argued by a decision"
+		}
+		t.Run(name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				f.shipped(t, twoConsumers())
+				f.foundOnLibnl(t)
+				var decisionID *int64
+				if argued {
+					// The build's findings stay disclosed; the decision
+					// covers an undisclosed occurrence, so only the
+					// decision withholds the commitment.
+					by := f.somebodyElse(t)
+					id := decisionSaying(t, f.db, by, "upgrade-needed")
+					f.decision(t, decisionRow{
+						By: by, Decision: id, Issue: f.issue(t, "CVE-2026-1"),
+						Occurrence: "libnl", State: "approved", Visibility: string(access.Private),
+					})
+					decisionID = &id
+				} else if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+					Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				committer := f.someoneElse(t, access.PrivateTriage)
+				if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
+					f.componentID(t, libnl.Name), "3.9.0", nil, decisionID,
+					[]int64{f.build}, map[int64]string{}); err != nil {
+					t.Fatal(err)
+				}
+
+				cases := []struct {
+					what string
+					who  access.Subject
+					want int
+				}{
+					{"a reader of disclosed work alone", f.holding(t, access.PublicRead), 0},
+					{"a reader of both", f.holding(t, access.PublicRead, access.PrivateRead), 1},
+				}
+				if argued {
+					cases = append(cases, struct {
+						what string
+						who  access.Subject
+						want int
+					}{"somebody on the issue's case", f.holding(t, access.PublicRead).OnCases(
+						map[int64][]int64{f.productID: {f.issue(t, "CVE-2026-1")}}), 0})
+				}
+				for _, c := range cases {
+					planned, err := f.store.PlannedUpgradesFor(ctx, c.who, f.build)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(planned) != c.want {
+						t.Errorf("%s is told of %d commitments, want %d", c.what, len(planned), c.want)
+						continue
+					}
+					if c.want == 1 && planned[0].State != finding.UpgradePlanned {
+						t.Errorf("%s reads the commitment as %s, want planned", c.what, planned[0].State)
+					}
+				}
+			})
+		})
+	}
+}
+
+// A commitment argued by a decision that covers nothing is told to nobody, as
+// reading that decision answers it absent.
+func TestACommitmentWhoseDecisionCoversNothingIsToldToNobody(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.foundOnLibnl(t)
+		id := decisionSaying(t, f.db, f.somebodyElse(t), "upgrade-needed")
+		committer := f.someoneElse(t, access.PrivateTriage)
+		if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
+			f.componentID(t, libnl.Name), "3.9.0", nil, &id,
+			[]int64{f.build}, map[int64]string{}); err != nil {
+			t.Fatal(err)
+		}
+		planned, err := f.store.PlannedUpgradesFor(ctx, f.holding(t, access.PublicRead, access.PrivateRead), f.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(planned) != 0 {
+			t.Errorf("a reader of everything is told of %d commitments over a decision covering nothing", len(planned))
+		}
+	})
+}
+
+// A decision row is read in its own product. A bulk decision can reach an
+// undisclosed occurrence in a product the reader holds nothing on, and reading
+// undisclosed work in the build's product says nothing about that one.
+func TestACommitmentIsReadAtEachDecisionRowInItsOwnProduct(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.foundOnLibnl(t)
+		other, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")
+		if err != nil {
+			t.Fatal(err)
+		}
+		by := f.somebodyElse(t)
+		id := decisionSaying(t, f.db, by, "upgrade-needed")
+		issue := f.issue(t, "CVE-2026-1")
+		f.decision(t, decisionRow{
+			By: by, Decision: id, Issue: issue, Occurrence: "libnl", State: "approved",
+		})
+		f.decision(t, decisionRow{
+			By: by, Decision: id, Product: other.ID, Issue: issue, Occurrence: "libnl",
+			State: "approved", Visibility: string(access.Private),
+		})
+		committer := f.someoneElse(t, access.PrivateTriage)
+		if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
+			f.componentID(t, libnl.Name), "3.9.0", nil, &id,
+			[]int64{f.build}, map[int64]string{}); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, c := range []struct {
+			what string
+			who  access.Subject
+			want int
+		}{
+			{"a reader of both halves of this product alone",
+				f.holding(t, access.PublicRead, access.PrivateRead), 0},
+			{"a reader of both halves of both products",
+				f.holdingIn(t, []int64{f.productID, other.ID}, access.PublicRead, access.PrivateRead), 1},
+		} {
+			planned, err := f.store.PlannedUpgradesFor(ctx, c.who, f.build)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(planned) != c.want {
+				t.Errorf("%s is told of %d commitments, want %d", c.what, len(planned), c.want)
 			}
 		}
 	})

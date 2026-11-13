@@ -76,6 +76,7 @@ The chain is the baseline, then one migration per release.
 | 44 | v0.9.0's schema into v0.10.0's |
 | 45 | v0.10.0's schema into v0.11.0's |
 | 46 | v0.11.0's schema into v0.12.0's |
+| 47 | v0.12.0's schema into v0.13.0's |
 
 `design-docs/database-upgrades.md` says what each does. A tagged release's
 migration, and every declaration it reads, never changes again, because a

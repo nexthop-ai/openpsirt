@@ -291,12 +291,13 @@ func InBatchesKeeping[T any](ctx context.Context, db bun.IDB, rows []T) error {
 	return nil
 }
 
-// IDsInBatches calls fn with the identifiers a bounded number at a time.
+// IDsInBatches calls fn with the identifiers, or keys, a bounded number at a
+// time.
 //
 // A list of identifiers in a statement has the same ceiling as a list of rows,
 // and closing what a scan no longer contains can name as many of them as
 // opening did.
-func IDsInBatches(ctx context.Context, ids []int64, fn func(context.Context, []int64) error) error {
+func IDsInBatches[T any](ctx context.Context, ids []T, fn func(context.Context, []T) error) error {
 	for start := 0; start < len(ids); start += BatchSize {
 		end := min(start+BatchSize, len(ids))
 		if err := fn(ctx, ids[start:end]); err != nil {

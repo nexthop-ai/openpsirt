@@ -255,3 +255,37 @@ func TestWhatWentOutIsReadAtEveryFlawTheAdvisoryEverCovered(t *testing.T) {
 		}
 	})
 }
+
+// An issue taken off, put back and taken off again keeps the stretch the
+// first issuance named it in, so what went out is still read at it.
+func TestWhatWentOutIsReadAtAFlawTakenOffPutBackAndTakenOffAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		undisclosed := f.recorded(t, f.master)
+		named := f.issuedOver(t, [2]string{"sonic", undisclosed})
+		if err := f.store.Drop(ctx, f.who, named, "sonic", undisclosed); err != nil {
+			t.Fatalf("taking the flaw off: %v", err)
+		}
+		if _, err := f.store.Add(ctx, f.who, named, "sonic", undisclosed); err != nil {
+			t.Fatalf("putting the flaw back: %v", err)
+		}
+		if err := f.store.Drop(ctx, f.who, named, "sonic", undisclosed); err != nil {
+			t.Fatalf("taking the flaw off again: %v", err)
+		}
+
+		public := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{f.product: {access.PublicRead}}, 0)
+		got := f.reachedBy(t, public, named)
+		if got.published[named] || got.sent[named] || got.issuances[named] {
+			t.Errorf("what %s went out as reached a public reader of sonic: reported %v, sent %v, read %v",
+				named, got.published[named], got.sent[named], got.issuances[named])
+		}
+		issued, err := advisory.AnyIssuedForProduct(ctx, f.db.DB, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !issued {
+			t.Error("sonic reads as having had no advisory go out")
+		}
+	})
+}

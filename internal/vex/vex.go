@@ -261,14 +261,18 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	}
 	// Disclosed work, and undisclosed work for a preview. Security testing material
 	// is never disclosed, so no document carries it.
+	// The reader is whoever the document reaches: everybody, for disclosed
+	// work, and the person asking, for a preview.
 	visible := []access.Visibility{access.Public}
+	reader := access.Published([]int64{named.ProductID})
 	if undisclosed {
 		if !subject.Reads(access.Private, named.ProductID) {
 			return nil, access.Denied("read undisclosed work here")
 		}
 		visible = append(visible, access.Private)
+		reader = subject
 	}
-	return s.document(ctx, who, named, build, visible, kind)
+	return s.document(ctx, who, named, build, visible, reader, kind)
 }
 
 // ErrNoPublisher says the deployment has not been told who it publishes as.
@@ -315,9 +319,10 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 }
 
 // document assembles what stands about one build, at the visibilities asked
-// for.
+// for, as the reader it reaches may be told it.
 func (s *Store) document(ctx context.Context, who publisher.Named, named *catalog.Named,
-	build *catalog.Build, visible []access.Visibility, kind Kind) (*Statements, error) {
+	build *catalog.Build, visible []access.Visibility, reader access.Subject,
+	kind Kind) (*Statements, error) {
 
 	if kind != Ours && kind != WithSuppliers {
 		return nil, refusal.Errorf("%q is not a kind of document this writes", kind)
@@ -422,21 +427,17 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, err
 	}
-	// A document of disclosed work publishes no other name of an issue that a
-	// flaw of ours recorded out of a reader's reach wrote onto it: one of them
-	// is the name minted for it. The reader is whoever the document reaches,
-	// who may read disclosed work in this product and nothing else. A preview
-	// including undisclosed work is for somebody who may read that work, and
-	// keeps them.
-	if len(visible) == 1 && visible[0] == access.Public {
-		withheld, err := finding.RecordedOutOfReach(ctx, s.idb(),
-			access.Published([]int64{named.ProductID}), issues)
-		if err != nil {
-			return nil, err
-		}
-		for issue := range withheld {
-			delete(alsoCalled, issue)
-		}
+	// A document publishes no other name of an issue that a flaw of ours
+	// recorded out of its reader's reach wrote onto it: one of them is the
+	// name minted for it. A preview's reader may read undisclosed work in this
+	// product, which says nothing of a flaw recorded in another product or at
+	// security testing visibility.
+	withheld, err := finding.RecordedOutOfReach(ctx, s.idb(), reader, issues)
+	if err != nil {
+		return nil, err
+	}
+	for issue := range withheld {
+		delete(alsoCalled, issue)
 	}
 
 	shipped, err := s.rootOf(ctx, named, build.ID)

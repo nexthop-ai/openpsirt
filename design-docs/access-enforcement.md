@@ -50,6 +50,8 @@ included.
 | The refusal sits in the store read as well as at the edge, and the zero subject counts as a non-person | A handler check is the one somebody forgets |
 | A non-person is refused; a person holding nothing gets an empty list | Both checks stay, and the layers agree |
 | A read is narrowed to the products somebody holds anything on, and within those to the visibilities read in each, as one call; nothing calls the visibility half bare | Where a product is already pinned, a named pairing states that the first half was done |
+| A test asks every read path the API offers, each parameter filled with the seeded names and identifiers, as a reader of disclosed work alone, and fails on any word of the undisclosed work seeded beside its findings in an answer or a refusal; query parameters keep their defaults (REQ-42, REQ-43) | A secondary read skipping the narrowing its findings take is invisible to a test of one route |
+| The seeded work is a recorded flaw with a note, a decision over it with its reasoning and a comment, a report with a message and a note, an advisory, a file attached to the flaw, a promise to upgrade a package whose findings are undisclosed, a code finding, an analyzer upload turned away with its reason, and a failed job with its error | A kind left unseeded passes the walk whatever its reads join |
 
 | Read | Answer to a subject that reads nothing there |
 |---|---|
@@ -59,21 +61,30 @@ included.
 
 ## Store methods with no subject
 
-A store method takes no subject only for one of three reasons:
+A store method or function takes no subject only for one of these reasons:
 
-1. A background pass answering to nobody.
-2. A private helper reading rows a narrowed query already selected.
-3. A question whose answer does not vary by who asks, such as whether a finding is suppressed.
+| Reason | Example |
+|---|---|
+| A background pass answering to nobody | Applying a scan; the sweeps |
+| A helper over rows a narrowed read already selected or authorized | The labels on a finding its detail read |
+| A question whose answer does not vary by who asks | Whether a finding is suppressed; a setting |
+| Establishing who is asking, or what they hold, as sign-in or authorized administration | Sessions, keys, grants, teams |
+| A person's own record, keyed by them | Their saved views |
 
-The exported methods of the finding, triage and graph stores that query without
-a subject are named, with their reason, in a list `make subjected` holds them to
-(`design-docs/build.md` § Make targets). Querying through a helper of the same
-package counts as querying.
+Every package under `internal/` is read, but a program and a test harness. A
+harness imports the testing package and is linked by no program under `cmd/`,
+directly or through another package; a linked package is read whatever it
+imports. A store is a type one of whose methods builds a query or calls a
+function of its package that does. Its exported methods, and the package's
+exported functions, that query without a subject are named, with their
+reason, in a list `make subjected` holds them to (`design-docs/build.md`
+§ Make targets). Querying through a helper of the same package counts as
+querying.
 
 | Read | Rule |
 |---|---|
 | What an assignment rule would catch; the words in use on a product | Take a subject, since both read findings product-wide |
-| A product's assignment rules, the response windows and the products each is limited to, an upload's receipt and kept documents | The store decides what the subject reaches: the rules for whoever triages the product, a window narrowed to products the reader may know exist, the builds a key may upload to. The sweeps applying rules and watching windows read as the deployment |
+| A product's assignment rules, the response windows and the products each is limited to, an upload's receipt, refusals and kept documents | The store decides what the subject reaches: the rules for whoever triages the product, a window narrowed to products the reader may know exist, the builds a key may upload to, an analyzer's receipts and refusals for whoever reads them in the build's own product. The sweeps applying rules and watching windows read as the deployment |
 | The administration trail | Refuses a subject holding neither administration nor the audit permission, the deployment itself excepted. A refusal, since an empty page claims nobody changed anything |
 | Whether somebody may read; whether they may triage | One question each, asked in one place on the subject |
 | Whether any row of a group is undisclosed | The private rows counted and compared with zero |

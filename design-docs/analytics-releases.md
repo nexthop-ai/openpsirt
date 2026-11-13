@@ -3,7 +3,7 @@
 What changed between two builds, the release note made of it, whether a branch
 is ready to release, what a new line inherits, and one issue across every build.
 
-Satisfies REQ-25, REQ-30, REQ-51.
+Satisfies REQ-25, REQ-30, REQ-42, REQ-43, REQ-51.
 
 ## Contents
 
@@ -30,6 +30,7 @@ Fixed, newly present and still present between any two builds of one product
 | A fixed entry states why, and what it moved to: "upgraded, 3.7.0 → 3.9.0" | The pair is written at closure, before the old component leaves the inventory |
 | A still-present entry carries the version its occurrence arrived from where it moved, on the still-present column only | It says whether somebody tried |
 | Explanations are read once for the list, narrowed by issues and components separately and paired on the way out | No engine here spells a column-pair comparison alike |
+| Explanations are read at the visibilities the entries were drawn at; an omitted count reads them at undisclosed only (REQ-42, REQ-43) | A merged flaw closes an undisclosed row under a disclosed identifier at the same component |
 | Each half is rated as its own product rates it | |
 
 ## The release note

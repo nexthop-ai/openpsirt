@@ -227,3 +227,38 @@ func StatementsV0120(engine database.Engine) map[string][]string {
 	}
 	return statements
 }
+
+// StatementsV0130 is v0.13.0's declaration of each table it changes.
+func StatementsV0130(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{"advisory_issue": advisoryIssueV0130(t)}
+}
+
+// StopV0130AfterLiveColumn adds the column marking an issue on an advisory
+// and nothing else: a start of the v0.13.0 upgrade on MySQL or MariaDB that
+// stopped after the column committed.
+func StopV0130AfterLiveColumn(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(advisoryIssueV0130(u.t), change{table: "advisory_issue",
+			add: []added{{column: "live"}}})
+	})
+}
+
+// StopV0130AfterLiveRule runs the v0.13.0 upgrade up to the uniqueness rule
+// holding the mark, and stops before the rule it replaces is dropped.
+func StopV0130AfterLiveRule(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(advisoryIssueV0130(u.t), change{table: "advisory_issue",
+			add: []added{{column: "live"}}, constraints: []string{"advisory_issue_live_once"}})
+	})
+}

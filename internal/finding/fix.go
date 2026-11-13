@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -265,6 +267,9 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this build is waiting on: %w", err)
 	}
+	if rows, err = s.toldOf(ctx, subject, buildID, visible, rows); err != nil {
+		return nil, err
+	}
 	if len(rows) == 0 {
 		return nil, nil
 	}
@@ -272,31 +277,41 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		folds = append(folds, row.FoldKey)
 	}
+	slices.Sort(folds)
+	folds = slices.Compact(folds)
 
 	// open is what is still open under each of them, and which packages
 	// those are. Joined from the finding rather than from the commitment,
 	// because coverage is a match on the fold rather than a row somebody
 	// wrote: a vulnerability published tonight against the same package is
 	// covered by this morning's commitment with nobody acting.
-	var open []struct {
+	type closing struct {
 		Fold        string `bun:"fold"`
 		Issues      int    `bun:"issues"`
 		Occurrences int    `bun:"places"`
 	}
+	var open []closing
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
-		Where(kinds, kindArgs...).
-		ColumnExpr(`COUNT(*) AS "places"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr(FoldedOn).
-		Scan(ctx, &open); err != nil {
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
+		var some []closing
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(FoldedOn+` AS "fold"`).
+			ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
+			Where(kinds, kindArgs...).
+			ColumnExpr(`COUNT(*) AS "places"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
+			GroupExpr(FoldedOn).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		open = append(open, some...)
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read what those bumps would close: %w", err)
 	}
 	counts := make(map[string]struct{ Issues, Occurrences int }, len(open))
@@ -335,6 +350,104 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	return planned, nil
+}
+
+// toldOf keeps the commitments a reader may be told of, visible being what
+// they read in the build's product. The commitment row carries no visibility,
+// so it is read through what it is about. One made by a decision is shown
+// where the reader reads every occurrence the decision covers, each at what
+// they read of its product: a case they were brought into counts for nothing,
+// as it widens no read of a build. One without a decision is shown where some
+// finding at its fold in this build, open or closed, is visible: a commitment
+// whose findings have all closed has landed, and stays readable to whoever
+// could read them.
+func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int64,
+	visible []access.Visibility, rows []Upgrade) ([]Upgrade, error) {
+
+	var decisions []int64
+	var folds []string
+	for _, row := range rows {
+		if row.DecisionID != nil {
+			decisions = append(decisions, *row.DecisionID)
+		} else {
+			folds = append(folds, row.FoldKey)
+		}
+	}
+	// One bulk decision stands behind many commitments, so each list is
+	// read once per value, a batch at a time.
+	slices.Sort(decisions)
+	decisions = slices.Compact(decisions)
+	slices.Sort(folds)
+	folds = slices.Compact(folds)
+	withheld := map[int64]bool{}
+	if len(decisions) > 0 {
+		type cover struct {
+			DecisionID int64             `bun:"decision_id"`
+			ProductID  int64             `bun:"product_id"`
+			Visibility access.Visibility `bun:"visibility"`
+		}
+		var covered []cover
+		if err := database.IDsInBatches(ctx, decisions, func(ctx context.Context, batch []int64) error {
+			var some []cover
+			if err := s.db.NewSelect().
+				TableExpr(`"decision_occurrence" AS "de"`).
+				ColumnExpr(`DISTINCT "de"."decision_id", "de"."product_id", "de"."visibility"`).
+				Where(`"de"."decision_id" IN (?)`, bun.List(batch)).
+				Scan(ctx, &some); err != nil {
+				return err
+			}
+			covered = append(covered, some...)
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("read what the commitments' decisions cover: %w", err)
+		}
+		// A decision covering nothing is one reading it answers as absent.
+		for _, id := range decisions {
+			withheld[id] = true
+		}
+		for _, row := range covered {
+			withheld[row.DecisionID] = false
+		}
+		// A build's commitments are a read of the build, which no case
+		// widens: what each one closes is counted at what the reader reads
+		// of the product, so a case-only reach would show a commitment with
+		// nothing under it.
+		for _, row := range covered {
+			if !subject.Reads(row.Visibility, row.ProductID) {
+				withheld[row.DecisionID] = true
+			}
+		}
+	}
+	seen := map[string]bool{}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
+		var held []string
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(`DISTINCT `+FoldedOn).
+			Where(kinds, kindArgs...).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
+			Scan(ctx, &held); err != nil {
+			return err
+		}
+		for _, fold := range held {
+			seen[fold] = true
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("read which commitments are about readable work: %w", err)
+	}
+	told := rows[:0]
+	for _, row := range rows {
+		if row.DecisionID != nil && !withheld[*row.DecisionID] ||
+			row.DecisionID == nil && seen[row.FoldKey] {
+			told = append(told, row)
+		}
+	}
+	return told, nil
 }
 
 // movedTo changes what a commitment is moving to, or refuses where an
@@ -380,25 +493,35 @@ type packages struct {
 func (s *Store) packagesIn(ctx context.Context, buildID int64,
 	visible []access.Visibility, folds []string) (map[string]packages, error) {
 
-	var rows []struct {
+	type named struct {
 		Fold     string `bun:"fold"`
 		Upstream string `bun:"upstream"`
 		Name     string `bun:"name"`
 	}
+	var rows []named
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Where(kinds, kindArgs...).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
-		ColumnExpr(`"c"."name" AS "name"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr(FoldedOn+`, "c"."name"`).
-		OrderExpr(`"c"."name"`).
-		Scan(ctx, &rows); err != nil {
+	// Each fold's names sit wholly in one batch, so ordering each batch by
+	// name orders every fold's list.
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
+		var some []named
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(FoldedOn+` AS "fold"`).
+			ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
+			ColumnExpr(`"c"."name" AS "name"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
+			GroupExpr(FoldedOn+`, "c"."name"`).
+			OrderExpr(`"c"."name"`).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		rows = append(rows, some...)
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read which packages a bump moves: %w", err)
 	}
 	out := make(map[string]packages, len(folds))
@@ -422,36 +545,44 @@ type holder struct {
 func (s *Store) heldPerFold(ctx context.Context, buildID int64,
 	visible []access.Visibility, folds []string) (map[string]holder, error) {
 
-	var rows []struct {
+	type carried struct {
 		Fold        string `bun:"fold"`
 		Least       *int64 `bun:"least_holder"`
 		Most        *int64 `bun:"most_holder"`
 		Occurrences int    `bun:"places"`
 		Held        int    `bun:"held"`
 	}
+	var rows []carried
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Where(kinds, kindArgs...).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		// The party rather than a name: the column holds a party, which may be
-		// a person or a team, and the name is looked up once for the few that
-		// come back rather than joined per row.
-		ColumnExpr(`MIN("f"."assigned_to") AS "least_holder"`).
-		ColumnExpr(`MAX("f"."assigned_to") AS "most_holder"`).
-		// Two counts rather than a conditional sum: that sum comes back as a
-		// decimal on two of the four engines, and the cast that makes it an
-		// integer is spelled per engine. Counted, a group is wholly held when
-		// the count of holders is the count of rows.
-		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`COUNT("f"."assigned_to") AS "held"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr(FoldedOn).
-		Scan(ctx, &rows); err != nil {
+	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
+		var some []carried
+		if err := s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(FoldedOn+` AS "fold"`).
+			// The party rather than a name: the column holds a party, which may be
+			// a person or a team, and the name is looked up once for the few that
+			// come back rather than joined per row.
+			ColumnExpr(`MIN("f"."assigned_to") AS "least_holder"`).
+			ColumnExpr(`MAX("f"."assigned_to") AS "most_holder"`).
+			// Two counts rather than a conditional sum: that sum comes back as a
+			// decimal on two of the four engines, and the cast that makes it an
+			// integer is spelled per engine. Counted, a group is wholly held when
+			// the count of holders is the count of rows.
+			ColumnExpr(`COUNT(*) AS "places"`).
+			ColumnExpr(`COUNT("f"."assigned_to") AS "held"`).
+			Where(`"f"."build_id" = ?`, buildID).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(FoldedOn+" IN (?)", bun.List(batch)).
+			GroupExpr(FoldedOn).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		rows = append(rows, some...)
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read who is carrying these: %w", err)
 	}
 	out := make(map[string]holder, len(rows))

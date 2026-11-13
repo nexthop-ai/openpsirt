@@ -152,6 +152,39 @@ func CodeFindingFlawAt(ctx context.Context, db bun.IDB, productID int64, occurre
 	return &h, nil
 }
 
+// CodeFindingFlawFor is the flaw record of the code finding at an occurrence
+// in a product, where the subject is on its case: they read the product's
+// undisclosed work, are on the flaw's case, or were granted the code finding.
+// Nil for anybody else, and for a code finding not recorded as a flaw, the two
+// answered alike.
+func (s *Store) CodeFindingFlawFor(ctx context.Context, subject access.Subject, productID int64,
+	occurrenceIdentity string) (*CodeFindingFlaw, error) {
+
+	h, err := CodeFindingFlawAt(ctx, s.db, productID, occurrenceIdentity)
+	if err != nil || h == nil {
+		return nil, err
+	}
+	if !subject.Reads(access.Private, productID) && !subject.OnCase(productID, h.VulnerabilityID) &&
+		!subject.OnCodeFinding(productID, occurrenceIdentity) {
+		return nil, nil
+	}
+	return h, nil
+}
+
+// CodeFindingFlawManaged is the flaw record of the code finding at an
+// occurrence in a product, for a subject who reads the product's security
+// testing work: who is on a code finding is managed by them. Anybody else is
+// refused before the record is looked up, so a refusal says nothing of whether
+// the code finding was recorded as a flaw. Nil where it was not.
+func (s *Store) CodeFindingFlawManaged(ctx context.Context, subject access.Subject, productID int64,
+	occurrenceIdentity string) (*CodeFindingFlaw, error) {
+
+	if !subject.Reads(access.SecurityTesting, productID) {
+		return nil, access.Denied(fmt.Sprintf("manage who is on a code finding in product %d", productID))
+	}
+	return CodeFindingFlawAt(ctx, s.db, productID, occurrenceIdentity)
+}
+
 // includedCodeFinding is the condition that the code finding finding under "f", in the product
 // bound, was included in its flaw's disclosure.
 const includedCodeFinding = `EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"

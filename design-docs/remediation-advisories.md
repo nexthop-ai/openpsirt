@@ -58,7 +58,7 @@ inherited issues reach the release note and the disposition register.
 | Read whole or not at all: a reader who may not see every issue it covers is told it does not exist | A document missing a product reads as complete, and a row saying one went out discloses as much |
 | One covering nothing, or whose issues were all taken off, is its minter's alone | It passes every narrowing, and its title is typed prose |
 | Everything about what went out (the report of issuances, the files a directory serves, one advisory's issuances, whether it changed since, its editorial status, a revision history) is shown only to a reader who may see what every issuance named and every flaw it covers now | Emptying or re-pointing an advisory after it went out discloses nothing |
-| An issue taken off leaves its record, and naming it again revives it | Who removed a flaw stays answerable, and the pair stays unique |
+| An issue taken off leaves its record, and naming it again writes another; it is on the advisory once at a time | Who removed a flaw stays answerable, and every stretch it was covered for is kept, so an issuance from any of them is read at the flaw it named |
 | A flaw recorded from a code finding is fixed in a build where a person closed it there; its page offers each build its code finding is no longer detected on, from the first run not seeing it (`design-docs/analysis-flaws.md` § Fixed in) | |
 | The flaws offered for a product are every one recorded there, open or fixed, with how many are open: recorded by a person, at a visibility the reader sees, in a product they triage | An advisory is usually written after the fix |
 

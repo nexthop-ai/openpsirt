@@ -38,7 +38,7 @@ func ReadsReceipts(subject access.Subject, productID int64, opensAt access.Visib
 func (s *Store) Receipts(ctx context.Context, subject access.Subject, productID, buildID int64,
 	k kind.Kind, opensAt access.Visibility, limit, offset int) ([]Sent, int, error) {
 
-	if err := catalog.ReadsBuild(ctx, s.db, subject, buildID); err != nil {
+	if err := catalog.ReadsBuildIn(ctx, s.db, subject, productID, buildID); err != nil {
 		return nil, 0, err
 	}
 	if !ReadsReceipts(subject, productID, opensAt) {

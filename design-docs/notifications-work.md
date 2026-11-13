@@ -3,7 +3,7 @@
 What a person is told about work: decision outcomes, code findings, what has sat
 still, vulnerability reports, the digest, embargoes and response windows.
 
-Satisfies REQ-24, REQ-28, REQ-38, REQ-47, REQ-48, REQ-77.
+Satisfies REQ-24, REQ-28, REQ-38, REQ-47, REQ-48, REQ-77, REQ-81.
 
 ## Contents
 
@@ -29,6 +29,11 @@ decision has no state of its own.
 | Waiting, sent back, approved, withdrawn, lapsed | As named |
 | Undone | Waiting again after somebody had agreed |
 | Several ways | An approver agreed to most of a bulk set and set some aside |
+
+| Rule | Reason |
+|---|---|
+| A notice about a decision's rows (sent back, an agreement withdrawn or undone, a lapse) is withheld as the strictest of them | A bulk decision can cover a disclosed issue and an undisclosed one |
+| It is stored against the product and issue of its most withheld row, the earliest among equals | A withheld notice is read only where its product's undisclosed work is |
 
 An undo and a lapse each notify: an undo reverses what the proposer relied on; a
 lapse hands work back. The lapse and the merge messages are wired at the
@@ -106,6 +111,7 @@ They report that no event occurred, which nothing driven by an act can.
 | A rejected report with no message sent is still unanswered | A ruling answers the claim, not the reporter |
 | A report about an issue long closed stops being raised; an unjudged claim is raised until answered | |
 | Each is bounded by what the person may read | |
+| A report nobody has answered is undisclosed whatever its issue (REQ-48, REQ-81) | The reporter and the letter are the report, though the issue be public |
 | Only a deferral in force is announced, by the compliance rate's test | Each clause is false of a waiting one |
 | Sitting still means no decision standing at the versions the code holds now, by the findings list's expression | |
 | The queue counts per team and product, in issues at a component whatever their visibility, undisclosed where any occurrence is; the others count per decision | One rule places thousands of findings |

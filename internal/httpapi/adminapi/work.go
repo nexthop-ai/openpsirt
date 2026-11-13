@@ -12,6 +12,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -164,11 +165,15 @@ func registerWork(api huma.API, in core.Deps) {
 				Waiting []QueuedBody    `json:"waiting"`
 			}
 		}
-		if err := core.Administrating(ctx); err != nil {
+		subject, err := core.Requester(ctx)
+		if err != nil {
 			return nil, err
 		}
-		jobs, total, err := in.Queue.FailedJobs(ctx, 0)
-		if err != nil {
+		jobs, total, err := in.Queue.FailedJobs(ctx, subject, 0)
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, huma.Error403Forbidden("not authorized")
+		case err != nil:
 			return nil, core.WentWrong(in.Logger, "the failed jobs could not be read", err)
 		}
 		out := &answer{}
@@ -212,10 +217,14 @@ func registerWork(api huma.API, in core.Deps) {
 		ID int64 `path:"id" doc:"The job to put back"`
 	}) (*struct{}, error) {
 		in := core.Of(ctx, in)
-		if err := core.Administrating(ctx); err != nil {
+		subject, err := core.Requester(ctx)
+		if err != nil {
 			return nil, err
 		}
-		if err := in.Queue.Requeue(ctx, in2.ID); err != nil {
+		if err := in.Queue.Requeue(ctx, subject, in2.ID); err != nil {
+			if errors.Is(err, access.ErrDenied) {
+				return nil, huma.Error403Forbidden("not authorized")
+			}
 			if errors.Is(err, queue.ErrNotFailed) {
 				return nil, huma.Error404NotFound("that job has not failed")
 			}

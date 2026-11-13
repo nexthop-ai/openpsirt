@@ -3,7 +3,7 @@
 Background work held as rows in the application's own database, and the
 leases that pick one replica for work that must happen once.
 
-Satisfies REQ-03, REQ-06, REQ-69.
+Satisfies REQ-03, REQ-06, REQ-42, REQ-69.
 
 ## Contents
 
@@ -72,7 +72,7 @@ to put one back.
 | Failed jobs are listed; waiting work is counted | Waiting work moves under a reader, and a count says whether the queue is filling |
 | Waiting work is counted per kind, against the bound | The bound is per kind, so a total hides one producer's backlog |
 | Work held by a worker that stopped reporting counts as waiting | Counted as running, a queue mid-reclaim reads as empty |
-| Reading any of it is administration | A failed parse quotes its cause, which can carry a component name or package address the reader holds nothing on |
+| Reading any of it is administration; reading the failed jobs or putting one back is also refused by the queue itself to anybody else (REQ-42) | A failed parse quotes its cause, which can carry a component name or package address the reader holds nothing on |
 | Putting a job back starts its attempts again | Whoever does it decided the cause is dealt with |
 | The last error survives being put back | It is the previous run's evidence |
 | Only a failed job is put back | Returning a running job hands the work to two workers, which on an ingest looks like real change |

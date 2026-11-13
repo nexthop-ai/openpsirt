@@ -84,7 +84,7 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 		// Asked before the build is looked up: a refusal that came only where
 		// something was sent would say which builds hold runs.
 		if !subject.ReadsBuild(named.ProductID, named.BranchOrTagID, named.VariantID) ||
-			(subject.Kind != access.Pipeline && !subject.Reads(analysis.OpensAt, named.ProductID)) {
+			!series.ReadsReceipts(subject, named.ProductID, analysis.OpensAt) {
 			return nil, core.NothingScannedThere()
 		}
 		out := &AnalysisReceiptsOutput{}
@@ -122,8 +122,12 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		out.Body.Total = total
-		refusals, err := series.NewStore(in.DB.DB).RefusalsOf(ctx, build.ID, kind.Analysis)
-		if err != nil {
+		refusals, err := series.NewStore(in.DB.DB).RefusalsOf(ctx, subject, named.ProductID, build.ID,
+			kind.Analysis, analysis.OpensAt)
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, core.NothingScannedThere()
+		case err != nil:
 			return nil, core.WentWrong(in.Logger, "the uploads turned away could not be read", err)
 		}
 		for _, r := range refusals {

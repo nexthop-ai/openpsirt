@@ -100,3 +100,37 @@ func TestEverySecurityTestingFigureAcrossProductsRefusesAProductNotReadAtSecurit
 		}
 	}
 }
+
+// The code finding queue across products keeps the products where the reader
+// reads security testing work, whatever the caller names, and refuses
+// anybody but a person before the database is asked anything.
+func TestTheQueueAcrossProductsKeepsOnlyProductsReadAtSecurityTesting(t *testing.T) {
+	reader := access.NewPerson(1, "reader", false, map[int64][]access.Role{
+		7: {access.SecurityTestingRead},
+		8: {access.PublicRead, access.PrivateRead},
+	}, 0)
+	scope, err := Scope{Across: []int64{7, 8}}.readAcross(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scope.Across) != 1 || scope.Across[0] != 7 {
+		t.Errorf("the queue across products reads %v, want the product read at security testing alone", scope.Across)
+	}
+	none, err := Scope{Across: []int64{8}}.readAcross(reader)
+	if err != nil || none.Across == nil || len(none.Across) != 0 {
+		t.Errorf("a reader of security testing work in none of them reads %v and %v, want an empty scope across",
+			none.Across, err)
+	}
+	for name, who := range map[string]access.Subject{
+		"a key":   access.NewPipeline(2, "ci", access.Scope{ProductID: 7}),
+		"anybody": access.Published([]int64{7}),
+	} {
+		err := refusedOrReached(func() error {
+			_, err := CodeFindingsOf(t.Context(), nil, who, Scope{Across: []int64{7}}, "", 10, 0)
+			return err
+		})
+		if !errors.Is(err, access.ErrDenied) {
+			t.Errorf("%s reading the queue across products answered %v, want a refusal", name, err)
+		}
+	}
+}

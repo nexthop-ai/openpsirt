@@ -41,6 +41,7 @@ changes nothing (REQ-49).
 |---|---|
 | Derived every sweep, never remembered | Otherwise every path that approves, withdraws, sends back or lapses must clear it, and one forgets |
 | A condition that returns is a new row | "Cleared, then came back" stays visible |
+| What a cleared condition says is an event told in the clearing transaction under every rule of an event: its undisclosed marks, product and issue kept, refused unattributed, and nobody who has left told | One path writes events, so none drops a mark |
 | Acknowledging a condition hides it, never resolves it, and the screen shows which | The thing is still true |
 | A standing condition's sentence, link, undisclosed mark, product and issue are restated each sweep on the same row | Its sentence carries a count, and every read narrows by those |
 | Everybody holding a condition is handed a list each sweep, even empty | A condition clears only by being left off, so a demoted administrator would go on being told |
@@ -115,6 +116,8 @@ told at once.
 | Rule | Reason |
 |---|---|
 | Only somebody who could already read it, from the editor's autocomplete query | On an undisclosed finding the notification is the disclosure |
+| A decision's text reaches only somebody reading every product and visibility its rows hold, and is withheld as the strictest of them | A bulk decision can cover a disclosed issue and an undisclosed one |
+| A decision's mention is stored against its most withheld row's product, and names an issue only where every row shares one | A bulk decision can span products, and a withheld notice is read where its product's undisclosed work is |
 | An unheld name and one held by a non-reader are not distinguished | Otherwise it answers who can see undisclosed work |
 | Never the author; never a failure of the write | |
 | Plain `@ana` where the name is letters, digits and `. _ : @ -`, starting and ending with a letter or digit; delimited `@\<ana+psirt@example.com>` otherwise | The plain form stops at the first other character, so `ana+psirt@example.com` or `auth0\|abc` names somebody else. The backslash keeps markdown from reading a tag. `@<…>` is read too where markdown leaves it text or links it |

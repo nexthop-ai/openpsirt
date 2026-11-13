@@ -396,15 +396,14 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		if _, err := finding.NewStore(db).CodeFindingAt(ctx, at.subject, at.build, occurrence); err != nil {
 			return nil, core.Absent(in.Logger, err, "that code finding could not be looked up", core.NoSuchFinding)
 		}
-		h, err := finding.CodeFindingFlawAt(ctx, db, at.named.ProductID, occurrence)
-		if err != nil {
-			return nil, core.WentWrong(in.Logger, "that code finding could not be looked up", err)
-		}
-		if h == nil {
-			return nil, huma.Error404NotFound(analysis.ErrNotRecordedAsFlaw.Error())
-		}
-		if !at.subject.Reads(access.SecurityTesting, at.named.ProductID) {
+		h, err := finding.NewStore(db).CodeFindingFlawManaged(ctx, at.subject, at.named.ProductID, occurrence)
+		switch {
+		case errors.Is(err, access.ErrDenied):
 			return nil, core.NoSuchFinding()
+		case err != nil:
+			return nil, core.WentWrong(in.Logger, "that code finding could not be looked up", err)
+		case h == nil:
+			return nil, huma.Error404NotFound(analysis.ErrNotRecordedAsFlaw.Error())
 		}
 		return h, nil
 	}

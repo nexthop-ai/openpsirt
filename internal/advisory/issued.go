@@ -313,9 +313,8 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 // removed since is still named in it and an issue added since is named in no
 // document yet.
 //
-// An issue taken off and put back keeps one row, whose interval starts again
-// when it was put back. An issuance from before it was taken off is then read
-// as not naming it.
+// An issue taken off and put back is a row for each stretch it was on, so an
+// issuance from any stretch is read as naming it.
 //
 // The issue is covered in one product, and a release belongs to one product,
 // so the two have to be the same product. Left unjoined, one upstream flaw

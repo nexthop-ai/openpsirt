@@ -11,7 +11,9 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
@@ -89,8 +91,17 @@ func (s *Store) Refused(ctx context.Context, r Refusal) error {
 }
 
 // RefusalsOf is the refusals of a kind recorded against a build, newest
-// first. The caller has already decided the subject reads the build's runs.
-func (s *Store) RefusalsOf(ctx context.Context, buildID int64, k kind.Kind) ([]Refusal, error) {
+// first, for a subject who reads the build's receipts: the reasons quote what
+// a sender sent, so they are read under the receipts' own rule.
+func (s *Store) RefusalsOf(ctx context.Context, subject access.Subject, productID, buildID int64,
+	k kind.Kind, opensAt access.Visibility) ([]Refusal, error) {
+
+	if err := catalog.ReadsBuildIn(ctx, s.db, subject, productID, buildID); err != nil {
+		return nil, err
+	}
+	if !ReadsReceipts(subject, productID, opensAt) {
+		return nil, access.Denied(fmt.Sprintf("read what analyzers sent against product %d", productID))
+	}
 	var out []Refusal
 	if err := s.db.NewSelect().Model(&out).
 		Where(`"sx"."build_id" = ?`, buildID).
