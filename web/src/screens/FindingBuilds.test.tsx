@@ -90,6 +90,69 @@ describe("correcting which builds a flaw affects", () => {
     expect((sent()[0]?.[1] as { body: { builds: unknown[] } }).body.builds).toHaveLength(3);
   });
 
+  // Six hundred rows over two builds, read in pages of five hundred. Once the
+  // first page is answered, a scan shifts the rows: `shift` returns the rows
+  // and total every later page is cut from.
+  function shifting(
+    shift: (rows: { branch_or_tag: string; variant: string; component: string }[]) => {
+      rows: { branch_or_tag: string; variant: string; component: string }[];
+      total: number;
+    },
+  ) {
+    const before = ["master", "v1.0"].flatMap((branch) =>
+      Array.from({ length: 300 }, (_, i) => ({
+        branch_or_tag: branch,
+        variant: "broadcom",
+        component: `module-${String(i).padStart(3, "0")}`,
+      })),
+    );
+    let pages = 0;
+    serve((path, init) => {
+      if (path === "/v1/products/{product}/releases") return { data: { items: releases } };
+      if (path === "/v1/issues/{issue}") {
+        const asked = (init as { params: { query?: { limit?: number; offset?: number } } }).params
+          .query;
+        const now = pages++ === 0 ? { rows: before, total: before.length } : shift(before);
+        const from = asked?.offset ?? 0;
+        const items = now.rows
+          .slice(from, from + (asked?.limit ?? 200))
+          .map((each) => ({ ...each, product: "sonic" }));
+        return { data: { items, total: now.total } };
+      }
+      return undefined;
+    });
+    return answer("PUT", () => ({ data: { added: 1, closed: 0 } }));
+  }
+
+  it("writes nothing where the rows grew between two pages", async () => {
+    // Added past the page boundary, so no page repeats a row: only the total
+    // says the answer moved.
+    const sent = shifting((rows) => ({
+      rows: [...rows, { branch_or_tag: "v1.0", variant: "broadcom", component: "added" }],
+      total: rows.length + 1,
+    }));
+    await opened();
+    expect(mount.host().textContent).toContain("This changed while it was read");
+    expect(mount.host().querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(sent()).toHaveLength(0);
+  });
+
+  it("writes nothing where a page repeats a row it already read", async () => {
+    // One row added ahead of the page boundary and one removed after it: the
+    // total holds, and the second page opens on the first page's last row.
+    const sent = shifting((rows) => {
+      const shifted = [
+        { branch_or_tag: "master", variant: "broadcom", component: "added" },
+        ...rows.slice(0, -1),
+      ];
+      return { rows: shifted, total: shifted.length };
+    });
+    await opened();
+    expect(mount.host().textContent).toContain("This changed while it was read");
+    expect(mount.host().querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(sent()).toHaveLength(0);
+  });
+
   it("edits one product's builds however many rows other products hold", async () => {
     serving([{ branch_or_tag: "master", variant: "broadcom" }], 1);
     await opened();

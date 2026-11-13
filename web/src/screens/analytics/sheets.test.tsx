@@ -362,6 +362,14 @@ describe("the findings burndown", () => {
     expect(chooser()?.value).toBe("");
   });
 
+  it("shows the component an address names beside an empty purl", async () => {
+    const spy = serve((path) => (path === "/v1/burndown" ? answer({}) : undefined));
+    mount.render(screen(<Burndown />, "/analytics/findings-burndown?purl=&component=libnl"));
+    await settle();
+    expect(askedOf(spy, "/v1/burndown")[0]).toEqual({ component: "libnl" });
+    expect(chooser()?.value).toBe("libnl");
+  });
+
   it("names the ecosystem of a chosen package only where two share a name", async () => {
     serve((path) =>
       path === "/v1/burndown"

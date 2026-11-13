@@ -162,8 +162,8 @@ export function Burndown() {
         {/* Keyed on the address's choice, so the box empties when Everything
             or a step back clears it. */}
         <Chooser
-          key={narrowed.purl ?? narrowed.component ?? ""}
-          typed={narrowed.purl ?? narrowed.component ?? ""}
+          key={narrowed.purl || narrowed.component || ""}
+          typed={narrowed.purl || narrowed.component || ""}
           onChoose={(typed) =>
             change(
               typed.toLowerCase().startsWith("pkg:") ? { purl: typed } : { component: typed },

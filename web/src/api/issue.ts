@@ -33,7 +33,20 @@ export const BUILDS_MOST = 200;
 // affected-builds editor sends the product's whole list, so it reads the
 // product's answer a page at a time until it holds every row. It stops once
 // the rows name more builds than one write takes, since the editor writes
-// nothing past that bound.
+// nothing past that bound. Pages are separate reads, so a scan landing between
+// two of them shifts the rows under the offset: a page whose total differs
+// from the first, or that repeats a row already held, marks the answer moved,
+// because a shifted page also skips a row nothing else reveals.
+// One row of the issue's answer: a component at a build.
+function rowKey(row: {
+  branch_or_tag?: string;
+  variant?: string;
+  component?: string;
+  version?: string;
+}): string {
+  return [buildKey(row), row.component ?? "", row.version ?? ""].join("\u0000");
+}
+
 export function useIssueIn(vulnerability: string, product: string, enabled = true) {
   return useQuery({
     queryKey: ["issue", vulnerability, product],
@@ -51,13 +64,21 @@ export function useIssueIn(vulnerability: string, product: string, enabled = tru
       const first = await ask(0);
       const items = [...(first.items ?? [])];
       const builds = new Set(items.map((row) => buildKey(row)));
+      const seen = new Set(items.map(rowKey));
+      let moved = false;
       while (items.length < first.total && builds.size <= BUILDS_MOST) {
-        const next = (await ask(items.length)).items ?? [];
-        if (next.length === 0) break;
+        const page = await ask(items.length);
+        const next = page.items ?? [];
+        if (page.total !== first.total) moved = true;
+        for (const row of next) {
+          if (seen.has(rowKey(row))) moved = true;
+          seen.add(rowKey(row));
+          builds.add(buildKey(row));
+        }
+        if (next.length === 0 || moved) break;
         items.push(...next);
-        for (const row of next) builds.add(buildKey(row));
       }
-      return { ...first, items };
+      return { ...first, items, moved };
     },
     retry: false,
   });
