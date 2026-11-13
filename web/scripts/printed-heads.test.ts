@@ -37,17 +37,30 @@ describe("a screen head on paper", () => {
        export function Crumb() { return <span className="crumbs"><b>run 7</b></span>; }
        export function Maybe({ on }) { if (on) { return <span><button>Go</button></span>; } return null; }
        export const Arrow = () => <span><a className="btn">CSV</a></span>;`,
-      "parts.tsx",
+      "ui/parts.tsx",
     );
+    // A component of the same name elsewhere, which the head does not import.
+    const other = parse(
+      `export function Crumb() { return <span><button>X</button></span>; }`,
+      "y.tsx",
+    );
+    const declared = new Map([
+      ["ui/parts.tsx", componentRoots("ui/parts.tsx", parts)],
+      ["y.tsx", componentRoots("y.tsx", other)],
+    ]);
     const found = printedActions(
-      "x.tsx",
+      "screens/x.tsx",
       parse(
-        `const x = <div className="screen-head"><h2>T</h2><Crumb /><Add /><Maybe on /><Arrow /></div>;`,
-        "x.tsx",
+        `import { Add, Crumb, Maybe, Arrow as Drawn } from "../ui/parts";
+         const x = <div className="screen-head"><h2>T</h2><Crumb /><Add /><Maybe on /><Drawn /></div>;`,
+        "screens/x.tsx",
       ),
-      componentRoots("parts.tsx", parts),
+      declared,
     );
-    expect(found).toEqual({ examined: 4, found: ["parts.tsx:1", "parts.tsx:3", "parts.tsx:4"] });
+    expect(found).toEqual({
+      examined: 4,
+      found: ["ui/parts.tsx:1", "ui/parts.tsx:3", "ui/parts.tsx:4"],
+    });
   });
 
   it("reports a print rule hiding every span under a head", () => {

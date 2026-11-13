@@ -82,7 +82,12 @@ export function componentRoots(file, source) {
 // Every span directly under a screen head, drawn there by a condition, or at
 // the root of a component drawn there, that holds an action and is not marked
 // `noprint`, as "file:line".
-export function printedActions(file, source, components = new Map()) {
+//
+// `declared` holds each source's components by file. A tag names the component
+// its own file declares, or the one its import names; two files declaring one
+// name are told apart that way.
+export function printedActions(file, source, declared = new Map()) {
+  const components = visibleIn(file, source, declared);
   const found = new Set();
   let examined = 0;
   const check = (child, where, text) => {
@@ -110,6 +115,26 @@ export function printedActions(file, source, components = new Map()) {
   return { examined, found: [...found] };
 }
 
+// The components one source can draw, by the name it draws them under: its own,
+// and each one a relative import brings in.
+function visibleIn(file, source, declared) {
+  const visible = new Map();
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const from = statement.moduleSpecifier.text;
+    const bindings = statement.importClause?.namedBindings;
+    if (!from.startsWith(".") || !bindings || !ts.isNamedImports(bindings)) continue;
+    const target = declared.get(path.join(path.dirname(file), from) + ".tsx");
+    if (!target) continue;
+    for (const each of bindings.elements) {
+      const root = target.get((each.propertyName ?? each.name).text);
+      if (root) visible.set(each.name.text, root);
+    }
+  }
+  for (const [name, root] of declared.get(file) ?? []) visible.set(name, root);
+  return visible;
+}
+
 // Every print rule that hides spans under a head by position, as its selector.
 export function hiddenByPosition(css) {
   return cssRules(css)
@@ -126,12 +151,9 @@ export function sweep() {
   const sources = interfaceSources()
     .filter(({ file }) => file.endsWith(".tsx"))
     .map(({ file, source }) => ({ file: path.relative(SRC, file), source }));
-  const components = new Map();
+  const declared = new Map(sources.map(({ file, source }) => [file, componentRoots(file, source)]));
   for (const { file, source } of sources) {
-    for (const [name, root] of componentRoots(file, source)) components.set(name, root);
-  }
-  for (const { file, source } of sources) {
-    const one = printedActions(file, source, components);
+    const one = printedActions(file, source, declared);
     examined += one.examined;
     for (const each of one.found) found.add(each);
   }
