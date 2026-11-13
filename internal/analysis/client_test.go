@@ -5,6 +5,7 @@ package analysis
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -127,5 +128,109 @@ func TestWhatTheClientWritesIsWhatTheDeploymentReads(t *testing.T) {
 	k := key(ruleName(placed.Runs[0].Tool, header.RuleID), *header)
 	if k.Scheme != "openpsirt/context/v1" {
 		t.Errorf("keyed on %q; want the client's fingerprint", k.Scheme)
+	}
+}
+
+// everyMemberRead is a SARIF run carrying every member of a rule, a result, a
+// location and an invocation that the deployment reads, each with a value
+// the reading keeps.
+const everyMemberRead = `{"version":"2.1.0","runs":[{
+ "tool":{"driver":{"name":"lint","version":"1.2","semanticVersion":"1.2.0","rules":[
+  {"id":"R1","name":"NullDeref","helpUri":"https://lint.example.test/R1",
+   "shortDescription":{"text":"Short."},"fullDescription":{"text":"Full."},
+   "messageStrings":{"default":{"text":"{0} is null here"}},
+   "defaultConfiguration":{"level":"error"},
+   "properties":{"tags":["security","external/cwe/cwe-476"],"security-severity":"7.5","precision":"high"}}]},
+  "extensions":[{"name":"pack","version":"3","rules":[{"id":"E1","name":"Ext","defaultConfiguration":{"level":"note"}}]}]},
+ "automationDetails":{"id":"lint/all/"},
+ "invocations":[{"exitCode":1,"executionSuccessful":false,
+  "toolExecutionNotifications":[{"level":"error","descriptor":{"id":"crash"}}],
+  "toolConfigurationNotifications":[{"level":"error","descriptor":{"id":"cfg"}}]}],
+ "results":[{"ruleId":"R1","level":"warning","kind":"review","baselineState":"absent",
+  "suppressions":[{"status":"accepted"}],
+  "message":{"id":"default","arguments":["p"]},
+  "locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+    "region":{"startLine":2,"startColumn":3,"endLine":2,"endColumn":9},
+    "contextRegion":{"startLine":1,"endLine":3}},
+   "logicalLocations":[{"fullyQualifiedName":"main","name":"main"}],
+   "message":{"text":"here"}}],
+  "relatedLocations":[{"physicalLocation":{"artifactLocation":{"uri":"b.c"},"region":{"startLine":1}},
+   "message":{"text":"declared"}}],
+  "codeFlows":[{"threadFlows":[{"locations":[
+   {"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":1}},
+    "logicalLocations":[{"name":"main"}],"message":{"text":"enter"}},"nestingLevel":1}]}]}],
+  "partialFingerprints":{"primaryLocationLineHash/v1":"abc"},
+  "fingerprints":{"lint/v1":"def"}},
+  {"ruleId":"E1","message":{"text":"from the extension"},
+   "locations":[{"physicalLocation":{"artifactLocation":{"uri":"b.c"},"region":{"startLine":1}}}]}]}]}`
+
+// TestEveryMemberTheDeploymentReadsSurvivesTheClient sends a SARIF run
+// carrying every member the deployment reads through the client and the
+// reader, and reads each rule, result and invocation as it reads the run
+// unforwarded. The client's shapes are a second copy of what the reader reads,
+// and a member they leave out is stripped from every forwarded run.
+func TestEveryMemberTheDeploymentReadsSurvivesTheClient(t *testing.T) {
+	root := checkout(t, "git@github.com:example/sonic.git")
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
+		Root: root, Work: root, Series: "lint/all", Built: time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC),
+		Client: "openpsirt-upload test",
+	}, []uploadclient.Input{{Name: "lint.sarif", Data: []byte(everyMemberRead)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want one", len(runs))
+	}
+	read := func(doc []byte) sarif.Run {
+		t.Helper()
+		log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+		if err != nil {
+			t.Fatalf("the deployment refuses the run: %v", err)
+		}
+		return log.Runs[0]
+	}
+	sent, forwarded := read([]byte(everyMemberRead)), read(runs[0].Doc)
+
+	// The client adds its own fingerprint and the source around each
+	// location, and names each file from the checkout's root, so those are
+	// left out of the comparison.
+	for i := range forwarded.Results {
+		res := &forwarded.Results[i]
+		for scheme := range res.Fingerprints {
+			if _, ok := sent.Results[i].Fingerprints[scheme]; !ok {
+				delete(res.Fingerprints, scheme)
+			}
+		}
+	}
+	plain := func(r sarif.Run) string {
+		for i := range r.Results {
+			res := &r.Results[i]
+			for _, locs := range [][]sarif.Location{res.Locations, res.Related} {
+				for j := range locs {
+					locs[j].Snippet, locs[j].SnippetLine, locs[j].Base = "", 0, ""
+				}
+			}
+			for j := range res.Steps {
+				res.Steps[j].Snippet, res.Steps[j].SnippetLine, res.Steps[j].Base = "", 0, ""
+			}
+			if len(res.Fingerprints) == 0 {
+				res.Fingerprints = nil
+			}
+		}
+		out, err := json.MarshalIndent(struct {
+			Rules       []sarif.Rule
+			Results     []sarif.Result
+			Invocations []sarif.Invocation
+		}{r.Tool.Rules, r.Results, r.Invocations}, "", " ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(out)
+	}
+	if want, got := plain(sent), plain(forwarded); got != want {
+		t.Errorf("the forwarded run reads as\n%s\nwant\n%s", got, want)
+	}
+	if forwarded.Tool.Name != "lint" || forwarded.Tool.Version != sent.Tool.Version || forwarded.AutomationID == "" {
+		t.Errorf("tool %+v, automation %q", forwarded.Tool, forwarded.AutomationID)
 	}
 }
