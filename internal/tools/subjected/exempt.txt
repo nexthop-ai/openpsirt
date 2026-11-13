@@ -45,6 +45,7 @@ access.Store.NewToken A person's own record: it mints a token for the signed-in 
 access.Store.OnCase Who is asking: who is on one case. Its route refuses a caller who does not read undisclosed work in the product.
 access.Store.People Who is asking: everybody and what they hold. Its routes require reading the deployment's records or administration.
 access.Store.PeopleReaching A background pass: the watches work out from grants who may hear of a change.
+access.Store.PersonHolds Who is asking: the visibilities one person may hold work at in a product, asked by an assignment, hand-over or hand-back write the caller was authorized for.
 access.Store.PersonReads Who is asking: whether one person may read a finding of a visibility in a product, asked by an assignment write the caller was authorized for.
 access.Store.PurgeExpiredSessions A background pass: the watch clears sessions that have run out.
 access.Store.Reactivate Who is asking: it records that a person is back. Its route requires administration.
@@ -264,6 +265,7 @@ queue.Leases.Take A background pass: a replica takes a lease so one of them carr
 queue.Leases.TakeLapsed A background pass: a replica takes a lease left to lapse, so its expiry records when the work is next due.
 queue.Queue.Add A background pass: it queues a job for the workers.
 queue.Queue.AddTx Not varying by reader: it queues a job for the workers inside the transaction that made its work, which its caller already authorized.
+queue.Queue.AddUnlessWaitingTx Not varying by reader: it queues a job for the workers inside the transaction that made its work, unless one is waiting untried, which its caller already authorized.
 queue.Queue.Bury A background pass: the undertaker fails jobs whose worker died.
 queue.Queue.Claim A background pass: a worker claims a job.
 queue.Queue.Depth Not varying by reader: how many jobs of a kind wait, which bounds uploads and shows on a screen only an administrator reaches.
