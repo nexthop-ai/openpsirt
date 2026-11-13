@@ -53,17 +53,21 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 	// that the build has an inventory at all: it opens with the first graph
 	// applied and some root stands for as long as the build has one.
 	var nodes []struct {
-		Build   int64  `bun:"tgt"`
-		Root    bool   `bun:"rt"`
-		Name    string `bun:"nm"`
-		Display string `bun:"dsp"`
-		Version string `bun:"ver"`
+		Build     int64  `bun:"tgt"`
+		Component int64  `bun:"cid"`
+		Root      bool   `bun:"rt"`
+		Stated    bool   `bun:"own"`
+		Name      string `bun:"nm"`
+		Display   string `bun:"dsp"`
+		Version   string `bun:"ver"`
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"n"."build_id" AS "tgt"`).
+		ColumnExpr(`"n"."component_id" AS "cid"`).
 		ColumnExpr(`"n"."is_root" AS "rt"`).
+		ColumnExpr(`CASE WHEN "n"."name_folded" IS NULL THEN FALSE ELSE TRUE END AS "own"`).
 		ColumnExpr(NodeFolded("n", "c")+` AS "nm"`).
 		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
 		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
@@ -72,6 +76,18 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 		Scan(ctx, &nodes)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read what two builds contain: %w", err)
+	}
+
+	// A node holding no name of its own was written before nodes held one,
+	// in a build not sent since, and reads the component row's. Where the
+	// other build states the same component, it reads what that build
+	// stated, so one component unchanged between the two is no change.
+	type said struct{ name, display, version string }
+	statedAs := map[int64]said{}
+	for _, node := range nodes {
+		if node.Stated && !node.Root {
+			statedAs[node.Component] = said{node.Name, node.Display, node.Version}
+		}
 	}
 
 	// One row per version of a name, standing on the first side, the second,
@@ -85,6 +101,9 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 			// Not one of the build's components, its version is not stored,
 			// and its name differs per variant.
 			continue
+		}
+		if other, ok := statedAs[node.Component]; ok && !node.Stated {
+			node.Name, node.Display, node.Version = other.name, other.display, other.version
 		}
 		row := fold.add(0, node.Name, node.Display, node.Version)
 		// One build compared with itself stands on both sides of every row,

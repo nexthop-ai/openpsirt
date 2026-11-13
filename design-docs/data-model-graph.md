@@ -63,6 +63,7 @@ and names held at a different set of versions.
 | Rule | Reason |
 |---|---|
 | Counted by the name the build stated, folded, as is a comparison of two builds | An upgrade is one dependency moving; the component row's name can be another product's, so grouping by it splits one name in two |
+| In a comparison of two builds, a node holding no name of its own reads the name and version the other build stated for the same component | A build not sent since nodes held a name reads the row's, and one component neither build moved would read as one name gone and another arrived |
 | A name at two versions at once is one entry | A vendored tree ships one routinely |
 | The root is excluded from both sides | Its version is not stored and its name differs per variant |
 | An image held by name is at no version on either side | What each build stated is on the component screen (`design-docs/interface-component.md` § The component screen) |
