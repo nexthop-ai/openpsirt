@@ -11,7 +11,7 @@ name: PR
 # event. A workflow that does not declare an event contributes no check run
 # there, and this job cannot tell a check that will never run from one that
 # has not started yet — so every workflow meant to gate a merge declares
-# `merge_group:` alongside `pull_request:`, and every job of the CI workflow
+# `merge_group:` alongside `pull_request:`, and every job of such a workflow
 # that runs on every change must also exist on the commit and have passed.
 
 on:
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       checks: read
-      # The CI workflow, read for the jobs it gates with.
+      # The workflows, read for the jobs they gate with.
       contents: read
     steps:
       - name: Wait for all checks to pass or be skipped
@@ -58,34 +58,51 @@ jobs:
           timeout: 3600
 
       # The wait cannot tell a check that will never run from one that has not
-      # appeared yet, and an empty set satisfies it. Every job of the CI
-      # workflow with no condition, read from the workflow itself, has to
-      # exist on the commit and have passed, so a run that never registered
-      # fails this. A job with a condition may be skipped.
+      # appeared yet, and an empty set satisfies it. Every workflow naming the
+      # merge queue's event gates a merge, and each of its jobs with no
+      # condition, read from the workflow itself, has to exist on the commit
+      # and have passed, so a run that never registered fails this. A job with
+      # a condition may be skipped.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: .github/workflows/ci.yml
+          sparse-checkout: .github/workflows/
           sparse-checkout-cone-mode: false
       - name: Confirm the gating checks ran and passed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          # A job's check is named by its name, or by its key where it has
-          # none. A matrix job's checks carry the matrix values, and a name
-          # holding an expression is expanded, so a gating job of either kind
-          # is refused.
+          # A workflow gates a merge where it names the queue's event, which
+          # `on:` may give as a map, a list or one name. This workflow is the
+          # aggregator and is left out. A path filter would leave a gating job
+          # off a commit it does not match, so one is refused.
           unconditional='.jobs | to_entries[] | select(.value | has("if") | not)'
-          unnamable=$(yq "$unconditional | select((.value | has(\"strategy\")) or ((.value.name // \"\") | test(\"[$][{]\"))) | .key" \
-            .github/workflows/ci.yml)
-          if [ -n "$unnamable" ]; then
-            echo "::error::ci.yml gates every change with a job whose check has no fixed name: $unnamable"
-            exit 1
-          fi
-          required=$(yq "$unconditional | (.value.name // .key)" .github/workflows/ci.yml)
-          if [ -z "$required" ]; then
-            echo "::error::no unconditional job was found in ci.yml, so this checked nothing"
+          events='.on | ((select(tag == "!!map") | keys | .[]), (select(tag == "!!seq") | .[]), select(tag == "!!str"))'
+          filtered='[.on.pull_request?, .on.merge_group?] | any_c(tag == "!!map" and (has("paths") or has("paths-ignore")))'
+          required=""
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            [ -f "$workflow" ] && [ "$workflow" != .github/workflows/pr.yml ] || continue
+            yq "$events" "$workflow" | grep -qx merge_group || continue
+            if [ "$(yq "$filtered" "$workflow")" = true ]; then
+              echo "::error::$workflow gates a merge and filters its pull_request or merge_group trigger by path"
+              exit 1
+            fi
+            # A job's check is named by its name, or by its key where it has
+            # none. A matrix job's checks carry the matrix values, and a name
+            # holding an expression is expanded, so a gating job of either
+            # kind is refused.
+            unnamable=$(yq "$unconditional | select((.value | has(\"strategy\")) or ((.value.name // \"\") | test(\"[$][{]\"))) | .key" \
+              "$workflow")
+            if [ -n "$unnamable" ]; then
+              echo "::error::$workflow gates every change with a job whose check has no fixed name: $unnamable"
+              exit 1
+            fi
+            required="$required
+          $(yq "$unconditional | (.value.name // .key)" "$workflow")"
+          done
+          if [ -z "$(printf '%s' "$required" | tr -d '[:space:]')" ]; then
+            echo "::error::no workflow gating a merge has an unconditional job, so this checked nothing"
             exit 1
           fi
           # The latest run of each name, as its conclusion.
