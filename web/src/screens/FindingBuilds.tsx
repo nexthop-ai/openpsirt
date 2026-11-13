@@ -74,7 +74,9 @@ export function AffectedBuilds({
   const cut = (holds.data?.total ?? rows.length) > rows.length;
   // Past the most one write names, the whole list cannot be sent either.
   const tooMany = now.size > BUILDS_MOST;
-  const partial = cut || tooMany;
+  // A scan landed between two pages, so the rows held may skip one.
+  const moved = holds.data?.moved ?? false;
+  const partial = cut || tooMany || moved;
 
   const set = useMutation({
     mutationFn: async (picked: string[]) =>
@@ -128,6 +130,16 @@ export function AffectedBuilds({
           error={builds.error ?? holds.error}
           what="The builds this is filed against could not be read."
         />
+      ) : moved ? (
+        <div className="alert">
+          <strong>This changed while it was read</strong>
+          <span>
+            A scan landed between pages, so what is shown may miss a build.{" "}
+            <button type="button" className="linkish" onClick={() => void holds.refetch()}>
+              Read it again
+            </button>
+          </span>
+        </div>
       ) : partial ? (
         <div className="alert">
           <strong>This is open at more builds than this screen can set</strong>
