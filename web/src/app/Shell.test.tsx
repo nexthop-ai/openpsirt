@@ -6,6 +6,16 @@ import { describe, expect, it, vi } from "vitest";
 import { Shell } from "./Shell";
 import { answer, location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Who } from "./session";
+import { keep, restore } from "./drafts";
+
+// A full load has no meaning in a test, and jsdom will not let one be
+// replaced, so the reload clearing this browser asks for is recorded here and
+// everything else it does runs as written.
+const reloaded = vi.fn();
+vi.mock("./session", async (actual) => {
+  const session = await actual<typeof import("./session")>();
+  return { ...session, clearHere: () => session.clearHere(reloaded) };
+});
 
 const mount = mounted();
 
@@ -89,6 +99,22 @@ describe("signing out", () => {
     expect(mount.host().textContent).toContain(who.identity);
     expect(buttons.some((text) => text?.startsWith("Clear this browser"))).toBe(true);
     expect(sent()).toHaveLength(0);
+  });
+
+  it("clears drafts and reloads where the proxy signed the reader in", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    keep("revise:9", "text nobody outside should ever see");
+    reloaded.mockClear();
+    mount.render(screen(<Shell who={{ ...who, by_proxy: true }}>{null}</Shell>, "/start"));
+    await settle();
+    const press = (label: string) =>
+      Array.from(mount.host().querySelectorAll("button")).find(
+        (each) => each.getAttribute("aria-label") === label || each.textContent?.startsWith(label),
+      );
+    await act(async () => press("You")?.click());
+    await act(async () => press("Clear this browser")?.click());
+    expect(restore("revise:9")).toBe("");
+    expect(reloaded).toHaveBeenCalledTimes(1);
   });
 
   it("says to sign out at the proxy where the proxy signed the reader in", async () => {

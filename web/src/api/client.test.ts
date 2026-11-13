@@ -120,4 +120,21 @@ describe("a request naming a dot segment", () => {
     }
     expect(await ask("...")).toBeUndefined();
   });
+
+  // The middleware does nothing unless the client every screen uses runs it.
+  // Sent, revoking a token of a person named ".." would revoke the caller's
+  // own token of that name.
+  it("is never sent by the client every screen uses", async () => {
+    let sent = false;
+    const out = await api.DELETE("/v1/people/{identity}/tokens/{name}", {
+      params: { path: { identity: "..", name: "build" } },
+      baseUrl: "http://psirt.example",
+      fetch: async () => {
+        sent = true;
+        return new Response(null, { status: 204 });
+      },
+    } as never);
+    expect(sent).toBe(false);
+    expect(out.response.status).toBe(400);
+  });
 });

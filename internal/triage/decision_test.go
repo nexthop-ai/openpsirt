@@ -1100,11 +1100,12 @@ func TestABatchNamedAsADotSegmentIsRefused(t *testing.T) {
 	// away when it is "." or "..".
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		recorded := f.decisionsMany(t, f.occurrences("under-a"))
-		for _, batch := range []string{".", ".."} {
-			if _, err := f.store.ApproveDecision(ctx, f.reviewer, recorded[0].DecisionID, batch,
-				nil, ""); !refusal.In(err) {
-				t.Errorf("a batch named %q answered %v, want a refusal", batch, err)
+		// One decision per name, so neither is refused as already approved.
+		for i, batch := range []string{".", ".."} {
+			recorded := f.decisionsMany(t, f.occurrences(fmt.Sprintf("under-%d", i)))
+			_, err := f.store.ApproveDecision(ctx, f.reviewer, recorded[0].DecisionID, batch, nil, "")
+			if !refusal.In(err) || !strings.Contains(err.Error(), "dot segment") {
+				t.Errorf("a batch named %q answered %v, want a refusal naming the dot segment", batch, err)
 			}
 		}
 	})
