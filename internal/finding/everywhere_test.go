@@ -181,8 +181,9 @@ func TestAnIssuesSightingsReadAPageAtATimeAreEverySightingOnce(t *testing.T) {
 func TestAnIssuesSightingsInPagesFollowTheOrderOfOneRead(t *testing.T) {
 	// The affected-builds editor joins pages end to end and checks that each
 	// opens on the last row of the one before, so a page read by offset holds
-	// the rows one whole read holds there, in its order. Branch names
-	// differing in case are the rows a collation ignoring case puts elsewhere.
+	// the rows one whole read holds there, in its order. Which order a
+	// collation gives is held on every engine by the database package's own
+	// test, since stored branch names are lower case.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		reported := []finding.Reported{found("CVE-2026-1", libnl)}
@@ -190,7 +191,7 @@ func TestAnIssuesSightingsInPagesFollowTheOrderOfOneRead(t *testing.T) {
 		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
-		for _, name := range []string{"Release-1", "apple", "Zulu", "beta"} {
+		for _, name := range []string{"release-1", "apple", "zulu", "beta"} {
 			build := f.anotherBranch(t, name)
 			f.shippedTo(t, build, twoConsumers())
 			if _, err := f.store.Apply(ctx, build, f.runOn(t, build), reported); err != nil {
@@ -211,7 +212,7 @@ func TestAnIssuesSightingsInPagesFollowTheOrderOfOneRead(t *testing.T) {
 			names = append(names, row.BranchOrTag)
 		}
 		if !slices.IsSorted(names) {
-			t.Errorf("one read ordered %v, want the names by their bytes", names)
+			t.Errorf("one read ordered %v, want the names in order", names)
 		}
 		var paged []string
 		for offset := 0; offset < total; offset += 2 {

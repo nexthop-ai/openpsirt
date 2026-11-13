@@ -64,13 +64,12 @@ export function AffectedBuilds({
   // set is in hand or nothing is written.
   const rows = holds.data?.items ?? [];
 
-  const now = useMemo(() => {
-    const held = new Set<string>();
-    for (const row of holds.data?.items ?? []) {
-      if (row.product === product) held.add(buildKey(row));
-    }
-    return held;
-  }, [holds.data, product]);
+  // Every row is this product's, since the server narrowed the answer to it
+  // by name regardless of capitals.
+  const now = useMemo(
+    () => new Set((holds.data?.items ?? []).map((row) => buildKey(row))),
+    [holds.data],
+  );
   const cut = (holds.data?.total ?? rows.length) > rows.length;
   // Past the most one write names, the whole list cannot be sent either.
   const tooMany = now.size > BUILDS_MOST;
