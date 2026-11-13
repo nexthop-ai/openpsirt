@@ -4,6 +4,7 @@
 package database_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -45,6 +46,37 @@ func TestAColumnReferenceIsQuotedForWhicheverEngineIsAsked(t *testing.T) {
 		if !strings.Contains(odd, quote+quote) {
 			t.Errorf("a name holding %s came back as %s, which closes the identifier early",
 				quote, odd)
+		}
+	})
+}
+
+func TestTextOrderedBytewiseSortsAsGoComparesIt(t *testing.T) {
+	// Names differing in case sort apart under a collation that ignores
+	// case. On PostgreSQL the values carry an ICU collation of their own,
+	// which is what a deployment's database collation gives a column, since
+	// the test servers' own default already compares bytes.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		names := []string{"openssl", "Python", "apple", "Zebra"}
+		var values []string
+		for _, name := range names {
+			value := "'" + name + "'"
+			if db.DB.Dialect().Name().String() == "pg" {
+				value += ` COLLATE "en-x-icu"`
+			}
+			values = append(values, "SELECT "+value+` AS "name"`)
+		}
+		var got []string
+		if err := db.DB.NewSelect().
+			TableExpr(`(`+strings.Join(values, " UNION ALL ")+`) AS "names"`).
+			ColumnExpr(`"name"`).
+			OrderExpr(database.Bytewise(db.DB, database.Column(db.DB, "names.name"))).
+			Scan(t.Context(), &got); err != nil {
+			t.Fatal(err)
+		}
+		want := slices.Clone(names)
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			t.Errorf("ordered %v, want %v as Go compares them", got, want)
 		}
 	})
 }

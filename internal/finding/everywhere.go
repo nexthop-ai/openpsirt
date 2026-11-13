@@ -6,7 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
-	"sort"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -169,7 +169,16 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		// value each for a component in a build.
 		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."version", "c"."id", `+
 			`"sn"."name", "sn"."version"`).
-		OrderExpr(`"p"."name", "st"."name", "va"."name", "component", "c"."id"`).
+		// Names are ordered by their bytes, so every engine answers in one
+		// order whatever its collation, and the rows an offset skips are the
+		// rows an earlier page returned.
+		OrderExpr(strings.Join([]string{
+			database.Bytewise(s.db, `"p"."name"`),
+			database.Bytewise(s.db, `"st"."name"`),
+			database.Bytewise(s.db, `"va"."name"`),
+			database.Bytewise(s.db, database.Expr(graph.NodeName("sn", "c"))),
+			`"c"."id"`,
+		}, ", ")).
 		Limit(int64(limit)).
 		Offset(int64(max(offset, 0))).
 		Scan(ctx, &rows)
@@ -191,20 +200,5 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			FixedIn:     row.FixedIn,
 		})
 	}
-	// Ordered here as well as in the statement, so two engines that disagree
-	// about how names sort still answer in the same order.
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if a.Product != b.Product {
-			return a.Product < b.Product
-		}
-		if a.BranchOrTag != b.BranchOrTag {
-			return a.BranchOrTag < b.BranchOrTag
-		}
-		if a.Variant != b.Variant {
-			return a.Variant < b.Variant
-		}
-		return a.Component < b.Component
-	})
 	return out, int(total), int(products), nil
 }
