@@ -126,6 +126,10 @@ MySQL and MariaDB compare text case-insensitively by default. The tables that
 need exact matching, such as a product's declared name, are created with binary
 comparison.
 
+A statement read a page at a time orders its text by bytes, through the database
+package, because PostgreSQL's order follows the collation a deployment chose
+(`design-docs/database.md` § Engine-specific code).
+
 ## Text truncation
 
 | Rule | Reason |

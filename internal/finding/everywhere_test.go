@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -173,6 +174,57 @@ func TestAnIssuesSightingsReadAPageAtATimeAreEverySightingOnce(t *testing.T) {
 		}
 		if len(seen) != 3 {
 			t.Errorf("pages of one held %d sightings, want all 3", len(seen))
+		}
+	})
+}
+
+func TestAnIssuesSightingsInPagesFollowTheOrderOfOneRead(t *testing.T) {
+	// The affected-builds editor joins pages end to end and checks that each
+	// opens on the last row of the one before, so a page read by offset holds
+	// the rows one whole read holds there, in its order. Branch names
+	// differing in case are the rows a collation ignoring case puts elsewhere.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		reported := []finding.Reported{found("CVE-2026-1", libnl)}
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"Release-1", "apple", "Zulu", "beta"} {
+			build := f.anotherBranch(t, name)
+			f.shippedTo(t, build, twoConsumers())
+			if _, err := f.store.Apply(ctx, build, f.runOn(t, build), reported); err != nil {
+				t.Fatal(err)
+			}
+		}
+		who := f.holding(t, access.PublicRead)
+		issue := f.issueID(t, "CVE-2026-1")
+		whole, total, _, err := f.store.Everywhere(ctx, who, issue, f.productID, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 5 || len(whole) != 5 {
+			t.Fatalf("one read held %d of %d, want 5 of 5, so this proves nothing", len(whole), total)
+		}
+		var names []string
+		for _, row := range whole {
+			names = append(names, row.BranchOrTag)
+		}
+		if !slices.IsSorted(names) {
+			t.Errorf("one read ordered %v, want the names by their bytes", names)
+		}
+		var paged []string
+		for offset := 0; offset < total; offset += 2 {
+			rows, _, _, err := f.store.Everywhere(ctx, who, issue, f.productID, 2, offset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range rows {
+				paged = append(paged, row.BranchOrTag)
+			}
+		}
+		if !slices.Equal(paged, names) {
+			t.Errorf("pages of two joined to %v, one read ordered %v", paged, names)
 		}
 	})
 }

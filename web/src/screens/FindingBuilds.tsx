@@ -74,7 +74,7 @@ export function AffectedBuilds({
   const cut = (holds.data?.total ?? rows.length) > rows.length;
   // Past the most one write names, the whole list cannot be sent either.
   const tooMany = now.size > BUILDS_MOST;
-  // A scan landed between two pages, so the rows held may skip one.
+  // The answer changed between two pages, so the rows held may skip one.
   const moved = holds.data?.moved ?? false;
   const partial = cut || tooMany || moved;
 
@@ -134,7 +134,7 @@ export function AffectedBuilds({
         <div className="alert">
           <strong>This changed while it was read</strong>
           <span>
-            A scan landed between pages, so what is shown may miss a build.{" "}
+            It changed between pages, so what is shown may miss a build.{" "}
             <button type="button" className="linkish" onClick={() => void holds.refetch()}>
               Read it again
             </button>

@@ -110,3 +110,23 @@ func AsTimestamp(db bun.IDB, expr string) string {
 		return expr
 	}
 }
+
+// Bytewise is a text expression that sorts and compares by its bytes, in the
+// spelling each engine understands.
+//
+// A statement read a page at a time by offset has to order the same way the
+// rows are ordered once read, and Go compares strings by their bytes.
+// PostgreSQL orders by the database's collation, which the deployment chose
+// and which ignores case under a glibc or ICU locale; MySQL and MariaDB order
+// a literal or a computed value by the connection's collation, which ignores
+// case by default. SQLite compares bytes.
+func Bytewise(db bun.IDB, expr Expr) string {
+	switch db.Dialect().Name().String() {
+	case "pg":
+		return fmt.Sprintf(`%s COLLATE "C"`, expr)
+	case "mysql":
+		return fmt.Sprintf("%s COLLATE utf8mb4_bin", expr)
+	default:
+		return string(expr)
+	}
+}

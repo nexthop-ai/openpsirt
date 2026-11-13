@@ -33,7 +33,7 @@ export const BUILDS_MOST = 200;
 // affected-builds editor sends the product's whole list, so it reads the
 // product's answer a page at a time until it holds every row. It stops once
 // the rows name more builds than one write takes, since the editor writes
-// nothing past that bound. Pages are separate reads, so a scan landing between
+// nothing past that bound. Pages are separate reads, so a change landing between
 // two of them shifts the rows under the offset and a row goes unread. Each
 // later page starts one row early, on the last row held: a page that opens on
 // any other row, or answers another total, marks the answer moved. Rows carry
