@@ -131,7 +131,7 @@ administrative act, recorded with who did it and what it held before.
 | A product's name is refused where a group mapping names it, before or after | A mapping names its product (REQ-41); configuration changes first |
 | A release is asked about the advisories that named it, by holding an issue they cover, never about its product | Asked of the product, one named release blocks every sibling |
 | An issue taken off an advisory after an issuance still counts; one taken off before does not | The first was on the document readers hold |
-| An issue taken off an advisory and put back keeps one row, with the interval it was last on | The pair is unique. When it was first on is lost, so an issuance from before it was taken off reads as not naming it, and a rename that document should refuse is allowed |
+| An issue taken off an advisory and put back is another row; every stretch it was on is kept | An issuance from any stretch reads as naming it, so a rename that document should refuse is refused |
 | A product's displayed name moves freely | Nothing is identified by it. A release and a variant have no displayed name apart from their name |
 | Whether a variant reaches customers stays correctable | It is in no document and identifies nothing |
 | Whether a release is a branch or a tag, and a tag's branch, do not move | They say what a release is |
