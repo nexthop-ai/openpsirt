@@ -109,7 +109,7 @@ and the upgrades it waits on, here. One query, keyed on the fold at both ends.
 | Each row counts what is still open under it: distinct issues and their occurrences | A build is clear when it stops holding them |
 | A bump is keyed on its target as well as its source | Grouped on source alone, upgrades to 5.9.0 and 5.9.2 read as one row; on a real image 42 of 127 pairs carry more than one target |
 | The last tie breaks on the fold | Rows keep one order across pages |
-| A commitment is listed to a reader who may read what it is about: every occurrence its decision covers, each read in its own product, no case widening it as none widens a read of a build; or with no decision, some finding at its fold in the build, open or closed (REQ-43) | The row carries no visibility of its own, and a commitment over undisclosed work names the work; what it closes is counted at the build's read, so a case-only reach would list it closing nothing |
+| A commitment is listed to a reader who may read what it is about: every occurrence its decision covers, each read in its own product, no case widening it as none widens a read of a build; or with no decision, some finding at its fold in the build, open or closed; one whose decision covers nothing is listed to nobody (REQ-43) | The row carries no visibility of its own, and a commitment over undisclosed work names the work; what it closes is counted at the build's read, so a case-only reach would list it closing nothing |
 | One source at two versions in one build lists the earlier first, by the ecosystem's ordering (`design-docs/remediation-versions.md`), else by text | |
 
 ## Build-declared suppressions
