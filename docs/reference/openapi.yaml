@@ -12466,6 +12466,7 @@ components:
           type: string
         to:
           description: The version an upgrade now moves to. Required for an upgrade, and refused for a patch
+          maxLength: 191
           type: string
       required:
         - by

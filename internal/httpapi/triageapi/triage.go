@@ -288,7 +288,7 @@ func registerTriage(api huma.API, in core.Deps) {
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			To        string `json:"to,omitempty" doc:"The version an upgrade now moves to. Required for an upgrade, and refused for a patch"`
+			To        string `json:"to,omitempty" maxLength:"191" doc:"The version an upgrade now moves to. Required for an upgrade, and refused for a patch"`
 			By        string `json:"by" format:"date" doc:"The date the work will be done by"`
 			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason the promise is changing, in markdown"`
 		}
