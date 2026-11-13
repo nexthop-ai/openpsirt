@@ -287,12 +287,18 @@ describe("a chip and the by-upgrade list", () => {
 
 describe("what the by-upgrade list says it cannot apply", () => {
   it("names only filters in force over the selection as ones it cannot apply", () => {
-    const params = new URLSearchParams("beneath=openssl&state=undecided&state=affected");
+    const params = new URLSearchParams("beneath=openssl&state=undecided");
     const oneBuild = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
     const wholeProduct = { product: "sonic", branch_or_tag: "", variant: "" };
-    expect(unbumped(params, oneBuild)).toHaveLength(2);
-    expect(unbumped(params, wholeProduct)).toEqual([unbumped(params, oneBuild)[1]]);
-    expect(unbumped(params, wholeProduct)[0]).toMatch(/past the first$/);
+    expect(unbumped(params, oneBuild)).toHaveLength(1);
+    expect(unbumped(params, wholeProduct)).toEqual([]);
+  });
+
+  it("names each value past the first it sends, and no value it never sends", () => {
+    const scope = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
+    const two = unbumped(new URLSearchParams("state=undecided&state=waiting"), scope);
+    expect(two).toEqual(["Decision state: Pending approval"]);
+    expect(unbumped(new URLSearchParams("state=undecided&state=bogus"), scope)).toEqual([]);
   });
 });
 

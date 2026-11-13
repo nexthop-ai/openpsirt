@@ -952,15 +952,17 @@ const BUMPABLE = new Set<string>(Object.keys(BUMP_FILTERS));
 
 // The filters in force that the by-bump view cannot apply, as their chips name
 // them. A bump has no occurrence, no deadline and no assignee, so a filter
-// asking about one has no row there to narrow; the filters it does take take
-// one value each, so a second value is named too. A filter the selection drops
-// is in force nowhere and is not named.
+// asking about one has no row there to narrow. The filters it does take take
+// one value each, the first the list sends, so every later value is named with
+// its filter. A filter the selection drops is in force nowhere and is not
+// named.
 export function unbumped(asked: URLSearchParams, scope: ListScope): string[] {
-  const chips = activeFilters(asked, undefined, scope);
-  return [
-    ...chips.filter((each) => !BUMPABLE.has(each.key)).map((each) => each.label),
-    ...chips
-      .filter((each) => BUMPABLE.has(each.key) && asked.getAll(each.key).length > 1)
-      .map((each) => each.label + " past the first"),
-  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const each of activeFilters(asked, undefined, scope)) {
+    if (!BUMPABLE.has(each.key)) out.push(each.label);
+    else if (seen.has(each.key)) out.push(`${each.label}: ${each.value}`);
+    seen.add(each.key);
+  }
+  return out;
 }
