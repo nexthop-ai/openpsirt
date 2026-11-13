@@ -16,15 +16,24 @@ const releases = [
   { branch_or_tag: "v2.0", variant: "broadcom", kind: "tag" },
 ];
 
-// The issue as the server answers it: the rows on this page, and how many
-// there are in all. Asked about sonic alone, it answers sonic's rows; asked
-// about every product, it counts a thousand more rows elsewhere.
-function serving(held: { branch_or_tag: string; variant: string }[], total: number) {
+// The issue as the server answers it: the rows of the page asked for, and how
+// many there are in all. Asked about sonic alone, it answers sonic's rows;
+// asked about every product, it counts a thousand more rows elsewhere. A total
+// past the rows held is rows the server lost between pages.
+function serving(
+  held: { branch_or_tag: string; variant: string; component?: string }[],
+  total: number,
+) {
   serve((path, init) => {
     if (path === "/v1/products/{product}/releases") return { data: { items: releases } };
     if (path === "/v1/issues/{issue}") {
-      const asked = (init as { params: { query?: { product?: string } } }).params.query;
-      const items = held.map((each) => ({ ...each, product: "sonic" }));
+      const asked = (
+        init as { params: { query?: { product?: string; limit?: number; offset?: number } } }
+      ).params.query;
+      const from = asked?.offset ?? 0;
+      const items = held
+        .slice(from, from + (asked?.limit ?? 200))
+        .map((each) => ({ ...each, product: "sonic" }));
       return asked?.product === "sonic"
         ? { data: { items, total } }
         : { data: { items, total: total + 1000 } };
@@ -62,6 +71,23 @@ describe("correcting which builds a flaw affects", () => {
     expect(mount.host().textContent).not.toContain("writing from what is shown");
     expect(() => button(mount.host(), "Set which builds it affects")).toThrow();
     expect(sent()).toHaveLength(0);
+  });
+
+  it("edits a product whose rows run past one page while its builds fit one write", async () => {
+    const rows = ["master", "v1.0"].flatMap((branch) =>
+      Array.from({ length: 300 }, (_, i) => ({
+        branch_or_tag: branch,
+        variant: "broadcom",
+        component: `module-${i}`,
+      })),
+    );
+    const sent = serving(rows, rows.length);
+    await opened();
+    expect(mount.host().textContent).not.toContain("more builds than this screen can set");
+    tick(mount.host(), "v2.0");
+    await press(mount.host(), "Set which builds it affects");
+    await settle();
+    expect((sent()[0]?.[1] as { body: { builds: unknown[] } }).body.builds).toHaveLength(3);
   });
 
   it("edits one product's builds however many rows other products hold", async () => {

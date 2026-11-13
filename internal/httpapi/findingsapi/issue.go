@@ -73,7 +73,9 @@ func registerIssue(api huma.API, in core.Deps) {
 		Summary: "List findings for one issue",
 		Description: "Every build that carries this issue, across every product you may see " +
 			"or in the one product `product` names, with how far it has been decided in each.\n\n" +
-			"One row per build and component, with a count of its occurrences.\n\n" +
+			"One row per build and component, with a count of its occurrences, ordered by " +
+			"product, branch or tag, variant and component; `offset` reads the rows past a " +
+			"page.\n\n" +
 			"The rows, `total` and the count of products cover only products you may read.\n\n" +
 			"An issue that affects nothing you may read answers `total` zero with empty " +
 			"`items`, whether nobody here has seen it or it sits only in products you cannot " +
@@ -86,6 +88,7 @@ func registerIssue(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Product       string `query:"product" doc:"Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found"`
 		Limit         int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
+		Offset        int    `query:"offset" minimum:"0" doc:"The number of rows skipped, in the order the rows are listed"`
 	}) (*IssueOutput, error) {
 		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
@@ -127,7 +130,7 @@ func registerIssue(api huma.API, in core.Deps) {
 			return out, nil
 		}
 		store := finding.NewStore(in.DB.DB)
-		rows, total, products, err := store.Everywhere(ctx, subject, id, productID, input.Limit)
+		rows, total, products, err := store.Everywhere(ctx, subject, id, productID, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "where this issue sits could not be read", err)
 		}
