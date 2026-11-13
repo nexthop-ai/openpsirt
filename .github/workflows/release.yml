@@ -9,11 +9,14 @@ name: Release
 # only the part a checkout cannot do: pushing to the registry, signing against
 # a workload identity, and creating the release.
 #
-# The build runs every dependency's code, the interface's build
-# tools among them, and holds nothing but a read of the repository. The
-# publish job holds the write, package and signing permissions and runs no
-# code from the repository or its dependencies: it takes the build's files and
-# image, checks them against the sums the build recorded, and publishes them.
+# The release is named by a job that runs no build tool: its version, image,
+# chart registry and which aliases move. The build runs every dependency's
+# code, the interface's build tools among them, holds nothing but a read of
+# the repository, and passes on nothing but the image's sum. The publish job
+# holds the write, package and signing permissions and runs no code from the
+# repository or its dependencies: it takes the build's files and image, checks
+# them against the sums the build recorded, and publishes them under the
+# names the naming job chose.
 # A build-time dependency gone bad reaches what it builds either way; split,
 # it cannot also sign other things, push other tags or rewrite other
 # releases. The documentation is split the same way: built with a read, and
@@ -31,8 +34,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build
+  # Every name the publish job pushes, signs or moves comes from here, where
+  # nothing but git and the shell runs. A step output of the build job is
+  # written by whatever ran in it, a dependency's code included, so the
+  # build's outputs choose no tag.
+  name:
+    name: Name the release
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,13 +52,11 @@ jobs:
       latest: ${{ steps.release.outputs.latest }}
       newest_on_line: ${{ steps.release.outputs.newest_on_line }}
       previous: ${{ steps.release.outputs.previous }}
-      image_sum: ${{ steps.saved.outputs.sum }}
 
     steps:
-      # Full history: `git describe` derives the version from the tag, and
-      # the release is named against every other tag. A shallow checkout has
-      # neither, and the tag is checked against the main it fetched. The token
-      # is not left in the checkout, where the build's code could read it.
+      # Full history: the release is named against every other tag, and the
+      # tag is checked against the main it fetched. A shallow checkout has
+      # neither.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
@@ -72,7 +77,7 @@ jobs:
           git merge-base --is-ancestor "${{ github.sha }}" origin/main \
             || { echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"; exit 1; }
 
-      # Named from the tags before any build tool runs, so nothing the build
+      # Named from the tags where no build tool runs, so nothing the build
       # fetches can move a tag this reads.
       - name: Name this release
         id: release
@@ -126,6 +131,24 @@ jobs:
             | awk -v tag="$GITHUB_REF_NAME" '$0 == tag { print prev; exit } { prev = $0 }')
           echo "previous=$previous" >> "$GITHUB_OUTPUT"
 
+  build:
+    name: Build
+    needs: name
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image_sum: ${{ steps.saved.outputs.sum }}
+
+    steps:
+      # Full history: `git describe` derives the version from the tag, and a
+      # shallow checkout has none. The token is not left in the checkout,
+      # where the build's code could read it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       # The Go release is the one the image builds with. The Dockerfile's
       # golang tag is the one pin of the patch, and go.mod's go line is only
       # the oldest release the module accepts.
@@ -171,7 +194,7 @@ jobs:
       # worked out again beside it, so what is pushed is what was built.
       - name: Build the release
         env:
-          IMAGE: ${{ steps.release.outputs.image }}
+          IMAGE: ${{ needs.name.outputs.image }}
         run: make dist VERSION="$GITHUB_REF_NAME" DIST_IMAGE="$IMAGE"
 
       # The image crosses to the publish job as an archive, and every file
@@ -181,8 +204,8 @@ jobs:
       - name: Save the image
         id: saved
         env:
-          VERSION: ${{ steps.release.outputs.version }}
-          IMAGE: ${{ steps.release.outputs.image }}
+          VERSION: ${{ needs.name.outputs.version }}
+          IMAGE: ${{ needs.name.outputs.image }}
         run: |
           mkdir -p bin/image
           docker save "$IMAGE:$VERSION" -o bin/image/image.tar
@@ -200,7 +223,7 @@ jobs:
 
   publish:
     name: Publish
-    needs: build
+    needs: [name, build]
     runs-on: ubuntu-latest
     permissions:
       # The release.
@@ -248,12 +271,12 @@ jobs:
       - name: Push the image
         id: image
         env:
-          VERSION: ${{ needs.build.outputs.version }}
-          IMAGE: ${{ needs.build.outputs.image }}
-          MINOR: ${{ needs.build.outputs.minor }}
-          PRERELEASE: ${{ needs.build.outputs.prerelease }}
-          LATEST: ${{ needs.build.outputs.latest }}
-          NEWEST_ON_LINE: ${{ needs.build.outputs.newest_on_line }}
+          VERSION: ${{ needs.name.outputs.version }}
+          IMAGE: ${{ needs.name.outputs.image }}
+          MINOR: ${{ needs.name.outputs.minor }}
+          PRERELEASE: ${{ needs.name.outputs.prerelease }}
+          LATEST: ${{ needs.name.outputs.latest }}
+          NEWEST_ON_LINE: ${{ needs.name.outputs.newest_on_line }}
         run: |
           image=$IMAGE
           version=$VERSION
@@ -276,8 +299,8 @@ jobs:
       - name: Push the chart
         id: chart
         env:
-          VERSION: ${{ needs.build.outputs.version }}
-          CHARTS: ${{ needs.build.outputs.charts }}
+          VERSION: ${{ needs.name.outputs.version }}
+          CHARTS: ${{ needs.name.outputs.charts }}
         run: |
           # helm push names the chart from the Chart.yaml inside the archive,
           # so the archive is held to this release's name and version before
@@ -296,14 +319,14 @@ jobs:
       - name: Sign the image
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
-          IMAGE: ${{ needs.build.outputs.image }}
+          IMAGE: ${{ needs.name.outputs.image }}
         run: |
           cosign sign --yes "$IMAGE@$DIGEST"
 
       - name: Sign the chart
         env:
           DIGEST: ${{ steps.chart.outputs.digest }}
-          CHARTS: ${{ needs.build.outputs.charts }}
+          CHARTS: ${{ needs.name.outputs.charts }}
         run: |
           cosign sign --yes "$CHARTS/openpsirt@$DIGEST"
 
@@ -323,8 +346,8 @@ jobs:
         env:
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
           CHART_DIGEST: ${{ steps.chart.outputs.digest }}
-          IMAGE: ${{ needs.build.outputs.image }}
-          CHARTS: ${{ needs.build.outputs.charts }}
+          IMAGE: ${{ needs.name.outputs.image }}
+          CHARTS: ${{ needs.name.outputs.charts }}
         run: |
           identity="^https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/"
           cosign verify \
@@ -353,7 +376,7 @@ jobs:
       - name: Attest the image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
-          subject-name: ${{ needs.build.outputs.image }}
+          subject-name: ${{ needs.name.outputs.image }}
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
 
@@ -365,13 +388,13 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.build.outputs.version }}
+          VERSION: ${{ needs.name.outputs.version }}
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-          IMAGE: ${{ needs.build.outputs.image }}
-          CHARTS: ${{ needs.build.outputs.charts }}
-          PRERELEASE: ${{ needs.build.outputs.prerelease }}
-          LATEST: ${{ needs.build.outputs.latest }}
-          PREVIOUS: ${{ needs.build.outputs.previous }}
+          IMAGE: ${{ needs.name.outputs.image }}
+          CHARTS: ${{ needs.name.outputs.charts }}
+          PRERELEASE: ${{ needs.name.outputs.prerelease }}
+          LATEST: ${{ needs.name.outputs.latest }}
+          PREVIOUS: ${{ needs.name.outputs.previous }}
         run: |
           version=$VERSION
           # The list of what changed is GitHub's, built from the titles of the
@@ -437,7 +460,7 @@ jobs:
   # the branch the build started from, and refuses the other.
   docs-build:
     name: Build the documentation
-    needs: [build, publish]
+    needs: [name, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -471,7 +494,7 @@ jobs:
       # tag it was started by rather than looking for the newest one.
       - name: Build under this version
         env:
-          LATEST: ${{ needs.build.outputs.latest }}
+          LATEST: ${{ needs.name.outputs.latest }}
           DOCS_RELEASE: ${{ github.ref_name }}
         run: |
           version="${GITHUB_REF_NAME#v}"

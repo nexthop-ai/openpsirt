@@ -189,7 +189,8 @@ workflow does the rest.
 | Signs and verifies the image, chart and checksum file | |
 | Creates the release with every asset, marked Latest only when newest | GitHub would mark every release Latest |
 | Publishes the documentation under the version, moving `latest` and the default when newest | |
-| Names the release, its aliases and the release it counts from out of the tags before any build tool runs | Code a build fetches runs in the same job and could move a local tag |
+| Names the release, its image and chart registry, its aliases and the release it counts from out of the tags, in a job of its own with a read of the repository, running git and the shell alone | Code a build fetches could move a local tag, or rewrite the build job's outputs, and so choose the tags the publish job pushes, signs and moves |
+| The publish job takes every name from the naming job, and from the build job only the image archive's sum | |
 | Builds the documentation in a job holding a read alone, and pushes its pages branch from another that runs none of its build tools, and only as commits on top of the published branch | The documentation's build tools come from pip; with the write beside them they could rewrite releases and tags |
 
 | Rule | Reason |
