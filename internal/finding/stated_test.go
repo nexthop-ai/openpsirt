@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -283,8 +284,24 @@ func TestAClosedRowIsShownByTheNameItsBuildLastStated(t *testing.T) {
 		f.shippedTo(t, elsewhere, stating(twoConsumers(), rot13))
 		f.shipped(t, twoConsumers())
 		f.applied(t, found("CVE-2026-1", libnl))
+		who := f.someoneElse(t, access.PublicTriage)
+		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID,
+			f.componentID(t, libnl.Name), "3.9.0", nil, nil,
+			[]int64{f.build}, map[int64]string{}); err != nil {
+			t.Fatal(err)
+		}
 		f.shipped(t, withoutLibnl())
 		f.applied(t)
+
+		// The build's plan names the package it moved off as it stated it.
+		planned, err := f.store.PlannedUpgradesFor(ctx, who, f.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(planned) != 1 || !slices.Equal(planned[0].Components, []string{libnl.Name}) {
+			t.Errorf("the plan for a package the build moved off names %v, want [%s] as the build"+
+				" last stated it", planned, libnl.Name)
+		}
 
 		rows, _, err := f.store.Register(ctx, f.holding(t, access.PublicRead), f.build,
 			finding.Registering{Closed: true}, 50, 0)
@@ -325,6 +342,15 @@ func TestAClosedRowIsShownByTheNameItsBuildLastStated(t *testing.T) {
 				t.Errorf("the list on a day the row was open shows it as %q, want %q as the build"+
 					" last stated it", group.Component, libnl.Name)
 			}
+		}
+		upgrades, _, err := f.store.PlannedUpgrades(ctx, f.holding(t, access.PublicRead), f.scope, 50, 0,
+			finding.Filter{OpenOn: &between})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(upgrades) != 1 || !slices.Equal(upgrades[0].Components, []string{libnl.Name}) {
+			t.Errorf("the planned upgrades on a day the row was open name %v, want [%s] as the"+
+				" build last stated it", upgrades, libnl.Name)
 		}
 	})
 }

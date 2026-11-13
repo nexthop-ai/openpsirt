@@ -326,16 +326,29 @@ func (s *Store) namesIn(ctx context.Context, buildIDs []int64, visible []access.
 		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
-		ColumnExpr(graph.NodeName("sn", "c") + ` AS "name"`).
+		// As the build last stated it, its open node else its latest: a
+		// list on a past day holds versions the build has since moved off,
+		// and the row's name can be another product's. Read per inner group
+		// rather than grouped on, since the fallback reads ungrouped columns;
+		// repeated names are dropped below.
+		ColumnExpr(graph.StatedName("sn", `"f"."build_id"`, `"f"."component_id"`, "c") + ` AS "name"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
-		ColumnExpr(`"va"."name" AS "variant"`).
-		GroupExpr(FoldedOn + `, "f"."fixed_in", ` + graph.NodeName("sn", "c") + `, "st"."name", "va"."name"`).
-		// In the order a reader scans them, so an upgrade names its packages and
-		// its builds the same way on every read.
-		OrderExpr(graph.NodeName("sn", "c") + `, "st"."name", "va"."name"`)
+		ColumnExpr(`"va"."name" AS "variant"`)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read which packages a bump moves: %w", err)
 	}
+	// In the order a reader scans them, so an upgrade names its packages and
+	// its builds the same way on every read.
+	sort.SliceStable(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		if a.BranchOrTag != b.BranchOrTag {
+			return a.BranchOrTag < b.BranchOrTag
+		}
+		return a.Variant < b.Variant
+	})
 	named := map[string][]string{}
 	seen := map[string]bool{}
 	in := map[string][]Build{}
