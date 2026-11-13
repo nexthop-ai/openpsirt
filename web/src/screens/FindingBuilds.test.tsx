@@ -34,7 +34,7 @@ function serving(
       const items = held
         .slice(from, from + (asked?.limit ?? 200))
         .map((each) => ({ ...each, product: "sonic" }));
-      return asked?.product === "sonic"
+      return asked?.product?.toLowerCase() === "sonic"
         ? { data: { items, total } }
         : { data: { items, total: total + 1000 } };
     }
@@ -191,6 +191,20 @@ describe("correcting which builds a flaw affects", () => {
     await opened();
     expect(mount.host().textContent).not.toContain("more builds than this screen can set");
     expect(mount.host().querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
+  });
+
+  it("holds a product's builds where the address spells its name in other capitals", async () => {
+    const sent = serving([{ branch_or_tag: "master", variant: "broadcom" }], 1);
+    mount.render(screen(<AffectedBuilds product="SONiC" vulnerability="OPENPSIRT-2026-1" />));
+    await press(mount.host(), "▸ Which builds this affects");
+    await settle();
+    tick(mount.host(), "v1.0");
+    await press(mount.host(), "Set which builds it affects");
+    await settle();
+    expect((sent()[0]?.[1] as { body: { builds: unknown[] } }).body.builds).toEqual([
+      { branch_or_tag: "master", variant: "broadcom" },
+      { branch_or_tag: "v1.0", variant: "broadcom" },
+    ]);
   });
 
   it("sends the whole set it holds, with the build added", async () => {

@@ -169,7 +169,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		// value each for a component in a build.
 		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."version", "c"."id", `+
 			`"sn"."name", "sn"."version"`).
-		// Names are ordered by their bytes, so every engine answers in one
+		// Names are ordered by code point, so every engine answers in one
 		// order whatever its collation, and the rows an offset skips are the
 		// rows an earlier page returned.
 		OrderExpr(strings.Join([]string{
