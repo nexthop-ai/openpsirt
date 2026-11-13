@@ -125,13 +125,7 @@ func registerTrail(api huma.API, in core.Deps) {
 			return nil, core.Refused(in.Logger, err, "what has been changed could not be read")
 		}
 
-		who := make([]int64, 0, len(changes))
-		for _, change := range changes {
-			if person := change.Person(); person != 0 {
-				who = append(who, person)
-			}
-		}
-		people, err := core.WhoSigned(ctx, in.DB.DB, who)
+		views, err := core.ChangeViews(ctx, in.DB.DB, changes)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "who changed these could not be read", err)
 		}
@@ -146,19 +140,14 @@ func registerTrail(api huma.API, in core.Deps) {
 		}{}
 		out.Body.Total = total
 		out.Body.From, out.Body.To = core.Stating(since, until)
-		out.Body.Items = make([]ChangeBody, 0, len(changes))
-		for _, change := range changes {
+		out.Body.Items = make([]ChangeBody, 0, len(views))
+		for _, view := range views {
 			body := ChangeBody{
-				At: core.Stamp(change.At), Actor: core.TrailActor(change.Actor),
-				By: people.Identity(change.Person()), ByName: people.Label(change.Person()),
-				Kind: core.TrailKind(change.Kind), About: change.Name,
-				Unset: change.Was == nil, Cleared: change.Became == nil,
-			}
-			if change.Was != nil {
-				body.Was = *change.Was
-			}
-			if change.Became != nil {
-				body.Became = *change.Became
+				At: view.At, Actor: core.TrailActor(view.Actor),
+				By: view.By, ByName: view.ByName,
+				Kind: core.TrailKind(view.Kind), About: view.About,
+				Was: view.Was, Became: view.Became,
+				Unset: view.Unset, Cleared: view.Cleared,
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}

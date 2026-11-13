@@ -29,7 +29,7 @@ working list.
 | Nothing on a release out of support is on a clock (REQ-15), applied separately | It reaches exploited findings too |
 | A product may state its own, and one stating none inherits rather than copies; clearing it is its own act | A copy stops following the deployment unseen |
 | Stating one is administration, the authority setting the deployment's | It hides findings |
-| Moving either rewrites what is stored, away from the request, one replica at a time (`design-docs/queue.md`) | |
+| Moving either rewrites what is stored, as a job queued in the act, one replica at a time (`design-docs/queue.md` § Leases) | A queued job outlives a restart, and is tried again as every job is |
 
 ## Issue assessments
 
@@ -75,8 +75,10 @@ whatever the severity.
 | A dismissal takes a finding off the clock; a deferral replaces the deadline with its date | |
 | Lateness is reported, never acted on | |
 | The shipped windows are a starting point | A deadline nobody agreed to leaves an estate overdue and ignored |
-| Changing a window rewrites stored deadlines, away from the request | Deadlines are written when a finding is first seen |
+| Changing a window rewrites stored deadlines, as a job queued in the act | Deadlines are written when a finding is first seen |
 | One replica rewrites at a time, reading the policy once its turn comes; a replica losing the race waits | Two would each write what they read |
+| A rewrite waiting unclaimed takes every change after it; a change while one runs queues one more | The waiting one has not read the policy |
+| A policy stated again is no change: no row, no rewrite | |
 
 Becoming known exploited also re-clocks an issue
 (`design-docs/findings-severity.md` § Urgency).

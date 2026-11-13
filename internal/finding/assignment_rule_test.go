@@ -27,7 +27,7 @@ func (f *fixture) teamReading(t *testing.T, name string, roles ...access.Role) i
 	t.Helper()
 	ctx := t.Context()
 	rights := access.NewStore(f.db.DB)
-	one, err := rights.DeclareTeam(ctx, name, name)
+	one, _, err := rights.DeclareTeam(ctx, name, name)
 	if err != nil {
 		t.Fatal(err)
 	}

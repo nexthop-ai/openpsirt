@@ -352,7 +352,7 @@ func TestATeamQueueReachesEachMemberAtTheVisibilityTheyRead(t *testing.T) {
 
 		team := func(name string) *access.Team {
 			t.Helper()
-			made, err := s.rights.DeclareTeam(ctx, name, name)
+			made, _, err := s.rights.DeclareTeam(ctx, name, name)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -394,7 +394,7 @@ func TestAnIssueAtOccurrencesOfBothVisibilitiesIsOnePieceOfQueuedWork(t *testing
 		privateReader := s.person(t, "private-reader", access.PrivateRead)
 		publicReader := s.person(t, "public-reader", access.PublicRead)
 		admin := s.person(t, "admin")
-		queue, err := s.rights.DeclareTeam(ctx, "Kernel", "Kernel")
+		queue, _, err := s.rights.DeclareTeam(ctx, "Kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -428,7 +428,7 @@ func TestReportsSittingInATeamQueueAreToldToTheMembersWhoReadReports(t *testing.
 		privateReader := s.person(t, "private-reader", access.PrivateRead)
 		publicReader := s.person(t, "public-reader", access.PublicRead)
 		admin := s.person(t, "admin")
-		queue, err := s.rights.DeclareTeam(ctx, "Intake", "Intake")
+		queue, _, err := s.rights.DeclareTeam(ctx, "Intake", "Intake")
 		if err != nil {
 			t.Fatal(err)
 		}

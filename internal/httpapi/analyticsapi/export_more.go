@@ -557,25 +557,16 @@ func registerChangeExport(api huma.API, in core.Deps) {
 				// The person, by the identity they sign in under and their
 				// display name beside it, read a page at a time like every
 				// other name this file carries.
-				who := make([]int64, 0, len(changes))
-				for _, change := range changes {
-					if person := change.Person(); person != 0 {
-						who = append(who, person)
-					}
-				}
-				people, err := core.WhoSigned(ctx, in.DB.DB, who)
+				views, err := core.ChangeViews(ctx, in.DB.DB, changes)
 				if err != nil {
 					return nil, err
 				}
-				rows := make([][]string, 0, len(changes))
-				for _, change := range changes {
+				rows := make([][]string, 0, len(views))
+				for _, view := range views {
 					rows = append(rows, []string{
-						core.Stamp(change.At), string(change.Actor),
-						people.Identity(change.Person()), people.Label(change.Person()),
-						string(change.Kind), change.Name,
-						core.OrBlank(change.Was), core.OrBlank(change.Became),
-						strconv.FormatBool(change.Was == nil),
-						strconv.FormatBool(change.Became == nil),
+						view.At, view.Actor, view.By, view.ByName, view.Kind, view.About,
+						view.Was, view.Became,
+						strconv.FormatBool(view.Unset), strconv.FormatBool(view.Cleared),
 					})
 				}
 				return rows, nil

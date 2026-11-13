@@ -26,6 +26,9 @@ const (
 	// Check names the work of checking a replaced branch inventory against
 	// the issues published while it was current.
 	Check = "inventory.check"
+	// Deadlines names the work of rewriting stored deadlines and urgency after
+	// a policy change.
+	Deadlines = "deadline.rewrite"
 )
 
 // Kinds is every kind of work this deployment queues.
@@ -34,4 +37,4 @@ const (
 // operator looking at what is waiting. The cap is per kind, so a single number
 // across the queue would hide the kind that is actually backed up behind the
 // two that are not.
-func Kinds() []string { return []string{Parse, Scan, AssignmentSweep, Analyze, Check} }
+func Kinds() []string { return []string{Parse, Scan, AssignmentSweep, Analyze, Check, Deadlines} }

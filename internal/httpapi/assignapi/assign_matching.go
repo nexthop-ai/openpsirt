@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -50,18 +51,28 @@ func recipient(err error, otherwise func(error) error) error {
 	return otherwise(err)
 }
 
-// personAdmits refuses handing a person work some of which is undisclosed, or
-// security testing, in a product where they may not read work of that visibility: the
-// hand-over would be the disclosure. Each visibility the work holds is asked
-// about, because each is its own grant. Asked through the transaction that
-// hands the work over.
+// personAdmits refuses handing a person work they could not open once they held
+// it, asked through the transaction that hands the work over.
+//
+// Somebody who holds no role in the product, or has left, is refused whatever
+// the work's visibility: disclosed work travels with its assignment only to
+// somebody who holds a role there, which is the rule a hand-back keeps it by,
+// and anything handed to somebody refused at sign-in sits in no list. Each
+// visibility other than public the work holds is then asked about, because
+// each is its own grant and handing over what they may not read would be the
+// disclosure.
 func personAdmits(person *access.Account, productID int64) finding.Admits {
 	return func(ctx context.Context, db bun.IDB, withheld []access.Visibility) error {
+		holds, err := access.NewStore(db).PersonHolds(ctx, person.ID, productID)
+		if err != nil {
+			return err
+		}
+		if len(holds) == 0 {
+			return errRecipient{huma.Error422UnprocessableEntity(
+				"they hold no role in this product or have left, so the work would sit with somebody who cannot open it")}
+		}
 		for _, v := range withheld {
-			reads, err := access.NewStore(db).PersonReads(ctx, person.ID, productID, v)
-			if err != nil {
-				return err
-			}
+			reads := slices.Contains(holds, v)
 			if !reads && v == access.SecurityTesting {
 				return errRecipient{huma.Error422UnprocessableEntity(
 					"some of this is at security testing visibility and they may not read security testing work here, " +
@@ -94,6 +105,65 @@ func teamAdmits(team *access.Team, productID int64) finding.Admits {
 	}
 }
 
+// receiver is who work is given to: the party it lands on, the person told
+// of it, and what the party is asked inside the write that moves it. The zero
+// receiver is nobody, which is how work is handed back.
+type receiver struct {
+	to *int64
+	// tell is the person to tell, and zero for a team: a queue filling up is
+	// digest content rather than an interruption.
+	tell int64
+	// identity is the person's, read back as them to ask what they may see.
+	identity string
+	admits   finding.Admits
+}
+
+// receiverOf resolves the person or team a request names as the receiver of
+// work in a product.
+//
+// The right to hand work over is asked before either name is looked up:
+// resolving first answers whether an account exists differently for a held
+// and an unheld name, which is a directory of the organization for the price
+// of one request (REQ-42).
+func receiverOf(ctx context.Context, in core.Deps, subject access.Subject, productID int64,
+	person, team string) (receiver, error) {
+
+	if err := mayHandOver(subject, productID, person, team); err != nil {
+		return receiver{}, err
+	}
+	rights := access.NewStore(in.DB.DB)
+	switch {
+	case person != "":
+		who, err := core.PersonNamed(ctx, in.Logger, rights, person)
+		if err != nil {
+			return receiver{}, err
+		}
+		party := who.PartyID
+		return receiver{to: &party, tell: who.ID, identity: who.Identity,
+			admits: personAdmits(who, productID)}, nil
+	case team != "":
+		found, err := core.TeamNamed(ctx, in.Logger, rights, team)
+		if err != nil {
+			return receiver{}, err
+		}
+		party := found.PartyID
+		return receiver{to: &party, admits: teamAdmits(found, productID)}, nil
+	}
+	return receiver{}, nil
+}
+
+// told reports whether the receiver is told the work arrived: a person, never
+// a team, never somebody assigning to themselves, never for handing back, and
+// only where they read the work at every visibility it holds (seenBy).
+func (r receiver) told(ctx context.Context, in core.Deps, subject access.Subject, productID int64,
+	withheld []access.Visibility) bool {
+
+	if r.to == nil || r.tell == 0 || *r.to == subject.Party() {
+		return false
+	}
+	return seenBy(ctx, in, r.identity, productID, withheld)
+}
+
 func registerAssignMatching(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "assign-matching-findings", Method: http.MethodPost,
@@ -110,8 +180,9 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			"Without the assigner right you may take what nobody holds and hand back your own. " +
 			"Rows somebody else holds are left with them, and `moved` counts only what changed " +
 			"hands.\n\n" +
-			"Refused as a whole where any row has not been disclosed and the person or team " +
-			"may not read undisclosed work in the product.",
+			"Refused as a whole where the person holds no role in the product or has been " +
+			"deactivated, or where any row has not been disclosed and the person or team may " +
+			"not read undisclosed work in the product.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Giving work to somebody else also needs assigner. Taking unowned work, "+
 		"or handing back your own, does not.", core.TriageRights()...), func(ctx context.Context, input *struct {
@@ -141,7 +212,8 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		if !subject.TriagesIn(product) {
 			return nil, huma.Error403Forbidden("not authorized")
 		}
-		if err := mayHandOver(subject, product, input.Body.Person, input.Body.Team); err != nil {
+		to, err := receiverOf(ctx, in, subject, product, input.Body.Person, input.Body.Team)
+		if err != nil {
 			return nil, err
 		}
 
@@ -150,30 +222,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			return nil, err
 		}
 
-		rights := access.NewStore(in.DB.DB)
-		var to *int64
-		var whoToTell int64
-		var admits finding.Admits
-		switch {
-		case input.Body.Person != "":
-			person, err := core.PersonNamed(ctx, in.Logger, rights, input.Body.Person)
-			if err != nil {
-				return nil, err
-			}
-			party := person.PartyID
-			to, whoToTell = &party, person.ID
-			admits = personAdmits(person, product)
-		case input.Body.Team != "":
-			team, err := core.TeamNamed(ctx, in.Logger, rights, input.Body.Team)
-			if err != nil {
-				return nil, err
-			}
-			party := team.PartyID
-			to = &party
-			admits = teamAdmits(team, product)
-		}
-
-		handed, err := at.Store.AssignMatching(ctx, subject, at.Scope, at.Filter, only, to, admits)
+		handed, err := at.Store.AssignMatching(ctx, subject, at.Scope, at.Filter, only, to.to, to.admits)
 		if err != nil {
 			return nil, recipient(err, func(err error) error {
 				return core.Refused(in.Logger, err, "cannot record who is dealing with this")
@@ -185,15 +234,14 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		// it. Told only where they may see all of it, for the reason the
 		// single assignment gives, and never for handing back.
 		arrived := handed.Pieces - len(handed.Left)
-		if to != nil && *to != subject.Party() && whoToTell != 0 && arrived > 0 &&
-			seenBy(ctx, in, input.Body.Person, product, handed.Withheld) {
+		if arrived > 0 && to.told(ctx, in, subject, product, handed.Withheld) {
 			private, securityTesting := notify.Withholding(handed.Withheld)
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
-				PersonID: whoToTell, Kind: notify.Assigned,
+				PersonID: to.tell, Kind: notify.Assigned,
 				Body: piecesOfWork(arrived) + " in " + input.Product,
 				Link: weblink.Assignments(), Private: private, SecurityTesting: securityTesting,
 				ProductID: &product,
-			}, "person", whoToTell)
+			}, "person", to.tell)
 		}
 		left, err := pieceBodies(ctx, in, handed.Left)
 		if err != nil {

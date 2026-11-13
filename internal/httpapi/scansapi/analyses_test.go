@@ -255,3 +255,27 @@ func TestAnAnalyzerUploadFromSomebodyNotAdmittedIsRecordedNowhere(t *testing.T) 
 		}
 	})
 }
+
+func TestAPersonSendsAnAnalyzerRunWhereTheyTriageSecurityTesting(t *testing.T) {
+	// Every result of a run opens as security testing work, so triaging that
+	// is what admits a person, and triaging the product's other findings is
+	// not.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses"
+		send := func(who, series string) (int, string) {
+			body, form := httpapitest.Form(t,
+				httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: gzipped(t, clangRun)},
+				httpapitest.Part{Field: "series", Content: series},
+				httpapitest.Part{Field: "built", Content: "2026-10-01T02:00:00Z"},
+				httpapitest.Part{Field: "source-root", Content: "/home/builder/sonic"})
+			got := r.Post(t, who, http.MethodPost, at, body, form)
+			return got.Code, got.Body.String()
+		}
+		if code, body := send("security-testing-triager", "clang-tidy/by-hand"); code != http.StatusAccepted {
+			t.Errorf("a triager of security testing work sending a run answered %d, want 202: %s", code, body)
+		}
+		if code, body := send("triager", "clang-tidy/other"); code != http.StatusForbidden {
+			t.Errorf("a triager of other findings sending a run answered %d, want 403: %s", code, body)
+		}
+	})
+}

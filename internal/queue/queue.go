@@ -241,6 +241,36 @@ func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (
 	return job, nil
 }
 
+// AddUnlessWaitingTx is AddTx for work any one run does all of. Where a job
+// of this kind and reference is waiting unclaimed and never tried, that job
+// takes this request too and nothing is added: it has not started, so it reads
+// whatever it decides from after this transaction commits. Work already
+// claimed may have read it before, so it is not counted.
+func (q *Queue) AddUnlessWaitingTx(ctx context.Context, db bun.IDB, kind, reference string) error {
+	// Written rather than read, so the waiting job is locked until this
+	// transaction ends: a claim made meanwhile waits for the commit or passes
+	// the job by, and its work reads what this transaction wrote. Read, a
+	// claim could take the job and read before the commit, and nothing would
+	// be queued after it.
+	touched, err := db.NewUpdate().Model((*Job)(nil)).
+		Set(`"updated_at" = ?`, q.now().Truncate(time.Microsecond)).
+		Where(`"kind" = ?`, kind).
+		Where(`"reference" = ?`, reference).
+		Where(`"state" = ?`, Pending).
+		// Never tried: a job waiting to be tried again may be on its last
+		// attempt, and waits out its backoff first.
+		Where(`"attempts" = 0`).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("ask whether the work is already waiting: %w", err)
+	}
+	if waiting, err := database.Changed(touched, "ask whether the work is already waiting"); err != nil || waiting {
+		return err
+	}
+	_, err = q.AddTx(ctx, db, kind, reference)
+	return err
+}
+
 // Depth counts work of one kind waiting to be done.
 //
 // Per kind, because the cap it feeds exists so that a runaway producer cannot

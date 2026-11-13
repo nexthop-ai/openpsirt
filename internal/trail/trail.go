@@ -366,6 +366,10 @@ const onProduct = " on "
 // this shape, so every producer of a per-product row builds it here.
 func OnProduct(name, product string) string { return name + onProduct + product }
 
+// OnEveryProduct is what a change made across every product is recorded
+// about, in the per-product shape so About reads it with the rest.
+func OnEveryProduct(name string) string { return OnProduct(name, "every product") }
+
 // InCase is what a change to who is on one undisclosed case is recorded about:
 // the product, the issue and the person. The column is sized for three maximal
 // names joined this way.
@@ -425,6 +429,11 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 // ASCII letters, and identities are compared exactly, so `alice@example.com`
 // would otherwise report the roles of `Alice@example.com`. The pattern stays,
 // because it is what an index on the column serves.
+//
+// A role row configuration wrote is a group mapping, about a group rather
+// than anybody's account, and is left out: a group's name shares the column
+// with a person's identity, so a group named as somebody is would report its
+// mappings as roles that person held.
 func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name string,
 	limit, offset int) ([]Change, int, error) {
 
@@ -434,7 +443,7 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 			return q.Where(`"about" = ?`, name).
 				WhereOr(`("about" LIKE ?`+database.LikeClause+` AND SUBSTR("about", 1, ?) = ?)`,
 					database.LikeEscaped(name)+onProduct+"%", utf8.RuneCountInString(prefix), prefix)
-		})
+		}).Where(`NOT ("kind" = ? AND "actor" = ?)`, Role, ByConfiguration)
 	}
 	return s.page(ctx, by, kind, narrow, limit, offset, fmt.Sprintf("what changed about %q", name))
 }

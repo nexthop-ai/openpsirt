@@ -132,10 +132,7 @@ func mappingsIn(ctx context.Context, db bun.IDB) ([]Mapping, error) {
 	for _, binding := range over {
 		out = append(out, Mapping{Group: binding.GroupName, Grants: string(binding.Grants)})
 	}
-	slices.SortFunc(out, func(a, b Mapping) int {
-		return strings.Compare(a.Group+"\x00"+a.Product+"\x00"+a.Grants,
-			b.Group+"\x00"+b.Product+"\x00"+b.Grants)
-	})
+	slices.SortFunc(out, compareMappings)
 	return out, nil
 }
 
@@ -422,6 +419,9 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// Resolve reads beside it. Folded in here, configuration's grant would
 	// be written as one made here and outlive the name.
 	effective := admin.administers || (person.IsAdmin && !person.AdminDerived)
+	// Read before the flags are rewritten: a flag a group gave says an
+	// earlier sign-in in group-bound mode already judged what they hold.
+	signedInBefore := person.AdminDerived || person.AuditsDerived
 	// A group's grant is derived only where it is what made them an
 	// administrator. Written as "whatever the groups say this time", the
 	// column destroys the input the line above depends on next time:
@@ -480,7 +480,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		person.AuditsDerivedAt = auditsAt
 	}
 
-	if err := s.replaceDerived(ctx, person.ID, roles, admin.everywhere); err != nil {
+	if err := s.replaceDerived(ctx, person.ID, roles, admin.everywhere, signedInBefore); err != nil {
 		return nil, err
 	}
 
@@ -559,16 +559,21 @@ type held struct {
 }
 
 // replaceDerived makes somebody's derived grants exactly what their groups say.
+// signedInBefore says a group gave them administration or auditing before this
+// sign-in, which only a sign-in in group-bound mode records.
 func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[int64][]Role,
-	everywhere []Role) error {
+	everywhere []Role, signedInBefore bool) error {
 
 	// What they held before is read first, so a sign-in that took a role
 	// away hands back what that leaves them unable to read. Asked only when
-	// something went, or when nothing was derived before: this runs on every
-	// request a proxy reports groups for. Nothing derived before is the first
-	// sign-in since the switch into group-bound mode, which hands nothing back
-	// itself, so the work assigned roles let them hold is judged here against
-	// what their groups derive.
+	// something went, or on the first sign-in since the switch into
+	// group-bound mode, which hands nothing back itself, so the work assigned
+	// roles let them hold is judged here against what their groups derive:
+	// this runs on every request a proxy reports groups for.
+	//
+	// The first sign-in is told by nothing derived before it, neither a role
+	// nor administration nor auditing. That is also every sign-in of somebody
+	// whose groups derive none of those.
 	var before []Grant
 	if err := s.db.NewSelect().Model(&before).Column("product_id", "role").
 		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Scan(ctx); err != nil {
@@ -614,7 +619,7 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 			return fmt.Errorf("record what these groups grant across every product: %w", err)
 		}
 	}
-	taken := len(before) == 0 && len(beforeEstate) == 0
+	taken := len(before) == 0 && len(beforeEstate) == 0 && !signedInBefore
 	for _, grant := range before {
 		taken = taken || !holds(roles[grant.ProductID], grant.Role)
 	}

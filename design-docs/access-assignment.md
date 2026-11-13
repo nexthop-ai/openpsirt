@@ -29,6 +29,7 @@ it is (REQ-34).
 | Findings arriving under an assigned component start unowned | Starting work needs nobody else's attention |
 | Assigner is held alongside triage, never instead of it, checked at the endpoint and the store; the session answer carries the same conjunction | An interface draws no control that always fails |
 | Who may be assigned is visibility, never a grant of its own | |
+| A person is given work only where they hold a role in its product and have not left, whatever its visibility, at every route that hands work to a person | Disclosed work travels with its assignment by the rule a hand-back keeps it by (§ Lost reading); handed to anybody else it names a product they hold nothing on, or sits with somebody refused at sign-in |
 | The write that moves the rows refuses a hand-off the caller may not make | A path that skipped its check still moves nothing |
 | Whether the recipient reads the work is asked inside the write's transaction, at every visibility open there: the single assignment, a code finding's, assignment by narrowing and an upgrade's holder | A scan recording an undisclosed occurrence in between would be handed over unasked |
 | A finding is assigned for a whole group: one issue in one component, however many occurrences | |
@@ -73,6 +74,8 @@ groups to use instead.
 | The queue is narrowed per viewer, counts included, and a matrix test asserts it | "Kernel team · 14" says two embargoed items exist |
 | A team gives up queued work no remaining member reads, whenever its members or their reading change; retiring empties the queue | § Lost reading |
 | Retiring a team keeps its row and name, and declaring the name again brings it back | Assigned work keeps a name to show |
+| Declaring one team, or putting one person on a team, from two requests at once is one team or one membership, and neither request is refused | A deployment script run twice at once is the ordinary case; the request losing the race to the index runs again and finds the row |
+| Of requests declaring or reinstating one team at once, one is answered that it declared the team and writes the trail row | The write reports it; a lookup before the write can miss a team another request has just committed |
 
 | Bound | Reason |
 |---|---|
@@ -153,7 +156,7 @@ administrator acts their work is in no list.
 | Operation | Meaning |
 |---|---|
 | Releasing | It goes back to be picked up |
-| Handing over | Names who deals with it now. Refused whole where any of it sits at a visibility the recipient may not read in its product, asked inside the moving transaction. Code findings move too |
+| Handing over | Names who deals with it now. Refused whole where the recipient holds no role in a product any of it is in, has left, or may not read the visibility some of it sits at in its product, asked inside the moving transaction. Code findings move too |
 
 Only an administrator does either; a person hands back their own by assigning it
 to nobody. Deactivation is `design-docs/access-grants.md` § Somebody who has
@@ -168,8 +171,8 @@ work it leaves with a holder who cannot open it.
 |---|---|
 | A role withdrawn on one product | Their work there they may no longer read: everything where it was their last role, otherwise the undisclosed or security testing work, and the reports, the role let them read |
 | A role withdrawn across every product | The same, product by product |
-| A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went or nothing was derived before, since a trusted-header sign-in runs on every request |
-| The first group-bound sign-in after a switch into group-bound mode | What administrator-assigned roles let them hold that their groups do not let them read |
+| A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went, since a trusted-header sign-in runs on every request |
+| The first group-bound sign-in after a switch into group-bound mode | What administrator-assigned roles let them hold that their groups do not let them read. Told by nothing derived before it, neither a role nor administration nor auditing |
 | A switch out of group-bound mode | The same, for everybody holding work, against the restored assigned roles |
 | Somebody taken off a team | The team's work no remaining member reads |
 | A team retired | Everything in its queue |
@@ -194,4 +197,4 @@ work it leaves with a holder who cannot open it.
 |---|---|
 | A rule naming a component with a letter outside ASCII matches on the three servers and not on SQLite | SQLite folds ASCII only. No deployment runs SQLite; agreement needs a stored folded name, a schema change |
 | The batch-fullness rule is reasoned, never pinned by a test | The divergence needs a write between a batch's read and write; what is pinned is that a sweep spanning several batches routes everything it matches |
-| After a switch into group-bound mode, work held by somebody who never signs in again stays with them until they do, are deactivated, or it is handed back by hand | Their set-aside roles grant nothing, so the work is in no list. A person whose groups derive no role is asked about on every sign-in |
+| After a switch into group-bound mode, work held by somebody who never signs in again stays with them until they do, are deactivated, or it is handed back by hand | Their set-aside roles grant nothing, so the work is in no list. A person whose groups derive no role and no administration or auditing they did not already hold is asked about on every sign-in |

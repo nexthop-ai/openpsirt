@@ -39,8 +39,9 @@ a forge that issues no identity token and publishes no discovery document.
 | The proof key is sent as a digest and kept as the secret it hashes | A code taken in flight being exchanged |
 | The identity token must carry the value tying it to this sign-in | A token from another sign-in |
 | An identity token naming no subject is refused | Matching by name alone |
+| A forge account answered with no numeric identifier, or zero, is refused | Every such answer matching whoever arrived with it first |
 | An identity with a NUL character in its subject, username, name, address or groups is refused | Two identities read as one; a NUL fails the statement on two engines |
-| A provider's address is recorded only where the provider says it verified it; no address redeems an authorization | Mail about undisclosed work going wherever an account holder typed |
+| A provider's address is recorded only where the provider says it verified it; no address redeems an authorization. The forge's is its primary address where verified, else its first verified one | Mail about undisclosed work going wherever an account holder typed |
 | The sealed value carries when it was minted, and a stale one is refused | The sealing key never rotates, and the browser holding the value may have planted it |
 
 ## Outbound provider fetches

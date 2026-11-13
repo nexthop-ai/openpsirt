@@ -296,14 +296,14 @@ func TestADigestCountsTheReportsInTheReadersTeamsQueues(t *testing.T) {
 		if err := rights.GrantRole(ctx, holder.ID, w.Product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}
-		theirs, err := rights.DeclareTeam(ctx, "intake", "Intake")
+		theirs, _, err := rights.DeclareTeam(ctx, "intake", "Intake")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if _, err := rights.AddToTeam(ctx, theirs.ID, holder.ID, holder.ID); err != nil {
 			t.Fatal(err)
 		}
-		other, err := rights.DeclareTeam(ctx, "kernel", "Kernel")
+		other, _, err := rights.DeclareTeam(ctx, "kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}

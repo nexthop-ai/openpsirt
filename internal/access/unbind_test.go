@@ -76,13 +76,7 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 func TestUnbindingAnIdentifierGrantsNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		alice := authorized(t, f, "alice", "alice")
-		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
-			t.Fatal(err)
-		}
+		unboundAfterSignIn(t, f, "alice", "okta-1001")
 		if _, err := f.store.MatchProvider(ctx, "okta", "okta-abc", "mallory"); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("somebody nobody authorized was not refused: %v", err)
 		}
@@ -100,13 +94,7 @@ func TestUnbindingAnIdentifierGrantsNothing(t *testing.T) {
 func TestUnbindingAnIdentifierKeepsWhatTheyHold(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		alice := authorized(t, f, "alice", "alice")
-		if _, err := f.store.MatchProvider(ctx, "okta", "okta-1001", "alice"); err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.UnbindIdentifier(ctx, alice.ID); err != nil {
-			t.Fatal(err)
-		}
+		unboundAfterSignIn(t, f, "alice", "okta-1001")
 		subject, err := f.store.Resolve(ctx, "alice")
 		if err != nil {
 			t.Fatalf("she holds nothing after unbinding: %v", err)
@@ -136,4 +124,18 @@ func TestUnbindingSomebodyWithNothingBoundMatchesNothing(t *testing.T) {
 			t.Errorf("unbinding somebody already unbound answered %v", err)
 		}
 	})
+}
+
+// unboundAfterSignIn is somebody authorized, signed in once through the
+// provider with subject, and then unbound.
+func unboundAfterSignIn(t *testing.T, f *fixture, identity, subject string) *access.Account {
+	t.Helper()
+	person := authorized(t, f, identity, identity)
+	if _, err := f.store.MatchProvider(t.Context(), "okta", subject, identity); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.store.UnbindIdentifier(t.Context(), person.ID); err != nil {
+		t.Fatal(err)
+	}
+	return person
 }

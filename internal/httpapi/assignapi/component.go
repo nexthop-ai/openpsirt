@@ -267,7 +267,9 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 			"both impossible. A team is a perfectly good holder — moving a package is work a " +
 			"queue tracks rather than a decision one person makes — and it stays unheld until " +
 			"somebody on it takes it. The handover is product-wide like every other, because " +
-			"the promise is per build and who is carrying the work is not.",
+			"the promise is per build and who is carrying the work is not. A person is given " +
+			"it only where they hold a role in the product, have not been deactivated, and may " +
+			"read every visibility it holds; anybody else is refused with 422.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
@@ -288,6 +290,21 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
+		// Authorized before any name in the body is resolved: a build, or
+		// the person or team carrying the work. Resolved first, a held and
+		// an unheld name are refused differently (REQ-42).
+		if !subject.TriagesIn(product.ID) {
+			return nil, huma.Error403Forbidden("not authorized")
+		}
+		// Whoever carries it is authorized and resolved before any build is,
+		// and asked about the whole set inside the transaction that records
+		// the promise: one embargoed finding among fifty makes the handover
+		// the disclosure.
+		holder, err := receiverOf(ctx, in, subject, product.ID, input.Body.Person, input.Body.Team)
+		if err != nil {
+			return nil, err
+		}
+
 		builds := make([]int64, 0, len(input.Body.Builds))
 		for _, at := range input.Body.Builds {
 			located, err := core.LocatedVisibly(ctx, in, subject, input.Product, at.BranchOrTag, at.Variant)
@@ -301,19 +318,13 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 			builds = append(builds, build.ID)
 		}
 
-		holder, admits, err := carrying(ctx, in, subject, product.ID, input.Body.Person,
-			input.Body.Team)
-		if err != nil {
-			return nil, err
-		}
-
 		// No limit read, because this one is not bounded. The setting bounds
 		// a bulk decision, which nothing re-checks; the next scan re-checks
 		// every row a promise names.
 		done, err := store.PlanUpgrade(ctx, subject, triage.Upgrade{
 			ProductID: product.ID, Component: input.Component, Version: input.Body.Version,
 			To: input.Body.To, By: by, Builds: builds, Reasoning: input.Body.Reasoning,
-			HoldBy: holder, Admits: admits,
+			HoldBy: holder.to, Admits: holder.admits,
 		})
 		if err != nil {
 			return nil, recipient(err, func(err error) error {
@@ -336,42 +347,6 @@ func oneVersion(err error, otherwise func(error) error) error {
 		return core.SeveralComponents(several, `"version" in the body`)
 	}
 	return otherwise(err)
-}
-
-// carrying is the party an upgrade is handed to, or none where nobody was
-// named, with what the party is asked before the work is handed over.
-//
-// The same checks the per-finding assignment makes, asked about the whole set
-// inside the transaction that records the promise: a handover carries
-// visibility of what was handed over, so the check is against the strictest
-// thing the promise covers rather than whichever row somebody was looking at —
-// one embargoed finding among fifty is enough to make the handover the
-// disclosure. And somebody has to be able to read a team's queue, or it sits
-// where none of them can see it.
-func carrying(ctx context.Context, in core.Deps, subject access.Subject, productID int64,
-	person, team string) (*int64, finding.Admits, error) {
-
-	if person == "" && team == "" {
-		return nil, nil, nil
-	}
-	if err := mayHandOver(subject, productID, person, team); err != nil {
-		return nil, nil, err
-	}
-	rights := access.NewStore(in.DB.DB)
-	if person != "" {
-		who, err := core.PersonNamed(ctx, in.Logger, rights, person)
-		if err != nil {
-			return nil, nil, err
-		}
-		party := who.PartyID
-		return &party, personAdmits(who, productID), nil
-	}
-	found, err := core.TeamNamed(ctx, in.Logger, rights, team)
-	if err != nil {
-		return nil, nil, err
-	}
-	party := found.PartyID
-	return &party, teamAdmits(found, productID), nil
 }
 
 // mayHandOver refuses a party nobody may be given work as, and a flaw record the

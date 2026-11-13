@@ -88,7 +88,9 @@ reaches out, settled by a lease.
 | What stopped the last attempt or what it could not take, bounded | It carries the upstream's address and reason phrase |
 
 Where what the upstream says moved, every build of the product holding an
-inventory and with no scan waiting is queued to be scanned again.
+inventory is queued to be scanned again. A build with a scan waiting has that
+scan take the request, under the queue's rule for work any one run does all of
+(`design-docs/queue.md` § Job structure).
 
 ## Statements recorded
 

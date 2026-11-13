@@ -283,6 +283,7 @@ func TestRecordingSomebodyAgainLeavesAdministrationAlone(t *testing.T) {
 			`{"identity":"deputy","admin":true}`); got.Code >= 300 {
 			t.Fatalf("recording an administrator answered %d: %s", got.Code, got.Body.String())
 		}
+		recorded := trailCount(t, r)
 
 		// A request about something else entirely, saying nothing about
 		// administration.
@@ -302,9 +303,7 @@ func TestRecordingSomebodyAgainLeavesAdministrationAlone(t *testing.T) {
 
 		// And nothing claimed it moved. A row per request would make the
 		// trail say administration changed on every edit to somebody's roles.
-		var trail httpapitest.Changed
-		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
-		for _, row := range trail.Items {
+		for _, row := range trailSince(t, r, recorded).Items {
 			if row.About == "deputy" && row.Became == "administrator" {
 				t.Errorf("a request saying nothing about administration recorded %+v", row)
 			}
@@ -594,6 +593,40 @@ func TestTheTrailNamesWhatWasChangedAsItIsStored(t *testing.T) {
 		}
 		if members != 1 {
 			t.Errorf("putting somebody on a team twice recorded %d memberships", members)
+		}
+	})
+}
+
+// Recording a new person with administration or audit records each grant from
+// not held, so an access review reading the trail for who was made an
+// administrator finds everybody made one in a single request.
+func TestRecordingANewAdministratorRecordsTheGrant(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		before := trailCount(t, r)
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"deputy","admin":true,"audits":true}`); got.Code >= 300 {
+			t.Fatalf("recording an administrator answered %d: %s", got.Code, got.Body.String())
+		}
+		granted := map[string]bool{}
+		for _, row := range trailSince(t, r, before).Items {
+			if row.About == "deputy" && row.Was == "" {
+				granted[row.Became] = true
+			}
+		}
+		for _, want := range []string{"recorded", "administrator", "auditor"} {
+			if !granted[want] {
+				t.Errorf("recording a new administrator and auditor left no %q row: %+v", want, granted)
+			}
+		}
+
+		// A plain new account is its creation alone.
+		before = trailCount(t, r)
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"plain"}`); got.Code >= 300 {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		if rows := trailSince(t, r, before).Items; len(rows) != 1 {
+			t.Errorf("recording somebody holding nothing over the deployment left %+v", rows)
 		}
 	})
 }

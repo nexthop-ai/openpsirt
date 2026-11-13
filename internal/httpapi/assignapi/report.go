@@ -45,7 +45,8 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 			"assign it to a team, which is a queue rather than a holding: it stays unheld until " +
 			"somebody takes it.\n\n" +
 			"A report is undisclosed, so a person is given one only where they read " +
-			"undisclosed work in the product, and a team only where one member does. A judged " +
+			"undisclosed work in the product, and a team only where one member does; anybody " +
+			"else is refused with 422. A judged " +
 			"report is refused with 409: its work goes on as the issue it became, or ended " +
 			"with its ruling.\n\n" +
 			"The person given it is told, where that is not you.",
@@ -73,34 +74,13 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		if err := finding.MayWorkReference(subject, product.ID); err != nil {
 			return nil, refusedHolding(in, err)
 		}
-		if err := mayHandOver(subject, product.ID, input.Body.Person, input.Body.Team); err != nil {
+		to, err := receiverOf(ctx, in, subject, product.ID, input.Body.Person, input.Body.Team)
+		if err != nil {
 			return nil, err
 		}
 
-		var to *int64
-		var admits finding.Admits
-		rights := access.NewStore(in.DB.DB)
-		switch {
-		case input.Body.Person != "":
-			person, err := core.PersonNamed(ctx, in.Logger, rights, input.Body.Person)
-			if err != nil {
-				return nil, err
-			}
-			party := person.PartyID
-			to = &party
-			admits = personAdmits(person, product.ID)
-		case input.Body.Team != "":
-			team, err := core.TeamNamed(ctx, in.Logger, rights, input.Body.Team)
-			if err != nil {
-				return nil, err
-			}
-			party := team.PartyID
-			to = &party
-			admits = teamAdmits(team, product.ID)
-		}
-
 		row, err := finding.NewStore(in.DB.DB).AssignReport(ctx, subject, product.ID,
-			input.Reference, to, admits)
+			input.Reference, to.to, to.admits)
 		if err != nil {
 			return nil, recipient(err, func(err error) error { return refusedHolding(in, err) })
 		}
@@ -108,17 +88,14 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		// team, never for handing back, and only where they read the product's
 		// reports. The line is undisclosed work, so nothing leaving the
 		// deployment names the report.
-		if to != nil && *to != subject.Party() && input.Body.Person != "" {
-			them, err := rights.Resolve(ctx, input.Body.Person)
-			if err == nil && them.Reads(access.Private, product.ID) {
-				productID := product.ID
-				core.Tell(ctx, in, "could not say that a report was assigned", notify.Telling{
-					PersonID: them.ID, Kind: notify.Assigned,
-					Body:    "Report " + row.Reference + ", in " + product.Name,
-					Link:    weblink.VulnerabilityReport(product.Name, row.Reference),
-					Private: true, ProductID: &productID,
-				}, "person", them.ID)
-			}
+		if to.told(ctx, in, subject, product.ID, []access.Visibility{access.Private}) {
+			productID := product.ID
+			core.Tell(ctx, in, "could not say that a report was assigned", notify.Telling{
+				PersonID: to.tell, Kind: notify.Assigned,
+				Body:    "Report " + row.Reference + ", in " + product.Name,
+				Link:    weblink.VulnerabilityReport(product.Name, row.Reference),
+				Private: true, ProductID: &productID,
+			}, "person", to.tell)
 		}
 		return &struct{}{}, nil
 	})
@@ -163,28 +140,10 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		holders := subject.Mine()
-		if input.Identity != "me" {
-			rights := access.NewStore(in.DB.DB)
-			person, err := rights.ByIdentity(ctx, input.Identity)
-			switch {
-			case errors.Is(err, access.ErrNoSuchPerson):
-				holders = []int64{core.Nobody}
-			case err != nil:
-				return nil, core.WentWrong(in.Logger, "that person could not be looked up", err)
-			default:
-				teams, err := rights.TeamsOf(ctx, person.ID)
-				if err != nil {
-					return nil, core.WentWrong(in.Logger, "what they are working could not be read", err)
-				}
-				holders = []int64{person.PartyID}
-				for _, team := range teams {
-					holders = append(holders, team.PartyID)
-				}
-			}
-		}
-		if len(holders) == 0 {
-			holders = []int64{core.Nobody}
+		holders, err := holdersOf(ctx, in, subject, input.Identity,
+			"what they are working could not be read")
+		if err != nil {
+			return nil, err
 		}
 		return heldReports(ctx, in, subject, input.Product, holders, input.Limit, input.Offset)
 	})
@@ -208,12 +167,9 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		holders := []int64{core.Nobody}
-		switch team, err := access.NewStore(in.DB.DB).TeamByName(ctx, input.Team); {
-		case err == nil:
-			holders = []int64{team.PartyID}
-		case !errors.Is(err, access.ErrNoSuchTeam):
-			return nil, core.WentWrong(in.Logger, "that team could not be looked up", err)
+		holders, err := teamHolders(ctx, in, input.Team)
+		if err != nil {
+			return nil, err
 		}
 		return heldReports(ctx, in, subject, input.Product, holders, input.Limit, input.Offset)
 	})

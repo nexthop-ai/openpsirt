@@ -31,7 +31,7 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 		r.Claimed(t, "private-triage", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
 
 		rights := access.NewStore(r.DB.DB)
-		team, err := rights.DeclareTeam(ctx, "platform", "Platform")
+		team, _, err := rights.DeclareTeam(ctx, "platform", "Platform")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +108,7 @@ func TestATeamWithNobodyOnItMeasuresNothing(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
-		if _, err := access.NewStore(r.DB.DB).DeclareTeam(t.Context(),
+		if _, _, err := access.NewStore(r.DB.DB).DeclareTeam(t.Context(),
 			"empty", "Nobody"); err != nil {
 			t.Fatal(err)
 		}

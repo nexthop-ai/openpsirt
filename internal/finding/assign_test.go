@@ -136,15 +136,33 @@ func TestWorkCanBeHandedToSomebodyElse(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Handed to somebody who holds a role in the product, since work
+		// handed to anybody else would sit with somebody who cannot open it.
+		taker, err := access.NewStore(f.db.DB).Ensure(t.Context(), "taker@example.com", "Taker", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := access.NewStore(f.db.DB).GrantRole(t.Context(), taker.ID, f.productID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+
 		admin := access.NewPerson(99, "admin", true, nil, 199)
 		if _, err := f.store.HandOver(t.Context(), admin, 7, 7); err == nil {
 			t.Error("work was handed to the person who already had it")
 		}
-		if _, err := f.store.HandOver(t.Context(), admin, 7, 8); err != nil {
+		// A party no person holds holds nothing, disclosed work included.
+		team, _, err := access.NewStore(f.db.DB).DeclareTeam(t.Context(), "kernel", "Kernel")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.HandOver(t.Context(), admin, 7, team.PartyID); !errors.Is(err, finding.ErrRecipientHoldsNothing) {
+			t.Errorf("disclosed work handed to a team answered %v, want that it holds nothing", err)
+		}
+		if _, err := f.store.HandOver(t.Context(), admin, 7, taker.PartyID); err != nil {
 			t.Fatal(err)
 		}
 		for id, who := range f.assigned(t) {
-			if who != 8 {
+			if who != taker.PartyID {
 				t.Errorf("finding %d is held by %d after being handed on", id, who)
 			}
 		}

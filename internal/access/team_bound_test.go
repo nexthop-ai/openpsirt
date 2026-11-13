@@ -21,11 +21,11 @@ func TestATeamNamePastTheColumnIsRefusedByTheStore(t *testing.T) {
 		ctx := t.Context()
 		refused := func(err error) bool { return refusal.In(err) }
 		boundtest.Edges(t, database.NameWidth, func(n int) error {
-			_, err := f.store.DeclareTeam(ctx, fmt.Sprint(n)+strings.Repeat("漢", n-len(fmt.Sprint(n))), "")
+			_, _, err := f.store.DeclareTeam(ctx, fmt.Sprint(n)+strings.Repeat("漢", n-len(fmt.Sprint(n))), "")
 			return err
 		}, refused)
 		boundtest.Edges(t, database.NameWidth, func(n int) error {
-			_, err := f.store.DeclareTeam(ctx, fmt.Sprintf("shown-%d", n), strings.Repeat("é", n))
+			_, _, err := f.store.DeclareTeam(ctx, fmt.Sprintf("shown-%d", n), strings.Repeat("é", n))
 			return err
 		}, refused)
 	})

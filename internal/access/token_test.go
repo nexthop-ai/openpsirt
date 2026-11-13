@@ -126,14 +126,7 @@ func TestATokenNarrowedToAProductCarriesNoAdministration(t *testing.T) {
 			t.Fatal(err)
 		}
 		sonic := f.products["sonic"]
-		_, secret, err := f.store.NewToken(ctx, person.ID, "narrow", &sonic, nil, time.Hour, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		subject, err := f.store.ResolveToken(ctx, secret)
-		if err != nil {
-			t.Fatal(err)
-		}
+		subject := minted(t, f, person.ID, "narrow", &sonic)
 		if subject.Admin {
 			t.Error("a token narrowed to one product still administered everything")
 		}
@@ -153,15 +146,7 @@ func TestATokenNarrowedToRolesCarriesNoAdministration(t *testing.T) {
 		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		_, secret, err := f.store.NewToken(ctx, person.ID, "reading", nil,
-			[]access.Role{access.PublicRead}, time.Hour, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		subject, err := f.store.ResolveToken(ctx, secret)
-		if err != nil {
-			t.Fatal(err)
-		}
+		subject := minted(t, f, person.ID, "reading", nil, access.PublicRead)
 		if subject.Admin || subject.ReadsTheDeployment() {
 			t.Errorf("a token narrowed to reading kept administration %v or the audit grant %v",
 				subject.Admin, subject.ReadsTheDeployment())
@@ -277,14 +262,7 @@ func TestANarrowedTokenDoesNotReadTheDeploymentsOwnRecords(t *testing.T) {
 			{"one-product", &sonic, nil, false},
 			{"read-only", nil, []access.Role{access.PublicRead}, false},
 		} {
-			_, secret, err := f.store.NewToken(ctx, auditor.ID, c.name, c.product, c.holds, time.Hour, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			subject, err := f.store.ResolveToken(ctx, secret)
-			if err != nil {
-				t.Fatal(err)
-			}
+			subject := minted(t, f, auditor.ID, c.name, c.product, c.holds...)
 			if got := subject.ReadsTheDeployment(); got != c.reads {
 				t.Errorf("a %s token reads the deployment's own records: %v, want %v", c.name, got, c.reads)
 			}
@@ -303,29 +281,14 @@ func TestATokenCannotMintOrWithdrawAnother(t *testing.T) {
 			t.Fatal(err)
 		}
 		sonic := f.products["sonic"]
-		_, narrow, err := f.store.NewToken(ctx, boss.ID, "narrow", &sonic, nil, time.Hour, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		subject, err := f.store.ResolveToken(ctx, narrow)
-		if err != nil {
-			t.Fatal(err)
-		}
+		subject := minted(t, f, boss.ID, "narrow", &sonic)
 		if !subject.Delegated() {
 			t.Error("a token did not arrive marked as a minted credential")
 		}
 
 		// And the same holds for one that was never narrowed: the limit is on
 		// minting, not on how wide the token happens to be.
-		_, wide, err := f.store.NewToken(ctx, boss.ID, "wide", nil, nil, time.Hour, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		whole, err := f.store.ResolveToken(ctx, wide)
-		if err != nil {
-			t.Fatal(err)
-		}
+		whole := minted(t, f, boss.ID, "wide", nil)
 		if !whole.Delegated() {
 			t.Error("an un-narrowed token did not arrive marked as a minted credential")
 		}
@@ -466,7 +429,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		if err := f.store.GrantRole(ctx, person.ID, elsewhere, access.PublicRead); err != nil {
 			t.Fatal(err)
 		}
-		team, err := f.store.DeclareTeam(ctx, "kernel", "Kernel")
+		team, _, err := f.store.DeclareTeam(ctx, "kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -498,14 +461,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, secret, err := f.store.NewToken(ctx, person.ID, "pinned", &here, nil, time.Hour, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		narrowed, err := f.store.ResolveToken(ctx, secret)
-		if err != nil {
-			t.Fatal(err)
-		}
+		narrowed := minted(t, f, person.ID, "pinned", &here)
 		whole, err := f.store.Resolve(ctx, "ana")
 		if err != nil {
 			t.Fatal(err)
@@ -646,14 +602,7 @@ func TestATokenCarriesOnlyTheRolesItWasMintedFor(t *testing.T) {
 			// ask for more than its owner has.
 			{"naming a role its owner does not hold", []access.Role{access.Approver}, false, false},
 		} {
-			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
-			if err != nil {
-				t.Fatalf("%s: %v", c.what, err)
-			}
-			subject, err := f.store.ResolveToken(ctx, secret)
-			if err != nil {
-				t.Fatalf("%s: %v", c.what, err)
-			}
+			subject := minted(t, f, person.ID, c.what, nil, c.holds...)
 			if got := subject.Reads(access.Public, f.products["sonic"]); got != c.reads {
 				t.Errorf("a token %s reads the product: %v, want %v", c.what, got, c.reads)
 			}
@@ -702,14 +651,7 @@ func TestAReadingTokenCannotWriteOnItsOwnersCase(t *testing.T) {
 			{"narrowed to reading", []access.Role{access.PublicRead}, false},
 			{"narrowed to triage", []access.Role{access.PublicTriage}, true},
 		} {
-			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
-			if err != nil {
-				t.Fatalf("%s: %v", c.what, err)
-			}
-			subject, err := f.store.ResolveToken(ctx, secret)
-			if err != nil {
-				t.Fatalf("%s: %v", c.what, err)
-			}
+			subject := minted(t, f, person.ID, c.what, nil, c.holds...)
 			// The read half is there whichever way it was narrowed.
 			if !subject.OnCase(f.products["sonic"], issue) {
 				t.Errorf("a token %s cannot read the case it was minted for", c.what)
@@ -821,14 +763,7 @@ func TestATokenNarrowsToAnSecurityTestingRole(t *testing.T) {
 			{"narrowed to security testing triage", []access.Role{access.SecurityTestingTriage}, false, true, true},
 			{"narrowed to public reading", []access.Role{access.PublicRead}, true, false, false},
 		} {
-			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
-			if err != nil {
-				t.Fatalf("%s: %v", c.what, err)
-			}
-			subject, err := f.store.ResolveToken(ctx, secret)
-			if err != nil {
-				t.Fatalf("%s: %v", c.what, err)
-			}
+			subject := minted(t, f, person.ID, c.what, nil, c.holds...)
 			if got := subject.Reads(access.Public, sonic); got != c.readsPublic {
 				t.Errorf("a token %s reads disclosed work: %v, want %v", c.what, got, c.readsPublic)
 			}

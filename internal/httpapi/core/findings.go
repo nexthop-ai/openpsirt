@@ -453,6 +453,8 @@ func RefusedFinding(in Deps, err error) error {
 		return Asked(in.Logger, err)
 	case errors.Is(err, finding.ErrRecipientMayNotRead):
 		return huma.Error422UnprocessableEntity(finding.ErrRecipientMayNotRead.Error())
+	case errors.Is(err, finding.ErrRecipientHoldsNothing):
+		return huma.Error422UnprocessableEntity(finding.ErrRecipientHoldsNothing.Error())
 	}
 	return WentWrong(in.Logger, "that could not be recorded", err)
 }

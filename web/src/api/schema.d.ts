@@ -2407,7 +2407,7 @@ export interface paths {
          *
          *     Nothing tells this software that somebody has gone — membership is read at sign-in, and a person who has left never signs in again. So this is an action an administrator takes rather than something that happens on its own, and until it is taken their work is in no list at all: not in the shared one because it is assigned, and not in anybody's own because they are not here.
          *
-         *     Send `to` instead to hand it to a named person rather than to nobody.
+         *     Send `to` instead to hand it to a named person rather than to nobody. That is refused with 422 where they hold no role in a product any of the work is in, have been deactivated, or may not read the visibility some of it sits at.
          *
          *     Requires: administrator
          */
@@ -2894,6 +2894,8 @@ export interface paths {
          *
          *     An empty date clears the override, so the release follows its product again. Clearing is not the same as stating the product's current date: a release that stated it would stop following when the product changed.
          *
+         *     Deadlines are rewritten afterwards by a queued job; the response returns before that has finished. Stating the date already in force changes nothing and records nothing. A full queue refuses the change with 503, recording nothing; send it again later.
+         *
          *     Requires: administrator
          */
         put: operations["set-branch-or-tag-end-of-life"];
@@ -3112,7 +3114,7 @@ export interface paths {
          *
          *     Send `person` as an empty string to hand it back to nobody. Send `team` instead to assign it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
          *
-         *     A person is given a code finding only where they may read it at its visibility, and a team only where one member may. A code finding every release of which is past its end of life is refused with 409, and so is a code finding recorded as a flaw: assign the flaw instead.
+         *     A person is given a code finding only where they hold a role in the product, have not been deactivated, and may read it at its visibility, and a team only where one member may; anybody else is refused with 422. A code finding every release of which is past its end of life is refused with 409, and so is a code finding recorded as a flaw: assign the flaw instead.
          *
          *     A code finding seen on a build it was not open on when it was assigned starts unassigned there.
          *
@@ -3539,6 +3541,8 @@ export interface paths {
          *     Send `person` as an empty string to hand it back to nobody, which is this same operation rather than one of its own.
          *
          *     Send `team` instead to assign it to a team. That is a queue rather than a holding: it stays unheld until somebody takes it, and anybody on the team may take it with the triage right alone. Assigning to a team asks that at least one member may read what is being assigned there — not that every member may.
+         *
+         *     A person is given it only where they hold a role in the product and have not been deactivated, and only where they may read it at every visibility it holds; anybody else is refused with 422.
          *
          *     Findings arriving later under the same component start unassigned.
          *
@@ -4729,7 +4733,7 @@ export interface paths {
          *
          *     Not bounded, unlike a bulk decision: this one covers as many occurrences as the component has open findings in the releases named.
          *
-         *     Saying who carries it is part of the act, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a decision one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
+         *     Saying who carries it is part of the act, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a decision one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not. A person is given it only where they hold a role in the product, have not been deactivated, and may read every visibility it holds; anybody else is refused with 422.
          *
          *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
@@ -4776,7 +4780,7 @@ export interface paths {
          *
          *     Nothing is deleted or hidden: the findings and the history stay, and stay reportable. What ends is what is expected of us.
          *
-         *     An empty date clears it, because extended support happens. Deadlines are rewritten afterwards, away from the request; the response returns before that has finished.
+         *     An empty date clears it, because extended support happens. Deadlines are rewritten afterwards by a queued job; the response returns before that has finished. Stating the date already in force changes nothing and records nothing. A full queue refuses the change with 503, recording nothing; send it again later.
          *
          *     Requires: administrator
          */
@@ -4887,7 +4891,7 @@ export interface paths {
          *
          *     Without the assigner right you may take what nobody holds and hand back your own. Rows somebody else holds are left with them, and `moved` counts only what changed hands.
          *
-         *     Refused as a whole where any row has not been disclosed and the person or team may not read undisclosed work in the product.
+         *     Refused as a whole where the person holds no role in the product or has been deactivated, or where any row has not been disclosed and the person or team may not read undisclosed work in the product.
          *
          *     Requires: public-triage or private-triage or security-testing-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
          */
@@ -5540,7 +5544,7 @@ export interface paths {
          *
          *     An empty value clears the override, so the product follows the deployment again. Clearing is not the same as stating the deployment's current minimum severity: a product that stated it would stop following when the deployment changed.
          *
-         *     Deadlines are rewritten afterwards, away from the request, because moving the minimum severity moves what is on a clock at all. The response returns before that has finished.
+         *     Deadlines are rewritten afterwards by a queued job, because moving the minimum severity moves what is on a clock at all. The response returns before that has finished. Stating the value already in force changes nothing and records nothing. A full queue refuses the change with 503, recording nothing; send it again later.
          *
          *     Requires: administrator
          */
@@ -5932,7 +5936,7 @@ export interface paths {
          *
          *     Send `person` as an empty string to hand it back to nobody. Send `team` instead to assign it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
          *
-         *     A report is undisclosed, so a person is given one only where they read undisclosed work in the product, and a team only where one member does. A judged report is refused with 409: its work goes on as the issue it became, or ended with its ruling.
+         *     A report is undisclosed, so a person is given one only where they read undisclosed work in the product, and a team only where one member does; anybody else is refused with 422. A judged report is refused with 409: its work goes on as the issue it became, or ended with its ruling.
          *
          *     The person given it is told, where that is not you.
          *
@@ -7193,6 +7197,8 @@ export interface paths {
          *     A size above the most a setting takes is refused, naming the most.
          *
          *     Only the settings this deployment recognizes may be set. A name it does not know is refused, because storing it would create something nothing ever reads.
+         *
+         *     A value equal to the one stored changes nothing and records nothing. Changing a deadline window queues a rewrite of stored deadlines; the response returns before it has run, and a full queue refuses the change with 503, recording nothing; send it again later.
          *
          *     Requires: administrator
          */
@@ -13782,7 +13788,10 @@ export interface components {
              * @description The decision that argued for it, where one did: its reasoning, its approval and its comments
              */
             decision_id?: number;
-            /** @description The moment the commitment was made, which is what this release has been waiting since */
+            /**
+             * Format: date-time
+             * @description The moment the commitment was made, which is what this release has been waiting since
+             */
             declared_at: string;
             /** @description The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
@@ -14673,6 +14682,19 @@ export interface components {
              * @description Issues at components open against it now, each issue counted once per component name, against today's vulnerability data rather than the day it was cut
              */
             open: number;
+        };
+        ReleasedOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReleasedOutputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
+             */
+            released: number;
         };
         Remediation: {
             category: string;
@@ -16749,32 +16771,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["WindowBody"][] | null;
-        };
-        "Withdraw-estate-roleResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Withdraw-estate-roleResponse.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
-             */
-            released: number;
-        };
-        "Withdraw-roleResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Withdraw-roleResponse.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
-             */
-            released: number;
         };
         WorkedBody: {
             /**
@@ -20601,7 +20597,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Withdraw-roleResponse"];
+                    "application/json": components["schemas"]["ReleasedOutputBody"];
                 };
             };
             /** @description Error */
@@ -20633,7 +20629,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Withdraw-estate-roleResponse"];
+                    "application/json": components["schemas"]["ReleasedOutputBody"];
                 };
             };
             /** @description Error */

@@ -68,25 +68,30 @@ const MostTeamMembers = 500
 var ErrNoSuchTeam = refusal.New("no team is known by that name")
 
 // DeclareTeam records a team, or returns the one already declared under that
-// name.
+// name, and reports whether this call declared it: inserted it, or reinstated
+// it from retirement.
 //
 // Declaring rather than creating, the way a product is: the same name arriving
 // twice is one team, and a second call is how a deployment script stays
-// runnable.
-func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Team, error) {
+// runnable. The report comes from the write that declared the team, because a
+// separate lookup before it reads a different moment on an engine that reads
+// committed rows per statement, and two callers at once would each be told
+// they declared it.
+func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Team, bool, error) {
 	matched := typedname.Matching(name)
 	if matched == "" {
-		return nil, refusal.Errorf("a team needs a name")
+		return nil, false, refusal.Errorf("a team needs a name")
 	}
 	shown := strings.TrimSpace(displayName)
 	// A longer name is refused. Cut, the name stored and the name typed
 	// would differ, and declaring the typed one again would make a second
 	// team.
 	if utf8.RuneCountInString(matched) > database.NameWidth || utf8.RuneCountInString(shown) > database.NameWidth {
-		return nil, refusal.Errorf("a team's name is at most %d characters", database.NameWidth)
+		return nil, false, refusal.Errorf("a team's name is at most %d characters", database.NameWidth)
 	}
 
 	team := new(Team)
+	declared := false
 	// Both statements or neither, for the reason a person and their party
 	// are written together: a team nothing can be assigned to is not a team.
 	// And the lookup is inside, because a retry runs against a database
@@ -96,7 +101,7 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 	// refused: declaring a team and putting people on it is one act, and what
 	// this asks for is met by the caller's transaction.
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		*team = Team{}
+		*team, declared = Team{}, false
 		found := new(Team)
 		err := tx.NewSelect().Model(found).
 			Where(`"name" = ?`, matched).Limit(1).Scan(ctx)
@@ -112,14 +117,27 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			// refused by the index with a message about a team that is not
 			// there as far as anybody can see. Reinstating is also what
 			// somebody typing a name they retired last week means.
-			if _, err := tx.NewUpdate().Model((*Team)(nil)).
+			//
+			// Conditional on the team still being retired, so of two callers
+			// reinstating it at once only the one whose write matched it
+			// declared it; the other runs again and finds it in use.
+			res, err := tx.NewUpdate().Model((*Team)(nil)).
 				Set(`"retired_at" = ?`, nil).
 				Set(`"display_name" = ?`, shown).
-				Where(`"id" = ?`, found.ID).Exec(ctx); err != nil {
+				Where(`"id" = ?`, found.ID).
+				Where(`"retired_at" IS NOT NULL`).Exec(ctx)
+			if err != nil {
 				return err
 			}
+			reinstated, err := database.Changed(res, "reinstate the team")
+			if err != nil {
+				return err
+			}
+			if !reinstated {
+				return fmt.Errorf("reinstate the team %q: %w", matched, database.ErrGoAgain)
+			}
 			found.RetiredAt, found.DisplayName = nil, shown
-			*team = *found
+			*team, declared = *found, true
 			return nil
 		case !database.IsNoRows(err):
 			// A read that could not be made says nothing about whether the
@@ -136,15 +154,20 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			CreatedAt: s.now().Truncate(time.Microsecond),
 		}
 		if _, err := tx.NewInsert().Model(fresh).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				// Declared by another request since the lookup. Run again,
+				// the lookup finds it and this answers with that team.
+				return fmt.Errorf("declare the team %q: %w", matched, database.ErrGoAgain)
+			}
 			return err
 		}
-		*team = *fresh
+		*team, declared = *fresh, true
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("record the team %q: %w", name, err)
+		return nil, false, fmt.Errorf("record the team %q: %w", name, err)
 	}
-	return team, nil
+	return team, declared, nil
 }
 
 // TeamByName reads a team by the name people type. A retired one is not found:
@@ -273,7 +296,8 @@ func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 // ON DUPLICATE KEY UPDATE, and engine-specific SQL stays out of the core.
 // Both statements in one transaction, so what the read saw is what the write
 // writes against; two administrators adding the same person at once resolve
-// against the primary key.
+// against the primary key, and the one refused by it runs again and finds the
+// membership.
 func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool, error) {
 	added := false
 	add := func(ctx context.Context, db bun.IDB) error {
@@ -286,12 +310,19 @@ func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool
 		if on > 0 {
 			return nil
 		}
-		_, err = db.NewInsert().Model(&Membership{
+		if _, err := db.NewInsert().Model(&Membership{
 			TeamID: teamID, PersonID: personID,
 			AddedAt: s.now().Truncate(time.Microsecond), AddedBy: by,
-		}).Exec(ctx)
-		added = err == nil
-		return err
+		}).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				// Added by another request since the count. Run again, the
+				// count finds the membership and this answers already there.
+				return fmt.Errorf("put person %d on team %d: %w", personID, teamID, database.ErrGoAgain)
+			}
+			return err
+		}
+		added = true
+		return nil
 	}
 	if err := database.Within(ctx, s.db, add); err != nil {
 		return false, fmt.Errorf("put that person on the team: %w", err)
@@ -404,6 +435,28 @@ func (s *Store) WhoHolds(ctx context.Context, parties []int64) (map[int64]Held, 
 			Team: true}
 	}
 	return held, nil
+}
+
+// PersonHolds is the visibilities somebody may hold work at in a product: none
+// where they hold no role there or have left, and otherwise public and each
+// other visibility they read. Assigning, handing over and handing back all
+// ask it, so the work one admits is the work the others keep.
+func (s *Store) PersonHolds(ctx context.Context, personID, productID int64) ([]Visibility, error) {
+	holds, err := s.HoldsAnythingIn(ctx, personID, productID)
+	if err != nil || !holds {
+		return nil, err
+	}
+	kept := []Visibility{Public}
+	for _, v := range []Visibility{Private, SecurityTesting} {
+		reads, err := s.PersonReads(ctx, personID, productID, v)
+		if err != nil {
+			return nil, err
+		}
+		if reads {
+			kept = append(kept, v)
+		}
+	}
+	return kept, nil
 }
 
 // PersonReads reports whether one person may read a finding of this visibility

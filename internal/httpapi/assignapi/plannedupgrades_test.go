@@ -177,6 +177,11 @@ func TestThePlannedUpgradesReadTwoPackagesOfOneSource(t *testing.T) {
 			// a number as digits, a list joined by spaces, an absent field empty.
 			field := map[string]string{"decision": "decision_id"}
 			item := list.Items[0]
+			// A moment, as every other moment is written: two commitments made
+			// on one day are told apart by it.
+			if declared, _ := item["declared_at"].(string); !moment(declared) {
+				t.Errorf("declared_at reads %q, want a moment in RFC 3339", declared)
+			}
 			for at, column := range want {
 				key := column
 				if named, ok := field[column]; ok {
@@ -272,10 +277,8 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			t.Fatalf("putting the release back answered %d: %s", set.Code, set.Body.String())
 		}
 		// Putting a release back puts what is open in it back on the clock,
-		// and that rewrite happens away from the request. Run here as well so
-		// what follows is asked of a settled state rather than of a race: it
-		// computes the same deadlines, so the pass that is still in flight
-		// writes the same values.
+		// and that rewrite is a queued job nothing here runs. Run it here so
+		// what follows is asked of a settled state.
 		if _, err := finding.NewStore(r.DB.DB).Recompute(t.Context(),
 			finding.DefaultWindows()); err != nil {
 			t.Fatal(err)
@@ -966,4 +969,10 @@ func TestANarrowedDecisionRecordsWhatThatNarrowingReaches(t *testing.T) {
 				"text holds it", got)
 		}
 	})
+}
+
+// moment is whether s is a moment written in RFC 3339.
+func moment(s string) bool {
+	_, err := time.Parse(time.RFC3339, s)
+	return err == nil
 }

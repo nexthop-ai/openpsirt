@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -23,9 +23,9 @@ import (
 // Stating policy on what exists.
 //
 // Per-product policy that changes what the tool reports without anything
-// being scanned. Three of these move what carries a deadline at all, so each
-// queues a rewrite away from the request: the line a product triages at, a
-// product's end of life and a branch or tag's end of life. A release's details and a
+// being scanned. What moves what carries a deadline at all queues a rewrite of
+// deadlines in its transaction: the line a product triages at, a product's end
+// of life and a branch or tag's end of life. A release's details and a
 // product's pair thresholds move no deadline and queue nothing; they sit here
 // as the same kind of policy rather than beside the declarations they amend.
 func registerCatalogPolicy(api huma.API, d core.Declaring) {
@@ -59,11 +59,13 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			if err != nil {
 				return err
 			}
-			was := thresholdsSaid(product.PairShare, product.PairApprovers)
+			was, became := thresholdsSaid(product.PairShare, product.PairApprovers), thresholdsSaid(share, approvers)
+			if was == became {
+				return nil
+			}
 			if err := store.SetPairThresholds(ctx, product.ID, share, approvers); err != nil {
 				return core.WentWrong(d.Logger, "those thresholds could not be recorded", err)
 			}
-			became := thresholdsSaid(share, approvers)
 			if err := core.Noted(ctx, tx, trail.Setting, "pair thresholds of "+product.Name,
 				trail.Said(was, was != ""), trail.Said(became, became != "")); err != nil {
 				return core.NotRecorded(d.Logger, err)
@@ -106,6 +108,16 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 				return core.WentWrong(d.Logger, "whether it publishes could not be read", err)
 			}
 			before := held[product.ID]
+			// Withdrawn whenever it is off, stated again included: a publish
+			// run that began before it went off can still have written.
+			if !in.Body.Publishes {
+				if err := publish.NewStore(tx).WithdrawProduct(ctx, product.ID); err != nil {
+					return core.WentWrong(d.Logger, "its documents could not be withdrawn", err)
+				}
+			}
+			if before == in.Body.Publishes {
+				return nil
+			}
 			if in.Body.Publishes && !before {
 				if err := pathsFree(ctx, tx, d.Logger, product.ID, product.Name); err != nil {
 					return err
@@ -113,11 +125,6 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			}
 			if err := store.SetPublishes(ctx, product.ID, in.Body.Publishes); err != nil {
 				return core.WentWrong(d.Logger, "whether it publishes could not be recorded", err)
-			}
-			if !in.Body.Publishes {
-				if err := publish.NewStore(tx).WithdrawProduct(ctx, product.ID); err != nil {
-					return core.WentWrong(d.Logger, "its documents could not be withdrawn", err)
-				}
 			}
 			if err := core.Noted(ctx, tx, trail.Setting, "publication of "+product.Name,
 				trail.Said(publishing(before), true),
@@ -139,8 +146,10 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			"An empty value clears the override, so the product follows the deployment again. " +
 			"Clearing is not the same as stating the deployment's current minimum severity: a product that " +
 			"stated it would stop following when the deployment changed.\n\n" +
-			"Deadlines are rewritten afterwards, away from the request, because moving the minimum " +
-			"severity moves what is on a clock at all. The response returns before that has finished.",
+			"Deadlines are rewritten afterwards by a queued job, because moving the minimum " +
+			"severity moves what is on a clock at all. The response returns before that has finished. " +
+			"Stating the value already in force changes nothing and records nothing. " +
+			"A full queue refuses the change with 503, recording nothing; send it again later.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -160,11 +169,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 					"or nothing at all to follow the deployment",
 					in.Body.MinimumSeverity, strings.Join(minimumSeverities, ", ")))
 		}
-		var product *catalog.Product
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			var store *catalog.Store
-			var err error
-			if store, product, err = core.ProductIn(ctx, d, tx, in.Product); err != nil {
+			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
+			if err != nil {
 				return err
 			}
 			// Absent means the product follows the deployment, which is a
@@ -174,6 +181,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			before, err := store.MinimumSeverityOf(ctx, product.ID)
 			if err != nil {
 				return core.WentWrong(d.Logger, "that minimum severity could not be recorded", err)
+			}
+			if (before == nil && word == "") || (before != nil && *before == word) {
+				return nil
 			}
 			if err := store.SetMinimumSeverity(ctx, product.ID, word); err != nil {
 				return core.WentWrong(d.Logger, "that minimum severity could not be recorded", err)
@@ -186,12 +196,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 				trail.Said(word, word != "")); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}
-			return nil
+			return d.RewriteDeadlines(ctx, tx)
 		}); err != nil {
 			return nil, err
-		}
-		if d.RewriteDeadlines != nil {
-			d.RewriteDeadlines(ctx, "minimum severity of product "+product.Name, word)
 		}
 		return &struct{}{}, nil
 	})
@@ -206,7 +213,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			"Nothing is deleted or hidden: the findings and the history stay, and stay " +
 			"reportable. What ends is what is expected of us.\n\n" +
 			"An empty date clears it, because extended support happens. Deadlines are rewritten " +
-			"afterwards, away from the request; the response returns before that has finished.",
+			"afterwards by a queued job; the response returns before that has finished. " +
+			"Stating the date already in force changes nothing and records nothing. " +
+			"A full queue refuses the change with 503, recording nothing; send it again later.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -220,14 +229,15 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		var product *catalog.Product
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			var store *catalog.Store
-			var err error
-			if store, product, err = core.ProductIn(ctx, d, tx, in.Product); err != nil {
+			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
+			if err != nil {
 				return err
 			}
 			before := product.EOLOn
+			if sameCalendarDay(before, on) {
+				return nil
+			}
 			if err := store.SetProductEndOfLife(ctx, product.ID, on); err != nil {
 				return core.WentWrong(d.Logger, "that date could not be recorded", err)
 			}
@@ -235,12 +245,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 				onDay(before), onDay(on)); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}
-			return nil
+			return d.RewriteDeadlines(ctx, tx)
 		}); err != nil {
 			return nil, err
-		}
-		if d.RewriteDeadlines != nil {
-			d.RewriteDeadlines(ctx, "end of life of product "+product.Name, in.Body.On)
 		}
 		return &struct{}{}, nil
 	})
@@ -310,6 +317,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 					}
 				}
 			}
+			if sameCalendarDay(branchOrTag.ReleasedOn, on) {
+				return nil
+			}
 			if err := store.SetReleasedOn(ctx, branchOrTag.ID, on); err != nil {
 				return core.WentWrong(d.Logger, "that date could not be recorded", err)
 			}
@@ -333,7 +343,11 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			"that stops being scanned is expected rather than a fault.\n\n" +
 			"An empty date clears the override, so the release follows its product again. " +
 			"Clearing is not the same as stating the product's current date: a release that " +
-			"stated it would stop following when the product changed.",
+			"stated it would stop following when the product changed.\n\n" +
+			"Deadlines are rewritten afterwards by a queued job; the response returns before " +
+			"that has finished. Stating the date already in force changes " +
+			"nothing and records nothing. " +
+			"A full queue refuses the change with 503, recording nothing; send it again later.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product     string `path:"product"`
@@ -348,15 +362,15 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		var product *catalog.Product
-		var branchOrTag *catalog.BranchOrTag
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			var store *catalog.Store
-			var err error
-			if store, product, branchOrTag, err = core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag); err != nil {
+			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
+			if err != nil {
 				return err
 			}
 			before := branchOrTag.EOLOn
+			if sameCalendarDay(before, on) {
+				return nil
+			}
 			if err := store.SetBranchOrTagEndOfLife(ctx, branchOrTag.ID, on); err != nil {
 				return core.WentWrong(d.Logger, "that date could not be recorded", err)
 			}
@@ -364,15 +378,21 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 				onDay(before), onDay(on)); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}
-			return nil
+			return d.RewriteDeadlines(ctx, tx)
 		}); err != nil {
 			return nil, err
 		}
-		if d.RewriteDeadlines != nil {
-			d.RewriteDeadlines(ctx, "end of life of "+product.Name+" "+branchOrTag.Name, in.Body.On)
-		}
 		return &struct{}{}, nil
 	})
+}
+
+// sameCalendarDay reports whether two dates, either of which may be unset, name the
+// same calendar day: a date stated again is no change to record.
+func sameCalendarDay(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return core.DayOf(a) == core.DayOf(b)
 }
 
 // thresholdsSaid is a product's own pair thresholds as the trail records them,

@@ -32,8 +32,9 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 			"Send `person` as an empty string to hand it back to nobody. Send `team` instead to " +
 			"assign it to a team, which is a queue rather than a holding: it stays unheld until " +
 			"somebody takes it.\n\n" +
-			"A person is given a code finding only where they may read it at its visibility, and a team " +
-			"only where one member may. A code finding every release of which is past its end of life " +
+			"A person is given a code finding only where they hold a role in the product, have not " +
+			"been deactivated, and may read it at its visibility, and a team only where one member " +
+			"may; anybody else is refused with 422. A code finding every release of which is past its end of life " +
 			"is refused with 409, and so is a code finding recorded as a flaw: assign the flaw " +
 			"instead.\n\n" +
 			"A code finding seen on a build it was not open on when it was assigned starts unassigned there.",
@@ -59,35 +60,13 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if err := mayHandOver(subject, product, input.Body.Person, input.Body.Team); err != nil {
+		to, err := receiverOf(ctx, in, subject, product, input.Body.Person, input.Body.Team)
+		if err != nil {
 			return nil, err
 		}
 
-		var to *int64
-		var whoToTell int64
-		var admits finding.Admits
-		rights := access.NewStore(in.DB.DB)
-		switch {
-		case input.Body.Person != "":
-			person, err := core.PersonNamed(ctx, in.Logger, rights, input.Body.Person)
-			if err != nil {
-				return nil, err
-			}
-			party := person.PartyID
-			to, whoToTell = &party, person.ID
-			admits = personAdmits(person, product)
-		case input.Body.Team != "":
-			team, err := core.TeamNamed(ctx, in.Logger, rights, input.Body.Team)
-			if err != nil {
-				return nil, err
-			}
-			party := team.PartyID
-			to = &party
-			admits = teamAdmits(team, product)
-		}
-
 		findings := finding.NewStore(in.DB.DB)
-		_, withheld, err := findings.AssignCodeFinding(ctx, subject, buildID, input.Occurrence, to, admits)
+		_, withheld, err := findings.AssignCodeFinding(ctx, subject, buildID, input.Occurrence, to.to, to.admits)
 		switch {
 		case errors.Is(err, finding.ErrCodeFindingPastEndOfLife), errors.Is(err, finding.ErrCodeFindingRecordedAsFlaw):
 			return nil, huma.Error409Conflict(err.Error())
@@ -101,7 +80,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		// a team, never for handing back, and only where they read the code finding
 		// at every visibility it holds. The line is security testing work, so it is
 		// withheld as such, and nothing leaving the deployment names the code finding.
-		if to == nil || *to == subject.Party() || !seenBy(ctx, in, input.Body.Person, product, withheld) {
+		if !to.told(ctx, in, subject, product, withheld) {
 			return &struct{}{}, nil
 		}
 		codeFinding, err := findings.CodeFindingAt(ctx, subject, buildID, input.Occurrence)
@@ -123,7 +102,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		}
 		private, securityTesting := notify.Withholding(withheld)
 		core.Tell(ctx, in, "could not say that a code finding was assigned", notify.Telling{
-			PersonID: whoToTell, Kind: notify.Assigned,
+			PersonID: to.tell, Kind: notify.Assigned,
 			Body: said + ", in " + input.Product + " " + input.BranchOrTag + " " + input.Variant,
 			Link: weblink.CodeFinding(input.Product, input.BranchOrTag, input.Variant, input.Occurrence),
 			// Withheld at every visibility it holds, so a read narrows the
@@ -132,7 +111,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 			Private: private, SecurityTesting: securityTesting,
 			ProductID:       &product,
 			VulnerabilityID: &codeFinding.VulnerabilityID,
-		}, "person", whoToTell)
+		}, "person", to.tell)
 		return &struct{}{}, nil
 	})
 }

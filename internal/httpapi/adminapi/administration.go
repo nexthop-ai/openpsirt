@@ -488,7 +488,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 					if err := store.GrantEstateRole(ctx, person.ID, access.Role(hold.Role)); err != nil {
 						return core.Asked(a.Logger, err)
 					}
-					if err := core.Noted(ctx, db, trail.Role, person.Identity+" on every product",
+					if err := core.Noted(ctx, db, trail.Role, trail.OnEveryProduct(person.Identity),
 						nil, trail.Said(string(hold.Role), true)); err != nil {
 						return core.NotRecorded(a.Logger, err)
 					}
@@ -567,11 +567,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Identity string `path:"identity"`
 		Product  string `path:"product"`
 		Role     string `path:"role"`
-	}) (*struct {
-		Body struct {
-			Released int64 `json:"released" doc:"Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
-		}
-	}, error) {
+	}) (*ReleasedOutput, error) {
 		a := a.In(ctx)
 		if _, err := core.Requester(ctx); err != nil {
 			return nil, err
@@ -612,29 +608,13 @@ func registerAdministration(api huma.API, a core.Administering) {
 				trail.Said(in.Role, true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}
-			if !handsBack(a) {
-				return nil
-			}
-			// Handed back in the withdrawal's own transaction, asked of what
-			// the withdrawal left rather than what another administrator
-			// leaves behind afterwards. Done after it, a failure leaves the
-			// role gone and the work with somebody who can no longer open it,
-			// and asking again answers that there is no such grant before it
-			// reaches the hand-back.
-			if released, err = finding.NewStore(tx).HandBackUnread(ctx,
-				access.Narrowed{People: []int64{person.ID}}); err != nil {
-				return core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
-			}
-			return nil
+			released, err = handBack(ctx, a, tx, person.ID)
+			return err
 		}); err != nil {
 			return nil, err
 		}
 
-		out := &struct {
-			Body struct {
-				Released int64 `json:"released" doc:"Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
-			}
-		}{}
+		out := &ReleasedOutput{}
 		out.Body.Released = released
 		return out, nil
 	})
@@ -712,11 +692,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
 		Role     string `path:"role"`
-	}) (*struct {
-		Body struct {
-			Released int64 `json:"released" doc:"Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
-		}
-	}, error) {
+	}) (*ReleasedOutput, error) {
 		a := a.In(ctx)
 		if _, err := core.Requester(ctx); err != nil {
 			return nil, err
@@ -742,40 +718,50 @@ func registerAdministration(api huma.API, a core.Administering) {
 			case err != nil:
 				return core.WentWrong(a.Logger, "cannot withdraw the role", err)
 			}
-			if err := core.Noted(ctx, tx, trail.Role, person.Identity+" on every product",
+			if err := core.Noted(ctx, tx, trail.Role, trail.OnEveryProduct(person.Identity),
 				trail.Said(in.Role, true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}
 
 			// Handed back in the withdrawal's own transaction, in every
-			// product at once, for the reason the per-product withdrawal
-			// gives.
-			if !handsBack(a) {
-				return nil
-			}
-			if released, err = finding.NewStore(tx).HandBackUnread(ctx,
-				access.Narrowed{People: []int64{person.ID}}); err != nil {
-				return core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
-			}
-			return nil
+			// product at once.
+			released, err = handBack(ctx, a, tx, person.ID)
+			return err
 		}); err != nil {
 			return nil, err
 		}
 
-		out := &struct {
-			Body struct {
-				Released int64 `json:"released" doc:"Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
-			}
-		}{}
+		out := &ReleasedOutput{}
 		out.Body.Released = released
 		return out, nil
 	})
 }
 
-// handsBack is whether this deployment hands back the work of somebody who
-// may no longer read it.
-func handsBack(a core.Administering) bool {
-	return a.Findings != nil
+// ReleasedOutput is what withdrawing a role answers: how much work went back.
+type ReleasedOutput struct {
+	Body struct {
+		Released int64 `json:"released" doc:"Findings, code findings and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
+	}
+}
+
+// handBack hands back what a withdrawal leaves somebody unable to read, and
+// their teams' work no remaining member reads, reporting how much moved.
+//
+// In the withdrawal's own transaction, asked of what the withdrawal left
+// rather than what another administrator leaves behind afterwards. Done after
+// it, a failure leaves the role gone and the work with somebody who can no
+// longer open it, and asking again answers that there is no such grant before
+// it reaches the hand-back.
+func handBack(ctx context.Context, a core.Administering, tx bun.IDB, personID int64) (int64, error) {
+	if a.Findings == nil {
+		// This deployment hands back nobody's work.
+		return 0, nil
+	}
+	released, err := finding.NewStore(tx).HandBackUnread(ctx, access.Narrowed{People: []int64{personID}})
+	if err != nil {
+		return 0, core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
+	}
+	return released, nil
 }
 
 // mintable is administerable for the acts that hand out a way in: a credential
@@ -817,24 +803,23 @@ type held struct {
 	asked *bool
 }
 
-// moved is the two of those, for a person who was already recorded.
+// moved is the two of those, read from what the person held before the
+// request, and from holding neither where they are new.
 //
 // Both, rather than whichever matches first. Written as arms of one switch
 // beside "this person is new", a request granting both records one of them —
 // and the audit permission, the one grant that opens the change log, is the
 // arm that never runs, so the permission to read the record is the change the
-// record does not hold.
-//
-// Nothing for somebody who has just been recorded: their creation is the row,
-// and a second line saying a brand-new account went from holding nothing is a
-// line about no change.
+// record does not hold. A new person granted either is a change from holding
+// nothing, and recorded as one beside the row recording them (REQ-22).
 func moved(before *access.Account, asked RecordBody) []held {
-	if before == nil {
-		return nil
+	var was access.Account
+	if before != nil {
+		was = *before
 	}
 	return []held{
-		{"administrator", before.IsAdmin, asked.Admin},
-		{"auditor", before.Audits, asked.Audits},
+		{"administrator", was.IsAdmin, asked.Admin},
+		{"auditor", was.Audits, asked.Audits},
 	}
 }
 

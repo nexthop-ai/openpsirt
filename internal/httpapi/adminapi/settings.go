@@ -5,20 +5,19 @@ package adminapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -113,7 +112,7 @@ var settable = []struct {
 	// before the built-in, which is why this takes the Deps.
 	shipped func(core.Deps) string
 	// movesDeadlines says changing this invalidates every stored deadline,
-	// so they are rewritten away from the request.
+	// so changing it queues a rewrite of them.
 	movesDeadlines bool
 }{
 	{setting.DueExploited, "Known exploited", setting.Deadlines,
@@ -391,7 +390,11 @@ func registerSettings(api huma.API, in core.Deps) {
 			"shipped one.\n\n" +
 			"A size above the most a setting takes is refused, naming the most.\n\n" +
 			"Only the settings this deployment recognizes may be set. A name it does not know is " +
-			"refused, because storing it would create something nothing ever reads.",
+			"refused, because storing it would create something nothing ever reads.\n\n" +
+			"A value equal to the one stored changes nothing and records nothing. Changing a " +
+			"deadline window queues a rewrite of stored deadlines; the response returns before " +
+			"it has run, and a full queue refuses the change with 503, recording nothing; " +
+			"send it again later.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Name string `path:"name"`
@@ -489,237 +492,73 @@ func registerSettings(api huma.API, in core.Deps) {
 			if err != nil {
 				return recording(in.Logger, "that setting could not be recorded", err)
 			}
+			// A value that did not move is no change: nothing is recorded,
+			// and nothing is rewritten.
+			if had && sameSetting(settable[row].kind, before, value) {
+				// Stored as it stood, so the trail's last value is still the
+				// one held.
+				if before != value {
+					if _, _, err := settings.Change(ctx, input.Name, before); err != nil {
+						return recording(in.Logger, "that setting could not be recorded", err)
+					}
+				}
+				return nil
+			}
 			if err := core.Noted(ctx, tx, trail.Setting, input.Name,
 				trail.Said(before, had), trail.Said(value, true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
+			}
+			// A deadline is stored on the finding when it is first seen,
+			// so changing how long something may stay open makes every
+			// stored one wrong. A rewrite is queued with the change, since a
+			// number somebody just typed that moves nothing is worse than a
+			// slow screen.
+			if settable[row].movesDeadlines {
+				return rewritingDeadlines(ctx, in.Logger, tx, in.Queue)
 			}
 			return nil
 		}); err != nil {
 			return nil, err
 		}
 
-		// A deadline is stored on the finding when it is first seen,
-		// so changing how long something may stay open makes every
-		// stored one wrong. Rewritten here rather than left until the
-		// next scan: a number somebody just typed that moves nothing
-		// is worse than a slow screen, and it is the difference
-		// between this and urgency, which nobody edits.
-		if settable[row].movesDeadlines {
-			// Off the request. The rewrite is bounded by how much is open
-			// rather than by anything the caller sent — measured at nineteen
-			// seconds against 441,108 findings — and a write that long is a
-			// request no proxy will wait for. It is not on the queue either,
-			// which would survive a restart: what a half-finished rewrite
-			// costs is some findings keeping the old deadline until the next
-			// scan or the next edit, which is the state they were already in
-			// a moment ago.
-			deadlinesRewritten(in)(ctx, input.Name, value)
-		}
 		return &struct{}{}, nil
 	})
 }
 
-// deadlinesRewritten returns the way a handler asks for stored deadlines to be
-// brought in line with a policy that just changed.
-//
-// One of these rather than each caller starting its own goroutine: the
-// deployment's windows, the deployment's line and a product's line all
-// invalidate the same stored answer, and three spellings of "and then rewrite
-// them" is three places for one of them to be forgotten.
-//
-// The requests one process makes are coalesced, per database. A rewrite reads
-// the policy once its turn comes, so one run after the last change applies
-// every change before it: a burst of changes is the run in progress and one
-// more, rather than a full rewrite each, queued behind one another until the
-// latest time out waiting. One run at a time in a process is also what keeps
-// two of its rewrites from sharing the lease, which knows the process and not
-// the goroutine.
-func deadlinesRewritten(in core.Deps) func(context.Context, string, string) {
-	return func(ctx context.Context, what, value string) {
-		in := core.Of(ctx, in)
-		logger, db, replica := in.Logger, in.DB, in.Replica
-		rewriterFor(db).ask(ctx, what, value, func(ctx context.Context, what, value string) {
-			rewrite(ctx, db, replica, logger, what, value)
-		})
+// rewritingDeadlines queues the rewrite a policy change forces, in the
+// transaction making the change (finding.RewriteDeadlines). A rewrite that
+// cannot be queued refuses the change, which records nothing.
+func rewritingDeadlines(ctx context.Context, logger *slog.Logger, tx bun.IDB, q *queue.Queue) error {
+	err := finding.RewriteDeadlines(ctx, tx, q)
+	if errors.Is(err, queue.ErrBacklogFull) {
+		return huma.Error503ServiceUnavailable(
+			"too much work is waiting to rewrite deadlines after this change, so it was not made; try again shortly")
 	}
-}
-
-// rewrite is the work a coalesced run does. A test puts a stand-in here to
-// watch the runs the handlers' path starts without rewriting anything.
-var rewrite = rewriteDeadlines
-
-// ask has run applied once more after whatever run is in progress, or starts
-// it now where none is. Each run has a context of its own, off the request,
-// bounded by recomputeLimit, and ended by stop.
-func (r *rewriter) ask(ctx context.Context, what, value string,
-	run func(ctx context.Context, what, value string)) {
-
-	r.mu.Lock()
-	if r.stopped {
-		r.mu.Unlock()
-		return
-	}
-	r.pending, r.what, r.value = true, what, value
-	if r.running {
-		r.mu.Unlock()
-		return
-	}
-	r.running = true
-	done := make(chan struct{})
-	r.done = done
-	r.mu.Unlock()
-	go func() {
-		defer close(done)
-		for {
-			r.mu.Lock()
-			if !r.pending || r.stopped {
-				r.running, r.cancel = false, nil
-				r.mu.Unlock()
-				return
-			}
-			r.pending = false
-			what, value := r.what, r.value
-			at, stop := context.WithTimeout(context.WithoutCancel(ctx), recomputeLimit)
-			r.cancel = stop
-			r.mu.Unlock()
-			run(at, what, value)
-			stop()
-		}
-	}()
-}
-
-// stop ends the run in progress, refuses every later ask, and waits for the
-// run to finish until ctx ends. The run's own lease is handed back on its way
-// out, which is what a process shutting down needs of it.
-func (r *rewriter) stop(ctx context.Context) {
-	r.mu.Lock()
-	r.stopped = true
-	running, cancel, done := r.running, r.cancel, r.done
-	r.mu.Unlock()
-	if !running {
-		return
-	}
-	if cancel != nil {
-		cancel()
-	}
-	select {
-	case <-done:
-	case <-ctx.Done():
-	}
-}
-
-// StopRewrites ends every deadline rewrite this process is running, and waits
-// until each has handed its lease back or ctx ends. A process shutting down
-// calls it once the server has stopped taking requests, so the next process
-// takes the next change's turn at once rather than once the lease lapses.
-func StopRewrites(ctx context.Context) {
-	rewriters.Lock()
-	running := make([]*rewriter, 0, len(rewriters.of))
-	for _, r := range rewriters.of {
-		running = append(running, r)
-	}
-	rewriters.Unlock()
-	for _, r := range running {
-		r.stop(ctx)
-	}
-}
-
-// rewriter is one database's coalesced deadline rewrites: whether one is
-// running, whether a change has arrived since it read the policy, and how to
-// end the run in progress.
-type rewriter struct {
-	mu          sync.Mutex
-	running     bool
-	pending     bool
-	stopped     bool
-	what, value string
-	cancel      context.CancelFunc
-	done        chan struct{}
-}
-
-// rewriters holds each database's rewriter for the life of the process.
-var rewriters = struct {
-	sync.Mutex
-	of map[*database.DB]*rewriter
-}{of: map[*database.DB]*rewriter{}}
-
-func rewriterFor(db *database.DB) *rewriter {
-	rewriters.Lock()
-	defer rewriters.Unlock()
-	r, ok := rewriters.of[db]
-	if !ok {
-		r = new(rewriter)
-		rewriters.of[db] = r
-	}
-	return r
-}
-
-// rewriteDeadlines applies a changed policy to every open finding, one replica
-// at a time.
-//
-// The policy is read after the lease is taken, not before. Two replicas
-// each handling a change would otherwise rewrite the same rows from whatever
-// each read when it started, and whichever finished last would win — so the
-// stored deadlines could end up describing a policy that had already been
-// superseded, with nothing saying so. Waiting rather than skipping is the
-// other half: a policy somebody just typed has to be applied, so the replica
-// that loses the race applies it afterwards, and the last rewrite is the one
-// holding the newest policy.
-func rewriteDeadlines(ctx context.Context, db *database.DB, replica string,
-	logger *slog.Logger, name, value string) {
-
-	leases := queue.NewLeases(db.DB)
-	if err := leases.Await(ctx, deadlineLease, replica, recomputeLimit, betweenTries); err != nil {
-		logger.Error("deadlines could not be rewritten: no turn came",
-			"setting", name, "value", value, "error", err)
-		return
-	}
-	defer func() {
-		// Handed back on a context of its own: this runs after work that may
-		// have used up the bound, and a lease left held would stop the next
-		// change being applied until it lapsed.
-		back, stop := context.WithTimeout(context.WithoutCancel(ctx), settleLease)
-		defer stop()
-		if err := leases.Release(back, deadlineLease, replica); err != nil {
-			logger.Warn("the deadline rewrite could not hand its turn back", "error", err)
-		}
-	}()
-
-	windows, err := finding.LoadWindows(ctx, db.DB)
 	if err != nil {
-		logger.Error("deadlines could not be rewritten: cannot tell when things are due",
-			"setting", name, "value", value, "error", err)
-		return
+		return core.WentWrong(logger, "the deadline rewrite could not be queued", err)
 	}
-	started := time.Now()
-	changed, err := finding.NewStore(db.DB).Recompute(ctx, windows)
-	if err != nil {
-		logger.Error("deadlines could not be rewritten",
-			"setting", name, "value", value, "rewritten", changed, "error", err)
-		return
-	}
-	logger.Info("deadlines rewritten after a policy change",
-		"setting", name, "value", value, "findings", changed,
-		"took", time.Since(started).Round(time.Millisecond).String())
+	return nil
 }
 
-// deadlineLease names the work of rewriting deadlines after a policy change,
-// so that one replica does it at a time.
-const deadlineLease = "deadline.rewrite"
-
-// recomputeLimit bounds the rewrite that follows a policy change, waiting for
-// a turn included. Long enough for a large estate, short enough that a rewrite
-// which has stopped making progress does not sit there for the life of the
-// process.
-const recomputeLimit = 30 * time.Minute
-
-// betweenTries is how often a replica waiting for its turn asks for it. Short
-// against the length of a rewrite, so a turn is not left idle.
-const betweenTries = 2 * time.Second
-
-// settleLease bounds handing a lease back once the work is over, so a database
-// that is not answering cannot hold a goroutine open.
-const settleLease = 5 * time.Second
+// sameSetting reports whether two spellings of a setting of this kind say the
+// same thing: 360h and 21600m are one length of time, and 010 and 10 one count.
+func sameSetting(kind setting.Kind, a, b string) bool {
+	switch kind {
+	case setting.Duration:
+		x, errX := time.ParseDuration(a)
+		y, errY := time.ParseDuration(b)
+		if errX == nil && errY == nil {
+			return x == y
+		}
+	case setting.Count, setting.Size, setting.Percent:
+		x, errX := strconv.Atoi(a)
+		y, errY := strconv.Atoi(b)
+		if errX == nil && errY == nil {
+			return x == y
+		}
+	}
+	return a == b
+}
 
 // settingRow finds a setting's row, and whether it is one.
 //

@@ -15,8 +15,8 @@ import (
 //
 // The grant is on the pair of product and occurrence, as a case collaborator's is
 // on the pair of product and issue. It reads the code finding's evidence and nothing
-// else of the product, at the security testing and private visibilities, and only
-// while the code finding's flaw is undisclosed: disclosure ends it, whether or not the
+// else of the product, at security testing visibility, and only while the code
+// finding's flaw is undisclosed: disclosure ends it, whether or not the
 // code finding was included. An included code finding goes public with its flaw
 // and a security-testing-only one stays at security testing visibility.
 type CodeFindingCollaborator struct {

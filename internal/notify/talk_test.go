@@ -228,7 +228,7 @@ func TestAChannelOnAPlatformNotOfferedCoversNothing(t *testing.T) {
 
 func TestTheMostSpecificChannelCarriesIt(t *testing.T) {
 	eachChat(t, func(t *testing.T, w *chatWorld) {
-		kernelTeam, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
+		kernelTeam, _, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -266,7 +266,7 @@ func TestTheMostSpecificChannelCarriesIt(t *testing.T) {
 // REQ-81.
 func TestANarrowChannelSaysNothingUndisclosed(t *testing.T) {
 	eachChat(t, func(t *testing.T, w *chatWorld) {
-		kernelTeam, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
+		kernelTeam, _, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -512,7 +512,7 @@ func TestAChannelIsNotToldWhatIsOld(t *testing.T) {
 
 func TestATeamsChannelKeepsItsQueueFromTheDeployments(t *testing.T) {
 	eachChat(t, func(t *testing.T, w *chatWorld) {
-		kernelTeam, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
+		kernelTeam, _, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -532,7 +532,7 @@ func TestATeamsChannelKeepsItsQueueFromTheDeployments(t *testing.T) {
 
 func TestANarrowChannelKeepsWhatItCarriesFromADirectMessage(t *testing.T) {
 	eachChat(t, func(t *testing.T, w *chatWorld) {
-		kernelTeam, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
+		kernelTeam, _, err := access.NewStore(w.db.DB).DeclareTeam(t.Context(), "kernel-team", "Kernel team")
 		if err != nil {
 			t.Fatal(err)
 		}

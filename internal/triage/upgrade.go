@@ -294,6 +294,9 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, decisionI
 		return nil, false, refusal.Errorf("say why the promise is changing: a date moved with no reason " +
 			"is one nobody can agree to again")
 	}
+	if err := versionBounded("version the upgrade moves to", to); err != nil {
+		return nil, false, err
+	}
 	db, err := s.pool()
 	if err != nil {
 		return nil, false, err

@@ -16,10 +16,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 	// arrangement rather than a misconfiguration.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		admin := admin(t, f)
 		cleared, err := f.store.Ensure(ctx, "cleared", "Cleared", nil, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -33,7 +30,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		team, err := f.store.DeclareTeam(ctx, "Kernel", "Kernel")
+		team, _, err := f.store.DeclareTeam(ctx, "Kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,11 +109,8 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 func TestARetiredTeamStopsTakingWorkAndKeepsItsName(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		team, err := f.store.DeclareTeam(ctx, "kernel", "Kernel")
+		admin := admin(t, f)
+		team, _, err := f.store.DeclareTeam(ctx, "kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,11 +140,11 @@ func TestARetiredTeamStopsTakingWorkAndKeepsItsName(t *testing.T) {
 func TestDeclaringATeamTwiceIsOneTeam(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		first, err := f.store.DeclareTeam(t.Context(), "kernel", "Kernel")
+		first, _, err := f.store.DeclareTeam(t.Context(), "kernel", "Kernel")
 		if err != nil {
 			t.Fatal(err)
 		}
-		again, err := f.store.DeclareTeam(ctx, "KERNEL", "Kernel team")
+		again, _, err := f.store.DeclareTeam(ctx, "KERNEL", "Kernel team")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,7 +164,7 @@ func TestDeclaringARetiredTeamsNameBringsItBack(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 
-		first, err := f.store.DeclareTeam(ctx, "platform", "Platform")
+		first, _, err := f.store.DeclareTeam(ctx, "platform", "Platform")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -181,7 +175,7 @@ func TestDeclaringARetiredTeamsNameBringsItBack(t *testing.T) {
 			t.Fatal("a retired team is still found by name")
 		}
 
-		again, err := f.store.DeclareTeam(ctx, "platform", "Platform Team")
+		again, _, err := f.store.DeclareTeam(ctx, "platform", "Platform Team")
 		if err != nil {
 			t.Fatalf("declaring a retired team's name again: %v", err)
 		}
@@ -211,10 +205,7 @@ func TestSecurityTestingWorkIsHeldOnlyByThoseWhoReadIt(t *testing.T) {
 		sonic := f.products["sonic"]
 		embargo := holding(t, f, "embargo", "Embargo", sonic, access.PrivateTriage)
 		analyst := holding(t, f, "analyst", "Analyst", sonic, access.SecurityTestingRead)
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		admin := admin(t, f)
 
 		for who, want := range map[int64]bool{embargo.ID: false, analyst.ID: true} {
 			reads, err := f.store.PersonReads(ctx, who, sonic, access.SecurityTesting)
@@ -226,7 +217,7 @@ func TestSecurityTestingWorkIsHeldOnlyByThoseWhoReadIt(t *testing.T) {
 			}
 		}
 
-		team, err := f.store.DeclareTeam(ctx, "desk", "Desk")
+		team, _, err := f.store.DeclareTeam(ctx, "desk", "Desk")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,11 +253,8 @@ func TestWorkOfTwoVisibilitiesIsHeldByAMemberWhoReadsBoth(t *testing.T) {
 		embargo := holding(t, f, "embargo", "Embargo", sonic, access.PrivateTriage)
 		analyst := holding(t, f, "analyst", "Analyst", sonic, access.SecurityTestingRead)
 		both := holding(t, f, "both", "Both", sonic, access.PrivateRead, access.SecurityTestingRead)
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		team, err := f.store.DeclareTeam(ctx, "desk", "Desk")
+		admin := admin(t, f)
+		team, _, err := f.store.DeclareTeam(ctx, "desk", "Desk")
 		if err != nil {
 			t.Fatal(err)
 		}

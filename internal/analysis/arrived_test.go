@@ -24,7 +24,7 @@ func TestARunOpeningCodeFindingsUnderARuleQueuesItsSweep(t *testing.T) {
 		ctx := t.Context()
 		w.inventory(t, w.Build.ID)
 		rights := access.NewStore(w.DB.DB)
-		team, err := rights.DeclareTeam(ctx, "routing", "routing")
+		team, _, err := rights.DeclareTeam(ctx, "routing", "routing")
 		if err != nil {
 			t.Fatal(err)
 		}

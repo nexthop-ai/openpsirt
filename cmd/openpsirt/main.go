@@ -621,6 +621,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// sweeps thousands of findings, and saving a form must not hold a
 	// transaction open across the estate.
 	assigning := finding.NewSweeper(db, work, logger, name)
+	rewriting := finding.NewRewriter(db, work, logger, name)
 	// Applies what an analyzer reported against a build, once the build has
 	// an inventory to place the results on, and tells the product's security testing
 	// readers of a run that dropped sharply.
@@ -697,7 +698,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	}
 	return handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: current, dates: dates,
-		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, assigning: assigning, analyze: analyze,
+		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, assigning: assigning, rewriting: rewriting, analyze: analyze,
 		undertaker: undertaker, publish: writer, suppliers: suppliers, forks: forks,
 		branches:  branches,
 		records:   records,

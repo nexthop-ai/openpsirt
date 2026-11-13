@@ -198,7 +198,7 @@ func registerBulk(api huma.API, in core.Deps) {
 			Outcome         core.OutcomeInBulk `json:"outcome"`
 			Justification   core.Justification `json:"justification,omitempty" doc:"Required when it does not apply"`
 			DeferredUntil   string             `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
-			FixedVersion    string             `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the decision has to hold for all of them"`
+			FixedVersion    string             `json:"fixed_version,omitempty" maxLength:"191" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the decision has to hold for all of them"`
 			Reasoning       string             `json:"reasoning" minLength:"1" doc:"The reasoning, holding for every issue named"`
 			SkipDecided     bool               `json:"skip_decided,omitempty" doc:"Leave out every occurrence a live decision already covers, and list them in the response. Left out, a selection covering one is refused, naming the decision"`
 		}

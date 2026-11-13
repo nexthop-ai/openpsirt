@@ -584,6 +584,23 @@ func TestAPublicAddressIsNotTakenForAVerifiedOne(t *testing.T) {
 	}
 }
 
+func TestAGitHubAccountWithNoIdentifierIsRefused(t *testing.T) {
+	// An absent, null or zero identifier reads as zero, and a subject of "0"
+	// would match every later such answer to whoever arrived with it first.
+	for _, user := range []map[string]any{
+		{"login": "ana"},
+		{"login": "ana", "id": nil},
+		{"login": "ana", "id": 0},
+	} {
+		adapter := forgeAnswering(t, "", user, []any{}, nil)
+		who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"},
+			"https://here.example/back")
+		if err == nil {
+			t.Errorf("an account answered as %v signed in as subject %q", user, who.Subject)
+		}
+	}
+}
+
 func TestTeamsAreReadPastTheFirstPage(t *testing.T) {
 	// This endpoint reports teams across every organization somebody belongs
 	// to, so one page is not a page of ours — and truncating it would silently

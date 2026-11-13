@@ -46,14 +46,14 @@ type DecisionOccurrenceBody struct {
 	DeferredUntil string         `json:"deferred_until,omitempty" doc:"The date a deferral returns. Required for a deferral"`
 	// FixedVersion makes the already-fixed decision checkable against whoever
 	// packages the component, rather than something taken on trust.
-	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other. Recorded and never compared against the version shipping"`
+	FixedVersion string `json:"fixed_version,omitempty" maxLength:"191" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other. Recorded and never compared against the version shipping"`
 	// CommittedTo is when the work an outcome promises will be done, for
 	// the two that promise work. Without it there is nothing to gate
 	// against and nothing to lapse.
 	CommittedTo string `json:"committed_to,omitempty" doc:"The date the promised work lands. Required for patch-needed and upgrade-needed, and refused with any other"`
 	// UpgradeTo is the version an upgrade moves to. Written by the component
 	// screen rather than here: a bump answers a component, not one finding.
-	UpgradeTo string `json:"upgrade_to,omitempty" doc:"The version an upgrade moves to. Carried on an upgrade-needed decision, which is recorded from a component rather than from one finding"`
+	UpgradeTo string `json:"upgrade_to,omitempty" maxLength:"191" doc:"The version an upgrade moves to. Carried on an upgrade-needed decision, which is recorded from a component rather than from one finding"`
 	Reasoning string `json:"reasoning" minLength:"1" doc:"The reasoning, in markdown. Somebody else has to agree with this"`
 	// FromStatement cites a VEX statement this was started from. A citation
 	// and never an application: their statement is not this decision, and the

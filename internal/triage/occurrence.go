@@ -825,6 +825,21 @@ func (p Proposal) valid(now time.Time) error {
 	if p.Outcome == UpgradeNeeded && strings.TrimSpace(p.UpgradeTo) == "" {
 		return refusal.New("an upgrade needs the version it moves to")
 	}
+	// Bounded like the versions a row is keyed on, because each is copied to
+	// every decision carried forward and printed in every document naming it.
+	if err := versionBounded("version the fix arrived in", p.FixedVersion); err != nil {
+		return err
+	}
+	return versionBounded("version the upgrade moves to", p.UpgradeTo)
+}
+
+// versionBounded refuses a version a caller states that is longer than the
+// versions a decision is keyed on. Counted in characters as sent, as the
+// published bound counts it.
+func versionBounded(what, v string) error {
+	if n := utf8.RuneCountInString(v); n > versionLimit {
+		return refusal.Errorf("the %s is %d characters, and a version is at most %d", what, n, versionLimit)
+	}
 	return nil
 }
 

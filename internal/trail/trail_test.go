@@ -551,3 +551,57 @@ func TestAStartThatChangesTheRoleModeHandsBackOnlyOnTheWayOut(t *testing.T) {
 		}
 	})
 }
+
+// A group's name shares the column with a person's identity, so a group
+// named as somebody is reports its mappings as roles they held unless a
+// person's history leaves configuration's mapping rows out. Their own grants,
+// on one product and across every product, are still theirs.
+func TestAPersonsHistoryHoldsNoGroupMappingNamedAsThem(t *testing.T) {
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		ctx := t.Context()
+		admin := w.DeclarePerson("admin@example.com", "Alex Admin", true)
+		by := access.NewPerson(admin.ID, admin.Identity, true, nil, 0)
+		s := trail.NewStore(w.DB.DB)
+		if _, _, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{
+			{Group: "leads", Grants: string(access.Administers)},
+			{Group: "jdoe", Product: "sonic", Grants: string(access.PublicRead)},
+			{Group: "jdoe", Grants: string(access.PublicTriage)},
+		}, nil); err != nil {
+			t.Fatal(err)
+		}
+		for _, about := range []string{trail.OnProduct("jdoe", "sonic"), trail.OnEveryProduct("jdoe")} {
+			if err := s.Record(ctx, by, trail.Role, about, nil, trail.Said("private-read", true)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, total, err := s.About(ctx, by, trail.Role, "jdoe", 100, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 2 || len(got) != 2 {
+			t.Fatalf("jdoe's history holds %d rows, want their two grants: %+v", total, got)
+		}
+		for _, change := range got {
+			if change.Actor != trail.ByPerson {
+				t.Errorf("jdoe's history holds a row %s recorded: %+v", change.Actor, change)
+			}
+		}
+	})
+}
+
+// A group mapping is recorded about in the form every other per-product row
+// takes, which a person's history reads back by the product it names.
+func TestAMappingIsRecordedAboutAsAnyPerProductRowIs(t *testing.T) {
+	for _, c := range []struct {
+		mapping access.Mapping
+		want    string
+	}{
+		{access.Mapping{Group: "kernel", Grants: string(access.PublicTriage), Product: "sonic"},
+			trail.OnProduct("kernel", "sonic")},
+		{access.Mapping{Group: "kernel", Grants: string(access.PublicTriage)}, trail.OnEveryProduct("kernel")},
+	} {
+		if got := c.mapping.String(); got != c.want {
+			t.Errorf("a mapping is recorded about as %q, want %q", got, c.want)
+		}
+	}
+}

@@ -31,10 +31,14 @@ dates each rewrite what the tool reports, so their record is evidence.
 | The record is written in the transaction making the change, and a failure to record fails the change with a refusal saying it was not made | A retry then changes nothing twice |
 | What follows the change is outside it: deactivation ends sessions inside, and hands work back after it commits, bounded by what they held, never by the request | Ending sessions is what deactivation means |
 | A grant and its withdrawal are recorded alike, minting a credential included | |
+| A setting, or a product's or release's policy or repositories, stated as it already stands leaves no row | A row per request says it changed on every save of an unchanged form |
+| A person recorded with administration or audit records each from not held, beside the row recording them; recorded again, each records only where it moved | An access review reads the trail for who was made an administrator |
 | A revocation that matched nothing leaves no row and is refused as not found: a grant, an estate grant, a removed group mapping, a team membership, a place on a case, a personal token, a pipeline key, a pinned identifier | Read as a withdrawal, it hands back work for a role never held |
 | Never the secret, and never the whole address: what a credential may send, and a destination's host | For Slack and Teams the address is the credential |
 | **What a change is about is composed from the names it resolved to** | History is read by stored identity, and a typed path segment is unbounded; an issue resolves through its first 191 runes |
 | The recorder bounds what it writes to the column | A backstop: an overlong value would refuse the act |
+| A change against one product is about the name and the product joined by " on ": a grant, an estate grant as "on every product", and a group mapping. The trail builds the first two; a mapping names itself, held to the same shape by a test | A person's history matches that shape |
+| A person's role history is the rows about their identity alone and beside a product, without the group mappings configuration records | A group's name shares the column with an identity, and a group named as somebody is would report its mappings as their roles |
 | **It is read over a period, and leaves as a file**; asked for no period, it answers about everything | An access review covers a certificate's stretch |
 | On screen it grows to two hundred rows, newest first, and past that says the file holds every one; a larger page is refused | |
 

@@ -118,6 +118,12 @@ func (g *GitHub) Complete(ctx context.Context, code string, pending Pending, red
 	if err := g.get(ctx, token, g.api+"/user", &account); err != nil {
 		return nil, err
 	}
+	// The identifier is what a person is matched on. An answer without one
+	// reads as zero, which would match every later answer without one to
+	// whoever arrived first.
+	if account.ID <= 0 {
+		return nil, fmt.Errorf("github answered an account with no identifier")
+	}
 	username, err := usernameFrom(account.Login)
 	if err != nil {
 		return nil, err
@@ -135,8 +141,8 @@ func (g *GitHub) Complete(ctx context.Context, code string, pending Pending, red
 	// The address on the profile is whatever somebody chose to show publicly,
 	// and often nothing at all. The verified ones are a list of their own, and
 	// the scope to read it is already asked for — so the address this hands
-	// over is the primary verified one or none, rather than a public string
-	// nobody checked.
+	// over is the primary one where it is verified, else the first verified
+	// one, else none, rather than a public string nobody checked.
 	if address, ok := g.verifiedEmail(ctx, token); ok {
 		identity.Email, identity.EmailVerified = address, true
 	}
@@ -244,7 +250,7 @@ func (g *GitHub) get(ctx context.Context, token *oauth2.Token, url string, into 
 const mostFromGitHub = 1 << 20
 
 // verifiedEmail asks for the addresses GitHub has confirmed and returns the
-// primary one.
+// primary one where it is verified, else the first verified one.
 //
 // A failure is not a failure to sign in. Somebody arriving is what was asked
 // for; where to reach them later is not part of it, and refusing the first

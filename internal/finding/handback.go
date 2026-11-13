@@ -103,21 +103,7 @@ type narrowedHolder struct {
 func (h narrowedHolder) reads(ctx context.Context, rights *access.Store, productID int64) ([]access.Visibility, error) {
 	var kept []access.Visibility
 	if h.person != 0 {
-		holds, err := rights.HoldsAnythingIn(ctx, h.person, productID)
-		if err != nil || !holds {
-			return nil, err
-		}
-		kept = append(kept, access.Public)
-		for _, v := range []access.Visibility{access.Private, access.SecurityTesting} {
-			reads, err := rights.PersonReads(ctx, h.person, productID, v)
-			if err != nil {
-				return nil, err
-			}
-			if reads {
-				kept = append(kept, v)
-			}
-		}
-		return kept, nil
+		return rights.PersonHolds(ctx, h.person, productID)
 	}
 	for _, v := range []access.Visibility{access.Private, access.SecurityTesting} {
 		reads, err := rights.AnyMemberReads(ctx, h.team, productID, v)
