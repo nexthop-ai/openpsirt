@@ -111,7 +111,8 @@ func registerVexImport(api huma.API, in core.Deps) {
 			"stays readable. Another document from the same publisher replaces nothing of this " +
 			"one, and of the publisher's statements about one product and vulnerability, the " +
 			"newest stands, whichever document carried it: by the statement's own time, its " +
-			"`last_updated` else its `timestamp`, else its document's, else the upload order. A " +
+			"`last_updated` else its `timestamp`, else its document's, else the upload order; a " +
+			"time after the upload is none. A " +
 			"document is its publisher and its own identifier: an OpenVEX `@id` or a CSAF " +
 			"tracking id. The publisher is the `publisher` parameter, else the one the " +
 			"document names: an OpenVEX author or a CSAF publisher name. A document naming none " +

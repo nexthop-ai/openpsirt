@@ -398,6 +398,12 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			if claims[i].SaidAt == nil {
 				claims[i].SaidAt = from.SaidAt
 			}
+			// A time after this recording is none, so the upload order
+			// decides: kept, a mistyped year or a wrong clock would outrank
+			// every later statement of the publisher's about the subject.
+			if claims[i].SaidAt != nil && claims[i].SaidAt.After(now) {
+				claims[i].SaidAt = nil
+			}
 		}
 
 		// The same bytes read the same way change nothing, so nothing is

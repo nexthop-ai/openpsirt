@@ -661,3 +661,38 @@ func TestAStatementDatedTheEpochKeepsItsTime(t *testing.T) {
 		}
 	})
 }
+
+// A statement dated after the moment it is recorded is ordered by its upload,
+// so a mistyped year does not outrank every later statement from the
+// publisher about the subject.
+func TestAStatementDatedInTheFutureIsOrderedByItsUpload(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		record := func(id, status string, said *time.Time) int {
+			t.Helper()
+			_, setAside, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: id,
+					Document: id + ".json", Digest: "sha256:" + id, SaidAt: said},
+				[]finding.Statement{{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+					Component: "zlib1g", About: "1.3", Status: status}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return setAside
+		}
+		typo := time.Now().UTC().AddDate(36, 0, 0)
+		record("typo", "not_affected", &typo)
+		if setAside := record("later", "affected", nil); setAside != 1 {
+			t.Errorf("a later upload set aside %d statements, want the one dated in the future", setAside)
+		}
+		var standing []string
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("document_id").
+			Where(`"superseded_at" IS NULL`).Scan(ctx, &standing); err != nil {
+			t.Fatal(err)
+		}
+		if len(standing) != 1 || standing[0] != "later" {
+			t.Errorf("in force: %v, want the later upload's statement alone", standing)
+		}
+	})
+}

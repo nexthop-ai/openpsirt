@@ -65,7 +65,8 @@ A later revision of a document, from the same publisher with the same OpenVEX
 document from that publisher stands beside it, except where both speak about
 the same component and vulnerability: there the newer statement stands, by the
 statement's `last_updated`, else its `timestamp`, else the document's
-`last_updated` or `timestamp`, else the order they were uploaded in. A document with no `@id` is
+`last_updated` or `timestamp`, else the order they were uploaded in. A time
+after the upload counts as none. A document with no `@id` is
 replaced by the publisher's next one with none, so give each release and each
 variant an `@id` of its own.
 
