@@ -12,10 +12,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	findingkind "github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/series"
 )
 
 // undisclosedSeed is the undisclosed work seedUndisclosed writes, each kind
@@ -29,10 +33,11 @@ type undisclosedSeed struct {
 }
 
 // seedUndisclosed writes a disclosed finding for a public reader to read, and
-// beside it: a recorded flaw, a decision over it with a comment naming the
-// reader, a report, an advisory covering the flaw, a file attached to it, a
-// promise to upgrade a package whose findings are undisclosed, and security
-// testing work.
+// beside it: a recorded flaw with a note, a decision over it with a comment
+// naming the reader, a report with a message and a note, an advisory covering
+// the flaw, a file attached to it, a promise to upgrade a package whose
+// findings are undisclosed, security testing work, an analyzer upload turned
+// away, and a failed job's error.
 func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 	t.Helper()
 	ctx := t.Context()
@@ -49,7 +54,22 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 		t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
 	}
 
+	if noted := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+		"/v1/products/mine/issues/"+flaw+"/notes",
+		`{"body":"Undisclosed issue note about the socket."}`); noted.Code >= 400 {
+		t.Fatalf("noting on the flaw answered %d: %s", noted.Code, noted.Body.String())
+	}
+
 	reference := r.Reported(t, "Undisclosed report about the socket")
+	for _, said := range []struct{ path, body string }{
+		{"/messages", `{"direction":"received","body":"Undisclosed message from the reporter."}`},
+		{"/notes", `{"body":"Undisclosed report note about the socket."}`},
+	} {
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/reports/"+reference+said.path, said.body); got.Code >= 400 {
+			t.Fatalf("writing %s on the report answered %d: %s", said.path, got.Code, got.Body.String())
+		}
+	}
 	advisory := httpapitest.AdvisoryOver(t, r, "private-triage", "mine", flaw)
 
 	// A promise to upgrade a package in a variant whose findings are all
@@ -90,13 +110,30 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 		t.Fatal(err)
 	}
 
+	// An analyzer upload turned away, whose reason is security testing
+	// material, and a job that failed quoting its cause.
+	if _, err := r.DB.DB.NewInsert().Model(&series.Refusal{
+		BuildID: r.BuildOf(t, httpapitest.SeededBuild), Series: "semgrep", SeriesFolded: "semgrep",
+		Kind: findingkind.Analysis, At: time.Now().UTC().Truncate(time.Second),
+		Reason: "Undisclosed refusal reason about the socket",
+	}).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	job := r.FailJob(t, queue.Scan, "1")
+	if _, err := r.DB.DB.NewUpdate().Model((*queue.Job)(nil)).
+		Set(`"last_error" = ?`, "Undisclosed job error about the socket").
+		Where(`"id" = ?`, job).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+
 	numbers := seededNumbers(t, r)
 
 	return undisclosedSeed{
 		marks: []string{
 			flaw, "management socket", "Undisclosed reasoning", "Undisclosed comment",
 			reference, "Undisclosed report", advisory, "Undisclosed upgrade", "CVE-2026-CURL", "8.5.0-1",
-			codeFinding, "Undisclosed attachment",
+			codeFinding, "Undisclosed attachment", "Undisclosed issue note", "Undisclosed message",
+			"Undisclosed report note", "Undisclosed refusal reason", "Undisclosed job error",
 		},
 		fill: map[string][]string{
 			"{product}": {"mine"}, "{branch_or_tag}": {"master"}, "{variant}": {"broadcom", "hidden"},

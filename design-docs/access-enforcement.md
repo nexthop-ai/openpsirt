@@ -51,7 +51,7 @@ included.
 | A non-person is refused; a person holding nothing gets an empty list | Both checks stay, and the layers agree |
 | A read is narrowed to the products somebody holds anything on, and within those to the visibilities read in each, as one call; nothing calls the visibility half bare | Where a product is already pinned, a named pairing states that the first half was done |
 | A test asks every read path the API offers, each parameter filled with the seeded names and identifiers, as a reader of disclosed work alone, and fails on any word of the undisclosed work seeded beside its findings in an answer or a refusal; query parameters keep their defaults (REQ-42, REQ-43) | A secondary read skipping the narrowing its findings take is invisible to a test of one route |
-| The seeded work is a recorded flaw, a decision over it with its reasoning and a comment, a report, an advisory, a file attached to the flaw, a promise to upgrade a package whose findings are undisclosed, and a code finding | A kind left unseeded passes the walk whatever its reads join |
+| The seeded work is a recorded flaw with a note, a decision over it with its reasoning and a comment, a report with a message and a note, an advisory, a file attached to the flaw, a promise to upgrade a package whose findings are undisclosed, a code finding, an analyzer upload turned away with its reason, and a failed job with its error | A kind left unseeded passes the walk whatever its reads join |
 
 | Read | Answer to a subject that reads nothing there |
 |---|---|
