@@ -35,7 +35,7 @@ claim goes stale.
 |---|---|
 | A job holds no payload | The queue stays small however large its subject |
 | Kinds are defined with the queue: read a scan, scan for vulnerabilities, sweep the assignment rules, apply an analyzer's run to its build, check a replaced inventory, rewrite deadlines after a policy change | |
-| Work any one run does all of is queued once while a job for it waits unclaimed and untried: the waiting job takes the later request, and one already claimed or waiting to be tried again does not. The request writes the waiting job, so a claim made meanwhile waits for its commit or passes it by. Two requests racing with none waiting may each queue one, and the run repeats | A job not yet started reads its input when it runs |
+| Work any one run does all of, a deadline rewrite or a build scanned again after its upstream moved, is queued once while a job for it waits unclaimed and untried: the waiting job takes the later request, and one already claimed or waiting to be tried again does not. The request writes the waiting job, so a claim made meanwhile waits for its commit or passes it by. Two requests racing with none waiting may each queue one, and the run repeats | A job not yet started reads its input when it runs |
 | A kind is stored in the row | Renaming one leaves queued work nothing claims |
 
 ## Exclusive handout

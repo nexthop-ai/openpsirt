@@ -126,11 +126,12 @@ func (p *Pass) reaching(ctx context.Context) (bool, error) {
 	return p.leases.Take(ctx, ReadLease, p.replica, held)
 }
 
-// Again queues a scan of every build of a product that holds an inventory and
-// has none waiting, so what its upstream says is applied, or stops being
-// applied, without waiting for the schedule. Queued on db, so an act that
-// changes what closes a product's findings queues the scans in its own
-// transaction.
+// Again queues a scan of every build of a product that holds an inventory, so
+// what its upstream says is applied, or stops being applied, without waiting
+// for the schedule. A build with a scan waiting unclaimed and never tried has
+// that scan take the request, which is held until db commits. Queued on db, so
+// an act that changes what closes a product's findings queues the scans in its
+// own transaction.
 func Again(ctx context.Context, db bun.IDB, q *queue.Queue, productID int64) error {
 	var buildIDs []int64
 	if err := db.NewSelect().
@@ -146,30 +147,13 @@ func Again(ctx context.Context, db bun.IDB, q *queue.Queue, productID int64) err
 		Scan(ctx, &buildIDs); err != nil {
 		return fmt.Errorf("read which builds a product holds: %w", err)
 	}
-	if len(buildIDs) == 0 {
-		return nil
-	}
-	var references []string
-	if err := db.NewSelect().Model((*queue.Job)(nil)).Column("reference").
-		Where(`"kind" = ?`, queue.Scan).
-		Where(`"state" IN (?)`, bun.List([]queue.State{queue.Pending})).
-		Scan(ctx, &references); err != nil {
-		return fmt.Errorf("read which builds are waiting to be scanned: %w", err)
-	}
-	waiting := make(map[string]bool, len(references))
-	for _, reference := range references {
-		waiting[reference] = true
-	}
 	for _, build := range buildIDs {
-		reference := strconv.FormatInt(build, 10)
-		if waiting[reference] {
-			continue
+		err := q.AddUnlessWaitingTx(ctx, db, queue.Scan, strconv.FormatInt(build, 10))
+		if errors.Is(err, queue.ErrBacklogFull) {
+			// The rest wait for the schedule, which reaches them.
+			return nil
 		}
-		if _, err := q.AddTx(ctx, db, queue.Scan, reference); err != nil {
-			if errors.Is(err, queue.ErrBacklogFull) {
-				// The rest wait for the schedule, which reaches them.
-				return nil
-			}
+		if err != nil {
 			return fmt.Errorf("queue build %d to be scanned again: %w", build, err)
 		}
 	}
