@@ -118,8 +118,8 @@ username_claim = "preferred_username"
 | `server.base_url` | The address people type. Sign-in providers send people back to it, links in notifications point at it, and a browser's write is refused when its origin is anything else |
 | `server.plain_http` left unset | The session cookie is marked for HTTPS only. The browser is on HTTPS at the proxy, which is what the cookie needs |
 
-No `OPENPSIRT_` variable is set anywhere the process can see it: one beside the
-file is refused at startup, naming it.
+Kubernetes service links aside, no `OPENPSIRT_` variable is set anywhere the
+process can see it: one beside the file is refused at startup, naming it.
 
 ## The service
 
