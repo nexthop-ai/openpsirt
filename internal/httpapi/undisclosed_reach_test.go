@@ -4,13 +4,14 @@
 package httpapi_test
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -148,9 +149,10 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 }
 
 // seededNumbers is the identifiers a route taking a number is tried with: the
-// first few of every table holding rows. An engine's sequences go on counting
-// across the tests sharing a database, so the seeded rows are found where they
-// are rather than assumed to start at one.
+// first few rows of every table holding any. An engine's sequences go on
+// counting across the tests sharing a database, so the seeded rows are found
+// where they are rather than assumed to start at one; and only identifiers a
+// row holds are tried, because a route taking two numbers is asked every pair.
 func seededNumbers(t *testing.T, r *httpapitest.Reach) []string {
 	t.Helper()
 	ctx := t.Context()
@@ -168,14 +170,13 @@ func seededNumbers(t *testing.T, r *httpapitest.Reach) []string {
 		if !slices.Contains(columns, "id") {
 			continue
 		}
-		var least sql.NullInt64
-		if err := r.DB.QueryRowContext(ctx, `SELECT MIN("id") FROM "`+table+`"`).Scan(&least); err != nil {
+		var ids []int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"`+table+`"`).Column("id").
+			OrderExpr(`"id" ASC`).Limit(6).Scan(ctx, &ids); err != nil {
 			t.Fatal(err)
 		}
-		for n := range int64(6) {
-			if least.Valid {
-				seen[least.Int64+n] = true
-			}
+		for _, id := range ids {
+			seen[id] = true
 		}
 	}
 	if len(seen) == 0 {
@@ -223,38 +224,54 @@ func TestNothingUndisclosedReachesAPublicReader(t *testing.T) {
 	// whichever route it is behind.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		seed := seedUndisclosed(t, r)
-		answered, asked := 0, 0
+		asked := 0
+		var paths []string
 		for _, op := range r.API.OpenAPI().Paths {
 			operation := op.Get
 			if operation == nil {
 				continue
 			}
-			paths := filledEvery(operation.Path, seed.fill)
+			filled := filledEvery(operation.Path, seed.fill)
 			// Every read is asked: a parameter the seed cannot fill is a read
 			// this walk would pass without looking at.
-			if len(paths) == 0 {
+			if len(filled) == 0 {
 				t.Errorf("GET %s has a parameter the walk fills with nothing, so it is never asked", operation.Path)
 			}
 			asked++
-			for _, path := range paths {
-				got := r.Body(t, "reader", http.MethodGet, path)
-				if got.Code == http.StatusOK {
-					answered++
-				}
-				for _, mark := range seed.marks {
-					// A path naming the mark is answered with the name it
-					// asked about, as a name nothing holds is.
-					if !strings.Contains(path, mark) && strings.Contains(got.Text, mark) {
-						t.Errorf("GET %s answered a reader of disclosed work with %q:\n%s",
-							path, mark, excerpt(got.Text, mark))
+			paths = append(paths, filled...)
+		}
+		// Asked by several workers at once: a route taking two numbers is
+		// asked every pair, and on a server engine each costs a round trip.
+		var answered atomic.Int64
+		next := make(chan string)
+		var asking sync.WaitGroup
+		for range 8 {
+			asking.Go(func() {
+				for path := range next {
+					got := r.Body(t, "reader", http.MethodGet, path)
+					if got.Code == http.StatusOK {
+						answered.Add(1)
+					}
+					for _, mark := range seed.marks {
+						// A path naming the mark is answered with the name it
+						// asked about, as a name nothing holds is.
+						if !strings.Contains(path, mark) && strings.Contains(got.Text, mark) {
+							t.Errorf("GET %s answered a reader of disclosed work with %q:\n%s",
+								path, mark, excerpt(got.Text, mark))
+						}
 					}
 				}
-			}
+			})
 		}
+		for _, path := range paths {
+			next <- path
+		}
+		close(next)
+		asking.Wait()
 		// A walk that reached nothing looks exactly like one that found
 		// nothing undisclosed.
-		if asked == 0 || answered == 0 {
-			t.Fatalf("%d operations were asked and %d answers came back, so this checked nothing", asked, answered)
+		if asked == 0 || answered.Load() == 0 {
+			t.Fatalf("%d operations were asked and %d answers came back, so this checked nothing", asked, answered.Load())
 		}
 		// The reader does read the disclosed finding, so a clean walk is a
 		// narrowing rather than a refusal of everything.
