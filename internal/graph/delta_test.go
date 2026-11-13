@@ -144,6 +144,33 @@ func TestAMoveIsGroupedByTheNameTheBuildStated(t *testing.T) {
 	})
 }
 
+func TestALaterRestatedNameLeavesAnEarlierScansChangesAlone(t *testing.T) {
+	// An earlier scan's changes read the names its nodes hold, so a later
+	// scan stating another name for the same component opens a node of its
+	// own rather than renaming one an earlier change reads.
+	each(t, func(t *testing.T, f *fixture) {
+		one := graph.Snapshot{Root: root, Components: []graph.Described{at("zlib", "1.3")},
+			Dependencies: []graph.Dependency{{Parent: root, Child: at("zlib", "1.3")}}}
+		applied(t, f, one)
+		bumped := at("zlib", "1.3.1")
+		upgrade := applied(t, f, graph.Snapshot{Root: root, Components: []graph.Described{bumped},
+			Dependencies: []graph.Dependency{{Parent: root, Child: bumped}}})
+		if got, want := delta(t, f, upgrade), (graph.Delta{Changed: 1}); got != want {
+			t.Fatalf("the upgrade reported %+v, want %+v", got, want)
+		}
+		renamed := bumped
+		renamed.Name = "libz"
+		restated := applied(t, f, graph.Snapshot{Root: root, Components: []graph.Described{renamed},
+			Dependencies: []graph.Dependency{{Parent: root, Child: renamed}}})
+		if got, want := delta(t, f, upgrade), (graph.Delta{Changed: 1}); got != want {
+			t.Errorf("after a later scan stated another name, the upgrade reports %+v, want %+v", got, want)
+		}
+		if got, want := delta(t, f, restated), (graph.Delta{Added: 1, Removed: 1}); got != want {
+			t.Errorf("the scan stating another name reported %+v, want %+v", got, want)
+		}
+	})
+}
+
 func TestANameAlreadyShippedAtAnotherVersionMovedRatherThanArrived(t *testing.T) {
 	// A name at two versions at once is what a vendored tree produces, and it
 	// is the case a comparison of name sets alone gets wrong: the name was

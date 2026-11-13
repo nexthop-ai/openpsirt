@@ -17,9 +17,28 @@ import (
 //
 // A node that is still present is written only where what the scan says about
 // it differs from the row: its root flag, or the identifiers the build stated
-// for it. An unchanged rebuild writes nothing.
+// for it. An unchanged rebuild writes nothing. A node whose stated name or
+// version moved is closed and another opened, because an earlier scan's
+// inventory changes read the node's name: restated in place, they would name
+// what a later scan stated.
 func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	wanted map[int64]stated) (map[int64]int64, int, int, error) {
+
+	// The nodes holding no name, read before they are given the row's. Each
+	// takes the name the build states in place: it never held one of its
+	// own, so no earlier change reads one.
+	var unnamed []int64
+	if err := tx.NewSelect().TableExpr(`"graph_node"`).ColumnExpr(`"id"`).
+		Where(`"build_id" = ?`, buildID).
+		Where(`"closed_scan_id" IS NULL`).
+		Where(`"name_folded" IS NULL`).
+		Scan(ctx, &unnamed); err != nil {
+		return nil, 0, 0, fmt.Errorf("read the nodes holding no name: %w", err)
+	}
+	filled := make(map[int64]bool, len(unnamed))
+	for _, id := range unnamed {
+		filled[id] = true
+	}
 
 	// A node written before the name and version were kept holds neither,
 	// and reads the component row's. It is given the row's here, in one
@@ -61,6 +80,11 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	var gone []int64
 	for _, node := range open {
 		if says, keep := wanted[node.ComponentID]; keep {
+			if (node.Name != says.name || node.Version != says.version) && !filled[node.ID] {
+				// Closed below, and opened again as missing.
+				gone = append(gone, node.ID)
+				continue
+			}
 			nodeIDs[node.ComponentID] = node.ID
 			if node.IsRoot != says.isRoot {
 				reroot[node.ID] = says.isRoot

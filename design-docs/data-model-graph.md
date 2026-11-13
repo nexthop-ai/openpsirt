@@ -67,6 +67,7 @@ and names held at a different set of versions.
 | The root is excluded from both sides | Its version is not stored and its name differs per variant |
 | An image held by name is at no version on either side | What each build stated is on the component screen (`design-docs/interface-component.md` § The component screen) |
 | The earliest scan applied to a build has none | |
+| A node whose stated name or version moves is closed and another opened; a node holding none takes the stated ones in place | An earlier scan's changes read its nodes' names, and restated in place would name what a later scan stated; a node holding none was never read by its own name |
 | Worked out when asked, never stored (REQ-20) | |
 
 It is read off the intervals: a node stands before a scan where it opened
