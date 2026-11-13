@@ -34,19 +34,11 @@ export const BUILDS_MOST = 200;
 // product's answer a page at a time until it holds every row. It stops once
 // the rows name more builds than one write takes, since the editor writes
 // nothing past that bound. Pages are separate reads, so a scan landing between
-// two of them shifts the rows under the offset: a page whose total differs
-// from the first, or that repeats a row already held, marks the answer moved,
-// because a shifted page also skips a row nothing else reveals.
-// One row of the issue's answer: a component at a build.
-function rowKey(row: {
-  branch_or_tag?: string;
-  variant?: string;
-  component?: string;
-  version?: string;
-}): string {
-  return [buildKey(row), row.component ?? "", row.version ?? ""].join("\u0000");
-}
-
+// two of them shifts the rows under the offset and a row goes unread. Each
+// later page starts one row early, on the last row held: a page that opens on
+// any other row, or answers another total, marks the answer moved. Rows carry
+// no unique key, since two components can share a name and version, so the
+// overlap is compared whole.
 export function useIssueIn(vulnerability: string, product: string, enabled = true) {
   return useQuery({
     queryKey: ["issue", vulnerability, product],
@@ -64,19 +56,20 @@ export function useIssueIn(vulnerability: string, product: string, enabled = tru
       const first = await ask(0);
       const items = [...(first.items ?? [])];
       const builds = new Set(items.map((row) => buildKey(row)));
-      const seen = new Set(items.map(rowKey));
       let moved = false;
-      while (items.length < first.total && builds.size <= BUILDS_MOST) {
-        const page = await ask(items.length);
-        const next = page.items ?? [];
-        if (page.total !== first.total) moved = true;
-        for (const row of next) {
-          if (seen.has(rowKey(row))) moved = true;
-          seen.add(rowKey(row));
-          builds.add(buildKey(row));
+      while (items.length > 0 && items.length < first.total && builds.size <= BUILDS_MOST) {
+        const page = await ask(items.length - 1);
+        const [overlap, ...next] = page.items ?? [];
+        if (
+          page.total !== first.total ||
+          JSON.stringify(overlap) !== JSON.stringify(items[items.length - 1])
+        ) {
+          moved = true;
+          break;
         }
-        if (next.length === 0 || moved) break;
+        if (next.length === 0) break;
         items.push(...next);
+        for (const row of next) builds.add(buildKey(row));
       }
       return { ...first, items, moved };
     },

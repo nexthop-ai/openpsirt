@@ -137,9 +137,9 @@ describe("correcting which builds a flaw affects", () => {
     expect(sent()).toHaveLength(0);
   });
 
-  it("writes nothing where a page repeats a row it already read", async () => {
+  it("writes nothing where the rows shifted later between two pages", async () => {
     // One row added ahead of the page boundary and one removed after it: the
-    // total holds, and the second page opens on the first page's last row.
+    // total holds, and the next page opens a row before the last one held.
     const sent = shifting((rows) => {
       const shifted = [
         { branch_or_tag: "master", variant: "broadcom", component: "added" },
@@ -151,6 +151,39 @@ describe("correcting which builds a flaw affects", () => {
     expect(mount.host().textContent).toContain("This changed while it was read");
     expect(mount.host().querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(sent()).toHaveLength(0);
+  });
+
+  it("writes nothing where the rows shifted earlier between two pages", async () => {
+    // One row removed ahead of the page boundary and one added after it: the
+    // total holds, and the next page opens past a row nothing read.
+    const sent = shifting((rows) => {
+      const shifted = [
+        ...rows.slice(1),
+        { branch_or_tag: "v1.0", variant: "broadcom", component: "added" },
+      ];
+      return { rows: shifted, total: shifted.length };
+    });
+    await opened();
+    expect(mount.host().textContent).toContain("This changed while it was read");
+    expect(mount.host().querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(sent()).toHaveLength(0);
+  });
+
+  it("edits where components share a name and version across pages", async () => {
+    const rows = ["master", "v1.0"].flatMap((branch) =>
+      Array.from({ length: 300 }, () => ({
+        branch_or_tag: branch,
+        variant: "broadcom",
+        component: "libnl",
+      })),
+    );
+    const sent = serving(rows, rows.length);
+    await opened();
+    expect(mount.host().textContent).not.toContain("This changed while it was read");
+    tick(mount.host(), "v2.0");
+    await press(mount.host(), "Set which builds it affects");
+    await settle();
+    expect((sent()[0]?.[1] as { body: { builds: unknown[] } }).body.builds).toHaveLength(3);
   });
 
   it("edits one product's builds however many rows other products hold", async () => {
