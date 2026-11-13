@@ -194,6 +194,7 @@ graph.ApplyWithin A background pass: ingest applies an inventory's graph to a bu
 graph.ComponentAsIn Not varying by reader: resolving a component name inside a build its callers already resolved for the subject, within their own transaction.
 graph.Components.Intern A background pass: ingest files the components a graph names, shared by every product that ships them.
 graph.IsRoot Not varying by reader: whether a component is a build's root, for a scope its caller already resolved.
+graph.MatchingAs Not varying by reader: resolving a component pattern among nodes its caller narrowed to a build of a product it resolved for the subject.
 graph.NamedAs Not varying by reader: resolving a component name among nodes its caller narrowed to a build or product it resolved for the subject.
 graph.Reaching Not varying by reader: every component at or beneath each start in a build, for the grouped list after it read the groups with a subject.
 graph.Replaced Not varying by reader: which components of a build replaced others by name, for a build its caller already resolved.

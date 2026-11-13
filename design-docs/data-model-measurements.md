@@ -67,3 +67,15 @@ products hold.
 | Search `ssl` | 6 | 81 ms, 216 ms | 390 ms, 589 ms |
 | Search `lib` | 428 | 94 ms, 277 ms | 366 ms, 742 ms |
 | Search `linux-image` | 1 | 73 ms, 199 ms | 325 ms, 442 ms |
+
+Measured on 2026-11-13, the component filter `openssl` once the stated list
+is non-empty, by the shape of its condition on the finding:
+
+| Condition | PostgreSQL | MySQL |
+|---|---|---|
+| The row's names and the stated components as two sets joined by OR | 92 ms at 604,000 findings, a parallel scan | 162 ms at 151,000 findings |
+| One set of components, the stated ones an alternative inside it | | 0.71 ms |
+
+An assignment rule's container read as one condition across the component
+and the node read every open node in the deployment on MySQL, 16.5 ms per
+build against 0.21 ms on a small fixture, once for each build of the product.

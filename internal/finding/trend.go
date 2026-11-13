@@ -387,11 +387,8 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 		// A component name is matched at any version: a chart of one version
 		// of one package is a chart of a moment.
 		if name := strings.TrimSpace(within.Component); name != "" {
-			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return orStated(q.WhereOr(`"f"."component_id" IN (?)`,
-					componentsWhere(q, `"c"."name_folded" = ?`, graph.Folded(name))),
-					`"f"."component_id"`, stated)
-			})
+			q = q.Where(`"f"."component_id" IN (?)`, namedOrStated(q, stated,
+				`"c"."name_folded" = ?`, graph.Folded(name)))
 		}
 		if len(within.Beneath) > 0 {
 			// Only the replaced components holding a finding in the range read.

@@ -395,3 +395,90 @@ func TestWideningAFlawFindsTheComponentByTheNameItsBuildStated(t *testing.T) {
 		}
 	})
 }
+
+// A component name typed into the findings list, its container filter and the
+// trend asks one set of components of the finding, the row's name or a
+// build's stated one: two sets joined by OR on the finding's column read every
+// open finding the rest of the filter leaves.
+func TestATypedComponentNameIsOneConditionOnTheFinding(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.applied(t, found("CVE-2026-1", libnl))
+		who := f.holding(t, access.PublicRead)
+		seen := &statements{}
+		f.hook(seen)
+		if _, _, err := f.store.Groups(ctx, who, f.scope, 50, 0,
+			finding.Filter{Components: []string{libnl.Name}}); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Under: swss.Name}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Trend(ctx, who, f.scope, time.Now().Add(-time.Hour), time.Hour, 1,
+			finding.Within{Component: libnl.Name}); err != nil {
+			t.Fatal(err)
+		}
+		seen.mu.Lock()
+		sent := append([]string{}, seen.sent...)
+		seen.mu.Unlock()
+		checked := 0
+		for _, statement := range sent {
+			if !strings.Contains(statement, `"c"."name_folded" = `) &&
+				!strings.Contains(statement, `"c"."name_folded" IN (`) {
+				continue
+			}
+			checked++
+			for _, column := range []string{`"f"."component_id" IN (`, `"f"."consumer_id" IN (`} {
+				if n := strings.Count(statement, column); n > 1 {
+					t.Errorf("a typed component name asks %s %d times, joined by OR:\n%s", column, n, statement)
+				}
+			}
+		}
+		if checked < 3 {
+			t.Fatalf("%d statements filtered by a typed component name, want the list's two and the trend's", checked)
+		}
+	})
+}
+
+// A rule's container is looked for by the component row's name and by the
+// name the build stated in two reads, exact or a pattern: one condition across
+// the two tables reads every open node of the deployment on MySQL.
+func TestARulesContainerReadsTheRowsNameAndTheStatedNameApart(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.applied(t, found("CVE-2026-1", libnl))
+		who := f.planner(t, access.PublicTriage)
+		seen := &statements{}
+		f.hook(seen)
+		for _, beneath := range []string{swss.Name, "libswss*"} {
+			caught, err := f.store.WouldMatch(ctx, who, f.productID, "", beneath, 20)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if caught.Total == 0 {
+				t.Errorf("a rule beneath %q catches nothing", beneath)
+			}
+		}
+		seen.mu.Lock()
+		sent := append([]string{}, seen.sent...)
+		seen.mu.Unlock()
+		checked := 0
+		for _, statement := range sent {
+			byRow := strings.Contains(statement, `"c"."name_folded" = `) ||
+				strings.Contains(statement, `"c"."name_folded" LIKE `)
+			byNode := strings.Contains(statement, `"n"."name_folded" = `) ||
+				strings.Contains(statement, `"n"."name_folded" LIKE `)
+			if byNode {
+				checked++
+			}
+			if byRow && byNode {
+				t.Errorf("a rule's container is asked of both names in one statement:\n%s", statement)
+			}
+		}
+		if checked < 2 {
+			t.Fatalf("%d statements read the stated name, want the exact name's and the pattern's", checked)
+		}
+	})
+}

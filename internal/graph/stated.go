@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // A component's name and version are read from the build's node. The
@@ -100,24 +102,49 @@ func statedColumn(column, build, componentID, component string) string {
 // reading every node the condition holds, where apart each is led by an index:
 // the component's fold, and the node's build and fold.
 func NamedAs(ctx context.Context, db bun.IDB, name, where string, args ...any) ([]int64, error) {
-	folded := Folded(name)
+	return namedBy(ctx, db, `= ?`, Folded(name), 0, where, args...)
+}
+
+// MatchingAs is NamedAs for a pattern, escaped for database.LikeClause: the
+// components whose row's fold or stated fold it matches. A positive limit
+// bounds each of the two reads, so a caller capping the answer at one less
+// sees the cap crossed whichever read crosses it.
+func MatchingAs(ctx context.Context, db bun.IDB, like string, limit int, where string,
+	args ...any) ([]int64, error) {
+
+	return namedBy(ctx, db, `LIKE ?`+database.LikeClause, like, limit, where, args...)
+}
+
+// namedBy is NamedAs and MatchingAs: the row's fold and the node's, each
+// compared by the comparison given, read apart and unioned.
+func namedBy(ctx context.Context, db bun.IDB, comparison, value string, limit int,
+	where string, args ...any) ([]int64, error) {
+
+	bounded := func(q *bun.SelectQuery) *bun.SelectQuery {
+		if limit > 0 {
+			return q.Limit(int64(limit))
+		}
+		return q
+	}
 	var byRow, byNode []int64
 	if err := db.NewSelect().Distinct().TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"n"."component_id"`).
 		Where(where, args...).
 		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`"c"."name_folded" = ?`, folded).
+		Where(`"c"."name_folded" `+comparison, value).
+		Apply(bounded).
 		Scan(ctx, &byRow); err != nil {
-		return nil, fmt.Errorf("read the components named %q: %w", name, err)
+		return nil, fmt.Errorf("read the components named %q: %w", value, err)
 	}
 	if err := db.NewSelect().Distinct().TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id"`).
 		Where(where, args...).
 		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`"n"."name_folded" = ?`, folded).
+		Where(`"n"."name_folded" `+comparison, value).
+		Apply(bounded).
 		Scan(ctx, &byNode); err != nil {
-		return nil, fmt.Errorf("read the components stated as %q: %w", name, err)
+		return nil, fmt.Errorf("read the components stated as %q: %w", value, err)
 	}
 	seen := make(map[int64]bool, len(byRow)+len(byNode))
 	ids := make([]int64, 0, len(byRow)+len(byNode))

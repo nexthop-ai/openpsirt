@@ -620,28 +620,21 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 	seen := map[int64]bool{}
 	var under []int64
 	for _, build := range builds {
+		// The component's row name or the name the build stated, read
+		// apart: one condition across the two tables reads every open node
+		// on MySQL. Each read stops one past the cap, so reaching it is
+		// distinguishable from landing on it exactly. The cap is the store's,
+		// not the constant: a store built with a smaller reach that truncates
+		// at the shipped number never trips its own refusal, and applies a
+		// rule to part of what it names.
 		var roots []int64
-		if err := s.db.NewSelect().
-			TableExpr(`"graph_node" AS "n"`).
-			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-			ColumnExpr(`DISTINCT "n"."component_id"`).
-			Where(`"n"."build_id" = ?`, build).
-			Where(`"n"."closed_scan_id" IS NULL`).
-			Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
-				// The component's row name or the name the build stated.
-				if glob, like := globbed(name); glob {
-					return q.Where(`("c"."name_folded" LIKE ?`+database.LikeClause+
-						` OR "n"."name_folded" LIKE ?`+database.LikeClause+`)`, like, like)
-				}
-				return q.Where(`("c"."name_folded" = ? OR "n"."name_folded" = ?)`, name, name)
-			}).
-			// One more than the cap, so that reaching it is distinguishable
-			// from landing on it exactly. The cap is the store's, not the
-			// constant: a store built with a smaller reach that truncates at
-			// the shipped number never trips its own refusal, and applies a
-			// rule to part of what it names.
-			Limit(int64(s.reaching())+1).
-			Scan(ctx, &roots); err != nil {
+		var err error
+		if glob, like := globbed(name); glob {
+			roots, err = graph.MatchingAs(ctx, s.db, like, s.reaching()+1, `"n"."build_id" = ?`, build)
+		} else {
+			roots, err = graph.NamedAs(ctx, s.db, name, `"n"."build_id" = ?`, build)
+		}
+		if err != nil {
 			return nil, fmt.Errorf("look for that component: %w", err)
 		}
 		if len(roots) > s.reaching() {

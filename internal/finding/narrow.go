@@ -642,11 +642,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// A component name somebody types is matched without regard to
 	// capitals, through the fold stored beside the name.
 	if names := trimmed(f.Components); len(names) > 0 {
-		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return orStated(q.WhereOr(`"f"."component_id" IN (?)`,
-				componentsWhere(q, `"c"."name_folded" IN (?)`, bun.List(foldedNames(names)))),
-				`"f"."component_id"`, f.stated.components)
-		})
+		q = q.Where(`"f"."component_id" IN (?)`, namedOrStated(q, f.stated.components,
+			`"c"."name_folded" IN (?)`, bun.List(foldedNames(names))))
 	}
 	// Lowered on both sides rather than asked to compare loosely: the
 	// engines do not agree on what a case-insensitive comparison is, and
@@ -659,9 +656,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// which of the two they mean, and an identifier cannot be mistaken
 		// for a package name in practice.
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			q = orStated(q.WhereOr(`"f"."component_id" IN (?)`,
-				componentsWhere(q, `"c"."name_folded" LIKE ?`+database.LikeClause, like)),
-				`"f"."component_id"`, f.stated.search)
+			q = q.WhereOr(`"f"."component_id" IN (?)`, namedOrStated(q, f.stated.search,
+				`"c"."name_folded" LIKE ?`+database.LikeClause, like))
 			return q.
 				WhereOr(`"f"."vulnerability_id" IN (?)`,
 					q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
@@ -722,11 +718,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.UnderTheBuild {
 		q = q.Where(`"f"."consumer_id" IS NULL`)
 	} else if under := strings.TrimSpace(f.Under); under != "" {
-		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return orStated(q.WhereOr(`"f"."consumer_id" IN (?)`,
-				componentsWhere(q, `"c"."name_folded" = ?`, graph.Folded(under))),
-				`"f"."consumer_id"`, f.stated.under)
-		})
+		q = q.Where(`"f"."consumer_id" IN (?)`, namedOrStated(q, f.stated.under,
+			`"c"."name_folded" = ?`, graph.Folded(under)))
 	}
 	// This product's own word on the issue, as against what was published. A
 	// rating of its own is the record of a priority somebody changed here —
@@ -1243,14 +1236,18 @@ func componentsWhere(q *bun.SelectQuery, condition string, args ...any) *bun.Sel
 	return q.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").Where(condition, args...)
 }
 
-// orStated adds, as an alternative, the components a build stated under the
-// name asked for. None adds nothing, since an empty list is a syntax error on
-// two of the engines.
-func orStated(q *bun.SelectQuery, column string, stated []int64) *bun.SelectQuery {
-	if len(stated) == 0 {
-		return q
+// namedOrStated is the components a condition on the row holds, or that a
+// build stated under the name asked for, as one set. The alternative sits
+// inside the component statement: two sets joined by OR on the finding's
+// column lose the semijoin on every engine and read every open finding, 162 ms
+// at 151,000 findings on MySQL against 0.71 ms. None stated adds nothing,
+// since an empty list is a syntax error on two of the engines.
+func namedOrStated(q *bun.SelectQuery, stated []int64, condition string, args ...any) *bun.SelectQuery {
+	if len(stated) > 0 {
+		condition = `(` + condition + ` OR "c"."id" IN (?))`
+		args = append(append([]any{}, args...), bun.List(stated))
 	}
-	return q.WhereOr(column+` IN (?)`, bun.List(stated))
+	return componentsWhere(q, condition, args...)
 }
 
 // foldedNames is typed component names as the fold stored beside each name.
