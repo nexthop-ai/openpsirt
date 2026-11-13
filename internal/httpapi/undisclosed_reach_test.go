@@ -18,8 +18,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// undisclosedSeed is undisclosed work of every kind a secondary read reaches,
-// each carrying words of its own, and the names a path is filled with.
+// undisclosedSeed is the undisclosed work seedUndisclosed writes, each kind
+// carrying words of its own, and the names a path is filled with.
 type undisclosedSeed struct {
 	// marks are the words only undisclosed work holds. A component's name is
 	// not one: the inventory is read at any visibility.
@@ -180,9 +180,8 @@ func filledEvery(path string, fill map[string][]string) []string {
 
 func TestNothingUndisclosedReachesAPublicReader(t *testing.T) {
 	// Every read path the API offers, asked by somebody who reads only
-	// disclosed work in the product, over undisclosed work of every kind a
-	// secondary read reaches: no answer carries a word of it, a refusal
-	// included. Query parameters are left at their defaults. A read that narrows its
+	// disclosed work in the product, over the undisclosed work seedUndisclosed
+	// writes: no answer carries a word of it, a refusal included. Query parameters are left at their defaults. A read that narrows its
 	// findings and joins another table without the same narrowing fails here
 	// whichever route it is behind.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
