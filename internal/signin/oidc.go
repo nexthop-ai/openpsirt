@@ -89,6 +89,13 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	if err != nil || issuer.Hostname() == "" {
 		return nil, fmt.Errorf("the issuer %q is not a URL naming a host", redact.URL(written))
 	}
+	// A password holding an unescaped "/", "?" or "#" parses with the rest
+	// of it as the path, so the host is wrong and a failed discovery would
+	// print the password in the address it quotes.
+	if redact.Stray(issuer) {
+		return nil, fmt.Errorf("the issuer %q holds an @ after its host, which reads as a user name "+
+			"or password cut short: percent-encode / ? # @ in a password, and an @ in a path as %%40", redact.URL(written))
+	}
 	if issuer.Scheme != "https" {
 		return nil, fmt.Errorf("the issuer %q is not https, and an identity provider reached over plain http can be answered by anybody on the path", redact.URL(written))
 	}

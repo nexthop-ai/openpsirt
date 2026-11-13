@@ -321,6 +321,7 @@ func TestWhatAProviderMustSupplyBeforeItIsUsable(t *testing.T) {
 		{"an unreadable issuer", whole(func(c *OIDCConfig) { c.Issuer = "://" }), "is not a URL naming a host"},
 		{"an issuer over plain http", whole(func(c *OIDCConfig) { c.Issuer = "http://issuer.example" }), "is not https"},
 		{"an issuer over plain http with a password", whole(func(c *OIDCConfig) { c.Issuer = "http://u:hunter2@issuer.example" }), "is not https"},
+		{"an issuer whose password cut its host short", whole(func(c *OIDCConfig) { c.Issuer = "https://bot:1234/hunter2@issuer.example/realms/x" }), "holds an @ after its host"},
 		{"no client identifier", whole(func(c *OIDCConfig) { c.ClientID = "" }), "client identifier and secret"},
 		{"no client secret", whole(func(c *OIDCConfig) { c.ClientSecret = "" }), "client identifier and secret"},
 		{"no username claim", whole(func(c *OIDCConfig) { c.UsernameClaim = "  " }), "OIDC_USERNAME_CLAIM"},
