@@ -43,7 +43,7 @@ answer and a deadline never restarts nightly.
 
 | Rule | Reason |
 |---|---|
-| A fix dated later than the moment it is weighed at has not arrived; a scan weighs at the run's start, a rewrite at the edit | |
+| A fix dated later than the moment it is weighed at has not arrived; a scan weighs at the run's start, a rewrite when it runs | |
 | A recount reads the store's clock, once per recount | A fix date weighs the same in a recount and in the scan beside it |
 | A finding may be overdue the moment it opens | There is no floor for a slow pipeline |
 
