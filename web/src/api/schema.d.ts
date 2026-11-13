@@ -1853,7 +1853,7 @@ export interface paths {
          * List findings for one issue
          * @description Every build that carries this issue, across every product you may see or in the one product `product` names, with how far it has been decided in each.
          *
-         *     One row per build and component, with a count of its occurrences.
+         *     One row per build and component, with a count of its occurrences, ordered by product, branch or tag, variant and component; `offset` reads the rows past a page.
          *
          *     The rows, `total` and the count of products cover only products you may read.
          *
@@ -19695,6 +19695,8 @@ export interface operations {
                 /** @description Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found */
                 product?: string;
                 limit?: number;
+                /** @description The number of rows skipped, in the order the rows are listed */
+                offset?: number;
             };
             header?: never;
             path: {

@@ -68,9 +68,11 @@ type Sighting struct {
 // page cut short still says how many products carry the issue.
 //
 // A product, where one is given, narrows the rows, the total and the count of
-// products to it; zero is every product the subject may see.
+// products to it; zero is every product the subject may see. Offset skips that
+// many rows of the order the rows are read in, so a caller needing every row
+// reads them a page at a time.
 func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
-	vulnerabilityID, productID int64, limit int) ([]Sighting, int, int, error) {
+	vulnerabilityID, productID int64, limit, offset int) ([]Sighting, int, int, error) {
 
 	limit = database.AWholeBuild.Of(limit)
 	// Not merely empty: "here is nothing" and "you cannot ask" are
@@ -169,6 +171,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			`"sn"."name", "sn"."version"`).
 		OrderExpr(`"p"."name", "st"."name", "va"."name", "component", "c"."id"`).
 		Limit(int64(limit)).
+		Offset(int64(max(offset, 0))).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("read where this issue sits: %w", err)
