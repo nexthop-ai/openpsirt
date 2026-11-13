@@ -172,6 +172,55 @@ func TestStoppingTrustingAnUpstreamOpensWhatItClosed(t *testing.T) {
 	})
 }
 
+// Stopping trusting the upstream sets aside its overtaken statements as well
+// and lets go of what overtook them, so no later recording restores one: the
+// upstream's documents make nothing any more.
+func TestStoppingTrustingAnUpstreamLeavesNothingToRestore(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		said := w.statement(portable, finding.PlacedAnybody)
+		if said == nil {
+			t.Fatal("the upstream's statement was not recorded")
+		}
+		// A newer statement of the upstream's about the same subject, which
+		// overtook it.
+		var newer int64
+		if _, err := w.DB.DB.NewRaw(`INSERT INTO "received_vex_statement" ("product_id", "publisher",
+			"source", "document_id", "vulnerability", "purl", "component", "placement", "about",
+			"status", "justification", "statement_id", "document", "digest", "uploaded_by", "uploaded_at")
+			SELECT "product_id", "publisher", "source", 'newer', "vulnerability", "purl", "component",
+			"placement", "about", "status", "justification", "statement_id", 'newer.json', "digest",
+			"uploaded_by", "uploaded_at" FROM "received_vex_statement" WHERE "id" = ?`, said.ID).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"id"`).
+			Where(`"document_id" = 'newer'`).Scan(ctx, &newer); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"received_vex_statement"`).
+			Set(`"superseded_at" = ?`, time.Now().UTC()).Set(`"overtaken_by" = ?`, newer).
+			Where(`"id" = ?`, said.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstream.NewStore(w.DB.DB).Withdraw(ctx, w.admin, w.fork.ID); err != nil {
+			t.Fatal(err)
+		}
+		var held int
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`COUNT(*)`).
+			Where(`"product_id" = ?`, w.fork.ID).Where(`"source" = ?`, finding.FromUpstream).
+			Where(finding.HeldByItsDocument).Scan(ctx, &held); err != nil {
+			t.Fatal(err)
+		}
+		if held != 0 {
+			t.Errorf("%d statements of an upstream no longer trusted are still made by their documents", held)
+		}
+	})
+}
+
 // A document that does not match the digest served beside it, one served
 // with no digest, and one whose signature the trusted key did not make are
 // not taken, and nothing they say closes anything.
