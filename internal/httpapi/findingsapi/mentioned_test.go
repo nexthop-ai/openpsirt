@@ -187,7 +187,9 @@ func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsMostWithheld(t *testi
 		// The reader reads disclosed work in the first product and undisclosed
 		// work in the second, so they read both rows; the author reads both
 		// as well. The person reading undisclosed work in the first product
-		// alone reads only one row.
+		// alone reads only one row, and so does the one reading undisclosed
+		// work alone in both: they read the most withheld row and not the
+		// disclosed one, so only the check of every row keeps them out.
 		for _, who := range []string{"reader", "private-triage"} {
 			person, err := r.Rights.ByIdentity(ctx, who)
 			if err != nil {
@@ -199,9 +201,16 @@ func TestAMentionOnADecisionSpanningVisibilitiesIsToldAsItsMostWithheld(t *testi
 				}
 			}
 		}
+		embargo, err := r.Rights.ByIdentity(ctx, "embargo-reader")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Rights.GrantRole(ctx, embargo.ID, theirs.ID, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
 		said := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/decisions/"+httpapitest.Itoa(decision)+"/comments",
-			`{"body":"@reader and @private, could you look at both?"}`)
+			`{"body":"@reader and @private and @embargo-reader, could you look at both?"}`)
 		if said.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
 		}
