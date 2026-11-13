@@ -15436,6 +15436,9 @@ components:
           description: The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
           format: int64
           type: integer
+        by_proxy:
+          description: Whether the trusted proxy in front of this deployment signed this browser in, so that signing out happens there
+          type: boolean
         chat:
           $ref: "#/components/schemas/ChatBody"
           description: The chat platforms this deployment offers and what they chose, where it offers any
@@ -36438,7 +36441,7 @@ paths:
   /v1/session:
     delete:
       description: |-
-        Ends the session the request arrived on, everywhere rather than in this browser alone — the session is stored, so it stops working whichever copy of the application answers next.
+        Ends the session the request arrived on; it stops working on every copy of the application. A browser the trusted proxy signed in holds no session here and is refused with 409; it signs out at the proxy.
 
         Requires: your own sign-in, as a person and not a pipeline key
       operationId: sign-out

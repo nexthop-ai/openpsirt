@@ -2558,7 +2558,7 @@ for a process and not for an install.</p>
 <tr>
 <td><code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
 <td><code>signin.bootstrap_admins</code></td>
-<td>Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. <strong>A name written <code>provider:username</code> is refused and the process stops</strong>, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked</td>
+<td>Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. <strong>A name written <code>provider:username</code> is refused and the process stops</strong>, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. A name of <code>.</code> or <code>..</code> stops the process too, because a browser resolves it away in every address about that person. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart. Removing a name and restarting revokes the administration the name granted, and keeps any granted under People; the process logs each name it revoked</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -2592,7 +2592,7 @@ username, and two providers issuing them independently cannot be told apart.</p>
 <tr>
 <td><code>OPENPSIRT_OIDC_NAME</code></td>
 <td><code>signin.oidc.name</code></td>
-<td>What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes and no spaces. The process refuses to start otherwise</td>
+<td>What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes, no spaces, and not <code>.</code> or <code>..</code>. The process refuses to start otherwise</td>
 <td><code>oidc</code></td>
 </tr>
 <tr>
