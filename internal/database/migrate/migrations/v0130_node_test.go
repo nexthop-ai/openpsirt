@@ -12,9 +12,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
-// v0130 is the migration v0.13.0 carries v0.12.0's schema across with.
-const v0130 = 47
-
 // seedNodeV0120 seeds a v0.12.0 build holding one component, and answers its
 // node.
 func seedNodeV0120(t *testing.T, db *database.DB) int64 {

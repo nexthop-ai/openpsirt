@@ -16,6 +16,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -1274,11 +1275,12 @@ func TestAFailedBranchScanPutBackAsksForItsInventoryAgain(t *testing.T) {
 		if _, err := reader.Once(ctx); err == nil {
 			t.Fatal("the unreadable inventory was read")
 		}
-		failed, _, err := q.FailedJobs(ctx, 10)
+		admin := access.NewPerson(1, "admin", true, nil, 0)
+		failed, _, err := q.FailedJobs(ctx, admin, 10)
 		if err != nil || len(failed) != 1 {
 			t.Fatalf("failed jobs %+v, %v", failed, err)
 		}
-		if err := q.Requeue(ctx, failed[0].ID); err != nil {
+		if err := q.Requeue(ctx, admin, failed[0].ID); err != nil {
 			t.Fatal(err)
 		}
 		_, err = reader.Once(ctx)

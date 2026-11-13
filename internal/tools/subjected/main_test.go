@@ -113,6 +113,45 @@ func twice(a int) int { return a * 2 }
 	}
 }
 
+func TestAMethodHandedOnAsAValueIsFollowed(t *testing.T) {
+	source := []byte(`package scanner
+
+func (s *Schedule) Once(ctx context.Context) (int, error) {
+	return s.both(ctx, s.rescans)
+}
+
+func (s *Schedule) Idle(ctx context.Context) (int, error) {
+	return s.both(ctx, s.nothing)
+}
+
+func (s *Schedule) both(ctx context.Context, pass func(context.Context) (int, error)) (int, error) {
+	return pass(ctx)
+}
+
+func (s *Schedule) rescans(ctx context.Context) (int, error) {
+	return 0, s.db.NewSelect().Scan(ctx)
+}
+
+func (s *Schedule) nothing(ctx context.Context) (int, error) { return 0, nil }
+`)
+	found, _, err := inSource("scanner", "s.go", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reported := map[string]bool{}
+	for _, one := range found {
+		reported[one.name] = true
+	}
+	for name, want := range map[string]bool{
+		"scanner.Schedule.Once": true,
+		"scanner.Schedule.Idle": false,
+	} {
+		if reported[name] != want {
+			t.Errorf("%s reported = %v, want %v", name, reported[name], want)
+		}
+	}
+}
+
 func TestACallIntoAnotherPackageIsNotTakenForOneOfThisPackages(t *testing.T) {
 	// strings.Replace is not this package's Replace, whatever that does, and
 	// a local or package-level name an import could be called is still this
