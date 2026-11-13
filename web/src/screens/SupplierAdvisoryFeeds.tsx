@@ -299,13 +299,16 @@ const KINDS = {
 
 // Uploading one document a publisher issued, for this product.
 //
-// The same two endpoints a script uses. An advisory adds to what that
-// publisher has said; a statement set replaces their whole previous set. Each
-// endpoint refuses the other kind and says which one takes it.
+// The same two endpoints a script uses. An advisory replaces the advisory of
+// the same name; a statement set replaces its own earlier revision, and of the
+// publisher's statements about one subject the newest stands. Each endpoint
+// refuses the other kind and says which one takes it. A statement set naming
+// no publisher is refused unless one is typed, so the box is offered for it.
 function Upload({ product }: { product: string }) {
   const queries = useQueryClient();
   const [kind, setKind] = useState<keyof typeof KINDS>("advisory");
   const [file, setFile] = useState<File | null>(null);
+  const [publisher, setPublisher] = useState("");
 
   const upload = useMutation({
     mutationFn: async () => {
@@ -323,9 +326,10 @@ function Upload({ product }: { product: string }) {
         );
         return `${taken.identifier} from ${taken.publisher}: ${taken.recorded} claims taken, ${taken.superseded} set aside.`;
       }
+      const named = publisher.trim();
       const taken = unwrap(
         await api.POST("/v1/products/{product}/vex-documents", {
-          params: { path: { product } },
+          params: { path: { product }, query: named ? { publisher: named } : undefined },
           ...sent,
         }),
       );
@@ -363,6 +367,23 @@ function Upload({ product }: { product: string }) {
             ))}
           </select>
         </label>
+        {kind === "statements" && (
+          <label
+            className="field"
+            title="Leave empty to use the publisher the document names. Required where it names none."
+          >
+            <span>Publisher</span>
+            <input
+              value={publisher}
+              maxLength={191}
+              placeholder="As the document says"
+              onChange={(event) => {
+                setPublisher(event.target.value);
+                upload.reset();
+              }}
+            />
+          </label>
+        )}
         <div className="field" style={{ flex: "1 1 18rem" }}>
           <span>File</span>
           <Dropzone
@@ -389,7 +410,7 @@ function Upload({ product }: { product: string }) {
       <p className="hint">
         {kind === "advisory"
           ? "Adds to what this publisher has said. The same advisory uploaded again replaces its earlier claims."
-          : "Replaces this publisher's whole previous statement set for the product."}
+          : "Replaces this document's earlier revision. Each publisher's newest statement on a package and issue stands."}
       </p>
       {upload.isSuccess && <p className="hint">{upload.data}</p>}
       {upload.isError && <Failed error={upload.error} what="That document was not taken." />}

@@ -70,6 +70,10 @@ after the upload counts as none. A document with no `@id` is
 replaced by the publisher's next one with none, so give each release and each
 variant an `@id` of its own.
 
+A document reissued under a new `@id` leaves in force whatever the old one
+said and the new one does not. Withdraw the old one by uploading a document
+with its `@id` and no statements.
+
 A statement naming a root that two builds of the product share, such as two
 variants of one release, is evidence rather than either build's claim. Send
 those with their SBOMs.
