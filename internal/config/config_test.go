@@ -591,9 +591,12 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	resolves := map[string][]string{
-		"minio":                           {"10.0.0.5"},
-		"minio.storage.svc.cluster.local": {"10.0.0.5"},
-		"localhost":                       {"::1", "127.0.0.1"},
+		"minio":                                {"10.0.0.5"},
+		"minio.storage.svc.cluster.local":      {"10.0.0.5"},
+		"localhost":                            {"::1", "127.0.0.1"},
+		"ec2-54-1-2-3.compute-1.amazonaws.com": {"54.1.2.3"},
+		"minio.corp.example":                   {"54.1.2.3"},
+		"minio-1.elb.us-east-1.amazonaws.com":  {"54.9.9.9"},
 	}
 	lookupHost = func(_ context.Context, host string) ([]string, error) {
 		if found, ok := resolves[host]; ok {
@@ -700,6 +703,13 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 			"DIRECTORY_DIR": root + "/files/csaf", "ATTACHMENT_DIR": root + "/files",
 		}, "DIRECTORY_DIR"},
 
+		// Only an S3 endpoint is Amazon's one service; any other Amazon host
+		// is a server like any other.
+		{"one bucket on an Amazon EC2 name and another name of that server", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "http://ec2-54-1-2-3.compute-1.amazonaws.com:9000",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "http://minio.corp.example:9000",
+		}, "DIRECTORY_BUCKET"},
+
 		{"two buckets", map[string]string{"DIRECTORY_BUCKET": "csaf", "ATTACHMENT_BUCKET": "psirt"}, ""},
 		{"one name on two stores", map[string]string{
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://one.example.test",
@@ -735,6 +745,14 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3.cn-north-1.amazonaws.com.cn",
 			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.amazonaws.com",
 		}, ""},
+		{"one name on Amazon S3 and on a store behind an Amazon load balancer", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio-1.elb.us-east-1.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://s3.us-east-1.amazonaws.com",
+		}, ""},
+		{"one name on Amazon S3 and on Amazon S3's external endpoint", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://s3-external-1.amazonaws.com",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://psirt.s3.dualstack.us-east-1.amazonaws.com",
+		}, "DIRECTORY_BUCKET"},
 		{"sibling folders", map[string]string{"DIRECTORY_DIR": root + "/csaf", "ATTACHMENT_DIR": root + "/csaf-private"}, ""},
 		{"a bucket beside a folder", map[string]string{"DIRECTORY_DIR": root, "ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_DIR": root}, ""},
 	} {

@@ -60,7 +60,7 @@ func apart(directory, attachments Store) error {
 // Each is compared as the service it reaches: a name and password
 // in the address are handed over as credentials and taken out of it, a
 // scheme's default port is no port, and capitals and slashes around the path
-// mean nothing. Every Amazon address of one partition is one service, because
+// mean nothing. Every Amazon S3 address of one partition is one service, because
 // a bucket's name is unique across it. Two host names on one port and path
 // are one service where they resolve to a shared address, since a short name
 // and a cluster name, or a name and its address, reach one server.
@@ -136,26 +136,30 @@ type storeService struct {
 	// rest is a port where the port is not the scheme's default, and a
 	// path where there is one.
 	rest string
-	// amazon says the host is one of Amazon's partitions.
+	// amazon says the host is an Amazon S3 endpoint, and host its partition.
 	amazon bool
 }
 
-// govCloud reports whether the labels of an Amazon host before its domain
-// name a GovCloud region, which shares the domain and is a partition of its
-// own. The region follows the service label, dotted as `s3.us-gov-west-1` or
-// dashed as `s3-us-gov-west-1`, and a bucket's name before it counts for
-// nothing.
-func govCloud(labels string) bool {
-	parts := strings.Split(strings.Trim(labels, "."), ".")
+// s3Label is the position of the service label among the labels of an
+// Amazon host before its domain, `s3` or one starting `s3-` as in
+// `s3-external-1` and `s3-fips`, or -1 where there is none. A bucket's name
+// may precede it, so the last such label is the service's.
+func s3Label(parts []string) int {
 	service := -1
 	for i, part := range parts {
 		if part == "s3" || strings.HasPrefix(part, "s3-") {
 			service = i
 		}
 	}
-	if service < 0 {
-		return slices.ContainsFunc(parts, func(part string) bool { return strings.HasPrefix(part, "us-gov-") })
-	}
+	return service
+}
+
+// govCloud reports whether the labels of an Amazon S3 host after its service
+// label name a GovCloud region, which shares the domain and is a partition of
+// its own. The region follows the service label, dotted as
+// `s3.us-gov-west-1` or dashed as `s3-us-gov-west-1`, and a bucket's name
+// before it counts for nothing.
+func govCloud(parts []string, service int) bool {
 	dashed := strings.TrimPrefix(strings.TrimPrefix(parts[service], "s3-"), "fips-")
 	if strings.HasPrefix(dashed, "us-gov-") {
 		return true
@@ -164,9 +168,10 @@ func govCloud(labels string) bool {
 }
 
 // storeParts is the service an object store endpoint reaches, and whether the
-// endpoint could be read. Every endpoint of one AWS partition reaches one
+// endpoint could be read. Every S3 endpoint of one AWS partition reaches one
 // service, since a bucket name is unique across it: China, GovCloud, and the
-// rest.
+// rest. Any other Amazon host, such as an EC2 instance's or a load balancer's
+// name, is a server like any other, compared by its resolved address.
 func storeParts(endpoint string) (storeService, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(endpoint))
 	if err != nil || parsed.Host == "" {
@@ -175,12 +180,19 @@ func storeParts(endpoint string) (storeService, bool) {
 	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
 	// The China partition first, since its domain ends in the other's.
 	for _, domain := range []string{awsService + ".cn", awsService} {
-		if host == domain || strings.HasSuffix(host, "."+domain) {
-			if govCloud(strings.TrimSuffix(host, domain)) {
-				domain = "us-gov." + domain
-			}
-			return storeService{host: domain, amazon: true}, true
+		labels, found := strings.CutSuffix(host, "."+domain)
+		if !found {
+			continue
 		}
+		parts := strings.Split(labels, ".")
+		service := s3Label(parts)
+		if service < 0 {
+			break
+		}
+		if govCloud(parts, service) {
+			domain = "us-gov." + domain
+		}
+		return storeService{host: domain, amazon: true}, true
 	}
 	service := storeService{host: host}
 	switch port := parsed.Port(); {
