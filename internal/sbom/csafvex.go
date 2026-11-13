@@ -307,8 +307,8 @@ func (r *csafReader) wrongProfile() error {
 			"versions it names", ErrWrongProfile)
 	case strings.EqualFold(said, vexProfile):
 		return fmt.Errorf("%w: that is a VEX document rather than a security advisory. "+
-			"It is read as VEX statements, where a publisher's whole statement set "+
-			"supersedes what they said before", ErrWrongProfile)
+			"It is read as VEX statements, where a revision of the same document "+
+			"replaces what it said before", ErrWrongProfile)
 	default:
 		return fmt.Errorf("%w: a CSAF document of category %q, which is not one this reads",
 			ErrWrongProfile, trim(said))

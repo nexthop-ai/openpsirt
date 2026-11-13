@@ -15,9 +15,9 @@ import (
 // Reading a supplier's CSAF security advisory, the third document a third
 // party's judgment arrives in beside OpenVEX and CSAF-VEX.
 //
-// A VEX document is a statement set: what a publisher says about everything at
-// once. An advisory is an announcement about one issue, and a publisher issues
-// one per issue. The claims inside are the same shape — a status per product
+// A VEX document is a set of statements, each about one issue and one
+// product. An advisory is an announcement about one issue, and a publisher
+// issues one per issue. The claims inside are the same shape — a status per product
 // identifier, resolved through the same tree — so the same reader reads both
 // and what differs is the document around them.
 //

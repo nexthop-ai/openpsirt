@@ -5,8 +5,7 @@
 
 // What one real supplier advisory costs to record.
 //
-// A VEX document is a publisher's whole statement set and a real one about a
-// single issue lists a few thousand products. A security advisory about a
+// A real VEX document about a single issue lists a few thousand products. A security advisory about a
 // kernel lists every package of every architecture on every platform it
 // shipped to, and one real one names 95,933 product identifiers — so an
 // administrator uploading it writes on that order of rows, in one

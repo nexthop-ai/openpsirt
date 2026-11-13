@@ -56,8 +56,8 @@ func registerDocuments(api huma.API, in core.Deps) {
 		Summary: "List uploaded VEX documents",
 		Description: "Returns every VEX document uploaded to this product, newest first, " +
 			"taken or turned away: who uploaded it, what became of it, and how many " +
-			"statements it recorded and set aside. The newest copy taken from each " +
-			"publisher is marked `current`.\n\n" +
+			"statements it recorded and set aside. The newest copy taken of each document, " +
+			"by its publisher and identifier, is marked `current`.\n\n" +
 			"Uploads made before v0.11.0 are not listed. Their statements still apply.\n\n" +
 			"Statements a trusted upstream publishes are listed with that upstream.",
 		Tags: []string{"Ingest"},

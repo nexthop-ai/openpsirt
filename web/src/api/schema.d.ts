@@ -6233,7 +6233,7 @@ export interface paths {
          *
          *     An advisory is about the versions it names. Where it says a vulnerability is fixed in one version, that is not a statement about another, so a claim naming a version is shown against every version of that component and offers a prefill only at the version it named.
          *
-         *     Uploading the same advisory again sets its earlier claims aside rather than deleting them, so what an approval was granted on the strength of stays readable. It is matched on the name the publisher gave it, so everything else that publisher has issued stays standing — which is the difference from a VEX document, where a publisher's whole statement set is replaced at once.
+         *     Uploading the same advisory again sets its earlier claims aside rather than deleting them, so what an approval was granted on the strength of stays readable. It is matched on the name the publisher gave it, so everything else that publisher has issued stays standing.
          *
          *     A VEX document is refused here and taken by the VEX endpoint instead.
          *
@@ -6535,7 +6535,7 @@ export interface paths {
         };
         /**
          * List uploaded VEX documents
-         * @description Returns every VEX document uploaded to this product, newest first, taken or turned away: who uploaded it, what became of it, and how many statements it recorded and set aside. The newest copy taken from each publisher is marked `current`.
+         * @description Returns every VEX document uploaded to this product, newest first, taken or turned away: who uploaded it, what became of it, and how many statements it recorded and set aside. The newest copy taken of each document, by its publisher and identifier, is marked `current`.
          *
          *     Uploads made before v0.11.0 are not listed. Their statements still apply.
          *
@@ -15313,7 +15313,7 @@ export interface components {
              * @description Pass as from_statement when starting a decision from this, so a later revision can be noticed
              */
             id: number;
-            /** @description The name the publisher gave the advisory */
+            /** @description The name the publisher gave the document: an advisory's name, or a VEX document's identifier, as sha256: and its digest where longer than 191 characters */
             identifier?: string;
             /** @description The term they gave for it, where the status is one that takes one */
             justification?: string;
