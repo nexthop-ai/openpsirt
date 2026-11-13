@@ -1685,6 +1685,7 @@ before uploading anything new under that name:
 
 The answer to the first step says how many statements it set aside. A set-aside
 statement stays readable beside any approval granted on it, and each approved
-decision that cites one raises a "cited statement changed" alert, which stands
-until the decision is made again against the statements the second step
-recorded.
+decision that cites one raises a "cited statement changed" alert. Where the
+second step records the same words, reasoning included, under the same
+publisher name, the alert clears; where v0.12.0 filed them under a file name, it
+stands until the decision is made again against what the second step recorded.

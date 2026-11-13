@@ -703,6 +703,61 @@ func TestASupplierRepeatingACitedStatementElsewhereTellsNobody(t *testing.T) {
 	})
 }
 
+// A supplier changing only the reasoning of a cited statement, in another of
+// its documents, tells the decision citing it: the words are part of the
+// evidence an approval was granted against.
+func TestASupplierRewordingACitedStatementTellsTheDecision(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		claim := *w.statement(ownBuild, "")
+		if err := w.Access.GrantRole(ctx, w.proposer.ID, w.fork.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		record := func(name string, month time.Month, words string) {
+			t.Helper()
+			at := time.Date(2026, month, 1, 0, 0, 0, 0, time.UTC)
+			said := claim
+			said.Statement = words
+			if _, _, err := w.findings.RecordStatements(ctx, w.admin, w.fork.ID, finding.Supplied{
+				Source: finding.FromVex, Identifier: "https://supplier.test/vex/" + name,
+				Publisher: "Supplier", Document: name + ".json", Digest: name + month.String(), SaidAt: &at,
+			}, []finding.Statement{said}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record("march", time.March, "The vulnerable function is never called.")
+		var cited int64
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"id"`).
+			Where(`"product_id" = ? AND "source" = ? AND "document" = ?`, w.fork.ID, finding.FromVex, "march.json").
+			Scan(ctx, &cited); err != nil {
+			t.Fatal(err)
+		}
+		w.decisionCiting(w.forkBuild, ownBuild, libnl.Name, triage.NotApplicable,
+			triage.CodeNotInExecutePath, &cited)
+
+		record("june", time.June, "The vulnerable function is called only by a test.")
+		if _, _, err := notify.NewWatch(w.DB.DB, slog.New(slog.DiscardHandler)).Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		rows, _, err := notify.NewStore(w.DB.DB).Waiting(ctx, w.proposer, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		told := 0
+		for _, row := range rows {
+			if row.Kind == notify.StatementRevised && row.ClearedAt == nil {
+				told++
+			}
+		}
+		if told != 1 {
+			t.Errorf("the supplier rewording the statement told the decision %d times, want once", told)
+		}
+	})
+}
+
 // A document that does not match the digest served beside it is not taken,
 // from an upstream that signs nothing, so only the digest stands in the way.
 func TestADocumentNotMatchingItsDigestIsNotTaken(t *testing.T) {
