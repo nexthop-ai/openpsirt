@@ -183,6 +183,28 @@ unscanned.
 | The producer's spelling names the one spelled that way | Links are built from the stored name, so a link reaches its component |
 | A clash in capitals alone, at one version, ecosystem and namespace, is reached only by its own spelling | The choices tell components apart by those three |
 
+### Dot segments
+
+A name that is a path segment of its own addresses is never `.` or `..`. A
+browser resolves either before sending, percent-encoded or not, so the thing
+could never be opened, and one in the middle of an address climbs: revoking a
+token of a person named `..` would revoke the caller's own token of that name.
+A name is judged as it is stored, so surrounding space hides nothing.
+
+| Name | Treatment |
+|---|---|
+| A product, branch or tag, or variant, declared or renamed | Refused |
+| A key, token, saved filter, team, label, supplier, outbound destination or approval batch | Refused |
+| A person recorded by an administrator or by configuration | Refused |
+| An identity provider's configured name | The process does not start (`docs/configuration.md`) |
+| A person a group mapping would record at sign-in | Refused as any unknown arrival is, saying nothing of why |
+| A component in an inventory, other than its root | The inventory is refused (`design-docs/ingest-parsing.md` § Tolerated and refused) |
+| An inventory's root | Filed under the product's name, as a root the document does not name is; a producer scanning the current directory names it `.` |
+| A source package a component names | No source: the component is filed as one with none named |
+| An issue name in scanner output | No name: the issue goes by its others, and one with none is refused |
+| A display name | Accepted; it is never a path segment |
+| More dots, or dots within a name | Accepted; a browser sends them as written |
+
 ## Engine differences
 
 Only column declarations differ; everything queried is portable.

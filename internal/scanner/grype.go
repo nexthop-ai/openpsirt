@@ -422,7 +422,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	epss := firstEPSS(match.Vulnerability.EPSS)
 	named, primary := weaknesses(match.Vulnerability.CWEs)
 	return &finding.Reported{
-		Issue: finding.Named{
+		Issue: finding.Addressed(finding.Named{
 			Identifier:           match.Vulnerability.ID,
 			Aliases:              aliases,
 			Severity:             strings.ToLower(match.Vulnerability.Severity),
@@ -442,7 +442,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 			Ratings:              ratings,
 			Weaknesses:           named,
 			PrimaryWeakness:      primary,
-		},
+		}),
 		Component: graph.Described{
 			Name: match.Artifact.Name, Version: match.Artifact.Version,
 			Purl: match.Artifact.Purl,

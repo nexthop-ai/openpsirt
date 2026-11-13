@@ -65,6 +65,7 @@ tested against it (`design-docs/notifications.md` § Links).
 |---|---|
 | Every route in the table is mounted | An entry with no screen lands on the not-found screen |
 | An address built from parts is built in one module, from the table, which alone escapes a part as a path segment; a query added to an address built elsewhere is built there too | A name holding a slash or a question mark otherwise becomes a second segment or a query |
+| An address with a part of `.` or `..`, to a screen or to a file, is the front page; an API request with such a path value is never sent | No escaping keeps a dot segment, so the address would reach the one above (`design-docs/data-model.md` § Dot segments) |
 | A builder names the parameters it sets: a product, a build, a version, never a query string | The findings list, the audit log, the dependency tree and the two comparisons take a query, because they write their filters into their own address |
 | A component link carries the build it was reached from, and the version where the row has one; a by-upgrade row names binaries under one source version and carries none | The component screen opens on the graph somebody was reading; a name at two versions is two components |
 | A build's screen moved to another build keeps the address's own segments, cutting the tail from the address as it stands | The router hands the tail back with escaped slashes restored |

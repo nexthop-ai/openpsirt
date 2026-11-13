@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it } from "vitest";
-import { api, csrf, csrfCookie } from "./client";
+import { api, csrf, csrfCookie, dotSegments } from "./client";
 
 // The `__Host-` prefix is the only thing stopping a sibling host under the
 // same registrable domain writing a cookie this deployment then reads. Two
@@ -97,5 +97,44 @@ describe("the application's client", () => {
       },
     } as never);
     expect(seen?.headers.get("X-CSRF-Token")).toBe("ours");
+  });
+});
+
+describe("a request naming a dot segment", () => {
+  it("is answered as a refusal before it is sent", async () => {
+    // The browser would send it to the route above: deleting a branch named
+    // ".." would ask to delete its product.
+    const ask = (branch_or_tag: string) =>
+      dotSegments.onRequest?.({
+        request: new Request("http://psirt.example/v1/products/sonic"),
+        schemaPath: "/v1/products/{product}/branches-and-tags/{branch_or_tag}",
+        params: { path: { product: "sonic", branch_or_tag } },
+        options: {} as never,
+        id: "1",
+      });
+    for (const dots of [".", ".."]) {
+      const answered = await ask(dots);
+      expect(answered).toBeInstanceOf(Response);
+      expect((answered as Response).status).toBe(400);
+      expect(await (answered as Response).text()).toContain("{branch_or_tag}");
+    }
+    expect(await ask("...")).toBeUndefined();
+  });
+
+  // The middleware does nothing unless the client every screen uses runs it.
+  // Sent, revoking a token of a person named ".." would revoke the caller's
+  // own token of that name.
+  it("is never sent by the client every screen uses", async () => {
+    let sent = false;
+    const out = await api.DELETE("/v1/people/{identity}/tokens/{name}", {
+      params: { path: { identity: "..", name: "build" } },
+      baseUrl: "http://psirt.example",
+      fetch: async () => {
+        sent = true;
+        return new Response(null, { status: 204 });
+      },
+    } as never);
+    expect(sent).toBe(false);
+    expect(out.response.status).toBe(400);
   });
 });

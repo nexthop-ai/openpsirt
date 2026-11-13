@@ -801,6 +801,9 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 	if row.Name == "" || row.Kind == "" {
 		return nil, refusal.Errorf("a destination needs a name and a kind")
 	}
+	if err := typedname.Addressable("a destination's name", d.Name); err != nil {
+		return nil, err
+	}
 	// A kind nothing is ever of is a destination that never receives
 	// anything, listed as configured and working.
 	if row.Kind != Everything && !slices.Contains(Kinds(), Kind(row.Kind)) {

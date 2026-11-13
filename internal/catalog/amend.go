@@ -26,7 +26,7 @@ import (
 // the caller, which is where that is known. This refuses nothing on that
 // ground and is not the place the rule is enforced.
 func (s *Store) RenameVariant(ctx context.Context, productID, variantID int64, name string) error {
-	if err := validName("variant", name); err != nil {
+	if err := validAddressedName("variant", name); err != nil {
 		return err
 	}
 	existing, err := s.VariantByName(ctx, productID, name)
@@ -94,7 +94,7 @@ func (s *Store) restoreVariant(ctx context.Context, variantID int64) (bool, erro
 // documents show and is corrected separately, because it is text rather than
 // something anything is identified by.
 func (s *Store) RenameProduct(ctx context.Context, productID int64, name string) error {
-	if err := validName("product", name); err != nil {
+	if err := validAddressedName("product", name); err != nil {
 		return err
 	}
 	existing, err := s.ProductByName(ctx, name)
@@ -157,7 +157,7 @@ func (s *Store) restoreProduct(ctx context.Context, productID int64) (bool, erro
 // spelling shown back are derived from one string, and a release has no
 // display name of its own that anything sets apart from it.
 func (s *Store) RenameBranchOrTag(ctx context.Context, productID, branchOrTagID int64, name string) error {
-	if err := validName("release", name); err != nil {
+	if err := validAddressedName("release", name); err != nil {
 		return err
 	}
 	existing, err := s.BranchOrTagByName(ctx, productID, name)

@@ -832,3 +832,31 @@ func TestTheCatalogListingDayIsTheEarliestReadableOne(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestAnIssueNamedAsADotSegmentGoesByItsOtherName(t *testing.T) {
+	// Every address about an issue carries its name as a path segment, and a
+	// browser resolves "." and ".." away.
+	raw, err := os.ReadFile("testdata/grype-output.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dots := range []string{".", ".."} {
+		body := strings.Replace(string(raw), `"GHSA-45x7-px36-x8w8"`, fmt.Sprintf("%q", dots), 1)
+		result, err := scanner.ParseGrype(strings.NewReader(body), scanner.Limits{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var named bool
+		for _, r := range result.Reported {
+			if r.Issue.Identifier == dots || slices.Contains(r.Issue.Aliases, dots) {
+				t.Errorf("an issue still goes by %q", dots)
+			}
+			if r.Issue.Identifier == "CVE-2023-48795" && r.Component.Name == "golang.org/x/crypto" {
+				named = true
+			}
+		}
+		if !named {
+			t.Errorf("the issue named %q is not filed under its other name", dots)
+		}
+	}
+}

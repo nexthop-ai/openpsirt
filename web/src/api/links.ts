@@ -40,20 +40,48 @@ function encoded(query: Asked | undefined): string {
   return out.toString();
 }
 
+// Whether a value is a dot segment once it is a path segment.
+//
+// A browser resolves "." and ".." before the request is sent, percent-encoded
+// or not, so no escaping reaches the thing named and the address lands on the
+// one above it.
+export function dotSegment(value: string | number): boolean {
+  return value === "." || value === "..";
+}
+
+// A pattern with each placeholder the expression finds replaced by its value,
+// escaped as one path segment, or nothing where any value is a dot segment,
+// which no escaping keeps.
+export function filledIn(
+  pattern: string,
+  placeholder: RegExp,
+  value: (name: string) => string | number,
+): string | undefined {
+  let climbs = false;
+  const filled = pattern.replace(placeholder, (_, name: string) => {
+    const part = value(name);
+    if (dotSegment(part)) climbs = true;
+    return encodeURIComponent(String(part));
+  });
+  return climbs ? undefined : filled;
+}
+
 // The address one route answers at, each placeholder filled and escaped for a
 // path segment. A placeholder left without a value is refused rather than sent
-// as its own name.
+// as its own name. A value that is a dot segment yields the front page, as
+// the server's notification links do: anywhere else is a different page.
 export function linkTo<P extends keyof paths & string>(
   path: P,
   ...[given]: [Placeholders<P>] extends [never] ? [Filled<never>?] : [Filled<Placeholders<P>>]
 ): string {
   const values: Record<string, string | number> = given?.path ?? {};
-  const filled = path.replace(/\{([^}]+)\}/g, (_, name: string) => {
+  const filled = filledIn(path, /\{([^}]+)\}/g, (name) => {
     if (!Object.hasOwn(values, name)) {
       throw new Error(`${path} needs a value for {${name}}`);
     }
-    return encodeURIComponent(String(values[name]));
+    return values[name] as string | number;
   });
+  if (filled === undefined) return "/";
   const query = encoded(given?.query);
   return query ? filled + "?" + query : filled;
 }

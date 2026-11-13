@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
 
@@ -390,3 +391,16 @@ var errNothingAnswered = errNothing("nothing answered at that address")
 type errNothing string
 
 func (e errNothing) Error() string { return string(e) }
+
+// A supplier's name is the last segment of the address that withdraws it.
+// Named "..", that address is the product's own.
+func TestASupplierNamedAsADotSegmentIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *configured) {
+		store := supplier.NewStore(f.db.DB)
+		for _, name := range []string{".", ".."} {
+			if _, err := store.Add(t.Context(), f.admin, f.product, name, described); !refusal.In(err) {
+				t.Errorf("a supplier named %q answered %v, want a refusal", name, err)
+			}
+		}
+	})
+}

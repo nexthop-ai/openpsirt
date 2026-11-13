@@ -72,12 +72,15 @@ type OutcomeBody struct {
 
 // WhoBody is the caller, as the caller.
 type WhoBody struct {
-	Identity string    `json:"identity" doc:"The identity this deployment holds for them"`
-	Name     string    `json:"name" doc:"The display name, where one is recorded"`
-	Admin    bool      `json:"admin" doc:"Administers this deployment"`
-	Audits   bool      `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
-	Kind     string    `json:"kind" enum:"person" doc:"Always a person. A pipeline key is refused this route"`
-	Reach    []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
+	Identity string `json:"identity" doc:"The identity this deployment holds for them"`
+	Name     string `json:"name" doc:"The display name, where one is recorded"`
+	Admin    bool   `json:"admin" doc:"Administers this deployment"`
+	Audits   bool   `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
+	Kind     string `json:"kind" enum:"person" doc:"Always a person. A pipeline key is refused this route"`
+	// ByProxy says signing out happens at the proxy. The menu offers a
+	// sign-out only where this deployment holds a session to end.
+	ByProxy bool      `json:"by_proxy,omitempty" doc:"Whether the trusted proxy in front of this deployment signed this browser in, so that signing out happens there"`
+	Reach   []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
 	// Collaborates says a screen has their own cases to ask for: a grant on
 	// one issue or one code finding reaches nothing in Reach.
 	Collaborates bool `json:"collaborates,omitempty" doc:"They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names"`
@@ -138,6 +141,7 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		body := WhoBody{
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{}, Outcomes: outcomeBodies(),
+			ByProxy: access.FromBrowserWithoutSession(access.SessionFrom(ctx)),
 		}
 		// Each of these fails the answer rather than being left out. Omitted, a
 		// limit reads to the interface as no limit at all.

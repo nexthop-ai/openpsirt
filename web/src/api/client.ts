@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import createClient, { type Middleware } from "openapi-fetch";
+import { dotSegment } from "./links";
 import type { components, paths } from "./schema";
 
 // A response shape, by the name the OpenAPI document gives it.
@@ -24,6 +25,27 @@ export const api = createClient<paths>({
   // authentication here.
   credentials: "same-origin",
 });
+
+// A request with a path value that is a dot segment is answered here, as a
+// refusal, and never sent: the browser would resolve it away, so the request
+// would reach another route, and revoking a token of a person named ".."
+// would revoke the caller's own token of that name. Answered
+// rather than thrown, so a caller reads it as it reads any refusal. Exported
+// so the rule can be pinned without a server.
+export const dotSegments: Middleware = {
+  onRequest({ params }) {
+    for (const [name, value] of Object.entries(params.path ?? {})) {
+      if ((typeof value === "string" || typeof value === "number") && dotSegment(value)) {
+        const detail = `{${name}} is "${String(value)}", which no address can carry`;
+        return new Response(JSON.stringify({ status: 400, title: "Bad Request", detail }), {
+          status: 400,
+          headers: { "Content-Type": "application/problem+json" },
+        });
+      }
+    }
+    return undefined;
+  },
+};
 
 // csrfCookie is the value a page has to echo on a write.
 //
@@ -87,4 +109,4 @@ export const csrf: Middleware = {
   },
 };
 
-api.use(csrf);
+api.use(dotSegments, csrf);

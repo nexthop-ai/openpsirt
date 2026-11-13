@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Account is somebody who has been granted access.
@@ -343,6 +344,9 @@ func (s *Store) Restate(ctx context.Context, identity, displayName string,
 	identity = Folded(identity)
 	if identity == "" {
 		return nil, nil, ErrNoIdentity
+	}
+	if err := typedname.Addressable("an identity", identity); err != nil {
+		return nil, nil, err
 	}
 	// The read and the write are one act, taken again whole where another
 	// writer recorded the same person first: the second pass finds the row

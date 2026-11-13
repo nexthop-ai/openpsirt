@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Link is somewhere a person can read about this, worked out from what is held
@@ -263,13 +264,12 @@ func alpineBranch(distro string) string {
 
 // segment escapes one name into one path segment.
 //
-// A segment of nothing but dots is refused rather than escaped. "." and ".."
-// are resolved by the browser before the request is sent, so a component named
-// that would quietly reach a different page on the same site — and nothing
-// that is really a package is called "..". Everything else, separators
-// included, is escaped into the segment it belongs to.
+// A dot segment is refused. "." and ".." are resolved by
+// the browser before the request is sent, so a component named that would
+// quietly reach a different page on the same site. Everything else,
+// separators included, is escaped into the segment it belongs to.
 func segment(name string) (string, bool) {
-	if name == "" || strings.Trim(name, ".") == "" {
+	if name == "" || typedname.DotSegment(name) {
 		return "", false
 	}
 	return url.PathEscape(name), true

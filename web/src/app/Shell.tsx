@@ -28,7 +28,7 @@ import {
 import { asAsked, listQuery } from "../screens/list";
 import { unownedAt, useUnowned, type Unowned } from "../screens/unowned";
 import { folded, fold } from "./rail";
-import { signedOutBy, signOut } from "./session";
+import { clearHere, signedOutBy, signOut, type SignOutAnswer } from "./session";
 import { counted, heldLine, holding, readsUndisclosed } from "./families";
 import { Scope } from "./Scope";
 import { codeTrendAt } from "../screens/codeTrend";
@@ -821,7 +821,10 @@ function Me({ who }: { who: Who }) {
   // A sign-out in flight, and one the server did not complete, which keeps
   // the page and offers it again.
   const [leaving, setLeaving] = useState(false);
-  const [stuck, setStuck] = useState(false);
+  const [stuck, setStuck] = useState<Exclude<SignOutAnswer, "ended"> | null>(null);
+  // Said by the answer about the reader, or learned from a refused sign-out
+  // where that answer predates it.
+  const atTheProxy = who.by_proxy || stuck === "at-the-proxy";
   // The choice made, and the machine's own answer. They differ for somebody who
   // has chosen nothing: the operating system is answering, and the menu has to
   // show which of the two that came out as while still marking the choice as
@@ -912,32 +915,56 @@ function Me({ who }: { who: Who }) {
             Your account
             <span className="tag">tokens, digest</span>
           </Link>
-          <button
-            type="button"
-            className="opt"
-            role="menuitem"
-            // The sequence lives in session.ts, where its ordering can be
-            // asserted: what makes it correct is which parts run before the
-            // await and outside the try, and a click handler is not somewhere
-            // a test can reach that from.
-            disabled={leaving}
-            onClick={() => {
-              setLeaving(true);
-              setStuck(false);
-              void signOut(
-                async () => signedOutBy((await api.DELETE("/v1/session", {})).response.status),
-                (where) => window.location.assign(where),
-              ).then((ended) => {
-                if (ended) return;
-                setLeaving(false);
-                setStuck(true);
-              });
-            }}
-          >
-            {stuck ? "Try signing out again" : "Sign out"}
-            <span className="tag">{who.identity}</span>
-          </button>
-          {stuck && (
+          {/* A sign-in the proxy holds ends at the proxy: there is no session
+              here to end, and the proxy signs the next request back in. */}
+          {atTheProxy && (
+            <p
+              className="hint"
+              role={stuck === "at-the-proxy" ? "alert" : undefined}
+              style={{ margin: "4px 10px" }}
+            >
+              Your proxy signed you in as {who.identity}. Sign out there.
+            </p>
+          )}
+          {atTheProxy && (
+            <button
+              type="button"
+              className="opt"
+              role="menuitem"
+              onClick={() => clearHere(() => window.location.reload())}
+            >
+              Clear this browser
+              <span className="tag">drafts and screen state</span>
+            </button>
+          )}
+          {!atTheProxy && (
+            <button
+              type="button"
+              className="opt"
+              role="menuitem"
+              // The sequence lives in session.ts, where its ordering can be
+              // asserted: what makes it correct is which parts run before the
+              // await and outside the try, and a click handler is not somewhere
+              // a test can reach that from.
+              disabled={leaving}
+              onClick={() => {
+                setLeaving(true);
+                setStuck(null);
+                void signOut(
+                  async () => signedOutBy((await api.DELETE("/v1/session", {})).response.status),
+                  (where) => window.location.assign(where),
+                ).then((answer) => {
+                  if (answer === "ended") return;
+                  setLeaving(false);
+                  setStuck(answer);
+                });
+              }}
+            >
+              {stuck === "not-ended" ? "Try signing out again" : "Sign out"}
+              <span className="tag">{who.identity}</span>
+            </button>
+          )}
+          {stuck === "not-ended" && (
             <p className="hint" role="alert" style={{ margin: "4px 10px" }}>
               Sign-out didn&rsquo;t reach the server. You&rsquo;re still signed in here.
             </p>

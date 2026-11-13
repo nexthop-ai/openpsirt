@@ -19,6 +19,17 @@ describe("an address a browser fetches directly", () => {
     expect(linkTo("/v1/findings")).toBe("/v1/findings");
   });
 
+  it("is the front page where a placeholder is a dot segment", () => {
+    // A browser resolves "." and ".." before it fetches, percent-encoded or
+    // not, so the address would reach the route above the thing it names.
+    for (const advisory of [".", ".."]) {
+      expect(linkTo("/v1/advisories/{advisory}/document", { path: { advisory } })).toBe("/");
+    }
+    expect(linkTo("/v1/advisories/{advisory}/document", { path: { advisory: "..." } })).toBe(
+      "/v1/advisories/.../document",
+    );
+  });
+
   it("refuses a placeholder left without a value", () => {
     const unfilled = { path: {} } as unknown as { path: { advisory: string } };
     expect(() => linkTo("/v1/advisories/{advisory}/document", unfilled)).toThrow("{advisory}");

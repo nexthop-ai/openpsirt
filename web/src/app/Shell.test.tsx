@@ -4,8 +4,18 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Shell } from "./Shell";
-import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
+import { answer, location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Who } from "./session";
+import { keep, restore } from "./drafts";
+
+// A full load has no meaning in a test, and jsdom will not let one be
+// replaced, so the reload clearing this browser asks for is recorded here and
+// everything else it does runs as written.
+const reloaded = vi.fn();
+vi.mock("./session", async (actual) => {
+  const session = await actual<typeof import("./session")>();
+  return { ...session, clearHere: () => session.clearHere(reloaded) };
+});
 
 const mount = mounted();
 
@@ -54,6 +64,72 @@ describe("the top search", () => {
     const at = await searched("openssl", { status: 503 });
     expect(at).toBe("/start");
     expect(mount.host().textContent).toContain("could not be looked up");
+  });
+});
+
+// The sign-out under the person's menu, for one answer from the server.
+async function signedOut(status: number): Promise<string> {
+  serve(() => ({ data: { items: [], total: 0 } }));
+  answer("DELETE", (path) => (path === "/v1/session" ? { status } : undefined));
+  mount.render(screen(<Shell who={who}>{null}</Shell>, "/start"));
+  await settle();
+  const press = (label: string) =>
+    Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.getAttribute("aria-label") === label || each.textContent?.startsWith(label),
+    );
+  await act(async () => press("You")?.click());
+  await act(async () => press("Sign out")?.click());
+  await settle();
+  // Still here: leaving would be the signed-out page.
+  expect(location()).toBe("/start");
+  return mount.host().textContent ?? "";
+}
+
+describe("signing out", () => {
+  it("is not offered where the proxy signed the reader in, and says where it happens", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    const sent = answer("DELETE", () => ({ status: 204 }));
+    mount.render(screen(<Shell who={{ ...who, by_proxy: true }}>{null}</Shell>, "/start"));
+    await settle();
+    const you = mount.host().querySelector<HTMLButtonElement>('button[aria-label="You"]');
+    await act(async () => you?.click());
+    const buttons = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);
+    expect(buttons.some((text) => text?.startsWith("Sign out"))).toBe(false);
+    expect(mount.host().textContent).toContain("Sign out there");
+    expect(mount.host().textContent).toContain(who.identity);
+    expect(buttons.some((text) => text?.startsWith("Clear this browser"))).toBe(true);
+    expect(sent()).toHaveLength(0);
+  });
+
+  it("clears drafts and reloads where the proxy signed the reader in", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    keep("revise:9", "text nobody outside should ever see");
+    reloaded.mockClear();
+    mount.render(screen(<Shell who={{ ...who, by_proxy: true }}>{null}</Shell>, "/start"));
+    await settle();
+    const press = (label: string) =>
+      Array.from(mount.host().querySelectorAll("button")).find(
+        (each) => each.getAttribute("aria-label") === label || each.textContent?.startsWith(label),
+      );
+    await act(async () => press("You")?.click());
+    await act(async () => press("Clear this browser")?.click());
+    expect(restore("revise:9")).toBe("");
+    expect(reloaded).toHaveBeenCalledTimes(1);
+  });
+
+  it("says to sign out at the proxy where the proxy signed the reader in", async () => {
+    const said = await signedOut(409);
+    expect(said).toContain("Sign out there");
+    // Offered again, it would clear the drafts again and be refused again.
+    const offered = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);
+    expect(offered.some((text) => text?.startsWith("Sign out"))).toBe(false);
+    expect(said).not.toContain("didn’t reach the server");
+  });
+
+  it("offers it again where the server did not end the session", async () => {
+    const said = await signedOut(503);
+    expect(said).toContain("Try signing out again");
+    expect(said).not.toContain("Sign out there");
   });
 });
 

@@ -156,13 +156,26 @@ func TestNothingAProducerWroteCanSteerALinkOffItsHost(t *testing.T) {
 				t.Errorf("%q produced scheme %q", purl, parsed.Scheme)
 			}
 			for _, part := range strings.Split(parsed.EscapedPath(), "/") {
-				if part != "" && strings.Trim(part, ".") == "" {
+				if dots := strings.ReplaceAll(strings.ToLower(part), "%2e", "."); dots == "." || dots == ".." {
 					t.Errorf("%q produced a path a browser resolves away: %q", purl, parsed.EscapedPath())
 				}
 			}
 			if parsed.Host == "" || strings.ContainsAny(parsed.Host, "/@") {
 				t.Errorf("%q produced host %q", purl, parsed.Host)
 			}
+		}
+	}
+}
+
+func TestAPackageNamedWithThreeDotsIsLinked(t *testing.T) {
+	// A browser resolves "." and ".." alone; it sends more dots as written.
+	for _, purl := range []string{"pkg:cargo/...@1.0", "pkg:cargo/openssl@..."} {
+		linked := false
+		for _, link := range links("CVE-2025-1000", nil, purl) {
+			linked = linked || strings.Contains(link.URL, "/...")
+		}
+		if !linked {
+			t.Errorf("%q produced no link to its package", purl)
 		}
 	}
 }

@@ -151,6 +151,35 @@ describe("an address refiled under another name", () => {
   });
 });
 
+describe("an address naming a dot segment", () => {
+  // A browser resolves "." and ".." before it navigates, percent-encoded or
+  // not, so the address would open the screen above the thing it names.
+  const ok = { product: "sonic", branch_or_tag: "main", variant: "x" };
+  for (const dots of [".", ".."]) {
+    it(`is the front page where a part is "${dots}"`, () => {
+      const built = [
+        routes.productAt(dots),
+        routes.branchOrTagAt("sonic", dots),
+        routes.variantsAt(dots),
+        routes.componentAt("sonic", dots),
+        routes.findingAt({ ...ok, variant: dots }, { vulnerability: "CVE-1", component: "a" }),
+        routes.findingAt(ok, { vulnerability: "CVE-1", component: dots }),
+        routes.issueAt(dots),
+        routes.sameScreenAt({ ...ok, branch_or_tag: dots }, "uploads"),
+        routes.refiled(routes.issueAt("CVE-1"), "CVE-1", dots),
+      ];
+      for (const at of built) expect(at).toBe("/");
+    });
+  }
+
+  it("is left alone where dots are only part of a name", () => {
+    for (const name of ["...", "release-2.4", ".hidden"]) {
+      const at = routes.branchOrTagAt("sonic", name);
+      expect(new URL(at, "http://psirt.example").pathname).toBe(at);
+    }
+  });
+});
+
 describe("every address the interface builds", () => {
   it("has a sample here for every builder, and a builder for every sample", () => {
     const builders = Object.entries(routes)

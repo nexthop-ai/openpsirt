@@ -82,6 +82,9 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 	if matched == "" {
 		return nil, false, refusal.Errorf("a team needs a name")
 	}
+	if err := typedname.Addressable("a team's name", name); err != nil {
+		return nil, false, err
+	}
 	shown := strings.TrimSpace(displayName)
 	// A longer name is refused. Cut, the name stored and the name typed
 	// would differ, and declaring the typed one again would make a second

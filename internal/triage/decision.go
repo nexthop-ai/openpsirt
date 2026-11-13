@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Decision is one proposer's action: what an approver reads and agrees to.
@@ -431,6 +432,11 @@ type DecisionApproved struct {
 func (s *Store) ApproveDecision(ctx context.Context, subject access.Subject, decisionID int64,
 	batch string, except []int64, because string) (*DecisionApproved, error) {
 
+	// Undone by its name in the path, stored as written, so a dot segment
+	// could never be undone.
+	if err := typedname.Unclimbing("a batch's name", batch); err != nil {
+		return nil, err
+	}
 	if len(except) > 0 {
 		if strings.TrimSpace(because) == "" {
 			return nil, refusal.Errorf("say why those are set aside: rows returned with no reason " +

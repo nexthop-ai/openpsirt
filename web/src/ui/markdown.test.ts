@@ -97,6 +97,26 @@ describe("the renderer", () => {
     expect(out).toContain('rel="noreferrer noopener nofollow"');
   });
 
+  it("opens a link that leaves this deployment in another tab", () => {
+    // Followed in place, a link out replaces the finding or the half-written
+    // decision the reader was on. Asserted on the attribute a browser reads:
+    // any other name renders and is ignored.
+    for (const source of [
+      "[the advisory](https://example.com/a)",
+      "see CVE-2026-31431",
+      "see GHSA-cfh5-3ghh-wfjx",
+    ]) {
+      const host = document.createElement("div");
+      host.innerHTML = render(source);
+      const links = Array.from(host.querySelectorAll("a[href]"));
+      expect(links, source).toHaveLength(1);
+      for (const link of links) {
+        expect(link.getAttribute("target"), source).toBe("_blank");
+        expect(link.getAttributeNames(), source).not.toContain("build");
+      }
+    }
+  });
+
   it("keeps a link to somewhere in this deployment", () => {
     // design-docs/text.md: one finding referring to another is ordinary, and the
     // submission check accepts it. The sanitizer keeps the anchor, so a link
@@ -106,6 +126,24 @@ describe("the renderer", () => {
     // Ours, so it opens here rather than being sent away with a policy meant
     // for somebody else's site.
     expect(out).not.toContain('target="_blank"');
+  });
+
+  it("leaves a mail link without a tab of its own", () => {
+    const host = document.createElement("div");
+    host.innerHTML = render("[mail us](mailto:x@example.com)");
+    const link = host.querySelector("a[href]");
+    expect(link?.getAttribute("href")).toBe("mailto:x@example.com");
+    expect(link?.getAttribute("target")).toBeNull();
+    expect(link?.getAttribute("rel")).toBe("noreferrer noopener nofollow");
+  });
+
+  it("opens an absolute link to this deployment in place", () => {
+    const ours = `${window.location.origin}/findings/CVE-2026-1000`;
+    const host = document.createElement("div");
+    host.innerHTML = render(`See [the other one](${ours}).`);
+    const link = host.querySelector("a[href]");
+    expect(link?.getAttribute("href")).toBe(ours);
+    expect(link?.getAttribute("target")).toBeNull();
   });
 
   it("does not mistake a protocol-relative address for one of ours", () => {

@@ -226,11 +226,14 @@ function anchor(node: Element) {
       return;
     }
     node.removeAttribute("href");
-  } else {
-    // Nothing linked from here is ours. No referrer, and no handle back to
-    // this window from whatever opens.
+  } else if (!sameDeployment(href)) {
+    // Somewhere else. No referrer, and no handle back to this window from
+    // whatever opens. An absolute link to this deployment is a page of ours
+    // and opens in place, as a relative one does.
     node.setAttribute("rel", "noreferrer noopener nofollow");
-    node.setAttribute("build", "_blank");
+    // A page opens in another tab, so the one being read stays. A mail link
+    // opens a mail program, and another tab would be left empty.
+    if (!/^mailto:/i.test(href)) node.setAttribute("target", "_blank");
   }
 }
 
@@ -319,7 +322,7 @@ function autolink(root: Element | DocumentFragment) {
       const link = document.createElement("a");
       link.setAttribute("href", hit.href);
       link.setAttribute("rel", "noreferrer noopener nofollow");
-      link.setAttribute("build", "_blank");
+      link.setAttribute("target", "_blank");
       link.textContent = hit.id;
       pieces.append(link);
       cursor = hit.end;
@@ -355,9 +358,11 @@ export function render(source: string): string {
     // document as well as set by the hook. What stops an author supplying
     // them is that raw markup is off at the parser (`html: false` above), so
     // no author-written attribute reaches the sanitizer at all — and that is
-    // the control to keep, not this list. These are here so the hook's own
-    // additions survive attribute sanitizing.
-    ADD_ATTR: ["rel", "build", "loading", "referrerpolicy"],
+    // the control to keep, not this list. Listed is what the hook sets on
+    // an image before attribute sanitizing, which has to survive it.
+    // `rel` and `target` are set on a link after sanitizing, so neither is
+    // listed: nothing judges them, and an author can supply neither.
+    ADD_ATTR: ["loading", "referrerpolicy"],
     ALLOW_DATA_ATTR: false,
     ALLOW_ARIA_ATTR: false,
     // Returned as nodes rather than as a string, so that the identifiers below

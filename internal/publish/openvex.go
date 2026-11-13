@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
@@ -157,12 +158,12 @@ func (g *Generator) openVEXDocument(product *catalog.Product, branchOrTag, branc
 
 // segment is a name as one segment of a path.
 //
-// Escaped the way a path segment is, and a name that is only dots escaped
-// further, since a client resolves "." and ".." before asking.
+// Escaped the way a path segment is. A dot segment, which declaration refuses,
+// is escaped further, since a client that does not resolve "%2E" would
+// otherwise climb; more dots are sent as written.
 func segment(name string) string {
-	escaped := url.PathEscape(name)
-	if strings.Trim(escaped, ".") == "" {
-		return strings.ReplaceAll(escaped, ".", "%2E")
+	if typedname.DotSegment(name) {
+		return strings.ReplaceAll(name, ".", "%2E")
 	}
-	return escaped
+	return url.PathEscape(name)
 }

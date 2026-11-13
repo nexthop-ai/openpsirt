@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Limits bound what a document may contain.
@@ -261,14 +262,34 @@ func countUnversioned(components []graph.Described) int {
 // root is excluded from identity and from expiry precisely because its version
 // changes on every build and its name differs per variant, so what it says
 // about itself was never load-bearing.
+//
+// A root named "." or ".." takes the unit's name, on the root and on every
+// edge to it: a finding on the build itself is addressed by its component
+// name, which a browser would resolve away. A producer scanning the current
+// directory names its root ".".
 func (d *Document) Snapshot(target graph.Described) graph.Snapshot {
 	root := d.Root
-	if !d.RootDeclared {
+	dependencies := d.Dependencies
+	switch {
+	case !d.RootDeclared:
 		root = target
+	case typedname.DotSegment(strings.TrimSpace(root.Name)):
+		was := root.Identity()
+		root.Name = target.Name
+		dependencies = make([]graph.Dependency, len(d.Dependencies))
+		for i, dep := range d.Dependencies {
+			if dep.Parent.Identity() == was {
+				dep.Parent.Name = target.Name
+			}
+			if dep.Child.Identity() == was {
+				dep.Child.Name = target.Name
+			}
+			dependencies[i] = dep
+		}
 	}
 	return graph.Snapshot{
 		Root:         root,
 		Components:   d.Components,
-		Dependencies: d.Dependencies,
+		Dependencies: dependencies,
 	}
 }

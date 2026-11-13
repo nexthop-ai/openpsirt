@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // refEdge is one declared dependency, still named by the identifiers the file
@@ -443,11 +444,27 @@ func (c *reader) finish() (*Document, error) {
 	c.resolveUpstream()
 	c.spdx3Licensing()
 	rootIdentity := c.doc.Root.Identity()
+	// A source package is addressed by its name as a path segment too, so a
+	// source named "." or ".." is no source: from a package identifier, a
+	// pedigree, or a root of that name copied as an ancestor. Before the
+	// edges, which carry these descriptions. Names are checked trimmed, as
+	// they are stored.
+	for i := range c.described {
+		if typedname.DotSegment(strings.TrimSpace(c.described[i].UpstreamName)) {
+			c.described[i].UpstreamName, c.described[i].UpstreamVersion = "", ""
+		}
+	}
 
 	c.doc.Components = make([]graph.Described, 0, len(c.described))
 	for _, described := range c.described {
 		if described.Identity() == rootIdentity {
 			continue
+		}
+		// Every address about a component carries its name as a path
+		// segment, stored trimmed, and a browser resolves "." and ".." away.
+		// The root is exempt: a snapshot names it after the build.
+		if err := typedname.Unclimbing("component name", strings.TrimSpace(described.Name)); err != nil {
+			return nil, refusal.Errorf("%w, so it cannot be tracked", err)
 		}
 		c.doc.Components = append(c.doc.Components, described)
 	}

@@ -182,9 +182,19 @@ func validName(what, name string) error {
 	return nil
 }
 
+// validAddressedName is validName for a name that is also a path segment in
+// every address about the thing it names. A display name is checked by
+// validName alone.
+func validAddressedName(what, name string) error {
+	if err := validName(what, name); err != nil {
+		return err
+	}
+	return typedname.Addressable(what+" name", name)
+}
+
 // DeclareProduct records a product so scans may be filed against it.
 func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*Product, error) {
-	if err := validName("product", name); err != nil {
+	if err := validAddressedName("product", name); err != nil {
 		return nil, err
 	}
 	// Trimmed and checked the way the name is, which the two siblings get by
@@ -791,7 +801,7 @@ func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error
 
 // DeclareBranchOrTag records a branch or tag of a product.
 func (s *Store) DeclareBranchOrTag(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*BranchOrTag, error) {
-	if err := validName("branch_or_tag", name); err != nil {
+	if err := validAddressedName("branch_or_tag", name); err != nil {
 		return nil, err
 	}
 	if !kind.Valid() {
@@ -841,7 +851,7 @@ func (s *Store) BranchOrTagByName(ctx context.Context, productID int64, name str
 // spellings are three sets of findings with nothing saying they belong
 // together.
 func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string, customerFacing bool) (*Variant, error) {
-	if err := validName("variant", name); err != nil {
+	if err := validAddressedName("variant", name); err != nil {
 		return nil, err
 	}
 	if _, err := s.VariantByName(ctx, productID, name); err == nil {

@@ -84,9 +84,9 @@ func matches(pattern, path string) bool {
 		return false
 	}
 	for i := range want {
-		// A browser resolves a segment of dots alone, percent-encoded or
-		// not, before the request leaves it.
-		if dots := strings.Trim(strings.ReplaceAll(strings.ToLower(got[i]), "%2e", "."), "."); dots == "" && got[i] != "" {
+		// A browser resolves a segment of "." or "..", percent-encoded or
+		// not, before the request leaves it. More dots are sent as written.
+		if dots := strings.ReplaceAll(strings.ToLower(got[i]), "%2e", "."); dots == "." || dots == ".." {
 			return false
 		}
 		if strings.HasPrefix(want[i], ":") {
@@ -123,6 +123,8 @@ func TestAnAddressIsHeldToTheRouteTable(t *testing.T) {
 		{"/issues/..", true},
 		{"/issues/%2E%2E", true},
 		{"/issues/.", true},
+		{"/issues/...", false},
+		{"/issues/%2E%2E%2E", false},
 	} {
 		why := unrouted(known, tc.address)
 		if tc.reported && why == "" {
@@ -194,12 +196,16 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		if !sampled {
 			continue
 		}
-		// A name of dots alone, which a browser resolves rather than sends.
-		for _, sample := range []string{odd, "..", "."} {
+		// A name of "." or "..", which a browser resolves rather than sends,
+		// and one of three dots, which it sends as written.
+		for _, sample := range []string{odd, "..", ".", "..."} {
 			address := build(sample)
 			if why := unrouted(known, address); why != "" {
 				t.Errorf("weblink.%s(%q) built %s: %s", name, sample, address, why)
 			}
+		}
+		if build("a") != build("b") && !strings.Contains(build("..."), "...") {
+			t.Errorf("weblink.%s(%q) built %s, which drops a name a browser sends as written", name, "...", build("..."))
 		}
 	}
 }

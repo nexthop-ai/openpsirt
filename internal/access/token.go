@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Credential prefixes.
@@ -71,6 +72,9 @@ func (s *Store) NewToken(ctx context.Context, personID int64, name string, produ
 	name = credentialNamed(name)
 	if name == "" {
 		return nil, "", refusal.Errorf("a token needs a name, so its owner can tell it from the others")
+	}
+	if err := typedname.Addressable("a token's name", name); err != nil {
+		return nil, "", err
 	}
 	if ceiling <= 0 {
 		ceiling = MaxTokenLifetime

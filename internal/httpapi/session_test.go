@@ -193,6 +193,38 @@ func TestSigningOutStopsTheCookieWorking(t *testing.T) {
 	})
 }
 
+func TestSigningOutThroughTheProxyIsRefusedRatherThanAnsweredAsDone(t *testing.T) {
+	// The proxy signs the next request back in from its own cookie, so a 204
+	// here tells somebody they left while they are still signed in.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		out := r.Body(t, "reader", http.MethodDelete, "/v1/session")
+		if out.Code != http.StatusConflict {
+			t.Fatalf("signing out through the proxy answered %d, want 409: %s", out.Code, out.Text)
+		}
+		if !strings.Contains(out.Text, "sign out there") {
+			t.Errorf("the refusal does not say where to sign out: %s", out.Text)
+		}
+		if got := r.As(t, "reader", http.MethodGet, "/v1/products"); got != http.StatusOK {
+			t.Errorf("the proxy arrival stopped working after a refused sign-out: %d", got)
+		}
+	})
+}
+
+func TestTheAnswerAboutYourselfSaysWhetherTheProxySignedYouIn(t *testing.T) {
+	// The menu offers a sign-out only where there is a session to end.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.Body(t, "reader", http.MethodGet, "/v1/session/me"); got.Code != http.StatusOK ||
+			!strings.Contains(got.Text, `"by_proxy":true`) {
+			t.Errorf("a proxy arrival answered %d: %s", got.Code, got.Text)
+		}
+		issued := signIn(t, r, "reader")
+		got := asBrowser(t, r, issued, http.MethodGet, "/v1/session/me", "")
+		if got.Code != http.StatusOK || strings.Contains(got.Body.String(), "by_proxy") {
+			t.Errorf("a session of ours answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
 func TestSigningOutIsNotSomethingAKeyCanDo(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.AsKey(t, http.MethodDelete, "/v1/session"); got != http.StatusForbidden {

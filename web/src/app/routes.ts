@@ -3,6 +3,7 @@
 
 import { matchPath } from "react-router-dom";
 import type { Body } from "../api/client";
+import { filledIn } from "../api/links";
 import table from "./routes.json";
 
 // Every address this application answers, and every address into it the
@@ -56,18 +57,25 @@ function withQuery(path: string, query?: Query): string {
   return rest ? `${path}?${rest}` : path;
 }
 
-// A pattern with each of its parts in place, escaped for a path segment.
-function fill(pattern: string, parts: Record<string, string | number | undefined>): string {
-  return pattern.replace(/:(\w+)/g, (_, name: string) =>
-    encodeURIComponent(String(parts[name] ?? "")),
-  );
+// A pattern with each of its parts in place, escaped for a path segment, or
+// nothing where a part is a dot segment, which no escaping keeps.
+function fill(
+  pattern: string,
+  parts: Record<string, string | number | undefined>,
+): string | undefined {
+  return filledIn(pattern, /:(\w+)/g, (name) => String(parts[name] ?? ""));
 }
 
+// An address naming a dot segment is the front page, as the server's
+// notification links are: anywhere else is a different screen.
 const at = (
   name: RouteName,
   parts: Record<string, string | number | undefined> = {},
   query?: Query,
-) => withQuery(fill(ROUTES[name], parts), query);
+) => {
+  const filled = fill(ROUTES[name], parts);
+  return filled === undefined ? ROUTES.home : withQuery(filled, query);
+};
 
 // One product and what hangs off it.
 export const productAt = (product: string) => at("product", { product });
@@ -253,6 +261,7 @@ export const vexAt = (build: Build) => at("vex", build);
 // it is the build's findings list.
 export function sameScreenAt(build: Build, rest: string): string {
   const prefix = fill(BUILD, build);
+  if (prefix === undefined) return ROUTES.home;
   return rest ? `${prefix}/${rest}` : buildFindingsAt(build);
 }
 
@@ -326,7 +335,7 @@ export function refiled(pathname: string, from: string, to: string): string {
       Object.entries(hit.params).map(([key, value]) => [key, decoded(value ?? "")]),
     );
     if (parts.issue === from) {
-      return fill(ROUTES[name], { ...parts, issue: to });
+      return fill(ROUTES[name], { ...parts, issue: to }) ?? ROUTES.home;
     }
   }
   return pathname;

@@ -95,28 +95,52 @@ export function mayOf(who: Who | null | undefined, product: string): Can | undef
 // cookie only when it ends the session, so a sign-out it refused or never
 // heard leaves the browser signed in, and on a shared machine the next person
 // to open it would be the last. The answer is whether it ended, and the caller
-// stays and offers it again where it did not. It never rejects: the caller is
-// a click handler, where a rejection is one nobody sees.
+// stays and offers it again where it did not. A browser a proxy signed in is
+// signed out at the proxy, which signs the next request back in, so the
+// caller stays and says so. It never rejects: the caller is a click handler,
+// where a rejection is one nobody sees.
 export async function signOut(
-  end: () => Promise<boolean>,
+  end: () => Promise<SignOutAnswer>,
   go: (where: string) => void,
-): Promise<boolean> {
-  forgetAll();
-  forgetSession();
-  let ended: boolean;
+): Promise<SignOutAnswer> {
+  forgetHere();
+  let answer: SignOutAnswer;
   try {
-    ended = await end();
+    answer = await end();
   } catch {
-    ended = false;
+    answer = "not-ended";
   }
-  if (!ended) return false;
+  if (answer !== "ended") return answer;
   rememberForward();
   go(signedOutHere);
-  return true;
+  return answer;
 }
 
-// Whether a sign-out's answer means nobody is signed in on this browser any
-// more: the session ended, or there was none to end.
-export function signedOutBy(status: number): boolean {
-  return (status >= 200 && status < 300) || status === 400 || status === 401;
+// What a sign-out's answer means for this browser: nobody is signed in on it
+// any more, the proxy in front of the deployment holds the sign-in, or the
+// session is still live.
+export type SignOutAnswer = "ended" | "at-the-proxy" | "not-ended";
+
+// What a sign-out clears before it asks the server: every draft, and what the
+// tab remembers.
+function forgetHere(): void {
+  forgetAll();
+  forgetSession();
+}
+
+// Clearing this browser for a reader the proxy signed in, who signs out at the
+// proxy and would otherwise leave drafts and tab state behind on a shared
+// machine. A full load follows, as it does a sign-out, so nothing held in
+// memory writes a draft back or stays on screen.
+export function clearHere(reload: () => void): void {
+  forgetHere();
+  reload();
+}
+
+// The answer a sign-out's status means. A refusal for want of any session is
+// signed out; 409 is the server saying a proxy signed this browser in.
+export function signedOutBy(status: number): SignOutAnswer {
+  if ((status >= 200 && status < 300) || status === 400 || status === 401) return "ended";
+  if (status === 409) return "at-the-proxy";
+  return "not-ended";
 }

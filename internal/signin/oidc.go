@@ -21,6 +21,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/redact"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // OIDC signs somebody in through an OpenID Connect provider.
@@ -95,10 +96,11 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		return nil, fmt.Errorf("the %q provider needs a client identifier and secret", cfg.Name)
 	}
 	// The name becomes a path segment and a route parameter, so it has to be
-	// one. A name carrying a slash or a space makes a deployment that starts
-	// and completes a sign-in for nobody.
+	// one. A name carrying a slash or a space, or a dot segment a browser
+	// resolves away, makes a deployment that starts and completes a sign-in
+	// for nobody.
 	name := strings.TrimSpace(cfg.Name)
-	if name == "" || len(name) > 64 || url.PathEscape(name) != name {
+	if name == "" || len(name) > 64 || url.PathEscape(name) != name || typedname.DotSegment(name) {
 		return nil, fmt.Errorf(
 			"the provider name %q cannot be part of an address: set %sOIDC_NAME to a short "+
 				"name made only of characters a URL path segment carries as written",
