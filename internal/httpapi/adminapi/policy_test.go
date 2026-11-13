@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // rewritesWaiting is how many deadline rewrites are queued and not yet claimed.
@@ -49,7 +50,10 @@ func TestAPolicyStatedAgainIsNoChange(t *testing.T) {
 			{"a release's end of life", "/v1/products/mine/branches-and-tags/master/end-of-life",
 				`{"on":"2030-01-31"}`, `{"on":""}`, ""},
 			{"repositories", "/v1/products/mine/repositories",
-				`{"hosts":[{"remote":"GitHub.com/","web":"https://github.com/","style":"github"}],"paths":[]}`,
+				// Out of stored order and spelled differently, so only the
+				// stored form compares equal.
+				`{"hosts":[{"remote":"GitLab.com/","web":"https://gitlab.com/","style":"gitlab"},` +
+					`{"remote":"GitHub.com/","web":"https://github.com/","style":"github"}],"paths":[]}`,
 				`{"hosts":[],"paths":[]}`, ""},
 		} {
 			done(t, r, http.MethodPut, each.path, each.first)
@@ -102,6 +106,35 @@ func TestAPolicyChangeQueuesOneRewriteOfDeadlines(t *testing.T) {
 			if n := rewritesWaiting(t, r); n != 1 {
 				t.Errorf("after %s, %d deadline rewrites are waiting, want one", each.path, n)
 			}
+		}
+	})
+}
+
+// A policy change whose rewrite of deadlines cannot be queued is refused with
+// 503 and records nothing: the change and its rewrite commit together, so the
+// stored value and the trail still say what they said.
+func TestAPolicyChangeWhoseRewriteCannotBeQueuedRecordsNothing(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		const path = "/v1/settings/remediation.due.high"
+		done(t, r, http.MethodPut, path, `{"value":"720h"}`)
+		// The rewrite it queued waits to be tried again, so it takes no later
+		// change, and with room for one it fills the queue.
+		if _, err := r.DB.DB.NewUpdate().Table("job").Set(`"attempts" = 1`).
+			Where(`"kind" = ?`, queue.Deadlines).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := setting.NewStore(r.DB.DB).Change(ctx, setting.QueueBacklog, "1"); err != nil {
+			t.Fatal(err)
+		}
+		before := trailCount(t, r)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPut, path,
+			`{"value":"480h"}`), http.StatusServiceUnavailable)
+		if rows := trailSince(t, r, before).Items; len(rows) != 0 {
+			t.Errorf("a change refused for a full queue recorded %+v", rows)
+		}
+		if held, _, err := setting.NewStore(r.DB.DB).Get(ctx, setting.DueHigh); err != nil || held != "720h" {
+			t.Errorf("a change refused for a full queue left the setting %q (%v), want 720h", held, err)
 		}
 	})
 }
