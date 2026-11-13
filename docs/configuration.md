@@ -1634,3 +1634,9 @@ v0.10.2 named `reaffirm-claim`.
 | `untag-finding` | `unlabel-finding` |
 | `withdraw-advisory-source` | `withdraw-supplier-advisory-feed` |
 | `withdraw-claim` | `withdraw-decision` |
+
+### From v0.12.0
+
+| Change | What to do |
+|---|---|
+| An issue taken off an advisory and put back keeps every stretch it was on, so an advisory issued during any of them is read as naming it. v0.12.0 kept only the last stretch, and the upgrade cannot recover an earlier one | Nothing the upgrade can do. Where v0.12.0 saw an issue taken off, put back and taken off again, an advisory issued during an earlier stretch is read as not naming it: what went out is shown to readers who may not see that issue, and a rename that issuance should refuse is allowed |
