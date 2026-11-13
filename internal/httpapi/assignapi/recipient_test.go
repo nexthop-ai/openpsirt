@@ -5,8 +5,10 @@ package assignapi_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -52,6 +54,49 @@ func TestDisclosedWorkIsGivenOnlyToSomebodyHoldingARoleInItsProduct(t *testing.T
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, disclosedAt,
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("handing disclosed work to a triager answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+// Planning an upgrade hands the disclosed work it promises to whoever carries
+// it, so it asks the same rule: somebody holding nothing in the product is
+// refused, and nothing is handed to them.
+func TestAPlannedUpgradeIsCarriedOnlyBySomebodyHoldingARoleInItsProduct(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
+			"/v1/products/mine/components/libcurl4t64/upgrade",
+			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
+				`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
+				`"person":"outsider",`+
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`),
+			http.StatusUnprocessableEntity)
+		if held := heldTotal(t, r, "outsider"); held != 0 {
+			t.Errorf("somebody holding nothing on the product was handed %d pieces of its work", held)
+		}
+	})
+}
+
+// A code finding is refused to somebody holding no role in its product, or who
+// has left, for that reason: the refusal says so rather than naming security
+// testing grants they could be given.
+func TestACodeFindingRefusedToSomebodyHoldingNothingSaysWhy(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		granted(t, r, "security-testing-triager", access.Assigner)
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
+			"/v1/people/security-testing-reader/deactivation", ""); got.Code != http.StatusOK {
+			t.Fatalf("deactivating answered %d: %s", got.Code, got.Body.String())
+		}
+		for _, who := range []string{"outsider", "security-testing-reader"} {
+			got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPut,
+				codeFindingAt(occurrence)+"/assignment", `{"person":"`+who+`"}`)
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("giving the code finding to %s answered %d: %s", who, got.Code, got.Body)
+			}
+			if !strings.Contains(got.Body.String(), "hold no role in this product or have left") {
+				t.Errorf("giving the code finding to %s was refused as %s", who, got.Body)
+			}
 		}
 	})
 }

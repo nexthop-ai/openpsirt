@@ -69,7 +69,7 @@ func personAdmits(person *access.Account, productID int64) finding.Admits {
 		}
 		if len(holds) == 0 {
 			return errRecipient{huma.Error422UnprocessableEntity(
-				"they hold no role in this product, so the work would sit with somebody who cannot open it")}
+				"they hold no role in this product or have left, so the work would sit with somebody who cannot open it")}
 		}
 		for _, v := range withheld {
 			reads := slices.Contains(holds, v)

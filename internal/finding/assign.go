@@ -36,7 +36,7 @@ var ErrRecipientMayNotRead = refusal.New("some of this is undisclosed or securit
 // a product some of it is in, or has left: they could never open it, so it
 // would sit in no list.
 var ErrRecipientHoldsNothing = refusal.New("they hold no role in a product some of this is in, " +
-	"so the work would sit with somebody who cannot open it")
+	"or have left, so the work would sit with somebody who cannot open it")
 
 // moveWork is the write itself, apart from the answering: which rows move, and
 // what they move to.
