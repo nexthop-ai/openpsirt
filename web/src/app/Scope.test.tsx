@@ -132,3 +132,33 @@ describe("applying a pick", () => {
     expect(mount.host().textContent).not.toContain("You can reach no product yet.");
   });
 });
+
+describe("the scope panel over a catalog with nothing in it", () => {
+  const empty =
+    (everywhere: boolean) =>
+    (path: string): Answer | undefined => {
+      if (path === "/v1/session/me")
+        return {
+          data: {
+            identity: "ana",
+            admin: false,
+            kind: "person",
+            reach: [],
+            outcomes: [],
+            everywhere,
+          },
+        };
+      return { data: { items: [] } };
+    };
+
+  it("says no product is declared to somebody reading every product", async () => {
+    await opened("/", empty(true));
+    expect(mount.host().textContent).toContain("No product is declared yet.");
+    expect(mount.host().textContent).not.toContain("You can reach no product yet.");
+  });
+
+  it("says no product is reached to somebody holding none", async () => {
+    await opened("/", empty(false));
+    expect(mount.host().textContent).toContain("You can reach no product yet.");
+  });
+});

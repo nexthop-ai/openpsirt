@@ -6,6 +6,7 @@ import { useClickAway } from "../ui/away";
 import { useReseed } from "../ui/reseed";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCatalog, useReleaseVariants } from "../api/catalog";
+import { useWho } from "./session";
 import { Refused } from "../api/queries";
 import {
   findingsPath,
@@ -27,6 +28,8 @@ import {
 // navigation, when it is a property of the screen they are already on.
 export function Scope() {
   const at = useScope();
+  // The identity read is already held, so this asks nothing new.
+  const who = useWho().data;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -195,7 +198,11 @@ export function Scope() {
           ))}
           {products.isError && <Unreadable error={products.error} what="the products" />}
           {products.data && (products.data.items ?? []).length === 0 && (
-            <p className="hint">You can reach no product yet.</p>
+            <p className="hint">
+              {!who?.admin && who?.everywhere
+                ? "No product is declared yet."
+                : "You can reach no product yet."}
+            </p>
           )}
         </div>
 
