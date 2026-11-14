@@ -5,7 +5,6 @@ package finding
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -281,7 +280,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 		if err != nil {
 			return fmt.Errorf("agree to the claim: %w", err)
 		}
-		if err := movedOne(result, "agree to the claim"); err != nil {
+		if err := database.MovedAll(result, 1, "agree to the claim"); err != nil {
 			return err
 		}
 		agreed = claim
@@ -339,7 +338,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		if err != nil {
 			return fmt.Errorf("withdraw the claim: %w", err)
 		}
-		if err := movedOne(result, "withdraw the claim"); err != nil {
+		if err := database.MovedAll(result, 1, "withdraw the claim"); err != nil {
 			return err
 		}
 		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, "", s.now())
@@ -1096,18 +1095,4 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		held[claim.ID] = would
 	}
 	return held, nil
-}
-
-// movedOne reads an update that matched on what the transaction read. None
-// matched means the row moved since, which is a lost race for the retry
-// helper to take again.
-func movedOne(result sql.Result, doing string) error {
-	n, err := database.Affected(result)
-	if err != nil {
-		return fmt.Errorf("%s: %w", doing, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("%s: %w", doing, database.ErrGoAgain)
-	}
-	return nil
 }

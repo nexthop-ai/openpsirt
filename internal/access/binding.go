@@ -249,13 +249,7 @@ func unmap(ctx context.Context, db bun.IDB, mapping Mapping) error {
 	// Matched nothing because another replica starting at the same moment
 	// removed it first. Going again reads it as gone, so the removal is
 	// recorded once.
-	switch n, err := database.Affected(res); {
-	case err != nil:
-		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, err)
-	case n == 0:
-		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, database.ErrGoAgain)
-	}
-	return nil
+	return database.MovedAll(res, 1, fmt.Sprintf("unmap %s from %q", mapping, mapping.Grants))
 }
 
 // AdmitByGroups signs somebody in against what a provider says they belong to.
