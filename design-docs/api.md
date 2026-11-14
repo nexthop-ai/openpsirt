@@ -91,7 +91,7 @@ Each operation carries a structured statement of what it asks of a caller
 | The line in the description is rendered from the declaration | Two hand-written copies disagree |
 | The line states the scope and the roles, a scope the middleware enforces whatever roles are held coming after the roles | A pipeline key holding every listed role is not told it may call a person-only operation |
 | A declaration states whether it is a gate or narrowed | Each misread as the other hides a hole or invents one |
-| A test asks each gated operation as somebody holding none of its roles, and a 2xx fails it | |
+| A test asks each gated operation as somebody holding none of its roles, and any answer other than 400, 403, 404 or 422 fails it | A success, a redirect and a fault are all failures to refuse; the test sends no body, so an operation taking one refuses its shape first |
 | An operation declaring neither scope nor roles is refused by a gate | |
 | "Any signed-in person" and "any recognized credential" are two scopes | A pipeline key is not somebody; two operations take any credential, a key reading back the scans filed on a build it may upload to and their receipts |
 | The part of a declaration about the subject alone is enforced before any handler; a role on a product stays in the handler | The role needs the product resolved |
@@ -125,6 +125,7 @@ decision.
 | Text written by people comes back as markdown, the only representation, with no parameter asking for markup (REQ-65) | The server refused what its policy forbids at submission (REQ-67); later rules are the renderer's (`design-docs/text.md`) |
 | A moment is stated in UTC, in RFC 3339, in a response and a file alike, converted before writing | A driver hands back the process's zone, so a literal `Z` would lie |
 | A day is the UTC day of its moment, in a response, a report and an export | |
+| A test reads every server package's source and refuses a time formatted with a layout, the time package's, a literal holding the reference year or a package-level constant of the same package, from anything but a conversion to UTC; a function keeping the offset on purpose is listed with its reason and reported once it no longer does | CI runs in UTC, where a missing conversion changes nothing |
 | Every moment goes through one renderer, and a test refuses an API body carrying a time value for the encoder | |
 | A moment not known is left out, its field optional, never the year 1 or an empty string | |
 | A published document states its dates as its format requires, in UTC | |

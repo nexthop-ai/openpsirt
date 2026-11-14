@@ -298,7 +298,7 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 		return nil, BuiltInFuture, fmt.Errorf(
 			"%w (%s): built %s, which is ahead of this server's clock. "+
 				"Accepting it would mean no later scan is ever newer",
-			ErrRejected, BuiltInFuture, a.BuiltAt.Format(time.RFC3339Nano))
+			ErrRejected, BuiltInFuture, a.BuiltAt.UTC().Format(time.RFC3339Nano))
 	}
 
 	scan := &Scan{

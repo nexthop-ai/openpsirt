@@ -71,6 +71,7 @@ tested against it (`design-docs/notifications.md` § Links).
 | A build's screen moved to another build keeps the address's own segments, cutting the tail from the address as it stands | The router hands the tail back with escaped slashes restored |
 | An address written out whole is matched against the table, path and query | An unknown address lands on not-found; an unread parameter opens the screen on its default |
 | Every listed parameter is read by its route's screen, found by reading the router and searching every module the screen reaches | A promised parameter nothing reads is a dead link |
+| A read is a `get`, `getAll` or `has` asked of query parameters: the router's, a new `URLSearchParams`, a name typed as one, or a property or function result the interface hands them out through | The same call on a map, a set or headers reads no address |
 | A screen whose address changed keeps its former address, forwarding with query and fragment; an address another screen now holds forwards nowhere | An unread notice keeps the link it was sent with |
 | An API address, under `/v1` or joined onto the API's build prefix, is not an address into the page | The API document describes it |
 
@@ -322,7 +323,10 @@ screens using them.
 | Invalidation | Each mutation hook runs through a real query client, and the test reads the keys it invalidates |
 | Look | A person |
 
-The gate measures statement coverage per file and fails a file no test reaches.
+The gate measures statement and function coverage per file, and fails a file
+where no test runs a statement or no test calls a function. A screen only
+imported runs its module-level statements and calls none of its functions, so
+a screen no test renders fails.
 The entry point and the test harness are outside the measure.
 
 ## Gaps the checks left

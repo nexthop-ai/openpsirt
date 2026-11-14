@@ -11,9 +11,11 @@ import (
 	"strings"
 )
 
-// tablesDeclared adds the tables a migration file creates to schema.
+// tablesDeclared adds the tables a migration file creates to schema. A test
+// beside the migrations declares fixture tables no deployment has, so it is
+// not read.
 func tablesDeclared(path string, body []byte, schema map[string]bool) {
-	if !strings.Contains(path, "database/migrate/migrations/") {
+	if !strings.Contains(path, "database/migrate/migrations/") || strings.HasSuffix(path, "_test.go") {
 		return
 	}
 	for _, match := range creating.FindAllStringSubmatch(string(body), -1) {
@@ -234,7 +236,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 			continue
 		}
 		pieces := assembled(fn, seen, nil)
-		quoted := assembled(fn, columnsRead, quotedByBuilder)
+		quoted := assembled(fn, columnsRead, quotingCallee)
 		ast.Inspect(fn.Body, func(node ast.Node) bool {
 			call, ok := node.(*ast.CallExpr)
 			if !ok {

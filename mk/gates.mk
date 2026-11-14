@@ -171,8 +171,9 @@ reserved:
 	$(GO) run ./internal/tools/reserved
 
 # That no query outside the database package asks an engine what it is. The
-# list of places where that is allowed lives here and in design-docs/database.md,
-# and widening one without the other is what fails.
+# places where that is allowed are listed in the program and in
+# design-docs/database.md, and the program refuses a path in one and not the
+# other.
 confined:
 	$(GO) run ./internal/tools/confined
 

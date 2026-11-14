@@ -217,7 +217,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 // sameText reports whether an edit changes nothing a revision would keep.
 func sameText(was, next FlawReport) bool {
 	sameDay := (was.ReceivedOn == nil) == (next.ReceivedOn == nil) &&
-		(was.ReceivedOn == nil || was.ReceivedOn.Format(time.DateOnly) == next.ReceivedOn.Format(time.DateOnly))
+		(was.ReceivedOn == nil || was.ReceivedOn.UTC().Format(time.DateOnly) == next.ReceivedOn.UTC().Format(time.DateOnly))
 	return sameDay && was.Title == next.Title && was.ReportedProblem == next.ReportedProblem &&
 		was.ReportedBy == next.ReportedBy && was.Contact == next.Contact && was.Credit == next.Credit
 }

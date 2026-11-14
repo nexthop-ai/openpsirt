@@ -50,6 +50,11 @@ func (e Engine) String() string { return string(e) }
 // IsProduction reports whether the engine is supported for production use.
 func (e Engine) IsProduction() bool { return e != SQLite && e != "" }
 
+// CommitsDataDefinition reports whether the engine commits implicitly around
+// every data-definition statement, so a migration that fails part way through
+// leaves its earlier statements applied.
+func (e Engine) CommitsDataDefinition() bool { return e == MySQL || e == MariaDB }
+
 // engineFromScheme maps the scheme of a database URL onto an engine.
 //
 // MySQL and MariaDB share a scheme because they share a driver; which one is

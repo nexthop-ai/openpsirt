@@ -41,7 +41,7 @@ refused by MySQL alone.
 |---|---|
 | A name a query invents | Checked for being bare, never against the reserved list, which misses a word an engine reserves next, as MySQL 8.0 reserved `rank`, `groups` and `cume_dist` |
 | Where a name is invented | `AS <word>`, a table renamed in a migration, and an alias a model declares |
-| The migrations | The data-definition keywords too, with comments stripped first |
+| The migrations | The data-definition keywords too, with comments stripped first. A test beside them declares fixture tables no deployment has, and is not read as the schema |
 | A declared table or column, wherever a query writes it | In a statement, in a builder method's SQL argument, and in a clause assembled in a variable and handed to one. A column alone and after a qualifier; a qualified one is fixed by quoting both halves |
 | What is a column | A declared name in lower case, since keywords are in capitals. A word before a parenthesis is a function. Arguments after a builder method's SQL are values |
 | Which literals are statements | Any literal containing `FROM "` or `JOIN "`, wherever it is held. Every table is quoted, so prose never carries the marker |
@@ -63,8 +63,8 @@ refused by MySQL alone.
 
 The alias half reads only literals recognizable as queries, and never doc
 comments, because "as" is in most English sentences; the table half reads every
-literal, because a query whose tables are all bare carries no marker. The pass counts the
-literals it reads and fails on none. The schema is also read back from each
+literal, because a query whose tables are all bare carries no marker. Each pass counts
+what it reads and fails on none: tables, columns, queries and literals of running code. The schema is also read back from each
 database and checked there. Two tests hold the silent truncation the mode's
 strictness prevents, each seen to fail with the fix reverted.
 

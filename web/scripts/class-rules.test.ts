@@ -4,11 +4,14 @@
 import { describe, expect, it } from "vitest";
 import {
   cssRules,
+  definedClasses,
   emits,
   positionedModifiers,
   rulesIn,
   styleless,
+  quotedRuns,
   unusedClasses,
+  writtenClasses,
   // @ts-expect-error - a gate script, which is plain ESM with no types of its own
 } from "./class-rules.mjs";
 
@@ -51,6 +54,22 @@ describe("how a stylesheet is read", () => {
 
   it("refuses a rule nested inside another rule", () => {
     expect(() => cssRules(`.foo { color: red; &:hover { color: blue; } }`)).toThrow(/nested/);
+  });
+
+  it("refuses a rule nested first inside another rule", () => {
+    expect(() => cssRules(`.foo { &:hover { color: blue; } }`)).toThrow(/nested/);
+    expect(() => cssRules(`.foo { & .x { position: fixed; } color: red; }`)).toThrow(/nested/);
+  });
+
+  it("refuses a rule nested inside an at-rule inside another rule", () => {
+    expect(() =>
+      cssRules(`.x { @media (max-width: 1px) { .y { color: red; } } color: blue; }`),
+    ).toThrow(/nested/);
+  });
+
+  it("reads a rule first inside an at-rule nested in another at-rule", () => {
+    const css = `@supports (display: grid) { @media (max-width: 780px) { .chip { padding: 0; } } }`;
+    expect(cssRules(css).map((rule: { selector: string }) => rule.selector)).toEqual([".chip"]);
   });
 
   it("reads a rule inside an at-rule block without the block's prelude", () => {
@@ -133,5 +152,48 @@ describe("a class the markup never applies", () => {
 
   it("is not reported at the head of a template, or where a library writes it", () => {
     expect(unusedClasses(["noticekind", "chip", "recharts-dot"], markup)).toEqual([]);
+  });
+});
+
+describe("which classes a stylesheet defines", () => {
+  it("reads every class in a selector once, in order", () => {
+    expect(definedClasses(`.chip.over { color: red; }\n.tag, .chip { color: blue; }`)).toEqual([
+      "chip",
+      "over",
+      "tag",
+    ]);
+  });
+
+  it("reads no class from a comment or a property value", () => {
+    expect(definedClasses(`/* .gone */\n.chip { background: url(a.png); }`)).toEqual(["chip"]);
+  });
+});
+
+describe("what markup a source file carries", () => {
+  it("keeps a quoted run holding a URL", () => {
+    expect(quotedRuns(`const a = "https://example.com chip";`)).toContain("chip");
+  });
+
+  it("drops a quoted word that appears only in a comment", () => {
+    const runs = quotedRuns(`// the "editor" opens\n/* 'found' */\nconst a = "chip";`);
+    expect(runs).toContain("chip");
+    expect(runs).not.toMatch(/editor|found/);
+  });
+
+  it("keeps a run inside an interpolation", () => {
+    expect(quotedRuns("const a = `col ${on ? 'over' : ''}`;")).toContain("over");
+  });
+});
+
+describe("which classes markup writes on an element", () => {
+  it("reads each literal word with its line", () => {
+    expect(writtenClasses(`<a />\n<b className="chip over" />`)).toEqual([
+      { word: "chip", line: 2 },
+      { word: "over", line: 2 },
+    ]);
+  });
+
+  it("skips a template's interpolation", () => {
+    expect(writtenClasses("<b className={`col ${ kind }`} />")).toEqual([{ word: "col", line: 1 }]);
   });
 });

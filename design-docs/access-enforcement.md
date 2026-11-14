@@ -27,9 +27,14 @@ a name first leaks the difference.
 | A list of issues | The resolver's list form, one statement per batch. A name filed only where the caller may not read it gets the words of a name nobody filed |
 | A component | A graph read taking a component name refuses before resolving it, or the inventory reads back one guess at a time, versions and ecosystems included |
 
-A test walks every route carrying an identity and asserts that a held and an
-unheld name answer alike, for every kind of credential, one holding nothing
-included.
+A test walks every operation the API document lists with an identity in its
+path and asserts that a held and an unheld name answer alike, for every kind of
+credential, one holding nothing included. A code finding recorded as a flaw is
+seeded, so its collaborators are reached past the role and the occurrence. The
+exceptions are a caller let through to name a person, who is told whether the
+name is held: a triager adding or removing a case collaborator, and an analyst
+granting or withdrawing a code finding, as one assigning work is. Each exception
+is listed with its reason and reported once the answers stop differing.
 
 ## Enforcement sites
 

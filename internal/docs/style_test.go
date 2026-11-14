@@ -6,8 +6,10 @@ package docs_test
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -46,27 +48,56 @@ func designDocuments(t *testing.T) map[string]string {
 	return documents(t, filepath.Join("..", "..", "design-docs", "*.md"))
 }
 
-// everyDocument is every markdown file the Spec register covers: the design
-// documents, the decisions, the agent instructions, the work list, and the
-// published pages.
+// everyDocument is every markdown file the Spec register covers: each one git
+// tracks or would add, wherever it sits, read from the repository's root. The
+// set comes from git, so a document in a new directory is read as soon as it
+// exists.
 //
 // The heading rules hold for all of them. The contents rule does not — a page
 // under `docs/` carries no list, because the site generates one — which is why
 // the two tests take different sets.
 func everyDocument(t *testing.T) map[string]string {
 	t.Helper()
+	root := filepath.Join("..", "..")
+	out, err := exec.Command("git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").Output() //nolint:gosec // G204: the root is this repository's, fixed here
+	if err != nil {
+		t.Fatalf("listing the tree: %v", err)
+	}
+	names := markdownIn(out)
+	if len(names) == 0 {
+		t.Fatal("git lists no markdown file, so this checked nothing")
+	}
 	docs := map[string]string{}
-	for _, pattern := range []string{
-		filepath.Join("..", "..", "*.md"),
-		filepath.Join("..", "..", "docs", "*.md"),
-		filepath.Join("..", "..", "docs", "*", "*.md"),
-		filepath.Join("..", "..", "internal", "*", "testdata", "*.md"),
-	} {
-		for name, text := range documents(t, pattern) {
-			docs[name] = text
+	for _, name := range names {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		body, err := os.ReadFile(path) //nolint:gosec // this repository's own documents
+		if err != nil {
+			t.Fatal(err)
 		}
+		docs[filepath.ToSlash(path)] = fence.ReplaceAllString(string(body), "")
 	}
 	return docs
+}
+
+// markdownIn is every markdown file in git's NUL-separated listing, once each.
+// An unmerged path is listed once per stage.
+func markdownIn(listing []byte) []string {
+	var names []string
+	for _, each := range strings.Split(string(listing), "\x00") {
+		if strings.HasSuffix(each, ".md") && !slices.Contains(names, each) {
+			names = append(names, each)
+		}
+	}
+	return names
+}
+
+func TestEveryMarkdownFileGitListsIsRead(t *testing.T) {
+	listing := []byte("README.md\x00pages/a.md\x00web/src/deep/notes.md\x00" +
+		"main.go\x00pages/a.md\x00docs/x.mdx\x00")
+	got := markdownIn(listing)
+	if want := []string{"README.md", "pages/a.md", "web/src/deep/notes.md"}; !slices.Equal(got, want) {
+		t.Errorf("read %q from the listing, want %q", got, want)
+	}
 }
 
 func documents(t *testing.T, pattern string) map[string]string {
@@ -201,10 +232,13 @@ func headingProblems(name, heading string) []string {
 		}
 		// A bare gerund is a noun — "Parsing", "Scanning" — and one taking an
 		// object is a verb with its object: "Asking upstream what is current".
+		// A gerund an article follows takes an object whatever the word:
+		// "Publishing the advisory".
 		coordinated := len(first) > 1 &&
 			(strings.EqualFold(first[1], "and") || strings.EqualFold(first[1], "or"))
+		article := len(first) > 1 && articles[strings.ToLower(first[1])]
 		if len(first) > 1 && strings.HasSuffix(strings.ToLower(first[0]), "ing") &&
-			!adjectival[strings.ToLower(first[0])] && !coordinated {
+			(article || !adjectival[strings.ToLower(first[0])]) && !coordinated {
 			problems = append(problems, fmt.Sprintf("%s: heading is a gerund taking an object: %q", name, heading))
 		}
 	}
@@ -240,12 +274,13 @@ func TestAHeadingThatIsASentenceIsReported(t *testing.T) {
 		"Ends.",
 		"Is it current?",
 		"A bump that did not reach the fix",
+		"Publishing the advisory",
 	} {
 		if len(headingProblems("x", bad)) == 0 {
 			t.Errorf("%q was not reported", bad)
 		}
 	}
-	for _, good := range []string{"Parsing", "Upstream currency", "Routing rules", "Reading and writing"} {
+	for _, good := range []string{"Parsing", "Upstream currency", "Routing rules", "Reading and writing", "Publishing measurements"} {
 		if problems := headingProblems("x", good); len(problems) != 0 {
 			t.Errorf("%q was reported: %v", good, problems)
 		}
@@ -259,6 +294,9 @@ var interrogative = map[string]bool{
 	"when": true, "where": true, "how": true, "which": true,
 }
 
+// articles open an object, so a gerund before one takes it.
+var articles = map[string]bool{"the": true, "a": true, "an": true}
+
 // adjectival are the gerunds that qualify the noun beside them rather than
 // taking it as an object: "Routing rules", "Pending upgrades". A gerund
 // followed by "and" or "or" is a coordination and needs no entry.
@@ -268,4 +306,5 @@ var interrogative = map[string]bool{
 // had to add deliberately, which is the point.
 var adjectival = map[string]bool{
 	"routing": true, "pending": true, "sending": true,
+	"finding": true, "standing": true, "rating": true, "publishing": true,
 }

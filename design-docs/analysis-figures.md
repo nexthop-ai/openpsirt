@@ -179,6 +179,7 @@ Whether a release shipped fewer code findings than the one before (REQ-54).
 | The check is repeated in the data layer, and every count carries the subject: a code finding counts where its visibility is read or its flaw's reach includes the reader (REQ-43) | A handler missing its check still leaks nothing |
 | Series and runs carry the family's visibility alone | A series names no code finding |
 | A role, visibility and endpoint matrix holds every figure and its files | |
+| A test asks every exported data-layer function taking a subject to refuse a reader of dependency work alone, and every one also taking a scope to refuse a product across products not read at security testing; a function outside the figures is exempt by name with its reason, both lists held against the source | A function is found by what it takes, so a new figure missing its check is found |
 
 ## Figures across products
 

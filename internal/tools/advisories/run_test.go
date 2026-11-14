@@ -77,15 +77,23 @@ func TestTheGoHalfFailsOnlyWhatTheBaseDidNotCarry(t *testing.T) {
 	write(t, dir, map[string]string{"stream.json": goStream})
 	var out strings.Builder
 	err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+	splitReport(t, err, out.String(), "main", "GO-NEW", "GO-OLD")
+}
+
+// splitReport holds a failed run's report to naming introducedID alone among
+// what the change introduces and presentID among what ref already carried.
+// An empty presentID asks that nothing is reported present.
+func splitReport(t *testing.T, err error, out, ref, introducedID, presentID string) {
+	t.Helper()
 	if !errors.Is(err, errFailed) {
-		t.Fatalf("an introduced advisory did not fail the change: %v\n%s", err, out.String())
+		t.Fatalf("an introduced advisory did not fail the change: %v\n%s", err, out)
 	}
-	introduced, present, _ := strings.Cut(out.String(), "already on main")
-	if !strings.Contains(introduced, "GO-NEW") || strings.Contains(introduced, "GO-OLD") {
-		t.Errorf("GO-NEW alone is introduced:\n%s", out.String())
+	introduced, present, _ := strings.Cut(out, "already on "+ref)
+	if !strings.Contains(introduced, introducedID) || (presentID != "" && strings.Contains(introduced, presentID)) {
+		t.Errorf("%s alone is introduced:\n%s", introducedID, out)
 	}
-	if !strings.Contains(present, "GO-OLD") {
-		t.Errorf("GO-OLD, which the base carried, was not reported as present:\n%s", out.String())
+	if presentID != "" && !strings.Contains(present, presentID) {
+		t.Errorf("%s, which the base carried, was not reported as present:\n%s", presentID, out)
 	}
 }
 
@@ -123,15 +131,39 @@ case "$PWD" in */web) cat "$ROOT/head.json" ;; *) cat "$ROOT/base.json" ;; esac`
 	t.Setenv("ROOT", dir)
 	var out strings.Builder
 	err := run(dir, "main", []string{"npm", "--", "sh", "-c", script, "npm"}, &out)
-	if !errors.Is(err, errFailed) {
-		t.Fatalf("an introduced advisory did not fail the change: %v\n%s", err, out.String())
+	splitReport(t, err, out.String(), "main", "GHSA-x", "GHSA-braces")
+}
+
+func TestEveryNpmAdvisoryIsIntroducedWhereTheBaseHasNoLockfile(t *testing.T) {
+	dir := repository(t, map[string]string{"kept": "x"})
+	write(t, dir, map[string]string{
+		"web/package.json":      "{}",
+		"web/package-lock.json": lock,
+		"head.json":             npmReport("braces"),
+	})
+	// The base has nothing to audit, so a run outside web/ is refused.
+	script := `case "$PWD" in */web) cat "$ROOT/head.json" ;; *) echo "audited a base with no lockfile" >&2; exit 9 ;; esac`
+	t.Setenv("ROOT", dir)
+	var out strings.Builder
+	err := run(dir, "main", []string{"npm", "--", "sh", "-c", script, "npm"}, &out)
+	splitReport(t, err, out.String(), "main", "GHSA-braces", "")
+}
+
+func TestAScannerNotNamedIsRefused(t *testing.T) {
+	var out strings.Builder
+	err := run(repository(t, map[string]string{"kept": "x"}), "main", []string{"pip", "--", "true"}, &out)
+	if err == nil || errors.Is(err, errFailed) || !strings.Contains(err.Error(), "no scanner") {
+		t.Errorf("an unknown scanner answered %v", err)
 	}
-	introduced, present, _ := strings.Cut(out.String(), "already on main")
-	if !strings.Contains(introduced, "GHSA-x") || strings.Contains(introduced, "GHSA-braces") {
-		t.Errorf("GHSA-x alone is introduced:\n%s", out.String())
+}
+
+func TestTheRepositorysDockerfileNamesAGoReleaseTheGateReads(t *testing.T) {
+	dockerfile, err := os.ReadFile(filepath.Join("..", "..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(present, "GHSA-braces") {
-		t.Errorf("GHSA-braces, which the base carried, was not reported as present:\n%s", out.String())
+	if imageGo(dockerfile) == "" {
+		t.Error("the Dockerfile's build stage names no golang release the advisories gate reads")
 	}
 }
 
@@ -174,4 +206,28 @@ func TestTheStandardLibraryIsTheReleaseTheBaseImageBuildsWith(t *testing.T) {
 			t.Errorf("%s: failed %v, want %v: %v\n%s", c.what, got, c.introduced, err, out.String())
 		}
 	}
+}
+
+func TestADockerfileNamingNoReleaseThisReadsIsRefused(t *testing.T) {
+	dir := repository(t, map[string]string{
+		"go.mod":     "module x\n\ngo 1.27.1\n",
+		"Dockerfile": "FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build\n",
+	})
+	write(t, dir, map[string]string{"stream.json": stdlibStream})
+	var out strings.Builder
+	err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+	if err == nil || errors.Is(err, errFailed) || !strings.Contains(err.Error(), "Dockerfile") {
+		t.Errorf("a Dockerfile whose release is unread answered %v", err)
+	}
+}
+
+func TestADockerfileNamingNoReleaseIsNotAskedWithoutAStandardLibraryFinding(t *testing.T) {
+	dir := repository(t, map[string]string{
+		"go.mod":     "module x\n\ngo 1.27.1\n\nrequire example.com/m v1.0.0\n",
+		"Dockerfile": "FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build\n",
+	})
+	write(t, dir, map[string]string{"stream.json": goStream})
+	var out strings.Builder
+	err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+	splitReport(t, err, out.String(), "main", "GO-NEW", "GO-OLD")
 }

@@ -25,7 +25,7 @@ func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded
 		copies:   copies{root: dir, quota: quota, now: time.Now, poll: 10 * time.Millisecond},
 		excluded: excluded,
 		on:       true,
-		Now:      time.Now,
+		now:      time.Now,
 	}
 	// Wired as NewPass wires it, so a copy removed to stay within the cache
 	// is recorded as no longer held.
@@ -86,7 +86,7 @@ func NewRemotePass(dir string, excluded outward.Excluded) *Pass {
 		copies:   copies{root: dir, quota: DefaultQuota, now: time.Now, poll: time.Second},
 		excluded: excluded,
 		on:       true,
-		Now:      time.Now,
+		now:      time.Now,
 	}
 }
 
@@ -123,3 +123,21 @@ func (p *Pass) Running(program string) *Pass {
 
 // Unfinished is what a visit records as having stopped it while it runs.
 const Unfinished = unfinished
+
+// Once records what patch links name and visits the one repository most worth
+// visiting, answering which.
+func (p *Pass) Once(ctx context.Context) (string, error) { return p.once(ctx) }
+
+// At is the pass reading the clock from now.
+func (p *Pass) At(now func() time.Time) *Pass {
+	p.now = now
+	return p
+}
+
+// How long a commit's branches stand, a failed repository is left, and one
+// host's visits may hold the pass.
+const (
+	LookAgainAfter = lookAgainAfter
+	RetryAfter     = retryAfter
+	HostShare      = hostShare
+)

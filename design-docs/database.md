@@ -92,14 +92,18 @@ every engine. Engine-specific code lives in these places and no others.
 | A release's upgrade | Changing an existing table is spelled per engine (`design-docs/database-upgrades.md` § Release upgrades). The catalog is asked which indexes, columns and foreign keys a table holds |
 | When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone (`design-docs/database-schema.md` § Indexes) |
 | Asking each engine what words it reserves | Each publishes them somewhere of its own. It regenerates the quoting gate's word list and is not a query the application runs |
+| Rehearsing an upgrade | The rehearsal makes its database as a file on SQLite and beside the named one on a server engine. It is a tool and runs no application query |
 
 | Rule | Reason |
 |---|---|
 | `make confined` refuses a dialect named outside the allowed paths | A hand-kept list grows silently |
-| The allowed paths are the database package, the queue's locking file, the test harness, and the tools that enforce this rule and regenerate the reserved words | The four directories pass any branch inside them, so the row naming that branch here is kept by review |
-| It reads tests | A branch in a test is a branch. An engine named to choose which engine runs is the one thing let past |
-| It looks for the branch: engine constants, driver error types, the query builder's upsert spellings, a handle asked which engine it is, and SQL only some engines accept | |
-| A path is added to the gate and to this table in one change | The gate holds the paths and this table the reasons |
+| The allowed paths are `internal/database/`, `internal/queue/claim_locking.go`, `internal/dbtest/`, `internal/tools/confined/`, `internal/tools/reserved/` and `internal/tools/rehearsal/` | A directory passes any branch inside it, so the row naming that branch here is kept by review |
+| It reads tests | A branch in a test is a branch. An engine named to choose which engine runs is let past, and so is what runs inside a test's closure for one engine |
+| A function of the package every reference to which runs on one engine runs there too | A closure handed to that call by name, or a helper called only from inside one, is the same code moved out of line. References match by name across the package's files, so a shadowing name keeps the function read |
+| It looks for the branch: engine constants under any name the database package is imported as, an engine compared as a value or by its name, driver error types, the query builder's upsert spellings, written as SQL or as its conflict clause, a handle asked which engine it is, and SQL only some engines accept | |
+| It looks for each engine's own catalog, statistics, functions and settings | PostgreSQL's `pg_` names and casts, MySQL's and MariaDB's two schemas, InnoDB's tables and `@@` session variables, SQLite's `sqlite_` tables and pragmas, with or without a schema before them |
+| An engine's role, asked through the database package's own question, is not a branch | Whether an engine serves production is an answer that package gives; the dialect stays inside it |
+| It refuses a path it allows and the allowed-paths row does not name, and one the row names that it does not allow | The gate holds the paths and this table the reasons |
 
 ## Engine detection
 

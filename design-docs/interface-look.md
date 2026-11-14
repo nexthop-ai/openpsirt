@@ -43,7 +43,7 @@ names them.
 | A warning and an all-clear each have three tokens: a panel on the surface, a wash over anything, the line around either. A different strength is a raw mix that says why beside it | Two screens' warnings are one shade |
 | A shape many rules share is one rule listing every selector: the sentence-case label, the small uppercase group heading, a chip's tint arms, the editor column's reserved height | A change lands everywhere it is drawn |
 
-### Choosing a look
+### Look choice
 
 | Rule | Reason |
 |---|---|
@@ -179,7 +179,7 @@ their own scale new with returned stacked above a zero line and corrected below
 it, one x axis. On the chart library's one scale, open in thousands flattens a
 day's tens to the baseline. A build's first scan, and a return after an upload
 that moved a sharp share of its build (`design-docs/analytics-program.md`
-§ Counting by identity), are dashed marks saying how many, never bars, so the
+§ Counts by identity), are dashed marks saying how many, never bars, so the
 inventory arriving or coming back sets no scale. The severity
 split and the ring use the library.
 

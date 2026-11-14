@@ -117,7 +117,7 @@ func (r *Runner) checkOne(ctx context.Context, reference string) (*Checking, *wa
 	owed := replaced.ReplacedAt.Add(settle)
 	if dated := finding.DataDate(result.DatabaseVersion, time.Now()); dated.Before(owed) {
 		return nil, &waiting{untilData, fmt.Sprintf("the scanner's data is dated %s, and the check is owed "+
-			"data dated %s or later", dated.Format(time.RFC3339), owed.Format(time.RFC3339))}, nil
+			"data dated %s or later", dated.UTC().Format(time.RFC3339), owed.UTC().Format(time.RFC3339))}, nil
 	}
 	if err := narrow(records, components, result.Reported); err != nil {
 		return nil, nil, err

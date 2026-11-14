@@ -6,9 +6,16 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -60,7 +67,7 @@ func TestTheNamesAreWrittenInNumericOrder(t *testing.T) {
 	if at79 < 0 || at79 > at787 || at787 > at1000 {
 		t.Errorf("CWE-79, 787 and 1000 are not in numeric order:\n%s", text)
 	}
-	if !strings.Contains(text, `const Version = "4.18"`) || !strings.Contains(text, "DO NOT EDIT") {
+	if !strings.Contains(text, "read from catalog 4.18\n// published 2025-09-09") || !strings.Contains(text, "DO NOT EDIT") {
 		t.Errorf("the generated file does not say what it was read from:\n%s", text)
 	}
 }
@@ -127,7 +134,91 @@ func TestAWeaknessTakesItsPrimaryParentInTheResearchView(t *testing.T) {
 	if !pillars["CWE-664"] || len(pillars) != 1 {
 		t.Errorf("read pillars %v; want CWE-664 alone", pillars)
 	}
-	if _, err := renderLineage(parents, classes, pillars); err != nil {
+	source, err := renderLineage(read.Version, read.Date, parents, classes, pillars)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(string(source), "read from catalog 4.18\n// published 2025-09-09") {
+		t.Errorf("the generated hierarchy does not say what it was read from:\n%s", source)
+	}
+}
+
+// committed reads a generated file of package weakness: the catalog its
+// header names, and each map it declares, by variable.
+func committed(t *testing.T, name string) (version, date string, maps map[string]map[string]string) {
+	t.Helper()
+	path := filepath.Join("..", "..", "weakness", name)
+	source, err := os.ReadFile(path) //nolint:gosec // G304: a generated file of this repository
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`read from catalog (\S+)\n// published (\S+) by`).FindSubmatch(source)
+	if m == nil {
+		t.Fatalf("%s names no catalog it was read from", name)
+	}
+	file, err := parser.ParseFile(token.NewFileSet(), path, source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maps = map[string]map[string]string{}
+	for _, decl := range file.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			value := spec.(*ast.ValueSpec)
+			entries := map[string]string{}
+			for _, element := range value.Values[0].(*ast.CompositeLit).Elts {
+				pair := element.(*ast.KeyValueExpr)
+				key, _ := strconv.Unquote(pair.Key.(*ast.BasicLit).Value)
+				switch v := pair.Value.(type) {
+				case *ast.BasicLit:
+					entries[key], _ = strconv.Unquote(v.Value)
+				case *ast.Ident:
+					entries[key] = v.Name
+				}
+			}
+			maps[value.Names[0].Name] = entries
+		}
+	}
+	return string(m[1]), string(m[2]), maps
+}
+
+func TestTheCommittedFilesAreWhatTheGeneratorWrites(t *testing.T) {
+	version, date, read := committed(t, "names.go")
+	if len(read["names"]) == 0 {
+		t.Fatal("names.go declares no names, so this checked nothing")
+	}
+	names, err := render(version, date, read["names"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held, _ := os.ReadFile(filepath.Join("..", "..", "weakness", "names.go")); !bytes.Equal(held, names) {
+		t.Errorf("names.go is not what the generator writes for its own catalog and names")
+	}
+
+	namesVersion, namesDate := version, date
+	version, date, read = committed(t, "lineage.go")
+	if version != namesVersion || date != namesDate {
+		t.Errorf("lineage.go names catalog %s of %s and names.go %s of %s; one run writes both",
+			version, date, namesVersion, namesDate)
+	}
+	set := func(m map[string]string) map[string]bool {
+		out := map[string]bool{}
+		for k := range m {
+			out[k] = true
+		}
+		return out
+	}
+	if len(read["parents"]) == 0 || len(read["classes"]) == 0 || len(read["pillars"]) == 0 {
+		t.Fatal("lineage.go declares an empty map, so this checked nothing")
+	}
+	lineage, err := renderLineage(version, date, read["parents"], set(read["classes"]), set(read["pillars"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held, _ := os.ReadFile(filepath.Join("..", "..", "weakness", "lineage.go")); !bytes.Equal(held, lineage) {
+		t.Errorf("lineage.go is not what the generator writes for its own catalog and hierarchy")
 	}
 }

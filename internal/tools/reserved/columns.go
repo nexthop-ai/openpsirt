@@ -174,12 +174,6 @@ func isWordByte(c byte) bool {
 	return c == '_' || isDigit(c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
-// quotedByBuilder is the builder's methods that quote the identifier they are
-// given. A query assembled in a variable is read for columns without them.
-var quotedByBuilder = map[string]bool{
-	"Column": true, "ExcludeColumn": true, "Order": true, "Group": true, "Table": true,
-}
-
 // queryArgument is the argument of a writing method that holds its SQL. The
 // rest are values bound into it, and a value is free to be a word the schema
 // has a column of. A call on a package rather than a value — strings.Join,
@@ -272,9 +266,11 @@ func qualifiedIn(text string, columns map[string]bool, path string, line int) []
 	return bad
 }
 
-// quotingCallee is every function given a qualified column that quotes it
-// itself: the builder's methods and the two functions that quote a name for
-// an engine. A name handed to one of them is written bare on purpose.
+// quotingCallee is every function given a name that quotes it itself: the
+// builder's methods and the two functions that quote a name for an engine. A
+// name handed to one of them is written bare on purpose, so neither a
+// qualified name handed over nor a query assembled in a variable is read
+// inside a call to one.
 var quotingCallee = map[string]bool{
 	"Column": true, "ExcludeColumn": true, "Order": true, "Group": true, "Table": true, "Ident": true,
 }

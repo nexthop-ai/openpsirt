@@ -352,7 +352,7 @@ func measureBeneathMoved(t *testing.T, rescans int) {
 	  OR "n"."component_id" IN (?))`,
 						w.Build.ID, beneath, w.Build.ID, w.Build.ID, bun.List(append([]int64{0}, under...)))}},
 				{"two joined by OR", `("f"."component_id" IN (?) OR "f"."component_id" IN (?))`,
-					[]any{graph.Within(db.DB, w.Build.ID, beneath), bun.List(append([]int64{0}, under...))}},
+					[]any{graph.WithinAny(db.DB, w.Build.ID, []int64{beneath}, true), bun.List(append([]int64{0}, under...))}},
 			} {
 				var count int64
 				formTook := timed(func() (err error) {

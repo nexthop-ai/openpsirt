@@ -3,22 +3,17 @@
 
 // Command readable reports source files that a text tool will not read.
 //
-// A single stray NUL byte in a TypeScript file made grep treat it as binary,
-// and every text-based check in this repository skipped it silently: the
-// class-collision script, the design-token check, and every audit somebody ran
-// by hand. The screen it hid was the busiest one in the interface, and the
-// consequence was not a wrong answer but the absence of one — four components
-// it draws were reported as reached by nothing at all.
-//
-// That is the whole class this exists for. A control character in source is
-// never deliberate: a separator meant as a character is written as an escape,
-// which is what every other file here does. What is checked is the bytes, not
-// the meaning — anything outside tab, newline and carriage return, and the
-// file is named.
+// One control byte makes grep treat a file as binary, and every text-based
+// check then skips it without saying so. A control character in source is
+// never deliberate: a separator meant as a character is written as an escape.
+// The bytes alone are checked: anything outside tab, newline and carriage
+// return names the file.
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,52 +36,56 @@ func carrying(body []byte) (byte, int, bool) {
 	return 0, 0, false
 }
 
-// text reports whether this is a file worth reading as one.
+// binary reports whether this is a file of a kind that is not text.
 //
-// By extension, because the alternative — sniffing the content — is the thing
-// that was fooled.
-func text(path string) bool {
+// Every other file is read, so a new text kind is checked from its first
+// commit and a new binary kind fails naming the file. By extension, because a
+// content sniff reads a text file holding one control byte as binary.
+func binary(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".go", ".ts", ".tsx", ".js", ".mjs", ".css", ".md", ".yaml", ".yml",
-		".json", ".sql", ".sh", ".html", ".txt", ".mod", ".sum", ".toml",
-		".svg", ".tpl", ".py", ".in", ".mk":
+	case ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp",
+		".woff", ".woff2", ".ttf", ".otf",
+		".xz", ".gz", ".zip", ".tar", ".pdf", ".wasm":
 		return true
 	}
-	switch name := filepath.Base(path); name {
-	case "Dockerfile", ".gitignore", ".dockerignore", ".prettierignore", "LICENSE", "NOTICE":
-		return true
-	default:
-		// Makefile.demo is a makefile whose extension is not a language.
-		return name == "Makefile" || strings.HasPrefix(name, "Makefile.")
-	}
+	return false
 }
 
 func main() {
 	var bad []string
-	// vendor is a dependency's own source, and the interface is walked rather
-	// than skipped: a byte that makes a text tool skip a file is not a Go
-	// question, and the five Go gates beside this one leave web out.
-	read, err := walk.Paths([]string{"vendor"}, func(path string) (bool, error) {
-		if !text(path) {
-			return false, nil
+	// Every file git does not ignore, so build output left in the checkout is
+	// not read. vendor is a dependency's own source, and the interface is read
+	// rather than skipped: a byte that makes a text tool skip a file is not a
+	// Go question.
+	files, err := walk.Unignored()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	read := 0
+	for _, path := range files {
+		if binary(path) || strings.HasPrefix(path, "vendor/") {
+			continue
 		}
-		// The path comes from the walk over the directory this was started in,
-		// never from a caller, and this program reads a repository and prints
-		// filenames. Said here rather than as a configured exclusion, which
-		// would also cover the next tool written beside it.
-		body, err := os.ReadFile(filepath.Clean(path)) //nolint:gosec // walked, not supplied
+		// The path is one git listed in this checkout, never a caller's.
+		body, err := os.ReadFile(filepath.Clean(path)) //nolint:gosec // listed by git, not supplied
+		if errors.Is(err, fs.ErrNotExist) {
+			// Deleted in the working tree and not yet committed.
+			continue
+		}
 		if err != nil {
-			return false, err
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
 		}
+		read++
 		if b, line, found := carrying(body); found {
 			bad = append(bad, fmt.Sprintf(
 				"%s:%d: byte 0x%02x, which makes text tools treat this file as binary "+
 					"and skip it. Write it as an escape", path, line, b))
 		}
-		return true, nil
-	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	}
+	if read == 0 {
+		fmt.Fprintln(os.Stderr, "no file was read, so this checked nothing")
 		os.Exit(2)
 	}
 	if len(bad) == 0 {

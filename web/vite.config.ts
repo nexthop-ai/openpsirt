@@ -50,9 +50,10 @@ export default defineConfig({
       // mounts the app and the harness is what tests draw with; neither is a
       // behavior of the interface.
       exclude: ["src/api/schema.d.ts", "src/**/*.test.{ts,tsx}", "src/main.tsx", "src/test/**"],
-      // Every file is reached by some test, so a screen added with none fails
-      // the run.
-      thresholds: { perFile: true, statements: 1 },
+      // Every file has a function some test calls, so a screen added with no
+      // test rendering it fails the run: importing a screen runs its
+      // module-level statements and none of its functions.
+      thresholds: { perFile: true, statements: 1, functions: 1 },
     },
   },
   server: {

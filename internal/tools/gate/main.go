@@ -228,7 +228,16 @@ var storage = []string{
 // rather than the diff: a file holding queries is one where a change to
 // anything can move what a query returns, and asking whether the edited lines
 // themselves were SQL is a narrower question than the one that matters.
-var query = regexp.MustCompile(`(?i)\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|CREATE TABLE|CREATE INDEX|ALTER TABLE|JOIN|GROUP BY|ORDER BY)\b|\.New(Select|Insert|Update|Delete|Raw)\(|RunInTx\(`)
+// Keywords match in upper case, as this tree writes SQL; in lower case they
+// are Go's select statement, strings.Join and prose.
+var query = regexp.MustCompile(`\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|CREATE TABLE|CREATE INDEX|ALTER TABLE|JOIN|GROUP BY|ORDER BY)\b|\.New(Select|Insert|Update|Delete|Raw)\(|RunInTx\(`)
+
+// reaching is an import of the standard database interface, the query builder,
+// or a harness that runs a test against every engine. A predicate built with
+// the builder need hold no keyword, and a test driving a query held in another
+// file holds no SQL at all.
+var reaching = regexp.MustCompile(`"(database/sql|github\.com/uptrace/bun|` +
+	`github\.com/nexthop-ai/openpsirt/internal/(dbtest|httpapi/httpapitest))(/[\w/]+)?"`)
 
 // What the API document is generated from: an operation, or a field whose
 // description it carries. A type a route answers with need not sit beside the
@@ -283,7 +292,7 @@ func classify(file string) []tier {
 		return []tier{everything}
 	}
 	var landed []tier
-	if query.Match(content) {
+	if query.Match(content) || reaching.Match(content) {
 		landed = append(landed, engines)
 	}
 	if operation.Match(content) || inAPIPackage(file) {
@@ -304,6 +313,12 @@ func changed() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ask git what changed: %w", err)
 	}
+	return parseStatus(out), nil
+}
+
+// parseStatus is every path in git's NUL-separated porcelain status, sorted,
+// each once.
+func parseStatus(out []byte) []string {
 	seen := map[string]bool{}
 	var files []string
 	// Records are NUL-separated, each "XY path"; a rename or copy is followed
@@ -329,7 +344,7 @@ func changed() ([]string, error) {
 		}
 	}
 	sort.Strings(files)
-	return files, nil
+	return files
 }
 
 // inAPIPackage is whether a path, relative to the checkout, is a file of the
