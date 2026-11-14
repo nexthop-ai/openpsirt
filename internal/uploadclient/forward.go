@@ -273,8 +273,8 @@ func renumber(run obj, m moves) {
 // merge folds the runs of one tool into one: clang writes a document per
 // translation unit, and the deployment reads one run of each tool. The
 // driver's rules are listed once, by identifier, and each extension's within
-// that extension, extensions being one where they share a name, a GUID and a
-// version, and an extension stating none of the three its own. A result names its rule by identifier after settling, and a rule of an
+// that extension, extensions of two runs being one where they share a name, a
+// GUID and a version, and an extension with neither name nor GUID its own. A result names its rule by identifier after settling, and a rule of an
 // extension by its extension's position, which is rewritten to the merged
 // list's.
 func merge(runs []obj) obj {
@@ -304,10 +304,13 @@ func merge(runs []obj) obj {
 			}
 			m.driverRules[j] = seen[id]
 		}
+		inRun := map[int]bool{}
 		for i, ext := range objects(tool, "extensions") {
 			key := str(ext, "name") + "\x00" + strings.ToLower(str(ext, "guid")) + "\x00" + str(ext, "version")
 			at, ok := extensionAt[key]
-			if !ok || key == "\x00\x00" {
+			// An extension with neither a name nor a GUID is its own, and one
+			// run's extensions are never one another.
+			if !ok || str(ext, "name") == "" && str(ext, "guid") == "" || inRun[at] {
 				at = len(extensions)
 				extensionAt[key] = at
 				kept := obj{}
@@ -318,6 +321,7 @@ func merge(runs []obj) obj {
 				extensions = append(extensions, kept)
 				extensionRules = append(extensionRules, map[string]int{})
 			}
+			inRun[at] = true
 			m.components[i] = at
 			m.rules[i] = map[int]int{}
 			merged := extensions[at].(obj)

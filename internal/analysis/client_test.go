@@ -382,3 +382,27 @@ func TestOneExtensionWrittenWithItsGUIDInTwoCasesMergesOnce(t *testing.T) {
 		t.Errorf("%d extensions; want the one pack", n)
 	}
 }
+
+func TestTwoExtensionsWithNoNameKeepTheirOwnRulesWhenForwarded(t *testing.T) {
+	strict := `{"version":"1.0","rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	lenient := `{"version":"1.0","rules":[{"id":"X","defaultConfiguration":{"level":"note"}}]}`
+	doc := forwardedOne(t, []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(strict, forwardedAt("1", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+		{Name: "b.sarif", Data: forwarded(lenient, forwardedAt("2", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+	})
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	levels := map[int]string{}
+	for _, res := range log.Runs[0].Results {
+		if len(res.Locations) > 0 {
+			levels[res.Locations[0].StartLine] = res.Level
+		}
+	}
+	for line, want := range map[int]string{1: "error", 2: "note"} {
+		if levels[line] != want {
+			t.Errorf("the result on line %d is at %q; want %q, its own extension's", line, levels[line], want)
+		}
+	}
+}

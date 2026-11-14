@@ -205,3 +205,52 @@ func TestAKeyIsHeldTwiceByTwoOccurrencesNeverByOneOnTwoBuilds(t *testing.T) {
 		t.Error("two results under one key were taken for one")
 	}
 }
+
+// inFunction is a result at a column of its line within a named function,
+// or none.
+type inFunction struct {
+	columned
+	function string
+}
+
+func (s inFunction) json() string {
+	loc := fmt.Sprintf(`{"physicalLocation":{"artifactLocation":{"uri":%q,"uriBaseId":%q},`+
+		`"region":{"startLine":%d,"startColumn":%d}}`, s.uri, s.base, s.line, s.column)
+	if s.function != "" {
+		loc += fmt.Sprintf(`,"logicalLocations":[{"fullyQualifiedName":%q}]`, s.function)
+	}
+	return fmt.Sprintf(`{"ruleId":%q,"message":{"text":%q},"locations":[%s}]}`, s.rule, s.message, loc)
+}
+
+func TestResultsOnOneLineKeepTheirCodeFindingsWhenALineMovesThem(t *testing.T) {
+	for name, function := range map[string]string{"on the nearest line": "", "on the function": "orch::doTask"} {
+		t.Run(name, func(t *testing.T) {
+			eachWorld(t, func(t *testing.T, w *world) {
+				w.inventory(t, w.Build.ID)
+				now := time.Now().UTC()
+				at := func(line, column int) inFunction {
+					s := inSWSS
+					s.line = line
+					return inFunction{columned{s, column}, function}
+				}
+				before := documentOf([]interface{ json() string }{at(12, 5), at(12, 30)}, 10, "")
+				// A line inserted above moves both, and the run lists them the
+				// other way round.
+				after := documentOf([]interface{ json() string }{at(13, 30), at(13, 5)}, 10, "")
+				if _, status := w.send(t, w.Build.ID, now.Add(-2*time.Hour), before); status != series.Applied {
+					t.Fatalf("status %s; want applied", status)
+				}
+				first := w.occurrenceByColumn(t, w.Build.ID)
+				if len(first) != 2 {
+					t.Fatalf("the two results opened at %v; want two occurrences", first)
+				}
+				if _, status := w.send(t, w.Build.ID, now.Add(-time.Hour), after); status != series.Applied {
+					t.Fatalf("status %s; want applied", status)
+				}
+				if got := w.occurrenceByColumn(t, w.Build.ID); !maps.Equal(got, first) {
+					t.Errorf("moved a line, the build holds %v; want %v", got, first)
+				}
+			})
+		})
+	}
+}

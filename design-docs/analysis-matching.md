@@ -47,6 +47,7 @@ line, each on what the last left.
 |---|---|
 | A code finding the last comparable run missed is a candidate in every layer; one it saw comes first on a tie | Of 28 absences hand-checked, 5 returned within two builds |
 | Where a whole key is held twice, by two results of a run or by two code findings, a code finding last seen at a result's column with its message is paired with it before any other holding the key | Each keeps its code finding whatever order a run lists them in, and a lone result returning takes its own |
+| Where a function key is held twice, a code finding last seen at a result's column is paired with it first; on the nearest line, at one distance, a code finding at the result's column comes first | A line inserted above results sharing a line moves them all off the whole key |
 | The line layer offers the eight nearest code findings sharing the line key | A generated file holds thousands under one key |
 | Each sighting records its pairing layer | A dismissal carries on strong and lapses on probable (`design-docs/analysis-triage.md` § Code finding triage) |
 

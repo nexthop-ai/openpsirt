@@ -172,32 +172,39 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 	// Where a key is held twice, by two results or by two occurrences of the
 	// series, a hit at the result's column saying what it says is taken first,
 	// so each keeps its occurrence whatever order a run lists them in; the rest
-	// take what is left. Only those keys' messages are read, since a key's
-	// hits span every build of the series.
+	// take what is left. An occurrence is where its newest code finding was
+	// seen, so one message is read for each, never one per build.
 	holders := map[string]map[string]bool{}
 	for k, hits := range byKey {
 		for _, h := range hits {
 			holding(holders, k, h.Occurrence)
 		}
 	}
-	shared := heldTwice(fresh, holders)
-	var ids []int64
+	shared := heldTwice(keysOf(fresh), holders)
+	newest := map[string]keyHit{}
 	for k := range shared {
 		for _, h := range byKey[k] {
-			ids = append(ids, h.ID)
+			if n, ok := newest[h.Occurrence]; !ok || h.ID > n.ID {
+				newest[h.Occurrence] = h
+			}
 		}
+	}
+	ids := make([]int64, 0, len(newest))
+	for _, h := range newest {
+		ids = append(ids, h.ID)
 	}
 	messages, err := messagesOf(ctx, db, ids)
 	if err != nil {
 		return err
 	}
-	at := map[spotKey][]keyHit{}
+	var hits []keyHit
 	for k := range shared {
-		for _, h := range byKey[k] {
-			sk := spotKey{k, spotOf(h.Column, messages[h.ID])}
-			at[sk] = append(at[sk], h)
-		}
+		hits = append(hits, byKey[k]...)
 	}
+	at := bySpot(hits, func(keyHit) bool { return true }, func(h keyHit) spotKey {
+		n := newest[h.Occurrence]
+		return spotKey{h.Key, spotOf(n.Column, messages[n.ID])}
+	})
 	take := func(i int, hits []keyHit) {
 		for _, h := range hits {
 			if used[h.Occurrence] {
