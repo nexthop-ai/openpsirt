@@ -285,15 +285,21 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// Asked of each standing row the reader may read, at that row's
 	// visibility; an agreement with any row its approver could not agree to
 	// now is listed, with every row it covers counted. The agreements are
-	// worked out once, uncorrelated, so a decision of many rows is not asked
-	// again for each of them.
+	// read first and bound into the listing: joined as a subquery, PostgreSQL
+	// plans a nested loop over both sides' rows where its statistics
+	// undercount a product's decisions, past 20 seconds for 20,500 standing
+	// rows against 60 to 70 ms read apart.
 	mayStillApprove, stillArgs := access.MayApproveWhere(`"apl"."approved_by"`, `"dl"."product_id"`, `"dl"."visibility"`)
-	lost := readableBy(s.db.NewSelect().ColumnExpr(`"apl"."id"`).
+	var lostIDs []int64
+	if err := readableBy(s.db.NewSelect().Distinct().ColumnExpr(`"apl"."id"`).
 		TableExpr(`"decision_occurrence" AS "dl"`).
 		Join(`JOIN "decision_approval" AS "apl" ON "apl"."decision_id" = "dl"."decision_id"`).
 		Where(`"apl"."withdrawn_at" IS NULL`).
 		Where(finding.InForceOn("dl")).
-		Where(`NOT `+mayStillApprove, stillArgs...), subject, "dl")
+		Where(`NOT `+mayStillApprove, stillArgs...), subject, "dl").Scan(ctx, &lostIDs); err != nil {
+		return nil, fmt.Errorf("read which approvers have lost the right: %w", err)
+	}
+	inLost, lostArgs := database.InAnyOf(`"ap"."id"`, lostIDs)
 	var lapsed []struct {
 		DecisionID int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
@@ -321,7 +327,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// agreed could agree today, asked by the rule a signed-in approver is
 		// asked by. A grant made inactive by a change of mode grants nothing
 		// while it sits there, so it is not a right somebody still holds.
-		Where(`"ap"."id" IN (?)`, lost).
+		Where(inLost, lostArgs...).
 		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(int64(room))).Scan(ctx, &lapsed)

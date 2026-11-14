@@ -113,6 +113,7 @@ findings, each where the reader may read it.
 | What a decision covers now is what its live rows reach | |
 | Coverage is counted for a bounded set of decisions per statement | One per decision is ten thousand round trips |
 | Somebody could not give an approval now where the approving rule refuses them today: reading at the decision's visibility, and the approver capability or triage there, the capability alone at security testing, each granted on the product or across every product and in force, held by an account not deactivated. It is asked of each standing row the reader may read, at that row's visibility, and a decision with any such row is listed with every row its agreement covers | The statement is built from the rule a signed-in approver is asked by. An administrator holds no role ungranted, so is listed like anybody else |
+| The agreements whose approver lost the right are read first, then listed by their identifiers | Joined as a subquery, PostgreSQL plans a nested loop where its statistics undercount a product's decisions: past 20 seconds for 20,500 standing rows, against 60 to 70 ms read apart |
 
 ## Dismissals and last uploads
 
