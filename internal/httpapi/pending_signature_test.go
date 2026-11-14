@@ -54,7 +54,7 @@ func TestASignatureFromAnotherPayloadDoesNotOpenASignIn(t *testing.T) {
 		_, signature, _ := strings.Cut(issued, ".")
 		spliced := base64.RawURLEncoding.EncodeToString(payload("/queue")) + "." + signature
 		got := complete(spliced)
-		if got.Code != http.StatusSeeOther {
+		if !noAccess(got) {
 			t.Fatalf("a payload carrying another payload's signature answered %d, want 303 (to %q)",
 				got.Code, got.Header().Get("Location"))
 		}

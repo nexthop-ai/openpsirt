@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   forgetForward,
   forwardable,
-  refusedHere,
   rememberForward,
   returningHere,
   signedOutHere,
@@ -42,6 +41,12 @@ describe("where a sign-in comes back to", () => {
     expect(returningHere()).toBe("");
     // However the marker is spelled, as the screen reads it.
     at("/", "?no-access=&x=1");
+    expect(returningHere()).toBe("");
+  });
+
+  it("carries nothing from the address a sign-out lands on", () => {
+    const [path, query] = signedOutHere.split("?");
+    at(path ?? "/", query ? "?" + query : "");
     expect(returningHere()).toBe("");
   });
 
@@ -95,9 +100,8 @@ describe("sending somebody straight on to the only provider", () => {
   it("does not forward at the address a refused sign-in lands on", () => {
     // The provider still holds the account it refused, so forwarding would
     // refuse it again in a loop. The server redirects every refused sign-in
-    // to this literal address, so it is written out here rather than read
-    // back from the screen.
-    expect(refusedHere).toBe("/?no-access");
+    // to this literal address (internal/httpapi/signin.go), so it is written
+    // out here rather than read back from the screen.
     at("/", "?no-access");
     expect(forwardable(1, false)).toBe(false);
   });

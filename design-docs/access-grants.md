@@ -110,8 +110,8 @@ One standing grant, covering products declared afterwards (REQ-42).
 |---|---|
 | One grant, never a copy per product, its reach worked out as the subject is resolved | A copy records the catalog of its moment |
 | Holding one in force is access whatever the catalog holds: before any product is declared its holder signs in and reaches no product | Spread over an empty catalog it adds no per-product grant, and counting only those refuses its holder at every request |
-| A grant set aside, naming no role, or derived longer ago than a token's window admits nobody through it, as it reaches no product | |
-| Asked whether somebody holds a role on any product, it answers yes before any product exists; a token narrowed to roles keeps only those of it, and one narrowed to a product keeps none of it beyond that product | A token's mint refuses roles its owner holds nowhere |
+| A grant set aside or naming no role admits nobody, and through a token neither does one derived longer ago than the token window | Each reaches no product |
+| Asked whether somebody holds a role on any product, it answers yes before any product exists; a token narrowed to roles keeps only those of it | A token's mint refuses roles its owner holds nowhere |
 | It narrows by visibility exactly as a per-product grant does, never through the queries' "every product" flag | That flag means no narrowing at all and belongs to the background passes (REQ-43) |
 | Withdrawn whole, leaving nothing behind, and handing back work product by product (`design-docs/access-assignment.md` § Lost reading) | |
 | Every question about what somebody holds asks this table too: whether they may be handed a finding, may be mentioned, still read their work, or still hold the approving right | Those predicates read the grant tables directly |

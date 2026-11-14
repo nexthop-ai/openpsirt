@@ -61,9 +61,7 @@ func TestEveryRefusedSignInLandsOnTheOneNoAccessScreen(t *testing.T) {
 				state = "the-state"
 			}
 			rec := callback(t, r, state, "a-code", true)
-			// The literal the sign-in screen reads as its marker
-			// (web/src/screens/SignIn.tsx), pinned there to the same text.
-			if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/?no-access" {
+			if !noAccess(rec) {
 				t.Errorf("%s answered %d to %q, want 303 to /?no-access: %s",
 					c.what, rec.Code, rec.Header().Get("Location"), rec.Body.String())
 			}
