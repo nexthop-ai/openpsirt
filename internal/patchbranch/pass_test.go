@@ -669,8 +669,25 @@ func TestEveryGitAVisitStartsIsGivenNothingOfTheProcess(t *testing.T) {
 		if len(invocations) == 0 {
 			t.Fatal("git was never run, so this checked nothing")
 		}
+		reaching, local := 0, 0
 		for i, each := range invocations {
 			lines := strings.Split(each, "\n")
+			// Only a clone or a fetch reaches the host, and only it is allowed
+			// a transport.
+			allowed := slices.ContainsFunc(lines, func(line string) bool {
+				return strings.HasPrefix(line, "ARG protocol.") && strings.HasSuffix(line, ".allow=always")
+			})
+			networked := slices.Contains(lines, "ARG clone") || slices.Contains(lines, "ARG fetch")
+			switch {
+			case networked:
+				reaching++
+			default:
+				local++
+			}
+			if allowed != networked {
+				t.Errorf("git run %d is allowed a transport %v, and reaches the host %v:\n%s",
+					i, allowed, networked, each)
+			}
 			if slices.Contains(lines, "ENV HTTPS_PROXY=http://proxy.example.test") {
 				t.Errorf("git run %d was given the process's proxy", i)
 			}
@@ -683,6 +700,10 @@ func TestEveryGitAVisitStartsIsGivenNothingOfTheProcess(t *testing.T) {
 					t.Errorf("git run %d ran without %q", i, setting)
 				}
 			}
+		}
+		if reaching == 0 || local == 0 {
+			t.Errorf("%d runs reached the host and %d did not, so the transport was not checked both ways",
+				reaching, local)
 		}
 	})
 }
