@@ -9,9 +9,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
-	"strconv"
-	"strings"
 	"sync"
+
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 )
 
 // The sources of every migration in this package.
@@ -89,22 +89,18 @@ func Expected() (int64, error) {
 			expectedErr = err
 			return
 		}
-		for _, name := range names {
-			digits, _, ok := strings.Cut(name, "_")
-			if !ok {
-				continue // fingerprint.go and anything else that is not one
-			}
-			version, err := strconv.ParseInt(digits, 10, 64)
-			if err != nil {
-				continue
-			}
-			if version > expected {
-				expected = version
-			}
-		}
-		if expected == 0 {
-			expectedErr = fmt.Errorf("this build carries no migrations")
-		}
+		expected, expectedErr = highestOf(names)
 	})
 	return expected, expectedErr
+}
+
+// highestOf is the highest migration among the embedded file names, by the
+// rule the release records read, so the two cannot disagree over a test file
+// the embedding includes.
+func highestOf(names []string) (int64, error) {
+	highest := released.Highest(names)
+	if highest == 0 {
+		return 0, fmt.Errorf("this build carries no migrations")
+	}
+	return highest, nil
 }
