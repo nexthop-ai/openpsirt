@@ -282,8 +282,9 @@ type Subject struct {
 	codeFindings map[int64][]string
 	// everywhere is the roles held across every product. Already spread over
 	// the catalog into grants, which is what every product-scoped question
-	// reads; kept apart only so that "holds this role anywhere" answers yes
-	// for somebody holding it across a catalog with nothing in it yet.
+	// reads. Kept apart for two questions that must answer yes over a catalog
+	// with nothing in it: whether a role is held anywhere, and whether one is
+	// held across every product.
 	everywhere []Role
 	// casesReadOnly takes the write half of a case grant away, for a
 	// credential narrowed to roles that do not include triage. Inverted so

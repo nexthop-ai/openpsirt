@@ -116,6 +116,7 @@ describe("the application after a refused sign-in with no way in", () => {
     await drawn(() => ({ status: 401 }), "/");
     expect(text()).toContain("No way in is configured.");
     expect(text()).not.toContain("Ask an administrator for access.");
+    expect(text()).not.toContain("Sign in to continue");
   });
 
   it("says the ways in could not be read, and not to ask for access", async () => {
