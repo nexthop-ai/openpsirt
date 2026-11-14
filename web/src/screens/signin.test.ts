@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   forgetForward,
   forwardable,
+  refusedHere,
   rememberForward,
   returningHere,
   signedOutHere,
@@ -32,6 +33,13 @@ describe("where a sign-in comes back to", () => {
       "?state=undecided&severity=high",
     );
     expect(returningHere()).toContain("%3Fstate%3Dundecided%26severity%3Dhigh");
+  });
+
+  it("carries nothing from the address a refused sign-in lands on", () => {
+    // Coming back there after signing in with another account would draw the
+    // home page under an address that says they were refused.
+    at("/", "?no-access");
+    expect(returningHere()).toBe("");
   });
 
   it("carries nothing from the home page, which is where a sign-in lands anyway", () => {
@@ -81,6 +89,16 @@ describe("sending somebody straight on to the only provider", () => {
     expect(forwardable(1, false)).toBe(false);
   });
 
+  it("does not forward at the address a refused sign-in lands on", () => {
+    // The provider still holds the account it refused, so forwarding would
+    // refuse it again in a loop. The server redirects every refused sign-in
+    // to this literal address, so it is written out here rather than read
+    // back from the screen.
+    expect(refusedHere).toBe("/?no-access");
+    at("/", "?no-access");
+    expect(forwardable(1, false)).toBe(false);
+  });
+
   it("does not forward after a sign-out once the address is gone", () => {
     // Pressing Back leaves the marker behind but not the address. The tab is
     // marked as well, because the session at the provider outlives both.
@@ -90,9 +108,8 @@ describe("sending somebody straight on to the only provider", () => {
   });
 
   it("does not forward twice in one tab", () => {
-    // Somebody who authenticates and was granted nothing is refused, and the
-    // refusal is an API answer rather than a screen. Coming back has to offer
-    // the way in rather than send them round again.
+    // A forward that comes back without a session has to offer the way in
+    // rather than send them round again.
     expect(forwardable(1, false)).toBe(true);
     rememberForward();
     expect(forwardable(1, false)).toBe(false);

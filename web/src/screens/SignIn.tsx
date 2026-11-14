@@ -22,7 +22,7 @@ type Provider = { name: string; path: string };
 // carries nothing and the server's own default applies.
 export function returningHere(): string {
   const here = window.location.pathname + window.location.search;
-  if (here === "/" || here === "") return "";
+  if (here === "/" || here === "" || here === refusedHere) return "";
   return "?return=" + encodeURIComponent(here);
 }
 
@@ -30,10 +30,9 @@ export function returningHere(): string {
 //
 // One provider means the button is the only thing on the screen, so the screen
 // is a stop on the way rather than a choice — but a forward that repeats is a
-// person who can never read why they were refused. Somebody who authenticates
-// and was granted nothing is refused by design, and the refusal is an API
-// answer rather than a screen; coming back to the application afterwards has to
-// show the way in rather than send them round again.
+// person who can never read that they were refused. Coming back to the
+// application after a refusal shows the way in rather than sending them round
+// again.
 //
 // Per tab, and cleared once somebody is actually signed in. Storage can be
 // unavailable or throw, and the honest answer then is to draw the button: a
@@ -48,6 +47,18 @@ const triedKey = "signin-forwarded";
 // one of them changing.
 const signedOut = "signed-out";
 export const signedOutHere = "/?" + signedOut;
+
+// The address a refused sign-in lands on, and the marker the sign-in screen
+// reads there. The server redirects every refused sign-in to exactly this
+// address, whatever the reason, so the screen says no more than that this
+// account has no access here.
+const refused = "no-access";
+export const refusedHere = "/?" + refused;
+
+// Whether the browser is on the address a refused sign-in lands on.
+function refusedSignIn(): boolean {
+  return new URLSearchParams(window.location.search).has(refused);
+}
 
 function alreadyTried(): boolean {
   try {
@@ -88,6 +99,9 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
   // forwarding would sign them straight back in and make signing out
   // impossible.
   if (new URLSearchParams(window.location.search).has(signedOut)) return false;
+  // A refused sign-in lands here, and the provider still holds the account it
+  // refused, so forwarding would refuse it again in a loop.
+  if (refusedSignIn()) return false;
   return !alreadyTried();
 }
 
@@ -113,6 +127,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
   const offered = providers.data?.items ?? [];
   const only = offered.length === 1 ? offered[0] : undefined;
   const forwarding = Boolean(only) && forwardable(offered.length, resuming);
+  const turnedAway = !resuming && refusedSignIn();
 
   useEffect(() => {
     if (!forwarding || !only) return;
@@ -156,9 +171,19 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
           <p className="text-xs uppercase tracking-wide text-[var(--faint)]">
             Product Security Incident Response &amp; Triage
           </p>
-          <p className="text-sm text-[var(--muted)]">
-            {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
-          </p>
+          {turnedAway ? (
+            <div className="text-center">
+              <p className="text-sm font-medium">No access here</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Signed in, but this account has no access here. Ask an administrator, or use another
+                account.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--muted)]">
+              {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
+            </p>
+          )}
           {resuming && (
             <p className="text-center text-sm text-[var(--muted)]">Anything you typed is kept.</p>
           )}
