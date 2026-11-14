@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -82,12 +83,12 @@ func begin(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	callback, err := in.RedirectURI(r, provider.Name())
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 	where, pending, err := provider.Begin(r.Context(), callback)
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 
@@ -100,12 +101,12 @@ func begin(w http.ResponseWriter, r *http.Request, in core.Deps) {
 		Minted: time.Now().UTC(),
 	})
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 	sealed, err := sealPending(r.Context(), in, encoded)
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 	cookie := browserCookie(pendingCookie, sealed, false, in.PlainHTTP,
@@ -128,6 +129,10 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	}
 
 	held, err := pendingFrom(r.Context(), in, r)
+	if errors.Is(err, errSignInFault) {
+		wentWrongHere(w, r, in, "a sign-in could not be completed", err)
+		return
+	}
 	if err != nil {
 		refuseSignIn(w, r, in)
 		return
@@ -148,7 +153,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	callback, err := in.RedirectURI(r, provider.Name())
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be completed", err)
+		wentWrongHere(w, r, in, "a sign-in could not be completed", err)
 		return
 	}
 	identity, err := provider.Complete(r.Context(), code, pending, callback)
@@ -190,7 +195,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	// outage turns every browser away as though nothing granted them anything.
 	person, err := admit(r, in, rights, identity)
 	if err != nil && !errors.Is(err, access.ErrDenied) {
-		wentWrongHere(w, in, "who signed in could not be looked up", err)
+		wentWrongHere(w, r, in, "who signed in could not be looked up", err)
 		return
 	}
 	if err != nil {
@@ -204,12 +209,12 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	lifetime, err := sessionWindow(r.Context(), in)
 	if err != nil {
-		wentWrongHere(w, in, "how long a sign-in lasts could not be read", err)
+		wentWrongHere(w, r, in, "how long a sign-in lasts could not be read", err)
 		return
 	}
 	issued, err := rights.StartSession(r.Context(), person.ID, lifetime)
 	if err != nil {
-		wentWrongHere(w, in, "a session could not be started", err)
+		wentWrongHere(w, r, in, "a session could not be started", err)
 		return
 	}
 
@@ -372,7 +377,7 @@ func openPending(ctx context.Context, in core.Deps, value string) ([]byte, error
 	}
 	key, err := signingKey(ctx, in)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errSignInFault, err)
 	}
 	mac := hmac.New(sha256.New, key)
 	mac.Write(payload)
@@ -495,13 +500,30 @@ func refuseSignIn(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	http.Redirect(w, r, refusedHere, http.StatusSeeOther)
 }
 
+// faultedHere is where a browser whose sign-in failed on this side lands: the
+// interface's sign-in screen, marked so that it says to try again shortly and
+// does not forward to the provider, which would repeat the fault in a loop.
+const faultedHere = "/?sign-in-failed"
+
+// errSignInFault marks a failure of this deployment's own while reading what a
+// sign-in left in the browser, which is a fault and never a refusal.
+var errSignInFault = errors.New("the sign-in key could not be read")
+
 // wentWrongHere records a fault where an operator can read it and says nothing
 // about it to whoever asked.
-func wentWrongHere(w http.ResponseWriter, in core.Deps, what string, err error) {
+//
+// Beginning and completing a sign-in are pages a browser is sent to, so the
+// answer is a page too. A fault is said apart from a refusal: trying again can
+// help with one and never with the other.
+func wentWrongHere(w http.ResponseWriter, r *http.Request, in core.Deps, what string, err error) {
 	if in.Logger != nil {
 		in.Log().Error(what, "error", err)
 	}
-	Problem(w, http.StatusInternalServerError, "something went wrong")
+	if _, held := r.Cookie(access.CookieName(pendingCookie, in.PlainHTTP)); held == nil {
+		cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
+		http.SetCookie(w, &cleared)
+	}
+	http.Redirect(w, r, faultedHere, http.StatusSeeOther)
 }
 
 // sessionWindow is how long a sign-in lasts here.

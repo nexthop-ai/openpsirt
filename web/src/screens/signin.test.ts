@@ -112,6 +112,15 @@ describe("sending somebody straight on to the only provider", () => {
     expect(forwardable(1, false)).toBe(true);
   });
 
+  it("does not forward at the address a failed sign-in lands on", () => {
+    // Forwarding would repeat the fault in a loop. The server redirects every
+    // sign-in that failed on its side to this literal address
+    // (internal/httpapi/signin.go).
+    at("/", "?sign-in-failed");
+    expect(forwardable(1, false)).toBe(false);
+    expect(returningHere()).toBe("");
+  });
+
   it("does not forward after a sign-out once the address is gone", () => {
     // Pressing Back leaves the marker behind but not the address. The tab is
     // marked as well, because the session at the provider outlives both.

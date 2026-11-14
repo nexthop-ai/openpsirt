@@ -23,7 +23,7 @@ type Provider = { name: string; path: string };
 export function returningHere(): string {
   const here = window.location.pathname + window.location.search;
   if (here === "/" || here === "") return "";
-  if (landedAt(signedOut) || landedAt(refused)) return "";
+  if (landedAt(signedOut) || landedAt(refused) || landedAt(failed)) return "";
   return "?return=" + encodeURIComponent(here);
 }
 
@@ -52,6 +52,11 @@ export const signedOutHere = "/?" + signedOut;
 // every refused sign-in to "/?no-access", whatever the reason, so the screen
 // says no more than that the sign-in gave no access.
 const refused = "no-access";
+
+// The marker on the address a sign-in that failed on this side lands on
+// ("/?sign-in-failed"). It is a fault rather than a refusal, so the screen says
+// to try again.
+const failed = "sign-in-failed";
 
 // Whether the address carries one of the markers above.
 function marked(marker: string): boolean {
@@ -106,6 +111,9 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
   // A refused sign-in lands here, and the provider still holds the account it
   // refused, so forwarding would refuse it again in a loop.
   if (landedAt(refused)) return false;
+  // A failed sign-in lands here, and forwarding would repeat the fault in a
+  // loop.
+  if (landedAt(failed)) return false;
   return !alreadyTried();
 }
 
@@ -129,13 +137,20 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
   });
 
   const offered = providers.data?.items ?? [];
+  // A browser the trusted proxy named and this deployment refused. The proxy
+  // signs it in on every request, so the ways in below are no way in for it.
+  const proxied = !resuming && Boolean(providers.data?.named_by_proxy);
   const only = offered.length === 1 ? offered[0] : undefined;
-  const forwarding = Boolean(only) && forwardable(offered.length, resuming);
-  // At the address a refused sign-in lands on, the refusal is said once a way
-  // in is offered and nothing else is: while the ways in load, where reading
-  // them fails, or where none is configured, the panel below speaks alone.
-  const refusedHere = !resuming && landedAt(refused);
-  const turnedAway = refusedHere && offered.length > 0;
+  const forwarding = Boolean(only) && !proxied && forwardable(offered.length, resuming);
+  // At an address a refused or failed sign-in lands on, what happened is said
+  // once a way in is offered and nothing else is: while the ways in load, where
+  // reading them fails, or where none is configured, the panel below speaks
+  // alone.
+  const landed = !resuming && (landedAt(refused) || landedAt(failed));
+  const turnedAway = proxied || (!resuming && landedAt(refused) && offered.length > 0);
+  const toRetry = !proxied && !resuming && landedAt(failed) && offered.length > 0;
+  // The invitation waits for the ways in, which may say the proxy named them.
+  const invited = !turnedAway && !toRetry && !landed && (resuming || !providers.isPending);
 
   useEffect(() => {
     if (!forwarding || !only) return;
@@ -179,17 +194,22 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
           <p className="text-xs uppercase tracking-wide text-[var(--faint)]">
             Product Security Incident Response &amp; Triage
           </p>
-          {turnedAway ? (
+          {turnedAway && (
             <div className="text-center">
               <p className="text-sm font-medium">No access here</p>
               <p className="mt-1 text-sm text-[var(--muted)]">Ask an administrator for access.</p>
             </div>
-          ) : (
-            !refusedHere && (
-              <p className="text-sm text-[var(--muted)]">
-                {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
-              </p>
-            )
+          )}
+          {toRetry && (
+            <div className="text-center">
+              <p className="text-sm font-medium">Sign-in didn&rsquo;t finish</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">Try again shortly.</p>
+            </div>
+          )}
+          {invited && (
+            <p className="text-sm text-[var(--muted)]">
+              {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
+            </p>
           )}
           {resuming && (
             <p className="text-center text-sm text-[var(--muted)]">Anything you typed is kept.</p>
@@ -202,7 +222,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
           <Failed error={providers.error} what="The ways in could not be read." />
         )}
 
-        {providers.data && (providers.data.items ?? []).length === 0 && (
+        {providers.data && !proxied && (providers.data.items ?? []).length === 0 && (
           <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-6 text-center">
             <p className="text-sm font-medium">No way in is configured.</p>
             <p className="mt-1 text-sm text-[var(--muted)]">
@@ -212,7 +232,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
         )}
 
         <div className="flex flex-col gap-2">
-          {(providers.data?.items ?? []).map((each: Provider) => (
+          {(proxied ? [] : offered).map((each: Provider) => (
             <a
               key={each.name}
               href={each.path + returningHere()}

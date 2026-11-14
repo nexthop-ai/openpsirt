@@ -7251,7 +7251,7 @@ export interface paths {
          * List sign-in providers
          * @description Returns the sign-in providers this deployment has configured, so a sign-in page can offer them.
          *
-         *     Answered without a credential, because it is what somebody sees before they have one. It is the only reading endpoint that is, and it reports names an operator configured and nothing else — no account exists or does not exist as far as this is concerned, which is the disclosure that would matter.
+         *     Answered without a credential, because it is what somebody sees before they have one. It is the only reading endpoint that is. It reports names an operator configured, and whether the trusted proxy in front of this deployment named the person asking; no account exists or does not exist as far as this is concerned, which is the disclosure that would matter.
          *
          *     Requires: nothing: this is answered before anybody has a credential
          */
@@ -12564,17 +12564,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyProviderBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyProviderBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["ProviderBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyReleaseBody: {
             /**
              * Format: uri
@@ -14139,6 +14128,17 @@ export interface components {
             name: string;
             /** @description The address to send the browser to */
             path: string;
+        };
+        ProvidersBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ProvidersBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ProviderBody"][] | null;
+            /** @description Whether the trusted proxy in front of this deployment named the person asking. Where it did and a request as them is refused, they were refused, for a reason this does not say */
+            named_by_proxy?: boolean;
         };
         PublicationBody: {
             /**
@@ -28542,7 +28542,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyProviderBody"];
+                    "application/json": components["schemas"]["ProvidersBody"];
                 };
             };
             /** @description Error */

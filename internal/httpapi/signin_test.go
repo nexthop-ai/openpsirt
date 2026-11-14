@@ -329,6 +329,14 @@ func TestAProviderThatFailedSaysNothingAboutWhy(t *testing.T) {
 	})
 }
 
+// faulted reports whether a sign-in failed on this side the one way every such
+// fault is answered: sent to the interface's try-again screen. The address is
+// the literal the sign-in screen reads its marker from
+// (web/src/screens/SignIn.tsx), which pins the same text.
+func faulted(rec *httptest.ResponseRecorder) bool {
+	return rec.Code == http.StatusSeeOther && rec.Header().Get("Location") == "/?sign-in-failed"
+}
+
 // noAccess reports whether a callback was refused the one way every refusal
 // is: sent to the interface's no-access screen. Any other address, the home
 // page included, forwards a browser with one provider straight back to it.
@@ -818,10 +826,13 @@ func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 				t.Fatal(err)
 			}
 			// A key that cannot be read is a fault here, so starting a sign-in
-			// answers 500 and sets no redirect to the provider.
+			// lands on the try-again screen and never reaches the provider.
 			rec := httptest.NewRecorder()
 			r.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
-			httpapitest.RefusedWith(t, rec, http.StatusInternalServerError)
+			if !faulted(rec) {
+				t.Fatalf("starting a sign-in over a malformed key answered %d to %q",
+					rec.Code, rec.Header().Get("Location"))
+			}
 
 			body := []byte(`{"pending":{"State":"the-state","Nonce":"the-nonce","Verifier":"the-verifier"},"minted":"` +
 				time.Now().UTC().Format(time.RFC3339Nano) + `"}`)
@@ -833,7 +844,7 @@ func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 			req.Header.Set("Cookie", "openpsirt_pending="+forged)
 			rec = httptest.NewRecorder()
 			r.handler.ServeHTTP(rec, req)
-			if !noAccess(rec) {
+			if !faulted(rec) {
 				t.Fatalf("a sign-in sealed with an empty key answered %d to %q",
 					rec.Code, rec.Header().Get("Location"))
 			}
@@ -863,8 +874,9 @@ func TestAProviderSignInWhoseMatchCouldNotBeReadIsAFault(t *testing.T) {
 		BaseURL:   "http://example.com",
 	})
 	rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
-	if rec.Code != http.StatusInternalServerError {
-		t.Errorf("a sign-in over a lookup that failed answered %d, want 500", rec.Code)
+	if !faulted(rec) {
+		t.Errorf("a sign-in over a lookup that failed answered %d to %q, want the try-again screen",
+			rec.Code, rec.Header().Get("Location"))
 	}
 	if hasSession(rec.Result().Cookies()) {
 		t.Error("a sign-in over a lookup that failed was handed a session")
@@ -902,13 +914,12 @@ func TestASignInWhoseSessionCouldNotBeStartedSaysNothingAboutWhy(t *testing.T) {
 		BaseURL:   "http://example.com",
 	})
 	rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("a sign-in whose session could not be written answered %d, want 500: %s",
-			rec.Code, rec.Body.String())
+	if !faulted(rec) {
+		t.Fatalf("a sign-in whose session could not be written answered %d to %q, want the try-again screen",
+			rec.Code, rec.Header().Get("Location"))
 	}
-	if !strings.Contains(rec.Body.String(), "something went wrong") ||
-		strings.Contains(rec.Body.String(), "session") {
-		t.Errorf("the fault said more than that something went wrong: %s", rec.Body.String())
+	if strings.Contains(rec.Body.String(), "session") {
+		t.Errorf("the fault said why: %s", rec.Body.String())
 	}
 	if hasSession(rec.Result().Cookies()) {
 		t.Error("a sign-in whose session could not be written was handed one")
@@ -983,20 +994,9 @@ func TestASignInThatCannotStartSaysNothingAboutWhy(t *testing.T) {
 				r.provider.BeginFail = c.fail
 				rec := httptest.NewRecorder()
 				r.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
-				if rec.Code != http.StatusInternalServerError {
-					t.Fatalf("answered %d, want 500", rec.Code)
-				}
-				if got := rec.Header().Get("Content-Type"); got != "application/problem+json" {
-					t.Errorf("answered as %q", got)
-				}
-				var problem struct {
-					Detail string `json:"detail"`
-				}
-				if err := json.Unmarshal(rec.Body.Bytes(), &problem); err != nil {
-					t.Fatal(err)
-				}
-				if problem.Detail != "something went wrong" {
-					t.Errorf("the answer reads %q", problem.Detail)
+				if !faulted(rec) {
+					t.Fatalf("answered %d to %q, want the try-again screen",
+						rec.Code, rec.Header().Get("Location"))
 				}
 				if strings.Contains(rec.Body.String(), c.hidden) {
 					t.Errorf("the answer repeats why: %s", rec.Body)
@@ -1061,13 +1061,12 @@ func TestASignInWhoseWindowCouldNotBeReadSaysNothingAboutWhy(t *testing.T) {
 		if !fault.fired {
 			t.Fatal("the window was never read, so this checked nothing")
 		}
-		if rec.Code != http.StatusInternalServerError {
-			t.Fatalf("a sign-in whose window could not be read answered %d, want 500: %s",
-				rec.Code, rec.Body.String())
+		if !faulted(rec) {
+			t.Fatalf("a sign-in whose window could not be read answered %d to %q, want the try-again screen",
+				rec.Code, rec.Header().Get("Location"))
 		}
-		if !strings.Contains(rec.Body.String(), "something went wrong") ||
-			strings.Contains(rec.Body.String(), "lasts") {
-			t.Errorf("the fault said more than that something went wrong: %s", rec.Body.String())
+		if strings.Contains(rec.Body.String(), "lasts") {
+			t.Errorf("the fault said why: %s", rec.Body.String())
 		}
 		if hasSession(rec.Result().Cookies()) {
 			t.Error("a sign-in whose window could not be read was handed a session")

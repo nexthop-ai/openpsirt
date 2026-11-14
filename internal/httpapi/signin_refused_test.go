@@ -11,7 +11,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -20,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
 
@@ -166,6 +170,94 @@ func TestARoleAcrossEveryProductSignsSomebodyInBeforeAnyProductExists(t *testing
 			if len(out.Items) != 0 {
 				t.Errorf("%s lists %d items before any product exists", path, len(out.Items))
 			}
+		}
+	})
+}
+
+// A browser the trusted proxy names and this deployment refuses has no callback
+// to be redirected from. The list of ways in says the proxy named the browser,
+// the same for a person let in, a person refused and a stranger, so the
+// interface draws the no-access screen without learning why.
+func TestTheWaysInSayWhetherTheProxyNamedTheBrowser(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ways := func(who string) string {
+			t.Helper()
+			got := r.Body(t, who, http.MethodGet, "/v1/sign-in")
+			if got.Code != http.StatusOK {
+				t.Fatalf("the ways in answered %d to %q: %s", got.Code, who, got.Text)
+			}
+			return got.Text
+		}
+		named := ways("reader")
+		if !strings.Contains(named, `"named_by_proxy":true`) {
+			t.Errorf("a browser the proxy named is not said to be: %s", named)
+		}
+		for _, who := range []string{"nobody-granted-anything", "a-stranger"} {
+			if got := ways(who); got != named {
+				t.Errorf("%q is told %s, unlike somebody let in: %s", who, got, named)
+			}
+			if got := r.Body(t, who, http.MethodGet, "/v1/session/me"); got.Code != http.StatusUnauthorized {
+				t.Errorf("%q read themselves: %d", who, got.Code)
+			}
+		}
+		if got := ways(""); strings.Contains(got, "named_by_proxy") {
+			t.Errorf("a browser the proxy did not name is said to be: %s", got)
+		}
+	})
+}
+
+// keyFault fails the read of the sign-in key once armed, and nothing else.
+type keyFault struct{ armed, fired bool }
+
+func (f *keyFault) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if !f.armed || f.fired || !strings.Contains(e.Query, setting.SignInKey) {
+		return ctx
+	}
+	f.fired = true
+	failed, cancel := context.WithCancel(ctx)
+	cancel()
+	return failed
+}
+
+func (f *keyFault) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// A sign-in whose key could not be read on the way back is this deployment's
+// fault, so it lands on the try-again screen and never on the no-access one:
+// telling somebody granted access to ask for it sends them to the wrong person.
+func TestASignInWhoseKeyCouldNotBeReadIsAFaultNeverARefusal(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		fault := &keyFault{}
+		handle := dbtest.Hooked(db, fault)
+		provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
+		handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{
+			Mode: func(context.Context) access.Mode { return access.Direct },
+			DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
+			Access:    access.NewResolver(access.NewStore(handle.DB), access.Trust{}).OverPlainHTTP(true),
+			Providers: map[string]signin.Provider{"stub": provider},
+			PlainHTTP: true,
+			BaseURL:   "http://example.com",
+		})
+		begun := httptest.NewRecorder()
+		handler.ServeHTTP(begun, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
+		if begun.Code != http.StatusFound {
+			t.Fatalf("starting a sign-in answered %d", begun.Code)
+		}
+		fault.armed = true
+		req := httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub/callback?state=the-state&code=a-code", nil)
+		for _, cookie := range begun.Result().Cookies() {
+			req.AddCookie(cookie)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if !fault.fired {
+			t.Fatal("the key was never read on the way back, so this checked nothing")
+		}
+		if !faulted(rec) {
+			t.Errorf("a sign-in whose key could not be read answered %d to %q, want the try-again screen",
+				rec.Code, rec.Header().Get("Location"))
+		}
+		if hasSession(rec.Result().Cookies()) {
+			t.Error("a sign-in whose key could not be read was handed a session")
 		}
 	})
 }

@@ -234,6 +234,11 @@ func Build(ready Ready, in core.Deps) *Built {
 			// sign in and they report nothing beyond whether this process can
 			// serve.
 			if open[r.URL.Path] || strings.HasPrefix(r.URL.Path, openPrefix) {
+				// Whether the proxy named somebody, for the list of ways in
+				// to say. Resolving them would decide nothing here.
+				if in.Access != nil && in.Access.NamedByProxy(r) {
+					r = r.WithContext(context.WithValue(r.Context(), namedByProxy{}, true))
+				}
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -522,9 +527,9 @@ func unavailable(w http.ResponseWriter) {
 //
 // The API answers `application/problem+json` for everything it refuses. The
 // handlers in front of the router — the credential check, and the sign-in
-// handlers for an unknown provider and an internal fault — write through this
-// rather than as `text/plain`; a refused sign-in callback redirects to the
-// sign-in screen instead, since a provider sent a browser there. A client
+// handlers for an unknown provider — write through this rather than as
+// `text/plain`; a refused or failed sign-in redirects to the sign-in screen
+// instead, since a browser was sent there. A client
 // that parses one shape and gets the other reads a failure as a transport
 // fault, and the shape of a refusal is part of the answer.
 //
