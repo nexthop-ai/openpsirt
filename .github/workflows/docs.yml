@@ -6,7 +6,9 @@ on:
   workflow_dispatch:
 
 # Read at the top, so a job added later starts with no write token and has to
-# ask. The one job here pushes the documentation branch and says so.
+# ask. The documentation is built where nothing can write: mkdocs and its
+# plugins run there, from pip. The pages branch it commits leaves as a git
+# bundle, and the one job holding the write only fetches and pushes it.
 permissions:
   contents: read
 
@@ -15,17 +17,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      # mike pushes the built set to the documentation branch.
-      contents: write
     steps:
       # Full history and tags: mike needs the documentation branch, and the
       # pages name the newest release tag reachable from main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: '3.12'
@@ -38,17 +38,62 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # A repository that has published nothing has no branch yet, and
+          # mike makes one.
+          if git rev-parse --verify -q origin/gh-pages > /dev/null; then
+            git branch gh-pages origin/gh-pages
+          fi
       # Published sets are versioned so a reader can tell which release they
       # are looking at. Unreleased work publishes as "main"; a tagged release
       # publishes under its version and moves the "latest" alias.
-      - run: mike deploy --push --update-aliases main
+      - run: mike deploy --update-aliases main
       # Without a default the site root serves nothing — every version lives in
       # its own directory. Once a release carries "latest", that is what a
       # visitor lands on; until then, unreleased work is. Set on every merge,
       # so a default that points anywhere else is put back.
       - run: |
           if mike list --json | jq -e 'any(.[]; .aliases | index("latest"))' > /dev/null; then
-            mike set-default --push latest
+            mike set-default latest
           else
-            mike set-default --push main
+            mike set-default main
           fi
+          mkdir -p bin
+          # The bundle holds what is new since the published branch, or the
+          # whole branch where there is none.
+          published=$(git rev-parse --verify -q origin/gh-pages || true)
+          git bundle create bin/pages.bundle gh-pages ${published:+"^$published"}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: pages
+          path: bin/pages.bundle
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      # The built set is pushed to the documentation branch.
+      contents: write
+    steps:
+      # Every branch, so the published one is here where it exists.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: pages
+          path: ${{ runner.temp }}/pages
+      # Only a commit on top of the published branch is pushed, so a build
+      # gone bad can add pages and never rewrite their history. The push is
+      # never forced, so the remote refuses anything else as well; the check
+      # says why.
+      - name: Push the pages
+        env:
+          BUNDLE: ${{ runner.temp }}/pages/pages.bundle
+        run: |
+          git fetch "$BUNDLE" gh-pages:refs/heads/built
+          if git rev-parse --verify -q origin/gh-pages > /dev/null; then
+            git merge-base --is-ancestor origin/gh-pages built \
+              || { echo "the published branch moved after the pages were built: re-run the workflow"; exit 1; }
+          fi
+          git push origin built:gh-pages

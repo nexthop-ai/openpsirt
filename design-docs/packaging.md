@@ -28,7 +28,7 @@ toolchain, the result run on Alpine.
 | Part | Detail |
 |---|---|
 | Size | ~40 MB |
-| User | Non-root, no login shell, no home directory |
+| User | Non-root, named by number as the chart runs it, no login shell, no home directory |
 | Extras | The vulnerability scanner; git, for patch-link branches; root certificates; timezone data |
 | Healthcheck | Liveness only; readiness needs the database and belongs to the orchestrator |
 
@@ -37,6 +37,7 @@ toolchain, the result run on Alpine.
 | The interface is built inside the image | The Go build embeds a git-ignored directory and an API-only binary is a supported build, so a clean checkout, as CI builds, would ship no interface silently. Docker is then the image's only requirement |
 | The binary is static, CGO off | Part of why the pure-Go SQLite driver was chosen |
 | The base is Alpine | An operator debugging a deployment wants a shell |
+| The user and group are numbers, the ones the chart runs as | A kubelet refuses a pod asking only for runAsNonRoot when the image names its user, since a name could be root |
 
 ## Base version
 
@@ -156,7 +157,9 @@ never both (REQ-83).
 | Rule | Reason |
 |---|---|
 | The file is TOML, named by `--config` | A variable naming it would sit beside the file |
-| An `OPENPSIRT_` variable beside a file is refused at startup, naming each, empty ones included | The harness's variables are refused too |
+| With no file, an `OPENPSIRT_` variable naming no setting is refused at startup, naming each, apart from those in § Variables left alone | A misspelled switch keeps its default in force with nothing said |
+| Beside a file, the same variables are left alone, and every other `OPENPSIRT_` variable is refused at startup, naming each, empty ones included | A pod configured by file shares its namespace with Services as any other does, and needs no `enableServiceLinks: false` |
+| A variable set twice is read at its first | The process reads it there |
 | Library and child-program variables stay in both modes: `PATH`, `HOME`, `TMPDIR`, `TZ`, certificate and proxy variables, `PG` variables, `AWS_` variables, every `GRYPE_` variable | |
 | One table defines each setting's variable and file key, read by both sources | A test holds it to the loader and the page (`design-docs/build-docs.md` § The settings reference) |
 | Keys are tables by area, nesting for parts | `database.url` is `url` under `[database]`; `signin.oidc.issuer` is `issuer` under `[signin.oidc]` |
@@ -164,16 +167,37 @@ never both (REQ-83).
 | A value of the wrong type is refused, never converted | |
 | An unknown key is refused, naming it | |
 | A list entry holding a comma is refused | It would split |
-| A malformed file is refused naming the line | |
+| A malformed file is refused naming the line, with what the parser repeats from the file hidden: anything it quotes, and a number | The file holds secrets, and a number out of range is repeated bare |
 | A file others may read or write is refused, asking for 0600 | It holds the secrets |
 | A file owned by anyone but the process's user or root is refused | Its owner can rewrite it; a mounted secret is root's |
 | The file is opened once, and every check is on what was opened | A swap between check and read would go unchecked |
 | A directory or pipe is refused by path before opening, and the opened file must be the checked one | A writerless pipe hangs the start |
 | A refusal stopping the process names the key, even after startup | The process rewrites variable names to keys on the way out |
 | A refusal answered to a request names the setting both ways | It cannot be rewritten. The advisory prefix and the publisher are the two |
-| A pod configured by file sets `enableServiceLinks: false` | A Service named `openpsirt` gives pods `OPENPSIRT_` variables |
 | The chart configures by environment | Secrets arrive as variable references |
 | The image sets no deployment variable; the scanner is on `PATH` | |
+
+### Variables left alone
+
+| Variables | Reason |
+|---|---|
+| The test suite's `OPENPSIRT_TEST_` variables | The build exports them to every program it runs |
+| The interface development server's `OPENPSIRT_DEV_` variables | |
+| The upload client's `OPENPSIRT_URL` and `OPENPSIRT_KEY` | |
+| A Kubernetes service link, with a link's name and a link's value | The chart's own Service is called `openpsirt` when the release is |
+
+| Link name | Accepted value |
+|---|---|
+| `<SERVICE>_SERVICE_HOST` | An IP address |
+| `<SERVICE>_SERVICE_PORT` and `<SERVICE>_SERVICE_PORT_<name>` | A port number |
+| `<SERVICE>_PORT` | `<protocol>://<address>:<port>` |
+| `<SERVICE>_PORT_<number>_<protocol>` | `<protocol>://<address>:<port>` |
+| `<SERVICE>_PORT_<number>_<protocol>_ADDR` | An IP address |
+| `<SERVICE>_PORT_<number>_<protocol>_PORT` | A port number |
+| `<SERVICE>_PORT_<number>_<protocol>_PROTO` | `tcp`, `udp` or `sctp` |
+
+A misspelled setting in a link's name, such as a mail port, has no link's
+value, so it is refused.
 
 ## Limits
 

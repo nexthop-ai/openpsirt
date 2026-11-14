@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -20,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/redact"
 )
 
@@ -116,6 +116,13 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 			// malformed escape in a password is the commonest reason it fails.
 			return nil, errors.New("object store endpoint: not an address at all")
 		}
+		// A password holding an unescaped "/", "?" or "#" parses with part
+		// of it as the host, so the client would be pointed there and the
+		// address shown with the credential in it.
+		if redact.Stray(parsed) {
+			return nil, fmt.Errorf("object store endpoint: %s: percent-encode "+
+				"/ ? # @ in the user name and password", redact.URL(endpoint))
+		}
 		// A name and password in the address are taken out of it and handed
 		// over as credentials, which is also what makes the signing
 		// well-defined. The client is given the address without them, so
@@ -144,7 +151,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		// the one the client gets.
 		shown = redact.Parsed(parsed)
 		plain = parsed.Scheme != "https"
-		inTheClear = plain && !loopback(parsed.Hostname())
+		inTheClear = plain && !outward.Loopback(parsed.Hostname())
 		if inTheClear && !settings.AllowHTTP {
 			// Naming the way through. The operator meeting this is the one a
 			// plaintext store was allowed for, and a refusal that states only
@@ -208,24 +215,6 @@ func (b *Bucket) InTheClear() bool { return b.clear }
 // Endpoint is where this store is, with any password taken out. Empty for a
 // cloud provider, which is addressed by region rather than by name.
 func (b *Bucket) Endpoint() string { return b.endpoint }
-
-// loopback says whether a host reaches no further than this machine.
-//
-// Loopback is the whole of 127.0.0.0/8 and ::1 in every spelling, including
-// the IPv4-mapped IPv6 forms, so it is asked of the parsed address rather than
-// matched against a list of spellings.
-//
-// The literal name stays, because it is a name rather than an address and the
-// deployment may have it in its own hosts file.
-func loopback(host string) bool {
-	if host == "localhost" {
-		return true
-	}
-	// Belt and braces: Hostname() already strips the brackets from an IPv6
-	// literal, and a caller that has not been through it has not.
-	ip := net.ParseIP(strings.Trim(host, "[]"))
-	return ip != nil && ip.IsLoopback()
-}
 
 func (b *Bucket) Put(ctx context.Context, key string, body io.Reader, size int64,
 	contentType string) error {

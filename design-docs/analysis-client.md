@@ -46,9 +46,11 @@ openpsirt-upload write --series [TOOL=]NAME... --output FILE OUTPUT...
 |---|---|
 | A native format is read where one exists | clang's SARIF lacks hash, path and function |
 | clang's plain `plist` is not to be sent | It drops cross-file diagnostics |
+| A property list whose dictionary key has no value, or that holds nothing, is refused | A key with no value never ends the containers around it, so the files listed after it are read or the list is refused |
 | HTML reports and output directories are refused | They carry source |
 | One tool's outputs merge into one run: rules by identifier, results and invocations concatenated, unit counts added | |
 | Several tools are one upload each; `write` names each file by tool before the extension; one refused does not stop the rest | A series is one tool |
+| `write` reduces a tool's name to lower-case letters, digits, `.`, `_` and `-`, every other character a `-`, with no `.` at either end, and `analyzer` where nothing is left; two tools reduced to one file name are refused | The name is the analyzer's own, and a `/` or `..` in it would write elsewhere. Windows drops a trailing `.`, so two names differing by one are one file |
 | Several tools need `--series TOOL=NAME` each; bare `--series NAME` serves one tool | A shared name changes when tools change |
 | `--rule`, `--rules-file`, `--tool-version`, `--exit-status` and `--units-analyzed` are refused for several tools | Each describes one |
 | One tool named twice in `--series` is refused | |
@@ -102,7 +104,10 @@ Each result carries `openpsirt/context/v1`, a content fingerprint of its line
 | Source is sent unless `--snippets=false`, which sends none | The deployment decides what it keeps |
 | Each location carries its lines and two lines of context either side, each at most 4,096 bytes, carriage returns removed | |
 | Forwarded SARIF loses whole-file contents, fixes, attachments, snippets and markdown messages, counted in the output; a markdown-only message is reduced as the deployment reduces one | |
-| A snippet is removed from every location: result, related places, flow steps, stack frames, shared flow steps, notification places | |
+| Every snippet of a region or context region and every markdown text in a forwarded run is removed, wherever it stands; a member named `snippet` elsewhere is a producer's key and stays | A region, and so a snippet, stands in a location, a related location and a flow step alike |
+| Every location in a run is placed, wherever it stands; with source sent, each in a result carries its lines | |
+| An invocation keeps only what the deployment reads: exit code, whether it succeeded, working directory, and each notification's level and descriptor identifier. The rest is removed and counted | The command line, arguments and environment carry what the CI job held, tokens included, and a notification's message can quote a failed request's address |
+| A run keeps, at every depth, only what the deployment reads, before anything in it is placed or counted: its tool's name, version and rules, its results, invocations, automation identifier and `openpsirt/` properties; of a result its rule, level, kind, suppression status, baseline state, message, locations, related locations, flow steps' locations and depth, and fingerprints. The rest is removed and counted | A converter's own invocation, a web request's headers, a flow step's state and a property bag carry what the CI job held |
 | A forwarded run's artifact list and starting points are removed | Paths are already resolved |
 | Run parameters are written as `design-docs/analysis.md` § Run parameters reads them: `openpsirt/client`, `openpsirt/commit`, `openpsirt/series` or `automationDetails.id` with `--built`, both unit counts or neither, an invocation from `--exit-status` | |
 | `--compile-commands` gives units expected by entry count; clang's units analyzed are documents read; expected units for a tool counting none analyzed are withheld, saying so | |
@@ -116,6 +121,7 @@ Each result carries `openpsirt/context/v1`, a content fingerprint of its line
 | Address from `--url` or `OPENPSIRT_URL`; key from `OPENPSIRT_KEY` only | A command-line key shows in process listings |
 | A 503 retries after `Retry-After`; a request reaching nothing retries with doubling pauses, five attempts, pauses at most two minutes | |
 | A redirect is not followed, failing the step with its target | It would carry the token |
+| A plain `http` address is refused unless its host is `localhost` or a loopback address, or `--allow-http` is given, which writes a warning naming the address to standard error | The key would cross the network unencrypted |
 | The receipt is printed as returned; a refusal fails the step with its words | 202 means queued |
 
 ## Distribution

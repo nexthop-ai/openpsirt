@@ -13,10 +13,9 @@ import (
 	"log/slog"
 	"net"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -358,19 +357,44 @@ type Store struct {
 	Dir       string
 }
 
-// Load reads configuration from the environment.
+// Load reads configuration from the environment, given in the form
+// os.Environ gives it.
 //
 // A value that is set and cannot be read is a startup error naming the
 // variable, never a silent fallback. "PLAIN_HTTP=false" turning Secure
 // cookies off, or "AUTO_MIGRATE=0" still migrating, is a setting that does
 // the opposite of what it says — worse than refusing to start, because the
-// operator has no reason to look.
-func Load() (Config, error) {
-	given := map[string]string{}
+// operator has no reason to look. A variable carrying the prefix that names
+// no setting is refused for the same reason, since a misspelled switch
+// leaves its default in force. Kubernetes service links, the upload client's
+// variables, the interface development server's and the test suite's own are
+// the exceptions.
+// Where a name is set twice the first is read, as the process reads it.
+func Load(environ []string) (Config, error) {
+	known := make(map[string]bool, len(settings))
 	for _, one := range settings {
-		if v, ok := os.LookupEnv(envPrefix + one.env); ok {
-			given[one.env] = v
+		known[one.env] = true
+	}
+	given := map[string]string{}
+	var unknown []string
+	for _, kv := range environ {
+		name, value, _ := strings.Cut(kv, "=")
+		key, ours := strings.CutPrefix(name, envPrefix)
+		switch {
+		case !ours:
+		case known[key]:
+			if _, twice := given[key]; !twice {
+				given[key] = value
+			}
+		case incidental(key, value):
+		case !slices.Contains(unknown, name):
+			unknown = append(unknown, name)
 		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return Config{}, fmt.Errorf("%s: not a setting: check its spelling",
+			strings.Join(unknown, ", "))
 	}
 	return load(given)
 }
@@ -674,6 +698,11 @@ func load(given map[string]string) (Config, error) {
 	if err := apart(c.Directory, c.Attachments); err != nil {
 		return Config{}, err
 	}
+	// The scheme is stored in lower case: published documents, which never
+	// change once signed, state addresses built from it.
+	if scheme, rest, found := strings.Cut(c.BaseURL, "://"); found {
+		c.BaseURL = strings.ToLower(scheme) + "://" + rest
+	}
 	if err := publishing(c, given); err != nil {
 		return Config{}, err
 	}
@@ -727,7 +756,7 @@ func publishing(c Config, given map[string]string) error {
 		return fmt.Errorf("OPENPSIRT_PUBLISH: set OPENPSIRT_PUBLISHER_NAME and " +
 			"OPENPSIRT_PUBLISHER_NAMESPACE too — every published document names its publisher")
 	}
-	if !strings.HasPrefix(c.BaseURL, "https://") {
+	if base, err := url.Parse(c.BaseURL); err != nil || base.Scheme != "https" {
 		return fmt.Errorf("OPENPSIRT_PUBLISH: set OPENPSIRT_BASE_URL to the https address " +
 			"this deployment is reached at — the documents state addresses built from it, " +
 			"and the standard requires them served over TLS")
@@ -774,58 +803,6 @@ func absoluteBase(base string) error {
 	return nil
 }
 
-// apart refuses a published directory that is the attachment store, or holds
-// it, or sits inside it.
-//
-// What the directory holds is served to anybody, and an attachment is fetched
-// only after its finding's visibility is checked (REQ-70). Sharing one store
-// serves every attachment unauthenticated. A bucket wins over a folder in each,
-// so each is compared in the form it takes.
-func apart(directory, attachments Store) error {
-	if bucket := strings.TrimSpace(directory.Bucket); bucket != "" {
-		if other := strings.TrimSpace(attachments.Bucket); strings.EqualFold(bucket, other) &&
-			sameEndpoint(directory.Endpoint, attachments.Endpoint) {
-			return fmt.Errorf("OPENPSIRT_DIRECTORY_BUCKET: names the attachment store's " +
-				"bucket, and everything in the directory is served to anybody: give the " +
-				"directory a bucket of its own")
-		}
-		return nil
-	}
-	dir, other := strings.TrimSpace(directory.Dir), strings.TrimSpace(attachments.Dir)
-	if dir == "" || other == "" || strings.TrimSpace(attachments.Bucket) != "" {
-		return nil
-	}
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		return fmt.Errorf("OPENPSIRT_DIRECTORY_DIR: %w", err)
-	}
-	other, err = filepath.Abs(other)
-	if err != nil {
-		return fmt.Errorf("OPENPSIRT_ATTACHMENT_DIR: %w", err)
-	}
-	if within(dir, other) || within(other, dir) {
-		return fmt.Errorf("OPENPSIRT_DIRECTORY_DIR: is, holds or sits inside " +
-			"OPENPSIRT_ATTACHMENT_DIR, and everything in the directory is served to " +
-			"anybody: give each a folder of its own")
-	}
-	return nil
-}
-
-// sameEndpoint reports whether two object store endpoints name one service.
-// Both unset is the provider's default for each.
-func sameEndpoint(a, b string) bool {
-	norm := func(endpoint string) string {
-		return strings.TrimRight(strings.ToLower(strings.TrimSpace(endpoint)), "/")
-	}
-	return norm(a) == norm(b)
-}
-
-// within reports whether path is root or a folder below it.
-func within(root, path string) bool {
-	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
 // plainAddress reads an address that stands alone: a scheme from schemes, a
 // host, and no credentials, query or fragment, an empty query included.
 //
@@ -844,6 +821,12 @@ func plainAddress(name, raw string, schemes ...string) (*url.URL, error) {
 			name, strings.Join(schemes, " or "), shown)
 	case parsed.Host == "":
 		return nil, fmt.Errorf("%s: names no host: %q", name, shown)
+	case redact.Stray(parsed) && strings.Contains(parsed.EscapedPath()+parsed.RawQuery+parsed.EscapedFragment(), "@"):
+		// The sign of a password holding an unescaped "/", "?" or "#" is also
+		// what an "@" in a path looks like, so the refusal names both.
+		return nil, fmt.Errorf("%s: holds an @ after its host, which reads as a user name "+
+			"or password cut short: percent-encode / ? # @ in a password, and an @ "+
+			"in a path as %%40: %q", name, shown)
 	case parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "":
 		return nil, fmt.Errorf("%s: names the address alone, with no query, "+
 			"fragment or credentials: %q", name, shown)

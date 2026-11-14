@@ -4,6 +4,7 @@
 package config_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/config"
@@ -24,7 +25,7 @@ func TestTheIngestBoundsAreReachableFromTheEnvironment(t *testing.T) {
 	t.Setenv("OPENPSIRT_INGEST_MAX_DEPTH", "8")
 	t.Setenv("OPENPSIRT_INGEST_MAX_DOCUMENTS", "9")
 
-	loaded, err := config.Load()
+	loaded, err := config.Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestTheAnalyzerBoundsAreReachableFromTheEnvironment(t *testing.T) {
 	} {
 		t.Setenv("OPENPSIRT_ANALYSIS_MAX_"+name, value)
 	}
-	loaded, err := config.Load()
+	loaded, err := config.Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +78,7 @@ func TestTheAnalyzerBoundsAreReachableFromTheEnvironment(t *testing.T) {
 // which is what lets a deployment change one bound without restating the rest.
 func TestAnUnsetIngestBoundKeepsItsDefault(t *testing.T) {
 	t.Setenv("OPENPSIRT_INGEST_MAX_DEPTH", "8")
-	loaded, err := config.Load()
+	loaded, err := config.Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +95,7 @@ func TestTheScannerBoundsAreReachableFromTheEnvironment(t *testing.T) {
 	t.Setenv("OPENPSIRT_SCANNER_MAX_MATCHES", "303")
 	t.Setenv("OPENPSIRT_SCANNER_MAX_REFERENCES", "17")
 
-	loaded, err := config.Load()
+	loaded, err := config.Load(os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -78,6 +78,8 @@ func TestPublishingStartsWithWhatItNeeds(t *testing.T) {
 		"signed, locked":                publishingWith(map[string]string{"PUBLISH_KEY": lockedKey, "PUBLISH_KEY_PASSPHRASE": keyPassphrase}),
 		"a rate":                        publishingWith(map[string]string{"PUBLISH_RATE": "30"}),
 		"trusted proxies and no header": publishingWith(map[string]string{"TRUSTED_SOURCES": "10.0.0.0/8"}),
+		// A scheme is the same scheme in capitals, as the parser reads it.
+		"an https address in capitals": publishingWith(map[string]string{"BASE_URL": "HTTPS://psirt.example.test"}),
 	} {
 		t.Run(name, func(t *testing.T) {
 			c, err := load(given)
@@ -88,6 +90,13 @@ func TestPublishingStartsWithWhatItNeeds(t *testing.T) {
 				t.Error("publishing is off")
 			}
 		})
+	}
+	capitals, err := load(publishingWith(map[string]string{"BASE_URL": "HTTPS://Psirt.example.test"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if capitals.BaseURL != "https://Psirt.example.test" {
+		t.Errorf("the base address is %q, want its scheme in lower case", capitals.BaseURL)
 	}
 	c, err := load(publishingWith(nil))
 	if err != nil {

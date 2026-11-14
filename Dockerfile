@@ -67,7 +67,7 @@ COPY web/ ./
 RUN npm run build
 
 # Build. Pinned to the same Go the module asks for.
-FROM golang:1.27.3-alpine@sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18 AS build
+FROM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS build
 
 WORKDIR /src
 
@@ -361,7 +361,9 @@ LABEL org.opencontainers.image.title="OpenPSIRT" \
       org.opencontainers.image.vendor="Nexthop Systems Inc." \
       org.opencontainers.image.licenses="Apache-2.0"
 
-USER openpsirt
+# By number: a pod asking only for runAsNonRoot is refused an image whose user
+# is a name, since the kubelet cannot tell a name is not root.
+USER 65532:65532
 EXPOSE 8080
 
 # Liveness. Readiness depends on the database and belongs to the orchestrator,

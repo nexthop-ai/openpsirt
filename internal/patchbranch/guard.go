@@ -57,7 +57,7 @@ func openGuard(host string, excluded outward.Excluded) (*guard, error) {
 		return nil, fmt.Errorf("open the proxy git reaches out through: %w", err)
 	}
 	g := &guard{
-		listener: listener, host: strings.ToLower(host), excluded: excluded,
+		listener: listener, host: strings.TrimSuffix(strings.ToLower(host), "."), excluded: excluded,
 		port: outward.HTTPSPort, reachable: excluded.Reachable,
 	}
 	g.server = &http.Server{
@@ -99,23 +99,26 @@ func (g *guard) tunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	host, port, err := net.SplitHostPort(r.Host)
-	if err != nil || port != g.port {
+	if err != nil {
 		g.refuse(w, fmt.Errorf("refused a tunnel to %s: a repository is reached on the https port", r.Host))
 		return
 	}
-	host = strings.ToLower(host)
-	if host != g.host {
-		g.refuse(w, fmt.Errorf("refused a tunnel to %s: this fetch is from %s", host, g.host))
+	// The one check every host a document chose passes, before the one
+	// this fetch adds: the repository's own host.
+	host, err = g.excluded.Permit(host, port, g.port)
+	if err != nil {
+		g.refuse(w, err)
 		return
 	}
-	if g.excluded.Host(host) {
-		g.refuse(w, fmt.Errorf("refused a tunnel to %s: an administrator excluded it", host))
+	if host != g.host {
+		g.refuse(w, fmt.Errorf("refused a tunnel to %s: this fetch is from %s", host, g.host))
 		return
 	}
 	dialer := outward.Dialer(g.reachable)
 	ctx, cancel := context.WithTimeout(r.Context(), dialBudget)
 	defer cancel()
-	upstream, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
+	// Permit reads an empty port as the https one, so the dial names it.
+	upstream, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, g.port))
 	if err != nil {
 		g.refuse(w, fmt.Errorf("could not reach %s: %w", host, err))
 		return

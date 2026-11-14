@@ -77,7 +77,7 @@ func leaveAtLatest(t *testing.T, ctx context.Context, db *database.DB) {
 // release-freeze runs it on the commit to be tagged; it is skipped otherwise,
 // because it writes into the tree.
 func TestWriteTheSchemaAReleaseTags(t *testing.T) {
-	tag := os.Getenv("OPENPSIRT_RELEASE_FREEZE")
+	tag := os.Getenv("OPENPSIRT_TEST_RELEASE_FREEZE")
 	if tag == "" {
 		t.Skip("writes a release's record: make release-freeze runs it")
 	}

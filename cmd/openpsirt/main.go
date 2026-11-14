@@ -47,7 +47,7 @@ import (
 )
 
 func main() {
-	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
+	if err := run(os.Args[1:], os.Environ(), os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "openpsirt: %v\n", err)
 		os.Exit(1)
 	}
@@ -69,7 +69,9 @@ func configFlag(file *string) func(string) error {
 	}
 }
 
-func run(args []string, stdout, stderr *os.File) (err error) {
+// run is the program, given its arguments and its environment in the form
+// os.Environ gives it.
+func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	fs := flag.NewFlagSet("openpsirt", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	showVersion := fs.Bool("version", false, "print the build and exit")
@@ -137,9 +139,9 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 
 	var cfg config.Config
 	if file == "" {
-		cfg, err = config.Load()
+		cfg, err = config.Load(environ)
 	} else {
-		cfg, err = config.LoadFile(file, os.Environ())
+		cfg, err = config.LoadFile(file, environ)
 	}
 	if err != nil {
 		return err

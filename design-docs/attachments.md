@@ -92,7 +92,15 @@ An object store through the S3-compatible API, never the database.
 |---|---|
 | Configured credentials win over the environment's | |
 | A key without its secret, a secret without its key, and a session token with no key and no name in the endpoint are refused at startup | Dropped, the process runs as whatever the environment offers, silently |
-| The published directory is never the attachment store: refused at startup for one bucket on one endpoint (both unset is the provider default), one folder, or folders nested either way | The directory is public; an attachment is served only after its check (REQ-70) |
+| An endpoint whose user information spilled past its authority is refused at startup, shown as `design-docs/access-trail.md` § Spilled user information describes | Part of the password parses as the host the client is pointed at |
+| The published directory is never the attachment store: refused at startup for one bucket on one service, one folder, or folders nested either way | The directory is public; an attachment is served only after its check (REQ-70) |
+| Two endpoints are one service where host, port and path match, ignoring capitals in the host, slashes around the path, credentials and the scheme's default port | A store routed by path keeps its path as a prefix, and the store takes credentials out of its endpoint before using it |
+| Two host names on one port and path are one service where they resolve to a shared address at startup; a name that does not exist shares nothing, and any other failed lookup counts as shared | A short name and a cluster name, or a name and its address, reach one server |
+| Every Amazon S3 address in one partition is one service: China, GovCloud, and the rest | Amazon's bucket names are unique within a partition |
+| An Amazon S3 address has a label `s3` or one starting `s3-` before its domain; any other Amazon host, such as an EC2 instance's or a load balancer's, is compared by its resolved address | A store run on EC2 or behind an Amazon load balancer is one server under every name |
+| An unset endpoint is the same as every other | The SDK resolves it from the environment, a profile or the region |
+| An endpoint that does not parse is the same as every other | |
+| Folders are compared with every symbolic link followed, through the nearest existing folder above one not made yet, and through what a link points at where that is not made yet, a relative target read from the link's own folder with its links followed | A link makes two names for one folder, and the folder is made where the link points |
 | A refusal names the settings of the store it is about | The two stores share setting names under two prefixes |
 
 ### The filesystem store

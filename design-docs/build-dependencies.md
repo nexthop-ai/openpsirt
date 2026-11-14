@@ -125,6 +125,7 @@ MIT, MPL-2.0 (REQ-01). `make licenses` checks Go and npm against one
 | Rule | Reason |
 |---|---|
 | Development dependencies are unrestricted | A build tool binds whoever builds |
+| An npm package marked `devOptional` is held to the list | It is an optional dependency of a shipped package as well as a development one, and a production install includes it |
 | Build tooling is exempt; the linter is GPL | Running a tool does not license the code |
 | The npm half refuses a development dependency the interface's source imports: a non-type-only import or re-export, a dynamic import, a stylesheet `@import` | It is in the bundle. Tests are not read |
 | A run reading no import, or finding no shipped dependency, refuses | |

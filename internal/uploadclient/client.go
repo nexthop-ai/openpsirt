@@ -135,6 +135,9 @@ func build(ctx context.Context, run git, opts Options, inputs []Input) ([]Run, R
 			report.Removed["snippets"] += s.snippets
 			report.Removed["markdown"] += s.markdown
 			report.Removed["attachments"] += s.attachments
+			report.Removed["invocation fields"] += s.invocation
+			report.Removed["run fields"] += s.run
+			report.Removed["result fields"] += s.result
 			tool := strings.ToLower(strings.TrimSpace(str(child(child(r, "tool"), "driver"), "name")))
 			if _, ok := byTool[tool]; !ok {
 				order = append(order, tool)

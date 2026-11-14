@@ -30,7 +30,7 @@ Neighbors: `design-docs/publishing.md` (what this deployment publishes),
 | Rule | Reason |
 |---|---|
 | One upstream per product | A fork descends from one project |
-| The upstream is named by the address of its CSAF `provider-metadata.json`, over https, with a host and no user | |
+| The upstream is named by the address of its CSAF `provider-metadata.json`, over https, with a host and no user, spilled or otherwise | A spilled password reads as the host it is pinned to (`design-docs/access-trail.md` § Spilled user information) |
 | An administrator inspects it, learning whose statements they are and the key's fingerprint, then trusts it by sending the fingerprint back; another fingerprint is refused naming the current one | |
 | The keys are those the description names, at its addresses, and must carry the fingerprints it states, or the set is refused. The whole set is trusted, up to four, and the armored keys are kept | A rotation is trusted with both |
 | An upstream naming no key is trusted unsigned, documents checked against their digests alone | |

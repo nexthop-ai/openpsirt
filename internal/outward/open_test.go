@@ -117,3 +117,44 @@ func TestAnOpenClientRefusesWhatAnAddressShouldNotCarry(t *testing.T) {
 		}
 	}
 }
+
+// A host a document chose passes one rule wherever it is checked, and is
+// answered as every later comparison reads it.
+func TestADocumentChosenHostIsPermittedByOneRule(t *testing.T) {
+	excluded, err := ParseExcluded("corp.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ host, port, says string }{
+		{"downloads.example.test", "22", "only the https port"},
+		{"wiki.\uff43orp.example.com", "", "not a host name"},
+		{"Git.Corp.Example.com.", "443", "an administrator excluded it"},
+	} {
+		_, err := excluded.Permit(c.host, c.port, HTTPSPort)
+		if !errors.Is(err, ErrRefused) || err == nil || !strings.Contains(err.Error(), c.says) {
+			t.Errorf("%s:%s answered %v, want %q", c.host, c.port, err, c.says)
+		}
+	}
+	for host, want := range map[string]string{"Downloads.Example.test.": "downloads.example.test", "192.0.2.1": "192.0.2.1"} {
+		got, err := excluded.Permit(host, "", HTTPSPort)
+		if err != nil || got != want {
+			t.Errorf("%s answered %q, %v, want %q", host, got, err, want)
+		}
+	}
+}
+
+// A pinned host is one https service however a document spells it: its
+// capitals, its trailing dot and the https port are no other host.
+func TestAPinnedHostIsOneServiceHoweverItIsSpelled(t *testing.T) {
+	permits := Pinned(time.Second, "Up.Example.", nil).Transport.(*guard).permits
+	for _, host := range []string{"up.example", "up.example:443", "UP.EXAMPLE.:443"} {
+		if err := permits(&url.URL{Scheme: "https", Host: host, Path: "/feed"}); err != nil {
+			t.Errorf("%s answered %v, want it reached", host, err)
+		}
+	}
+	for _, host := range []string{"up.example:8443", "other.example"} {
+		if err := permits(&url.URL{Scheme: "https", Host: host}); !errors.Is(err, ErrRefused) {
+			t.Errorf("%s answered %v, want it refused", host, err)
+		}
+	}
+}

@@ -181,10 +181,17 @@ workflow does the rest.
 | Refuses a tag not on `main` | Only `main` passed the merge queue |
 | Refuses unfrozen migrations; a candidate, `-rc.N`, is held to its release's record, and other suffixes are refused | A release's databases apply what it shipped |
 | Runs `make dist`, handed the version and image name it pushes | A failure reproduces locally, and what is pushed is what was built |
+| Builds in a job holding a read of the repository alone, the token not left in the checkout, and publishes in another holding the write, package and signing permissions, which runs nothing from the repository or its dependencies | A build-time dependency gone bad reaches what it builds either way; split, it cannot also sign other things, push other tags or rewrite other releases |
+| The publish job checks every file against `SHA256SUMS`, and the image archive against the sum the build recorded, before it pushes or signs | The files and the image cross between jobs |
+| The publish job pushes the chart only where the archive's own name and version are `openpsirt` and the release's | The registry tags the chart from inside the archive, so a build gone bad could otherwise overwrite another release's |
+| The build's files are kept fourteen days | A failed publish is re-run from them; a rebuild makes an image with another digest |
 | Pushes the image and chart to `ghcr.io` | |
 | Signs and verifies the image, chart and checksum file | |
 | Creates the release with every asset, marked Latest only when newest | GitHub would mark every release Latest |
 | Publishes the documentation under the version, moving `latest` and the default when newest | |
+| Names the release, its image and chart registry, its aliases and the release it counts from out of the tags, in a job of its own with a read of the repository, running git and the shell alone | Code a build fetches could move a local tag, or rewrite the build job's outputs, and so choose the tags the publish job pushes, signs and moves |
+| The publish job takes every name from the naming job, and from the build job only the image archive's sum | |
+| Builds the documentation in a job holding a read alone, and pushes its pages branch from another that runs none of its build tools, and only as commits on top of the published branch | The documentation's build tools come from pip; with the write beside them they could rewrite releases and tags |
 
 | Rule | Reason |
 |---|---|

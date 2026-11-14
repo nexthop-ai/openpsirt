@@ -135,7 +135,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		t.Logf("%d open rows, %d promised occurrences and one kernel decision", open, promised)
 		dbtest.SettleStatistics(t, db)
 
-		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_MEASURE_SLOW")}
+		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_TEST_MEASURE_SLOW")}
 		db = dbtest.Hooked(db, slow)
 		store := finding.NewStore(db.DB)
 		decisions = triage.NewStore(db.DB)
@@ -274,7 +274,7 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 		}
 		triager := access.NewPerson(person.ID, "triager", false,
 			map[int64][]access.Role{product.ID: {access.PublicTriage, access.PrivateTriage}}, 0)
-		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_MEASURE_SLOW")}
+		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_TEST_MEASURE_SLOW")}
 		db = dbtest.Hooked(db, slow)
 		store = finding.NewStore(db.DB)
 

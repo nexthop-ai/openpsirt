@@ -66,7 +66,7 @@ logged.
 | Rule | Reason |
 |---|---|
 | A password parameter in the query is redacted pair by pair, as written | The query parser drops a pair it cannot decode |
-| A server URL with an `@` in its path or a query parameter's name, a fragment, or no `//` after the scheme is refused; an `@` in a query parameter's value is accepted | A password with an unescaped `/`, `?` or `#` parses split where redaction does not look. A value's `@` is a user name a driver reads |
+| A server URL whose user information spilled past its authority, with a fragment, or with no `//` after the scheme, is refused | A password with an unescaped `/`, `?` or `#` parses split where redaction does not look (§ Spilled user information) |
 | Every error from opening a connection has each spelling of each credential taken out | A driver redacts user information only |
 | A PostgreSQL connection string reaches the driver with each `@` in its query escaped | The driver's error masks up to the last `@` |
 | A refusal names the scheme, the host and the kind of fault, and asks for percent-encoding | The parser's own message quotes the URL |
@@ -74,8 +74,30 @@ logged.
 | The upgrade rehearsal reads the URL from the environment and passes it to its container through the environment | An argument is readable by every local user and logged |
 | A URL the parser refuses is judged by the database package before any other parser reads it | Other parsers quote it |
 | Every configured address is shown through one redaction rule: the database server, the object store endpoint, the published directory, the deployment address, the chat server and the identity provider's issuer | |
+| A spilled address is refused at startup as the object store endpoint, the published directory, the deployment address, the chat server and the identity provider's issuer; by the upload client as its deployment's address; and as a webhook destination or an upstream an administrator names | The client would be pointed at part of the password |
 | Redaction replaces the password, every query value carrying a credential, and the fragment; in a deployment, directory, chat server or issuer address it replaces a lone user name too | A presigned object store address carries its signature and session token in the query. Those four addresses carry no user, so a name there is a token |
 | A refused address with no `//` after its scheme shows nothing up to its last `@`, and one the parser cannot read is not shown | `admin:hunter2@psirt.example.com` parses with the scheme `admin` |
+| An address whose user information spilled shows nothing between its `//` and its last `@` | Part of the password parses as the host |
+| What follows the last `@` is shown only where it is a host and port; otherwise nothing of the address is | It may be the rest of a query, secrets included |
+| A spilled address is not shown where its last `@` sits in a credential's value, in a fragment after a query, or in a query value or fragment after an authority with a user, a path or no port | What follows that `@` is the rest of a secret |
+
+### Spilled user information
+
+User information spilled past its authority where an address carries one of
+these signs.
+
+| Sign | Reason |
+|---|---|
+| An `@` in the path or in a query parameter's name | The rest of a user name and password cut at `/` or `?`; `https://bot:1234/rest@host` parses with the host `bot:1234` |
+| An `@` in the fragment | The rest of a password cut at `#` |
+| An `@` in a query parameter's value, under every condition below | The rest of a password cut at `?` |
+
+| Condition on a query value | Reason |
+|---|---|
+| The address has no user information and no path | Only an authority ending at `?` leaves the rest of a password in the query |
+| The host has a port, or ends in `:` | The port is the start of the password |
+| The parameter names neither a user nor a credential | Drivers read both from the query, so `?user=app@corp` is accepted |
+| A host follows the query's last `@` | |
 
 ## Limits
 

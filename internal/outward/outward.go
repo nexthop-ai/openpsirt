@@ -78,18 +78,39 @@ func Guarded(hosts ...string) *http.Client {
 // redirect, and the refusal to connect inside this network. The dialer keeps
 // the interactive budget whatever the whole call is given, because how long a
 // connection takes to establish does not scale with what is being fetched.
+//
+// A host is a name, with its port where it is not the https port. A request
+// reaches a host on the port it names and no other, since a document naming
+// another port on a permitted host is asking for a different service.
 func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 	allowed := make(map[string]bool, len(hosts))
 	for _, host := range hosts {
-		allowed[strings.ToLower(host)] = true
+		allowed[Authority(host)] = true
 	}
 	return client(within, Reachable, func(to *url.URL) error {
-		host := to.Hostname()
-		if !allowed[strings.ToLower(host)] {
-			return fmt.Errorf("%w a request to %s: not a configured provider host", ErrRefused, host)
+		if !allowed[Authority(to.Host)] {
+			return fmt.Errorf("%w a request to %s: not a configured provider host", ErrRefused, to.Host)
 		}
 		return nil
 	})
+}
+
+// Authority is a host and port as one https service is named: lower case,
+// without a trailing dot, and without the port where it is the https one.
+// Two authorities name one service where they are equal.
+func Authority(hostport string) string {
+	host, port := hostport, ""
+	if h, p, err := net.SplitHostPort(hostport); err == nil {
+		host, port = h, p
+	}
+	host = strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")
+	if port == "" || port == HTTPSPort {
+		if strings.Contains(host, ":") {
+			return "[" + host + "]"
+		}
+		return host
+	}
+	return net.JoinHostPort(host, port)
 }
 
 // Open returns an HTTP client for addresses a publisher's own document names,
@@ -100,15 +121,9 @@ func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 // redirect followed, and no connection to an address inside this network or
 // in an excluded one — checked on the address a name resolved to, at the
 // moment of connecting. Before anything is resolved, a request is refused
-// that names a host excluded by name, a host that is not a plain name or
-// address, a port other than the https one, or a user.
-//
-// A plain name is checked because the transport maps a name written in other
-// scripts to the one it resolves: a fullwidth letter in a host passes a
-// comparison against the excluded names and then dials the host they name.
-// The port is checked because the addresses come from a publisher's document,
-// and one naming every port on a host would make the fetcher a port scanner
-// whose findings come back in the supplier's error.
+// that names a user, or that Excluded.Permit refuses: a port other than the
+// https one, a host that is not a plain name or address, or a host excluded
+// by name.
 func Open(within time.Duration, excluded Excluded) *http.Client {
 	return open(within, excluded, HTTPSPort)
 }
@@ -117,19 +132,11 @@ func Open(within time.Duration, excluded Excluded) *http.Client {
 // a server on a port of its own.
 func open(within time.Duration, excluded Excluded, port string) *http.Client {
 	return client(within, excluded.Reachable, func(to *url.URL) error {
-		host := strings.ToLower(strings.TrimSuffix(to.Hostname(), "."))
-		switch {
-		case to.User != nil:
-			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, host)
-		case to.Port() != "" && to.Port() != port:
-			return fmt.Errorf("%w a request to %s on port %s: only the https port is reached",
-				ErrRefused, host, to.Port())
-		case net.ParseIP(host) == nil && !HostName(host):
-			return fmt.Errorf("%w a request to %q: not a host name", ErrRefused, to.Hostname())
-		case excluded.Host(host):
-			return fmt.Errorf("%w a request to %s: an administrator excluded it", ErrRefused, host)
+		if to.User != nil {
+			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, to.Hostname())
 		}
-		return nil
+		_, err := excluded.Permit(to.Hostname(), to.Port(), port)
+		return err
 	})
 }
 
@@ -172,12 +179,12 @@ func ConfiguredTrusting(within time.Duration, roots *x509.CertPool) *http.Client
 // user in an address. host carries its port where it names one. roots are the
 // certificate authorities the host is checked against, nil for the system's.
 func Pinned(within time.Duration, host string, roots *x509.CertPool) *http.Client {
-	pinned := strings.ToLower(host)
+	pinned := Authority(host)
 	c := client(within, anywhere, func(to *url.URL) error {
 		switch {
 		case to.User != nil:
 			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, to.Hostname())
-		case strings.ToLower(to.Host) != pinned:
+		case Authority(to.Host) != pinned:
 			return fmt.Errorf("%w a request to %s: only the configured host %s is reached",
 				ErrRefused, to.Host, host)
 		}
@@ -189,6 +196,19 @@ func Pinned(within time.Duration, host string, roots *x509.CertPool) *http.Clien
 		}
 	}
 	return c
+}
+
+// Loopback reports whether a host is this machine: localhost, in any case
+// and with or without its trailing dot, or a loopback address, bracketed or
+// not. Loopback is the whole of 127.0.0.0/8 and ::1 in every spelling, the
+// IPv4-mapped forms included, so it is asked of the parsed address rather than
+// matched against a list of spellings.
+func Loopback(host string) bool {
+	if strings.EqualFold(strings.TrimSuffix(host, "."), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
 }
 
 // anywhere is the address check of a client whose address an administrator

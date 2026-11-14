@@ -84,6 +84,21 @@ else
 	  --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh \
 	  -s templates/deployment.yaml | grep -q 'checksum/secrets:' \
 	  || { echo "rotating the chart-held mail password would not roll the pods"; exit 1; }
+	@# The checksum is salted, so it is no offline test of a guessed password:
+	@# one salt renders one checksum, and another salt another.
+	@sum() { helm template t deploy/helm/openpsirt --set database.existingSecret=s \
+	  --set auth.bootstrapAdmins='{admin}' --set auth.trustedHeader.name=X-User \
+	  --set auth.trustedHeader.sources='{10.0.0.0/8}' --set mail.server=smtp:587 \
+	  --set mail.from=psirt@example.com --set mail.username=u --set mail.password=shh \
+	  --set rolloutSalt="$$1" -s templates/deployment.yaml | awk '/checksum\/secrets:/ {print $$2}'; }; \
+	  one=$$(sum a); again=$$(sum a); other=$$(sum b); \
+	  [ -n "$$one" ] && [ "$$one" = "$$again" ] && [ "$$one" != "$$other" ] \
+	  || { echo "the secrets' checksum does not follow the salt ($$one, $$again, $$other)"; exit 1; }
+	@# With no salt given and no cluster, a salt is drawn and stored, kept.
+	@helm template t deploy/helm/openpsirt --set database.url=postgres://u:p@db/x \
+	  --set auth.bootstrapAdmins='{admin}' --set auth.trustedHeader.name=X-User \
+	  --set auth.trustedHeader.sources='{10.0.0.0/8}' | grep -q '^  name: t-openpsirt-rollout-salt$$' \
+	  || { echo "a chart holding a secret stores no salt for its checksum"; exit 1; }
 	# An install that cannot reach a login is not an install, and mail that is
 	# half configured is mail nobody gets. Each of these refuses at template
 	# time rather than producing a deployment that starts, fails its own

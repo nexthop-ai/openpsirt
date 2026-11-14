@@ -37,6 +37,41 @@ func TestAProviderClientTalksToItsOwnHostAndNowhereElse(t *testing.T) {
 	}
 }
 
+// A provider client reaches its host on the port it was given and no other:
+// another port on the host is another service.
+func TestAProviderClientReachesItsHostOnItsPortAlone(t *testing.T) {
+	for host, refused := range map[string][]string{
+		"issuer.example":      {"https://issuer.example:8443/keys", "https://issuer.example:80/keys"},
+		"issuer.example:8443": {"https://issuer.example/keys", "https://issuer.example:443/keys", "https://issuer.example:9443/keys"},
+	} {
+		client := Guarded(host)
+		for _, url := range refused {
+			req, err := http.NewRequest(http.MethodGet, url, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := client.Transport.RoundTrip(req); err == nil ||
+				!strings.Contains(err.Error(), "not a configured provider host") {
+				t.Errorf("%s through a client for %s answered %v, want it refused", url, host, err)
+			}
+		}
+	}
+	for host, url := range map[string]string{
+		"issuer.example":      "https://ISSUER.example:443/keys",
+		"Issuer.Example:8443": "https://issuer.example:8443/keys",
+		"issuer.example.":     "https://issuer.example/keys",
+	} {
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		permitted := Guarded(host).Transport.(*guard).permits
+		if err := permitted(req.URL); err != nil {
+			t.Errorf("%s through a client for %s was refused: %v", url, host, err)
+		}
+	}
+}
+
 func TestAProviderIsReachedOverHTTPSOnly(t *testing.T) {
 	// A provider reached over plain http can be answered by anybody on the
 	// path, and what comes back decides who somebody is.
@@ -101,7 +136,7 @@ func TestTheAddressGuardSeesAnAddressAndNotAName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := Guarded("localhost")
+	client := Guarded("localhost:" + port)
 
 	_, err = client.Get("https://localhost:" + port)
 	if err == nil {
@@ -128,11 +163,7 @@ func TestAnAllowedProviderSurvivesEveryLayerOfTheClient(t *testing.T) {
 	}))
 	defer server.Close()
 
-	host, _, err := net.SplitHostPort(strings.TrimPrefix(server.URL, "https://"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := Guarded(host)
+	client := Guarded(strings.TrimPrefix(server.URL, "https://"))
 	transport, ok := client.Transport.(*guard).inner.(*http.Transport)
 	if !ok {
 		t.Fatal("the guarded client is not built the way this test assumes")
@@ -292,6 +323,20 @@ func TestAConfiguredAddressIsReachedWhereverItIs(t *testing.T) {
 		}
 		if !errors.Is(err, ErrRefused) {
 			t.Errorf("%s was refused for another reason: %v", address, err)
+		}
+	}
+}
+
+// A host is this machine where it is localhost in any spelling or a loopback
+// address in any form, and nowhere else.
+func TestOnlyThisMachineIsLoopback(t *testing.T) {
+	for host, want := range map[string]bool{
+		"localhost": true, "LOCALHOST.": true, "127.0.0.1": true, "127.8.9.10": true,
+		"::1": true, "[::1]": true, "::ffff:127.0.0.1": true,
+		"localhost.example.com": false, "10.0.0.1": false, "::2": false, "": false,
+	} {
+		if got := Loopback(host); got != want {
+			t.Errorf("%q read as loopback %v, want %v", host, got, want)
 		}
 	}
 }

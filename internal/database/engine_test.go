@@ -224,6 +224,7 @@ func TestACredentialNeverLeavesThePackage(t *testing.T) {
 		{"a password parameter the driver quotes back",
 			"postgres://app@127.0.0.1:1/x?password=s3cret&connect_timeout=never", "s3cret"},
 		{"an at sign in the password, before a slash", "postgres://app:p@ss/word@127.0.0.1:1/x", "ss/word"},
+		{"a question mark and an equals sign in the password", "postgres://app:12?a=b@127.0.0.1:1/x", "12?a=b"},
 		{"an opaque URL", "postgres:app:s3cret@127.0.0.1:1/x", "s3cret"},
 		{"a number sign in a password parameter", "postgres://127.0.0.1:1?password=s3cr#t", "s3cr"},
 		{"an at sign in a password parameter", "postgres://127.0.0.1:1/x?password=ab@cd%zz", "cd"},
@@ -256,14 +257,27 @@ func TestACredentialNeverLeavesThePackage(t *testing.T) {
 }
 
 func TestAnAtSignInAQueryValueIsNotAStrayCredential(t *testing.T) {
-	// Drivers read a user name and a password from the query, and a user name
-	// holding an "@" is written there as it is.
-	target, err := ParseURL("postgres://db.internal/x?user=app@corp&password=hunter2")
-	if err != nil {
-		t.Fatalf("a user name in the query was refused: %v", err)
+	// Drivers read a user name, a password and options from the query, and a
+	// value holding an "@" is written there as it is. Only an address with no
+	// user information and no path, a port, and a host after the "@", can hold
+	// the rest of a password there.
+	for _, raw := range []string{
+		"postgres://db.internal/x?user=app@corp&password=hunter2",
+		"postgres://app@db.internal/x?password=hunter2@x",
+		"postgres://app:hunter2@db.internal/psirt?application_name=psirt@prod",
+		"postgres://db.internal?user=app@myserver&password=hunter2",
+		"postgres://db.internal?user=app&application_name=svc@prod",
+	} {
+		target, err := ParseURL(raw)
+		if err != nil {
+			t.Fatalf("an at sign in a query value was refused: %v", err)
+		}
+		if strings.Contains(target.Redacted, "hunter2") {
+			t.Errorf("the logged URL carries the password: %q", target.Redacted)
+		}
 	}
-	if strings.Contains(target.Redacted, "hunter2") {
-		t.Errorf("the logged URL carries the password: %q", target.Redacted)
+	if _, err := ParseURL("postgres://u:12?a=b@db.internal/x"); err == nil {
+		t.Error("a password cut short into a query value was read as a host and port")
 	}
 }
 

@@ -108,6 +108,26 @@
 {{- if and (or .Values.mail.password .Values.mail.existingSecret) (not .Values.mail.username) }}
 {{- fail "set mail.username: a password with no username is never sent, so the server would refuse every message and the mail would look configured" }}
 {{- end }}
+{{- /*
+The salt the secrets' checksum is taken with. Anybody who can read the
+Deployment sees the annotation and every other byte of the Secrets it covers,
+so an unsalted digest lets them test guesses at a weak password offline. The
+salt is rolloutSalt where set, which a render with no cluster sets; otherwise
+the one stored beside the release, or a new one stored with it and kept across
+upgrades, so the pods roll only when a secret changes.
+*/}}
+{{- $checksummed := or (and .Values.database.url (not .Values.database.existingSecret)) (and .Values.auth.oidc.clientSecret (not .Values.auth.oidc.existingSecret)) (and .Values.auth.github.clientSecret (not .Values.auth.github.existingSecret)) (and .Values.mail.server .Values.mail.password (not .Values.mail.existingSecret)) (and .Values.chat.slack.token (not .Values.chat.slack.existingSecret)) (and .Values.chat.zulip.site .Values.chat.zulip.key (not .Values.chat.zulip.existingSecret)) }}
+{{- $saltName := printf "%s-rollout-salt" (include "openpsirt.fullname" .) }}
+{{- $salt := .Values.rolloutSalt }}
+{{- $storeSalt := false }}
+{{- if and $checksummed (not $salt) }}
+{{- $stored := lookup "v1" "Secret" .Release.Namespace $saltName }}
+{{- $salt = dig "data" "salt" "" $stored | b64dec }}
+{{- if not $salt }}
+{{- $salt = randAlphaNum 32 }}
+{{- end }}
+{{- $storeSalt = true }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -130,8 +150,8 @@ spec:
         # this a rotation updates the Secret, leaves the pod template
         # byte-identical, and every running pod keeps using the old credential
         # while the upgrade reports success.
-        {{- if or (and .Values.database.url (not .Values.database.existingSecret)) (and .Values.auth.oidc.clientSecret (not .Values.auth.oidc.existingSecret)) (and .Values.auth.github.clientSecret (not .Values.auth.github.existingSecret)) (and .Values.mail.server .Values.mail.password (not .Values.mail.existingSecret)) (and .Values.chat.slack.token (not .Values.chat.slack.existingSecret)) (and .Values.chat.zulip.site .Values.chat.zulip.key (not .Values.chat.zulip.existingSecret)) }}
-        checksum/secrets: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- if $checksummed }}
+        checksum/secrets: {{ print $salt (include (print $.Template.BasePath "/secret.yaml") .) | sha256sum }}
         {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -394,3 +414,17 @@ spec:
       {{- with .Values.tolerations }}
       tolerations: {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- if $storeSalt }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $saltName }}
+  labels: {{- include "openpsirt.labels" . | nindent 4 }}
+  annotations:
+    # Kept through an uninstall and every upgrade: a new salt rolls the pods.
+    helm.sh/resource-policy: keep
+type: Opaque
+data:
+  salt: {{ $salt | b64enc | quote }}
+{{- end }}

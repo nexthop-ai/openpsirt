@@ -15,15 +15,15 @@ import (
 // TestAgainstARealArchive reads a CVE List archive somebody downloaded, and is
 // skipped unless they point at one.
 //
-// Run with OPENPSIRT_CVE_ARCHIVE set to a day's `_all_CVEs_at_midnight.zip.zip`.
+// Run with OPENPSIRT_TEST_CVE_ARCHIVE set to a day's `_all_CVEs_at_midnight.zip.zip`.
 // It exists because what the List's records say is not something to assume:
 // the kernel's records write a branch's fix as a wildcard bound, a commit
 // range beside every release range, and the version a bug arrived in as a
 // line with no type at all.
 func TestAgainstARealArchive(t *testing.T) {
-	archive := os.Getenv("OPENPSIRT_CVE_ARCHIVE")
+	archive := os.Getenv("OPENPSIRT_TEST_CVE_ARCHIVE")
 	if archive == "" {
-		t.Skip("set OPENPSIRT_CVE_ARCHIVE to a CVE List archive to read it")
+		t.Skip("set OPENPSIRT_TEST_CVE_ARCHIVE to a CVE List archive to read it")
 	}
 	dir := t.TempDir()
 	if _, err := cverecord.Build(archive, dir, ""); err != nil {

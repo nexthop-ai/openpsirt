@@ -109,7 +109,7 @@ func TestStartingWithoutMigratingChecksTheSchemaFirst(t *testing.T) {
 	}
 	defer func() { _ = discard.Close() }()
 
-	err = run(nil, discard, discard)
+	err = run(nil, os.Environ(), discard, discard)
 	if err == nil {
 		t.Fatal("the server started against a schema this build is ahead of")
 	}

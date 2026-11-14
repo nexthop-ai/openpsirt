@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -164,6 +165,55 @@ func TestTheOutputOfTwoAnalyzersIsWrittenToAFileOfEach(t *testing.T) {
 		if err != nil || !strings.Contains(string(data), tool+"/all") {
 			t.Errorf("%s's document: %v; want its own file naming its series", tool, err)
 		}
+	}
+}
+
+// An analyzer names itself, and its name is reduced to a file name written
+// beside the output named, wherever its characters would point.
+func TestAnAnalyzersOwnNameWritesBesideTheOutput(t *testing.T) {
+	_, sarif := checkout(t)
+	dir := t.TempDir()
+	out := filepath.Join(dir, "run.sarif")
+	for name, file := range map[string]string{
+		"x/../../../../evil": "run.x-..-..-..-..-evil.sarif",
+		"Org/Tool":           "run.org-tool.sarif",
+		"..":                 "run.analyzer.sarif",
+		"Tool.":              "run.tool.sarif",
+	} {
+		t.Run(name, func(t *testing.T) {
+			crafted := filepath.Join(t.TempDir(), "crafted.sarif")
+			named := strings.Replace(output, `"name":"lint"`, `"name":`+strconv.Quote(name), 1)
+			if err := os.WriteFile(crafted, []byte(named), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := run(context.Background(), []string{"write", "--series", "lint=lint/all",
+				"--series", strings.ToLower(name) + "=other/all", "--output", out, sarif, crafted},
+				&bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
+				t.Errorf("%q was not written as %s beside the output: %v", name, file, err)
+			}
+		})
+	}
+}
+
+// Two analyzers whose names reduce to one file name are refused, rather
+// than the second written over the first.
+func TestTwoAnalyzersWrittenToOneFileAreRefused(t *testing.T) {
+	checkout(t)
+	crafted := filepath.Join(t.TempDir(), "crafted.sarif")
+	if err := os.WriteFile(crafted, []byte(strings.Replace(output, `"name":"lint"`, `"name":"lint!"`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(t.TempDir(), "other.sarif")
+	if err := os.WriteFile(other, []byte(strings.Replace(output, `"name":"lint"`, `"name":"lint?"`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := run(context.Background(), []string{"write", "--series", "lint!=a", "--series", "lint?=b",
+		"--output", filepath.Join(t.TempDir(), "run.sarif"), crafted, other}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "would both be written") {
+		t.Errorf("answered %v, want a refusal naming both", err)
 	}
 }
 

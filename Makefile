@@ -320,7 +320,7 @@ docs-check:
 # Dockerfile whose golang tag is the Go release they build with, and the
 # workflow running them. A test in internal/build holds it to the imports.
 CLIENT_PACKAGES := ./cmd/openpsirt-upload/ ./internal/uploadclient/
-CLIENT_SOURCES  := $(CLIENT_PACKAGES) ./internal/version/ ./internal/markdown/ ./internal/refusal/ ./internal/sarif/testdata/ Dockerfile go.mod go.sum .github/workflows/ci.yml
+CLIENT_SOURCES  := $(CLIENT_PACKAGES) ./internal/version/ ./internal/markdown/ ./internal/refusal/ ./internal/outward/ ./internal/redact/ ./internal/sarif/testdata/ Dockerfile go.mod go.sum .github/workflows/ci.yml
 client-test:
 	$(GO) test $(TEST_LINK) -count=1 $(CLIENT_PACKAGES)
 

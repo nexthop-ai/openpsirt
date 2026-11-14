@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -247,6 +248,27 @@ func TestAProviderNamingItsEndpointsElsewhereIsRefusedAtStartup(t *testing.T) {
 	}
 }
 
+// An endpoint on another port of the issuer's host is another service, and
+// is refused as one on another host is.
+func TestAProviderNamingAnEndpointOnAnotherPortIsRefusedAtStartup(t *testing.T) {
+	for _, field := range []string{"authorization_endpoint", "token_endpoint", "jwks_uri"} {
+		p := standing(t)
+		host, port, err := net.SplitHostPort(strings.TrimPrefix(p.URL, "https://"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		other := "8443"
+		if port == other {
+			other = "9443"
+		}
+		p.document = map[string]any{field: "https://" + net.JoinHostPort(host, other) + "/x"}
+		_, err = p.adapter(t, OIDCConfig{})
+		if err == nil || !strings.Contains(err.Error(), "rather than on its own host") {
+			t.Errorf("a provider naming its %s on port %s answered %v, want it refused", field, other, err)
+		}
+	}
+}
+
 // An endpoint on the issuer's own host is still refused over plain http, or
 // where the document names it unreadably: a token redeemed over http carries
 // the client secret in the clear.
@@ -299,6 +321,7 @@ func TestWhatAProviderMustSupplyBeforeItIsUsable(t *testing.T) {
 		{"an unreadable issuer", whole(func(c *OIDCConfig) { c.Issuer = "://" }), "is not a URL naming a host"},
 		{"an issuer over plain http", whole(func(c *OIDCConfig) { c.Issuer = "http://issuer.example" }), "is not https"},
 		{"an issuer over plain http with a password", whole(func(c *OIDCConfig) { c.Issuer = "http://u:hunter2@issuer.example" }), "is not https"},
+		{"an issuer whose password cut its host short", whole(func(c *OIDCConfig) { c.Issuer = "https://bot:1234/hunter2@issuer.example/realms/x" }), "holds an @ after its host"},
 		{"no client identifier", whole(func(c *OIDCConfig) { c.ClientID = "" }), "client identifier and secret"},
 		{"no client secret", whole(func(c *OIDCConfig) { c.ClientSecret = "" }), "client identifier and secret"},
 		{"no username claim", whole(func(c *OIDCConfig) { c.UsernameClaim = "  " }), "OIDC_USERNAME_CLAIM"},

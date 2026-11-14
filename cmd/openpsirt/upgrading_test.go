@@ -91,7 +91,7 @@ func startHeld(t *testing.T, addr string, migrate func(context.Context, *databas
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = quiet.Close() })
-	go func() { s.done <- run(nil, quiet, quiet) }()
+	go func() { s.done <- run(nil, os.Environ(), quiet, quiet) }()
 	return s
 }
 
@@ -333,7 +333,7 @@ func TestAStopBeforeThePortOpensExitsCleanly(t *testing.T) {
 	}
 	defer func() { _ = quiet.Close() }()
 
-	if err := run(nil, quiet, quiet); err != nil {
+	if err := run(nil, os.Environ(), quiet, quiet); err != nil {
 		t.Errorf("a start stopped before its port opened answered %v", err)
 	}
 }

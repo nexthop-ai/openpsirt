@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
@@ -44,14 +45,18 @@ const sarifVersion = "2.1.0"
 
 // settled is what settling a run left out, counted for the report.
 type settled struct {
-	contents, fixes, snippets, markdown, attachments int
+	contents, fixes, snippets, markdown, attachments, invocation, run, result int
 }
+
+// runProperty is the prefix of the run properties the deployment reads.
+const runProperty = "openpsirt/"
 
 // settle makes a run self-contained and free of source text: every reference
 // by position resolved to what it names, every path placed in the checkout,
-// and whole files, proposed fixes, attachments, snippets and markdown
-// removed. It runs before runs of one tool are merged, since a position and a
-// named starting point mean something only within the run that states them.
+// and whole files, proposed fixes, attachments, snippets, markdown and every
+// member, at any depth, that the deployment does not read removed. It runs
+// before runs of one tool are merged, since a position and a named starting
+// point mean something only within the run that states them.
 func settle(run obj, at *placer) settled {
 	var out settled
 	driver := child(child(run, "tool"), "driver")
@@ -90,38 +95,34 @@ func settle(run obj, at *placer) settled {
 			out.fixes += len(items(res, "fixes"))
 			delete(res, "fixes")
 		}
-		out.markdown += plainMessage(child(res, "message"))
-		eachLocation(res, func(loc obj) {
-			place(loc)
-			out.snippets += dropSnippets(loc)
-			out.markdown += plainMessage(child(loc, "message"))
-		})
 		// An attachment is a file the tool attached, with regions of its
 		// text, and nothing the deployment reads.
 		if _, ok := res["attachments"]; ok {
 			out.attachments += len(items(res, "attachments"))
 			delete(res, "attachments")
 		}
-		for _, flow := range objects(res, "codeFlows") {
-			out.markdown += plainMessage(child(flow, "message"))
-		}
 	}
-	eachRunLocation(run, func(loc obj) {
-		place(loc)
-		out.snippets += dropSnippets(loc)
-		out.markdown += plainMessage(child(loc, "message"))
-	})
-	for _, component := range append([]obj{driver}, extensions...) {
-		for _, rule := range objects(component, "rules") {
-			for _, key := range []string{"shortDescription", "fullDescription", "help"} {
-				out.markdown += plainMessage(child(rule, key))
-			}
-		}
-	}
+	// What the deployment does not read is removed before anything is
+	// walked, so nothing is placed or counted in what is never sent.
+	out.result += prune(run["results"], resultShape)
+	out.invocation += prune(run["invocations"], invocationShape)
 	delete(run, "artifacts")
 	delete(run, "originalUriBaseIds")
 	// The client writes the repositories itself, from the checkout.
 	delete(run, "versionControlProvenance")
+	out.run += prune(run, runShape)
+	properties := child(run, "properties")
+	for key := range properties {
+		if !strings.HasPrefix(key, runProperty) && key != unitsKey {
+			delete(properties, key)
+			out.run++
+		}
+	}
+	eachLocation(run, place)
+	// Every snippet and every markdown text wherever it stands, since SARIF
+	// allows a physical location, and so a snippet, in more than one place.
+	out.snippets += stripSnippets(run)
+	eachMessage(run, func(m obj) { out.markdown += plainMessage(m) })
 	return out
 }
 
@@ -190,20 +191,6 @@ func plainMessage(m obj) int {
 	}
 	delete(m, "markdown")
 	return 1
-}
-
-// dropSnippets removes the source text a location's regions carry.
-func dropSnippets(loc obj) int {
-	n := 0
-	physical := child(loc, "physicalLocation")
-	for _, key := range []string{"region", "contextRegion"} {
-		r := child(physical, key)
-		if _, ok := r["snippet"]; ok {
-			delete(r, "snippet")
-			n++
-		}
-	}
-	return n
 }
 
 // merge folds the runs of one tool into one: clang writes a document per

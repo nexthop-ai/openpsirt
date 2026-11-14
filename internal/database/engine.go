@@ -108,12 +108,12 @@ func ParseURL(raw string) (Target, error) {
 	if !ok {
 		return Target{}, fmt.Errorf("unsupported database %q: want one of postgres, mysql, mariadb, sqlite", u.Scheme)
 	}
-	// A password holding an unescaped "/", "?" or "#" still parses: the
-	// authority ends at that character, part of the credential becomes the
-	// host, and the rest lands in the path, the query or the fragment — none
-	// of which redaction treats as a credential. That shape is judged by where
-	// the stray "@" lands.
-	if engine != SQLite && strayCredential(u) {
+	// A password holding an unescaped "/", "?" or "#" still parses, with
+	// part of the credential read as the host and the rest in the path, the
+	// query or the fragment. It is refused: a driver would be handed the
+	// wrong server, and the parsed address shows the credential.
+	// A fragment is refused whatever it holds: no driver reads one.
+	if engine != SQLite && (redact.Stray(u) || u.Fragment != "") {
 		return Target{}, fmt.Errorf("database URL is not a URL: %s: percent-encode "+
 			"/ ? # @ in the user name and password", parseFailure(raw, nil))
 	}
@@ -367,25 +367,6 @@ func transport(u *url.URL) string {
 		return ""
 	}
 	return "&tls=preferred"
-}
-
-// strayCredential reports whether a server URL has user information that
-// spilled past its authority.
-//
-// An "@" in the path, or in a query key, is the rest of a user name and
-// password cut short by an unescaped "/" or "?": a split password lands in a
-// key. A query value may hold an "@", because drivers read a user name from
-// the query, and `?user=app@corp` is a user name rather than a spill. A
-// fragment has no meaning to any driver and is where a password cut at "#"
-// lands. An opaque URL, a scheme followed by a colon and no slashes, puts
-// the whole of the user information outside anything redaction reads.
-func strayCredential(u *url.URL) bool {
-	stray := u.Opaque != "" || u.Fragment != "" || strings.Contains(u.EscapedPath(), "@")
-	for _, pair := range strings.Split(u.RawQuery, "&") {
-		key, _, _ := strings.Cut(pair, "=")
-		stray = stray || strings.Contains(key, "@")
-	}
-	return stray
 }
 
 // parseFailure describes a URL the parser refused without repeating it.

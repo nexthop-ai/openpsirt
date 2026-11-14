@@ -115,6 +115,9 @@ func TestTheGuardOpensNoTunnelGitWasNotSentThrough(t *testing.T) {
 		{"a port other than https", "github.com", http.MethodConnect, "github.com:22", "https port"},
 		{"a host other than the repository's", "github.com", http.MethodConnect, "example.org:443", "this fetch is from"},
 		{"a host an administrator excluded", "git.corp.example.com", http.MethodConnect, "git.corp.example.com:443", "excluded"},
+		// Refused by the rule every host a document chose passes, as the
+		// open client refuses it.
+		{"a host that is not a plain name", "git_hub.com", http.MethodConnect, "git_hub.com:443", "not a host name"},
 		{"a name that resolves inside this network", "localhost", http.MethodConnect, "localhost:443", "inside this network"},
 		{"an address inside this network", "127.0.0.1", http.MethodConnect, "127.0.0.1:443", "inside this network"},
 	} {

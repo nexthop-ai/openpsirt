@@ -32,6 +32,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
@@ -658,7 +659,9 @@ func outboundClient() *http.Client { return outward.Configured(signalTimeout) }
 // Slack in every list and every record of it.
 func reachable(address string) error {
 	parsed, err := url.Parse(strings.TrimSpace(address))
-	if err == nil && parsed.User != nil {
+	// A password holding an unescaped "/", "?" or "#" parses with its start
+	// as the host, so it is the same credential spilled past the authority.
+	if err == nil && (parsed.User != nil || redact.Stray(parsed)) {
 		return refusal.Errorf("an address here carries no name or password in it: put the " +
 			"secret in the field for it, so what is signed and what is sent are separate")
 	}

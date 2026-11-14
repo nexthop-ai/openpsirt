@@ -145,7 +145,9 @@ export function licenseVerdict(packages, against = allowed, admitted = exception
   let checked = 0;
   for (const [location, entry] of Object.entries(packages)) {
     // The root package is this repository, and dev dependencies do not ship.
-    if (!location || entry.dev || entry.devOptional) continue;
+    // A package marked devOptional does: it is an optional dependency of a
+    // shipped one as well as a development dependency.
+    if (!location || entry.dev) continue;
     checked++;
 
     const name = location.replace(/^node_modules\//, "").replace(/\/node_modules\//g, "/");

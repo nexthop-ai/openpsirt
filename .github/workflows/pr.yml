@@ -11,7 +11,8 @@ name: PR
 # event. A workflow that does not declare an event contributes no check run
 # there, and this job cannot tell a check that will never run from one that
 # has not started yet — so every workflow meant to gate a merge declares
-# `merge_group:` alongside `pull_request:`.
+# `merge_group:` alongside `pull_request:`, and every job of such a workflow
+# that runs on every change must also exist on the commit and have passed.
 
 on:
   pull_request:
@@ -27,6 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       checks: read
+      # The workflows, read for the jobs they gate with.
+      contents: read
     steps:
       - name: Wait for all checks to pass or be skipped
         # v0.7.0 carries the fix that checks the latest run for a commit
@@ -45,12 +48,76 @@ jobs:
           # satisfied, and an empty set satisfies it vacuously — so a first
           # poll landing before any sibling check exists reports success and
           # gates nothing. A minute of a hosted runner removes the window in
-          # which that is reachable. It narrows the race rather than closing
-          # it: nothing here can prove a check run that has not appeared yet
-          # is still coming.
+          # which that is reachable for most checks; the step after this one
+          # closes it for the checks every change is gated by.
           delay: 60
           # An hour. The longest job is the four-engine suite with the race
           # detector, plus the image and chart build beside it; a ceiling far
           # above that costs nothing on a green run and stops a wedged check
           # from holding a queue entry open all day.
           timeout: 3600
+
+      # The wait cannot tell a check that will never run from one that has not
+      # appeared yet, and an empty set satisfies it. Every workflow naming the
+      # merge queue's event gates a merge, and each of its jobs with no
+      # condition, read from the workflow itself, has to exist on the commit
+      # and have passed, so a run that never registered fails this. A job with
+      # a condition may be skipped.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/workflows/
+          sparse-checkout-cone-mode: false
+      - name: Confirm the gating checks ran and passed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          # A workflow gates a merge where it names the queue's event, which
+          # `on:` may give as a map, a list or one name. This workflow is the
+          # aggregator and is left out. A path filter would leave a gating job
+          # off a commit it does not match, so one is refused.
+          unconditional='.jobs | to_entries[] | select(.value | has("if") | not)'
+          events='.on | ((select(tag == "!!map") | keys | .[]), (select(tag == "!!seq") | .[]), select(tag == "!!str"))'
+          filtered='[.on.pull_request?, .on.merge_group?] | any_c(tag == "!!map" and (has("paths") or has("paths-ignore")))'
+          required=""
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            [ -f "$workflow" ] && [ "$workflow" != .github/workflows/pr.yml ] || continue
+            yq "$events" "$workflow" | grep -qx merge_group || continue
+            if [ "$(yq "$filtered" "$workflow")" = true ]; then
+              echo "::error::$workflow gates a merge and filters its pull_request or merge_group trigger by path"
+              exit 1
+            fi
+            # A job's check is named by its name, or by its key where it has
+            # none. A matrix job's checks carry the matrix values, and a name
+            # holding an expression is expanded, so a gating job of either
+            # kind is refused.
+            unnamable=$(yq "$unconditional | select((.value | has(\"strategy\")) or ((.value.name // \"\") | test(\"[$][{]\"))) | .key" \
+              "$workflow")
+            if [ -n "$unnamable" ]; then
+              echo "::error::$workflow gates every change with a job whose check has no fixed name: $unnamable"
+              exit 1
+            fi
+            required="$required
+          $(yq "$unconditional | (.value.name // .key)" "$workflow")"
+          done
+          if [ -z "$(printf '%s' "$required" | tr -d '[:space:]')" ]; then
+            echo "::error::no workflow gating a merge has an unconditional job, so this checked nothing"
+            exit 1
+          fi
+          # The latest run of each name, as its conclusion.
+          runs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100" \
+            --jq '.check_runs[] | [.id, .name, (.conclusion // "pending")] | @tsv' | sort -n)
+          failed=0
+          while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            conclusion=$(printf '%s\n' "$runs" | awk -F '\t' -v name="$name" '$2 == name { c = $3 } END { print c }')
+            if [ -z "$conclusion" ]; then
+              echo "::error::the check \"$name\" never ran on $SHA"
+              failed=1
+            elif [ "$conclusion" != "success" ]; then
+              echo "::error::the check \"$name\" ended $conclusion on $SHA"
+              failed=1
+            fi
+          done <<< "$required"
+          exit "$failed"

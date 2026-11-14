@@ -15,14 +15,14 @@ import (
 // TestAgainstTheRealIndexes is the only thing here that reaches the network,
 // and it is skipped unless somebody asks for it.
 //
-// Run with OPENPSIRT_CURRENCY_LIVE=1. It exists because the shape of what an
+// Run with OPENPSIRT_TEST_CURRENCY_LIVE=1. It exists because the shape of what an
 // index returns is not something to assume: crates.io refuses a request that
 // does not say who is asking, the module proxy escapes uppercase letters, and
 // PyPI dates a release by its files rather than by itself. None of that is
 // visible from a specification.
 func TestAgainstTheRealIndexes(t *testing.T) {
-	if os.Getenv("OPENPSIRT_CURRENCY_LIVE") == "" {
-		t.Skip("set OPENPSIRT_CURRENCY_LIVE=1 to ask the real indexes")
+	if os.Getenv("OPENPSIRT_TEST_CURRENCY_LIVE") == "" {
+		t.Skip("set OPENPSIRT_TEST_CURRENCY_LIVE=1 to ask the real indexes")
 	}
 	client := currency.New()
 	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)

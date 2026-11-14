@@ -8,6 +8,19 @@ name: Release
 # recipe, and a release failure reproduces with one command. What is here is
 # only the part a checkout cannot do: pushing to the registry, signing against
 # a workload identity, and creating the release.
+#
+# The release is named by a job that runs no build tool: its version, image,
+# chart registry and which aliases move. The build runs every dependency's
+# code, the interface's build tools among them, holds nothing but a read of
+# the repository, and passes on nothing but the image's sum. The publish job
+# holds the write, package and signing permissions and runs no code from the
+# repository or its dependencies: it takes the build's files and image, checks
+# them against the sums the build recorded, and publishes them under the
+# names the naming job chose.
+# A build-time dependency gone bad reaches what it builds either way; split,
+# it cannot also sign other things, push other tags or rewrite other
+# releases. The documentation is split the same way: built with a read, and
+# pushed by a job that runs none of its build tools.
 
 on:
   push:
@@ -21,27 +34,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish
+  # Every name the publish job pushes, signs or moves comes from here, where
+  # nothing but git and the shell runs. A step output of the build job is
+  # written by whatever ran in it, a dependency's code included, so the
+  # build's outputs choose no tag.
+  name:
+    name: Name the release
     runs-on: ubuntu-latest
     permissions:
-      # The release, and the documentation branch mike pushes to.
-      contents: write
-      # The image and the chart, both to ghcr.
-      packages: write
-      # Keyless signing and provenance: the identity is the workflow's own,
-      # so there is no key to hold, rotate, or lose to whoever holds it next.
-      id-token: write
-      attestations: write
+      contents: read
     outputs:
+      version: ${{ steps.release.outputs.version }}
+      image: ${{ steps.release.outputs.image }}
+      charts: ${{ steps.release.outputs.charts }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+      minor: ${{ steps.release.outputs.minor }}
       latest: ${{ steps.release.outputs.latest }}
+      newest_on_line: ${{ steps.release.outputs.newest_on_line }}
+      previous: ${{ steps.release.outputs.previous }}
 
     steps:
-      # Full history: `git describe` derives the version from the tag, and
-      # mike needs the documentation branch. A shallow checkout has neither.
+      # Full history: the release is named against every other tag, and the
+      # tag is checked against the main it fetched. A shallow checkout has
+      # neither.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # A tag pointing at a commit that never reached main is a release of
       # something nothing gated. Everything on main arrived through the merge
@@ -49,16 +68,86 @@ jobs:
       # would be indistinguishable afterwards.
       # Nothing derived from the tag is substituted into a script in this file.
       # A ${{ }} value is expanded when the script is written, so a tag name
-      # carrying shell syntax — which the ref format permits — would run here,
-      # in a job holding the write, package and signing permissions, and the
-      # failure path of the check meant to refuse it is one of the places it
-      # would run. Every such value is passed through `env:` and read as a
-      # variable, which the shell treats as data.
+      # carrying shell syntax — which the ref format permits — would run as
+      # script, and the failure path of the check meant to refuse it is one of
+      # the places it would run. Every such value is passed through `env:` and
+      # read as a variable, which the shell treats as data.
       - name: Confirm the tag is on main
         run: |
-          git fetch origin main --quiet
           git merge-base --is-ancestor "${{ github.sha }}" origin/main \
             || { echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"; exit 1; }
+
+      # Named from the tags where no build tool runs, so nothing the build
+      # fetches can move a tag this reads.
+      - name: Name this release
+        id: release
+        run: |
+          # A release tag is a version: the globs and outputs below read it.
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] \
+            || { echo "::error::$GITHUB_REF_NAME is not a release version"; exit 1; }
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # A registry reference is lower case, and the repository's name need
+          # not be. Every later reference to the image or the chart is one of
+          # these two. The signing identity keeps the repository's own case,
+          # because the certificate carries it.
+          image="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          charts="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/charts"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "charts=$charts" >> "$GITHUB_OUTPUT"
+          # Anything with a hyphen after the patch number is a prerelease:
+          # 0.1.0-rc.1 is, 0.1.0 is not. A prerelease moves no alias and takes
+          # no floating tag — it exists to be tried, not to be landed on by
+          # somebody who asked for the current version.
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
+          # "latest" is the newest release, and "<major>.<minor>" the newest
+          # patch on its line. A fix to an older line moves neither past a
+          # newer release, so each moves only where this tag is the newest of
+          # its kind. The tag has matched the release pattern above, so it
+          # holds nothing a glob or a shell acts on.
+          newest=$(git tag -l 'v*' | grep -v -- - | sort -V | tail -1)
+          line=$(git tag -l "v${version%.*}.*" | grep -v -- - | sort -V | tail -1)
+          if [ "$newest" = "$GITHUB_REF_NAME" ]; then latest=true; else latest=false; fi
+          if [ "$line" = "$GITHUB_REF_NAME" ]; then newest_on_line=true; else newest_on_line=false; fi
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "newest_on_line=$newest_on_line" >> "$GITHUB_OUTPUT"
+          # The release the notes count from: the newest stable tag below this
+          # one for a stable release, and the newest tag of any kind below it
+          # for a prerelease. Empty for the first release, where the notes
+          # count from the start of the history. A hyphen becomes a tilde for
+          # the sort, which orders 0.1.0-rc.1 below 0.1.0 as semantic
+          # versioning does; a ref name cannot hold a tilde, so nothing else
+          # is changed by the round trip.
+          case "$version" in
+            *-*) candidates=$(git tag -l 'v*') ;;
+            *)   candidates=$(git tag -l 'v*' | grep -v -- -) ;;
+          esac
+          previous=$(printf '%s\n%s\n' "$candidates" "$GITHUB_REF_NAME" | grep . \
+            | sed 's/-/~/' | sort -uV | sed 's/~/-/' \
+            | awk -v tag="$GITHUB_REF_NAME" '$0 == tag { print prev; exit } { prev = $0 }')
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build
+    needs: name
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image_sum: ${{ steps.saved.outputs.sum }}
+
+    steps:
+      # Full history: `git describe` derives the version from the tag, and a
+      # shallow checkout has none. The token is not left in the checkout,
+      # where the build's code could read it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       # The Go release is the one the image builds with. The Dockerfile's
       # golang tag is the one pin of the patch, and go.mod's go line is only
@@ -95,73 +184,85 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e  # v5.1.0
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532  # v4.1.3
       # No buildx setup step here: one makes a container builder the
       # default, and that driver does not load what it builds
       # into the daemon's image store — "make dist" builds the image and then
       # reads the two inventories out of it, so the image has to be there.
-      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Name this release
-        id: release
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          # A registry reference is lower case, and the repository's name need
-          # not be. Every later reference to the image or the chart is one of
-          # these two. The signing identity keeps the repository's own case,
-          # because the certificate carries it.
-          image="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
-          charts="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/charts"
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-          echo "charts=$charts" >> "$GITHUB_OUTPUT"
-          # Anything with a hyphen after the patch number is a prerelease:
-          # 0.1.0-rc.1 is, 0.1.0 is not. A prerelease moves no alias and takes
-          # no floating tag — it exists to be tried, not to be landed on by
-          # somebody who asked for the current version.
-          case "$version" in
-            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
-            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
-          esac
-          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
-          # "latest" is the newest release, and "<major>.<minor>" the newest
-          # patch on its line. A fix to an older line moves neither past a
-          # newer release, so each moves only where this tag is the newest of
-          # its kind. The tag has matched the release pattern by now, so it
-          # holds nothing a glob or a shell acts on.
-          newest=$(git tag -l 'v*' | grep -v -- - | sort -V | tail -1)
-          line=$(git tag -l "v${version%.*}.*" | grep -v -- - | sort -V | tail -1)
-          if [ "$newest" = "$GITHUB_REF_NAME" ]; then latest=true; else latest=false; fi
-          if [ "$line" = "$GITHUB_REF_NAME" ]; then newest_on_line=true; else newest_on_line=false; fi
-          echo "latest=$latest" >> "$GITHUB_OUTPUT"
-          echo "newest_on_line=$newest_on_line" >> "$GITHUB_OUTPUT"
-          # The release the notes count from: the newest stable tag below this
-          # one for a stable release, and the newest tag of any kind below it
-          # for a prerelease. Empty for the first release, where the notes
-          # count from the start of the history. A hyphen becomes a tilde for
-          # the sort, which orders 0.1.0-rc.1 below 0.1.0 as semantic
-          # versioning does; a ref name cannot hold a tilde, so nothing else
-          # is changed by the round trip.
-          case "$version" in
-            *-*) candidates=$(git tag -l 'v*') ;;
-            *)   candidates=$(git tag -l 'v*' | grep -v -- -) ;;
-          esac
-          previous=$(printf '%s\n%s\n' "$candidates" "$GITHUB_REF_NAME" | grep . \
-            | sed 's/-/~/' | sort -uV | sed 's/~/-/' \
-            | awk -v tag="$GITHUB_REF_NAME" '$0 == tag { print prev; exit } { prev = $0 }')
-          echo "previous=$previous" >> "$GITHUB_OUTPUT"
 
       # Every asset, and the check that each names one version: the version
       # and the image this workflow pushes, handed to the build rather than
       # worked out again beside it, so what is pushed is what was built.
       - name: Build the release
         env:
-          IMAGE: ${{ steps.release.outputs.image }}
+          IMAGE: ${{ needs.name.outputs.image }}
         run: make dist VERSION="$GITHUB_REF_NAME" DIST_IMAGE="$IMAGE"
+
+      # The image crosses to the publish job as an archive, and every file
+      # beside it. The archive's sum is a job output, and SHA256SUMS covers
+      # the rest, so the publish job checks what arrived against what was
+      # built before it pushes or signs anything.
+      - name: Save the image
+        id: saved
+        env:
+          VERSION: ${{ needs.name.outputs.version }}
+          IMAGE: ${{ needs.name.outputs.image }}
+        run: |
+          mkdir -p bin/image
+          docker save "$IMAGE:$VERSION" -o bin/image/image.tar
+          echo "sum=$(sha256sum bin/image/image.tar | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release
+          path: |
+            bin/dist/
+            bin/image/
+          if-no-files-found: error
+          # Long enough to re-run a failed publish the next week; a rebuild
+          # would make an image with another digest.
+          retention-days: 14
+
+  publish:
+    name: Publish
+    needs: [name, build]
+    runs-on: ubuntu-latest
+    permissions:
+      # The release.
+      contents: write
+      # The image and the chart, both to ghcr.
+      packages: write
+      # Keyless signing and provenance: the identity is the workflow's own,
+      # so there is no key to hold, rotate, or lose to whoever holds it next.
+      id-token: write
+      attestations: write
+
+    # No checkout: nothing from the repository or its dependencies runs here.
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: release
+          path: bin
+
+      - name: Check what the build made
+        env:
+          IMAGE_SUM: ${{ needs.build.outputs.image_sum }}
+        run: |
+          (cd bin/dist && sha256sum --check --strict SHA256SUMS)
+          # Every file published is one the sums name, and nothing beside them.
+          listed=$(cd bin/dist && awk '{ sub(/^\*/, "", $2); print $2 }' SHA256SUMS | sort)
+          present=$(cd bin/dist && ls -1 | grep -v -x -e SHA256SUMS | sort)
+          [ "$listed" = "$present" ] \
+            || { echo "::error::bin/dist holds files SHA256SUMS does not name"; diff <(echo "$listed") <(echo "$present"); exit 1; }
+          [ -n "$IMAGE_SUM" ] || { echo "::error::the build recorded no sum for the image"; exit 1; }
+          echo "$IMAGE_SUM  bin/image/image.tar" | sha256sum --check --strict
+          docker load -i bin/image/image.tar
+
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e  # v5.1.0
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532  # v4.1.3
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # The image "make dist" already built and read the inventories out of,
       # pushed under the tags the design gives it. The exact tag never moves;
@@ -170,12 +271,12 @@ jobs:
       - name: Push the image
         id: image
         env:
-          VERSION: ${{ steps.release.outputs.version }}
-          IMAGE: ${{ steps.release.outputs.image }}
-          MINOR: ${{ steps.release.outputs.minor }}
-          PRERELEASE: ${{ steps.release.outputs.prerelease }}
-          LATEST: ${{ steps.release.outputs.latest }}
-          NEWEST_ON_LINE: ${{ steps.release.outputs.newest_on_line }}
+          VERSION: ${{ needs.name.outputs.version }}
+          IMAGE: ${{ needs.name.outputs.image }}
+          MINOR: ${{ needs.name.outputs.minor }}
+          PRERELEASE: ${{ needs.name.outputs.prerelease }}
+          LATEST: ${{ needs.name.outputs.latest }}
+          NEWEST_ON_LINE: ${{ needs.name.outputs.newest_on_line }}
         run: |
           image=$IMAGE
           version=$VERSION
@@ -198,10 +299,18 @@ jobs:
       - name: Push the chart
         id: chart
         env:
-          VERSION: ${{ steps.release.outputs.version }}
-          CHARTS: ${{ steps.release.outputs.charts }}
+          VERSION: ${{ needs.name.outputs.version }}
+          CHARTS: ${{ needs.name.outputs.charts }}
         run: |
-          out=$(helm push "bin/dist/openpsirt-$VERSION.tgz" "oci://$CHARTS" 2>&1)
+          # helm push names the chart from the Chart.yaml inside the archive,
+          # so the archive is held to this release's name and version before
+          # anything is pushed.
+          chart="bin/dist/openpsirt-$VERSION.tgz"
+          name=$(helm show chart "$chart" | yq '.name')
+          version=$(helm show chart "$chart" | yq '.version')
+          [ "$name" = "openpsirt" ] && [ "$version" = "$VERSION" ] \
+            || { echo "::error::the chart archive holds $name $version, not openpsirt $VERSION"; exit 1; }
+          out=$(helm push "$chart" "oci://$CHARTS" 2>&1)
           echo "$out"
           digest=$(printf '%s\n' "$out" | awk '/^Digest: /{print $2}')
           [ -n "$digest" ] || { echo "::error::helm push named no digest, so the chart cannot be signed"; exit 1; }
@@ -210,14 +319,14 @@ jobs:
       - name: Sign the image
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
-          IMAGE: ${{ steps.release.outputs.image }}
+          IMAGE: ${{ needs.name.outputs.image }}
         run: |
           cosign sign --yes "$IMAGE@$DIGEST"
 
       - name: Sign the chart
         env:
           DIGEST: ${{ steps.chart.outputs.digest }}
-          CHARTS: ${{ steps.release.outputs.charts }}
+          CHARTS: ${{ needs.name.outputs.charts }}
         run: |
           cosign sign --yes "$CHARTS/openpsirt@$DIGEST"
 
@@ -237,8 +346,8 @@ jobs:
         env:
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
           CHART_DIGEST: ${{ steps.chart.outputs.digest }}
-          IMAGE: ${{ steps.release.outputs.image }}
-          CHARTS: ${{ steps.release.outputs.charts }}
+          IMAGE: ${{ needs.name.outputs.image }}
+          CHARTS: ${{ needs.name.outputs.charts }}
         run: |
           identity="^https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/"
           cosign verify \
@@ -267,7 +376,7 @@ jobs:
       - name: Attest the image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
-          subject-name: ${{ steps.release.outputs.image }}
+          subject-name: ${{ needs.name.outputs.image }}
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
 
@@ -279,13 +388,13 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.release.outputs.version }}
+          VERSION: ${{ needs.name.outputs.version }}
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-          IMAGE: ${{ steps.release.outputs.image }}
-          CHARTS: ${{ steps.release.outputs.charts }}
-          PRERELEASE: ${{ steps.release.outputs.prerelease }}
-          LATEST: ${{ steps.release.outputs.latest }}
-          PREVIOUS: ${{ steps.release.outputs.previous }}
+          IMAGE: ${{ needs.name.outputs.image }}
+          CHARTS: ${{ needs.name.outputs.charts }}
+          PRERELEASE: ${{ needs.name.outputs.prerelease }}
+          LATEST: ${{ needs.name.outputs.latest }}
+          PREVIOUS: ${{ needs.name.outputs.previous }}
         run: |
           version=$VERSION
           # The list of what changed is GitHub's, built from the titles of the
@@ -334,29 +443,32 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then set -- --prerelease; else set --; fi
           # GitHub marks a new release Latest unless told otherwise, so a fix
           # to an older line is told which it is, as the image tags are.
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "$version" \
             --notes-file /tmp/notes.md \
             --latest="$LATEST" \
             "$@" \
             bin/dist/*
 
-  # A job of its own, in the group docs.yml uses, because both push to the
-  # same branch. Two mike runs racing on gh-pages is how a published set ends
-  # up with a version directory and no entry in the switcher.
-  docs:
-    name: Publish the documentation
-    needs: publish
+  # The documentation is built where nothing can write: mkdocs and its
+  # plugins run here, from pip. The pages branch it commits leaves as a git
+  # bundle, and the job holding the write only fetches and pushes it.
+  # Neither job is in the group docs.yml uses: a newer run queued in a group
+  # cancels the one waiting there, and a release's pages would be lost. Two
+  # builds racing on gh-pages cannot leave a version directory with no entry
+  # in the switcher, because the publish job pushes only a fast-forward of
+  # the branch the build started from, and refuses the other.
+  docs-build:
+    name: Build the documentation
+    needs: [name, publish]
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-    concurrency:
-      group: docs
-      cancel-in-progress: false
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: '3.12'
@@ -369,24 +481,69 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # A repository that has published nothing has no branch yet, and
+          # mike makes one.
+          if git rev-parse --verify -q origin/gh-pages > /dev/null; then
+            git branch gh-pages origin/gh-pages
+          fi
       # The published set is versioned so a reader can tell which release
       # they are looking at. A prerelease publishes under its own version and
       # moves nothing, and nor does a fix to an older line: "latest" has to
       # keep meaning the newest release somebody is meant to be running.
       # The pages name the release a reader deploys, and this build names the
       # tag it was started by rather than looking for the newest one.
-      - name: Publish under this version
+      - name: Build under this version
         env:
-          LATEST: ${{ needs.publish.outputs.latest }}
+          LATEST: ${{ needs.name.outputs.latest }}
           DOCS_RELEASE: ${{ github.ref_name }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           case "$version" in
-            *-*) mike deploy --push "$version" ;;
+            *-*) mike deploy "$version" ;;
             *)   if [ "$LATEST" = "true" ]; then
-                   mike deploy --push --update-aliases "$version" latest
-                   mike set-default --push latest
+                   mike deploy --update-aliases "$version" latest
+                   mike set-default latest
                  else
-                   mike deploy --push "$version"
+                   mike deploy "$version"
                  fi ;;
           esac
+          mkdir -p bin
+          # The bundle holds what is new since the published branch, or the
+          # whole branch where there is none.
+          published=$(git rev-parse --verify -q origin/gh-pages || true)
+          git bundle create bin/pages.bundle gh-pages ${published:+"^$published"}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: pages
+          path: bin/pages.bundle
+          if-no-files-found: error
+
+  docs:
+    name: Publish the documentation
+    needs: docs-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Every branch, so the published one is here where it exists.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: pages
+          path: ${{ runner.temp }}/pages
+      # Only a commit on top of the published branch is pushed, so a build
+      # gone bad can add pages and never rewrite their history. The push is
+      # never forced, so the remote refuses anything else as well; the check
+      # says why.
+      - name: Push the pages
+        env:
+          BUNDLE: ${{ runner.temp }}/pages/pages.bundle
+        run: |
+          git fetch "$BUNDLE" gh-pages:refs/heads/built
+          if git rev-parse --verify -q origin/gh-pages > /dev/null; then
+            git merge-base --is-ancestor origin/gh-pages built \
+              || { echo "the published branch moved after the pages were built: re-run both documentation jobs"; exit 1; }
+          fi
+          git push origin built:gh-pages
