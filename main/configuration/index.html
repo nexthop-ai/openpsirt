@@ -5550,6 +5550,22 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <td>A patch link's repository on github.com or gitlab.com is known by its path in lower case, as those hosts compare it. A repository recorded under a path with capitals is cloned once more under the new key, and the earlier copy is evicted like any unused one</td>
 <td>Nothing. The first pass after the upgrade takes longer for those repositories</td>
 </tr>
+<tr>
+<td>What became of a withdrawn decision names whoever withdrew it, and a person's throughput counts a withdrawal for them, whoever proposed the decision. v0.12.0 named the proposer and counted every withdrawal for them. A decision withdrawn before the upgrade names nobody and counts toward nobody's throughput</td>
+<td>Nothing the upgrade can do: v0.12.0 did not record who withdrew a decision</td>
+</tr>
+<tr>
+<td>The approval-quality report lists an agreement as standing from somebody who could not give it now wherever the approving rule refuses them today, so an administrator or a deactivated approver who cannot approve now is listed, and a triager who still triages there is not. v0.12.0 asked about the approver capability alone, never listed an administrator and listed a deactivated approver as still holding the right</td>
+<td>Nothing. Expect that list to change on the first report after the upgrade</td>
+</tr>
+<tr>
+<td><code>PUT /v1/decisions/{id}/elsewhere</code> answers 409 for a decision about a code finding recorded as a flaw. v0.12.0 set the link</td>
+<td>Judge the flaw instead. A script setting a link on such a decision now receives the refusal</td>
+</tr>
+<tr>
+<td>The <code>outcome</code> of what stands with nobody agreeing, in <code>GET /v1/approvals/scrutiny</code>, lists <code>dismissed</code> and <code>not-security</code>, the code finding outcomes the report already returned. v0.12.0's API document left them out</td>
+<td>Accept both values in a client generated from the API document</td>
+</tr>
 </tbody>
 </table>
 <h4 id="vex-statements-from-v0120">VEX statements from v0.12.0<a class="headerlink" href="#vex-statements-from-v0120" title="Permanent link">&para;</a></h4>
