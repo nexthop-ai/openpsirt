@@ -86,6 +86,29 @@ describe("the application before anybody is known", () => {
   });
 });
 
+describe("the application after a refused sign-in", () => {
+  afterEach(() => window.history.replaceState({}, "", "/"));
+
+  it("says this account has no access here, and offers the way in without forwarding", async () => {
+    // One provider forwards straight to it anywhere else. Here that would
+    // refuse the same account again, in a loop.
+    window.history.replaceState({}, "", "/?no-access");
+    serve((path) => {
+      if (path === "/v1/session/me") return { status: 401 };
+      if (path === "/v1/sign-in")
+        return { data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] } };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<App />, "/"));
+    await settle();
+    expect(text()).toContain("No access here");
+    expect(text()).toContain("this account has no access here. Ask an administrator");
+    expect(text()).not.toContain("Sign in to continue");
+    const way = mount.host().querySelector<HTMLAnchorElement>('a[href^="/v1/sign-in/oidc"]');
+    expect(way?.getAttribute("href")).toBe("/v1/sign-in/oidc");
+  });
+});
+
 describe("the application for somebody signed in", () => {
   it("keeps an address it does not answer in the bar and says so", async () => {
     await drawn(() => ({ data: WHO }));

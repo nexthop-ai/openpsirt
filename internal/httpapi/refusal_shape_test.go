@@ -58,37 +58,3 @@ func TestTheRefusalEverybodyMeetsFirstHasTheDocumentedShape(t *testing.T) {
 		}
 	})
 }
-
-func TestASignInThatWillNotCompleteRefusesInTheSameShape(t *testing.T) {
-	// The sign-in callbacks are ordinary handlers rather than operations,
-	// because a redirect arriving from a provider is not an API call — and
-	// they answered `text/plain` while everything else answered
-	// `application/problem+json`. A client that parses one shape and gets the
-	// other reads a refusal as a transport fault, and the shape of a refusal
-	// is part of the answer.
-	eachSignIn(t, func(t *testing.T, r *signInReach) {
-		// A callback with nothing pending, which is the refusal every
-		// one of the reasons collapses into: a provider that failed, a
-		// state that did not match, somebody unknown, and somebody
-		// known and granted nothing all answer alike.
-		got := callback(t, r, "whatever", "code", false)
-		if got.Code != http.StatusUnauthorized {
-			t.Fatalf("a callback with nothing pending answered %d: %s",
-				got.Code, got.Body.String())
-		}
-		if kind := got.Header().Get("Content-Type"); kind != "application/problem+json" {
-			t.Errorf("a refused sign-in came back as %q, not the shape every other "+
-				"refusal takes: %s", kind, got.Body.String())
-		}
-		var refused map[string]any
-		if err := json.Unmarshal(got.Body.Bytes(), &refused); err != nil {
-			t.Fatalf("a refused sign-in is not readable as JSON: %v (%s)",
-				err, got.Body.String())
-		}
-		for _, field := range []string{"title", "status", "detail"} {
-			if _, held := refused[field]; !held {
-				t.Errorf("the refusal is missing %q: %s", field, got.Body.String())
-			}
-		}
-	})
-}

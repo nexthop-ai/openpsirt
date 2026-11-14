@@ -34,9 +34,10 @@ Satisfies REQ-42, REQ-61, REQ-66.
 
 ## Refusal shape
 
-`application/problem+json` for everything, the credential check and the sign-in
-callbacks in front of the router included; `text/plain` reads to a client as a
-transport fault. Each fault travels as its own detail carrying the line and the
+`application/problem+json` for everything, the credential check in front of the
+router included; `text/plain` reads to a client as a transport fault. A refused
+sign-in callback is a redirect, by `design-docs/access-signin.md` § Refused
+sign-in. Each fault travels as its own detail carrying the line and the
 offending text, so an interface can point at it.
 
 | Error | Answer |

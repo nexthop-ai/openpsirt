@@ -129,7 +129,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	held, err := pendingFrom(r.Context(), in, r)
 	if err != nil {
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 	pending := held.Pending
@@ -137,12 +137,12 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	// handing a signed-in person a callback of their own making and having the
 	// session come back as theirs.
 	if state := r.URL.Query().Get("state"); state == "" || state != pending.State {
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 
@@ -160,7 +160,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 			in.Log().Warn("a sign-in could not be completed",
 				"provider", provider.Name(), "error", err)
 		}
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 	if part, carried := identity.NUL(); carried {
@@ -168,7 +168,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 			in.Log().Warn("a sign-in was refused because the provider's identity carries a NUL character",
 				"provider", provider.Name(), "part", part)
 		}
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 
@@ -198,7 +198,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 			in.Log().Info("refused somebody who authenticated but reaches nothing",
 				"provider", provider.Name(), "identity", identity.Username)
 		}
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 
@@ -474,16 +474,25 @@ func aLocalPath(where string) string {
 	return parsed.RequestURI()
 }
 
+// refusedHere is where a browser whose sign-in was refused lands: the
+// interface's sign-in screen, marked so that it says this account has no
+// access here and does not forward to the provider again, which would sign the
+// same account straight back in and loop.
+const refusedHere = "/?no-access"
+
 // refuseSignIn answers a sign-in that will not be completed.
 //
 // One answer for every reason: a provider that failed, a state that did not
-// match, somebody unknown, and somebody known but granted nothing. Telling
-// them apart says whether a name is real, which is free reconnaissance for
-// somebody who has just proved nothing.
-func refuseSignIn(w http.ResponseWriter, in core.Deps) {
+// match, somebody unknown, somebody known but granted nothing, and somebody who
+// has left. Telling them apart says whether a name is real, which is free
+// reconnaissance for somebody who has just proved nothing.
+//
+// The callback is a page the provider sends a browser to, so the answer is a
+// page too. A problem document there is drawn as raw text.
+func refuseSignIn(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
 	http.SetCookie(w, &cleared)
-	Problem(w, http.StatusUnauthorized, "not authorized")
+	http.Redirect(w, r, refusedHere, http.StatusSeeOther)
 }
 
 // wentWrongHere records a fault where an operator can read it and says nothing

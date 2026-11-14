@@ -230,8 +230,8 @@ func TestACallbackWithoutTheSignInThatStartedItIsRefused(t *testing.T) {
 			{"no code", "the-state", "", true},
 		} {
 			rec := callback(t, r, c.state, c.code, c.pending)
-			if rec.Code != http.StatusUnauthorized {
-				t.Errorf("a callback with %s answered %d, want 401", c.what, rec.Code)
+			if rec.Code != http.StatusSeeOther {
+				t.Errorf("a callback with %s answered %d, want 303", c.what, rec.Code)
 			}
 			if cookies := rec.Result().Cookies(); hasSession(cookies) {
 				t.Errorf("a callback with %s handed out a session", c.what)
@@ -249,8 +249,8 @@ func TestSomebodyWhoAuthenticatesButWasGrantedNothingGetsInNowhere(t *testing.T)
 		for i, who := range []string{"ungranted", "a-stranger"} {
 			r.provider.Says = &signin.Identity{Subject: fmt.Sprintf("subject-%d", i+2), Username: who}
 			rec := callback(t, r, "the-state", "a-code", true)
-			if rec.Code != http.StatusUnauthorized {
-				t.Errorf("%q answered %d, want 401", who, rec.Code)
+			if rec.Code != http.StatusSeeOther {
+				t.Errorf("%q answered %d, want 303", who, rec.Code)
 			}
 			if hasSession(rec.Result().Cookies()) {
 				t.Errorf("%q was handed a session", who)
@@ -315,8 +315,8 @@ func TestAProviderThatFailedSaysNothingAboutWhy(t *testing.T) {
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		r.provider.Fail = errClientSecretRejected
 		rec := callback(t, r, "the-state", "a-code", true)
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("a failed exchange answered %d, want 401", rec.Code)
+		if rec.Code != http.StatusSeeOther {
+			t.Errorf("a failed exchange answered %d, want 303", rec.Code)
 		}
 		if strings.Contains(rec.Body.String(), "secret") {
 			t.Errorf("the refusal described the fault: %q", rec.Body.String())
@@ -350,7 +350,7 @@ func TestAnIdentifierAlreadyPinnedIsNotRedeemableByAnotherName(t *testing.T) {
 
 		// Somebody else, presenting the name that person signs in under.
 		r.provider.Says = &signin.Identity{Subject: "2002", Username: "granted"}
-		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusUnauthorized {
+		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusSeeOther {
 			t.Errorf("somebody else redeemed a pinned name: %d", rec.Code)
 		}
 
@@ -368,8 +368,8 @@ func TestAnIdentityTokenNamingNobodyIsRefused(t *testing.T) {
 	// name — the thing the pinning exists to replace.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		r.provider.Says = &signin.Identity{Subject: "", Username: "granted"}
-		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusUnauthorized {
-			t.Errorf("a sign-in naming no subject answered %d, want 401", rec.Code)
+		if rec := callback(t, r, "the-state", "a-code", true); rec.Code != http.StatusSeeOther {
+			t.Errorf("a sign-in naming no subject answered %d, want 303", rec.Code)
 		}
 	})
 }
@@ -511,8 +511,8 @@ func TestASignInNobodyStartedHereIsRefused(t *testing.T) {
 		rec := httptest.NewRecorder()
 		r.handler.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Fatalf("a sign-in nobody started here answered %d, want 401: %s",
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("a sign-in nobody started here answered %d, want 303: %s",
 				rec.Code, rec.Header().Get("Location"))
 		}
 		for _, cookie := range rec.Result().Cookies() {
@@ -727,8 +727,8 @@ func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
 			t.Fatalf("a sign-in sealed just now answered %d", got)
 		}
 		// Older than the window it was given.
-		if got := complete(sealed(time.Now().UTC().Add(-2 * pendingLifeForTest))); got != http.StatusUnauthorized {
-			t.Errorf("a sign-in sealed long ago answered %d, want 401", got)
+		if got := complete(sealed(time.Now().UTC().Add(-2 * pendingLifeForTest))); got != http.StatusSeeOther {
+			t.Errorf("a sign-in sealed long ago answered %d, want 303", got)
 		}
 		// And one carrying no time at all, which is what every value sealed
 		// before this check looks like.
@@ -740,8 +740,8 @@ func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := complete(r.sealed(t, body)); got != http.StatusUnauthorized {
-			t.Errorf("a sign-in carrying no mint time answered %d, want 401", got)
+		if got := complete(r.sealed(t, body)); got != http.StatusSeeOther {
+			t.Errorf("a sign-in carrying no mint time answered %d, want 303", got)
 		}
 	})
 }
@@ -819,7 +819,7 @@ func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 			req.Header.Set("Cookie", "openpsirt_pending="+forged)
 			rec = httptest.NewRecorder()
 			r.handler.ServeHTTP(rec, req)
-			httpapitest.RefusedWith(t, rec, http.StatusUnauthorized)
+			httpapitest.RefusedWith(t, rec, http.StatusSeeOther)
 			for _, cookie := range rec.Result().Cookies() {
 				if cookie.Name == "openpsirt_session" && cookie.Value != "" {
 					t.Errorf("with the key stored as %q a sign-in sealed with an empty key was completed", stored)
@@ -932,7 +932,7 @@ func TestASignInOverTLSReadsOnlyACookieBoundToThisHost(t *testing.T) {
 			r.handler.ServeHTTP(rec, req)
 			return rec
 		}
-		if rec := returned("openpsirt_pending"); rec.Code != http.StatusUnauthorized {
+		if rec := returned("openpsirt_pending"); rec.Code != http.StatusSeeOther {
 			t.Errorf("the sign-in completed from a bare-named cookie: %d", rec.Code)
 		}
 		rec := returned("__Host-openpsirt_pending")
