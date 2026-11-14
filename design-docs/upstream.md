@@ -84,7 +84,7 @@ reaches out, settled by a lease.
 | What is gone | A document no listing names is withdrawn only by a complete read: every listing read whole, every entry naming a document and a moment, every moved document taken and checked. Otherwise nothing is withdrawn, and an unreadable entry is recorded as what stopped the read |
 | A moved upstream | Its first complete read lets a document under the same tracking identifier replace the old address's, as a revision, and withdraws what the new address does not list |
 | A document | Compared against the digest served beside it, and its signature where a key is trusted. One failing either is not taken, and the next pass reads the listings whole |
-| An entry that cannot be read | Counted beside its listing's validator, so an answer that nothing moved records it again and never clears it |
+| An entry that cannot be read | Counted beside its listing's validator, so an answer that nothing moved records it again and never clears it. A validator stored without the count is never sent, and its listing is read whole |
 | A document refused again | Each replica remembers what it refused at the moment its listing named, and tries those after every other entry, so refusals at the head of a listing never fill a pass |
 | An address that comes to hold another document | What the document it held said is set aside, unless another address recorded for the upstream still holds it, until a complete read withdraws that address |
 | Its name | The tracking identifier it names itself by; its next revision replaces its statements |

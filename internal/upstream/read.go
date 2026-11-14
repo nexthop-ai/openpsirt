@@ -155,11 +155,12 @@ func resolve(base, named string) (string, error) {
 
 // cached is what one listing last answered with, and how many of its entries
 // named no document this can read, which an answer that nothing moved leaves
-// as they were.
+// as they were. A validator stored without that count is never sent, since an
+// answer that nothing moved would read as no entry left unread.
 type cached struct {
 	Tag      string `json:"tag,omitempty"`
 	Modified string `json:"modified,omitempty"`
-	Skipped  int    `json:"skipped,omitempty"`
+	Skipped  *int   `json:"skipped,omitempty"`
 }
 
 // listed is one document a listing names, and the moment it says the document
@@ -485,7 +486,7 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 			}
 			validator := &cached{}
 			if validators {
-				if was, ok := held[address]; ok {
+				if was, ok := held[address]; ok && was.Skipped != nil {
 					validator.Tag, validator.Modified = was.Tag, was.Modified
 				}
 			}
@@ -507,11 +508,13 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 			if err != nil {
 				return nil, nil, 0, err
 			}
+			skipped := 0
 			for _, one := range entries {
 				if one.skipped {
-					validator.Skipped++
+					skipped++
 				}
 			}
+			validator.Skipped = &skipped
 			kept[address] = *validator
 			if len(out)+len(entries) > r.listed {
 				return nil, nil, 0, refusal.Errorf("the upstream's listings name more than the %d "+
@@ -528,7 +531,7 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 	case unchanged == len(addresses):
 		skipped := 0
 		for _, one := range kept {
-			skipped += one.Skipped
+			skipped += *one.Skipped
 		}
 		return nil, encoded(kept), false, skipped, nil
 	case unchanged > 0:

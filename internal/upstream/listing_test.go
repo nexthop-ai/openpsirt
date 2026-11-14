@@ -6,6 +6,7 @@ package upstream_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"regexp"
 	"strings"
 	"testing"
@@ -83,6 +84,40 @@ func TestAnEntryThatCannotBeReadStaysRecordedWhileNothingMoves(t *testing.T) {
 			t.Fatal("a read with an entry it could not read records nothing")
 		}
 		w.read()
+		if failed := w.failed(); !strings.Contains(failed, "name no document this can read") {
+			t.Errorf("the next read records %q, want the entry it still cannot read", failed)
+		}
+	})
+}
+
+// A validator stored without a count of the entries it left unread is never
+// sent: the listing is read whole, so an entry that cannot be read is recorded
+// again rather than cleared by an answer that nothing moved.
+func TestAValidatorStoredWithoutItsUnreadCountIsNotSent(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.server.feedListing(`{"id":"junk","content":{"src":"junk.json"}}`)
+		w.read()
+		if w.failed() == "" {
+			t.Fatal("a read with an entry it could not read records nothing")
+		}
+		up, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil || up == nil {
+			t.Fatalf("the fork trusts no upstream: %v", err)
+		}
+		uncounted := regexp.MustCompile(`,?"skipped":\d+`).ReplaceAllString(up.Listings, "")
+		if uncounted == up.Listings {
+			t.Fatalf("the stored validators %q carry no count to take out", up.Listings)
+		}
+		if _, err := w.DB.DB.NewUpdate().Model((*upstream.Upstream)(nil)).
+			Set(`"listings" = ?`, uncounted).Where(`"id" = ?`, up.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		w.read()
+		if got := w.server.answered[publish.FeedPath]; got != http.StatusOK {
+			t.Errorf("the feed answered %d, want it read whole", got)
+		}
 		if failed := w.failed(); !strings.Contains(failed, "name no document this can read") {
 			t.Errorf("the next read records %q, want the entry it still cannot read", failed)
 		}
