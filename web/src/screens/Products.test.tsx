@@ -146,3 +146,30 @@ describe("the products somebody else reads", () => {
     expect(host().textContent).toContain("deployment’s");
   });
 });
+
+describe("the products somebody holding a role on every product reads", () => {
+  it("says no product is declared, never that a role is missing", async () => {
+    serve((path) => {
+      if (path === "/v1/products") return { data: { items: [] } };
+      if (path === "/v1/last-uploads") return { data: { items: [], quiet_after_days: 7 } };
+      return undefined;
+    });
+    mount.render(screen(<Products who={{ ...person(false), everywhere: true }} />, "/products"));
+    await settle();
+    expect(host().textContent).toContain("No product is declared yet.");
+    expect(host().textContent).not.toContain("An administrator grants a role");
+  });
+
+  it("tells somebody holding nothing that a role is granted", async () => {
+    serve((path) => {
+      if (path === "/v1/products") return { data: { items: [] } };
+      if (path === "/v1/last-uploads") return { data: { items: [], quiet_after_days: 7 } };
+      return undefined;
+    });
+    mount.render(screen(<Products who={person(false)} />, "/products"));
+    await settle();
+    expect(host().textContent).toContain(
+      "An administrator grants a role before anything appears here.",
+    );
+  });
+});
