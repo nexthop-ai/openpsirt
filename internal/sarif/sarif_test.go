@@ -723,6 +723,16 @@ func TestARuleIsFoundByIdentifierThenByPositionInItsComponent(t *testing.T) {
 	}
 }
 
+func TestTheLongestPrefixNamingARuleIsTheResultsRule(t *testing.T) {
+	doc := `{"version":"2.1.0","runs":[{"results":[{"ruleId":"r0/md5/x"}],
+	"tool":{"driver":{"name":"t","rules":[
+		{"id":"r0","defaultConfiguration":{"level":"note"}},
+		{"id":"r0/md5","defaultConfiguration":{"level":"error"}}]}}}]}`
+	if got := read(t, doc).Runs[0].Results[0].Level; got != "error" {
+		t.Errorf("the result is at %q; want %q, the rule r0/md5's", got, "error")
+	}
+}
+
 func TestClangTidyOutputIsReadWithNoFingerprintAndNoFunction(t *testing.T) {
 	log := readFile(t, "clangtidy-artemis.sarif")
 	r := log.Runs[0]
