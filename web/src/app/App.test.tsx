@@ -176,6 +176,16 @@ describe("the application for a browser the proxy named and this deployment refu
 describe("the application after a sign-in that failed on this side", () => {
   afterEach(() => window.history.replaceState({}, "", "/"));
 
+  it("says one thing at an address carrying both markers, the refusal", async () => {
+    window.history.replaceState({}, "", "/?no-access&sign-in-failed");
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] },
+    });
+    expect(text()).toContain("No access here");
+    expect(text()).not.toContain("Try again shortly.");
+    expect(mount.host().querySelectorAll("#sign-in-state")).toHaveLength(1);
+  });
+
   it("says to try again, and offers the way in without forwarding", async () => {
     window.history.replaceState({}, "", "/?sign-in-failed");
     await drawn(() => ({ status: 401 }), "/", {
