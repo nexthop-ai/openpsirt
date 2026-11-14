@@ -6,6 +6,7 @@ package advisory
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -175,8 +176,10 @@ func (s *Store) referencesTo(ctx context.Context,
 		// leaving the deployment links to, and passing the rule an address
 		// stored beside a decision goes through. A relative address, or one
 		// naming something inside this deployment, points nowhere outside it,
-		// and the standard's reference is a URI.
-		if one.URL == "" || seen[one.URL] || markdown.Autolinkable(one.URL) != nil {
+		// and the standard's reference is a URI. That rule is about markdown
+		// and reads an entity as the character it names, so the address is
+		// parsed as a URI as well.
+		if one.URL == "" || seen[one.URL] || markdown.Autolinkable(one.URL) != nil || !absoluteURI(one.URL) {
 			continue
 		}
 		seen[one.URL] = true
@@ -196,6 +199,13 @@ func (s *Store) referencesTo(ctx context.Context,
 		return nil, nil
 	}
 	return out, nil
+}
+
+// absoluteURI reports whether an address parses as an absolute URI naming a
+// host, or a mail address, which is what the standard's reference holds.
+func absoluteURI(address string) bool {
+	u, err := url.Parse(address)
+	return err == nil && u.IsAbs() && (u.Scheme == "mailto" || u.Host != "")
 }
 
 // summaryOfKind says what a reference appears to be, in the words a reader of

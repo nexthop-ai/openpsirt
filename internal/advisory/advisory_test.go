@@ -695,7 +695,12 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 			finding.Reference{URL: "www.vendor.example/advisory/1", Kind: finding.Report},
 			finding.Reference{URL: "issue:CVE-2026-1", Kind: finding.Report},
 			finding.Reference{URL: "/v1/findings/1", Kind: finding.Report},
-			finding.Reference{URL: "attachment:notes.txt", Kind: finding.Report})
+			finding.Reference{URL: "attachment:notes.txt", Kind: finding.Report},
+			// Addresses markdown accepts that are no URI: a scheme spelled
+			// with an entity, a broken escape, an unclosed address literal.
+			finding.Reference{URL: "&#104;ttps://example.test/x", Kind: finding.Report},
+			finding.Reference{URL: "https://example.test/%zz", Kind: finding.Report},
+			finding.Reference{URL: "https://[::1", Kind: finding.Report})
 
 		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
