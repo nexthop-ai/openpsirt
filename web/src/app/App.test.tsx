@@ -39,10 +39,14 @@ const ONE: Record<string, unknown> = {
 
 // Draws the application at an address, with the identity read answered as
 // given and every other read answered empty.
-async function drawn(who: () => Answer, at = "/nowhere/at/all") {
+async function drawn(
+  who: () => Answer,
+  at = "/nowhere/at/all",
+  ways: Answer = { data: { items: [] } },
+) {
   const asked = serve((path) => {
     if (path === "/v1/session/me") return who();
-    if (path === "/v1/sign-in") return { data: { items: [] } };
+    if (path === "/v1/sign-in") return ways;
     if (path in ONE) return { data: ONE[path] };
     return { data: { items: [], total: 0 } };
   });
@@ -93,14 +97,9 @@ describe("the application after a refused sign-in", () => {
     // One provider forwards straight to it anywhere else. Here that would
     // refuse the same account again, in a loop.
     window.history.replaceState({}, "", "/?no-access");
-    serve((path) => {
-      if (path === "/v1/session/me") return { status: 401 };
-      if (path === "/v1/sign-in")
-        return { data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] } };
-      return { data: { items: [], total: 0 } };
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] },
     });
-    mount.render(screen(<App />, "/"));
-    await settle();
     expect(text()).toContain("No access here");
     expect(text()).toContain("Ask an administrator for access.");
     expect(text()).not.toContain("Sign in to continue");
@@ -116,6 +115,13 @@ describe("the application after a refused sign-in with no way in", () => {
     window.history.replaceState({}, "", "/?no-access");
     await drawn(() => ({ status: 401 }), "/");
     expect(text()).toContain("No way in is configured.");
+    expect(text()).not.toContain("Ask an administrator for access.");
+  });
+
+  it("says the ways in could not be read, and not to ask for access", async () => {
+    window.history.replaceState({}, "", "/?no-access");
+    await drawn(() => ({ status: 401 }), "/", { status: 503 });
+    expect(text()).toContain("The ways in could not be read.");
     expect(text()).not.toContain("Ask an administrator for access.");
   });
 });

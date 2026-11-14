@@ -42,6 +42,12 @@ func TestEveryRefusedSignInLandsOnTheOneNoAccessScreen(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Everything a browser is told, apart from the moment it was told.
+		told := func(rec *httptest.ResponseRecorder) string {
+			header := rec.Header().Clone()
+			header.Del("Date")
+			return fmt.Sprint(rec.Code, header, rec.Body.String())
+		}
 		var first string
 		for i, c := range []struct {
 			what  string
@@ -69,9 +75,9 @@ func TestEveryRefusedSignInLandsOnTheOneNoAccessScreen(t *testing.T) {
 				t.Errorf("%s was handed a session", c.what)
 			}
 			if i == 0 {
-				first = rec.Body.String()
-			} else if rec.Body.String() != first {
-				t.Errorf("%s answered %q, unlike the first refusal's %q", c.what, rec.Body.String(), first)
+				first = told(rec)
+			} else if told(rec) != first {
+				t.Errorf("%s answered %q, unlike the first refusal's %q", c.what, told(rec), first)
 			}
 		}
 	})
@@ -129,8 +135,20 @@ func TestARoleAcrossEveryProductSignsSomebodyInBeforeAnyProductExists(t *testing
 			return out
 		}
 
-		if got := get("/v1/session/me"); got.Code != http.StatusOK {
-			t.Fatalf("the current user answered %d, want 200: %s", got.Code, got.Body.String())
+		me := get("/v1/session/me")
+		if me.Code != http.StatusOK {
+			t.Fatalf("the current user answered %d, want 200: %s", me.Code, me.Body.String())
+		}
+		// Said, so a screen tells an empty catalog from nothing granted.
+		var who struct {
+			Everywhere bool              `json:"everywhere"`
+			Reach      []json.RawMessage `json:"reach"`
+		}
+		if err := json.Unmarshal(me.Body.Bytes(), &who); err != nil {
+			t.Fatal(err)
+		}
+		if !who.Everywhere || len(who.Reach) != 0 {
+			t.Errorf("the current user says everywhere %v and reaches %d products", who.Everywhere, len(who.Reach))
 		}
 		// Admitted, and reaching nothing product-scoped.
 		for _, path := range []string{"/v1/products", "/v1/findings"} {

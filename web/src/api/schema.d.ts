@@ -16733,6 +16733,8 @@ export interface components {
             digest_unassigned?: boolean;
             /** @description The time an undisclosed flaw reported from outside has before its disclosure date, as a duration such as 2160h0m0s */
             disclose_after?: string;
+            /** @description Whether they hold a role across every product, which covers each product as it is declared */
+            everywhere?: boolean;
             /** @description The identity this deployment holds for them */
             identity: string;
             /**
