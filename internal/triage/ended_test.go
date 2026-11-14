@@ -312,6 +312,53 @@ func TestWhatAPersonGotThroughIsCountedInDecisions(t *testing.T) {
 	})
 }
 
+func TestAWithdrawalCountsForWhoeverWithdrewIt(t *testing.T) {
+	// Any triager on the product may withdraw, so the proposer is not always
+	// the one who took the decision back.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		dropped := f.decisionsMany(t, f.occurrences("under-a"))
+		if _, err := f.store.Withdraw(ctx, f.reviewer, dropped[0].DecisionID); err != nil {
+			t.Fatal(err)
+		}
+		measured, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{}, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]triage.Worked{}
+		for _, one := range measured.Throughput {
+			got[one.Person] = one
+		}
+		if p, a := got["proposer"], got["approver"]; p.Withdrawn != 0 || a.Withdrawn != 1 {
+			t.Errorf("the proposer is credited %d withdrawals and the withdrawer %d, want 0 and 1",
+				p.Withdrawn, a.Withdrawn)
+		}
+		// One piece of work each, so the two are ordered by name: a
+		// withdrawal is work done.
+		if len(measured.Throughput) != 2 || measured.Throughput[0].Person != "approver" {
+			t.Errorf("throughput reads %+v; want the withdrawer and the proposer, alike in work, by name",
+				measured.Throughput)
+		}
+		// Narrowed to people, a withdrawal is theirs who withdrew it: a team's
+		// count is of what its own people took back, whoever proposed it.
+		narrowed, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{People: []int64{f.approver}},
+			time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		withdrew := 0
+		for _, one := range narrowed.Throughput {
+			if one.Person == "approver" {
+				withdrew = one.Withdrawn
+			}
+		}
+		if withdrew != 1 {
+			t.Errorf("narrowed to the withdrawer, throughput reads %+v; want their one withdrawal",
+				narrowed.Throughput)
+		}
+	})
+}
+
 func TestADecisionThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
 	// The cap applies to the decisions that grew, worst first. Taken off the
 	// oldest agreements, a decision agreed to after them never appears.

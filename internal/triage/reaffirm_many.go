@@ -372,17 +372,17 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return reaffirmPlan{}, err
 	}
-	severity := map[[2]int64]int{}
+	keys := make([][2]int64, 0, len(lapsed))
+	for _, row := range lapsed {
+		keys = append(keys, [2]int64{row.ProductID, row.VulnerabilityID})
+	}
+	severity, err := s.severitiesOf(ctx, keys)
+	if err != nil {
+		return reaffirmPlan{}, err
+	}
 	full := false
 	for _, row := range lapsed {
 		key := [2]int64{row.ProductID, row.VulnerabilityID}
-		if _, asked := severity[key]; !asked {
-			now, err := s.severityOf(ctx, row.ProductID, row.VulnerabilityID)
-			if err != nil {
-				return reaffirmPlan{}, err
-			}
-			severity[key] = now
-		}
 		if needsFullApproval(row, *previous, severity[key], carryable != nil) {
 			full = true
 		}
@@ -399,12 +399,21 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	// occurrence identity is names alone while a row is keyed on the versions
 	// too, so one component at two versions under one consumer is two lapsed
 	// rows sharing an occurrence — and writing the same live key twice refuses the
-	// whole act with "a decision already stands here", which is false.
+	// whole act with "a decision already stands here", which is false. Keyed on
+	// the issue the finding is held under, since rows filed under two names
+	// that merged lead to one finding.
+	// Where two rows lead to one, an undisclosed one keeps it undisclosed,
+	// whichever is read first.
 	done := map[string]bool{}
+	proposed := map[string]int{}
 	for _, row := range lapsed {
 		key := occurrenceKey(row.ProductID, row.VulnerabilityID, row.OccurrenceIdentity)
 		for _, at := range atVersions(row, where[key]) {
-			written := key + "\x00" + at.ComponentUpstream + "\x00" + at.ConsumerUpstream
+			written := occurrenceKey(at.ProductID, at.VulnerabilityID, at.OccurrenceIdentity) +
+				"\x00" + at.ComponentUpstream + "\x00" + at.ConsumerUpstream
+			if i, held := proposed[written]; held && proposals[i].Occurrence.Visibility == access.Public {
+				proposals[i].Occurrence.Visibility = row.Visibility
+			}
 			if done[written] {
 				continue
 			}
@@ -429,6 +438,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 			// still holds; it is not an occasion to change who may see it.
 			at.Visibility = row.Visibility
 			occurrences[row.OccurrenceIdentity] = true
+			proposed[written] = len(proposals)
 			proposals = append(proposals, remade(*previous, at, reasoning, by,
 				severity[[2]int64{row.ProductID, row.VulnerabilityID}], full))
 		}
@@ -540,16 +550,34 @@ func occurrenceKey(productID, vulnerabilityID int64, occurrenceIdentity string) 
 // the versions are what a row expires on, so one row could not stand for
 // both. An occurrence that is open nowhere comes back not at all, which is a finding
 // that closed rather than a fault.
+//
+// Asked of the issue each row is read as, and keyed by the issue the row is
+// filed under: a row filed under an issue that merged into another sits at
+// the findings the other holds.
 func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 	lapsed []DecisionOccurrence) (map[string][]Occurrence, error) {
 
-	issues := map[int64]bool{}
+	filed := map[int64]bool{}
 	identities := map[string]bool{}
 	products := map[int64]bool{}
 	for _, row := range lapsed {
-		issues[row.VulnerabilityID] = true
+		filed[row.VulnerabilityID] = true
 		identities[row.OccurrenceIdentity] = true
 		products[row.ProductID] = true
+	}
+	readAs, err := finding.IssuesOf(ctx, s.db, keysOf(filed))
+	if err != nil {
+		return nil, err
+	}
+	issues := map[int64]bool{}
+	filedUnder := map[int64][]int64{}
+	for id := range filed {
+		as, known := readAs[id]
+		if !known {
+			as = id
+		}
+		issues[as] = true
+		filedUnder[as] = append(filedUnder[as], id)
 	}
 	at := map[string][]Occurrence{}
 	for productID := range products {
@@ -590,15 +618,17 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 			return nil, fmt.Errorf("read where these sit now: %w", err)
 		}
 		for _, row := range rows {
-			key := occurrenceKey(productID, row.VulnerabilityID, row.OccurrenceIdentity)
-			at[key] = append(at[key], Occurrence{
-				ProductID: productID, VulnerabilityID: row.VulnerabilityID,
-				OccurrenceIdentity: row.OccurrenceIdentity,
-				ComponentUpstream:  row.ComponentUpstream,
-				ConsumerUpstream:   row.ConsumerUpstream,
-				OnTag:              row.OnTag == 1,
-				Kind:               kind.Kind(row.Kind),
-			})
+			for _, under := range filedUnder[row.VulnerabilityID] {
+				key := occurrenceKey(productID, under, row.OccurrenceIdentity)
+				at[key] = append(at[key], Occurrence{
+					ProductID: productID, VulnerabilityID: row.VulnerabilityID,
+					OccurrenceIdentity: row.OccurrenceIdentity,
+					ComponentUpstream:  row.ComponentUpstream,
+					ConsumerUpstream:   row.ConsumerUpstream,
+					OnTag:              row.OnTag == 1,
+					Kind:               kind.Kind(row.Kind),
+				})
+			}
 		}
 	}
 	return at, nil

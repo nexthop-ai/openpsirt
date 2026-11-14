@@ -150,13 +150,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		}
 		decision, err := finding.NewStore(in.DB.DB).Agree(ctx, subject, input.ID)
 		if err != nil {
-			if errors.Is(err, finding.ErrNoSuchAssessment) {
-				return nil, core.NoSuchAssessment()
-			}
-			if errors.Is(err, access.ErrDenied) {
-				return nil, huma.Error403Forbidden("not authorized")
-			}
-			return nil, core.Asked(in.Logger, err)
+			return nil, refusedAssessment(in, err)
 		}
 		outgrown(ctx, in, decision.ProductID, decision.VulnerabilityID)
 		return &struct{ Body AssessmentBody }{Body: assessmentBody(*decision, "", subject.ID)}, nil
@@ -184,13 +178,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		}
 		withdrawn, err := finding.NewStore(in.DB.DB).Withdraw(ctx, subject, input.ID)
 		if err != nil {
-			if errors.Is(err, finding.ErrNoSuchAssessment) {
-				return nil, core.NoSuchAssessment()
-			}
-			if errors.Is(err, access.ErrDenied) {
-				return nil, huma.Error403Forbidden("not authorized")
-			}
-			return nil, core.Asked(in.Logger, err)
+			return nil, refusedAssessment(in, err)
 		}
 		// The published rating back in force can be worse than the one taken
 		// back.
@@ -264,25 +252,52 @@ func registerAssessment(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "what agreeing would do could not be worked out", err)
 		}
 		out := &core.ListOutput[AssessmentBody]{}
-		out.Body.Total = total
-		out.Body.Items = make([]AssessmentBody, 0, len(decisions))
-		for _, decision := range decisions {
-			body := assessmentBody(decision, named[decision.VulnerabilityID], subject.ID)
-			body.Product = products[decision.ProductID]
-			body.ProductName = shown[decision.ProductID]
-			if decision.State == finding.AssessmentProposed && decision.NeedsApproval {
-				// A claim that stopped being readable between the list and
-				// this read is left off rather than failing the whole page.
-				consequence, known := would[decision.ID]
-				if !known {
-					continue
-				}
-				body.Open, body.OffTheList = consequence.Findings, consequence.OffTheList
-			}
-			out.Body.Items = append(out.Body.Items, body)
-		}
+		out.Body.Items, out.Body.Total = assessmentPage(decisions, total, would,
+			func(decision finding.Assessment) AssessmentBody {
+				body := assessmentBody(decision, named[decision.VulnerabilityID], subject.ID)
+				body.Product = products[decision.ProductID]
+				body.ProductName = shown[decision.ProductID]
+				return body
+			})
 		return out, nil
 	})
+}
+
+// assessmentPage is the page of assessments the list answers, and its total.
+//
+// The count and WhatAgreeingWouldDo ask one readability rule, so a waiting
+// claim it did not answer stopped being readable between the two reads. It is
+// left off rather than failing the whole page, and the page's total is
+// lowered to match what the page shows.
+func assessmentPage(decisions []finding.Assessment, total int, would map[int64]finding.Consequence,
+	bodyOf func(finding.Assessment) AssessmentBody) ([]AssessmentBody, int) {
+
+	items := make([]AssessmentBody, 0, len(decisions))
+	for _, decision := range decisions {
+		waiting := decision.State == finding.AssessmentProposed && decision.NeedsApproval
+		consequence, known := would[decision.ID]
+		if waiting && !known {
+			total--
+			continue
+		}
+		body := bodyOf(decision)
+		if waiting {
+			body.Open, body.OffTheList = consequence.Findings, consequence.OffTheList
+		}
+		items = append(items, body)
+	}
+	return items, total
+}
+
+// refusedAssessment answers a store's refusal of an act on an assessment.
+func refusedAssessment(in core.Deps, err error) error {
+	switch {
+	case errors.Is(err, finding.ErrNoSuchAssessment):
+		return core.NoSuchAssessment()
+	case errors.Is(err, access.ErrDenied):
+		return huma.Error403Forbidden("not authorized")
+	}
+	return core.Asked(in.Logger, err)
 }
 
 func assessmentBody(a finding.Assessment, identifier string, asking int64) AssessmentBody {

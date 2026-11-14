@@ -195,3 +195,32 @@ func TestARemovalFromDisclosureLandingWhileADisclosureAppliesKeepsTheCodeFinding
 			http.StatusNotFound)
 	})
 }
+
+// Pointing a decision somewhere is a write to the decision like any other:
+// it moves the decision's stamp, and a decision about a code finding recorded
+// as a flaw is refused it, the flaw being judged instead.
+func TestPointingADecisionElsewhereIsADecisionWrite(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence, decision, _ := confirmedCodeFinding(t, r)
+		subject, err := r.Rights.Resolve(t.Context(), "security-testing-triager")
+		if err != nil {
+			t.Fatal(err)
+		}
+		before := decisionStamp(t, r, decision)
+		if err := triage.NewStore(r.DB.DB).PointAt(t.Context(), subject, decision,
+			"https://tracker.example/PSIRT-42"); err != nil {
+			t.Fatal(err)
+		}
+		if got := decisionStamp(t, r, decision); got == before {
+			t.Errorf("the decision's stamp is %d after its link was set; want it changed", got)
+		}
+		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
+			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
+		}
+		err = triage.NewStore(r.DB.DB).PointAt(t.Context(), subject, decision, "https://tracker.example/PSIRT-43")
+		if !errors.Is(err, triage.ErrCodeFindingRecordedAsFlaw) {
+			t.Errorf("pointing a decision about a code finding recorded as a flaw answered %v; want it refused", err)
+		}
+	})
+}

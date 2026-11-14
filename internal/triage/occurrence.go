@@ -77,6 +77,9 @@ type DecisionOccurrence struct {
 	// EndedAt is when this stopped applying — withdrawn, or lapsed because
 	// the code moved. Null while it is live.
 	EndedAt *time.Time `bun:"ended_at"`
+	// EndedBy is who withdrew it. Null while it is live, and where it lapsed,
+	// which is nobody's act.
+	EndedBy *int64 `bun:"ended_by"`
 	// LiveKey is what this row decides about, while its decision is still
 	// live. Null once it is withdrawn or has lapsed, which is what lets a
 	// fresh decision be made at an occurrence a dead one used to cover.
@@ -403,27 +406,8 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject,
 
 	var recorded []*DecisionOccurrence
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		recorded = recorded[:0]
-		if err := within.allowed(ctx, subject, proposals); err != nil {
-			return err
-		}
-		// Asked per occurrence rather than once for the set: the threshold reads
-		// the decision, and two occurrences of one finding can differ in what they
-		// carry. Re-worked on every attempt, against the policy and the
-		// postponement in force when the write lands rather than when the
-		// request arrived.
-		if err := within.gate(ctx, subject, proposals); err != nil {
-			return err
-		}
-		// One action, one decision, however many occurrences it covers. The
-		// decision is what the queue lists, what an approver agrees to, and what
-		// the argument is held on; the rows underneath stay one per occurrence and
-		// carry only where the decision lands.
-		decision, err := within.newDecision(ctx, FindingDecision, subject.ID, nil, "", proposals[0])
-		if err != nil {
-			return err
-		}
-		recorded, err = within.proposeAll(ctx, decision, proposals)
+		var err error
+		recorded, err = within.decideAll(ctx, subject, proposals)
 		return err
 	})
 	if err != nil {
@@ -455,23 +439,44 @@ func (s *Store) ProposeGrouped(ctx context.Context, subject access.Subject, firs
 			also.Occurrence = occurrence
 			proposals = append(proposals, also)
 		}
-		if err := within.allowed(ctx, subject, proposals); err != nil {
-			return err
-		}
-		if err := within.gate(ctx, subject, proposals); err != nil {
-			return err
-		}
-		decision, err := within.newDecision(ctx, FindingDecision, subject.ID, nil, "", proposals[0])
-		if err != nil {
-			return err
-		}
-		recorded, err = within.proposeAll(ctx, decision, proposals)
+		recorded, err = within.decideAll(ctx, subject, proposals)
 		return err
 	})
 	if err != nil {
 		return nil, s.alreadyDecided(ctx, err, occurrencesOf(proposals))
 	}
 	return recorded[0], nil
+}
+
+// decideAll records one finding decision at every occurrence these proposals
+// name, inside the transaction the store is rebuilt over: the limit and the
+// right to decide each, the gate, one decision, and its rows.
+//
+// Worked on a copy, so an attempt the retry helper takes again starts from
+// the proposals as given. The gate is asked per occurrence rather than once
+// for the set: the threshold reads the decision, and two occurrences of one
+// finding can differ in what they carry. It is re-worked on every attempt,
+// against the policy and the postponement in force when the write lands.
+//
+// One action is one decision, however many occurrences it covers. The decision
+// is what the queue lists, what an approver agrees to, and what the argument is
+// held on; the rows underneath stay one per occurrence and carry only where the
+// decision lands.
+func (s *Store) decideAll(ctx context.Context, subject access.Subject,
+	given []Proposal) ([]*DecisionOccurrence, error) {
+
+	proposals := slices.Clone(given)
+	if err := s.allowed(ctx, subject, proposals); err != nil {
+		return nil, err
+	}
+	if err := s.gate(ctx, subject, proposals); err != nil {
+		return nil, err
+	}
+	decision, err := s.newDecision(ctx, FindingDecision, subject.ID, nil, "", proposals[0])
+	if err != nil {
+		return nil, err
+	}
+	return s.proposeAll(ctx, decision, proposals)
 }
 
 func (s *Store) propose(ctx context.Context, decision *Decision, p Proposal) (*DecisionOccurrence, error) {
@@ -518,18 +523,21 @@ func (s *Store) write(ctx context.Context, decision *Decision, proposals []Propo
 	// row filed under an issue that has since merged into another names
 	// the issue it was filed under, and a new decision is about the issue
 	// that stands — keyed under it, where every live row about it is.
-	filed := make([]int64, 0, len(proposals))
-	for _, p := range proposals {
-		filed = append(filed, p.Occurrence.VulnerabilityID)
+	//
+	// Rewritten on a copy: the caller's proposals are what its closure
+	// authorizes, and a retried attempt authorizing the rewritten issue
+	// would be authorizing something the request did not name.
+	proposals = slices.Clone(proposals)
+	asked := make([]Occurrence, len(proposals))
+	for i := range proposals {
+		asked[i] = proposals[i].Occurrence
 	}
-	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	stood, err := s.asTheyStand(ctx, asked)
 	if err != nil {
 		return nil, err
 	}
 	for i := range proposals {
-		if issue, known := issueOf[proposals[i].Occurrence.VulnerabilityID]; known {
-			proposals[i].Occurrence.VulnerabilityID = issue
-		}
+		proposals[i].Occurrence = stood[i]
 	}
 	if err := s.refuseIfIncident(ctx, decision, proposals); err != nil {
 		return nil, err
@@ -984,7 +992,12 @@ func (s *Store) alreadyDecided(ctx context.Context, err error, occurrences []Occ
 	if len(occurrences) > 1 {
 		where = "at one of these occurrences"
 	}
-	for _, occurrence := range occurrences {
+	// Under the issue each is read as, which is where the write keyed it.
+	stood, readErr := s.asTheyStand(ctx, occurrences)
+	if readErr != nil {
+		return err
+	}
+	for _, occurrence := range stood {
 		standing, found := s.liveAt(ctx, liveKeysFor(occurrence)...)
 		if !found {
 			continue
@@ -995,6 +1008,29 @@ func (s *Store) alreadyDecided(ctx context.Context, err error, occurrences []Occ
 			ErrAlreadyDecided, standing.ID, standing.State, where)
 	}
 	return err
+}
+
+// asTheyStand is these occurrences filed under the issue each is read as: one
+// named by an issue that merged into another names the one that stands. A
+// copy, in order; the occurrences given are left as they are. The write keys
+// under it and a refusal looks for the standing decision under it, so the two
+// read one rule.
+func (s *Store) asTheyStand(ctx context.Context, occurrences []Occurrence) ([]Occurrence, error) {
+	filed := make([]int64, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		filed = append(filed, occurrence.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filed)
+	if err != nil {
+		return nil, err
+	}
+	out := slices.Clone(occurrences)
+	for i := range out {
+		if issue, known := issueOf[out[i].VulnerabilityID]; known {
+			out[i].VulnerabilityID = issue
+		}
+	}
+	return out, nil
 }
 
 // ErrNothingOpen says a selection named nothing that is actually open where it

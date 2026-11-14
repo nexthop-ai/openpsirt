@@ -543,8 +543,7 @@ var standingHere = `FROM ` + DecisionOccurrences + `
 	  AND "de"."live_key" IS NOT NULL
 	  AND ` + KeyMatches + `
 	ORDER BY CASE WHEN "cl"."outcome" = '` + OutcomeMismatched + `'
-	                   AND ("de"."state" = 'approved'
-	                        OR ("de"."needs_approval" = FALSE AND "de"."sent_back_at" IS NULL))
+	                   AND ` + InForceOn("de") + `
 	              THEN 0 ELSE 1 END, "de"."id"
 	LIMIT 1`
 

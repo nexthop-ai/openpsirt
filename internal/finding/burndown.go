@@ -691,7 +691,7 @@ func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since
 		if !wanted[key] {
 			continue
 		}
-		standing := !ended(r.State) && (r.State == "approved" || (!r.NeedsApproval && r.SentBack == 0))
+		standing := StandsInForce(r.State, r.NeedsApproval, r.SentBack != 0)
 		var spans []heldSpan
 		switch {
 		case !r.NeedsApproval:
@@ -730,7 +730,3 @@ func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since
 	}
 	return out, nil
 }
-
-// ended is whether a decision occurrence's stored state is one that stopped
-// applying, read here without the triage package that owns the words.
-func ended(state string) bool { return state == "withdrawn" || state == "lapsed" }

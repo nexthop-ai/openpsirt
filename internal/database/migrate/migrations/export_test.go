@@ -234,6 +234,7 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 	return map[string][]string{
 		"advisory_issue":         advisoryIssueV0130(t),
 		"advisory_override":      advisoryOverrideV0130(t),
+		"decision_occurrence":    decisionOccurrenceV0130(t),
 		"graph_node":             graphNodeV0130(t),
 		"received_vex_statement": receivedStatementV0130(t),
 	}
@@ -344,5 +345,20 @@ func StopV0130AfterStatementTime(ctx context.Context, db *database.DB) error {
 		}
 		return u.change(receivedStatementV0130(u.t), change{table: "received_vex_statement",
 			add: []added{{column: "said_at"}}})
+	})
+}
+
+// StopV0130AfterEndedByColumn adds the column naming who withdrew a decision
+// occurrence and nothing else: a start of the v0.13.0 upgrade on MySQL or
+// MariaDB that stopped after the column committed.
+func StopV0130AfterEndedByColumn(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(decisionOccurrenceV0130(u.t), change{table: "decision_occurrence",
+			add: []added{{column: "ended_by"}}})
 	})
 }

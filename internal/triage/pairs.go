@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 // Pair is two people agreeing to each other's work in one product, whichever
@@ -54,16 +56,11 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 	// Grouped by the two people as they stand, and folded into pairs below.
 	// Ordering the two within the statement needs the lesser and greater of
 	// two values, which the four engines spell differently.
-	err := s.db.NewSelect().
-		TableExpr(`"decision_occurrence" AS "de"`).
-		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
+	err := agreedSince(s.db, since).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`"ap"."approved_by" AS "approved_by"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
-		Where(`"ap"."withdrawn_at" IS NULL`).
-		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
-		Where(`"de"."proposed_at" >= ?`, since).
 		GroupExpr(`"de"."product_id", "de"."proposed_by", "ap"."approved_by"`).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -73,14 +70,9 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 		ProductID int64 `bun:"product_id"`
 		Decisions int   `bun:"claims"`
 	}
-	err = s.db.NewSelect().
-		TableExpr(`"decision_occurrence" AS "de"`).
-		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
+	err = agreedSince(s.db, since).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
-		Where(`"ap"."withdrawn_at" IS NULL`).
-		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
-		Where(`"de"."proposed_at" >= ?`, since).
 		GroupExpr(`"de"."product_id"`).
 		Scan(ctx, &totals)
 	if err != nil {
@@ -112,4 +104,17 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 		})
 	}
 	return out, nil
+}
+
+// agreedSince is every row of a decision proposed since a moment that
+// somebody other than its proposer agreed to and has not taken back, beside
+// the agreement. The pairs and each product's total are counted over this one
+// selection, so a pair's share of its product cannot exceed the whole.
+func agreedSince(db bun.IDB, since time.Time) *bun.SelectQuery {
+	return db.NewSelect().
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
+		Where(`"ap"."withdrawn_at" IS NULL`).
+		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
+		Where(`"de"."proposed_at" >= ?`, since)
 }

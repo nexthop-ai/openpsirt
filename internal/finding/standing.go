@@ -87,7 +87,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// finding out of the undecided figure while putting it in no other. Spelled
 	// through the same helper as the rest, so the version match is one
 	// expression.
-	anyDecision := decisionState{"any_claim", ` AND "de"."state" <> ?`, []any{"withdrawn"}}
+	anyDecision := decisionState{"any_claim", ` AND "de"."state" <> ?`, []any{StateWithdrawn}}
 	// One row per build, issue and component. The build rows count these
 	// directly, and the product's totals fold them again by issue and
 	// component, in one pass here. The table of decided occurrences is most of

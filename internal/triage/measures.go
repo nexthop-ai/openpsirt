@@ -97,8 +97,9 @@ type Spread struct {
 type Worked struct {
 	Person string
 	// Proposed is decisions they made, Approved ones they agreed to, and
-	// Withdrawn ones they took back. There is no send-back count here: the
-	// record holds that a decision was sent back and not by whom.
+	// Withdrawn ones they withdrew, whoever proposed them. There is no
+	// send-back count here: the record holds that a decision was sent back
+	// and not by whom.
 	Proposed  int
 	Approved  int
 	Withdrawn int
@@ -108,8 +109,8 @@ type Worked struct {
 // unbounded where none was.
 //
 // A zero start is the beginning, which is what a period's zero side means.
-// Written once because four statements here take it and a default substituted
-// in one of them is a figure over a window nobody asked for.
+// Every statement here bounding a start takes it, because a default
+// substituted in one of them is a figure over a window nobody asked for.
 func from(q *bun.SelectQuery, column string, since time.Time) *bun.SelectQuery {
 	if since.IsZero() {
 		return q
@@ -132,8 +133,9 @@ const measuredAtMost = 5000
 type Measuring struct {
 	// Products keeps decisions made in these products.
 	Products []int64
-	// People keeps decisions these people proposed — a team, resolved to
-	// its members by whoever asked.
+	// People keeps the work these people did — a team, resolved to its
+	// members by whoever asked: decisions they proposed, agreements they
+	// gave, and withdrawals they made, of anybody's decision.
 	//
 	// By the proposer for both waits, including the wait for a second person:
 	// a decision belongs to whoever argued it, which is the rule the record of
@@ -226,9 +228,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		GroupExpr(`"de"."decision_id", ` + rating.EffectiveExpr).
 		OrderExpr(`MIN("de"."proposed_at") DESC`).
 		Limit(measuredAtMost + 1)
-	if !since.IsZero() {
-		q = q.Where(`"de"."proposed_at" >= ?`, since)
-	}
+	q = from(q, `"de"."proposed_at"`, since)
 	q = only.narrow(readableBy(q, subject, "de"))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return Measures{}, fmt.Errorf("read how long triage is taking: %w", err)
@@ -275,9 +275,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 		Where(`"de"."sent_back_at" IS NOT NULL`).
 		Where(`"de"."sent_back_at" < ?`, until)
-	if !since.IsZero() {
-		back = back.Where(`"de"."sent_back_at" >= ?`, since)
-	}
+	back = from(back, `"de"."sent_back_at"`, since)
 	if err := only.narrow(readableBy(back, subject, "de")).Scan(ctx, &out.SentBack); err != nil {
 		return Measures{}, fmt.Errorf("read how much came back: %w", err)
 	}
@@ -318,9 +316,11 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		return nil
 	}
 
-	// Proposed and withdrawn are both read off the row. Withdrawn is
-	// dated by the proposal for the same reason the audit is: a decision belongs
-	// to the window it was argued in. Both count decisions, as agreements do: a
+	// Proposed and withdrawn are both read off the row. A withdrawal is the
+	// work of whoever withdrew it, which any triager on the product may do, and
+	// one recorded with nobody named counts for nobody. It is dated by the
+	// proposal for the same reason the audit is: a decision belongs to the
+	// window it was argued in. Both count decisions, as agreements do: a
 	// decision writes a row per occurrence and is one piece of work.
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
@@ -334,12 +334,13 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	}
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
-			ColumnExpr(`"de"."proposed_by" AS "person"`).
+			ColumnExpr(`"de"."ended_by" AS "person"`).
 			ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 			Where(`"de"."state" = ?`, Withdrawn).
+			Where(`"de"."ended_by" IS NOT NULL`).
 			Where(`"de"."proposed_at" < ?`, until).
-			GroupExpr(`"de"."proposed_by"`)
-		return only.narrow(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"))
+			GroupExpr(`"de"."ended_by"`)
+		return only.by(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"), `"de"."ended_by"`)
 	}, func(w *Worked) *int { return &w.Withdrawn }); err != nil {
 		return nil, err
 	}
@@ -385,8 +386,8 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	}
 	// Most done first, which is the order somebody reads this in.
 	sort.Slice(out, func(i, j int) bool {
-		left := out[i].Proposed + out[i].Approved
-		right := out[j].Proposed + out[j].Approved
+		left := out[i].Proposed + out[i].Approved + out[i].Withdrawn
+		right := out[j].Proposed + out[j].Approved + out[j].Withdrawn
 		if left != right {
 			return left > right
 		}

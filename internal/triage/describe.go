@@ -162,23 +162,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 	for id := range issueIDs {
 		wanted = append(wanted, id)
 	}
-	var issues []finding.Vulnerability
-	if err := s.db.NewSelect().Model(&issues).
-		Where(`"id" IN (?)`, bun.List(wanted)).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read what these issues are: %w", err)
-	}
-	// A flaw recorded where this reader may not read it wrote its summary
-	// onto the issue row every product shares.
-	withheld, err := finding.RecordedOutOfReach(ctx, s.db, subject, wanted)
+	byIssue, err := finding.IssuesFor(ctx, s.db, subject, wanted)
 	if err != nil {
 		return nil, err
-	}
-	byIssue := make(map[int64]finding.Vulnerability, len(issues))
-	for _, issue := range issues {
-		if withheld[issue.ID] {
-			issue.WithholdRecorded()
-		}
-		byIssue[issue.ID] = issue
 	}
 	// Each row's own product's rating of its issue. A rating belongs to a
 	// product, and these rows span them — a queue of decisions is not one

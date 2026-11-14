@@ -13,11 +13,13 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -52,21 +54,43 @@ func readableIn(ctx context.Context, db bun.IDB, subject access.Subject,
 //
 // The published rating only. What a product says instead belongs to the
 // product, so it is read alongside by whoever knows which product is being
-// asked about and put on the copy the row shows (RatedIn). A description a
-// flaw recorded out of the subject's reach wrote is left out.
+// asked about and put on the copy the row shows (RatedIn).
 func issuesNamed(ctx context.Context, db bun.IDB, subject access.Subject,
 	ids []int64) (map[int64]Vulnerability, error) {
+	// The description too, for the one line the row shows of it. One lookup
+	// for the page either way, and the row is already being read for the
+	// identifier beside it.
+	return IssuesFor(ctx, db, subject, ids, "identifier", "severity", "description")
+}
+
+// IssuesFor reads these issue rows, by identifier, as this subject may be told
+// them: a description a flaw recorded out of the subject's reach wrote is left
+// out (WithholdRecorded). Every column is read where none is named, and the
+// identifier the answer is keyed by is read whichever are.
+//
+// The one read of issue rows by identifier for a reader that shows the row
+// alone, so what is withheld from one such surface is withheld from every
+// one. A reader withholding the issue's other names, addresses or kinds
+// beside the row reads them together and asks RecordedOutOfReach for all.
+func IssuesFor(ctx context.Context, db bun.IDB, subject access.Subject, ids []int64,
+	columns ...string) (map[int64]Vulnerability, error) {
+
 	held := map[int64]Vulnerability{}
 	if len(ids) == 0 {
 		return held, nil
 	}
 	var issues []Vulnerability
-	if err := db.NewSelect().Model(&issues).
-		// The description too, for the one line the row shows of it. One
-		// lookup for the page either way, and the row is already being read
-		// for the identifier beside it.
-		Column("id", "identifier", "severity", "description").
-		Where(`"id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
+	// A published document names every issue of its builds, so the list may
+	// pass what one IN takes.
+	where, args := database.InAnyOf(`"id"`, ids)
+	q := db.NewSelect().Model(&issues).Where(where, args...)
+	if len(columns) > 0 {
+		if !slices.Contains(columns, "id") {
+			columns = append([]string{"id"}, columns...)
+		}
+		q = q.Column(columns...)
+	}
+	if err := q.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}
 	withheld, err := RecordedOutOfReach(ctx, db, subject, ids)

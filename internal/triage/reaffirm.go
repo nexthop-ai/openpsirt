@@ -237,26 +237,64 @@ func remade(previous Decision, at Occurrence, reasoning string, by int64, severi
 // assessment and after it, and zero against zero would read as no worse after
 // somebody rated it critical — the one thing this comparison exists to catch.
 func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64) (int, error) {
-	var issue struct {
-		Published  string `bun:"published"`
-		Assessed   string `bun:"assessed"`
-		ScoreCenti int    `bun:"score_centi"`
+	key := [2]int64{productID, vulnerabilityID}
+	now, err := s.severitiesOf(ctx, [][2]int64{key})
+	if err != nil {
+		return 0, err
 	}
-	// Read as the issue the row's own issue stands for: a merge moves
-	// the published word and the product's rating to the issue kept.
-	if err := s.db.NewSelect().
-		TableExpr(`"vulnerability" AS "sv"`).
-		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "sv"."issue_id"`).
-		Join(rating.Here, productID).
-		ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
-		ColumnExpr(`COALESCE("ir"."severity", '') AS "assessed"`).
-		ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
-		Where(`"sv"."id" = ?`, vulnerabilityID).Scan(ctx, &issue); err != nil {
-		return 0, fmt.Errorf("read how bad this is now: %w", err)
+	return now[key], nil
+}
+
+// severitiesOf is severityOf for each of these product and issue pairs, keyed
+// by the pair. A product's rating is joined per product, so it is one
+// statement per product and batch of issues rather than one per pair. An
+// issue no row names is an error, since a zero would read as unrated and
+// let a rise through unescalated.
+func (s *Store) severitiesOf(ctx context.Context, keys [][2]int64) (map[[2]int64]int, error) {
+	out := make(map[[2]int64]int, len(keys))
+	issuesIn := map[int64][]int64{}
+	for _, key := range keys {
+		if _, asked := out[key]; asked {
+			continue
+		}
+		out[key] = 0
+		issuesIn[key[0]] = append(issuesIn[key[0]], key[1])
 	}
-	return finding.Rating{
-		Published: issue.Published, Assessed: issue.Assessed, ScoreCenti: issue.ScoreCenti,
-	}.Score(), nil
+	for productID, issues := range issuesIn {
+		if err := database.IDsInBatches(ctx, issues, func(ctx context.Context, batch []int64) error {
+			var rows []struct {
+				ID         int64  `bun:"id"`
+				Published  string `bun:"published"`
+				Assessed   string `bun:"assessed"`
+				ScoreCenti int    `bun:"score_centi"`
+			}
+			// Read as the issue the row's own issue stands for: a merge moves
+			// the published word and the product's rating to the issue kept.
+			if err := s.db.NewSelect().
+				TableExpr(`"vulnerability" AS "sv"`).
+				Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "sv"."issue_id"`).
+				Join(rating.Here, productID).
+				ColumnExpr(`"sv"."id" AS "id"`).
+				ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
+				ColumnExpr(`COALESCE("ir"."severity", '') AS "assessed"`).
+				ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+				Where(`"sv"."id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
+				return err
+			}
+			if len(rows) != len(batch) {
+				return fmt.Errorf("%d of %d issues have no record", len(batch)-len(rows), len(batch))
+			}
+			for _, row := range rows {
+				out[[2]int64{productID, row.ID}] = finding.Rating{
+					Published: row.Published, Assessed: row.Assessed, ScoreCenti: row.ScoreCenti,
+				}.Score()
+			}
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("read how bad this is now: %w", err)
+		}
+	}
+	return out, nil
 }
 
 // needsFullApproval reports whether a re-affirmation is really a new decision.

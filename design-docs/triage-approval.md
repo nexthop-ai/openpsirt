@@ -34,6 +34,7 @@ a deployment with one person approves nothing.
 | Undoing returns only approved rows to proposed, and withdrawing changes only proposed or approved rows | A lapsed row returned to waiting is unique to nothing, and rewritten loses when it stopped |
 | A withdrawn approval stays on the record | |
 | A withdrawal records who made it, apart from who agreed | A proposer revising their words must not read as the approver undoing |
+| A withdrawn decision occurrence records who withdrew it, and what became of a decision names them; a row withdrawn before v0.13.0 names nobody | Any triager on the product may withdraw, so the proposer is not who did |
 | A carried agreement is marked carried wherever the approver's name appears (`design-docs/triage-lapse.md` § Re-affirmation) | The approver never read the re-affirmer's reasoning |
 | Whether a decision waits is answered when it is made, and every read says so (REQ-24) | A short deferral takes effect at once, and a proposal silent about waiting reads as in force |
 

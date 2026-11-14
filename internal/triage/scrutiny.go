@@ -282,6 +282,24 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// one. An approval is a fact about a moment, so it is right that this
 	// stands — and it is still the first thing an auditor asks after a
 	// reorganization.
+	// Asked of each standing row the reader may read, at that row's
+	// visibility; an agreement with any row its approver could not agree to
+	// now is listed, with every row it covers counted. The agreements are
+	// read first and bound into the listing: joined as a subquery, PostgreSQL
+	// plans a nested loop over both sides' rows where its statistics
+	// undercount a product's decisions, past 20 seconds for 20,500 standing
+	// rows against 60 to 70 ms read apart.
+	mayStillApprove, stillArgs := access.MayApproveWhere(`"apl"."approved_by"`, `"dl"."product_id"`, `"dl"."visibility"`)
+	var lostIDs []int64
+	if err := readableBy(s.db.NewSelect().Distinct().ColumnExpr(`"apl"."id"`).
+		TableExpr(`"decision_occurrence" AS "dl"`).
+		Join(`JOIN "decision_approval" AS "apl" ON "apl"."decision_id" = "dl"."decision_id"`).
+		Where(`"apl"."withdrawn_at" IS NULL`).
+		Where(finding.InForceOn("dl")).
+		Where(`NOT `+mayStillApprove, stillArgs...), subject, "dl").Scan(ctx, &lostIDs); err != nil {
+		return nil, fmt.Errorf("read which approvers have lost the right: %w", err)
+	}
+	inLost, lostArgs := database.InAnyOf(`"ap"."id"`, lostIDs)
 	var lapsed []struct {
 		DecisionID int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
@@ -306,23 +324,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(standing, held...).
 		// The right they used, checked against what they hold now rather than
 		// against what they held then: the question is whether the person who
-		// agreed could agree today. A grant made inactive by a change of mode
-		// is kept so the change can be undone, and it grants nothing while it
-		// sits there — so it is not a right somebody still holds.
-		Where(`NOT EXISTS (SELECT 1 FROM "role_grant" AS "rg"`+
-			` WHERE "rg"."person_id" = "ap"."approved_by" AND "rg"."product_id" = "de"."product_id"`+
-			` AND "rg"."active" = ? AND "rg"."role" = ?)`, true, access.Approver).
-		// Nor one held across every product, which is the same right reached
-		// by the other grant. Without this an approver holding it that way
-		// had every approval they ever gave reported as lapsed.
-		Where(`NOT EXISTS (SELECT 1 FROM "role_grant_all" AS "rga"`+
-			` WHERE "rga"."person_id" = "ap"."approved_by"`+
-			` AND "rga"."active" = ? AND "rga"."role" = ?)`, true, access.Approver).
-		// An administrator reaches every product, so one is never in this list
-		// however their grants read. Either half makes one: granted here, or
-		// named in configuration.
-		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
-			` WHERE "ad"."id" = "ap"."approved_by" AND ("ad"."is_admin" = ? OR "ad"."is_bootstrap" = ?))`, true, true).
+		// agreed could agree today, asked by the rule a signed-in approver is
+		// asked by. A grant made inactive by a change of mode grants nothing
+		// while it sits there, so it is not a right somebody still holds.
+		Where(inLost, lostArgs...).
 		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(int64(room))).Scan(ctx, &lapsed)

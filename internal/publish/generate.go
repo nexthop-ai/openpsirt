@@ -12,7 +12,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -188,27 +187,12 @@ func (g *Generator) described(ctx context.Context, subject access.Subject,
 	if len(issues) == 0 {
 		return out, nil
 	}
-	var rows []struct {
-		ID          int64  `bun:"id"`
-		Description string `bun:"description"`
-	}
-	where, args := database.InAnyOf(`"v"."id"`, issues)
-	if err := g.db.NewSelect().
-		TableExpr(`"vulnerability" AS "v"`).
-		ColumnExpr(`"v"."id" AS "id"`).
-		ColumnExpr(`COALESCE("v"."description", '') AS "description"`).
-		Where(where, args...).
-		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what these issues are: %w", err)
-	}
-	withheld, err := finding.RecordedOutOfReach(ctx, g.db, subject, issues)
+	byIssue, err := finding.IssuesFor(ctx, g.db, subject, issues, "description")
 	if err != nil {
 		return nil, err
 	}
-	for _, row := range rows {
-		if !withheld[row.ID] {
-			out[row.ID] = row.Description
-		}
+	for id, issue := range byIssue {
+		out[id] = issue.Description
 	}
 	return out, nil
 }

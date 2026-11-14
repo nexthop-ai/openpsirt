@@ -29,7 +29,7 @@ flaws). `GET …/code-findings/{occurrence}/flaw` is the offer; `POST` records i
 | The flaw is undisclosed, found here, at no version | |
 | Flaw and link are written in one transaction re-reading that the code finding is confirmed and unrecorded (REQ-71) | |
 | It changes the standing decision's stamp, matched on the stamp read (`design-docs/database-transactions.md` § Reads a write depends on) | A concurrent withdrawn confirmation would leave a flaw nobody confirmed |
-| A recorded code finding takes no decision, and its decisions are neither revised, withdrawn, split, approved nor sent back (409); an undone batch of approvals skips them | The flaw's decisions replace them |
+| A recorded code finding takes no decision, and its decisions are neither revised, withdrawn, split, approved, sent back nor pointed elsewhere (409); an undone batch of approvals skips them | The flaw's decisions replace them |
 | Recording, inclusion, removal and withdrawal are refused without both triage roles before any build named is resolved | A differing refusal lists builds (REQ-42) |
 | The flaw records its code finding, the offer's first component, and the builds proposed: every build seen in, plus those holding the component never analyzed | The record outlasts the link |
 | The flaw's page names its code finding only to a reader of both | (REQ-42) |

@@ -367,16 +367,16 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // word cannot come to mean different things.
 func registerState(word DecisionStanding) (string, bool) {
 	live := `"de"."live_key" IS NOT NULL`
-	lapsed := `"de"."state" = 'lapsed'`
+	lapsed := `"de"."state" = '` + StateLapsed + `'`
 	switch word {
 	case StandingUndecided:
 		return `"de"."id" IS NULL`, true
 	case StandingAgreed:
-		return "(" + live + ` AND "de"."state" = 'approved')`, true
+		return "(" + live + ` AND "de"."state" = '` + StateApproved + `')`, true
 	case StandingLapsed:
 		return "(" + lapsed + ")", true
 	case StandingWaiting:
-		return "(" + live + ` AND "de"."state" NOT IN ('approved', 'lapsed'))`, true
+		return "(" + live + ` AND "de"."state" NOT IN ('` + StateApproved + `', '` + StateLapsed + `'))`, true
 	default:
 		return "", false
 	}
@@ -432,13 +432,13 @@ var onTheRecordHere = `(("de"."live_key" IS NOT NULL AND ` + keyMatchesOn("de", 
 		  AND ` + keyMatchesOn("d3", outcomeOf("d3")) + `
 		  AND (` + rankOf("d3") + ` < ` + rankOf("de") + `
 		    OR (` + rankOf("d3") + ` = ` + rankOf("de") + ` AND "d3"."id" < "de"."id"))))
-	OR ("de"."state" = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "d2"
+	OR ("de"."state" = '` + StateLapsed + `' AND NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "d2"
 		JOIN "vulnerability" AS "d2v" ON "d2v"."id" = "d2"."vulnerability_id"
 		WHERE "d2"."product_id" = "de"."product_id"
 		  AND "d2v"."issue_id" = "dv"."issue_id"
 		  AND "d2"."occurrence_identity" = "de"."occurrence_identity"
 		  AND (("d2"."live_key" IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
-		    OR ("d2"."state" = 'lapsed' AND "d2"."id" > "de"."id")))))`
+		    OR ("d2"."state" = '` + StateLapsed + `' AND "d2"."id" > "de"."id")))))`
 
 // outcomeOf is the outcome of a decision occurrence's decision, as a scalar.
 func outcomeOf(occurrence string) string {
@@ -449,8 +449,7 @@ func outcomeOf(occurrence string) string {
 // does: a correction in force before anything else.
 func rankOf(occurrence string) string {
 	return `(CASE WHEN ` + outcomeOf(occurrence) + ` = '` + OutcomeMismatched + `'
-		AND ("` + occurrence + `"."state" = 'approved'
-		  OR ("` + occurrence + `"."needs_approval" = FALSE AND "` + occurrence + `"."sent_back_at" IS NULL))
+		AND ` + InForceOn(occurrence) + `
 		THEN 0 ELSE 1 END)`
 }
 
@@ -531,7 +530,7 @@ func (s *Store) registerQuery(productID int64,
 // onTheRecord opens the case expression each of the decision occurrence's own
 // columns is wrapped in: a decision is part of this record where it is live or
 // where it lapsed, and a superseded one is not.
-const onTheRecord = `CASE WHEN "de"."live_key" IS NOT NULL OR "de"."state" = 'lapsed' THEN `
+const onTheRecord = `CASE WHEN "de"."live_key" IS NOT NULL OR "de"."state" = '` + StateLapsed + `' THEN `
 
 // disposedFrom is one row as the register states it.
 func disposedFrom(row registerRow) Disposed {
@@ -584,9 +583,9 @@ func occurrenceStanding(occurrence string) DecisionStanding {
 	switch occurrence {
 	case "":
 		return StandingUndecided
-	case "approved":
+	case StateApproved:
 		return StandingAgreed
-	case "lapsed":
+	case StateLapsed:
 		return StandingLapsed
 	default:
 		return StandingWaiting

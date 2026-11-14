@@ -149,10 +149,11 @@ func OutcomesInBulk() []Outcome {
 }
 
 // OutcomesThatHideRisk are the outcomes that take something out of the working
-// queue, which is what needing a second person turns on.
+// queue, which is what needing a second person turns on: of a vulnerability
+// and of a code finding alike.
 func OutcomesThatHideRisk() []Outcome {
-	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
-	for _, each := range VulnerabilityOutcomes() {
+	kept := make([]Outcome, 0, len(Outcomes()))
+	for _, each := range Outcomes() {
 		if each.HidesRisk() {
 			kept = append(kept, each)
 		}
@@ -378,16 +379,16 @@ type State string
 
 const (
 	// Proposed means somebody has proposed it and nobody has agreed yet.
-	Proposed State = "proposed"
+	Proposed State = finding.StateProposed
 	// Approved means a second person agreed, against one specific revision of
 	// the reasoning.
-	Approved State = "approved"
+	Approved State = finding.StateApproved
 	// Withdrawn means it no longer applies because somebody took it back.
-	Withdrawn State = "withdrawn"
+	Withdrawn State = finding.StateWithdrawn
 	// LapsedState means the code it was a decision about changed. Named for what
 	// it is rather than for the word alone, because "lapsed" reads as a verb
 	// everywhere else in this package.
-	LapsedState State = "lapsed"
+	LapsedState State = finding.StateLapsed
 )
 
 // States is every state a decision occurrence can reach, in the order a row moves

@@ -42,6 +42,12 @@ func TestADecisionSaysWhereTheWorkIsHappening(t *testing.T) {
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPut,
 			fmt.Sprintf("/v1/decisions/%d/elsewhere", decision),
 			`{"elsewhere":"https://elsewhere.example/1"}`), http.StatusNotFound)
+		// Nor is that refusal any different for an address that is refused
+		// in its own right: what was sent is judged only for somebody who may
+		// write it.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPut,
+			fmt.Sprintf("/v1/decisions/%d/elsewhere", decision),
+			`{"elsewhere":"ms-msdt:calc"}`), http.StatusNotFound)
 
 		// An address nobody should be handed as a link is refused in words
 		// naming it, and is not a fault here.

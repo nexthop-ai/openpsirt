@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/triageapi"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // A deferral short enough to stand on nobody's say-so but the proposer's,
@@ -196,10 +199,10 @@ func TestADecisionCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 	})
 }
 
-func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
-	// An administrator reaches every product, so what they agreed to has not
-	// lapsed however their grants read. Named in configuration is
-	// administration too, and the only kind some deployments have.
+func TestAnAdministratorWhoCouldNotApproveNowIsListed(t *testing.T) {
+	// An administrator holds no role ungranted, so one whose right to approve
+	// was withdrawn could not agree today and is listed like anybody else.
+	// Named in configuration is administration too.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
@@ -223,8 +226,85 @@ func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
 		if _, err := r.Rights.NameBootstrapAdmins(t.Context(), []string{"reviewer"}); err != nil {
 			t.Fatal(err)
 		}
-		if who := lapsedBy(); len(who) != 0 {
-			t.Errorf("an approver named in configuration is reported as having lost the right: %v", who)
+		if who := lapsedBy(); len(who) != 1 || who[0] != "reviewer" {
+			t.Errorf("an administrator who could not approve now is left off the list: %v", who)
+		}
+	})
+}
+
+func TestATriagerWhoMayStillApproveIsNotListed(t *testing.T) {
+	// A triager agrees to somebody else's decision without the approver
+	// capability, and still holding triage there could agree today.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.AgreedBy(t, "assigner", decision)
+		for _, row := range scrutiny(t, r, "private-triage", "").Lapsed {
+			if row.DecisionID == decision {
+				t.Errorf("an approval by a triager who still triages there is listed as lost: %+v", row)
+			}
+		}
+	})
+}
+
+func TestAnAgreementLostOnOneRowCountsEveryRowItCovers(t *testing.T) {
+	// The right is asked of each row at its own visibility, and the
+	// decision is listed with every row the agreement covers: the reach of
+	// the agreement is what an auditor weighs.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		decision, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
+		var row triage.DecisionOccurrence
+		if err := r.DB.DB.NewSelect().Model(&row).Where(`"de"."id" = ?`, ids[0]).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if row.Visibility != access.Public {
+			t.Fatalf("the decision is %s; this needs a disclosed one beside an undisclosed row", row.Visibility)
+		}
+		// An undisclosed row of the same decision, which the approver, who
+		// reads disclosed work alone, could not agree to now.
+		hidden := row
+		hidden.ID, hidden.LiveKey, hidden.OccurrenceIdentity, hidden.Visibility = 0, nil, "elsewhere", access.Private
+		if _, err := r.DB.DB.NewInsert().Model(&hidden).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var listed []triageapi.LapsedApprovalBody
+		for _, one := range scrutiny(t, r, "private-triage", "").Lapsed {
+			if one.DecisionID == decision {
+				listed = append(listed, one)
+			}
+		}
+		if len(listed) != 1 || listed[0].Rows != len(ids)+1 {
+			t.Errorf("the agreement is listed as %+v; want it once, covering %d rows", listed, len(ids)+1)
+		}
+	})
+}
+
+func TestAnAgreementLostOnlyOnARowTheReaderCannotReadIsNotListed(t *testing.T) {
+	// Listing it would tell a reader of disclosed work alone that an
+	// undisclosed row exists under the decision.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		decision, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
+		var row triage.DecisionOccurrence
+		if err := r.DB.DB.NewSelect().Model(&row).Where(`"de"."id" = ?`, ids[0]).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		hidden := row
+		hidden.ID, hidden.LiveKey, hidden.OccurrenceIdentity, hidden.Visibility = 0, nil, "elsewhere", access.Private
+		if _, err := r.DB.DB.NewInsert().Model(&hidden).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.ContainsFunc(scrutiny(t, r, "private-triage", "").Lapsed,
+			func(one triageapi.LapsedApprovalBody) bool { return one.DecisionID == decision }) {
+			t.Fatal("the agreement is not listed as lost to a reader of every row, so this tests nothing")
+		}
+		for _, one := range scrutiny(t, r, "reader", "").Lapsed {
+			if one.DecisionID == decision {
+				t.Errorf("a reader of disclosed work alone is told the agreement was lost on a row they cannot read: %+v", one)
+			}
 		}
 	})
 }
@@ -263,6 +343,44 @@ func TestAConfirmedCodeFindingIsNoExceptionToTheSecondPersonRule(t *testing.T) {
 		decideCodeFinding(t, r, occurrence, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
 		if got := scrutiny(t, r, "security-testing-reviewer", ""); len(got.Alone) != 0 {
 			t.Errorf("a confirmed code finding is reported as standing alone: %+v", got.Alone)
+		}
+	})
+}
+
+func TestACodeFindingDismissalStandingAloneIsReportedInAPublishedOutcome(t *testing.T) {
+	// A code finding's dismissal hides risk as a vulnerability's does, so it
+	// is what the report exists to surface when nobody else stands behind it,
+	// and it is reported in a word the published vocabulary holds.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		decided := decideCodeFinding(t, r, occurrence,
+			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
+		if got := httpapitest.AsPerson(t, r, "security-testing-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.DecisionID), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
+		}
+		// The one agreement standing is its proposer's own, which nothing
+		// here records and an imported record can hold.
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"decision_approval"`).
+			Set(`"approved_by" = (SELECT "de"."proposed_by" FROM "decision_occurrence" AS "de"`+
+				` WHERE "de"."decision_id" = ? LIMIT 1)`, decided.DecisionID).
+			Where(`"decision_id" = ?`, decided.DecisionID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		out := scrutiny(t, r, "security-testing-reviewer", "")
+		var dismissed *triageapi.UnagreedBody
+		for i := range out.Alone {
+			if out.Alone[i].Outcome == "dismissed" {
+				dismissed = &out.Alone[i]
+			}
+		}
+		if dismissed == nil {
+			t.Fatalf("what stands alone is %+v; want the code finding's dismissal", out.Alone)
+		}
+		if !slices.Contains(triage.OutcomesThatHideRisk(), triage.Outcome(dismissed.Outcome)) {
+			t.Errorf("the report says %q, which the published outcomes that hide risk %v do not hold",
+				dismissed.Outcome, triage.OutcomesThatHideRisk())
 		}
 	})
 }

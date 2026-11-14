@@ -1246,7 +1246,7 @@ export interface paths {
          *
          *     Anybody who may argue about the decision may set it: a link is a note about where the conversation is rather than a decision, and needing a second person for it would leave it unset.
          *
-         *     Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason.
+         *     Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason. A decision about a code finding recorded as a flaw is refused with 409: the flaw is judged instead.
          *
          *     Requires: public-triage or private-triage or security-testing-triage on the product
          */
@@ -16221,7 +16221,7 @@ export interface components {
              */
             decisions: number;
             /** @enum {string} */
-            outcome: "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security";
             /**
              * Format: int64
              * @description The number of occurrences those acts cover
@@ -16836,7 +16836,7 @@ export interface components {
             proposed: number;
             /**
              * Format: int64
-             * @description Decisions of theirs they took back
+             * @description Decisions they withdrew, whoever proposed them, dated by the proposal
              */
             withdrawn: number;
         };

@@ -61,6 +61,7 @@ uses.
 | Some occurrences agreed, the rest undecided, nothing waiting or lapsed: no state; the interface labels it partly decided, in the waiting color | |
 | Undecided means nothing stands, never nothing ever said | A withdrawn decision's row covers the occurrence so "lapsed" can be said of a decision holding no key |
 | The row's word and the filter's bucket are one rule | Two spellings drop a withdrawn decision from every list and count |
+| In force is one rule, agreed or proposed needing nobody and not sent back, said once for statements and once for a row already read, and a test holds the two to one answer for every state | A copy of it answers the audit, the evidence and the burndown differently |
 | A live decision matches by product, issue, occurrence and both versions; a lapsed or withdrawn one by occurrence alone | Matched by occurrence alone, an approval at one version reads as agreed over the next build's version |
 | A row says when a live decision at one of its occurrences is sent back to its author | That is the row a proposer looks for, and the queue no longer shows it |
 | An occurrence names the decision standing on it, not only the decision's row | A person acts on the decision |

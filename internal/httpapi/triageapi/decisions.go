@@ -188,7 +188,8 @@ func registerDecisionLink(api huma.API, in core.Deps) {
 			"the conversation is rather than a decision, and needing a second person for it " +
 			"would leave it unset.\n\n" +
 			"Sent empty it is cleared. A stale link is worse than none — it sends somebody to " +
-			"a ticket that closed for a different reason.",
+			"a ticket that closed for a different reason. A decision about a code finding " +
+			"recorded as a flaw is refused with 409: the flaw is judged instead.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`

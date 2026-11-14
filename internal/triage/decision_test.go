@@ -1110,3 +1110,143 @@ func TestABatchNamedAsADotSegmentIsRefused(t *testing.T) {
 		}
 	})
 }
+
+func TestAWithdrawalIsReportedAsTheWithdrawersAct(t *testing.T) {
+	// Any triager on the product may take a decision back, so what became
+	// of a decision names whoever did, and its proposer learns somebody else
+	// withdrew it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		claimed := f.decisions(t, f.at())
+		other := f.privateTriager(t, "other-triager", "Other Triager")
+		if _, err := f.store.Withdraw(ctx, other, claimed.DecisionID); err != nil {
+			t.Fatal(err)
+		}
+		page, _, err := f.store.Became(ctx, f.triager, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page) != 1 {
+			t.Fatalf("the page holds %d decisions, want the one", len(page))
+		}
+		if page[0].Happened != triage.TakenBack || page[0].By != other.ID {
+			t.Errorf("the decision reads as %q by %d; want %q by the triager who withdrew it, %d",
+				page[0].Happened, page[0].By, triage.TakenBack, other.ID)
+		}
+	})
+}
+
+func TestARevisedDecisionNamesNobodyWhoEndedIt(t *testing.T) {
+	// Revising a withdrawn decision brings it back to life, so nobody
+	// withdrew what stands.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		claimed := f.decisions(t, f.at())
+		other := f.privateTriager(t, "other-triager", "Other Triager")
+		if _, err := f.store.Withdraw(ctx, other, claimed.DecisionID); err != nil {
+			t.Fatal(err)
+		}
+		endedBy := func() []*int64 {
+			var rows []triage.DecisionOccurrence
+			if err := f.db.DB.NewSelect().Model(&rows).
+				Where(`"de"."decision_id" = ?`, claimed.DecisionID).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			out := make([]*int64, 0, len(rows))
+			for _, row := range rows {
+				out = append(out, row.EndedBy)
+			}
+			return out
+		}
+		for _, by := range endedBy() {
+			if by == nil || *by != other.ID {
+				t.Fatalf("a withdrawn row names %v as its withdrawer; want %d, or this tests nothing", by, other.ID)
+			}
+		}
+		if _, err := f.store.Revise(ctx, f.triager, claimed.DecisionID,
+			"Looked again: the call site is reachable after all."); err != nil {
+			t.Fatal(err)
+		}
+		for _, by := range endedBy() {
+			if by != nil {
+				t.Errorf("a revised row still names %d as its withdrawer", *by)
+			}
+		}
+	})
+}
+
+func TestProposingUnderAMergedNameLeavesTheRequestAsGivenAndNamesWhatStands(t *testing.T) {
+	// A proposal naming an issue that merged into another is written under
+	// the issue that stands. The rewrite is the write's own: the proposals a
+	// caller handed over, which a retried attempt authorizes again, still
+	// name the issue asked about, and a refusal finds the decision standing
+	// under the issue it was keyed under.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		merged := f.secondIssue(t)
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
+			Where(`"id" = ?`, merged).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		standing := f.decisions(t, f.at())
+
+		at := f.at()
+		at.VulnerabilityID = merged
+		proposals := []triage.Proposal{{
+			Occurrence: at, Outcome: triage.WontFix,
+			Reasoning: "Not worth the churn.", By: f.proposer,
+		}}
+		_, err := f.store.ProposeMany(ctx, f.triager, proposals)
+		if !errors.Is(err, triage.ErrAlreadyDecided) ||
+			!strings.Contains(err.Error(), fmt.Sprintf("decision occurrence %d", standing.ID)) {
+			t.Errorf("proposing under the merged name answered %v; want it refused naming decision occurrence %d",
+				err, standing.ID)
+		}
+		if proposals[0].Occurrence.VulnerabilityID != merged {
+			t.Errorf("the proposal handed over now names issue %d; want the issue it asked about, %d",
+				proposals[0].Occurrence.VulnerabilityID, merged)
+		}
+	})
+}
+
+func TestTheInForceRuleAnswersAlikeInAStatementAndInGo(t *testing.T) {
+	// Whether a decision is in force is asked by statements and of rows
+	// already read. The two spellings answer alike for every state, need for
+	// agreement and sending back a row can hold.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		row := f.decisions(t, f.at())
+		sentAt := time.Now().UTC().Truncate(time.Second)
+		asked := 0
+		for _, state := range []string{finding.StateProposed, finding.StateApproved,
+			finding.StateWithdrawn, finding.StateLapsed} {
+			for _, needs := range []bool{false, true} {
+				for _, sentBack := range []bool{false, true} {
+					var sent *time.Time
+					if sentBack {
+						sent = &sentAt
+					}
+					if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
+						Set(`"state" = ?`, state).Set(`"needs_approval" = ?`, needs).
+						Set(`"sent_back_at" = ?`, sent).
+						Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
+					n, err := f.db.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
+						Where(`"de"."id" = ?`, row.ID).Where(finding.InForceOn("de")).Count(ctx)
+					if err != nil {
+						t.Fatal(err)
+					}
+					asked++
+					if inGo := finding.StandsInForce(state, needs, sentBack); (n == 1) != inGo {
+						t.Errorf("%s, needing agreement %v, sent back %v: the statement says %v and Go says %v",
+							state, needs, sentBack, n == 1, inGo)
+					}
+				}
+			}
+		}
+		if asked == 0 {
+			t.Fatal("no combination was asked, so this checked nothing")
+		}
+	})
+}

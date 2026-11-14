@@ -49,7 +49,7 @@ func standingOutcomeIn(product productBound) string {
 	JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"
 	WHERE "dc"."product_id" = ` + product.sql + ` AND "dc"."live_key" IS NOT NULL
 	  AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `
-	  AND ("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL)))`
+	  AND ` + finding.InForceOn("dc") + `)`
 }
 
 // recordedAsFlawIn is whether the code finding under "f" in the product bound
@@ -184,7 +184,7 @@ func (scope Scope) decidedIn(db bun.IDB, which decided) *bun.SelectQuery {
 		q = q.Where(`"de"."state" = ? AND "de"."needs_approval" = TRUE AND "de"."sent_back_at" IS NULL`,
 			string(triage.Proposed))
 	} else {
-		q = q.Where(`("de"."state" = 'approved' OR ("de"."needs_approval" = FALSE AND "de"."sent_back_at" IS NULL))`)
+		q = q.Where(finding.InForceOn("de"))
 	}
 	return identifiers(db, q.GroupExpr(`"f"."id"`))
 }

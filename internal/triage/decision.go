@@ -117,32 +117,27 @@ type Decision struct {
 func (s *Store) PointAt(ctx context.Context, subject access.Subject, decisionID int64,
 	where string) error {
 
-	// Read as what they may see, then checked row by row for what they may
-	// argue about. The two are asked separately because the second
-	// question names the issue: somebody brought into one case may argue
-	// about it , and a check that only knew the product would refuse them.
-	_, rows, err := s.readableDecisionRows(ctx, subject, decisionID)
-	if err != nil {
-		return err
-	}
-	if len(rows) == 0 {
-		return ErrNotTheirs
-	}
-	for _, row := range rows {
-		if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			return ErrNotTheirs
-		}
-	}
 	where = strings.TrimSpace(where)
-	if err := markdown.Addressable(where); err != nil {
-		return err
-	}
-	if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set(`"elsewhere" = ?`, where).
-		Where(`"id" = ?`, decisionID).Exec(ctx); err != nil {
-		return fmt.Errorf("record where the work is: %w", err)
-	}
-	return nil
+	// Written as every other change to a decision is: the rows read and asked
+	// of inside the transaction that writes, a decision about a code finding
+	// recorded as a flaw refused, and the stamp moved. The rule names the
+	// issue, so somebody brought into one case may point its decisions
+	// somewhere. The link is judged after that, so somebody refused the
+	// decision is refused alike whatever they sent.
+	return s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		if _, _, err := within.writableRows(ctx, subject, decisionID, mayDecideOn); err != nil {
+			return err
+		}
+		if err := markdown.Addressable(where); err != nil {
+			return err
+		}
+		if _, err := tx.NewUpdate().Model((*Decision)(nil)).
+			Set(`"elsewhere" = ?`, where).
+			Where(`"id" = ?`, decisionID).Exec(ctx); err != nil {
+			return fmt.Errorf("record where the work is: %w", err)
+		}
+		return nil
+	})
 }
 
 // argument is what this decision says, in the shape a new decision is recorded from.
@@ -291,21 +286,22 @@ var ErrNotExtendable = refusal.New("that decision cannot be extended")
 // driver the image does not build — and each arrived with no decision. An
 // extension is a decision of its own, recorded as derived from the one it
 // carries, and it needs a second person like any other dismissal: the approver
-// is told the argument was read once already, not that it was agreed to twice
-// .
+// is told the argument was read once already, not that it was agreed to twice.
 //
 // Everything it turns on is read inside the transaction that writes: whether
 // the source is approved, and what it was a decision about.
 func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
-	proposals []Proposal) ([]*DecisionOccurrence, error) {
+	given []Proposal) ([]*DecisionOccurrence, error) {
 
-	if len(proposals) == 0 {
+	if len(given) == 0 {
 		return nil, nil
 	}
-
 	var recorded []*DecisionOccurrence
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		recorded = recorded[:0]
+		// The gate writes what it works out onto the proposals, so each
+		// attempt works on a fresh copy of what was given.
+		proposals := slices.Clone(given)
 		if err := within.allowed(ctx, subject, proposals); err != nil {
 			return err
 		}
@@ -332,7 +328,7 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		return err
 	})
 	if err != nil {
-		return nil, s.alreadyDecided(ctx, err, occurrencesOf(proposals))
+		return nil, s.alreadyDecided(ctx, err, occurrencesOf(given))
 	}
 	return recorded, nil
 }
