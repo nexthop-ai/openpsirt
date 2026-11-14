@@ -255,9 +255,8 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 
 	var faults []string
 	r.step("the rows %s left", r.from)
-	// Every table the release's schema record names exists by construction,
-	// so failing to count one is a fault, never an absent table.
-	held, err := r.count(ctx, fromTables, setOf(fromTables))
+	releaseTables, releaseRequired := releaseCount(fromTables)
+	held, err := r.count(ctx, releaseTables, releaseRequired)
 	if err != nil {
 		return nil, err
 	}
@@ -283,17 +282,15 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err := r.migrate(ctx, "up"); err != nil {
 		return nil, err
 	}
-	if applied, err := r.version(ctx); err != nil {
+	applied, err := r.version(ctx)
+	if err != nil {
 		return nil, err
-	} else if applied != current {
-		// A schema short of this tree's lacks tables this tree declares, so
-		// counting them would bury the fault under a missing table.
-		return append(faults, fmt.Sprintf("the upgrade reached schema version %d, and this tree carries %d", applied, current)), nil
 	}
-	upgradedTables := unionTables(fromTables, dbtest.Tables())
-	// A name only the release used is gone after the renames, so only this
-	// tree's own tables are required.
-	upgraded, err := r.count(ctx, upgradedTables, setOf(dbtest.Tables()))
+	upgradedTables, upgradedRequired, fault := upgradedCount(applied, current, fromTables, dbtest.Tables())
+	if fault != "" {
+		return append(faults, fault), nil
+	}
+	upgraded, err := r.count(ctx, upgradedTables, upgradedRequired)
 	if err != nil {
 		return nil, err
 	}
@@ -876,6 +873,26 @@ func unionTables(a, b []string) []string {
 		}
 	}
 	return keys(seen)
+}
+
+// releaseCount is the tables the release's rows are counted in, and which of
+// them must be counted. Every table the release's schema record names exists
+// by construction, so failing to count one is a fault, never an absent table.
+func releaseCount(fromTables []string) (tables []string, required map[string]bool) {
+	return fromTables, setOf(fromTables)
+}
+
+// upgradedCount is the tables counted once this tree's upgrade reached schema
+// version applied, and which of them must be counted, or the fault when it
+// fell short of current. A schema short of this tree's lacks tables this tree
+// declares, so counting them would bury the fault under a missing table. A
+// name only the release used is gone after the renames, so only this tree's
+// own tables are required.
+func upgradedCount(applied, current int64, fromTables, tree []string) (tables []string, required map[string]bool, fault string) {
+	if applied != current {
+		return nil, nil, fmt.Sprintf("the upgrade reached schema version %d, and this tree carries %d", applied, current)
+	}
+	return unionTables(fromTables, tree), setOf(tree), ""
 }
 
 func setOf(names []string) map[string]bool {

@@ -153,3 +153,39 @@ func TestAnOptionalTableThatCannotBeCountedIsLeftOut(t *testing.T) {
 		t.Errorf("counts = %v, want scan alone", counts)
 	}
 }
+
+func TestEveryTableTheReleaseNamesMustBeCounted(t *testing.T) {
+	tables, required := releaseCount([]string{"finding", "decision"})
+	if !slices.Equal(tables, []string{"finding", "decision"}) {
+		t.Errorf("counted %v, want the release's tables", tables)
+	}
+	for _, table := range tables {
+		if !required[table] {
+			t.Errorf("%s may go uncounted, so a failed count reads as an absent table", table)
+		}
+	}
+}
+
+func TestAnUpgradeShortOfThisTreeIsAFaultBeforeAnythingIsCounted(t *testing.T) {
+	tables, required, fault := upgradedCount(46, 47, []string{"finding"}, []string{"finding", "late"})
+	if fault == "" || !strings.Contains(fault, "46") || !strings.Contains(fault, "47") {
+		t.Errorf("a short upgrade: fault %q, want one naming both versions", fault)
+	}
+	if tables != nil || required != nil {
+		t.Errorf("a short upgrade counts %v requiring %v, want nothing counted", tables, required)
+	}
+}
+
+func TestAfterTheUpgradeOnlyThisTreesTablesMustBeCounted(t *testing.T) {
+	tables, required, fault := upgradedCount(47, 47, []string{"finding", "old_name"}, []string{"finding", "new_name"})
+	if fault != "" {
+		t.Fatalf("an upgrade that reached this tree: fault %q, want none", fault)
+	}
+	slices.Sort(tables)
+	if !slices.Equal(tables, []string{"finding", "new_name", "old_name"}) {
+		t.Errorf("counted %v, want both releases' tables", tables)
+	}
+	if !required["finding"] || !required["new_name"] || required["old_name"] {
+		t.Errorf("required %v, want this tree's tables alone", required)
+	}
+}
