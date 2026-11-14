@@ -138,8 +138,9 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
 
   const offered = providers.data?.items ?? [];
   // A browser the trusted proxy named and this deployment refused. The proxy
-  // signs it in on every request, so the ways in below are no way in for it.
-  const proxied = !resuming && Boolean(providers.data?.named_by_proxy);
+  // signs it in on every request, so the ways in below are no way in for it,
+  // whether or not a session ended first.
+  const proxied = Boolean(providers.data?.named_by_proxy);
   const only = offered.length === 1 ? offered[0] : undefined;
   const forwarding = Boolean(only) && !proxied && forwardable(offered.length, resuming);
   // At an address a refused or failed sign-in lands on, what happened is said
@@ -211,7 +212,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
               {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
             </p>
           )}
-          {resuming && (
+          {resuming && !proxied && (
             <p className="text-center text-sm text-[var(--muted)]">Anything you typed is kept.</p>
           )}
         </div>

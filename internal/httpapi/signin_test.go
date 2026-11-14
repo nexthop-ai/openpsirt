@@ -924,6 +924,10 @@ func TestASignInWhoseSessionCouldNotBeStartedSaysNothingAboutWhy(t *testing.T) {
 	if hasSession(rec.Result().Cookies()) {
 		t.Error("a sign-in whose session could not be written was handed one")
 	}
+	// The pending cookie is spent: trying again begins afresh.
+	if !strings.Contains(strings.Join(rec.Header().Values("Set-Cookie"), "\n"), access.CookieName("openpsirt_pending", true)+"=;") {
+		t.Errorf("a failed sign-in kept its pending cookie: %v", rec.Header().Values("Set-Cookie"))
+	}
 }
 
 // Over TLS every cookie a sign-in sets is named for this host alone, and the
@@ -993,7 +997,15 @@ func TestASignInThatCannotStartSaysNothingAboutWhy(t *testing.T) {
 			signInWith(t, dbtest.Two, c.how, func(t *testing.T, r *signInReach) {
 				r.provider.BeginFail = c.fail
 				rec := httptest.NewRecorder()
-				r.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
+				req := httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil)
+				// A sign-in another tab has under way, which a fault here
+				// leaves to finish.
+				for _, plain := range []bool{false, true} {
+					req.AddCookie(&http.Cookie{ //nolint:gosec // a request cookie carries no attributes
+						Name: access.CookieName("openpsirt_pending", plain), Value: "elsewhere",
+					})
+				}
+				r.handler.ServeHTTP(rec, req)
 				if !faulted(rec) {
 					t.Fatalf("answered %d to %q, want the try-again screen",
 						rec.Code, rec.Header().Get("Location"))
