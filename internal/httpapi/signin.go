@@ -154,6 +154,10 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 		return
 	}
 	identity, err := provider.Complete(r.Context(), code, pending, callback)
+	if errors.Is(err, signin.ErrUnanswered) {
+		failedToComplete(w, r, in, "a sign-in could not be completed", err)
+		return
+	}
 	if err != nil {
 		// Logged rather than described. What went wrong between us and a
 		// provider is an operator's problem, and telling whoever is at the
