@@ -116,9 +116,9 @@ export function Support() {
                   <tbody>
                     {rows.map((row) => (
                       <tr key={`${row.product} ${row.branch_or_tag}`} className="row">
-                        <td>{row.product}</td>
+                        <td>{row.product_name}</td>
                         <td>
-                          {row.branch_or_tag} <span className="hint">{row.kind}</span>
+                          {row.branch_or_tag_name} <span className="hint">{row.kind}</span>
                         </td>
                         <td>
                           {row.ended_on}{" "}
@@ -187,9 +187,9 @@ export function Support() {
               <tbody>
                 {ending.map((row) => (
                   <tr key={`${row.product} ${row.branch_or_tag}`} className="row">
-                    <td>{row.product}</td>
+                    <td>{row.product_name}</td>
                     <td>
-                      {row.branch_or_tag} <span className="hint">{row.kind}</span>
+                      {row.branch_or_tag_name} <span className="hint">{row.kind}</span>
                     </td>
                     <td>
                       {row.ended_on}{" "}

@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -92,16 +94,18 @@ func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 		}
 		// A switch the same way: a word other than on and off is the default,
 		// whichever way the default points.
-		for _, fallback := range []bool{true, false} {
-			if _, _, err := s.Change(ctx, setting.IssueDates, "yes"); err != nil {
+		for _, bad := range []string{"yes", "maybe", "ON", "", "true"} {
+			if _, _, err := s.Change(ctx, setting.IssueDates, bad); err != nil {
 				t.Fatal(err)
 			}
-			got, err := s.Switch(ctx, setting.IssueDates, fallback)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != fallback {
-				t.Errorf("%q read as %v, want the default %v", "yes", got, fallback)
+			for _, fallback := range []bool{true, false} {
+				got, err := s.Switch(ctx, setting.IssueDates, fallback)
+				if err != nil {
+					t.Fatalf("%q: %v", bad, err)
+				}
+				if got != fallback {
+					t.Errorf("%q read as %v, want the default %v", bad, got, fallback)
+				}
 			}
 		}
 	})
@@ -287,6 +291,36 @@ func TestAWordSettingReadsAsItsDefaultUnlessItHoldsAWordItTakes(t *testing.T) {
 			if got := read(); got != want {
 				t.Errorf("%q read as %q, want %q", value, got, want)
 			}
+		}
+	})
+}
+
+// statements counts the statements a handle makes.
+type statements struct{ n int }
+
+func (c *statements) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	c.n++
+	return ctx
+}
+
+func (c *statements) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// A renamed setting's own and former names are read in one statement, which
+// sees one snapshot: read in two, a change committing between them moves the
+// row past both reads and the setting reads as unset.
+func TestARenamedSettingIsReadInOneStatement(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		if _, _, err := setting.NewStore(db.DB).Change(ctx, "triage.together-cap", "300"); err != nil {
+			t.Fatal(err)
+		}
+		count := &statements{}
+		value, set, err := setting.NewStore(dbtest.Hooked(db, count).DB).Get(ctx, setting.BulkDecisionCap)
+		if err != nil || !set || value != "300" {
+			t.Fatalf("the former name read as %q, %v, %v", value, set, err)
+		}
+		if count.n != 1 {
+			t.Errorf("a renamed setting was read in %d statements", count.n)
 		}
 	})
 }

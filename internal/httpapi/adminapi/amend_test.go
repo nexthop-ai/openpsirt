@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 )
@@ -525,6 +526,42 @@ func TestTurningPublishingOffWithdrawsTheProductsDocuments(t *testing.T) {
 		}
 		if held.WithdrawnAt == nil {
 			t.Error("a document of a product turned off and on again is still served before the next pass")
+		}
+	})
+}
+
+// A rename onto a name another row of the same level holds is a conflict at
+// every level, answered 409 and naming the name.
+func TestARenameOntoATakenNameIsAConflict(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		names := catalog.NewStore(r.DB.DB)
+		mine, err := names.ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := names.DeclareProduct(ctx, "ours", "ours"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := names.DeclareBranchOrTag(ctx, mine.ID, "stable", catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := names.DeclareVariant(ctx, mine.ID, "mellanox", true); err != nil {
+			t.Fatal(err)
+		}
+		for path, name := range map[string]string{
+			"/v1/products/mine":                          "ours",
+			"/v1/products/mine/branches-and-tags/master": "stable",
+			"/v1/products/mine/variants/broadcom":        "Mellanox",
+		} {
+			got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, path, `{"name":"`+name+`"}`)
+			if got.Code != http.StatusConflict {
+				t.Errorf("renaming %s onto %q answered %d: %s", path, name, got.Code, got.Body.String())
+				continue
+			}
+			if !strings.Contains(strings.ToLower(got.Body.String()), strings.ToLower(name)) {
+				t.Errorf("the refusal of %s does not name %q: %s", path, name, got.Body.String())
+			}
 		}
 	})
 }

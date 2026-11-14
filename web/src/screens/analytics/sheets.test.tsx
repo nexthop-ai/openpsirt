@@ -138,6 +138,8 @@ describe("the releases out of support", () => {
                 {
                   product: "sonic",
                   branch_or_tag: "202305",
+                  product_name: "SONiC",
+                  branch_or_tag_name: "Release-202305",
                   kind: "branch",
                   ended_on: "2026-01-01",
                   ended_days: 1,
@@ -149,6 +151,8 @@ describe("the releases out of support", () => {
                 {
                   product: "sonic",
                   branch_or_tag: "202411",
+                  product_name: "SONiC",
+                  branch_or_tag_name: "Release-202411",
                   kind: "tag",
                   ended_on: "2026-12-01",
                   ended_days: -30,
@@ -184,6 +188,9 @@ describe("the releases out of support", () => {
     expect(ending?.getAttribute("href")).toContain("on=tag");
     expect(ending?.getAttribute("href")).not.toContain("support=");
     expect(text()).toContain("30 days");
+    // Rows read as every screen names them; the addresses keep the names.
+    expect(text()).toContain("Release-202305");
+    expect(text()).toContain("Release-202411");
   });
 });
 

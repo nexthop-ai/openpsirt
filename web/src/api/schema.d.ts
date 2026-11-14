@@ -6633,7 +6633,7 @@ export interface paths {
         };
         /**
          * List releases that are out of support
-         * @description Every release you can see whose end-of-life date has passed, with how long ago that was and how many issues are still open against it.
+         * @description Every release you can see whose end-of-life date has passed, with how long ago that was and how many issues are still open against it. A retired release, or any release of a retired product, is left out.
          *
          *     Past end-of-life the deadline is removed from every open finding on a release, so nothing here is overdue or due soon and none of it reaches a figure built on either. Nothing is deleted or hidden: the findings and the history stay, and stay reportable.
          *
@@ -6663,7 +6663,7 @@ export interface paths {
         };
         /**
          * Export releases that are out of support
-         * @description The same answer as a file: every release you can see whose end-of-life date has passed, how long ago that was, and how many issues are still open against it.
+         * @description The same answer as a file: every release you can see whose end-of-life date has passed, how long ago that was, and how many issues are still open against it. A retired release, or any release of a retired product, is left out.
          *
          *     `open` counts issues at components rather than one per occurrence, the same unit every release-level count here uses. `inherited` means the date came from the product rather than from the release itself.
          *
@@ -14513,7 +14513,7 @@ export interface components {
             severity?: "critical" | "high" | "medium" | "low" | "negligible" | "none";
             /** @description The flaw, in your own words */
             summary: string;
-            /** @description A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
+            /** @description A CVSS 3.0, 3.1 or 4.0 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
             vector?: string;
             /** @description The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
@@ -14557,7 +14557,7 @@ export interface components {
             severity?: "critical" | "high" | "medium" | "low" | "negligible" | "none";
             /** @description The flaw, in your own words */
             summary: string;
-            /** @description A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
+            /** @description A CVSS 3.0, 3.1 or 4.0 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
             vector?: string;
             /** @description The version, where the build holds that name at several */
             version?: string;
@@ -15048,7 +15048,10 @@ export interface components {
             closed: number;
         };
         RetiredBody: {
+            /** @description The release's name, as addresses name it */
             branch_or_tag: string;
+            /** @description The release as screens show it */
+            branch_or_tag_name: string;
             /** @description The date has passed. False is a release that is about to go out of support */
             ended: boolean;
             /**
@@ -15070,7 +15073,10 @@ export interface components {
              * @description Issues open against it, counted at components rather than at every occurrence they sit at
              */
             open: number;
+            /** @description The product's name, as addresses name it */
             product: string;
+            /** @description The product as screens show it */
+            product_name: string;
         };
         RetiredOutputBody: {
             /**

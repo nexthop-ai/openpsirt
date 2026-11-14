@@ -201,6 +201,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		if salt = []byte(strings.TrimSpace(string(salt))); len(salt) == 0 {
 			return fmt.Errorf("%s holds no salt", saltFile)
 		}
+		if err := uploadclient.CheckSalt(salt); err != nil {
+			return fmt.Errorf("%s: %w", saltFile, err)
+		}
 		opts.Salt = salt
 	}
 	if rulesFile != "" {

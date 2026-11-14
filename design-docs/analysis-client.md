@@ -94,6 +94,7 @@ Each result carries `openpsirt/context/v1`, a content fingerprint of its line
 | SHA-256 of the line and one either side, each trimmed with inner white space collapsed, joined by line feeds; beyond the file is empty | Reindenting, moving and line endings keep it |
 | A trailing carriage return is removed first | |
 | With `--salt-file`, HMAC-SHA256 keyed on the trimmed file | A short line cannot be guessed back |
+| A salt under 32 bytes is refused, naming its length and how to make one | Its published digest below is an offline test of guesses at a weak salt |
 | A salted run names its salt as `openpsirt/salt`, the first eight bytes of its SHA-256 in lower-case hex, and carries no tool fingerprint | A rotation is visible; a tool's own cannot be salted |
 | Files are read only inside the checkout, links followed, up to 16 MiB | Nothing else on the build host is read |
 

@@ -134,7 +134,7 @@ limit, and the kernel kills the larger on excess.
 | Everything contacted before serving is under one deadline, each step logged first | A silent hang looks like a slow image pull |
 | Migrating is outside the deadline, which restarts after it | A large schema change outlasts any start |
 | With automatic migration on, the port opens after the database connects and before the schema is applied | Health checks are answered throughout: 873 s for the v0.9.0 upgrade on a production-shaped PostgreSQL database |
-| Until the start completes, `/healthz` answers 200, `/readyz` 503, and every other path 503 with `Retry-After` | The API answers in the refusal shape, a browser gets a page, anything else "OpenPSIRT is upgrading its database". Nothing reads the database |
+| Until the start completes, `/healthz` answers 200, `/readyz` 503, and every other path 503 with `Retry-After` | A path the interface refuses as the API's, without regard to capitals and after dot segments, answers in the refusal shape, a browser gets a page, anything else "OpenPSIRT is upgrading its database". Nothing reads the database |
 | The router replaces the upgrading answer in one step, last; background passes start after | A request reaches one or the other whole |
 | With automatic migration off, the port opens after every start-up check | |
 | Every refusal reading no database precedes the port | Sign-in providers and return address, stores, the interface, queue sizes against the scanner timeout, the signing key |
@@ -144,7 +144,7 @@ limit, and the kernel kills the larger on excess.
 | An unknown subcommand is refused | A typo would start a server |
 | Background loops run from one list; the mail sender is absent with no channel and the attachment sweeper with no store | |
 | Every exit waits for the background work, a failure to serve included | Each pass fires at once, so an early return leaves them mid-query as the database closes |
-| One setting bounds both halves of the shutdown grace, which exit alike | Different exit codes would report half an unfinished shutdown as finished |
+| One setting bounds both halves of the shutdown grace, and either overrunning it after a stop signal exits 1 | A supervisor reads the exit code; different codes would report half an unfinished shutdown as finished |
 | The chart stops every earlier pod before starting a new one | Below 1.0 an upgrade may reshape tables the old release reads (REQ-76), and a ReadWriteOnce claim must move |
 | A rolling update is the operator's choice, scaling to zero by hand before a schema change | Nothing serves between old pods stopping and a new one ready |
 | The commands are `serve`, the default, and `migrate`, each taking `--config` before or after its name | |

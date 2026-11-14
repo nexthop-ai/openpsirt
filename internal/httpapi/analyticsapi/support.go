@@ -20,9 +20,13 @@ import (
 // RetiredBody is one release that has gone out of support, and what is still
 // open against it.
 type RetiredBody struct {
-	Product     string        `json:"product"`
-	BranchOrTag string        `json:"branch_or_tag"`
-	Kind        core.LineKind `json:"kind" doc:"Whether this line moves"`
+	Product     string `json:"product" doc:"The product's name, as addresses name it"`
+	BranchOrTag string `json:"branch_or_tag" doc:"The release's name, as addresses name it"`
+	// ProductName and BranchOrTagName are what a screen shows, which the
+	// names above are not once anybody spelled them with capitals.
+	ProductName     string        `json:"product_name" doc:"The product as screens show it"`
+	BranchOrTagName string        `json:"branch_or_tag_name" doc:"The release as screens show it"`
+	Kind            core.LineKind `json:"kind" doc:"Whether this line moves"`
 	// EndedOn is the date support ended: the release's own where it stated
 	// one, its product's otherwise.
 	EndedOn string `json:"ended_on" doc:"The date support ended, as YYYY-MM-DD"`
@@ -61,7 +65,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		Path:    "/v1/releases/out-of-support",
 		Summary: "List releases that are out of support",
 		Description: "Every release you can see whose end-of-life date has passed, with how " +
-			"long ago that was and how many issues are still open against it.\n\n" +
+			"long ago that was and how many issues are still open against it. A retired " +
+			"release, or any release of a retired product, is left out.\n\n" +
 			"Past end-of-life the deadline is removed from every open finding on a release, so " +
 			"nothing here is overdue or due soon and none of it reaches a figure built on " +
 			"either. Nothing is deleted or hidden: the findings and the history stay, and stay " +
@@ -109,7 +114,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		Summary: "Export releases that are out of support",
 		Description: "The same answer as a file: every release you can see whose end-of-life " +
 			"date has passed, how long ago that was, and how many issues are still open " +
-			"against it.\n\n" +
+			"against it. A retired release, or any release of a retired product, is left " +
+			"out.\n\n" +
 			"`open` counts issues at components rather than one per occurrence, the same unit " +
 			"every release-level count here uses. `inherited` means the date came from the " +
 			"product rather than from the release itself.\n\n" +
@@ -139,7 +145,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 				state = "ended"
 			}
 			written = append(written, []string{
-				row.Product, row.BranchOrTag, string(row.Kind), state, row.EndedOn,
+				row.Product, row.ProductName, row.BranchOrTag, row.BranchOrTagName,
+				string(row.Kind), state, row.EndedOn,
 				strconv.FormatBool(row.Inherited),
 				strconv.Itoa(row.EndedDays), strconv.Itoa(row.Open),
 			})
@@ -147,7 +154,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "releases out of support",
 			Header: []string{
-				"product", "branch_or_tag", "kind", "state", "ended_on", "inherited",
+				"product", "product name", "branch_or_tag", "branch or tag name", "kind", "state",
+				"ended_on", "inherited",
 				"ended_days", "open",
 			},
 			Held: written,
@@ -222,6 +230,7 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 		since := int(today.Sub(release.EndedOn).Hours() / 24)
 		rows = append(rows, RetiredBody{
 			Product: release.Product, BranchOrTag: release.BranchOrTag,
+			ProductName: release.ProductShown, BranchOrTagName: release.BranchOrTagShown,
 			Kind: core.LineKind(release.Kind), EndedOn: release.EndedOn.UTC().Format(time.DateOnly),
 			Inherited: release.Inherited,
 			EndedDays: since,

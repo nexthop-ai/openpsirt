@@ -92,7 +92,7 @@ one claim shape.
 | Newer is by the statement's own time (an OpenVEX statement's `last_updated`, else its `timestamp`), else its document's (an OpenVEX document's `last_updated`, else its `timestamp`; a CSAF `current_release_date`), else the upload order; a time that does not parse, falls outside the years 1000 to 9999 in UTC, or is after the moment the statement is recorded, is none. Equal times go to the later recorded | A document stating no times still orders, by arrival |
 | A revision withdrawing the newest statement restores the newest it overtook; one its own revision withdrew is never restored | The publisher's word is their latest one still said |
 | A revision repeating an overtaken statement keeps its one row, still overtaken, and takes the time the revision states | |
-| Recording statements writes a fresh value into one fixed lock row before the transaction reads anything (`design-docs/database-transactions.md` § Replica coordination) | Each of two documents recorded at once would read the other's statements as absent, and both newest would stand |
+| Recording statements takes one turn before the transaction reads anything (`design-docs/queue.md` § Leases) | Each of two documents recorded at once would read the other's statements as absent, and both newest would stand |
 | The same bytes uploaded again record the times the document states where the rows hold none | |
 | The same bytes again write nothing where they read as what stands, and replace it where the reader now derives differently | |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is `frr` |

@@ -26,16 +26,24 @@ func reserved(path string) bool {
 	// request spelled with a dot segment or with different capitals is
 	// answered with the page rather than reaching the API — a client parsing
 	// JSON then reports a parse failure rather than the 404 it is.
-	path = strings.ToLower(path)
-	if path == "/v1" || strings.HasPrefix(path, "/v1/") {
+	if apiPath(path) {
 		return true
 	}
+	path = strings.ToLower(path)
 	switch path {
 	case "/docs", "/openapi.json", "/openapi.yaml",
 		"/openapi-3.0.json", "/openapi-3.0.yaml":
 		return true
 	}
 	return strings.HasPrefix(path, "/schemas/")
+}
+
+// apiPath reports whether a path is the API's, compared without regard to
+// capitals. Every answer that tells the API from the page asks this. Dot
+// segments are the caller's to clean, where the path it holds may carry them.
+func apiPath(p string) bool {
+	p = strings.ToLower(p)
+	return p == "/v1" || strings.HasPrefix(p, "/v1/")
 }
 
 // mountInterface serves the interface under everything the API does not claim.

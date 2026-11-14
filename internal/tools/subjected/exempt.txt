@@ -127,6 +127,7 @@ chunked.reader.Read A helper over a narrowed read: the bytes of one document Doc
 currency.Refresher.Once A background pass: one cycle of the currency refresher.
 currency.Refresher.Run A background pass: the currency refresher asks package indexes about components on a schedule.
 currency.RootOwners Not varying by reader: the names the deployment's own roots are published under. The unanswered list classifies against them and answers only the names its reader may see.
+database.AnalyzeAndLog A background pass: startup and the migrations refresh the engine's table statistics and log what they did.
 database.AnalyzeEveryTable A background pass: startup and the migrations refresh the engine's table statistics.
 database.DB.ServerTime Not varying by reader: the database server's own clock.
 database.InBatches Not varying by reader: an engine helper inserting rows its caller already chose.
@@ -144,7 +145,6 @@ finding.CodeFindingFlaw.Unlink A helper over a narrowed read: undoing a flaw rec
 finding.CodeFindingFlawAt A helper over a narrowed read: the flaw record at an occurrence, read inside the analysis transactions after their own authorization. Routes use CodeFindingFlawFor and CodeFindingFlawManaged, which take a subject.
 finding.CoveredInBuild A helper over a narrowed read: it reads only at the visibilities its caller passes, which the VEX documents work out for their reader.
 finding.Describing A background pass: an analyzer run marks the flaw records it describes before writing their source.
-finding.EnsureStatementsLock A background pass: it makes the row VEX recording waits on, before an upload or an upstream fetch the caller authorized.
 finding.FoldsNamed A helper over a narrowed read: it resolves a component name to its folds within builds the caller already resolved with a subject.
 finding.HandBack Who is asking: it hands back work when a sign-in or a change of role mode takes reading away from its holder.
 finding.InTheFold Not varying by reader: the components one component folds together with, a fact of the graph. Read inside reads and writes that authorized the build.
@@ -188,7 +188,6 @@ finding.Sweeper.CatchUp A background pass: the daily catch-up queues a sweep for
 finding.Sweeper.CatchUpOnce A background pass: one run of the daily catch-up.
 finding.Sweeper.Once A background pass: it claims one queued sweep and places a batch of it.
 finding.Sweeper.Run A background pass: the assignment sweeper claims queued sweeps until none is waiting.
-finding.TakeStatements A background pass: it makes every other VEX recording wait, inside a write the caller authorized.
 finding.Vulnerabilities.ByName Not varying by reader: resolving a name to an issue. Every route asks who may be told of it before answering.
 finding.Vulnerabilities.DatesOf Not varying by reader: when an issue was published, as OSV states. Read beside the issue after the caller was told of it.
 finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
@@ -268,6 +267,7 @@ publish.AnyPublishedForBranchOrTag Not varying by reader: whether any served doc
 publish.AnyPublishedForProduct Not varying by reader: whether any served document names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.AnyPublishedForVariant Not varying by reader: whether any served document names a variant. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.Store.TurnOff Who is asking: an administrator turning publishing off for a product records it and withdraws its documents, on a route only an administrator reaches.
+queue.EnsureTurn Not varying by reader: it makes the row a turn is taken on, for a write its caller already authorized.
 queue.Held Not varying by reader: whether a replica holds a lease, for the patch branch progress on a screen only an administrator reaches.
 queue.Leases.Await A background pass: a replica waits its turn to rewrite deadlines after a policy change.
 queue.Leases.Handback A background pass: a replica hands back a lease as a pass ends.
@@ -287,6 +287,7 @@ queue.Queue.Postpone A background pass: a worker puts a job back to wait.
 queue.Queue.Renew A background pass: a worker renews its hold on a job.
 queue.Queue.Settle A background pass: a worker records how a job ended.
 queue.Queue.Succeed A background pass: a worker records a job done.
+queue.TakeTurn Not varying by reader: it makes other writers taking one turn wait, inside a transaction its caller already authorized.
 saved.Store.ForgetFilter A person's own record: it removes a filter the signed-in person saved, keyed by their id.
 saved.Store.SaveFilterPreparing A person's own record: it saves a filter for the signed-in person, keyed by their id.
 saved.Store.SavedFilters A person's own record: the filters the signed-in person saved, keyed by their id.

@@ -102,6 +102,8 @@ describe("signing out", () => {
     expect(signedOutBy(204)).toBe("ended");
     expect(signedOutBy(400)).toBe("ended");
     expect(signedOutBy(401)).toBe("ended");
+    // The forgery guard's refusal: the session it refused still works.
+    expect(signedOutBy(403)).toBe("not-ended");
     expect(signedOutBy(503)).toBe("not-ended");
     expect(signedOutBy(500)).toBe("not-ended");
   });

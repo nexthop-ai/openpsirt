@@ -152,6 +152,53 @@ func (s *Schedule) nothing(ctx context.Context) (int, error) { return 0, nil }
 	}
 }
 
+func TestACallStatingTypeArgumentsIsFollowed(t *testing.T) {
+	source := []byte(`package catalog
+
+func (s *Store) One(ctx context.Context, name string) (*Row, error) {
+	return byName[Row](ctx, s.db, name)
+}
+
+func (s *Store) Two(ctx context.Context, name string) (*Row, error) {
+	return byPair[Row, Other](ctx, s.db, name)
+}
+
+func Bare(ctx context.Context, db bun.IDB, name string) (*Row, error) {
+	return byName[Row](ctx, db, name)
+}
+
+func (s *Store) Pure(name string) string { return same[string](name) }
+
+func byName[T any](ctx context.Context, db bun.IDB, name string) (*T, error) {
+	return nil, db.NewSelect().Scan(ctx)
+}
+
+func byPair[T, U any](ctx context.Context, db bun.IDB, name string) (*T, error) {
+	return nil, db.NewSelect().Scan(ctx)
+}
+
+func same[T any](v T) T { return v }
+`)
+	found, _, err := inSource("catalog", "c.go", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reported := map[string]bool{}
+	for _, one := range found {
+		reported[one.name] = true
+	}
+	for name, want := range map[string]bool{
+		"catalog.Store.One":  true,
+		"catalog.Store.Two":  true,
+		"catalog.Bare":       true,
+		"catalog.Store.Pure": false,
+	} {
+		if reported[name] != want {
+			t.Errorf("%s reported = %v, want %v", name, reported[name], want)
+		}
+	}
+}
+
 func TestACallIntoAnotherPackageIsNotTakenForOneOfThisPackages(t *testing.T) {
 	// strings.Replace is not this package's Replace, whatever that does, and
 	// a local or package-level name an import could be called is still this

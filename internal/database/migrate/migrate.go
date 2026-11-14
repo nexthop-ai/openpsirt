@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/pressly/goose/v3"
 
@@ -131,17 +130,7 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 // A failed refresh is logged and the upgrade stands: stale estimates make a
 // statement slow, never wrong, and the next start asks again.
 func refreshStatistics(ctx context.Context, db *database.DB, logger *slog.Logger) {
-	started := time.Now()
-	done, err := database.AnalyzeEveryTable(ctx, db)
-	if err != nil {
-		logger.Error("could not refresh the planner's statistics after the upgrade", "error", err)
-		return
-	}
-	if len(done.Skipped) > 0 {
-		logger.Warn("tables held by something else were not analyzed after the upgrade", "tables", done.Skipped)
-	}
-	logger.Info("refreshed the planner's statistics after the upgrade", "tables", done.Tables,
-		"took", time.Since(started).Round(time.Millisecond))
+	database.AnalyzeAndLog(ctx, db, logger, "after the upgrade")
 }
 
 // upEnded says why an upgrade ended part way: stopped by its caller, or

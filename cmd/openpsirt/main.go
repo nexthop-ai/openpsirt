@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
@@ -201,8 +200,11 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	// A start a stop signal ended is a clean stop, wherever it was. What the
 	// step it ended said about being stopped is logged rather than returned,
 	// so a supervisor stopping a starting process does not read a failure.
+	// Serving is past the start: a drain that overruns its grace after the
+	// signal is returned, so the exit code says so.
+	serving := false
 	defer func() {
-		if err != nil && stopping.Err() != nil {
+		if err != nil && !serving && stopping.Err() != nil {
 			logger.Info("stopped before the start completed", "interrupted", err)
 			err = nil
 		}
@@ -235,6 +237,7 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 		if err != nil {
 			return err
 		}
+		serving = true
 		return serveBeside(stopping, cfg, logger, server, beside.background)
 	}
 
@@ -277,6 +280,7 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	}
 	server.answer(handler)
 	logger.Info("serving")
+	serving = true
 	return serveBeside(stopping, cfg, logger, server, beside.background)
 }
 
@@ -304,17 +308,7 @@ func refreshStatistics(ctx context.Context, cfg config.Config, logger *slog.Logg
 		ctx, cancel = context.WithTimeout(ctx, cfg.StartupTimeout/4)
 		defer cancel()
 	}
-	started := time.Now()
-	done, err := database.AnalyzeEveryTable(ctx, db)
-	if err != nil {
-		logger.Error("could not refresh the planner's statistics", "error", err)
-		return
-	}
-	if len(done.Skipped) > 0 {
-		logger.Warn("tables held by something else were not analyzed", "tables", done.Skipped)
-	}
-	logger.Info("refreshed the planner's statistics", "tables", done.Tables,
-		"took", time.Since(started).Round(time.Millisecond))
+	database.AnalyzeAndLog(ctx, db, logger, "")
 }
 
 // prepare is everything a start does after the schema is in place and before

@@ -6,10 +6,18 @@ package catalog_test
 import (
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -69,7 +77,7 @@ type byID struct {
 // that is not there from a read that could not be made. The release being
 // filled in is the identifier for the first fill-in case and the parent for
 // the second, which holds a tag that exists.
-func byIDReads(tag func() int64) []byID {
+func byIDReads(tag func() int64, db bun.IDB) []byID {
 	return []byID{
 		{"ProductOf", func(ctx context.Context, s *catalog.Store, id int64) error {
 			_, err := s.ProductOf(ctx, id)
@@ -103,7 +111,133 @@ func byIDReads(tag func() int64) []byID {
 			_, err := s.FillInParent(ctx, tag(), id)
 			return err
 		}},
+		{"DeclareBranchOrTag cut from a release nobody declared", func(ctx context.Context, s *catalog.Store, id int64) error {
+			_, err := s.DeclareBranchOrTag(ctx, id, "v9.9", catalog.Tag, &id)
+			return err
+		}},
+		{"BuiltAs", func(ctx context.Context, s *catalog.Store, id int64) error {
+			_, err := s.BuiltAs(ctx, administrator, id)
+			return err
+		}},
+		{"MinimumSeverityOf", func(ctx context.Context, s *catalog.Store, id int64) error {
+			_, err := s.MinimumSeverityOf(ctx, id)
+			return err
+		}},
+		{"ReadsBuild", func(ctx context.Context, s *catalog.Store, id int64) error {
+			return catalog.ReadsBuild(ctx, db, administrator, id)
+		}},
+		{"ReadsBuildIn", func(ctx context.Context, s *catalog.Store, id int64) error {
+			return catalog.ReadsBuildIn(ctx, db, administrator, id, id)
+		}},
 	}
+}
+
+// administrator sees every product, so a read refused is refused for want of
+// the row.
+var administrator = access.NewPerson(1, "admin", true, nil, 0)
+
+// Every exported read of this package that tells a missing row from a fault
+// through missingOr is in byIDReads, so the two tests over it cover each:
+// found from the source, as every exported function reaching missingOr
+// directly or through unexported functions and methods, and each entry naming
+// one.
+func TestEveryReadByIdentifierIsListed(t *testing.T) {
+	set := token.NewFileSet()
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reads := map[string]bool{}
+	calls := map[string]map[string]bool{}
+	declared := map[string]bool{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(set, name, nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			declared[fn.Name.Name] = true
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				if call, ok := n.(*ast.CallExpr); ok {
+					if callee := calledName(call.Fun); callee != "" {
+						if calls[fn.Name.Name] == nil {
+							calls[fn.Name.Name] = map[string]bool{}
+						}
+						calls[fn.Name.Name][callee] = true
+					}
+				}
+				return true
+			})
+		}
+	}
+	// A read is an exported function reaching missingOr, itself or through
+	// unexported functions and methods of this package, however many deep.
+	// An exported callee is a read of its own, listed for itself, and is not
+	// followed: a function calling one may answer its miss some other way.
+	tells := map[string]bool{"missingOr": true}
+	for changed := true; changed; {
+		changed = false
+		for name, called := range calls {
+			if tells[name] {
+				continue
+			}
+			for callee := range called {
+				if tells[callee] && (callee == "missingOr" || declared[callee] && !ast.IsExported(callee)) {
+					tells[name], changed = true, true
+					break
+				}
+			}
+		}
+	}
+	for name := range tells {
+		if ast.IsExported(name) {
+			reads[name] = true
+		}
+	}
+	if len(reads) == 0 {
+		t.Fatal("no read calls missingOr in the source, so this checked nothing")
+	}
+	listed := map[string]bool{}
+	for _, read := range byIDReads(func() int64 { return 1 }, nil) {
+		listed[strings.Fields(read.name)[0]] = true
+	}
+	for name := range reads {
+		if !listed[name] {
+			t.Errorf("%s tells a missing row from a fault and byIDReads does not list it", name)
+		}
+	}
+	for name := range listed {
+		if _, ok := reflect.TypeFor[*catalog.Store]().MethodByName(name); !ok && !reads[name] {
+			t.Errorf("byIDReads lists %s, which is no method of the store and no read found in the source", name)
+		}
+	}
+}
+
+// calledName is the name a call reaches, by its bare name, through a selector
+// such as a method on the store, or with the type arguments a generic call
+// states; empty for anything else.
+func calledName(fun ast.Expr) string {
+	switch generic := fun.(type) {
+	case *ast.IndexExpr:
+		fun = generic.X
+	case *ast.IndexListExpr:
+		fun = generic.X
+	}
+	switch called := fun.(type) {
+	case *ast.Ident:
+		return called.Name
+	case *ast.SelectorExpr:
+		return called.Sel.Name
+	}
+	return ""
 }
 
 // An identifier no row holds answers ErrNotFound and names the identifier,
@@ -121,7 +255,7 @@ func TestAnIdentifierNothingHoldsIsNotDeclared(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, read := range byIDReads(func() int64 { return tag.ID }) {
+		for _, read := range byIDReads(func() int64 { return tag.ID }, db.DB) {
 			err := read.read(ctx, s, nobody)
 			if !errors.Is(err, catalog.ErrNotFound) {
 				t.Errorf("%s of an identifier nothing holds answered %v", read.name, err)
@@ -139,8 +273,9 @@ func TestAnIdentifierNothingHoldsIsNotDeclared(t *testing.T) {
 // A read that cannot be made is a fault, never ErrNotFound: a database that
 // cannot answer is not one that answered "no such row".
 func TestAReadThatCannotBeMadeIsNotAMiss(t *testing.T) {
-	s := catalog.NewStore(dbtest.Closed(t).DB)
-	for _, read := range byIDReads(func() int64 { return 1 }) {
+	closed := dbtest.Closed(t).DB
+	s := catalog.NewStore(closed)
+	for _, read := range byIDReads(func() int64 { return 1 }, closed) {
 		err := read.read(t.Context(), s, 1)
 		if err == nil || errors.Is(err, catalog.ErrNotFound) {
 			t.Errorf("%s against a database that cannot answer said %v", read.name, err)

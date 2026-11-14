@@ -108,7 +108,7 @@ func TestADirectoryOfOutputIsRefused(t *testing.T) {
 func TestTheSaltIsNamedByItsTrimmedBytes(t *testing.T) {
 	_, sarif := checkout(t)
 	salt := filepath.Join(t.TempDir(), "salt")
-	if err := os.WriteFile(salt, []byte("  pepper\n"), 0o600); err != nil {
+	if err := os.WriteFile(salt, []byte("  pepper and enough more to reach 32\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "out.sarif")
@@ -120,12 +120,27 @@ func TestTheSaltIsNamedByItsTrimmedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sum := sha256.Sum256([]byte("pepper"))
+	sum := sha256.Sum256([]byte("pepper and enough more to reach 32"))
 	if want := `"openpsirt/salt":"` + hex.EncodeToString(sum[:8]) + `"`; !bytes.Contains(doc, []byte(want)) {
 		t.Errorf("the document does not carry %s", want)
 	}
 	if bytes.Contains(doc, []byte("pepper")) {
 		t.Error("the document carries the salt itself")
+	}
+}
+
+// A short salt is refused naming the file and the remedy, before anything is
+// read or written.
+func TestAShortSaltFileIsRefused(t *testing.T) {
+	_, sarif := checkout(t)
+	salt := filepath.Join(t.TempDir(), "salt")
+	if err := os.WriteFile(salt, []byte("pipeline secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := run(context.Background(), []string{"write", "--series", "lint", "--salt-file", salt,
+		"--output", filepath.Join(t.TempDir(), "out.sarif"), sarif}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "15 bytes") || !strings.Contains(err.Error(), "openssl rand") {
+		t.Errorf("a short salt answered %v", err)
 	}
 }
 

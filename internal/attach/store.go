@@ -5,7 +5,6 @@ package attach
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -20,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // Store reads and writes attachments, and owns the bytes as well as the rows.
@@ -31,9 +31,9 @@ type Store struct {
 	db    *bun.DB
 	files Storage
 	now   func() time.Time
-	// logger is where the one destructive pass in this package says what it
-	// destroyed and what it could not. Nil where a caller has not said, which
-	// every caller but the sweep is.
+	// logger is where this package says what it destroyed, and which bytes it
+	// could not: the collection pass, and an upload whose record failed. Nil
+	// where a caller has not said, and then the process's default logger.
 	logger *slog.Logger
 	// afterPage runs between the collection pass reading its page and acting
 	// on it, so a test can put there what a comment saving its text does. The
@@ -44,6 +44,10 @@ type Store struct {
 	// checked and before the row is written, so a test can hold two uploads
 	// in the window a concurrent writer would otherwise slip through.
 	beforeRecord func()
+	// recorded replaces the error an upload's transaction answered, so a test
+	// can report a failure for a transaction that committed, as a driver does
+	// when the caller goes away during the commit.
+	recorded func(error) error
 }
 
 // NewStore returns a store over db, keeping bytes in files.
@@ -54,14 +58,25 @@ func NewStore(db *bun.DB, files Storage) *Store {
 	return &Store{db: db, files: files, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// Reporting gives a store somewhere to say what a collection pass did.
+// Reporting gives a store somewhere to say what it removed and what it could
+// not.
 //
-// The pass is the only writer here that destroys somebody's data and the only
-// one that kept no record of what it destroyed — a count, with no key, no
-// filename and no issue. What it names is what an orphan can be found by.
+// The collection pass destroys somebody's data and keeps no record of what it
+// destroyed, and an upload whose record failed leaves bytes no row names.
+// What either logs is what an orphan can be found by.
 func (s *Store) Reporting(logger *slog.Logger) *Store {
 	s.logger = logger
 	return s
+}
+
+// log is where the store says what it could not remove: its own logger, or
+// the process's default, because an unremoved key is the only way to find the
+// bytes and has to reach somebody.
+func (s *Store) log() *slog.Logger {
+	if s.logger != nil {
+		return s.logger
+	}
+	return slog.Default()
 }
 
 // Configured reports whether this deployment can hold files at all.
@@ -305,7 +320,7 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	if quota > 0 || share > 0 {
-		if err := ensureUploadLock(ctx, s.db); err != nil {
+		if err := queue.EnsureTurn(ctx, s.db, uploadLock); err != nil {
 			return nil, err
 		}
 	}
@@ -358,7 +373,7 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		// total read beside another upload's transaction does not hold that
 		// upload's file.
 		if quota > 0 || share > 0 {
-			if err := lockUploads(ctx, tx); err != nil {
+			if err := queue.TakeTurn(ctx, tx, uploadLock); err != nil {
 				return err
 			}
 		}
@@ -374,68 +389,62 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		_, err := tx.NewInsert().Model(row).Exec(ctx)
 		return err
 	})
+	if s.recorded != nil {
+		err = s.recorded(err)
+	}
 	if err != nil {
-		// The row is what the sweep can see, so a failure here leaves bytes
-		// nothing knows about. Removed now rather than left for a reaper that
-		// has no record to work from — and where that removal fails too, the
-		// key is said out loud, because it is then the only thing that can
-		// find them.
-		if removed := s.files.Delete(ctx, key); removed != nil && s.logger != nil {
-			s.logger.ErrorContext(ctx, "an upload that could not be recorded left bytes behind",
-				"key", key, "error", removed)
+		if s.unrecorded(ctx, token, key) {
+			// The commit landed: the upload is done, and answering it failed
+			// would have the caller send a second copy.
+			return row, nil
 		}
 		return nil, fmt.Errorf("record an attachment: %w", err)
 	}
 	return row, nil
 }
 
-// uploadLock names the row an upload's transaction locks before it reads how
-// much is stored. A row of the lease table, which is a row per name: nothing
-// holds or takes it, and updating it is what makes a second upload's
-// transaction wait for the first to commit, on every engine.
+// unrecorded removes the bytes of an upload whose transaction failed.
+//
+// The row is what the sweep can see, so a failure leaves bytes nothing knows
+// about. The bytes are removed at once, because no record is left for a sweep
+// to find them by, and where that removal fails too, the key is logged,
+// because it is then the only thing that can find them. On a context of its
+// own, because the request's is often why the record failed: a client that
+// went away.
+//
+// A failure answered during the commit does not say the commit failed, so the
+// row is looked for first: bytes a committed row names stay with their row,
+// and the answer says the row was found.
+func (s *Store) unrecorded(ctx context.Context, token, key string) bool {
+	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
+	defer cancel()
+	held, err := s.db.NewSelect().Model((*Attachment)(nil)).Where(`"token" = ?`, token).Count(cleanup)
+	if err != nil {
+		s.log().ErrorContext(ctx, "an upload that may not have been recorded left bytes behind",
+			"key", key, "error", err)
+		return false
+	}
+	if held > 0 {
+		return true
+	}
+	if removed := s.files.Delete(cleanup, key); removed != nil {
+		s.log().ErrorContext(ctx, "an upload that could not be recorded left bytes behind",
+			"key", key, "error", removed)
+	}
+	return false
+}
+
+// uploadLock names the turn an upload's transaction takes before it reads how
+// much is stored. The room is a sum over rows, and a sum read beside another
+// upload's uncommitted insert does not include it.
 const uploadLock = "attachment uploads"
 
-// lockRow is the part of a lease row that locking one needs.
-type lockRow struct {
-	bun.BaseModel `bun:"table:lease"`
-
-	Name string `bun:"name,pk"`
-}
-
-// ensureUploadLock makes the row lockUploads updates.
-//
-// Outside the transaction, because a second writer's insert is refused by the
-// primary key, and on PostgreSQL a refused statement aborts the transaction it
-// is in.
-func ensureUploadLock(ctx context.Context, db bun.IDB) error {
-	_, err := db.NewInsert().Model(&lockRow{Name: uploadLock}).Exec(ctx)
-	if err != nil && !database.IsDuplicate(err) {
-		return fmt.Errorf("record the upload lock: %w", err)
-	}
-	return nil
-}
-
-// lockUploads makes every other upload's transaction wait for this one.
-//
-// The room is a sum over rows, and a sum read beside another writer's
-// uncommitted insert does not include it, under the isolation every engine
-// here defaults to. An update of one fixed row takes a lock the next upload
-// has to wait on, so the second sum is read after the first insert commits.
-//
-// The write puts a new value in the row every time. An update setting a
-// column to what it already holds is matched and not written on MySQL and
-// MariaDB, and a cluster certifies only rows that were written, so two
-// uploads on two nodes would both pass. The value itself means nothing, and
-// nothing takes this lease by name.
-func lockUploads(ctx context.Context, tx bun.Tx) error {
-	if _, err := tx.NewUpdate().Model((*lockRow)(nil)).
-		Set(`"held_by" = ?`, rand.Text()).
-		Where(`"name" = ?`, uploadLock).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("wait for other uploads: %w", err)
-	}
-	return nil
-}
+// cleanupWait bounds a removal that runs on a context of its own so that it
+// finishes past a stop or a caller going away: an upload's bytes whose record
+// failed, the collection pass's claim and its bytes, and a redacted file's
+// bytes. One still running when the shutdown grace ends fails the exit, which
+// is true, and cutting it short would leave bytes nothing names.
+const cleanupWait = 30 * time.Second
 
 // roomIn refuses an upload the deployment has no space for.
 //

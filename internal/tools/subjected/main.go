@@ -305,7 +305,7 @@ func queryingNames(all []declared) map[string]bool {
 func calledBy(body *ast.BlockStmt, imported map[string]bool) []string {
 	var called []string
 	reached := func(fun ast.Expr) {
-		switch fun := fun.(type) {
+		switch fun := instantiated(fun).(type) {
 		case *ast.Ident:
 			called = append(called, fun.Name)
 		case *ast.SelectorExpr:
@@ -331,13 +331,25 @@ func calledBy(body *ast.BlockStmt, imported map[string]bool) []string {
 	return called
 }
 
+// instantiated is the function a call names, without the type arguments a
+// call to a generic function may state.
+func instantiated(fun ast.Expr) ast.Expr {
+	switch generic := fun.(type) {
+	case *ast.IndexExpr:
+		return generic.X
+	case *ast.IndexListExpr:
+		return generic.X
+	}
+	return fun
+}
+
 // callsQuerying reports whether a body calls, by its bare name, a function of
 // this package that queries.
 func callsQuerying(body *ast.BlockStmt, querying map[string]bool) bool {
 	found := false
 	ast.Inspect(body, func(node ast.Node) bool {
 		if call, ok := node.(*ast.CallExpr); ok {
-			if fun, ok := call.Fun.(*ast.Ident); ok && querying[fun.Name] {
+			if fun, ok := instantiated(call.Fun).(*ast.Ident); ok && querying[fun.Name] {
 				found = true
 			}
 		}
