@@ -452,10 +452,11 @@ func Build(ready Ready, in core.Deps) *Built {
 var open = map[string]bool{
 	"/healthz": true,
 	"/readyz":  true,
-	// The view before anybody has a credential. It lists the
-	// providers an operator configured and nothing else — the sign-in page
-	// has to draw a button per provider, and it cannot ask for that list
-	// while holding nothing. Everything under openPrefix already answers
+	// The view before anybody has a credential. It lists the providers an
+	// operator configured, and whether the trusted proxy named the browser
+	// asking, the same whether that person is let in or refused. The sign-in
+	// page draws a button per provider and cannot ask for that list while
+	// holding nothing. Everything under openPrefix already answers
 	// without a credential for the same reason; this is the list of what is
 	// down there.
 	"/v1/sign-in": true,

@@ -197,18 +197,22 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
           </p>
           {turnedAway && (
             <div className="text-center">
-              <p className="text-sm font-medium">No access here</p>
+              <p id="sign-in-state" className="text-sm font-medium">
+                No access here
+              </p>
               <p className="mt-1 text-sm text-[var(--muted)]">Ask an administrator for access.</p>
             </div>
           )}
           {toRetry && (
             <div className="text-center">
-              <p className="text-sm font-medium">Sign-in didn&rsquo;t finish</p>
+              <p id="sign-in-state" className="text-sm font-medium">
+                Sign-in didn&rsquo;t finish
+              </p>
               <p className="mt-1 text-sm text-[var(--muted)]">Try again shortly.</p>
             </div>
           )}
           {invited && (
-            <p className="text-sm text-[var(--muted)]">
+            <p id="sign-in-state" className="text-sm text-[var(--muted)]">
               {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
             </p>
           )}
