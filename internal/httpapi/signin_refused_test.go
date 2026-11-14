@@ -203,6 +203,14 @@ func TestTheWaysInSayWhetherTheProxyNamedTheBrowser(t *testing.T) {
 		if got := ways(""); strings.Contains(got, "named_by_proxy") {
 			t.Errorf("a browser the proxy did not name is said to be: %s", got)
 		}
+		// The answer turns on who asks, so no cache may share it.
+		req := httptest.NewRequest(http.MethodGet, "/v1/sign-in", nil)
+		req.Header.Set(httpapitest.TestHeader, "reader")
+		rec := httptest.NewRecorder()
+		r.Handler.ServeHTTP(rec, req)
+		if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+			t.Errorf("the ways in may be cached: Cache-Control %q", got)
+		}
 	})
 }
 

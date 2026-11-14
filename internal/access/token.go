@@ -290,7 +290,7 @@ func (s Subject) narrowedTo(productID int64) Subject {
 	// the subject was built, so what is left above is already the intersection,
 	// and "holds this role anywhere" answers from it.
 	s.everywhere = nil
-	//
+
 	// The cases stay: being brought into one is a grant on a pair of a product
 	// and an issue, and a token pinned to that product does not take it away.
 	// Cases in other products go, for the same reason the other grants do.

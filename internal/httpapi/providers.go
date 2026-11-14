@@ -25,6 +25,11 @@ type ProvidersBody struct {
 	NamedByProxy bool `json:"named_by_proxy,omitempty" doc:"Whether the trusted proxy in front of this deployment named the person asking. Where it did and the read of the current user is refused, they were refused, for a reason this does not say"`
 }
 
+type providersAnswer struct {
+	CacheControl string `header:"Cache-Control" doc:"Always no-store"`
+	Body         ProvidersBody
+}
+
 // ProviderBody is one way in.
 type ProviderBody struct {
 	Name string `json:"name" doc:"The segment in the sign-in path"`
@@ -42,9 +47,12 @@ func registerProviders(api huma.API, in core.Deps) {
 			"operator configured, and whether the trusted proxy in front of this deployment " +
 			"named the person asking.",
 		Tags: []string{"Access"},
-	}, core.NoCredential, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ProvidersBody }, error) {
+	}, core.NoCredential, ""), func(ctx context.Context, _ *struct{}) (*providersAnswer, error) {
 		in := core.Of(ctx, in)
-		out := &struct{ Body ProvidersBody }{}
+		// The answer turns on who is asking, through the proxy's header, and
+		// is read without a credential, so no cache may hand it to another
+		// browser.
+		out := &providersAnswer{CacheControl: "no-store"}
 		out.Body.NamedByProxy, _ = ctx.Value(namedByProxy{}).(bool)
 		out.Body.Items = make([]ProviderBody, 0, len(in.Providers))
 		for name := range in.Providers {

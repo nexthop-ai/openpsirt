@@ -36841,6 +36841,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProvidersBody"
           description: OK
+          headers:
+            Cache-Control:
+              schema:
+                description: Always no-store
+                type: string
         default:
           content:
             application/problem+json:
