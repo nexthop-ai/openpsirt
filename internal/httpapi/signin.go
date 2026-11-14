@@ -143,6 +143,15 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 		return
 	}
 	code := r.URL.Query().Get("code")
+	// A provider that sends the browser back saying it could not answer
+	// (RFC 6749 § 4.1.2.1) has said nothing about who this is. Every other
+	// error it sends back, a denial included, is a refusal.
+	if said := r.URL.Query().Get("error"); code == "" &&
+		(said == "temporarily_unavailable" || said == "server_error") {
+		failedToComplete(w, r, in, "a sign-in could not be completed",
+			fmt.Errorf("%s answered %s", provider.Name(), said))
+		return
+	}
 	if code == "" {
 		refuseSignIn(w, r, in)
 		return
@@ -155,7 +164,8 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	}
 	identity, err := provider.Complete(r.Context(), code, pending, callback)
 	if errors.Is(err, signin.ErrUnanswered) {
-		failedToComplete(w, r, in, "a sign-in could not be completed", err)
+		failedToComplete(w, r, in, "a sign-in could not be completed",
+			fmt.Errorf("%s: %w", provider.Name(), err))
 		return
 	}
 	if err != nil {

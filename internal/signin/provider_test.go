@@ -43,7 +43,7 @@ type provider struct {
 	mux *http.ServeMux
 	// tokenAnswer and keysAnswer, where set, are the status the token and
 	// key endpoints answer instead, for the tests about a provider that does
-	// not answer.
+	// not answer; a tokenAnswer of -1 is a 200 that does not parse.
 	tokenAnswer, keysAnswer int
 	// forged, where set, signs the identity token in place of the key the
 	// provider publishes.
@@ -95,6 +95,11 @@ func standing(t *testing.T) *provider {
 	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if p.tokenAnswer == -1 {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("not json"))
 			return
 		}
 		if p.tokenAnswer != 0 {
@@ -750,6 +755,8 @@ func TestAProviderThatDoesNotAnswerIsToldApartFromOneThatSaysNo(t *testing.T) {
 			o.config.Endpoint.TokenURL = "https://127.0.0.1:1/token"
 		}, true},
 		{"keys answering 503", func(p *provider, _ *OIDC) { p.keysAnswer = http.StatusServiceUnavailable }, true},
+		{"a token endpoint answering 429", func(p *provider, _ *OIDC) { p.tokenAnswer = http.StatusTooManyRequests }, true},
+		{"a token endpoint answering what does not parse", func(p *provider, _ *OIDC) { p.tokenAnswer = -1 }, true},
 		{"a token endpoint turning the code down", func(p *provider, _ *OIDC) { p.tokenAnswer = http.StatusBadRequest }, false},
 		{"a token signed with another key", func(p *provider, _ *OIDC) {
 			other, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -779,11 +786,23 @@ func TestAProviderThatDoesNotAnswerIsToldApartFromOneThatSaysNo(t *testing.T) {
 func TestAGitHubThatDoesNotAnswerIsToldApartFromOneThatSaysNo(t *testing.T) {
 	for _, c := range []struct {
 		what       string
-		status     int
+		answer     func(http.ResponseWriter)
+		unreached  bool
 		unanswered bool
 	}{
-		{"a profile answering 502", http.StatusBadGateway, true},
-		{"a profile answering 401", http.StatusUnauthorized, false},
+		{"a profile answering 502", func(w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) }, false, true},
+		{"a profile answering 429", func(w http.ResponseWriter) { w.WriteHeader(http.StatusTooManyRequests) }, false, true},
+		{"a profile answering 403 with no requests left", func(w http.ResponseWriter) {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.WriteHeader(http.StatusForbidden)
+		}, false, true},
+		{"a profile that does not parse", func(w http.ResponseWriter) { _, _ = w.Write([]byte("{")) }, false, true},
+		{"a profile nobody serves", nil, true, true},
+		{"a profile answering 401", func(w http.ResponseWriter) { w.WriteHeader(http.StatusUnauthorized) }, false, false},
+		{"a profile answering 403 with requests left", func(w http.ResponseWriter) {
+			w.Header().Set("X-RateLimit-Remaining", "10")
+			w.WriteHeader(http.StatusForbidden)
+		}, false, false},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			adapter := forge(t, "", func(w http.ResponseWriter, r *http.Request) {
@@ -791,8 +810,11 @@ func TestAGitHubThatDoesNotAnswerIsToldApartFromOneThatSaysNo(t *testing.T) {
 					writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
 					return
 				}
-				w.WriteHeader(c.status)
+				c.answer(w)
 			})
+			if c.unreached {
+				adapter.api = "http://127.0.0.1:1"
+			}
 			_, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"}, "https://here.example/back")
 			if err == nil {
 				t.Fatal("the sign-in completed")

@@ -14,7 +14,8 @@ import (
 )
 
 // ErrUnanswered marks a sign-in the provider failed to answer: it could not be
-// reached, answered with a server error, or sent back something unreadable.
+// reached, answered with a server error or a rate limit, or sent back
+// something unreadable.
 // Every other failure to complete one is the provider turning somebody down.
 var ErrUnanswered = errors.New("the provider did not answer")
 

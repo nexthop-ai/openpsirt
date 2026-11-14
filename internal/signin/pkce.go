@@ -63,11 +63,12 @@ func exchangePKCE(ctx context.Context, config oauth2.Config, client *http.Client
 	token, err := config.Exchange(ctx, code,
 		oauth2.SetAuthURLParam("code_verifier", pending.Verifier))
 	// The token endpoint answering with a client error turns the code down.
-	// Anything else, from no connection to a server error or an answer that
-	// does not parse, is the provider failing to answer.
+	// Anything else, from no connection to a server error, a rate limit or an
+	// answer that does not parse, is the provider failing to answer.
 	var answered *oauth2.RetrieveError
 	if err != nil && (!errors.As(err, &answered) || answered.Response == nil ||
-		answered.Response.StatusCode >= http.StatusInternalServerError) {
+		answered.Response.StatusCode >= http.StatusInternalServerError ||
+		answered.Response.StatusCode == http.StatusTooManyRequests) {
 		return nil, unanswered(err)
 	}
 	return token, err

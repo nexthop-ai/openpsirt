@@ -294,5 +294,20 @@ func TestAProviderThatDoesNotAnswerIsAFaultNeverARefusal(t *testing.T) {
 			t.Errorf("a provider turning the sign-in down answered %d to %q, want the no-access screen",
 				rec.Code, rec.Header().Get("Location"))
 		}
+
+		// What a provider sends the browser back with, in place of a code.
+		for said, unanswered := range map[string]bool{
+			"temporarily_unavailable": true, "server_error": true, "access_denied": false,
+		} {
+			rec := callback(t, r, "the-state", "&error="+said, true)
+			if unanswered && !faulted(rec) {
+				t.Errorf("a provider saying %s answered %d to %q, want the try-again screen",
+					said, rec.Code, rec.Header().Get("Location"))
+			}
+			if !unanswered && !noAccess(rec) {
+				t.Errorf("a provider saying %s answered %d to %q, want the no-access screen",
+					said, rec.Code, rec.Header().Get("Location"))
+			}
+		}
 	})
 }
