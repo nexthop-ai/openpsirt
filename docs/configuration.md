@@ -643,7 +643,7 @@ WARN mail may cross the network in the clear server=relay.internal:25
 | `OPENPSIRT_MAIL_SERVER` | `mail.server` | The SMTP server as `host:port`, e.g. `smtp.example.com:587` | unset |
 | `OPENPSIRT_MAIL_USERNAME` | `mail.username` | Username, where the server wants one. Sent only after STARTTLS | unset |
 | `OPENPSIRT_MAIL_PASSWORD` | `mail.password` | Password for that username. Sent only after STARTTLS | unset |
-| `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` | `mail.allow_plaintext` | Send to a server that offers no STARTTLS, which is otherwise refused. For a relay on a network you accept mail crossing in the clear; credentials are still never sent without STARTTLS | off |
+| `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` | `mail.allow_plaintext` | Send to a server that offers no STARTTLS, which is otherwise refused. For a relay on a network you accept mail crossing in the clear. Refused beside `OPENPSIRT_MAIL_USERNAME`, since a username is sent only after STARTTLS | off |
 
 Who gets what is not configuration: each person chooses in their own settings,
 and the daily digest is off until somebody asks for it. Mail carries a notice as
@@ -1676,7 +1676,7 @@ v0.10.2 named `reaffirm-claim`.
 | `POST /v1/advisories/{advisory}/approval` takes `{"edition": n}`, the edition agreed to, and answers 409 where the advisory has moved to another edition since. v0.12.0 took no body | Send the `edition` the advisory reported, or the oldest of the `Advisory-Edition` values its releases and its document named where those were read too. A request without it is refused |
 | A build's OpenVEX document states a decision not to fix that names no mitigation as affected, its action saying no fix is planned. v0.12.0 left such a decision out | Nothing, unless one should not be stated: the first publishing pass after the upgrade states every one |
 | Mail carries a notice as it happens only where somebody must act on it: work assigned to them, a mention, a decision waiting on them or sent back, a disclosure or response window coming due or passed, a deferral ending, an approval withdrawn or undone, a decision lapsing, a critical finding in a release, an unanswered report and a reporter's message. Every other notice reaches mail in the daily digest, which lists it. v0.12.0 mailed every notice as it happened | Nothing. Somebody who wants the rest by mail turns the daily digest on in their own settings; without it, those notices stay in the application |
-| Mail to a server that offers no STARTTLS is refused and logged at error, and every notice and digest waits unsent until the configuration changes. v0.12.0 sent it in the clear | Give the mail server STARTTLS. For a relay on a network you accept mail crossing in the clear, set `OPENPSIRT_MAIL_ALLOW_PLAINTEXT`; a password is still never sent without STARTTLS |
+| Mail to a server that offers no STARTTLS is refused and logged at error, and every notice and digest waits unsent until the configuration changes. v0.12.0 sent it in the clear | Give the mail server STARTTLS. For a relay on a network you accept mail crossing in the clear, set `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` with no username, which is sent only after STARTTLS |
 | A patch link's repository on github.com or gitlab.com is known by its path in lower case, as those hosts compare it. A repository recorded under a path with capitals is cloned once more under the new key, and the earlier copy is evicted like any unused one | Nothing. The first pass after the upgrade takes longer for those repositories |
 
 #### VEX statements from v0.12.0

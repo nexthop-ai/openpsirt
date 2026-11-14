@@ -6,11 +6,13 @@ package config
 import (
 	"errors"
 	"io/fs"
+	"maps"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -117,7 +119,7 @@ var everySetting = map[string]string{
 	"SCANNER_MAX_MATCHES": "301", "SCANNER_MAX_REFERENCES": "31",
 
 	"MAIL_FROM": "psirt@example.test", "MAIL_SERVER": "smtp.example.test:587",
-	"MAIL_USERNAME": "mailer", "MAIL_PASSWORD": "mail-secret", "MAIL_ALLOW_PLAINTEXT": "true",
+	"MAIL_USERNAME": "mailer", "MAIL_PASSWORD": "mail-secret",
 	"SLACK_TOKEN": "xoxb-1", "ZULIP_SITE": "https://chat.example.test",
 	"ZULIP_EMAIL": "bot@example.test", "ZULIP_KEY": "zulip-key",
 
@@ -178,42 +180,69 @@ var everySetting = map[string]string{
 	"ANALYSIS_MAX_HELD":                  "20",
 }
 
+// exclusive is a value for each setting the loader refuses beside one in
+// everySetting, and exclusiveOf the settings it is refused beside, which the
+// configuration holding it leaves unset.
+var (
+	exclusive   = map[string]string{"MAIL_ALLOW_PLAINTEXT": "true"}
+	exclusiveOf = []string{"MAIL_USERNAME", "MAIL_PASSWORD"}
+)
+
 // A deployment configured by file and one configured by the environment, with
 // the same value for every setting, are configured identically.
 //
 // Every setting at once rather than a sample: the values are distinct, so a
 // key read into the wrong setting, or a value spelled differently on the way
-// through, is a difference in the result.
+// through, is a difference in the result. A setting refused beside another is
+// read in a second configuration of its own.
 func TestAFileAndTheEnvironmentConfigureTheSame(t *testing.T) {
-	if len(everySetting) != len(settings) {
-		t.Fatalf("%d values for %d settings: every setting needs one", len(everySetting), len(settings))
+	if len(everySetting)+len(exclusive) != len(settings) {
+		t.Fatalf("%d values for %d settings: every setting needs one",
+			len(everySetting)+len(exclusive), len(settings))
 	}
-	var file strings.Builder
 	for _, one := range settings {
-		raw, ok := everySetting[one.env]
-		if !ok {
-			t.Fatalf("no value for %s%s", envPrefix, one.env)
+		_, in := everySetting[one.env]
+		_, out := exclusive[one.env]
+		if in == out {
+			t.Fatalf("%s%s needs one value, in everySetting or exclusive", envPrefix, one.env)
 		}
-		t.Setenv(envPrefix+one.env, raw)
-		file.WriteString(one.file + " = " + literal(one.kind, raw) + "\n")
 	}
-	fromEnv, err := Load(os.Environ())
-	if err != nil {
-		t.Fatalf("the environment: %v", err)
+	together := maps.Clone(exclusive)
+	for key, raw := range everySetting {
+		if !slices.Contains(exclusiveOf, key) {
+			together[key] = raw
+		}
 	}
-	fromFile, err := LoadFile(writeFile(t, file.String()), nil)
-	if err != nil {
-		t.Fatalf("the file: %v", err)
-	}
-	if !reflect.DeepEqual(fromEnv, fromFile) {
-		t.Errorf("the two differ:\n environment %+v\n file        %+v", fromEnv, fromFile)
-	}
-	defaults, err := load(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reflect.DeepEqual(fromFile, defaults) {
-		t.Error("the file configured nothing: the result is the defaults")
+	for name, values := range map[string]map[string]string{"every setting": everySetting, "exclusive settings": together} {
+		t.Run(name, func(t *testing.T) {
+			var file strings.Builder
+			for _, one := range settings {
+				raw, ok := values[one.env]
+				if !ok {
+					continue
+				}
+				t.Setenv(envPrefix+one.env, raw)
+				file.WriteString(one.file + " = " + literal(one.kind, raw) + "\n")
+			}
+			fromEnv, err := Load(os.Environ())
+			if err != nil {
+				t.Fatalf("the environment: %v", err)
+			}
+			fromFile, err := LoadFile(writeFile(t, file.String()), nil)
+			if err != nil {
+				t.Fatalf("the file: %v", err)
+			}
+			if !reflect.DeepEqual(fromEnv, fromFile) {
+				t.Errorf("the two differ:\n environment %+v\n file        %+v", fromEnv, fromFile)
+			}
+			defaults, err := load(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if reflect.DeepEqual(fromFile, defaults) {
+				t.Error("the file configured nothing: the result is the defaults")
+			}
+		})
 	}
 }
 

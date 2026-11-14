@@ -125,7 +125,7 @@ type Config struct {
 	MailUsername string
 	MailPassword string
 	// MailAllowPlaintext sends mail to a server offering no STARTTLS, which
-	// is otherwise refused. Never with a password.
+	// is otherwise refused. Refused beside a username.
 	MailAllowPlaintext bool
 	// SlackToken is a Slack app's bot token, and the Zulip three are a Zulip
 	// bot's server, address and key. Each is a chat platform this deployment
@@ -599,6 +599,15 @@ func load(given map[string]string) (Config, error) {
 		return Config{}, fmt.Errorf(
 			"OPENPSIRT_MAIL_SERVER and OPENPSIRT_MAIL_FROM: set both or neither — " +
 				"a server with nobody to send as sends nothing, and says nothing about it")
+	}
+
+	// A username is sent only after STARTTLS, so a server offering none is
+	// refused whatever the switch says, and the switch beside one does
+	// nothing but warn of mail in the clear that never goes.
+	if c.MailAllowPlaintext && strings.TrimSpace(c.MailUsername) != "" {
+		return Config{}, fmt.Errorf(
+			"OPENPSIRT_MAIL_ALLOW_PLAINTEXT and OPENPSIRT_MAIL_USERNAME: set one or neither — " +
+				"a username is sent only after STARTTLS, so a server without it is refused either way")
 	}
 
 	// The same rule again. A Zulip bot is a server, the address it signs in

@@ -79,7 +79,7 @@ kind reaches mail in the digest alone (`design-docs/notifications-work.md`
 | Tried five times, then left unsent and readable | |
 | Somebody with no address is sent nothing, in the query | |
 | Nothing is sent without STARTTLS unless the operator accepts plaintext, warned at every start | A stripped STARTTLS reads as a server offering none |
-| No password goes without STARTTLS, plaintext accepted or not | |
+| No username or password goes without STARTTLS, so accepting plaintext beside a username is refused at startup | The pair would only warn of mail that never goes |
 | A send refused for either stops the sweep and the digest pass, logged at error, with no attempt counted and no digest marked sent | It is the configuration, so every message waits for it to change |
 | The server's certificate is checked against the system's authorities, which `SSL_CERT_FILE` and `SSL_CERT_DIR` set | A private authority needs no setting of its own |
 | A message carries its date, a random identifier at the sender's domain, and says its body is 8-bit UTF-8 | RFC 5322 requires the date, and some receivers refuse a message without an identifier; not every relay adds them |
