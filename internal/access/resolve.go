@@ -494,6 +494,8 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 				everywhere = append(everywhere, grant.Role)
 			}
 		}
+	}
+	if len(everywhere) > 0 {
 		products, err := s.everyProduct(ctx)
 		if err != nil {
 			return Subject{}, err

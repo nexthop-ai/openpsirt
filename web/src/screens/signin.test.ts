@@ -107,6 +107,9 @@ describe("sending somebody straight on to the only provider", () => {
     // out here rather than read back from the screen.
     at("/", "?no-access");
     expect(forwardable(1, false)).toBe(false);
+    // Only there: a screen's own query carrying the word forwards as usual.
+    at("/findings", "?no-access");
+    expect(forwardable(1, false)).toBe(true);
   });
 
   it("does not forward after a sign-out once the address is gone", () => {

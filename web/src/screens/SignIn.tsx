@@ -23,7 +23,7 @@ type Provider = { name: string; path: string };
 export function returningHere(): string {
   const here = window.location.pathname + window.location.search;
   if (here === "/" || here === "") return "";
-  if (window.location.pathname === "/" && (marked(signedOut) || marked(refused))) return "";
+  if (landedAt(signedOut) || landedAt(refused)) return "";
   return "?return=" + encodeURIComponent(here);
 }
 
@@ -56,6 +56,12 @@ const refused = "no-access";
 // Whether the address carries one of the markers above.
 function marked(marker: string): boolean {
   return new URLSearchParams(window.location.search).has(marker);
+}
+
+// Whether the browser is on the home page carrying a marker, which is the
+// address the server or a sign-out sends it to.
+function landedAt(marker: string): boolean {
+  return window.location.pathname === "/" && marked(marker);
 }
 
 function alreadyTried(): boolean {
@@ -99,7 +105,7 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
   if (marked(signedOut)) return false;
   // A refused sign-in lands here, and the provider still holds the account it
   // refused, so forwarding would refuse it again in a loop.
-  if (marked(refused)) return false;
+  if (landedAt(refused)) return false;
   return !alreadyTried();
 }
 
@@ -127,7 +133,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
   const forwarding = Boolean(only) && forwardable(offered.length, resuming);
   // Where no way in is configured, that is the one thing worth saying, so
   // nothing is said until the ways in are read.
-  const refusedHere = !resuming && marked(refused);
+  const refusedHere = !resuming && landedAt(refused);
   const turnedAway = refusedHere && offered.length > 0;
 
   useEffect(() => {
