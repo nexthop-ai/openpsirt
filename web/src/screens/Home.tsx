@@ -418,8 +418,8 @@ function holdings(who: Who): string {
   const reach = (who.reach ?? []).filter((each) => each.may_see);
   if (reach.length === 0) {
     if (who.audits) return "You audit this deployment";
-    // A role across every product reaches nothing until a product exists.
-    if (who.everywhere && (who.reach ?? []).length === 0) return "No product is declared yet";
+    // A role across every product reaches nothing while no product is open.
+    if (who.everywhere && (who.reach ?? []).length === 0) return "You hold a role on every product";
     return "You hold no role on a product";
   }
   const triage = reach

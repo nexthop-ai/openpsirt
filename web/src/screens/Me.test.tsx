@@ -34,7 +34,7 @@ describe("a person's own page", () => {
     mount.render(screen(<Me />));
     await settle();
     const text = mount.host().textContent ?? "";
-    expect(text).toContain("Every product, once one is declared.");
+    expect(text).toContain("Every product, as each is declared.");
     expect(text).not.toContain("An administrator grants access.");
   });
 

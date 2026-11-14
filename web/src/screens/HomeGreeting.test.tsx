@@ -38,7 +38,7 @@ describe("the front page's greeting", () => {
     expect(text).not.toContain("You can read");
   });
 
-  it("says no product is declared yet to somebody holding a role across every product", async () => {
+  it("says a role across every product is held while no product is open", async () => {
     serve(() => ({ data: { items: [], total: 0 } }));
     mount.render(
       screen(
@@ -57,7 +57,7 @@ describe("the front page's greeting", () => {
     );
     await settle();
     const text = mount.host().textContent ?? "";
-    expect(text).toContain("No product is declared yet");
+    expect(text).toContain("You hold a role on every product");
     expect(text).not.toContain("You hold no role on a product");
   });
 });
