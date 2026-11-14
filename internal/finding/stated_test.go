@@ -508,3 +508,237 @@ func TestARulesContainerReadsTheRowsNameAndTheStatedNameApart(t *testing.T) {
 		}
 	})
 }
+
+// Every reader of an open finding names its component, its consumer and their
+// versions as the finding's own build stated them, where another product
+// described every package first under other names and versions.
+func TestEveryReaderOfAFindingNamesWhatItsOwnBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shippedTo(t, f.inAnotherProduct(t, "hedgehog"), poisoned(twoConsumers()))
+		f.shipped(t, twoConsumers())
+		other := f.anotherBranch(t, "2026.06")
+		f.shippedTo(t, other, twoConsumers())
+		f.applied(t, found("CVE-2026-1", libnl))
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PublicRead, access.PublicTriage, access.PrivateTriage)
+		issue := f.issueID(t, "CVE-2026-1")
+		component := f.open(t)[0].ComponentID
+		consumers := []string{swss.Name, teamd.Name}
+		slices.Sort(consumers)
+		consumersOf := func(said []string) []string {
+			slices.Sort(said)
+			return slices.Compact(said)
+		}
+
+		sightings, _, _, err := f.store.Everywhere(ctx, who, issue, 50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(sightings) == 0 {
+			t.Fatal("the issue is sighted nowhere")
+		}
+		for _, row := range sightings {
+			if row.Component != libnl.Name || row.Version != libnl.Version {
+				t.Errorf("where the issue is sighted shows %s %s", row.Component, row.Version)
+			}
+		}
+
+		occurrences, err := f.store.OccurrencesFor(ctx, who, f.build, issue, component)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var said []string
+		for _, one := range occurrences {
+			said = append(said, one.Consumer)
+		}
+		if got := consumersOf(said); !slices.Equal(got, consumers) {
+			t.Errorf("the occurrences a decision covers name consumers %v, want %v", got, consumers)
+		}
+
+		reach, err := f.store.ReachingAcross(ctx, who, occurrences, f.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(reach.Automatic) != 1 || reach.Automatic[0].Version != libnl.Version {
+			t.Errorf("the builds a decision reaches read %+v, want the other at %s",
+				reach.Automatic, libnl.Version)
+		}
+
+		within, err := f.store.OccurrencesOnComponentWithin(ctx, f.db.DB, who, f.productID,
+			[]int64{f.build}, libnl.Name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		said = nil
+		for _, one := range within {
+			for _, occurrence := range one.Occurrences {
+				said = append(said, occurrence.Consumer)
+			}
+		}
+		if got := consumersOf(said); !slices.Equal(got, consumers) {
+			t.Errorf("the occurrences a promise covers name consumers %v, want %v", got, consumers)
+		}
+
+		late, _, err := f.store.RunningOutPage(ctx, who, finding.Scope{}, 365*24*time.Hour, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(late) == 0 {
+			t.Fatal("nothing is running out of time")
+		}
+		for _, row := range late {
+			if row.Component != libnl.Name || row.Version != libnl.Version {
+				t.Errorf("what is running out of time shows %s %s", row.Component, row.Version)
+			}
+		}
+
+		evidence, err := f.store.Detail(ctx, who, f.build, issue, component)
+		if err != nil {
+			t.Fatal(err)
+		}
+		said = nil
+		for _, one := range evidence.Occurrences {
+			said = append(said, one.Consumer)
+			if one.Component != libnl.Name {
+				t.Errorf("an occurrence in a finding's evidence names %s", one.Component)
+			}
+			if len(one.Chain) == 0 || one.Chain[len(one.Chain)-1].Version != libnl.Version {
+				t.Errorf("an occurrence's way down ends at %+v, want %s", one.Chain, libnl.Version)
+			}
+		}
+		if got := consumersOf(said); !slices.Equal(got, consumers) {
+			t.Errorf("a finding's evidence names consumers %v, want %v", got, consumers)
+		}
+
+		rows, _, err := f.store.Register(ctx, who, f.build, finding.Registering{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		said = nil
+		for _, row := range rows {
+			said = append(said, row.Consumer)
+		}
+		if got := consumersOf(said); !slices.Equal(got, consumers) {
+			t.Errorf("the register names consumers %v, want %v", got, consumers)
+		}
+
+		builds, err := f.store.AcrossBuilds(ctx, who, f.wholeProduct(), libnl.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) == 0 {
+			t.Fatal("no build ships the package")
+		}
+		for _, build := range builds {
+			for _, one := range build.Packages {
+				if one.Name != libnl.Name || one.Version != libnl.Version {
+					t.Errorf("the package across builds shows %s %s", one.Name, one.Version)
+				}
+			}
+		}
+
+		packages, err := f.store.Grouped(ctx, who, f.build, finding.ByEcosystem, "deb")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var named []string
+		for _, row := range packages {
+			if row.One != nil {
+				named = append(named, row.One.Name+" "+row.One.Version)
+			}
+		}
+		slices.Sort(named)
+		want := []string{libnl.Name + " " + libnl.Version, swss.Name + " " + swss.Version,
+			teamd.Name + " " + teamd.Version}
+		if !slices.Equal(named, want) {
+			t.Errorf("an ecosystem's packages read %v, want %v", named, want)
+		}
+
+		if _, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The netlink parser trusts a length it never checks.",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		embargoes, _, err := f.store.DisclosureDeadlinesPage(ctx, who, finding.Scope{},
+			120*24*time.Hour, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(embargoes) != 1 || !slices.Equal(embargoes[0].Components, []string{libnl.Name}) {
+			t.Errorf("the disclosure deadlines read %+v, want one naming %s", embargoes, libnl.Name)
+		}
+	})
+}
+
+// A name typed exactly as the build stated one of the components it folds to
+// keeps that component alone among the versions carrying an issue, where
+// another product named it otherwise first.
+func TestTheVersionsCarryingAnIssueKeepTheSpellingItsBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shippedTo(t, f.inAnotherProduct(t, "hedgehog"), poisoned(twoConsumers()))
+		shouting := at(strings.ToUpper(libnl.Name), libnlNew.Version)
+		mine := twoConsumers()
+		mine.Components = append(mine.Components, shouting)
+		mine.Dependencies = append(mine.Dependencies, graph.Dependency{Parent: teamd, Child: shouting})
+		f.shipped(t, mine)
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-1", shouting))
+
+		choices, err := f.store.VersionsWithIssue(ctx, f.holding(t, access.PublicRead), f.build,
+			f.issueID(t, "CVE-2026-1"), libnl.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(choices) != 1 || choices[0].Version != libnl.Version {
+			t.Errorf("typed as the build spelled one, the versions carrying the issue are %+v,"+
+				" want %s alone", choices, libnl.Version)
+		}
+	})
+}
+
+// A page over one product's builds names a component as a build still holding
+// it stated it, before a build that stated it later and has dropped it since.
+func TestAProductsPageNamesAComponentAsABuildStillHoldingItStatedIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.applied(t, found("CVE-2026-1", libnl))
+		other := f.anotherBranch(t, "2026.06")
+		f.shippedTo(t, other, stating(twoConsumers(), strings.ToUpper))
+		f.shippedTo(t, other, withoutLibnl())
+
+		groups, _, err := f.store.ComponentGroups(ctx, f.holding(t, access.PublicRead), f.wholeProduct(),
+			50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(groups) != 1 || groups[0].Component != libnl.Name {
+			t.Errorf("the product's list by component reads %+v, want %s as the build holding it"+
+				" stated it", groups, libnl.Name)
+		}
+	})
+}
+
+// poisoned is a snapshot whose packages are named and versioned as no build of
+// the fixture's product states them, its root left alone.
+func poisoned(snap graph.Snapshot) graph.Snapshot {
+	out := stating(snap, rot13)
+	elsewhere := func(d graph.Described) graph.Described {
+		if d.Purl != snap.Root.Purl {
+			d.Version = "99.0"
+		}
+		return d
+	}
+	for i, c := range out.Components {
+		out.Components[i] = elsewhere(c)
+	}
+	for i, d := range out.Dependencies {
+		out.Dependencies[i] = graph.Dependency{Parent: elsewhere(d.Parent), Child: elsewhere(d.Child)}
+	}
+	return out
+}

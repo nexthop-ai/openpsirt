@@ -63,6 +63,20 @@ func TestAForkTakesWhatItsUpstreamSaysForAnybody(t *testing.T) {
 			t.Error("the statement about the upstream's own build was not recorded for review")
 		}
 
+		// The shared row's name and the builds' version as two products might
+		// state them, so an offer shows what the fork's build stated. A
+		// statement is matched on the row's folded name and version, which
+		// stay.
+		if _, err := w.DB.DB.NewUpdate().Table("component").Set(`"name" = ?`, "nothing").
+			Where(`"purl" = ?`, libnl.Purl).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		const stated = "3.7.0+fork"
+		if _, err := w.DB.DB.NewUpdate().Table("graph_node").Set(`"version" = ?`, stated).
+			Where(`"component_id" IN (SELECT "id" FROM "component" WHERE "purl" = ?)`, libnl.Purl).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 		offers, err := w.findings.Offers(t.Context(), w.proposer, w.fork.ID)
 		if err != nil {
 			t.Fatal(err)
@@ -72,6 +86,10 @@ func TestAForkTakesWhatItsUpstreamSaysForAnybody(t *testing.T) {
 			offered = append(offered, one.Issue+" at "+one.Component+" "+one.Version)
 			if one.Issue == portable {
 				t.Errorf("a statement applied by itself is offered for review: %+v", one)
+			}
+			if one.Component != libnl.Name || one.Version != stated {
+				t.Errorf("an offer names %s %s, want %s %s as the fork's build stated it",
+					one.Component, one.Version, libnl.Name, stated)
 			}
 		}
 		if len(offers) != 2 || offers[0].Issue != ownBuild {

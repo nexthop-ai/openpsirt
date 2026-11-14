@@ -20,6 +20,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -1148,6 +1149,49 @@ func TestTheQueueAndEvidenceNameTheComponentACodeFindingIsPlacedOn(t *testing.T)
 			if p := (placed{got.Component, got.Version, got.OnBuild}); p != want[got.At.Path] {
 				t.Errorf("the evidence places %s on %+v; want %+v", got.At.Path, p, want[got.At.Path])
 			}
+		}
+	})
+}
+
+// Every reader of a code finding's component names it as the finding's build
+// stated it, where another product described the package first under another
+// name and version.
+func TestEveryCodeFindingReaderNamesWhatTheBuildStated(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		ctx := t.Context()
+		other := w.DeclareProduct("edge", "Edge")
+		theirs := w.BuildFor(w.DeclareBranchOrTag(other, "main", catalog.Branch, nil),
+			w.DeclareVariant(other, "box", true)).ID
+		w.inventoryAt(t, theirs, "theirs", time.Now().UTC().Add(-3*time.Hour),
+			graph.Described{Purl: "pkg:generic/edge@1.0", Name: "edge", Version: "1.0"},
+			graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "nothing", Version: "99.0"})
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+
+		listed, evidenced := w.placement(t)
+		const path = "src/sonic-frr/frr/bgpd/bgp_attr.c"
+		want := [3]string{"frr", "10.2", "false"}
+		if listed[path] != want || evidenced[path] != want {
+			t.Errorf("the queue places it on %v and the evidence on %v; want %v",
+				listed[path], evidenced[path], want)
+		}
+
+		placed, _, err := componentOf(ctx, w.DB.DB, w.Build.ID, w.frr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if placed.Name != "frr" {
+			t.Errorf("a flaw recorded from it is offered %q; want frr", placed.Name)
+		}
+		alike, err := resembling(ctx, w.DB.DB, w.Build.ID, "src/sonic-frr/frr")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(alike) != 1 || alike[0].Name != "frr" {
+			t.Errorf("the components resembling its directory are %+v; want frr", alike)
 		}
 	})
 }

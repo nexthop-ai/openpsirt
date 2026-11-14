@@ -70,5 +70,13 @@ func TestABuildNeverAnalyzedIsFoundByTheNameItStated(t *testing.T) {
 				t.Errorf("typed %q, the builds never analyzed are %v, want %v", typed, got, want)
 			}
 		}
+		// Narrowed by the version the build stated, never the row's.
+		found, err := unanalyzed(ctx, w.DB.DB, w.Product.ID, 0, "openssl", graph.Choice{Version: "3.0.11-1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(found) != 1 || found[0].BuildID != w.Build.ID {
+			t.Errorf("typed with the version the build stated, the builds never analyzed are %+v", found)
+		}
 	})
 }

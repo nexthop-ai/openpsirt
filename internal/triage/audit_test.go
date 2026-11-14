@@ -4,10 +4,12 @@
 package triage_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -509,19 +511,7 @@ func TestTheRecordIsFoundByTheNameTheBuildStated(t *testing.T) {
 		f.finds(t, in, libfoo, at.OccurrenceIdentity, access.Public)
 		f.agreed(t, at)
 
-		scan, _, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
-			BuildID: in.build, ContentHash: "stated", BuiltAt: time.Now().UTC().Add(-time.Hour),
-			ParserVersion: "test",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.db.DB.NewRaw(`INSERT INTO "graph_node" ("build_id", "component_id",
-			"opened_scan_id", "is_root", "name", "version", "name_folded") VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			in.build, libfoo, scan.ID, false, "libfoo-bin", "1.2.3", graph.Folded("libfoo-bin")).
-			Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.stated(t, in.build, map[int64]graph.Described{libfoo: {Name: "libfoo-bin", Version: "1.2.3"}})
 
 		_, total, err := f.store.Audit(ctx, f.reviewer, triage.Filter{Component: "LIBFOO-BIN"},
 			time.Time{}, time.Time{}, 50, 0)
@@ -532,4 +522,99 @@ func TestTheRecordIsFoundByTheNameTheBuildStated(t *testing.T) {
 			t.Errorf("filtering on the name the build stated found %d, want 1", total)
 		}
 	})
+}
+
+// Every triage reader of an occurrence names its component, its version and
+// its consumer as the occurrence's build stated them, never as the shared
+// component row does.
+func TestEveryTriageReaderNamesWhatTheBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		at := f.at()
+		in := f.build(t, f.product, "as-stated")
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		libbar := f.component(t, "libbar", "4.5.6")
+		row := &finding.Finding{
+			BuildID: in.build, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+			Visibility: access.Public, ComponentID: libfoo, ConsumerID: &libbar,
+			OccurrenceIdentity: at.OccurrenceIdentity, OpenedAt: time.Now().Truncate(time.Microsecond),
+			OpenedRunID: &in.run,
+		}
+		if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		agreed := f.agreed(t, at)
+		f.stated(t, in.build, map[int64]graph.Described{
+			libfoo: {Name: "libfoo-bin", Version: "1.2.3+b1"},
+			libbar: {Name: "libbar-bin", Version: "4.5.6+b1"},
+		})
+
+		audited, _, err := f.store.Audit(ctx, f.reviewer, triage.Filter{}, time.Time{}, time.Time{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(audited) != 1 || audited[0].Component != "libfoo-bin" || audited[0].Version != "1.2.3+b1" ||
+			audited[0].Consumer != "libbar-bin" {
+			t.Errorf("the record reads %+v, want libfoo-bin 1.2.3+b1 under libbar-bin", audited)
+		}
+
+		described, err := f.store.Describe(ctx, f.reviewer, []triage.DecisionOccurrence{*agreed})
+		if err != nil {
+			t.Fatal(err)
+		}
+		one, held := described[agreed.ID]
+		if !held || one.Component != "libfoo-bin" || one.Version != "1.2.3+b1" || one.Parent != "libbar-bin" {
+			t.Errorf("the decision is described as %+v, want libfoo-bin 1.2.3+b1 under libbar-bin", one)
+		}
+	})
+}
+
+// Two components at one occurrence of one build are described by the one first
+// in the order of the names the build stated, whatever the rows are called.
+func TestADecisionIsDescribedByTheFirstNameTheBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		at := f.at()
+		in := f.build(t, f.product, "two-at-once")
+		libfoo := f.component(t, "libfoo", "1.2.3")
+		libqux := f.component(t, "libqux", "1.2.3")
+		f.finds(t, in, libfoo, at.OccurrenceIdentity, access.Public)
+		f.finds(t, in, libqux, at.OccurrenceIdentity, access.Public)
+		agreed := f.agreed(t, at)
+		f.stated(t, in.build, map[int64]graph.Described{
+			libfoo: {Name: "zz-libfoo", Version: "1.2.3"},
+			libqux: {Name: "aa-libqux", Version: "1.2.3"},
+		})
+
+		described, err := f.store.Describe(ctx, f.reviewer, []triage.DecisionOccurrence{*agreed})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if one := described[agreed.ID]; one.Component != "aa-libqux" {
+			t.Errorf("the decision is described by %q, want aa-libqux, first as the build named them",
+				one.Component)
+		}
+	})
+}
+
+// stated records a scan of the build stating each component under the name
+// and version given.
+func (f *fixture) stated(t *testing.T, buildID int64, as map[int64]graph.Described) {
+	t.Helper()
+	ctx := t.Context()
+	scan, _, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
+		BuildID: buildID, ContentHash: fmt.Sprintf("stated-%d", buildID),
+		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for component, said := range as {
+		if _, err := f.db.DB.NewRaw(`INSERT INTO "graph_node" ("build_id", "component_id",
+			"opened_scan_id", "is_root", "name", "version", "name_folded") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			buildID, component, scan.ID, false, said.Name, said.Version, graph.Folded(said.Name)).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
