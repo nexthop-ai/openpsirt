@@ -203,6 +203,19 @@ func TestTheWaysInSayWhetherTheProxyNamedTheBrowser(t *testing.T) {
 		if got := ways(""); strings.Contains(got, "named_by_proxy") {
 			t.Errorf("a browser the proxy did not name is said to be: %s", got)
 		}
+		// The header is honored only from a configured source; the same
+		// header from anywhere else names nobody.
+		untrusted := httptest.NewRequest(http.MethodGet, "/v1/sign-in", nil)
+		untrusted.RemoteAddr = "198.51.100.7:1234"
+		untrusted.Header.Set(httpapitest.TestHeader, "reader")
+		heard := httptest.NewRecorder()
+		r.Handler.ServeHTTP(heard, untrusted)
+		if heard.Code != http.StatusOK {
+			t.Fatalf("the ways in answered %d to an untrusted source: %s", heard.Code, heard.Body)
+		}
+		if strings.Contains(heard.Body.String(), "named_by_proxy") {
+			t.Errorf("a header from an untrusted source is said to be the proxy's: %s", heard.Body)
+		}
 		// The answer turns on who asks, so no cache may share it.
 		req := httptest.NewRequest(http.MethodGet, "/v1/sign-in", nil)
 		req.Header.Set(httpapitest.TestHeader, "reader")

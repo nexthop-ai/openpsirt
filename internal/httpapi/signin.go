@@ -497,9 +497,9 @@ const refusedHere = "/?no-access"
 
 // refuseSignIn answers a sign-in that will not be completed.
 //
-// One answer for every reason: a provider that failed, a state that did not
-// match, somebody unknown, somebody known but granted nothing, and somebody who
-// has left. Telling them apart says whether a name is real, which is free
+// One answer for every reason: a provider turning the sign-in down, a state
+// that did not match, somebody unknown, somebody known but granted nothing, and
+// somebody who has left. Telling them apart says whether a name is real, which is free
 // reconnaissance for somebody who has just proved nothing.
 //
 // The callback is a page the provider sends a browser to, so the answer is a

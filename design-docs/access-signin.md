@@ -237,8 +237,8 @@ to begin, so a refusal or a fault there answers with a page.
 | The list of ways in is answered `no-store` | It turns on who asks and is read without a credential, so a shared cache would hand one browser's answer to another |
 | A browser the proxy named that this deployment refuses is shown the "No access here" screen, with no way in offered, including where its session ended mid-use | The proxy names it again on every request, outranking any session |
 | A key, a token, a trusted header or a session is refused with the problem document of `design-docs/api-refusals.md` § Refusal shape | Those are requests a client reads |
-| A callback naming an unknown provider answers 404 with the problem document | A name nobody configured is no sign-in to land |
-| A request the router turns away before those handlers run, during an upgrade or on an unconfigured deployment, answers with the problem document, and a panic with plain text | Those answers come from in front of every route |
+| A sign-in begun, or a callback, naming an unknown provider answers 404 with the problem document | A name nobody configured is no sign-in to land |
+| A request the router turns away before those handlers run, during an upgrade or on an unconfigured deployment, answers with the problem document, and a panic with an empty 500 | Those answers come from in front of every route |
 
 ## Values a deployment mints
 
