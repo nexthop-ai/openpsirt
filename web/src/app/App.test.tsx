@@ -150,6 +150,8 @@ describe("the application for a browser the proxy named and this deployment refu
     mount.render(screen(<SignIn resuming />, "/"));
     await settle();
     expect(text()).toContain("No access here");
+    // What the overlay is named by, so a screen reader hears what is drawn.
+    expect(mount.host().querySelector("#sign-in-state")?.textContent).toBe("No access here");
     expect(text()).not.toContain("Your session ended");
     expect(text()).not.toContain("Anything you typed is kept.");
     expect(text()).not.toContain("Continue with");

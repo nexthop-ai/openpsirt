@@ -34,9 +34,9 @@ Satisfies REQ-42, REQ-61, REQ-66.
 
 ## Refusal shape
 
-`application/problem+json` for every refusal and fault except a refusal or fault
-inside the handlers beginning or completing a sign-in, which is a redirect by
-`design-docs/access-signin.md` § Refused sign-in. The
+`application/problem+json` for every refusal and fault except most of those
+inside the handlers beginning or completing a sign-in, which redirect;
+`design-docs/access-signin.md` § Refused sign-in says which. The
 credential check in front of the router answers in it too; `text/plain` reads
 to a client as a transport fault. Each fault travels as its own detail carrying the line and the
 offending text, so an interface can point at it.
