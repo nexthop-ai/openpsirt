@@ -252,6 +252,7 @@ newest, by upload order, which a stopped upgrade run again finds done.
 | Names and versions | A node from before the upgrade shows the component's name and version, and is found by the component's name, until its build's inventory is sent again; a rescan alone keeps them |
 | Advisories from v0.12.0 | Two supplier advisories or upstream documents from one publisher about one product and issue both stood; the older now stands aside, and an approval citing it is flagged as citing a revised statement |
 | VEX statements from v0.12.0 | Carry no document identifier, so a later revision stating an identifier replaces none of them. Those uploaded without `publisher` are filed under the file name, which names no real publisher. The document is not kept, so nothing backfills them; `docs/configuration.md` § VEX statements from v0.12.0 says how to clear them |
+| Withdrawals from v0.12.0 | Name nobody as the withdrawer and count toward nobody's throughput, since v0.12.0 recorded nobody; `docs/configuration.md` § From v0.12.0 |
 
 | Check, on each engine | What it holds |
 |---|---|
