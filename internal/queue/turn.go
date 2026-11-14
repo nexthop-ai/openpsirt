@@ -37,13 +37,18 @@ func EnsureTurn(ctx context.Context, db bun.IDB, name string) error {
 // The write puts a new value in the row every time. An update setting a
 // column to what it already holds is matched and not written on MySQL and
 // MariaDB, and a cluster certifies only rows that were written, so two
-// writers on two nodes would both pass.
+// writers on two nodes would both pass. An update matching no row waits for
+// nothing, so a turn whose row is missing is refused.
 func TakeTurn(ctx context.Context, tx bun.IDB, name string) error {
-	if _, err := tx.NewUpdate().Model((*Lease)(nil)).
+	res, err := tx.NewUpdate().Model((*Lease)(nil)).
 		Set(`"held_by" = ?`, rand.Text()).
 		Where(`"name" = ?`, name).
-		Exec(ctx); err != nil {
+		Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("wait for the turn %q: %w", name, err)
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return fmt.Errorf("wait for the turn %q: its row is not recorded", name)
 	}
 	return nil
 }

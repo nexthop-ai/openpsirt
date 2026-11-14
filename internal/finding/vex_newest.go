@@ -6,7 +6,6 @@ package finding
 import (
 	"cmp"
 	"context"
-	"crypto/rand"
 	"fmt"
 	"slices"
 	"strings"
@@ -15,30 +14,16 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
-// statementsLock names the row a transaction recording a publisher's
-// statements writes before it reads anything.
+// statementsLock names the turn a transaction recording a publisher's
+// statements takes before it reads anything.
 const statementsLock = "received statements"
 
-// statementsLease is the part of a lease row that taking one needs.
-type statementsLease struct {
-	bun.BaseModel `bun:"table:lease"`
-
-	Name string `bun:"name,pk"`
-}
-
 // EnsureStatementsLock makes the row TakeStatements writes.
-//
-// Outside the transaction, because a second writer's insert is refused by the
-// primary key, and on PostgreSQL a refused statement aborts the transaction it
-// is in.
 func EnsureStatementsLock(ctx context.Context, db bun.IDB) error {
-	_, err := db.NewInsert().Model(&statementsLease{Name: statementsLock}).Exec(ctx)
-	if err != nil && !database.IsDuplicate(err) {
-		return fmt.Errorf("record the statements lock: %w", err)
-	}
-	return nil
+	return queue.EnsureTurn(ctx, db, statementsLock)
 }
 
 // TakeStatements makes every other transaction recording statements wait for
@@ -46,23 +31,8 @@ func EnsureStatementsLock(ctx context.Context, db bun.IDB) error {
 // and MariaDB fix what a transaction reads at its first read, so a read
 // before the wait would not see what the other transaction wrote, and both
 // documents' newest statements would stand.
-//
-// The write puts a new value in the row every time. An update setting a
-// column to what it already holds is matched and not written on MySQL and
-// MariaDB, and a cluster certifies only rows that were written, so two
-// recordings on two nodes would both commit.
 func TakeStatements(ctx context.Context, tx bun.IDB) error {
-	res, err := tx.NewUpdate().Model((*statementsLease)(nil)).
-		Set(`"held_by" = ?`, rand.Text()).
-		Where(`"name" = ?`, statementsLock).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("wait for other statements being recorded: %w", err)
-	}
-	if n, err := res.RowsAffected(); err != nil || n != 1 {
-		return fmt.Errorf("wait for other statements being recorded: the lock row is not recorded")
-	}
-	return nil
+	return queue.TakeTurn(ctx, tx, statementsLock)
 }
 
 // HeldByItsDocument chooses the statements a document still makes: those in

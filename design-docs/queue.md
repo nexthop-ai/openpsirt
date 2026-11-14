@@ -156,11 +156,13 @@ the first to commit. One mechanism serves every turn.
 |---|---|
 | Attachment uploads | The check of room left (`design-docs/attachments.md` § Quota and removal) |
 | One person's saved filters | The check of how many they keep (`design-docs/database-transactions.md` § Reads a write depends on) |
+| Received statements | Which statement from a publisher stands newest (`design-docs/ingest-claims.md` § Administrator-supplied VEX) |
 
 | Rule | Reason |
 |---|---|
 | The row is made before the transaction opens, a duplicate ignored | A refused insert aborts a PostgreSQL transaction |
 | Each take writes a new random value | MySQL and MariaDB match and do not write an unchanged value, and a cluster certifies only written rows |
+| A take matching no row is refused | An update matching nothing waits for nothing |
 
 ## Backlog refusal
 
