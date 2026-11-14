@@ -8,9 +8,20 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 )
+
+// ErrUnanswered marks a sign-in the provider failed to answer: it could not be
+// reached, answered with a server error, or sent back something unreadable.
+// Every other failure to complete one is the provider turning somebody down.
+var ErrUnanswered = errors.New("the provider did not answer")
+
+// unanswered marks err as the provider failing to answer.
+func unanswered(err error) error {
+	return fmt.Errorf("%w: %w", ErrUnanswered, err)
+}
 
 // Identity is who a provider says somebody is.
 //

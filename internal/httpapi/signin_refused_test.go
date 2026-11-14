@@ -269,3 +269,30 @@ func TestASignInWhoseKeyCouldNotBeReadIsAFaultNeverARefusal(t *testing.T) {
 		}
 	})
 }
+
+// A provider that does not answer, from an outage, a network failure or a
+// server error, lands a returning sign-in on the try-again screen. A provider
+// turning somebody down still lands it on the no-access screen.
+func TestAProviderThatDoesNotAnswerIsAFaultNeverARefusal(t *testing.T) {
+	twoSignIn(t, func(t *testing.T, r *signInReach) {
+		r.provider.Says = &signin.Identity{Subject: "1", Username: "granted"}
+		r.provider.Fail = fmt.Errorf("%w: the token endpoint answered 503", signin.ErrUnanswered)
+		rec := callback(t, r, "the-state", "a-code", true)
+		if !faulted(rec) {
+			t.Fatalf("a provider that did not answer answered %d to %q, want the try-again screen",
+				rec.Code, rec.Header().Get("Location"))
+		}
+		if strings.Contains(rec.Body.String(), "503") {
+			t.Errorf("the answer repeats why: %s", rec.Body)
+		}
+		if hasSession(rec.Result().Cookies()) {
+			t.Error("a provider that did not answer handed out a session")
+		}
+
+		r.provider.Fail = errClientSecretRejected
+		if rec := callback(t, r, "the-state", "a-code", true); !noAccess(rec) {
+			t.Errorf("a provider turning the sign-in down answered %d to %q, want the no-access screen",
+				rec.Code, rec.Header().Get("Location"))
+		}
+	})
+}

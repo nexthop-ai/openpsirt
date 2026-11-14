@@ -224,13 +224,15 @@ to begin, so a refusal or a fault there answers with a page.
 
 | Rule | Reason |
 |---|---|
-| Every refused callback to a configured provider redirects to the interface's sign-in screen at `/?no-access`, with one address and body for every reason: a failed exchange, an echoed value that does not match, somebody unknown, granted nothing or gone, a lapsed authorization (REQ-41) | Told apart, the reasons say whether a name is real |
+| Every refused callback to a configured provider redirects to the interface's sign-in screen at `/?no-access`, with one address and body for every reason: the provider turning the code down or handing over a token that does not verify, an echoed value that does not match, somebody unknown, granted nothing or gone, a lapsed authorization (REQ-41) | Told apart, the reasons say whether a name is real |
 | The screen there reads "No access here" and "Ask an administrator for access.", and offers the configured ways in | It states no reason, since an expired or mismatched sign-in lands there too |
 | The screen there never forwards to the provider | The provider still holds the refused account, so a forward refuses it again in a loop |
 | A sign-in begun from that screen, or from the one sign-out lands on, carries no return address | Landing back on either draws the home page under an address that says otherwise |
 | A fault on this side inside the handlers beginning or completing a sign-in redirects to `/?sign-in-failed`, whose screen says the sign-in did not finish and to try again shortly, offers the ways in, and never forwards | Trying again can help with a fault and never with a refusal; a forward repeats the fault in a loop |
 | A fault completing a sign-in clears its pending cookie; a fault beginning one leaves the cookie alone | The cookie may hold a sign-in another tab has under way |
 | The sign-in key failing to be read while a returning sign-in is checked is a fault | A refusal sends somebody granted access to ask for it |
+| A provider that does not answer is a fault: it cannot be reached, it answers the token exchange or a profile read with a server error, it sends back something unreadable, or its keys cannot be fetched | An outage must not tell everybody granted access to ask for it |
+| The token endpoint answering with a client error, or a token its keys do not verify, is the provider turning the sign-in down, and a refusal | That is the provider's answer about this sign-in |
 | The list of ways in says whether the trusted proxy named the browser asking, from a source it is honored from, whatever the person holds | It is the one sign a browser the proxy named and this deployment refused has, and it says nothing of why |
 | The list of ways in is answered `no-store` | It turns on who asks and is read without a credential, so a shared cache would hand one browser's answer to another |
 | A browser the proxy named that this deployment refuses is shown the "No access here" screen, with no way in offered, including where its session ended mid-use | The proxy names it again on every request, outranking any session |
