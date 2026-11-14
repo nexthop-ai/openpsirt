@@ -81,6 +81,9 @@ type WhoBody struct {
 	// sign-out only where this deployment holds a session to end.
 	ByProxy bool      `json:"by_proxy,omitempty" doc:"Whether the trusted proxy in front of this deployment signed this browser in, so that signing out happens there"`
 	Reach   []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
+	// Everywhere says an empty Reach is a catalog with nothing in it yet
+	// rather than nothing granted.
+	Everywhere bool `json:"everywhere,omitempty" doc:"Whether they hold a role across every product, which covers each product as it is declared"`
 	// Collaborates says a screen has their own cases to ask for: a grant on
 	// one issue or one code finding reaches nothing in Reach.
 	Collaborates bool `json:"collaborates,omitempty" doc:"They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names"`
@@ -141,7 +144,8 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		body := WhoBody{
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{}, Outcomes: outcomeBodies(),
-			ByProxy: access.FromBrowserWithoutSession(access.SessionFrom(ctx)),
+			ByProxy:    access.FromBrowserWithoutSession(access.SessionFrom(ctx)),
+			Everywhere: subject.HoldsEverywhere(),
 		}
 		// Each of these fails the answer rather than being left out. Omitted, a
 		// limit reads to the interface as no limit at all.

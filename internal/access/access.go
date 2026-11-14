@@ -912,6 +912,12 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 	return false
 }
 
+// HoldsEverywhere reports whether this subject holds a role across every
+// product, which covers each product as it is declared.
+func (s Subject) HoldsEverywhere() bool {
+	return s.Kind == Person && len(s.everywhere) > 0
+}
+
 // Products returns the products whose findings this subject may read, at
 // either visibility.
 //
