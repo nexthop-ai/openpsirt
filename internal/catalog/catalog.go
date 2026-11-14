@@ -423,10 +423,8 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 		Where(where, arg).
 		Scan(ctx, &stated)
 	if err != nil {
-		if database.IsNoRows(err) {
-			return EndOfLife{}, fmt.Errorf("%s %d: %w", what, id, ErrNotFound)
-		}
-		return EndOfLife{}, fmt.Errorf("read when this %s goes out of support: %w", what, err)
+		return EndOfLife{}, missingOr(err, fmt.Sprintf("%s %d", what, id),
+			fmt.Sprintf("read when this %s goes out of support", what))
 	}
 	if stated.BranchOrTag != nil {
 		return EndOfLife{On: stated.BranchOrTag, FromBranchOrTag: true}, nil
@@ -448,10 +446,7 @@ func (s *Store) BuildMoves(ctx context.Context, buildID int64) (bool, error) {
 		Where(`"s"."id" IN (SELECT "tg"."branch_or_tag_id" FROM "build" AS "tg" WHERE "tg"."id" = ?)`, buildID).
 		Scan(ctx, &kind)
 	if err != nil {
-		if database.IsNoRows(err) {
-			return false, fmt.Errorf("build %d: %w", buildID, ErrNotFound)
-		}
-		return false, fmt.Errorf("read whether that release moves: %w", err)
+		return false, missingOr(err, fmt.Sprintf("build %d", buildID), "read whether that release moves")
 	}
 	return Kind(kind) == Branch, nil
 }
@@ -1127,10 +1122,8 @@ func (s *Store) ExistingBuild(ctx context.Context, branchOrTagID, variantID int6
 	err := s.db.NewSelect().Model(build).
 		Where(`"branch_or_tag_id" = ?`, branchOrTagID).Where(`"variant_id" = ?`, variantID).Scan(ctx)
 	if err != nil {
-		if database.IsNoRows(err) {
-			return nil, fmt.Errorf("nothing has been filed against this build: %w", ErrNotFound)
-		}
-		return nil, fmt.Errorf("look up what is filed against this build: %w", err)
+		return nil, missingOr(err, "nothing has been filed against this build",
+			"look up what is filed against this build")
 	}
 	return build, nil
 }

@@ -111,6 +111,10 @@ func byIDReads(tag func() int64, db bun.IDB) []byID {
 			_, err := s.FillInParent(ctx, tag(), id)
 			return err
 		}},
+		{"DeclareBranchOrTag cut from a release nobody declared", func(ctx context.Context, s *catalog.Store, id int64) error {
+			_, err := s.DeclareBranchOrTag(ctx, id, "v9.9", catalog.Tag, &id)
+			return err
+		}},
 		{"BuiltAs", func(ctx context.Context, s *catalog.Store, id int64) error {
 			_, err := s.BuiltAs(ctx, administrator, id)
 			return err
@@ -133,9 +137,10 @@ func byIDReads(tag func() int64, db bun.IDB) []byID {
 var administrator = access.NewPerson(1, "admin", true, nil, 0)
 
 // Every exported read of this package that tells a missing row from a fault
-// is in byIDReads, so the two tests over it cover each: found from the source,
-// as every function whose body calls missingOr directly or through an
-// unexported function, and each entry naming one.
+// through missingOr is in byIDReads, so the two tests over it cover each:
+// found from the source, as every exported function reaching missingOr
+// directly or through unexported functions and methods, and each entry naming
+// one.
 func TestEveryReadByIdentifierIsListed(t *testing.T) {
 	set := token.NewFileSet()
 	entries, err := os.ReadDir(".")
@@ -144,6 +149,7 @@ func TestEveryReadByIdentifierIsListed(t *testing.T) {
 	}
 	reads := map[string]bool{}
 	calls := map[string]map[string]bool{}
+	declared := map[string]bool{}
 	for _, entry := range entries {
 		name := entry.Name()
 		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
@@ -158,29 +164,42 @@ func TestEveryReadByIdentifierIsListed(t *testing.T) {
 			if !ok || fn.Body == nil {
 				continue
 			}
+			declared[fn.Name.Name] = true
 			ast.Inspect(fn.Body, func(n ast.Node) bool {
 				if call, ok := n.(*ast.CallExpr); ok {
-					if ident, ok := call.Fun.(*ast.Ident); ok {
+					if callee := calledName(call.Fun); callee != "" {
 						if calls[fn.Name.Name] == nil {
 							calls[fn.Name.Name] = map[string]bool{}
 						}
-						calls[fn.Name.Name][ident.Name] = true
+						calls[fn.Name.Name][callee] = true
 					}
 				}
 				return true
 			})
 		}
 	}
-	// A read is an exported function calling missingOr, itself or through an
-	// unexported function that does.
-	for name, called := range calls {
-		if !ast.IsExported(name) {
-			continue
-		}
-		for callee := range called {
-			if callee == "missingOr" || !ast.IsExported(callee) && calls[callee]["missingOr"] {
-				reads[name] = true
+	// A read is an exported function reaching missingOr, itself or through
+	// unexported functions and methods of this package, however many deep.
+	// An exported callee is a read of its own, listed for itself, and is not
+	// followed: a function calling one may answer its miss some other way.
+	tells := map[string]bool{"missingOr": true}
+	for changed := true; changed; {
+		changed = false
+		for name, called := range calls {
+			if tells[name] {
+				continue
 			}
+			for callee := range called {
+				if tells[callee] && (callee == "missingOr" || declared[callee] && !ast.IsExported(callee)) {
+					tells[name], changed = true, true
+					break
+				}
+			}
+		}
+	}
+	for name := range tells {
+		if ast.IsExported(name) {
+			reads[name] = true
 		}
 	}
 	if len(reads) == 0 {
@@ -200,6 +219,25 @@ func TestEveryReadByIdentifierIsListed(t *testing.T) {
 			t.Errorf("byIDReads lists %s, which is no method of the store and no read found in the source", name)
 		}
 	}
+}
+
+// calledName is the name a call reaches, by its bare name, through a selector
+// such as a method on the store, or with the type arguments a generic call
+// states; empty for anything else.
+func calledName(fun ast.Expr) string {
+	switch generic := fun.(type) {
+	case *ast.IndexExpr:
+		fun = generic.X
+	case *ast.IndexListExpr:
+		fun = generic.X
+	}
+	switch called := fun.(type) {
+	case *ast.Ident:
+		return called.Name
+	case *ast.SelectorExpr:
+		return called.Sel.Name
+	}
+	return ""
 }
 
 // An identifier no row holds answers ErrNotFound and names the identifier,
